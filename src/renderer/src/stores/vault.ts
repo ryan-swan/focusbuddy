@@ -35,6 +35,12 @@ interface VaultStore {
     }
   ) => Promise<void>
   removeEntry: (id: string) => Promise<void>
+  // Rotate the master password — re-encrypts the verifier and every entry under
+  // the new key. Requires the current password; stays unlocked on success.
+  changeMasterPassword: (
+    current: string,
+    next: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>
   // Decrypt and return the secret blob for an entry — caller holds the plaintext briefly
   reveal: (id: string) => Promise<VaultSecret | null>
 }
@@ -112,6 +118,20 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   removeEntry: async (id) => {
     await window.api.vault.deleteEntry(id)
     set({ entries: get().entries.filter((e) => e.id !== id) })
+  },
+  changeMasterPassword: async (current, next) => {
+    const result = await window.api.vault.changeMasterPassword(current, next)
+    if (result.ok) {
+      hapticMedium()
+      // The verifier and every entry's iv/ciphertext changed in the DB, so the
+      // cached meta + entries are stale — reload both under the new key.
+      const meta = await window.api.vault.meta()
+      set({ meta })
+      await get().loadEntries()
+    } else {
+      hapticWarning()
+    }
+    return result
   },
   reveal: async (id) => {
     const entry = get().entries.find((e) => e.id === id)

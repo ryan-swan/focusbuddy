@@ -91,6 +91,18 @@ body {
       auto,
       18px 18px;
   }
+  /* Theme studio custom canvas background. When the user picks one, the root
+     gets data-desk-bg and --fb-desk-bg / --fb-desk-bg-color carry a solid
+     colour or a gradient. Specificity (0,2,1) beats the .dark / .futuristic
+     paper rules (0,2,0) so it wins in every base theme. The ambient
+     time-of-day ::before still plays softly on top. */
+  html[data-desk-bg] .desk-paper {
+    background-color: var(--fb-desk-bg-color, transparent);
+    background-image: var(--fb-desk-bg, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
   /* `.no-tod` modifier — suppresses ambient overlays (time-of-day ::before AND the
      Futuristic flowing accent-beam ::after) on surfaces where they bleed through
      semi-transparent cards. Only the Canvas keeps these ambient effects. */
@@ -194,11 +206,23 @@ body {
   .chip-btn {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors select-none;
   }
+  /* Token-driven (not stone-*): these repaint correctly in futuristic /
+     atelier / gemstone, whose ink and surface ramps are not grey. */
   .chip-active {
-    @apply border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-700 hover:border-stone-400 dark:hover:border-stone-500 shadow-sm cursor-grab active:cursor-grabbing;
+    @apply shadow-sm cursor-grab active:cursor-grabbing;
+    border-color: var(--edge-firm);
+    background: var(--surface-raised);
+    color: var(--ink-100);
+  }
+  .chip-active:hover {
+    background: var(--surface-sunken);
+    border-color: var(--edge-strong, var(--edge-firm));
   }
   .chip-disabled {
-    @apply border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 text-stone-400 dark:text-stone-600 cursor-not-allowed;
+    @apply cursor-not-allowed;
+    border-color: var(--edge-soft);
+    background: var(--surface-sunken);
+    color: var(--ink-40);
   }
   /* Primary action — accent fill with spring micro-press, inset highlight for
      a sense of being a physical key, and an accent-tinted shadow that
@@ -227,19 +251,29 @@ body {
     transition-duration: var(--dur-instant);
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-stone-600 dark:text-stone-400 text-xs hover:bg-stone-100/70 dark:hover:bg-stone-800/70 hover:text-stone-900 dark:hover:text-stone-100;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs;
+    color: var(--ink-70);
     transition: background-color var(--dur-quick) var(--ease-spring-crisp),
       color var(--dur-quick) var(--ease-spring-crisp),
       transform var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .btn-ghost:hover {
+    background: var(--surface-sunken);
+    color: var(--ink-100);
   }
   .btn-ghost:active:not(:disabled) {
     transform: scale(0.97);
   }
   .icon-btn {
-    @apply inline-flex items-center justify-center h-6 w-6 rounded text-stone-500 dark:text-stone-400 hover:bg-stone-100/70 dark:hover:bg-stone-800/70 hover:text-stone-900 dark:hover:text-stone-100;
+    @apply inline-flex items-center justify-center h-6 w-6 rounded;
+    color: var(--ink-50);
     transition: background-color var(--dur-quick) var(--ease-spring-crisp),
       color var(--dur-quick) var(--ease-spring-crisp),
       transform var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .icon-btn:hover {
+    background: var(--surface-sunken);
+    color: var(--ink-100);
   }
   .icon-btn:active:not(:disabled) {
     transform: scale(0.92);
@@ -264,6 +298,44 @@ body {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+/* Rubber-band (marquee) selection box — animated "marching ants" border in the
+   accent colour, with a faint accent fill. Rendered in screen space so the
+   1px dashes stay crisp at every zoom level. */
+.fb-marquee {
+  background-image:
+    linear-gradient(90deg, rgb(var(--accent)) 50%, transparent 50%),
+    linear-gradient(90deg, rgb(var(--accent)) 50%, transparent 50%),
+    linear-gradient(0deg, rgb(var(--accent)) 50%, transparent 50%),
+    linear-gradient(0deg, rgb(var(--accent)) 50%, transparent 50%);
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  background-size:
+    8px 1px,
+    8px 1px,
+    1px 8px,
+    1px 8px;
+  background-position:
+    0 0,
+    0 100%,
+    0 0,
+    100% 0;
+  box-shadow: inset 0 0 0 9999px rgb(var(--accent) / 0.08);
+  animation: fb-march 0.5s infinite linear;
+}
+@keyframes fb-march {
+  to {
+    background-position:
+      8px 0,
+      -8px 100%,
+      0 -8px,
+      100% 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-marquee {
+    animation: none;
   }
 }
 
@@ -312,38 +384,782 @@ body {
   }
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   FUTURISTIC theme — premium next-gen workspace.
+   ──────────────────────────────────────────────────────────────────────────
+   The target feeling is Arc Browser × Linear × Raycast × Vision Pro:
+   - Calm, dim, layered.
+   - Glass surfaces, not cards.
+   - Borders so soft they read as light, not lines (max 6% white).
+   - Lighting and depth do the work that borders used to do.
+   - Accent is a single violet (#8B5CF6); every other color earns its
+     place by being a status signal, not decoration.
+
+   Palette (locked):
+     Base       #060816     deepest layer — the room
+     Mid        #0A0F1E     glass surfaces — panels
+     Raised     #101827     hover / active surfaces — desk objects
+     Accent     #8B5CF6     primary violet — interaction + AI signals
+     Border     rgba(255,255,255,0.06)   max — usually 3%
+     Glass      rgba(255,255,255,0.03)   the panel fill
+   ────────────────────────────────────────────────────────────────────── */
+
 .futuristic body {
-  background: #050714;
+  /* Three-stop radial wash on top of the base ink. The wash is what makes
+     the empty space feel atmospheric — without it the UI sits on flat
+     black, which reads as cheap. With it, the room "has weather". */
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      rgba(139, 92, 246, 0.10) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 15% 92%,
+      rgba(99, 102, 241, 0.07) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 85% 92%,
+      rgba(168, 85, 247, 0.06) 0%,
+      transparent 65%
+    ),
+    #060816 !important;
+  background-attachment: fixed !important;
+  color-scheme: dark;
+}
+
+/* Subtle film-grain noise — masks the gradient banding and gives the
+   surface a "scanned" texture instead of a sterile gradient. Rendered via
+   SVG data URL so there's no asset to load. Opacity is whisper-soft. */
+.futuristic body {
+  position: relative;
+}
+.futuristic body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.65 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Ambient orb — single, large, slow-drifting. One orb (not two) keeps
+   the room calm instead of busy. */
+.futuristic body::before {
+  content: '';
+  position: fixed;
+  width: 640px;
+  height: 640px;
+  top: -160px;
+  right: -160px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    circle,
+    rgba(139, 92, 246, 0.14) 0%,
+    rgba(139, 92, 246, 0.05) 38%,
+    transparent 72%
+  );
+  filter: blur(56px);
+  animation: futuristic-orb-drift 28s ease-in-out infinite alternate;
+}
+
+@keyframes futuristic-orb-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(80px, 100px) scale(1.16);
+    opacity: 1;
+  }
 }
 
 .futuristic .widget-glow {
   animation: futuristic-pulse 2.5s ease-in-out infinite;
 }
 
-.futuristic body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background: repeating-linear-gradient(
-    180deg,
-    transparent 0px,
-    transparent 2px,
-    rgba(34, 211, 238, 0.018) 3px,
-    transparent 4px
-  );
+/* Titlebar — pure glass with the softest possible hairline. Scoped to
+   header.titlebar-drag (the single top masthead in App.tsx) — a bare
+   `header` tag selector would also match every semantic <header> a page
+   view renders (DashboardHeader, DocumentsView, VaultView, etc.), painting
+   an unwanted dark glass bar behind ordinary page titles. */
+.futuristic header.titlebar-drag {
+  border-color: rgba(255, 255, 255, 0.04) !important;
+  background: rgba(10, 15, 30, 0.62) !important;
+  backdrop-filter: saturate(160%) blur(30px) !important;
+  -webkit-backdrop-filter: saturate(160%) blur(30px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
 }
 
-/* Futuristic chrome accents — soft cyan/violet glow on panel borders */
-.futuristic header {
-  border-color: rgba(99, 102, 241, 0.25) !important;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.7)) !important;
-}
+/* Sidebar / chat panel — same glass language, slightly raised. */
 .futuristic aside {
-  background: rgba(10, 14, 26, 0.6) !important;
-  backdrop-filter: blur(14px);
-  border-color: rgba(99, 102, 241, 0.18) !important;
+  background: rgba(10, 15, 30, 0.58) !important;
+  backdrop-filter: saturate(160%) blur(30px) !important;
+  -webkit-backdrop-filter: saturate(160%) blur(30px) !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Sidebar's section heading sticky bars — match the calm palette so the
+   header bands don't look like striped paper. */
+.futuristic aside .bg-stone-50,
+.futuristic aside .bg-stone-900 {
+  background: transparent !important;
+}
+
+/* Dashboard cards — the most aggressive noise reduction. We strip the
+   visible border, fold the inset highlight to just a hint of light, and
+   let depth+spacing do the work that the border used to do. */
+.futuristic .fb-glass-soft,
+.futuristic [class*='rounded-xl'][class*='backdrop-blur'] {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 40px -16px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+/* Card lift on hover — the premium signature. Only on cards that the
+   user can interact with. Combines a small Y translation with an
+   accent-colored ambient halo, mimicking Vision Pro's "lit object". */
+.futuristic .fb-glass-soft:hover,
+.futuristic [class*='rounded-xl'][class*='backdrop-blur']:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(139, 92, 246, 0.08),
+    0 12px 32px -8px rgba(139, 92, 246, 0.16),
+    0 24px 56px -24px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Floating chrome — command center pill, minimap, zoom controls,
+   right-rail. The glass treatment is slightly more opaque so these
+   surfaces read as "in front of" the cards. */
+.futuristic .fb-glass-chrome {
+  background-color: rgba(16, 24, 39, 0.72) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 48px -12px rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+}
+
+/* Desk surface — replaces "paper" with a near-black glass with the
+   subtlest grid hint. The grid only appears when the user is dragging
+   (toggled via .desk-paper.fb-canvas-dragging in JS). */
+.futuristic .desk-paper {
+  background:
+    radial-gradient(
+      ellipse 50% 35% at 50% 50%,
+      rgba(139, 92, 246, 0.03) 0%,
+      transparent 65%
+    ),
+    #060816 !important;
+}
+
+.futuristic .desk-paper::before,
+.futuristic .desk-paper::after {
+  display: none !important;
+}
+
+/* Snap-to-grid visual — only visible while the user is actively dragging
+   a desk object. The class is toggled on documentElement from WidgetFrame
+   onDragStart/onDragStop. The grid is so faint it reads as a register
+   mark, not as cells. */
+.fb-canvas-dragging.futuristic .desk-paper,
+.futuristic .fb-canvas-dragging .desk-paper {
+  background:
+    linear-gradient(
+      to right,
+      rgba(139, 92, 246, 0.05) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(139, 92, 246, 0.05) 1px,
+      transparent 1px
+    ),
+    radial-gradient(
+      ellipse 50% 35% at 50% 50%,
+      rgba(139, 92, 246, 0.04) 0%,
+      transparent 65%
+    ),
+    #060816 !important;
+  background-size: 24px 24px, 24px 24px, auto, auto !important;
+}
+
+/* Primary buttons get a calm violet glow — present at rest, brighter on
+   hover. This is where the user's eye should go. */
+.futuristic .btn-primary {
+  background: linear-gradient(
+    180deg,
+    rgba(139, 92, 246, 0.95),
+    rgba(124, 58, 237, 0.95)
+  ) !important;
+  border: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(139, 92, 246, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 12px 32px -8px rgba(139, 92, 246, 0.36) !important;
+  transition: box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.futuristic .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 1px rgba(139, 92, 246, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 40px -8px rgba(139, 92, 246, 0.5) !important;
+}
+
+.futuristic .text-accent {
+  text-shadow: 0 0 12px rgba(139, 92, 246, 0.35);
+}
+
+/* All the muted border classes get softened to the global border budget. */
+.futuristic .border-stone-200,
+.futuristic .border-stone-300,
+.futuristic .border-stone-700,
+.futuristic .border-stone-800 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dividers between sections get even softer — the eye should read these
+   as breath, not as lines. */
+.futuristic aside .border-stone-200,
+.futuristic aside .border-stone-700,
+.futuristic header.titlebar-drag .border-stone-200,
+.futuristic header.titlebar-drag .border-stone-700 {
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* MODAL DIALOG BODIES — every dialog using the fixed inset-0 backdrop
+   pattern (ShareDialog, PeerBodyDoubleDialog, CanvasContextMenu, etc.)
+   has an inner card that uses `bg-white dark:bg-stone-900`. In futuristic
+   mode the universal backdrop override + the brown-grey card body had
+   nearly identical brightness, so the dialog visually blended INTO the
+   backdrop — the user saw "blank screen with no way back".
+   This rule lifts the dialog card to a clearly distinct deep navy glass
+   with a violet halo so it ALWAYS reads as foreground. Targets direct
+   children of fixed.inset-0 wrappers — exactly the dialog body pattern. */
+.futuristic .fixed.inset-0 > div:not([class*='inset-0']) {
+  background-color: rgba(20, 28, 48, 0.96) !important;
+  border-color: rgba(139, 92, 246, 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(139, 92, 246, 0.12),
+    0 24px 64px -12px rgba(139, 92, 246, 0.28),
+    0 32px 80px -16px rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(30px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(160%) !important;
+}
+
+/* Modal text — anything inside a fixed.inset-0 modal body uses stone
+   shades. Lift them to the platinum/grey palette so they read on the
+   navy ground. */
+.futuristic .fixed.inset-0 [class*='text-stone-900'],
+.futuristic .fixed.inset-0 [class*='text-stone-800'] {
+  color: rgb(226, 232, 240) !important;
+}
+
+.futuristic .fixed.inset-0 [class*='text-stone-700'],
+.futuristic .fixed.inset-0 [class*='text-stone-600'] {
+  color: rgb(196, 200, 220) !important;
+}
+
+.futuristic .fixed.inset-0 [class*='text-stone-500'],
+.futuristic .fixed.inset-0 [class*='text-stone-400'] {
+  color: rgb(140, 148, 180) !important;
+}
+
+/* Modal inputs / textareas / code blocks within dialogs get the same
+   glass treatment as canvas inputs. */
+.futuristic .fixed.inset-0 input,
+.futuristic .fixed.inset-0 textarea,
+.futuristic .fixed.inset-0 code {
+  background-color: rgba(0, 0, 0, 0.32) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  color: rgb(226, 232, 240) !important;
+}
+
+/* Modal buttons that use stone-100 hover states pick up the soft violet
+   wash so the modal feels consistent with the chrome. */
+.futuristic .fixed.inset-0 button[class*='hover\\:bg-stone-100']:hover,
+.futuristic .fixed.inset-0 button[class*='hover\\:bg-stone-800']:hover {
+  background-color: rgba(139, 92, 246, 0.10) !important;
+}
+
+/* Tailwind opacity-suffixed backgrounds → unified deep navy glass.
+   Covers EVERY opacity variant: /70, /80, /85, /90, /95 across white,
+   stone-50, stone-100, stone-800, stone-900. This is what makes the
+   FloatingToolbar (bg-white/95), WidgetPalette (bg-stone-50/70), and
+   WidgetDock (bg-stone-50/95) — the "Desk objects" toolbar and "On
+   desk" tab strip — match the rest of the futuristic chrome. */
+.futuristic [class*='bg-white\\/'],
+.futuristic [class*='bg-stone-50\\/'],
+.futuristic [class*='bg-stone-100\\/'],
+.futuristic [class*='bg-stone-200\\/'],
+.futuristic [class*='bg-stone-700\\/'],
+.futuristic [class*='bg-stone-800\\/'],
+.futuristic [class*='bg-stone-900\\/'] {
+  background-color: rgba(16, 24, 39, 0.78) !important;
+  backdrop-filter: saturate(160%) blur(20px) !important;
+  -webkit-backdrop-filter: saturate(160%) blur(20px) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Sidebar / palette / dock row hover state — soft accent wash instead of
+   a hard fill change. */
+.futuristic aside button:hover:not([disabled]),
+.futuristic aside [role='treeitem']:hover {
+  background: rgba(139, 92, 246, 0.06) !important;
+}
+
+/* Inputs in futuristic mode — drop the inset, lean on glass. */
+.futuristic input,
+.futuristic textarea,
+.futuristic [contenteditable] {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.futuristic input:focus,
+.futuristic textarea:focus,
+.futuristic [contenteditable]:focus {
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.08) !important;
+  outline: none !important;
+}
+
+/* ── Motion primitives — used in any theme, but most visible in futuristic
+   where lighting carries them. ─────────────────────────────────────── */
+
+/* Card lift utility — explicit opt-in on rows / list items / cards that
+   should respond to hover with the premium signature. */
+.fb-hover-lift {
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.fb-hover-lift:hover {
+  transform: translateY(-1px);
+}
+.futuristic .fb-hover-lift:hover {
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.10),
+    0 8px 24px -8px rgba(139, 92, 246, 0.20);
+}
+
+/* Breathing pulse — slow, calm. Used on AI signals and the focus session
+   timer so the eye reads "alive" without anything moving fast. */
+@keyframes fb-breathe {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+.fb-breathe {
+  animation: fb-breathe 5.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Halo — the accent ring around an actively-AI-thinking element. */
+@keyframes fb-halo {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.35),
+      0 0 18px -4px rgba(139, 92, 246, 0.30);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.55),
+      0 0 32px -2px rgba(139, 92, 246, 0.45);
+  }
+}
+.fb-halo {
+  animation: fb-halo 2.4s ease-in-out infinite;
+}
+
+/* Progress ring stroke grow-in — applied on mount of any rendered SVG
+   circular progress ring so the percentage feels earned, not stamped. */
+@keyframes fb-ring-grow {
+  from {
+    stroke-dashoffset: var(--ring-circumference, 200);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.fb-ring-grow {
+  animation: fb-ring-grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Smooth dock / undock — for desk objects sliding to dock positions and
+   the palette/dock pill itself sliding into place. */
+.fb-dock-snap {
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ── Desk objects (widgets) — cohesive navy/violet treatment ─────────────
+   Every widget in futuristic mode unifies to a deep navy-violet glass
+   body so the desk reads as a single material with objects floating on
+   it — rather than a quilt of yellow/pink/white tiles. Sticky's user
+   color choice survives as a 3px top accent stripe so notes stay
+   distinguishable. Color widgets keep their swatch (it IS the content).
+   ──────────────────────────────────────────────────────────────────── */
+
+/* OUTER FRAME — the WidgetFrame's bg-white dark:bg-stone-900 wrapper.
+   This is what gives every widget its base. Slightly lighter than the
+   desk so widgets sit ON the desk, not vanish into it. */
+.futuristic [data-widget-id] {
+  background-color: rgba(15, 18, 36, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 12px 32px -12px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* WIDGET HEADER STRIP — the per-widget label bar. Soften it from the
+   stone wash to a deeper navy with a hairline beneath. */
+.futuristic [data-widget-id] > div[class*='cursor-move'] {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+  color: rgb(196, 181, 253) !important;
+}
+
+/* WIDGET CONTENT BODIES — widgets render their body with various stone
+   shades and bg-white. Catch every nested element using those classes
+   and unify them. Covers: bg-white, bg-stone-50, bg-stone-100,
+   bg-stone-800, bg-stone-900. */
+.futuristic [data-widget-id] .bg-white,
+.futuristic [data-widget-id] [class*='bg-white']:not([class*='bg-white/']),
+.futuristic [data-widget-id] [class*='bg-stone-50']:not([class*='bg-stone-50/']),
+.futuristic [data-widget-id] [class*='bg-stone-100']:not([class*='bg-stone-100/']),
+.futuristic [data-widget-id] [class*='bg-stone-200']:not([class*='bg-stone-200/']),
+.futuristic [data-widget-id] .dark\:bg-stone-900,
+.futuristic [data-widget-id] [class*='bg-stone-900']:not([class*='bg-stone-900/']),
+.futuristic [data-widget-id] [class*='bg-stone-800']:not([class*='bg-stone-800/']),
+.futuristic [data-widget-id] [class*='bg-stone-700']:not([class*='bg-stone-700/']) {
+  background-color: rgba(15, 18, 36, 0.85) !important;
+}
+
+/* Tailwind opacity-suffixed (bg-white/95 etc.) variants — used by sticky
+   headers within widgets, popovers, etc. */
+.futuristic [data-widget-id] [class*='bg-white\\/'],
+.futuristic [data-widget-id] [class*='bg-stone-900\\/'] {
+  background-color: rgba(15, 18, 36, 0.78) !important;
+}
+
+/* Text inside widgets — most widgets use stone-900 for body text. Lift
+   it to a soft platinum so it reads on the navy ground. */
+.futuristic [data-widget-id] .text-stone-900,
+.futuristic [data-widget-id] [class*='text-stone-900'],
+.futuristic [data-widget-id] [class*='text-stone-800'] {
+  color: rgb(226, 232, 240) !important;
+}
+
+.futuristic [data-widget-id] [class*='text-stone-700'],
+.futuristic [data-widget-id] [class*='text-stone-600'] {
+  color: rgb(196, 200, 220) !important;
+}
+
+.futuristic [data-widget-id] [class*='text-stone-500'],
+.futuristic [data-widget-id] [class*='text-stone-400'] {
+  color: rgb(140, 148, 180) !important;
+}
+
+/* Borders inside widgets follow the global 6% budget. */
+.futuristic [data-widget-id] [class*='border-stone-200'],
+.futuristic [data-widget-id] [class*='border-stone-300'],
+.futuristic [data-widget-id] [class*='border-stone-700'],
+.futuristic [data-widget-id] [class*='border-stone-800'] {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* STICKY — override the inline backgroundColor with !important. The
+   user's chosen color becomes a 3px top accent strip so they can still
+   tell their pink sticky from their yellow one without breaking the
+   theme's cohesion. */
+.futuristic [data-widget-kind="sticky"] .fb-sticky-body {
+  background-color: rgba(20, 24, 44, 0.92) !important;
+  border-top: 3px solid var(--fb-sticky-tint, rgb(139, 92, 246)) !important;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Grow the sticky's textarea with its content so the widget auto-grows (the
+   frame measures the body and follows). Supported in this Electron's Chromium. */
+.fb-sticky-textarea {
+  field-sizing: content;
+}
+
+.futuristic [data-widget-kind="sticky"] .fb-sticky-textarea {
+  color: rgb(226, 232, 240) !important;
+}
+
+.futuristic [data-widget-kind="sticky"] .fb-sticky-textarea::placeholder {
+  color: rgba(196, 200, 220, 0.45) !important;
+}
+
+/* The sticky color palette dots stay vivid so the picker still reads —
+   give them a subtle accent ring so the active state is clear. */
+.futuristic [data-widget-kind="sticky"] .fb-sticky-body > div > button {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* CALCULATOR — the digital display + button grid. Display is the deepest
+   recessed glass; number buttons are mid-glass; operator/equals lift
+   gently. Three tiers of background preserve the calculator's
+   information hierarchy without breaking cohesion.
+   The body uses the Tailwind arbitrary-value bg-[#f6f3eb] (warm tan) —
+   override directly via the data-widget-kind hook. */
+.futuristic [data-widget-kind="calculator"] > div {
+  background-color: rgba(15, 18, 36, 0.92) !important;
+}
+
+/* Display area — the deepest recess */
+.futuristic [data-widget-kind="calculator"] > div > div:first-child {
+  background-color: rgba(6, 8, 22, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.futuristic [data-widget-kind="calculator"] > div > div:first-child > div:last-child {
+  color: rgb(196, 181, 253) !important;
+  text-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.futuristic [data-widget-kind="calculator"] button {
+  color: rgb(226, 232, 240) !important;
+  transition: background-color 160ms ease, transform 120ms ease, box-shadow 160ms ease;
+}
+
+/* Number / dot buttons — base glass */
+.futuristic [data-widget-kind="calculator"] button[class*='bg-white']:not([class*='hover:']) {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Operator buttons (+, -, ×, ÷) — lifted glass */
+.futuristic [data-widget-kind="calculator"] button[class*='bg-stone-200']:not([class*='hover:']) {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Equals button — the violet accent */
+.futuristic [data-widget-kind="calculator"] button[class*='bg-stone-900'] {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.95), rgba(124, 58, 237, 0.95)) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 12px -2px rgba(139, 92, 246, 0.4) !important;
+}
+
+/* Function buttons (C, ±, %) — same tone as numbers */
+.futuristic [data-widget-kind="calculator"] button[class*='bg-stone-100']:not([class*='hover:']) {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.futuristic [data-widget-kind="calculator"] button:hover {
+  background-color: rgba(139, 92, 246, 0.12) !important;
+}
+
+.futuristic [data-widget-kind="calculator"] button:active {
+  transform: scale(0.96);
+}
+
+/* TIMER — the big numeric display + start/stop. Glass body, accent ring
+   on running state (the TimerWidget already toggles state classes). */
+.futuristic [data-widget-kind="timer"] input {
+  color: rgb(226, 232, 240) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* COLOR WIDGET — the swatch IS the content, so we keep the user's color
+   visible. We just give the chrome a glass treatment so it sits inside
+   the futuristic frame instead of poking out. The swatch retains full
+   saturation; the surrounding label/inputs get the unified tone. */
+.futuristic [data-widget-kind="color"] [class*='bg-white'],
+.futuristic [data-widget-kind="color"] [class*='bg-stone-900'] {
+  /* The swatch element will be marked color-swatch-* in the widget; for
+     now we keep the swatch alone (it's the largest div with inline
+     backgroundColor) and only tint the surrounding chrome. The general
+     [data-widget-id] rules above already handle the rest. */
+}
+
+/* TASK LINK, FILE, LOCAL APP LAUNCHER — they all render a small "card"
+   with an icon + label inside the widget body. Make sure the inner card
+   doesn't have a brighter white inside the violet body. */
+.futuristic [data-widget-kind="task-link"] .bg-white,
+.futuristic [data-widget-kind="task-link"] [class*='bg-stone-900'],
+.futuristic [data-widget-kind="file"] .bg-white,
+.futuristic [data-widget-kind="file"] [class*='bg-stone-900'],
+.futuristic [data-widget-kind="local-app-launcher"] .bg-white {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* TABLE widget — header strip + cells. The thead bg gets the deep
+   recessed look; row hover picks up the soft accent wash. */
+.futuristic [data-widget-kind="table"] thead {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.futuristic [data-widget-kind="table"] tbody tr:hover {
+  background-color: rgba(139, 92, 246, 0.05) !important;
+}
+
+/* PAGE / MARKDOWN — Tiptap surfaces. Editor area is the body; prose
+   styles use stone classes that already get covered by the text overrides
+   above. We just need to make sure the editor placeholder isn't lost. */
+.futuristic [data-widget-kind="page"] .ProseMirror,
+.futuristic [data-widget-kind="markdown"] .ProseMirror {
+  color: rgb(226, 232, 240) !important;
+}
+
+.futuristic [data-widget-kind="page"] .ProseMirror .is-empty::before,
+.futuristic [data-widget-kind="markdown"] .ProseMirror .is-empty::before {
+  color: rgba(196, 200, 220, 0.35) !important;
+}
+
+/* FIELD — tagged option pills inside fields keep their hue (the user
+   picked those colors for semantic meaning) but get a soft glow so they
+   read on the navy ground rather than fighting it. */
+.futuristic [data-widget-kind="field"] [style*='backgroundColor'] {
+  filter: brightness(1.1) saturate(0.85);
+}
+
+/* Buttons inside widgets — unify hover state to the soft accent wash. */
+.futuristic [data-widget-id] button:hover:not([disabled]) {
+  background-color: rgba(139, 92, 246, 0.08);
+}
+
+/* Active widget — keep the accent border + halo from the existing rule
+   so the user can still see what's selected. */
+.futuristic [data-widget-id].widget-glow {
+  border-color: rgba(139, 92, 246, 0.55) !important;
+}
+
+/* Stream Deck button error flash — used by StreamDeckWidget tiles when
+   an action fails to execute. Pulses a rose ring for 1.6s then fades. */
+@keyframes fb-streamdeck-error {
+  0% {
+    box-shadow: inset 0 0 0 2px rgba(244, 114, 182, 0.9);
+  }
+  40% {
+    box-shadow: inset 0 0 0 2px rgba(244, 114, 182, 0.7);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px rgba(244, 114, 182, 0);
+  }
+}
+
+/* ── Premium futuristic focus mode ────────────────────────────────────── */
+/* When .focus-session-active is on (futuristic mode), the dim becomes
+   a deeper, cinematic fade. CRITICAL: keep the hover-restore behavior
+   from the base .focus-session-active rule so the sidebar/header aren't
+   permanently unreachable — hovering brings them back to full opacity,
+   exactly like the base theme does. */
+.futuristic.focus-session-active aside,
+.futuristic .focus-session-active aside {
+  /* Keep the navigation sidebar legible even in the cinematic futuristic dim.
+     It was 0.22 + 2px blur, which made folders and tasks impossible to read. */
+  opacity: 0.6 !important;
+  filter: none;
+  transition: opacity 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.futuristic.focus-session-active header,
+.futuristic .focus-session-active header {
+  opacity: 0.35 !important;
+  filter: blur(1px);
+  transition: opacity 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Hover-restore — REQUIRED so the user can always reach the sidebar
+   and header to end their session or navigate. Without this, the
+   futuristic focus mode would trap the user. */
+.futuristic.focus-session-active aside:hover,
+.futuristic .focus-session-active aside:hover,
+.futuristic.focus-session-active header:hover,
+.futuristic .focus-session-active header:hover {
+  opacity: 1 !important;
+  filter: blur(0) !important;
+}
+.futuristic.focus-session-active .desk-paper,
+.futuristic .focus-session-active .desk-paper {
+  filter: brightness(0.96) saturate(1.05);
+  transition: filter 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ── Futuristic canvas-chrome text lift ─────────────────────────────────
+   The WidgetPalette ("Desk objects" header), WidgetDock ("On desk" tab
+   strip), and FloatingToolbar all sit on the now-deep-navy chrome
+   surfaces. Their text-stone-500 / text-stone-400 / text-stone-700
+   labels need to read against navy. Lift them to soft platinum tones
+   that match the rest of the futuristic palette. Scoped to the canvas
+   chrome to avoid lifting text in dashboard cards (which already have
+   their own scope). */
+.futuristic [class*='bg-stone-900\\/'] [class*='text-stone-500'],
+.futuristic [class*='bg-stone-50\\/'] [class*='text-stone-500'],
+.futuristic [class*='bg-stone-900\\/'] [class*='text-stone-400'],
+.futuristic [class*='bg-stone-50\\/'] [class*='text-stone-400'],
+.futuristic [class*='bg-white\\/'] [class*='text-stone-500'],
+.futuristic [class*='bg-white\\/'] [class*='text-stone-400'] {
+  color: rgb(140, 148, 180) !important;
+}
+
+.futuristic [class*='bg-stone-900\\/'] [class*='text-stone-700'],
+.futuristic [class*='bg-stone-50\\/'] [class*='text-stone-700'],
+.futuristic [class*='bg-white\\/'] [class*='text-stone-700'],
+.futuristic [class*='bg-stone-900\\/'] [class*='text-stone-600'],
+.futuristic [class*='bg-stone-50\\/'] [class*='text-stone-600'],
+.futuristic [class*='bg-white\\/'] [class*='text-stone-600'] {
+  color: rgb(196, 200, 220) !important;
+}
+
+.futuristic [class*='bg-stone-900\\/'] [class*='text-stone-800'],
+.futuristic [class*='bg-stone-50\\/'] [class*='text-stone-800'],
+.futuristic [class*='bg-white\\/'] [class*='text-stone-800'],
+.futuristic [class*='bg-stone-900\\/'] [class*='text-stone-900'],
+.futuristic [class*='bg-stone-50\\/'] [class*='text-stone-900'],
+.futuristic [class*='bg-white\\/'] [class*='text-stone-900'] {
+  color: rgb(226, 232, 240) !important;
+}
+
+/* Hover state on dock/palette buttons → soft accent wash instead of
+   bright stone-100 fill */
+.futuristic [class*='bg-stone-900\\/'] button:hover:not([disabled]),
+.futuristic [class*='bg-stone-50\\/'] button:hover:not([disabled]),
+.futuristic [class*='bg-white\\/'] button:hover:not([disabled]) {
+  background-color: rgba(139, 92, 246, 0.10) !important;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -367,7 +1183,11 @@ body {
     ) !important;
 }
 
-.atelier header {
+/* Scoped to header.titlebar-drag (the single top masthead in App.tsx) — a
+   bare `header` tag selector also matched every semantic <header> a page
+   view renders (DashboardHeader in AllTasksView/DeskGallery, VaultView,
+   etc.), painting an unwanted dark glass bar behind ordinary page titles. */
+.atelier header.titlebar-drag {
   background: oklch(20% 0.028 250 / 0.65) !important;
   backdrop-filter: saturate(160%) blur(24px);
   -webkit-backdrop-filter: saturate(160%) blur(24px);
@@ -458,8 +1278,12 @@ body {
   background-color: oklch(92% 0.022 80) !important;
 }
 
-/* Titlebar wordmark in Atelier — heritage gold, not white */
-.atelier header h1 {
+/* Titlebar wordmark in Atelier — heritage gold, not white. Scoped to the
+   masthead's own h1 (header.titlebar-drag h1) — a bare `header h1` selector
+   also caught DashboardHeader's <h1> in AllTasksView/DeskGallery/HomeDashboard
+   and any other view header, shrinking their page titles down to a 11px
+   uppercase gold label. */
+.atelier header.titlebar-drag h1 {
   color: rgb(var(--accent)) !important;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -646,6 +1470,30 @@ body {
 .tiptap-editor .ProseMirror ::selection {
   background: rgb(var(--accent) / 0.25);
 }
+
+/* The assistant composer (Phase 4.3). A TipTap editor standing in for what was
+   a <textarea>, so mention chips can sit inside the sentence. It is NOT a
+   .tiptap-editor — that class carries document typography this box must not
+   inherit — so it restates only the two things it genuinely needs: no focus
+   outline (the composer's own container draws the focus ring) and a
+   placeholder, matching the textarea's placeholder colour token rather than the
+   document editor's italic grey. */
+.assistant-composer-input.ProseMirror {
+  outline: none;
+}
+.assistant-composer-input.ProseMirror p {
+  margin: 0;
+}
+.assistant-composer-input.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--ink-50);
+  pointer-events: none;
+  height: 0;
+}
+.assistant-composer-input.ProseMirror ::selection {
+  background: rgb(var(--accent) / 0.25);
+}
 /* Task list checkbox alignment when authored by Tiptap (different DOM than markdown task list) */
 .tiptap-editor .ProseMirror ul[data-type='taskList'] {
   list-style: none;
@@ -679,7 +1527,12 @@ body {
 
 /* Focus Session (5-Minute Promise) — dims the shell so the canvas feels held in spotlight.
    Triggered by adding `focus-session-active` to <html> from FocusSessionOverlay. */
-.focus-session-active aside,
+/* Header and footer are peripheral chrome, so they de-emphasise hard during a
+   focus session. The sidebar is NAVIGATION — dimming it to near-invisible (it
+   was 0.28 + blur) made folders and tasks unreadable, which reads as a bug
+   rather than ambience. Keep the sidebar clearly legible and clickable; it
+   still reads as "backgrounded" at 0.62 without a blur, and hover brings it to
+   full. */
 .focus-session-active header,
 .focus-session-active footer {
   opacity: 0.28;
@@ -687,10 +1540,15 @@ body {
     filter 700ms cubic-bezier(0.22, 1, 0.36, 1);
   filter: saturate(0.45) blur(0.5px);
 }
+.focus-session-active aside {
+  opacity: 0.62;
+  transition: opacity 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  filter: none;
+}
 .focus-session-active aside:hover,
 .focus-session-active header:hover,
 .focus-session-active footer:hover {
-  opacity: 0.85;
+  opacity: 1;
   filter: saturate(1) blur(0);
 }
 .focus-session-active .desk-paper {
@@ -780,4 +1638,552 @@ body {
 }
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(168, 162, 158, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GEMSTONE — the jewel theme.
+
+   Onyx-black ground, faceted glass surfaces, prismatic light refraction along
+   every edge, and a slow whisper-soft sparkle drifting across the room. The
+   facets and refraction are fixed spectral colour (the diamond quality), while
+   every glow re-tints to the chosen accent, so emerald, ruby and sapphire each
+   recolour the light without changing the structure. Built to feel premium and
+   beautiful to work inside, not busy.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gemstone {
+  color-scheme: dark;
+  /* The prismatic spectrum, reused on every refraction edge and glint. A
+     travelling gradient: emerald → sapphire → amethyst → ruby → topaz, fading
+     to nothing at both ends so a 200%-wide copy can shimmer through. */
+  --gem-spectrum: linear-gradient(
+    100deg,
+    rgba(52, 211, 153, 0) 0%,
+    rgba(52, 211, 153, 0.6) 12%,
+    rgba(56, 189, 248, 0.6) 30%,
+    rgba(167, 139, 250, 0.55) 48%,
+    rgba(251, 113, 133, 0.55) 66%,
+    rgba(250, 204, 21, 0.5) 82%,
+    rgba(52, 211, 153, 0) 100%
+  );
+}
+
+/* ── The room ──────────────────────────────────────────────────────────────
+   Onyx base with jewel-tone washes caught in the dark, plus broad conic facet
+   slices radiating from the crown, as light moves across a cut stone. */
+.gemstone body {
+  background:
+    /* faceted crown — broad spectral slices from just above the top edge */
+    conic-gradient(
+      from 200deg at 50% -12%,
+      rgba(56, 189, 248, 0.06) 0deg,
+      transparent 26deg,
+      rgba(167, 139, 250, 0.055) 52deg,
+      transparent 82deg,
+      rgba(52, 211, 153, 0.05) 110deg,
+      transparent 142deg,
+      rgba(251, 113, 133, 0.045) 168deg,
+      transparent 200deg,
+      rgba(56, 189, 248, 0.05) 232deg,
+      transparent 270deg,
+      rgba(167, 139, 250, 0.045) 312deg,
+      transparent 348deg
+    ),
+    /* jewel washes — emerald crown, sapphire and ruby at the lower corners */
+    radial-gradient(ellipse 72% 46% at 50% -2%, rgba(52, 211, 153, 0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 56% 42% at 10% 98%, rgba(56, 189, 248, 0.1) 0%, transparent 64%),
+    radial-gradient(ellipse 56% 42% at 90% 98%, rgba(251, 113, 133, 0.085) 0%, transparent 64%),
+    /* accent-tinted core glow rising from the floor */
+    radial-gradient(ellipse 90% 60% at 50% 112%, rgba(var(--accent), 0.1) 0%, transparent 60%),
+    #06070c !important;
+  background-attachment: fixed !important;
+  position: relative;
+}
+
+/* Faceted crystalline lattice — fine diagonal cuts over the whole room, drifting
+   slowly so the facets feel like they catch and release the light. Whisper
+   opacity; reads as material, not as a grid. */
+.gemstone body::after {
+  content: '';
+  position: fixed;
+  inset: -64px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  background-image:
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.009) 0 1px, transparent 1px 124px);
+  animation: gem-facet-drift 42s ease-in-out infinite alternate;
+}
+
+/* Sparkle field A — glints scattered across the whole viewport, breathing
+   between dim and bright on a slow, irregular pulse. */
+.gemstone body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle 1.5px at 17% 21%, rgba(255, 255, 255, 0.95), transparent 62%),
+    radial-gradient(circle 1px at 71% 15%, rgba(206, 240, 255, 0.85), transparent 62%),
+    radial-gradient(circle 1.3px at 39% 63%, rgba(255, 238, 246, 0.85), transparent 62%),
+    radial-gradient(circle 1px at 85% 57%, rgba(214, 255, 233, 0.8), transparent 62%),
+    radial-gradient(circle 1.4px at 57% 87%, rgba(255, 255, 255, 0.9), transparent 62%),
+    radial-gradient(circle 1px at 8% 79%, rgba(223, 233, 255, 0.8), transparent 62%),
+    radial-gradient(circle 1.2px at 93% 86%, rgba(255, 246, 214, 0.78), transparent 62%),
+    radial-gradient(circle 1px at 47% 9%, rgba(235, 226, 255, 0.78), transparent 62%);
+  animation: gem-sparkle-a 5.4s ease-in-out infinite;
+}
+
+@keyframes gem-sparkle-a {
+  0%, 100% { opacity: 0.28; }
+  44% { opacity: 0.95; }
+  62% { opacity: 0.5; }
+}
+
+@keyframes gem-sparkle-b {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.16; }
+}
+
+@keyframes gem-facet-drift {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(26px, 18px, 0); }
+}
+
+/* A travelling spectral shimmer for refraction edges — the 200%-wide gem
+   spectrum slides through the 1px (or hairline) window of an edge. */
+@keyframes gem-refract {
+  0% { background-position: 200% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* The active-widget halo pulses on a gem-pulse rather than the violet one. */
+.gemstone .widget-glow {
+  animation: futuristic-pulse 2.6s ease-in-out infinite;
+}
+
+/* ── Glass chrome — header + sidebar ──────────────────────────────────────
+   Deep onyx glass. Each carries a travelling prismatic hairline along its
+   inner edge, so the chrome looks like the bevelled rim of a cut stone. */
+.gemstone header {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(9, 10, 17, 0.66) !important;
+  backdrop-filter: saturate(155%) blur(30px) !important;
+  -webkit-backdrop-filter: saturate(155%) blur(30px) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  position: relative;
+}
+.gemstone header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background-image: var(--gem-spectrum);
+  background-size: 200% 100%;
+  opacity: 0.7;
+  animation: gem-refract 11s linear infinite;
+}
+
+.gemstone aside {
+  background: rgba(9, 10, 17, 0.6) !important;
+  backdrop-filter: saturate(155%) blur(30px) !important;
+  -webkit-backdrop-filter: saturate(155%) blur(30px) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  position: relative;
+}
+.gemstone aside::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  pointer-events: none;
+  background-image: var(--gem-spectrum);
+  background-size: 100% 200%;
+  opacity: 0.45;
+  animation: gem-refract 14s linear infinite reverse;
+}
+
+/* Sidebar's sticky section bands fade into the glass. */
+.gemstone aside .bg-stone-50,
+.gemstone aside .bg-stone-900 {
+  background: transparent !important;
+}
+
+/* Dashboard / soft cards — faceted onyx glass that lifts on hover with an
+   accent-tinted halo. */
+.gemstone .fb-glass-soft,
+.gemstone [class*='rounded-xl'][class*='backdrop-blur'] {
+  background-color: rgba(255, 255, 255, 0.028) !important;
+  border-color: rgba(255, 255, 255, 0.055) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 16px 40px -16px rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.gemstone .fb-glass-soft:hover,
+.gemstone [class*='rounded-xl'][class*='backdrop-blur']:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(var(--accent), 0.12),
+    0 12px 32px -8px rgba(var(--accent), 0.2),
+    0 24px 56px -24px rgba(0, 0, 0, 0.62) !important;
+}
+
+/* Floating chrome — command pill, minimap, zoom, right-rail. */
+.gemstone .fb-glass-chrome {
+  background-color: rgba(13, 15, 24, 0.74) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 16px 48px -12px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+}
+
+/* Desk surface — near-black onyx glass with a faint accent breath at centre
+   and a sparkle field of its own (phase-offset from the room's), so the canvas
+   itself twinkles while you work. */
+.gemstone .desk-paper {
+  background:
+    radial-gradient(ellipse 52% 36% at 50% 50%, rgba(var(--accent), 0.04) 0%, transparent 66%),
+    #05060a !important;
+  position: relative;
+}
+.gemstone .desk-paper::before,
+.gemstone .desk-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+/* faint jewel vignette in the corners of the desk */
+.gemstone .desk-paper::before {
+  background:
+    radial-gradient(ellipse 40% 50% at 0% 0%, rgba(52, 211, 153, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 50% at 100% 100%, rgba(56, 189, 248, 0.045) 0%, transparent 60%);
+}
+/* desk sparkle field B */
+.gemstone .desk-paper::after {
+  background-image:
+    radial-gradient(circle 1.3px at 28% 34%, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(circle 1px at 63% 26%, rgba(214, 245, 255, 0.82), transparent 60%),
+    radial-gradient(circle 1.2px at 78% 70%, rgba(255, 235, 245, 0.82), transparent 60%),
+    radial-gradient(circle 1px at 44% 78%, rgba(226, 255, 238, 0.8), transparent 60%),
+    radial-gradient(circle 1px at 15% 62%, rgba(232, 232, 255, 0.78), transparent 60%);
+  animation: gem-sparkle-b 6.7s ease-in-out infinite;
+}
+
+/* Drag grid — register marks in faint accent, matched to the gem ground. */
+.fb-canvas-dragging.gemstone .desk-paper,
+.gemstone .fb-canvas-dragging .desk-paper {
+  background:
+    linear-gradient(to right, rgba(var(--accent), 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(var(--accent), 0.06) 1px, transparent 1px),
+    radial-gradient(ellipse 52% 36% at 50% 50%, rgba(var(--accent), 0.04) 0%, transparent 66%),
+    #05060a !important;
+  background-size: 24px 24px, 24px 24px, auto, auto !important;
+}
+
+/* Primary buttons — a polished gem cabochon in the accent colour, with a
+   bright top bevel and an accent halo that brightens on hover. */
+.gemstone .btn-primary {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent), 0.98),
+    rgba(var(--accent-hover), 0.98)
+  ) !important;
+  border: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 1px rgba(var(--accent), 0.34),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 12px 32px -8px rgba(var(--accent), 0.42) !important;
+  transition:
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+.gemstone .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 0 0 1px rgba(var(--accent), 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 16px 40px -8px rgba(var(--accent), 0.58) !important;
+}
+
+.gemstone .text-accent {
+  text-shadow: 0 0 12px rgba(var(--accent), 0.4);
+}
+
+.gemstone .border-stone-200,
+.gemstone .border-stone-300,
+.gemstone .border-stone-700,
+.gemstone .border-stone-800 {
+  border-color: rgba(255, 255, 255, 0.055) !important;
+}
+
+/* ── Desk objects (widgets) — faceted gem glass ───────────────────────────
+   Each widget is a small cut stone: deep onyx body, a bright top bevel, and a
+   thin prismatic refraction line tracing the very top edge. */
+.gemstone [data-widget-id] {
+  background-color: rgba(14, 16, 28, 0.93) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.44),
+    0 12px 32px -12px rgba(0, 0, 0, 0.6) !important;
+  position: relative;
+}
+/* prismatic top-edge refraction — sits just inside the rounded corners */
+.gemstone [data-widget-id]::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  z-index: 2;
+  background-image: var(--gem-spectrum);
+  background-size: 200% 100%;
+  opacity: 0.5;
+  animation: gem-refract 13s linear infinite;
+}
+
+/* widget header strip */
+.gemstone [data-widget-id] > div[class*='cursor-move'] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgb(186, 230, 218) !important;
+}
+
+/* widget content bodies — unify the stone/white shades to gem-glass */
+.gemstone [data-widget-id] .bg-white,
+.gemstone [data-widget-id] [class*='bg-white']:not([class*='bg-white/']),
+.gemstone [data-widget-id] [class*='bg-stone-50']:not([class*='bg-stone-50/']),
+.gemstone [data-widget-id] [class*='bg-stone-100']:not([class*='bg-stone-100/']),
+.gemstone [data-widget-id] [class*='bg-stone-200']:not([class*='bg-stone-200/']),
+.gemstone [data-widget-id] .dark\:bg-stone-900,
+.gemstone [data-widget-id] [class*='bg-stone-900']:not([class*='bg-stone-900/']),
+.gemstone [data-widget-id] [class*='bg-stone-800']:not([class*='bg-stone-800/']),
+.gemstone [data-widget-id] [class*='bg-stone-700']:not([class*='bg-stone-700/']) {
+  background-color: rgba(14, 16, 28, 0.86) !important;
+}
+
+.gemstone [data-widget-id] [class*='bg-white\\/'],
+.gemstone [data-widget-id] [class*='bg-stone-900\\/'] {
+  background-color: rgba(14, 16, 28, 0.78) !important;
+}
+
+/* widget text */
+.gemstone [data-widget-id] .text-stone-900,
+.gemstone [data-widget-id] [class*='text-stone-900'],
+.gemstone [data-widget-id] [class*='text-stone-800'] {
+  color: rgb(228, 234, 240) !important;
+}
+.gemstone [data-widget-id] [class*='text-stone-700'],
+.gemstone [data-widget-id] [class*='text-stone-600'] {
+  color: rgb(196, 204, 216) !important;
+}
+.gemstone [data-widget-id] [class*='text-stone-500'],
+.gemstone [data-widget-id] [class*='text-stone-400'] {
+  color: rgb(142, 152, 174) !important;
+}
+
+.gemstone [data-widget-id] [class*='border-stone-200'],
+.gemstone [data-widget-id] [class*='border-stone-300'],
+.gemstone [data-widget-id] [class*='border-stone-700'],
+.gemstone [data-widget-id] [class*='border-stone-800'] {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* sticky — user's colour survives as a top accent strip */
+.gemstone [data-widget-kind="sticky"] .fb-sticky-body {
+  background-color: rgba(18, 20, 34, 0.93) !important;
+  border-top: 3px solid var(--fb-sticky-tint, rgb(var(--accent))) !important;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+.gemstone [data-widget-kind="sticky"] .fb-sticky-textarea {
+  color: rgb(228, 234, 240) !important;
+}
+.gemstone [data-widget-kind="sticky"] .fb-sticky-textarea::placeholder {
+  color: rgba(196, 204, 216, 0.45) !important;
+}
+.gemstone [data-widget-kind="sticky"] .fb-sticky-body > div > button {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* calculator — match the futuristic recessed-glass treatment */
+.gemstone [data-widget-kind="calculator"] > div {
+  background-color: rgba(14, 16, 28, 0.93) !important;
+}
+
+/* Respect reduced-motion — hold the sparkle and refraction still. */
+@media (prefers-reduced-motion: reduce) {
+  .gemstone body::before,
+  .gemstone body::after,
+  .gemstone .desk-paper::after,
+  .gemstone header::after,
+  .gemstone aside::after,
+  .gemstone [data-widget-id]::before {
+    animation: none !important;
+  }
+}
+
+/* ── PlexiProjects motion (world-leading polish) ──────────────────────────── */
+/* A flowing "current" along the critical path. stroke-dashoffset is GPU-cheap on
+   SVG; reduced-motion disables it below. */
+@keyframes gantt-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+/* Gantt bars grow in from their start date, with a gentle spring overshoot. */
+@keyframes gantt-bar-grow {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+.gantt-bar-grow {
+  animation: gantt-bar-grow var(--dur-base) var(--ease-spring-soft) both;
+  transform-origin: left center;
+}
+/* Cards / tiles rise into place, staggered by index via inline animation-delay. */
+@keyframes fb-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fb-fade-in-up {
+  animation: fb-fade-in-up var(--dur-base) var(--ease-spring-soft) both;
+}
+/* A soft accent bloom for the critical-path bars — a glow, not a selection ring. */
+.gantt-crit-glow {
+  box-shadow:
+    0 0 0 1px rgb(var(--accent) / 0.55),
+    0 0 12px -2px rgb(var(--accent) / 0.5);
+}
+/* Smooth the snap of a dragged bar back onto the day grid (toggled briefly). */
+.gantt-bar-snap {
+  transition: left var(--dur-quick) var(--ease-spring-snap);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gantt-bar-grow,
+  .fb-fade-in-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  [style*='gantt-flow'] {
+    animation: none !important;
+  }
+}
+
+/* Assistant "working" indicator — three dots that breathe in sequence. Replaces
+   the static italic "thinking" pill, which gave no sense that anything was
+   actually in flight. Each dot's delay is set inline by ChatPanel. */
+@keyframes fb-dot-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.fb-dot {
+  animation: fb-dot-pulse 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-dot {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
+/* Assistant retrieval trace — lines fade in as each phase lands, the whole
+   block fades out once the answer is done, and the in-flight phase carries a
+   blinking square. Kept as plain CSS beside fb-dot rather than as Tailwind
+   keyframes: that's how every other animation in this app is declared. */
+@keyframes fb-trace-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fb-trace-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fb-trace-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+.fb-trace-in {
+  animation: fb-trace-in 200ms ease-out;
+}
+.fb-trace-out {
+  /* Duration must match FADE_MS in components/assistant/RetrievalTrace.tsx —
+     the collapse timer fires when this finishes. */
+  animation: fb-trace-out 200ms ease-out forwards;
+}
+.fb-trace-blink {
+  animation: fb-trace-blink 1s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-trace-in,
+  .fb-trace-blink {
+    animation: none;
+  }
+  /* The fade-out still has to end invisible: the collapse timer runs on a clock,
+     not on the animation, so skipping the animation must not leave the expanded
+     trace on screen underneath the collapsed summary. */
+  .fb-trace-out {
+    animation: none;
+    opacity: 0;
+  }
 }

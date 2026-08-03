@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useFocusSessionStore } from '../../stores/focusSession'
@@ -7,6 +7,8 @@ import { futuristicPowerOn, taskComplete } from '../../lib/audioBeep'
 import { priorityScore, projectPath } from '../../lib/dashboardScope'
 import { energyAffinity, energyFitForTask, useEnergyStore } from '../../stores/energy'
 import Icon from '../Icon'
+import { DashboardHeader, ListRow, PLEXI_CARD, StatusPill } from '../plexi'
+import { fieldInputClass } from '../plexi/forms'
 
 type Filter = 'today' | 'overdue' | 'upcoming' | 'open' | 'done'
 type Sort = 'smart' | 'energy' | 'due' | 'updated' | 'alpha'
@@ -139,6 +141,30 @@ export default function AllTasksView(): JSX.Element {
   const [filter, setFilter] = useState<Filter>('today')
   const [sort, setSort] = useState<Sort>('smart')
   const [search, setSearch] = useState('')
+  // Progressive rendering: with years of tasks a flat .map() renders thousands
+  // of rows and the view starts to chug (review scale finding). We mount the
+  // first chunk and reveal more as the sentinel at the bottom scrolls into
+  // view, so the DOM stays small without a windowing dependency. Every task is
+  // still reachable by scrolling; nothing is silently capped.
+  const CHUNK = 120
+  const [renderCap, setRenderCap] = useState(CHUNK)
+  const sentinelRef = useRef<HTMLLIElement | null>(null)
+
+  // A new filter/search/sort starts back at the first chunk.
+  useEffect(() => {
+    setRenderCap(CHUNK)
+  }, [filter, sort, search])
+
+  // Reveal the next chunk whenever the sentinel row becomes visible.
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setRenderCap((c) => c + CHUNK)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  })
 
   const now = Date.now()
   const allTasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
@@ -203,19 +229,7 @@ export default function AllTasksView(): JSX.Element {
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-3">
         {/* Header */}
-        <div className="flex items-baseline gap-3 mb-1">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm">
-            <Icon name="checklist" size={20} className="text-accent" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
-              All Tasks
-            </h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400">
-              Every task across every project, flat.
-            </p>
-          </div>
-        </div>
+        <DashboardHeader title="All Tasks" subtitle="Every task across every project, flat." />
 
         {/* Filter chips */}
         <div className="flex flex-wrap items-center gap-1.5">
@@ -229,7 +243,7 @@ export default function AllTasksView(): JSX.Element {
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
                   active
                     ? 'bg-accent/15 text-accent border border-accent/40'
-                    : 'bg-white/80 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500'
+                    : 'bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-[var(--edge-firm)]'
                 }`}
               >
                 <Icon name={f.icon} size={12} filled={active} />
@@ -238,7 +252,7 @@ export default function AllTasksView(): JSX.Element {
                   className={`text-[10px] font-mono px-1 rounded ${
                     active
                       ? 'bg-accent/20 text-accent'
-                      : 'bg-stone-100 dark:bg-stone-700 text-stone-500 dark:text-stone-400'
+                      : 'bg-[color-mix(in_oklab,var(--ink-100)_6%,transparent)] text-[var(--ink-60)]'
                   }`}
                 >
                   {count}
@@ -254,20 +268,22 @@ export default function AllTasksView(): JSX.Element {
             <Icon
               name="search"
               size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-50)]"
             />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks…"
-              className="w-full bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 rounded-md pl-7 pr-3 py-1.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+              className={`${fieldInputClass()} pl-7`}
             />
           </div>
+          {/* The important w-auto stops fieldInputClass's w-full from letting
+              the select starve the flex-1 search input beside it. */}
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
-            className="bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 rounded-md px-2 py-1.5 text-xs text-stone-700 dark:text-stone-300 focus:outline-none focus:border-stone-700 dark:focus:border-stone-400"
+            className={`${fieldInputClass()} !w-auto`}
           >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -278,12 +294,12 @@ export default function AllTasksView(): JSX.Element {
         </div>
 
         {/* List */}
-        <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur overflow-hidden">
+        <div className={`${PLEXI_CARD} overflow-hidden`}>
           {visible.length === 0 ? (
             <EmptyState filter={filter} hasSearch={search.trim().length > 0} />
           ) : (
-            <ul className="divide-y divide-stone-100 dark:divide-stone-800">
-              {visible.map((task) => (
+            <ul className="divide-y divide-[var(--edge-soft)]">
+              {visible.slice(0, renderCap).map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -294,11 +310,16 @@ export default function AllTasksView(): JSX.Element {
                   onOpenProject={(id) => goProject(id)}
                 />
               ))}
+              {visible.length > renderCap && (
+                <li ref={sentinelRef} className="py-3 text-center text-[11px] text-[var(--ink-50)]">
+                  Loading more…
+                </li>
+              )}
             </ul>
           )}
         </div>
 
-        <div className="text-[11px] text-stone-500 dark:text-stone-500 text-center">
+        <div className="text-[11px] text-[var(--ink-50)] text-center">
           {visible.length} of {counts.open + counts.done} task{visible.length === 1 ? '' : 's'}{' '}
           shown
         </div>
@@ -319,16 +340,16 @@ function EmptyState({
     : filter === 'today'
       ? "Nothing due today, nothing overdue, nothing in progress. You're caught up."
       : filter === 'overdue'
-        ? 'Nothing overdue — sweet.'
+        ? 'Nothing overdue. Sweet.'
         : filter === 'upcoming'
           ? 'Nothing in the next 7 days.'
           : filter === 'done'
-            ? "Nothing completed yet — when you finish tasks they show up here."
+            ? 'Nothing completed yet. When you finish tasks they show up here.'
             : 'No open tasks. Add one from the sidebar.'
   return (
     <div className="py-10 text-center">
-      <div className="text-3xl mb-2">🌤️</div>
-      <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed px-6">{msg}</p>
+      <Icon name="partly_cloudy_day" size={32} className="text-[var(--ink-30)] mb-2" />
+      <p className="text-sm text-[var(--ink-70)] leading-relaxed px-6">{msg}</p>
     </div>
   )
 }
@@ -352,18 +373,20 @@ function TaskRow({
 }: RowProps): JSX.Element {
   const now = Date.now()
   let dueLabel: string | null = null
-  let dueClass = 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+  // StatusPill tones: rose family (busy) for overdue, amber (away) for due
+  // soon, neutral (offline) otherwise.
+  let dueTone: 'busy' | 'away' | 'offline' = 'offline'
   if (task.dueDate != null) {
     const daysLeft = Math.ceil((task.dueDate - now) / MS_PER_DAY)
     if (daysLeft < 0) {
       dueLabel = `${-daysLeft}d late`
-      dueClass = 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400'
+      dueTone = 'busy'
     } else if (daysLeft === 0) {
       dueLabel = 'today'
-      dueClass = 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
+      dueTone = 'away'
     } else if (daysLeft === 1) {
       dueLabel = 'tomorrow'
-      dueClass = 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
+      dueTone = 'away'
     } else if (daysLeft <= 7) {
       dueLabel = `${daysLeft}d`
     } else {
@@ -379,7 +402,7 @@ function TaskRow({
   const isDone = task.status === 'done'
 
   return (
-    <li className="px-4 py-2 flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-800/50 group transition-colors">
+    <ListRow as="li" className="px-4 py-2 group">
       <button
         onClick={onMarkDone}
         disabled={isDone}
@@ -388,8 +411,8 @@ function TaskRow({
           isDone
             ? 'border-emerald-500 bg-emerald-500 text-white cursor-default'
             : task.status === 'in_progress'
-              ? 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40'
-              : 'border-stone-300 dark:border-stone-600 text-transparent hover:text-stone-700 dark:hover:text-stone-300 hover:border-stone-500 dark:hover:border-stone-400'
+              ? 'border-sky-500 text-sky-500 hover:bg-sky-500/10'
+              : 'border-[var(--edge-firm)] text-transparent hover:text-[var(--ink-90)] hover:border-[var(--ink-50)]'
         }`}
       >
         <Icon
@@ -403,14 +426,14 @@ function TaskRow({
           onClick={onOpen}
           className={`text-sm text-left truncate w-full ${
             isDone
-              ? 'line-through text-stone-400 dark:text-stone-500'
-              : 'text-stone-900 dark:text-stone-100 hover:text-accent'
+              ? 'line-through text-[var(--ink-50)]'
+              : 'text-[var(--ink-100)] hover:text-accent'
           }`}
         >
           {task.title}
         </button>
         {path.length > 0 && (
-          <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate flex items-center gap-0.5 mt-0.5">
+          <div className="text-[10px] text-[var(--ink-70)] truncate flex items-center gap-0.5 mt-0.5">
             {path.map((segment, i) => (
               <span key={i} className="flex items-center gap-0.5">
                 {i > 0 && <Icon name="chevron_right" size={10} />}
@@ -419,7 +442,7 @@ function TaskRow({
                     // Last segment = immediate parent (always); open that project's dashboard
                     if (i === path.length - 1 && parentNode) onOpenProject(parentNode.id)
                   }}
-                  className={i === path.length - 1 ? 'hover:text-stone-700 dark:hover:text-stone-300' : ''}
+                  className={i === path.length - 1 ? 'hover:text-[var(--ink-90)]' : ''}
                 >
                   {segment}
                 </button>
@@ -430,17 +453,17 @@ function TaskRow({
       </div>
       {dueLabel && (
         <span
-          className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${dueClass}`}
+          className="shrink-0"
           title={task.dueDate ? `Due ${new Date(task.dueDate).toLocaleDateString()}` : ''}
         >
-          {dueLabel}
+          <StatusPill tone={dueTone} label={dueLabel} />
         </span>
       )}
       <AxisDots task={task} />
       {!isDone && (
         <button
           onClick={onQuickStart}
-          className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all shrink-0"
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all shrink-0"
           style={{ backgroundColor: 'rgb(var(--accent))' }}
           title="Start a 5-minute focus session on this task"
         >
@@ -448,7 +471,7 @@ function TaskRow({
           <span>5 min</span>
         </button>
       )}
-    </li>
+    </ListRow>
   )
 }
 
@@ -459,7 +482,7 @@ function AxisDots({ task }: { task: FbNode }): JSX.Element {
         <span
           key={i}
           className={`w-1 h-1 rounded-full ${
-            i <= val ? 'bg-stone-700 dark:bg-stone-300' : 'bg-stone-200 dark:bg-stone-700'
+            i <= val ? 'bg-[var(--ink-70)]' : 'bg-[var(--ink-10)]'
           }`}
         />
       ))}
@@ -467,7 +490,7 @@ function AxisDots({ task }: { task: FbNode }): JSX.Element {
   )
   return (
     <div
-      className="hidden md:flex items-center gap-2 shrink-0 text-stone-400 dark:text-stone-500"
+      className="hidden md:flex items-center gap-2 shrink-0 text-[var(--ink-50)]"
       title={`Urgency ${task.priority} · Importance ${task.importance}`}
     >
       <div className="flex items-center gap-0.5">

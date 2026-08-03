@@ -1,10 +1,27 @@
-import { dialog, nativeImage } from 'electron'
-import { exec, execFile } from 'child_process'
+import { dialog, nativeImage, shell } from 'electron'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, extname, join } from 'path'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, rmSync } from 'fs'
 
-const execAsync = promisify(exec)
+// The rich integration (bundle-id, icon capture, running-state, focus/unminimise
+// via AppleScript, the mirror-mode punch-through) is macOS-only. On other
+// platforms the app launcher degrades to "launcher only": pick an executable and
+// launch it via shell.openPath, with no icon/running enrichment. Guarded so the
+// app never runs a missing macOS command on Windows/Linux.
+const isMac = process.platform === 'darwin'
+
+// execFile variant that CAPTURES stdout, with NO shell — arguments are passed
+// as a discrete argv array so a path/value can never be interpreted as shell
+// syntax (closes the `defaults`/`sips` command-injection vector). The osascript
+const execFileP = promisify(execFile)
+
+// Safely embed a string as an AppleScript string literal: wrap in double quotes
+// and backslash-escape backslashes and quotes. Combined with execFile (no
+// shell), this closes the single-quote-breakout injection the audit found.
+function asAppleScriptString(value: string): string {
+  return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+}
 
 // ── Picker ──────────────────────────────────────────────────────────────────
 // Surfaces the macOS file picker filtered to .app bundles. Returns a structured
@@ -28,20 +45,26 @@ export async function pickLocalApp(): Promise<PickedLocalApp | null> {
   // entirely (the live-mirror punch-through feature requires `transparent:
   // true` on the main window). Without a parent, the dialog opens as a
   // modal panel above the active window, which works reliably regardless.
-  const opts: Electron.OpenDialogOptions = {
-    title: 'Add local app',
-    defaultPath: '/Applications',
-    properties: ['openFile'],
-    filters: [{ name: 'Applications', extensions: ['app'] }]
-  }
+  const opts: Electron.OpenDialogOptions = isMac
+    ? {
+        title: 'Add local app',
+        defaultPath: '/Applications',
+        properties: ['openFile'],
+        filters: [{ name: 'Applications', extensions: ['app'] }]
+      }
+    : {
+        title: 'Add local app',
+        properties: ['openFile'],
+        filters: [{ name: 'Programs', extensions: ['exe', 'lnk', 'bat', 'cmd'] }]
+      }
   try {
     const result = await dialog.showOpenDialog(opts)
     if (result.canceled || result.filePaths.length === 0) return null
     const appPath = result.filePaths[0]
     // Defensive: the picker filter is advisory on macOS — users can navigate
     // around it with shortcuts and pick a non-.app file. Reject anything that
-    // isn't an actual .app bundle path.
-    if (extname(appPath) !== '.app') return null
+    // isn't an actual .app bundle path (macOS only).
+    if (isMac && extname(appPath) !== '.app') return null
     return buildPickedFromPath(appPath)
   } catch (err) {
     // Surface to main-process console so dev-server tail catches it. The
@@ -54,6 +77,16 @@ export async function pickLocalApp(): Promise<PickedLocalApp | null> {
 }
 
 async function buildPickedFromPath(appPath: string): Promise<PickedLocalApp> {
+  // Off macOS: launcher-only. No bundle id, no icon capture (those are
+  // AppleScript / macOS-specific). The title is the executable name.
+  if (!isMac) {
+    return {
+      title: basename(appPath).replace(/\.(exe|lnk|bat|cmd)$/i, ''),
+      appPath,
+      bundleId: null,
+      iconPngBase64: null
+    }
+  }
   const title = basename(appPath).replace(/\.app$/, '')
   const [bundleId, iconPngBase64] = await Promise.all([
     readBundleId(appPath),
@@ -71,13 +104,11 @@ async function readBundleId(appPath: string): Promise<string | null> {
   const plist = join(appPath, 'Contents', 'Info')
   try {
     // 2s timeout guard. `defaults read` is usually <100ms but we never want
-    // a stuck process to hang the entire describe pipeline.
-    const { stdout } = await Promise.race([
-      execAsync(`defaults read "${plist}" CFBundleIdentifier`),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000)
-      )
-    ])
+    // a stuck process to hang the entire describe pipeline. execFile (no shell)
+    // means `plist` cannot inject commands even with metacharacters in the path.
+    const { stdout } = await execFileP('defaults', ['read', plist, 'CFBundleIdentifier'], {
+      timeout: 2000
+    })
     const id = stdout.trim()
     return id || null
   } catch {
@@ -101,6 +132,7 @@ async function readBundleId(appPath: string): Promise<string | null> {
 // PNG so the renderer doesn't pay a per-render IPC cost.
 
 async function captureAppIcon(appPath: string): Promise<string | null> {
+  if (!isMac) return null // icon extraction is macOS-only (sips/iconutil)
   if (!existsSync(appPath)) return null
   // We deliberately do NOT use Electron's app.getFileIcon — Electron 33 on
   // macOS Sonoma+ crashes the main process with a fatal NOTREACHED CHECK when
@@ -142,10 +174,14 @@ async function captureAppIcon(appPath: string): Promise<string | null> {
       // synchronous-ish (sub-100ms) and avoids needing native .icns parsing.
       const tmp = join('/tmp', `fb-icon-${Date.now()}.png`)
       try {
-        await execAsync(`sips -s format png "${candidate}" --out "${tmp}" -Z 128`)
+        await execFileP(
+          'sips',
+          ['-s', 'format', 'png', candidate, '--out', tmp, '-Z', '128'],
+          { timeout: 4000 }
+        )
         const buf = readFileSync(tmp)
         try {
-          await execAsync(`rm "${tmp}"`)
+          rmSync(tmp, { force: true })
         } catch {
           // best effort cleanup
         }
@@ -163,12 +199,9 @@ async function captureAppIcon(appPath: string): Promise<string | null> {
 async function readIconFileName(appPath: string): Promise<string | null> {
   const plistBase = join(appPath, 'Contents', 'Info')
   try {
-    const { stdout } = await Promise.race([
-      execAsync(`defaults read "${plistBase}" CFBundleIconFile`),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000)
-      )
-    ])
+    const { stdout } = await execFileP('defaults', ['read', plistBase, 'CFBundleIconFile'], {
+      timeout: 2000
+    })
     const name = stdout.trim()
     return name || null
   } catch {
@@ -212,6 +245,13 @@ export async function launchLocalApp(input: {
   bundleId: string | null
   title?: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Off macOS: cross-platform launch via the OS shell. shell.openPath returns
+  // an empty string on success or an error message.
+  if (!isMac) {
+    if (!input.appPath) return { ok: false, error: 'No app path on the connected app.' }
+    const err = await shell.openPath(input.appPath)
+    return err ? { ok: false, error: err } : { ok: true }
+  }
   let opened = false
   if (input.bundleId) {
     try {
@@ -245,18 +285,21 @@ export async function launchLocalApp(input: {
     // Activate + unhide + unminimise. Each step is best-effort and wrapped in
     // its own try/catch so a single failure doesn't abort the rest. Errors
     // here are not user-visible — the `open` call above already succeeded.
-    const safe = procName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    // execFile (no shell): the process name is an -e argument, so quotes or
+    // shell metacharacters in an app name cannot inject a command.
     try {
-      await execAsync(
-        `osascript -e 'tell application "System Events" to tell process "${safe}" to set visible to true'`
-      )
+      await execFileP('osascript', [
+        '-e',
+        `tell application "System Events" to tell process ${asAppleScriptString(procName)} to set visible to true`
+      ])
     } catch {
       // app may not be Accessibility-allowed yet — fine
     }
     try {
-      await execAsync(
-        `osascript -e 'tell application "System Events" to tell process "${safe}" to if (count of windows) > 0 then if value of attribute "AXMinimized" of window 1 is true then set value of attribute "AXMinimized" of window 1 to false'`
-      )
+      await execFileP('osascript', [
+        '-e',
+        `tell application "System Events" to tell process ${asAppleScriptString(procName)} to if (count of windows) > 0 then if value of attribute "AXMinimized" of window 1 is true then set value of attribute "AXMinimized" of window 1 to false`
+      ])
     } catch {
       // window may not support AXMinimized — fine
     }
@@ -274,10 +317,10 @@ async function resolveProcessName(input: {
 }): Promise<string | null> {
   if (input.bundleId) {
     try {
-      const escaped = input.bundleId.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-      const { stdout } = await execAsync(
-        `osascript -e 'tell application "System Events" to return name of (first process whose bundle identifier is "${escaped}")'`
-      )
+      const { stdout } = await execFileP('osascript', [
+        '-e',
+        `tell application "System Events" to return name of (first process whose bundle identifier is ${asAppleScriptString(input.bundleId)})`
+      ])
       const name = stdout.trim()
       if (name) return name
     } catch {
@@ -306,14 +349,14 @@ export async function isLocalAppRunning(input: {
   appPath: string | null
   title: string
 }): Promise<boolean> {
+  if (!isMac) return false // running-state detection uses AppleScript (macOS)
   const name = input.appPath ? basename(input.appPath).replace(/\.app$/, '') : input.title
   if (!name) return false
-  // Escape double quotes in the app name for the AppleScript literal.
-  const safe = name.replace(/"/g, '\\"')
   try {
-    const { stdout } = await execAsync(
-      `osascript -e 'tell application "System Events" to return (count of (processes whose name is "${safe}")) > 0'`
-    )
+    const { stdout } = await execFileP('osascript', [
+      '-e',
+      `tell application "System Events" to return (count of (processes whose name is ${asAppleScriptString(name)})) > 0`
+    ])
     return stdout.trim() === 'true'
   } catch {
     return false
@@ -325,7 +368,7 @@ export async function isLocalAppRunning(input: {
 // isn't a .app bundle or doesn't exist.
 export async function describeLocalApp(appPath: string): Promise<PickedLocalApp | null> {
   if (!existsSync(appPath)) return null
-  if (extname(appPath) !== '.app') return null
+  if (isMac && extname(appPath) !== '.app') return null
   return buildPickedFromPath(appPath)
 }
 

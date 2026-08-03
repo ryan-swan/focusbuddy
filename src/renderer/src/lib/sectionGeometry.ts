@@ -212,3 +212,97 @@ export function findNonOverlapPosition(
   const maxBottom = Math.max(...existing.map((e) => e.y + e.height), 0)
   return { x: desired.x, y: maxBottom + gap }
 }
+
+// A top-level object the desk drag can push out of the way. Minimal shape so
+// callers can build these from a Widget or a computed section frame.
+export interface Placeable {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+// Drag priority: the widget the user is moving stays exactly where they dropped
+// it (the "anchor"), and any top-level widgets it now overlaps flow OUT of its
+// way to the nearest clear spot, cascading so pushed widgets never end up on top
+// of each other or of the anchor. This is the inverse of findNonOverlapPosition,
+// which relocates the DROPPED widget instead — the wrong priority once the user
+// has deliberately placed something. `blockers` (e.g. section frames) are treated
+// as immovable: pushed widgets avoid them, but they never move. Nearest widgets
+// resolve first so the closest thing moves the least. Returns only the widgets
+// that actually moved, mapped to their new position.
+export function resolvePushFromAnchor(
+  anchor: { x: number; y: number; width: number; height: number },
+  movable: Placeable[],
+  blockers: Array<{ x: number; y: number; width: number; height: number }> = [],
+  gap = SECTION_GAP,
+  // 'horizontal' (default) slides impacted widgets left/right to keep the same
+  // reading row, so a dragged widget "parts" its neighbours sideways (N4 spec).
+  // 'nearest' finds the closest clear spot in any direction.
+  axis: 'horizontal' | 'nearest' = 'horizontal'
+): Map<string, { x: number; y: number }> {
+  type Rect = { x: number; y: number; width: number; height: number }
+  const overlaps = (a: Rect, b: Rect): boolean =>
+    !(
+      a.x + a.width + gap <= b.x ||
+      a.x >= b.x + b.width + gap ||
+      a.y + a.height + gap <= b.y ||
+      a.y >= b.y + b.height + gap
+    )
+  const cx = (r: Rect): number => r.x + r.width / 2
+  const cy = (r: Rect): number => r.y + r.height / 2
+  const order = [...movable].sort(
+    (p, q) => Math.hypot(cx(p) - cx(anchor), cy(p) - cy(anchor)) - Math.hypot(cx(q) - cx(anchor), cy(q) - cy(anchor))
+  )
+  const fixed: Rect[] = [anchor, ...blockers]
+  const clearOf = (r: Rect): boolean => fixed.every((f) => !overlaps(r, f))
+
+  // Slide a rect horizontally (y fixed) past every obstacle it hits, moving in
+  // the preferred direction until clear. Monotonic + guarded, so it terminates.
+  const slideHorizontally = (p: Placeable, preferRight: boolean): Rect => {
+    let x = p.x
+    const rectAt = (): Rect => ({ x, y: p.y, width: p.width, height: p.height })
+    for (let guard = 0; guard < 400; guard++) {
+      const hit = fixed.find((f) => overlaps(rectAt(), f))
+      if (!hit) break
+      x = preferRight ? hit.x + hit.width + gap : hit.x - p.width - gap
+    }
+    return rectAt()
+  }
+
+  const moved = new Map<string, { x: number; y: number }>()
+  for (const p of order) {
+    const desired: Rect = { x: p.x, y: p.y, width: p.width, height: p.height }
+    if (clearOf(desired)) {
+      fixed.push(desired)
+      continue
+    }
+    // findNonOverlapPosition only reads x/y/width/height off the obstacles, so a
+    // plain rect array stands in for Widget[].
+    let px: number
+    let py: number
+    if (axis === 'horizontal') {
+      // Push toward the side the widget already sits on relative to the anchor,
+      // so it moves the shorter way out; keep its row (y).
+      const slid = slideHorizontally(p, cx(desired) >= cx(anchor))
+      if (clearOf(slid)) {
+        px = slid.x
+        py = slid.y
+      } else {
+        // Rare — boxed in on that row: fall back to the nearest clear spot so it
+        // never lands overlapping.
+        const fb = findNonOverlapPosition(desired, fixed as unknown as Widget[], gap)
+        px = fb.x
+        py = fb.y
+      }
+    } else {
+      const fb = findNonOverlapPosition(desired, fixed as unknown as Widget[], gap)
+      px = fb.x
+      py = fb.y
+    }
+    moved.set(p.id, { x: Math.round(px), y: Math.round(py) })
+    fixed.push({ x: px, y: py, width: p.width, height: p.height })
+  }
+  return moved
+}

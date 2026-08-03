@@ -5,11 +5,14 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
+import { TableKit } from '@tiptap/extension-table'
+import { Markdown } from 'tiptap-markdown'
 import type { Editor } from '@tiptap/react'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
 function formatAge(ts: number | null): string {
   if (!ts) return 'never'
@@ -36,6 +39,7 @@ interface Props {
 // on each transaction (debounced lightly) so the page survives reloads.
 export default function PageWidget({ widget, inline = false }: Props): JSX.Element {
   const update = useWidgetStore((s) => s.update)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
   const [slashOpen, setSlashOpen] = useState(false)
   const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
@@ -89,6 +93,12 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
         TaskList,
         TaskItem.configure({ nested: true }),
         Link.configure({ openOnClick: false }),
+        // GFM tables — render + edit, stored natively in the page's Tiptap JSON.
+        TableKit.configure({ table: { resizable: false } }),
+        // Lets a pasted |---|---| markdown table (or markdown in general) become
+        // real nodes. The page still stores Tiptap JSON via getJSON; this only
+        // affects how pasted text is interpreted, so tables paste in cleanly.
+        Markdown.configure({ html: false, transformPastedText: true, transformCopiedText: false }),
         Placeholder.configure({
           placeholder: isLiving
             ? 'Living page — set a query above to populate this.'
@@ -190,13 +200,13 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
   }
 
   async function enableLivingMode(): Promise<void> {
-    const q = prompt(
-      'What should this living page summarize?',
-      'A running summary of everything on this task.'
-    )
-    if (!q || !q.trim()) return
-    await update(widget.id, { livingQuery: q.trim(), livingPaused: false })
-    setQueryDraft(q.trim())
+    // Electron has no window.prompt (it returns null), so asking for the query
+    // up front silently did nothing and Make living appeared broken. Instead we
+    // enter living mode with a sensible default query and generate immediately;
+    // the inline query bar above the page lets the user refine it and regenerate.
+    const defaultQuery = 'A running summary of everything on this task.'
+    await update(widget.id, { livingQuery: defaultQuery, livingPaused: false })
+    setQueryDraft(defaultQuery)
     // Kick an immediate first generation so the page isn't empty.
     setTimeout(() => void regenerateLiving(), 50)
   }
@@ -279,7 +289,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
   const body = (
     <div
       ref={containerRef}
-      className="h-full w-full bg-white dark:bg-stone-900 overflow-y-auto relative flex flex-col"
+      className="h-full w-full bg-[var(--surface-raised)] overflow-y-auto relative flex flex-col"
     >
       {isLiving && (
         <LivingHeader
@@ -306,7 +316,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
         />
       )}
       {!isLiving && (
-        <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-stone-200 dark:border-stone-700 bg-stone-50/60 dark:bg-stone-900/40 shrink-0">
+        <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 shrink-0">
           <button
             onClick={() => {
               setAiOpen(true)
@@ -322,10 +332,10 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
             <Icon name="auto_awesome" size={12} />
             <span>AI draft</span>
           </button>
-          <span className="w-px h-4 bg-stone-200 dark:bg-stone-700 mx-1" />
+          <span className="w-px h-4 bg-[var(--surface-sunken)] mx-1" />
           <button
             onClick={() => void enableLivingMode()}
-            className="text-[10px] uppercase tracking-wider text-stone-500 hover:text-accent flex items-center gap-1 px-1.5 py-1"
+            className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] hover:text-accent flex items-center gap-1 px-1.5 py-1"
             title="Turn this page into a living summary that auto-updates from the rest of your canvas"
           >
             <Icon name="autorenew" size={11} />
@@ -337,13 +347,30 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
           — they're hand-defined in globals.css. We don't have Tailwind's
           @tailwindcss/typography plugin installed, so `prose` classes would
           render as bare text (which is why this used to be blank). */}
-      <div className={`md-rendered tiptap-editor px-5 py-4 text-stone-900 dark:text-stone-100 min-h-[140px] flex-1 text-[14px] leading-relaxed ${isLiving ? 'select-text' : ''}`}>
+      <div
+        className={`md-rendered tiptap-editor px-5 py-4 text-[var(--ink-100)] min-h-[140px] flex-1 leading-relaxed ${isLiving ? 'select-text' : ''}`}
+        onContextMenu={(e) => {
+          if (e.shiftKey) return
+          e.preventDefault()
+          const sel = window.getSelection()?.toString() ?? ''
+          setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
+        }}
+      >
         <EditorContent editor={editor} />
       </div>
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          selectionContext={{ selectionText: ctxMenu.selectionText }}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
 
       {slashOpen && slashPos && (
         <div
-          className="absolute z-50 w-56 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1"
+          className="absolute z-50 w-56 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
           style={{ top: slashPos.top, left: slashPos.left }}
         >
           <SlashItem
@@ -403,7 +430,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
             label="Divider"
             onClick={() => applyBlock(() => editor?.chain().focus().setHorizontalRule().run())}
           />
-          <div className="my-1 border-t border-stone-200 dark:border-stone-700" />
+          <div className="my-1 border-t border-[var(--edge-soft)]" />
           <SlashItem
             icon="auto_awesome"
             label="AI prompt"
@@ -418,7 +445,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
       )}
 
       {aiOpen && (
-        <div className="absolute bottom-3 left-3 right-3 z-50 rounded-lg border border-accent bg-white dark:bg-stone-900 shadow-xl p-3 max-h-[60%] flex flex-col gap-2">
+        <div className="absolute bottom-3 left-3 right-3 z-50 rounded-lg border border-accent bg-[var(--surface-raised)] shadow-xl p-3 max-h-[60%] flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <Icon name="auto_awesome" size={13} className="text-accent" />
             <span className="text-[10px] uppercase tracking-wider font-semibold text-accent">
@@ -429,7 +456,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
                 setAiOpen(false)
                 rejectAiStaged()
               }}
-              className="ml-auto h-5 w-5 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-700"
+              className="ml-auto h-5 w-5 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-70)]"
               aria-label="Close"
             >
               <Icon name="close" size={12} />
@@ -449,7 +476,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
             }}
             placeholder='Tell the AI what to draft — e.g. "Write a meeting agenda for…"'
             rows={2}
-            className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           {aiError && (
             <div className="text-[11px] text-amber-700 dark:text-amber-400 px-1">
@@ -461,11 +488,11 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
               or Reject (discard). They can also re-prompt to regenerate. */}
           {aiStaged && (
             <div className="flex-1 min-h-0 flex flex-col gap-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 flex items-center gap-1">
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] flex items-center gap-1">
                 <Icon name="visibility" size={11} />
                 <span>Preview — review before inserting</span>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-md p-2.5 text-[12px] text-stone-800 dark:text-stone-100 whitespace-pre-wrap font-mono">
+              <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md p-2.5 text-[12px] text-[var(--ink-90)] whitespace-pre-wrap font-mono">
                 {aiStaged.markdown}
               </div>
             </div>
@@ -475,14 +502,14 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
               <>
                 <button
                   onClick={rejectAiStaged}
-                  className="text-[11px] px-3 py-1 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                 >
                   Discard
                 </button>
                 <button
                   onClick={() => void runAiPrompt()}
                   disabled={!aiPrompt.trim() || aiBusy}
-                  className="text-[11px] px-3 py-1 rounded text-stone-700 dark:text-stone-200 border border-stone-300 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                 >
                   {aiBusy ? 'Regenerating…' : 'Regenerate'}
                 </button>
@@ -514,7 +541,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
               </button>
             )}
           </div>
-          <div className="text-[9px] text-stone-400 dark:text-stone-500">
+          <div className="text-[9px] text-[var(--ink-40)]">
             Cmd+Enter to draft · Esc to close · staged content never inserts without your approval
           </div>
         </div>
@@ -548,12 +575,12 @@ function SlashItem({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--surface-sunken)] text-left"
     >
-      <Icon name={icon} size={14} className="text-stone-500" />
-      <span className="text-[12px] flex-1 text-stone-700 dark:text-stone-200">{label}</span>
+      <Icon name={icon} size={14} className="text-[var(--ink-50)]" />
+      <span className="text-[12px] flex-1 text-[var(--ink-70)]">{label}</span>
       {shortcut && (
-        <span className="text-[10px] text-stone-400 font-mono">{shortcut}</span>
+        <span className="text-[10px] text-[var(--ink-40)] font-mono">{shortcut}</span>
       )}
     </button>
   )
@@ -599,7 +626,7 @@ function LivingHeader(props: LivingHeaderProps): JSX.Element {
   } = props
 
   return (
-    <div className="border-b border-stone-200 dark:border-stone-700 bg-gradient-to-b from-accent/[0.06] to-transparent shrink-0">
+    <div className="border-b border-[var(--edge-soft)] bg-gradient-to-b from-accent/[0.06] to-transparent shrink-0">
       <div className="px-3 py-1.5 flex items-start gap-2">
         <Icon
           name="auto_awesome"
@@ -607,9 +634,9 @@ function LivingHeader(props: LivingHeaderProps): JSX.Element {
           className={`text-accent mt-0.5 shrink-0 ${busy ? 'animate-pulse' : ''}`}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[9px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 mb-0.5 flex items-center gap-1.5">
+          <div className="text-[9px] uppercase tracking-[0.12em] text-[var(--ink-50)] mb-0.5 flex items-center gap-1.5">
             <span>Living page</span>
-            <span className="text-stone-300 dark:text-stone-600">·</span>
+            <span className="text-[var(--ink-30)]">·</span>
             <span
               title={generatedAt ? new Date(generatedAt).toLocaleString() : 'Never generated'}
               className={paused ? 'text-amber-600' : ''}
@@ -632,14 +659,14 @@ function LivingHeader(props: LivingHeaderProps): JSX.Element {
                 if (e.key === 'Escape') onCancelEdit()
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="w-full text-[12px] px-1.5 py-0.5 bg-white dark:bg-stone-800 border border-accent rounded focus:outline-none"
+              className="w-full text-[12px] px-1.5 py-0.5 bg-[var(--surface-raised)] border border-accent rounded focus:outline-none"
               placeholder="What should this page summarize?"
             />
           ) : (
             <button
               onClick={onStartEdit}
               onMouseDown={(e) => e.stopPropagation()}
-              className="text-left text-[12px] text-stone-700 dark:text-stone-200 hover:text-accent leading-snug truncate w-full"
+              className="text-left text-[12px] text-[var(--ink-70)] hover:text-accent leading-snug truncate w-full"
               title="Click to edit the query"
             >
               {query || '(no query — click to set one)'}

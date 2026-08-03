@@ -7,8 +7,12 @@ import type {
   SelectOption
 } from '@shared/fields'
 import { defaultValue } from '@shared/fields'
+import type { DocType } from '@shared/types'
 import { useTablesStore } from '../../stores/tables'
+import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
+import DocPickerModal from '../DocPickerModal'
+import { useDocMetas, primeDocMeta } from '../../lib/docMetaCache'
 
 // One field editor used everywhere a typed value is edited: standalone canvas
 // field widgets, table cells, page-block fields. The component is variant-
@@ -29,7 +33,14 @@ export interface FieldEditorProps {
   autoFocus?: boolean
 }
 
-export default function FieldEditor(props: FieldEditorProps): JSX.Element {
+export default function FieldEditor(rawProps: FieldEditorProps): JSX.Element {
+  // Defensive: every sub-input reads def.config (e.g. CheckboxInput reads
+  // config.label). A field/column with no config — legacy rows, an imported or
+  // seeded table — must degrade to defaults, not white-screen the canvas. Make
+  // config at least an empty object before dispatching.
+  const props: FieldEditorProps = rawProps.def.config
+    ? rawProps
+    : { ...rawProps, def: { ...rawProps.def, config: {} } as unknown as FieldDefinition }
   const { def, value } = props
   switch (def.type) {
     case 'text-short':
@@ -67,12 +78,114 @@ export default function FieldEditor(props: FieldEditorProps): JSX.Element {
       return (
         <RelationField {...props} value={Array.isArray(value) ? (value as string[]) : []} />
       )
+    case 'doc-ref':
+      return (
+        <DocRefField {...props} value={Array.isArray(value) ? (value as string[]) : []} />
+      )
     default:
       // All FieldType variants are covered above; if this branch is ever
       // reached at runtime, `def` is something we don't know how to render
       // (e.g. a future type loaded from an upgraded DB).
       return <UnsupportedField type={(def as FieldDefinition).type} />
   }
+}
+
+const DOC_TYPE_ICON: Record<DocType, string> = {
+  doc: 'description',
+  sheet: 'table_chart',
+  slides: 'slideshow',
+  map: 'account_tree',
+  design: 'palette'
+}
+
+// Cell/widget editor for the doc-ref field: chips referencing PlexiOffice
+// documents. Click a chip to open the document; add via a searchable office-file
+// picker; a table cell also accepts documents dropped onto it (handled by the
+// table, which commits the id here). Renders the document's live title/type via
+// the shared doc-meta cache.
+function DocRefField(props: FieldEditorProps & { value: string[] }): JSX.Element {
+  const { value, variant, onCommit, def } = props
+  const cfg = (def.config ?? {}) as { docType?: string; multi?: boolean }
+  const multi = cfg.multi !== false
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const metas = useDocMetas(value)
+  const goDocument = useViewStore((s) => s.goDocument)
+
+  function addDoc(id: string): void {
+    if (value.includes(id)) return
+    onCommit(multi ? [...value, id] : [id])
+  }
+  function removeDoc(id: string): void {
+    onCommit(value.filter((v) => v !== id))
+  }
+
+  const compact = variant === 'cell'
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${compact ? '' : 'p-1'}`}>
+      {value.map((id) => {
+        const meta = metas[id]
+        return (
+          <span
+            key={id}
+            className="inline-flex items-center gap-1 max-w-full rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] pl-1.5 pr-1 py-0.5"
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                goDocument(id)
+              }}
+              className="inline-flex items-center gap-1 min-w-0"
+              title={meta ? `Open ${meta.title}` : 'Open document'}
+            >
+              <Icon
+                name={meta ? DOC_TYPE_ICON[meta.docType] : 'description'}
+                size={12}
+                className="text-[rgb(var(--accent))] shrink-0"
+              />
+              <span className="text-[11.5px] text-[var(--ink-80)] truncate">
+                {meta ? meta.title || 'Untitled' : 'Document'}
+              </span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                removeDoc(id)
+              }}
+              className="text-[var(--ink-40)] hover:text-[var(--ink-90)] shrink-0"
+              title="Remove"
+            >
+              <Icon name="close" size={11} />
+            </button>
+          </span>
+        )
+      })}
+      {(multi || value.length === 0) && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setPickerOpen(true)
+          }}
+          data-testid="doc-ref-add"
+          className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-[var(--edge-firm)] text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.5)] px-1.5 py-0.5 text-[11px]"
+          title="Reference an office file"
+        >
+          <Icon name="add" size={12} /> {value.length === 0 ? 'Office file' : ''}
+        </button>
+      )}
+      {pickerOpen && (
+        <DocPickerModal
+          title="Reference an office file"
+          onlyType={cfg.docType as DocType | undefined}
+          onPick={(d) => {
+            primeDocMeta(d.id, { title: d.title, docType: d.docType })
+            addDoc(d.id)
+            setPickerOpen(false)
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  )
 }
 
 function UnsupportedField({ type }: { type: FieldType }): JSX.Element {
@@ -114,8 +227,8 @@ function ShortText({ def, value, variant, onCommit, autoFocus }: SubProps<string
       }}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-white dark:focus:bg-stone-900'
-          : 'w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700'
+          ? 'w-full bg-transparent px-2 py-1 fb-body outline-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)]'
       }
     />
   )
@@ -136,8 +249,8 @@ function LongText({ def, value, variant, onCommit }: SubProps<string>): JSX.Elem
       rows={variant === 'cell' ? 1 : 4}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-2 py-1 text-[12px] outline-none resize-none focus:bg-white dark:focus:bg-stone-900'
-          : 'w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700 resize-y'
+          ? 'w-full bg-transparent px-2 py-1 fb-body outline-none resize-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)] resize-y'
       }
     />
   )
@@ -157,7 +270,7 @@ function NumberInput({
   return (
     <div className="inline-flex items-center gap-1 w-full">
       {config.prefix && (
-        <span className="text-[11px] text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-[var(--ink-50)]">
           {config.prefix}
         </span>
       )}
@@ -174,12 +287,12 @@ function NumberInput({
         }}
         className={
           variant === 'cell'
-            ? 'flex-1 bg-transparent px-1 py-1 text-[12px] outline-none text-right focus:bg-white dark:focus:bg-stone-900'
-            : 'flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700 text-right'
+            ? 'flex-1 bg-transparent px-1 py-1 fb-body outline-none text-right focus:bg-[var(--surface-raised)]'
+            : 'flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)] text-right'
         }
       />
       {config.suffix && (
-        <span className="text-[11px] text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-[var(--ink-50)]">
           {config.suffix}
         </span>
       )}
@@ -198,7 +311,7 @@ function CheckboxInput({ def, value, onCommit }: SubProps<boolean>): JSX.Element
         className="h-3.5 w-3.5 rounded accent-emerald-600 cursor-pointer"
       />
       {config.label && (
-        <span className="text-[12px] text-stone-700 dark:text-stone-300">
+        <span className="text-[12px] text-[var(--ink-70)]">
           {config.label}
         </span>
       )}
@@ -218,9 +331,10 @@ function SingleSelect({
   onCommit
 }: SubProps<string | null>): JSX.Element {
   const [open, setOpen] = useState(false)
-  const config = def.config as { options: SelectOption[] }
+  const config = def.config as { options?: SelectOption[] }
+  const options = config.options ?? []
   const ref = useRef<HTMLDivElement | null>(null)
-  const selected = config.options.find((o) => o.id === value) ?? null
+  const selected = options.find((o) => o.id === value) ?? null
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent): void {
@@ -233,7 +347,7 @@ function SingleSelect({
     <div ref={ref} className="relative w-full">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-2 py-1 text-[12px] hover:bg-stone-50 dark:hover:bg-stone-800 rounded inline-flex items-center gap-1"
+        className="w-full text-left px-2 py-1 text-[12px] hover:bg-[var(--surface-sunken)] rounded inline-flex items-center gap-1"
       >
         {selected ? (
           <span
@@ -243,28 +357,28 @@ function SingleSelect({
             {selected.label}
           </span>
         ) : (
-          <span className="text-stone-400">—</span>
+          <span className="text-[var(--ink-40)]">—</span>
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1">
+        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
           <button
             onClick={() => {
               onCommit(null)
               setOpen(false)
             }}
-            className="block w-full text-left text-[11px] px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400"
+            className="block w-full text-left text-[11px] px-2 py-1 hover:bg-[var(--surface-sunken)] text-[var(--ink-40)]"
           >
             (none)
           </button>
-          {config.options.map((opt) => (
+          {options.map((opt) => (
             <button
               key={opt.id}
               onClick={() => {
                 onCommit(opt.id)
                 setOpen(false)
               }}
-              className="block w-full text-left px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800"
+              className="block w-full text-left px-2 py-1 hover:bg-[var(--surface-sunken)]"
             >
               <span
                 className="px-1.5 py-0.5 rounded text-[11px]"
@@ -286,9 +400,10 @@ function MultiSelect({
   onCommit
 }: SubProps<string[]>): JSX.Element {
   const [open, setOpen] = useState(false)
-  const config = def.config as { options: SelectOption[] }
+  const config = def.config as { options?: SelectOption[] }
+  const options = config.options ?? []
   const ref = useRef<HTMLDivElement | null>(null)
-  const selected = config.options.filter((o) => value.includes(o.id))
+  const selected = options.filter((o) => value.includes(o.id))
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent): void {
@@ -305,10 +420,10 @@ function MultiSelect({
     <div ref={ref} className="relative w-full">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-2 py-1 text-[12px] hover:bg-stone-50 dark:hover:bg-stone-800 rounded inline-flex flex-wrap items-center gap-1"
+        className="w-full text-left px-2 py-1 text-[12px] hover:bg-[var(--surface-sunken)] rounded inline-flex flex-wrap items-center gap-1"
       >
         {selected.length === 0 ? (
-          <span className="text-stone-400">—</span>
+          <span className="text-[var(--ink-40)]">—</span>
         ) : (
           selected.map((opt) => (
             <span
@@ -322,16 +437,16 @@ function MultiSelect({
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1 max-h-60 overflow-y-auto">
-          {config.options.map((opt) => {
+        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1 max-h-60 overflow-y-auto">
+          {options.map((opt) => {
             const checked = value.includes(opt.id)
             return (
               <button
                 key={opt.id}
                 onClick={() => toggle(opt.id)}
-                className="block w-full text-left px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 inline-flex items-center gap-1.5"
+                className="block w-full text-left px-2 py-1 hover:bg-[var(--surface-sunken)] inline-flex items-center gap-1.5"
               >
-                <span className="h-3 w-3 rounded-sm inline-flex items-center justify-center border border-stone-300 dark:border-stone-600">
+                <span className="h-3 w-3 rounded-sm inline-flex items-center justify-center border border-[var(--edge-firm)]">
                   {checked && <Icon name="check" size={10} />}
                 </span>
                 <span
@@ -343,8 +458,8 @@ function MultiSelect({
               </button>
             )
           })}
-          {config.options.length === 0 && (
-            <div className="px-2 py-1 text-[11px] text-stone-400">
+          {options.length === 0 && (
+            <div className="px-2 py-1 text-[11px] text-[var(--ink-40)]">
               No options defined
             </div>
           )}
@@ -372,8 +487,8 @@ function DateInput({ def, value, variant, onCommit }: SubProps<number | null>): 
       }}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-1 py-1 text-[12px] outline-none focus:bg-white dark:focus:bg-stone-900'
-          : 'w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-stone-700'
+          ? 'w-full bg-transparent px-1 py-1 fb-body outline-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)]'
       }
     />
   )
@@ -407,7 +522,7 @@ function Attachment({
       ))}
       <button
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800"
+        className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
       >
         <Icon name="add" size={10} />
         attach
@@ -440,7 +555,7 @@ function AttachmentChip({
     }
   }, [fileId])
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)]">
       <Icon name="attach_file" size={10} />
       <a
         href={`fb-file://${fileId}`}
@@ -452,7 +567,7 @@ function AttachmentChip({
       </a>
       <button
         onClick={onRemove}
-        className="text-stone-400 hover:text-red-600"
+        className="text-[var(--ink-40)] hover:text-red-600"
         title="Remove"
       >
         <Icon name="close" size={10} />
@@ -505,7 +620,7 @@ function ButtonField({ def }: SubProps<unknown>): JSX.Element {
         <span>{busy ? 'Running…' : config.label ?? 'Run'}</span>
       </button>
       {result !== null && (
-        <div className="text-[10px] text-stone-600 dark:text-stone-300 whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-stone-50 dark:bg-stone-800/40 rounded px-1.5 py-1">
+        <div className="text-[10px] text-[var(--ink-70)] whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-[var(--surface-sunken)] rounded px-1.5 py-1">
           {result}
         </div>
       )}
@@ -615,7 +730,7 @@ function RelationField({
     <div ref={ref} className="relative w-full">
       <div className="flex flex-wrap items-center gap-1">
         {linked.length === 0 && (
-          <span className="text-stone-400 text-[11px]">—</span>
+          <span className="text-[var(--ink-40)] text-[11px]">—</span>
         )}
         {linked.map((row) => (
           <span
@@ -637,8 +752,8 @@ function RelationField({
           onClick={() => setOpen((v) => !v)}
           className={
             variant === 'cell'
-              ? 'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
-              : 'inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded border border-dashed border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
+              ? 'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+              : 'inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           }
         >
           <Icon name="add" size={10} />
@@ -646,12 +761,12 @@ function RelationField({
         </button>
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[200px] max-h-64 overflow-y-auto rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1">
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-stone-400 border-b border-stone-100 dark:border-stone-800">
+        <div className="absolute z-50 mt-1 left-0 min-w-[200px] max-h-64 overflow-y-auto rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--ink-40)] border-b border-[var(--edge-soft)]">
             {table.title} — pick {multi ? 'records' : 'a record'}
           </div>
           {available.length === 0 && (
-            <div className="px-2 py-2 text-[11px] text-stone-400 text-center">
+            <div className="px-2 py-2 text-[11px] text-[var(--ink-40)] text-center">
               {rows.length === 0 ? 'No rows in target table yet.' : 'All rows linked.'}
             </div>
           )}
@@ -659,7 +774,7 @@ function RelationField({
             <button
               key={row.id}
               onClick={() => toggle(row.id)}
-              className="w-full text-left px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 text-[11px] text-stone-700 dark:text-stone-200 truncate"
+              className="w-full text-left px-2 py-1 hover:bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-70)] truncate"
             >
               {rowLabel(row)}
             </button>

@@ -98,29 +98,29 @@ export default function PreTaskBridge(): JSX.Element | null {
 
   return (
     <div className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm">
-      <div className="bg-white dark:bg-stone-900 w-full max-w-md mx-4 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden">
+      <div className="bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
         <div className="px-5 pt-5 pb-3 text-center">
           <div className="text-2xl mb-1">🌱</div>
-          <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+          <h3 className="text-base font-semibold text-[var(--ink-100)]">
             What would make this 10% easier right now?
           </h3>
-          <p className="text-[12px] text-stone-500 dark:text-stone-400 mt-1 truncate">
-            <em className="not-italic text-stone-700 dark:text-stone-300">{activeTask.title}</em>
-            {reasonLine && <span className="text-stone-400 dark:text-stone-500"> · {reasonLine}</span>}
+          <p className="text-[12px] text-[var(--ink-50)] mt-1 truncate">
+            <em className="not-italic text-[var(--ink-70)]">{activeTask.title}</em>
+            {reasonLine && <span className="text-[var(--ink-40)]"> · {reasonLine}</span>}
           </p>
         </div>
 
         <div className="px-5 pb-3 space-y-2">
           <button
             onClick={handleFivePromise}
-            className="w-full flex items-start gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 transition-colors text-left group"
+            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left group"
           >
             <Icon name="bolt" size={18} className="text-accent shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
+              <div className="text-sm font-medium text-[var(--ink-100)]">
                 Just 5 minutes
               </div>
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
+              <div className="text-[11px] text-[var(--ink-50)] leading-snug mt-0.5">
                 Hard ceiling. No commitment past 5. The only initiation technique that consistently works.
               </div>
             </div>
@@ -128,11 +128,11 @@ export default function PreTaskBridge(): JSX.Element | null {
 
           <button
             onClick={handleBodyDouble}
-            className="w-full flex items-start gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 transition-colors text-left group"
+            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left group"
           >
             <Icon name="group" size={18} className="text-accent shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+              <div className="text-sm font-medium text-[var(--ink-100)] flex items-center gap-1.5">
                 Body double me
                 {bodyDouble.enabled && (
                   <span className="text-[9px] font-mono px-1 rounded bg-accent/15 text-accent">
@@ -140,7 +140,7 @@ export default function PreTaskBridge(): JSX.Element | null {
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
+              <div className="text-[11px] text-[var(--ink-50)] leading-snug mt-0.5">
                 Quiet AI presence sitting beside you. Drops a short observation every ~10 min.
               </div>
             </div>
@@ -148,22 +148,22 @@ export default function PreTaskBridge(): JSX.Element | null {
 
           <button
             onClick={handleAIDraft}
-            className="w-full flex items-start gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 transition-colors text-left group"
+            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left group"
           >
             <Icon name="auto_awesome" size={18} className="text-accent shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
+              <div className="text-sm font-medium text-[var(--ink-100)]">
                 Have AI suggest the first step
               </div>
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
+              <div className="text-[11px] text-[var(--ink-50)] leading-snug mt-0.5">
                 One concrete first action, drafted in the assistant panel. Removes the "where do I even start" tax.
               </div>
             </div>
           </button>
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex items-center justify-between">
-          <span className="text-[10px] text-stone-500 dark:text-stone-500 font-mono">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center justify-between">
+          <span className="text-[10px] text-[var(--ink-50)] font-mono">
             auto-opens in {secondsLeft}s
           </span>
           <button onClick={close} className="btn-ghost">

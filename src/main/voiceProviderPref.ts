@@ -1,0 +1,63 @@
+// Persisted voice-transcription provider preference.
+//
+// Stored in the same userData directory as the rest of the app's
+// preferences, separate from the encrypted secrets envelope because
+// it's NOT a secret — it's a routing flag the renderer can also read
+// via IPC. Two values: 'cloud' (OpenAI Whisper API) or 'local'
+// (Transformers.js ONNX whisper-tiny). Default = 'cloud' for new
+// installs — gives a working transcription path out of the box as long
+// as the user has set their OpenAI key, no model download wait.
+//
+// Persistence is a one-line JSON file rather than electron-store /
+// conf so we keep zero new dependencies. Reads are cached after first
+// load; writes are write-through (no debounce — preference flips are
+// rare and the file is 30 bytes).
+
+import { app } from 'electron'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import type { TranscriptionProvider } from './ai/voiceNote'
+
+interface PrefShape {
+  provider: TranscriptionProvider
+  v: 1
+}
+
+let cache: PrefShape | null = null
+
+function filePath(): string {
+  return join(app.getPath('userData'), 'voice-provider.json')
+}
+
+function load(): PrefShape {
+  if (cache) return cache
+  try {
+    if (!existsSync(filePath())) {
+      cache = { provider: 'cloud', v: 1 }
+      return cache
+    }
+    const raw = readFileSync(filePath(), 'utf-8')
+    const parsed = JSON.parse(raw) as Partial<PrefShape>
+    const provider: TranscriptionProvider =
+      parsed.provider === 'local' || parsed.provider === 'cloud' ? parsed.provider : 'cloud'
+    cache = { provider, v: 1 }
+    return cache
+  } catch {
+    cache = { provider: 'cloud', v: 1 }
+    return cache
+  }
+}
+
+export function getTranscriptionProvider(): TranscriptionProvider {
+  return load().provider
+}
+
+export function setTranscriptionProvider(p: TranscriptionProvider): void {
+  cache = { provider: p, v: 1 }
+  try {
+    writeFileSync(filePath(), JSON.stringify(cache, null, 2), 'utf-8')
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[voiceProviderPref] save failed:', err)
+  }
+}

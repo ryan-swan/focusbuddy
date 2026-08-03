@@ -44,7 +44,7 @@ export default function EnergyChip(): JSX.Element {
         {meta ? (
           <span className="text-sm leading-none">{meta.emoji}</span>
         ) : (
-          <Icon name="bolt" size={14} className="text-stone-400 dark:text-stone-500" />
+          <Icon name="bolt" size={14} className="text-[var(--ink-40)]" />
         )}
         {meta && (
           <span
@@ -101,14 +101,14 @@ function EnergyPopover({ anchorEl, onPick, onClose }: PopoverProps): JSX.Element
   return (
     <div
       ref={ref}
-      className="fixed z-[180] w-64 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
+      className="fixed z-[180] w-64 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl backdrop-blur"
       style={style}
     >
-      <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+      <div className="px-3 py-2 border-b border-[var(--edge-soft)]">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           Energy right now
         </div>
-        <div className="text-[10px] text-stone-500 dark:text-stone-500 mt-0.5">
+        <div className="text-[10px] text-[var(--ink-50)] mt-0.5">
           Used to suggest tasks that match your state, not punish your interest.
         </div>
       </div>
@@ -123,7 +123,7 @@ function EnergyPopover({ anchorEl, onPick, onClose }: PopoverProps): JSX.Element
               className={`w-full flex items-start gap-3 p-2 rounded-md text-left transition-colors ${
                 active
                   ? 'bg-accent/10 border border-accent/40'
-                  : 'border border-transparent hover:bg-stone-100 dark:hover:bg-stone-800'
+                  : 'border border-transparent hover:bg-[var(--surface-sunken)]'
               }`}
             >
               <span className="text-xl leading-none mt-0.5">{m.emoji}</span>
@@ -134,7 +134,7 @@ function EnergyPopover({ anchorEl, onPick, onClose }: PopoverProps): JSX.Element
                 >
                   {m.label}
                 </div>
-                <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
+                <div className="text-[10px] text-[var(--ink-50)] leading-snug">
                   {m.description}
                 </div>
               </div>

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { effectiveShortcutToKind } from '../lib/keymap'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
+import { useMessagingStore } from '../stores/messaging'
+import { useAiCommandBar } from '../stores/aiCommandBar'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
 import StickyWidget from './widgets/StickyWidget'
@@ -10,31 +13,65 @@ import MarkdownWidget from './widgets/MarkdownWidget'
 import TaskLinkWidget from './widgets/TaskLinkWidget'
 import LocalAppLauncherWidget from './widgets/LocalAppLauncherWidget'
 import FileWidget from './widgets/FileWidget'
+import DriveWidget from './widgets/DriveWidget'
 import FieldWidget from './widgets/FieldWidget'
 import PageWidget from './widgets/PageWidget'
+import LivingDocWidget from './widgets/LivingDocWidget'
+import ChatThreadWidget from './widgets/ChatThreadWidget'
+import DeskPresenceBar from './DeskPresenceBar'
 import TableWidget from './widgets/TableWidget'
+import ChartWidget from './widgets/ChartWidget'
+import OfficeDocWidget from './widgets/OfficeDocWidget'
+import OfficeDocAddDialog from './widgets/OfficeDocAddDialog'
 import CalculatorWidget from './widgets/CalculatorWidget'
 import ColorWidget from './widgets/ColorWidget'
 import ImageWidget from './widgets/ImageWidget'
 import VideoWidget from './widgets/VideoWidget'
 import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
-import WidgetPalette from './WidgetPalette'
-import WidgetDock from './WidgetDock'
+import StreamDeckWidget from './widgets/StreamDeckWidget'
 import WidgetFocusMode from './WidgetFocusMode'
 import ExtensionPrompt from './ExtensionPrompt'
-import ResumeModal from './ResumeModal'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
 import AiBuilderDialog from './AiBuilderDialog'
 import type { AiBuildSuggestion } from '@shared/types'
-import LoadMeter from './LoadMeter'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
+import AiAssistPreview from './contextMenu/AiAssistPreview'
+import WidgetSetupPreview from './contextMenu/WidgetSetupPreview'
+import BrowserContextMenu from './contextMenu/BrowserContextMenu'
+// Side-effect import registers the core widget context-action providers (sticky
+// checklist, living-doc regenerate, ...) for the unified context menu.
+import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
+import MinimapWidget from './widgets/MinimapWidget'
+import CanvasMinimapFAB from './CanvasMinimapFAB'
+import AutomationsFAB from './AutomationsFAB'
+import DeskSuggestionChip from './DeskSuggestionChip'
+import DeskGallery from './DeskGallery'
+import ColumnsView from './ColumnsView'
+import { useDeskViewStore } from '../stores/deskView'
+import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
+import MindMapWidget from './widgets/MindMapWidget'
+import DiagramWidget from './widgets/DiagramWidget'
+import ScratchpadWidget from './widgets/ScratchpadWidget'
+import ShapeWidget from './widgets/ShapeWidget'
+import CardWidget from './widgets/CardWidget'
+import CustomBlockWidget from './widgets/CustomBlockWidget'
+import AgentWidget from './widgets/AgentWidget'
+import WebhookWidget from './widgets/WebhookWidget'
+import InboundHookWidget from './widgets/InboundHookWidget'
+import PortalWidget from './widgets/PortalWidget'
+import ZoomControls from './ZoomControls'
+import CanvasEdgeIndicators from './CanvasEdgeIndicators'
+import { useEdgePan } from '../lib/useEdgePan'
+import { useOverlayStore, selectAnyMenuOpen } from '../stores/overlay'
+import { useNavPrefs, frictionFromGlide } from '../lib/navPrefs'
+import { launchMeeting } from '../lib/startMeeting'
 import Icon from './Icon'
 import { useChatStore } from '../stores/chat'
 import { useFocusSessionStore } from '../stores/focusSession'
-import { chimeIn, futuristicPowerOn } from '../lib/audioBeep'
+import { chimeIn, futuristicPowerOn, sonarPing } from '../lib/audioBeep'
 import type { WidgetSuggestion } from '@shared/types'
 import {
   CATEGORIES,
@@ -44,16 +81,55 @@ import {
   type WidgetCatalogEntry,
   type WidgetCategory
 } from '../lib/widgetCatalog'
+import { useActionHistory } from '../stores/actionHistory'
+import { computeAlign, computeDistribute, type AlignMode, type DistributeAxis } from '../lib/canvasAlign'
 import {
   computeSectionFrame,
+  computeLayoutCells,
   effectiveLayout,
-  SECTION_PADDING
+  SECTION_PADDING,
+  SECTION_MIN_W,
+  SECTION_MIN_H
 } from '../lib/sectionGeometry'
+import { spawnPositionFor } from '../lib/spawnPosition'
+import { firstHttpUrl } from '../lib/dropUrl'
 import { lookupWebview } from '../lib/webviewRegistry'
-import { PinLayoutContext, computeZonePinPositions } from '../lib/pinLayout'
-import LinkOverlay from './LinkOverlay'
+import {
+  getOrigin,
+  subscribeOrigins,
+  isKitDismissed,
+  dismissKit,
+  type NodeCanvasOrigin
+} from '../lib/nodeCanvasOrigin'
+import MindmapStartingKit from './MindmapStartingKit'
+import SyncWidgetPicker from './SyncWidgetPicker'
+import HistoryPanel from './HistoryPanel'
+import ResumeModal from './ResumeModal'
+import CanvasBreadcrumb from './CanvasBreadcrumb'
+import ContextHealthStrip from './ContextHealthStrip'
+import CanvasLinearView from './CanvasLinearView'
+import FloatingPill from './FloatingPill'
+import { useFreeDesk } from '../hooks/useFreeDesk'
+import type { StandardApp } from '../lib/standardApps'
+import {
+  PinLayoutContext,
+  computeZonePinPositions,
+  type ChromeInsets
+} from '../lib/pinLayout'
+import {
+  AI_RAIL_BUTTON_SIZE,
+  AI_RAIL_WIDTH,
+  useAIRailCollapsed
+} from '../lib/chromeState'
+import LinkOverlay, { type PendingLinkPick } from './LinkOverlay'
+import { tidyPositions, type TidyOptions } from '../lib/autoArrange'
 import { useLinksStore } from '../stores/links'
+import { useAccountStore } from '../stores/account'
+import { currentDeviceClass } from '../lib/deviceClass'
+import { serializeOverlayObjects } from '../lib/deskLayoutOverlay'
+import { useContextHealthStore } from '../stores/contextHealth'
 import { LinkDragContext } from '../lib/linkDragContext'
+import { computeVisibleObjectIds, type VirtualizationBox } from '../lib/canvasVirtualization'
 import type {
   ContextMenuPayload,
   SectionLayout,
@@ -80,6 +156,9 @@ const CATEGORY_COLOR: Record<WidgetCategory, string> = {
   Layout: '#737373'
 }
 
+// Stable empty overlay-objects reference so the layout-save effect does not
+// re-arm while a Desk is not opted into per-device layout (PLX-APP-010 Phase 2).
+const EMPTY_OVERLAY_OBJECTS: never[] = []
 const WEB_KINDS: WidgetKind[] = ['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email']
 const isWebKind = (k: WidgetKind): boolean => WEB_KINDS.includes(k)
 
@@ -97,12 +176,22 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <LocalAppLauncherWidget widget={w} />
     case 'file':
       return <FileWidget widget={w} />
+    case 'drive':
+      return <DriveWidget widget={w} />
     case 'field':
       return <FieldWidget widget={w} />
     case 'page':
       return <PageWidget widget={w} />
     case 'table':
       return <TableWidget widget={w} />
+    case 'chart':
+      return <ChartWidget widget={w} />
+    case 'doc':
+    case 'sheet':
+    case 'slides':
+    case 'map':
+    case 'design':
+      return <OfficeDocWidget widget={w} />
     case 'calculator':
       return <CalculatorWidget widget={w} />
     case 'color':
@@ -113,6 +202,34 @@ function renderWidget(w: Widget): JSX.Element | null {
       return <VideoWidget widget={w} />
     case 'timer':
       return <TimerWidget widget={w} />
+    case 'streamdeck':
+      return <StreamDeckWidget widget={w} />
+    case 'minimap':
+      return <MinimapWidget widget={w} />
+    case 'voice-recorder':
+      return <VoiceRecorderWidget widget={w} />
+    case 'mindmap':
+      return <MindMapWidget widget={w} />
+    case 'diagram':
+      return <DiagramWidget widget={w} />
+    case 'scratchpad':
+      return <ScratchpadWidget widget={w} />
+    case 'shape':
+      return <ShapeWidget widget={w} />
+    case 'card':
+      return <CardWidget widget={w} />
+    case 'custom-block':
+      return <CustomBlockWidget widget={w} />
+    case 'agent':
+      return <AgentWidget widget={w} />
+    case 'webhook':
+      return <WebhookWidget widget={w} />
+    case 'inbound-hook':
+      return <InboundHookWidget widget={w} />
+    case 'portal':
+      return <PortalWidget widget={w} />
+    case 'living-doc':
+      return <LivingDocWidget widget={w} />
     case 'section':
       return <SectionWidget widget={w} renderChild={renderWidget} />
     case 'webview':
@@ -122,6 +239,8 @@ function renderWidget(w: Widget): JSX.Element | null {
     case 'gslide':
     case 'email':
       return <WebViewWidget widget={w} />
+    case 'chat-thread':
+      return <ChatThreadWidget widget={w} />
     default:
       return null
   }
@@ -139,20 +258,53 @@ const STATUS_META: Record<
 
 export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  // Per-desk view mode: the infinite Canvas (default) or the Columns view.
+  const deskViewModes = useDeskViewStore((s) => s.modes)
+  const deskViewMode = activeTaskId ? deskViewModes[activeTaskId] ?? 'canvas' : 'canvas'
+  const setDeskViewMode = useDeskViewStore((s) => s.set)
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
+  const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
+  const resolveObjectChannel = useMessagingStore((s) => s.resolveObjectChannel)
+  const setActiveTask = useNodeStore((s) => s.setActive)
+  const expandFolder = useNodeStore((s) => s.expand)
+  // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
+  // node, show a path back to the map. Re-read on task switch + origin changes.
+  const [nodeOrigin, setNodeOrigin] = useState<NodeCanvasOrigin | null>(() =>
+    getOrigin(activeTaskId)
+  )
+  useEffect(() => {
+    const read = (): void => setNodeOrigin(getOrigin(activeTaskId))
+    read()
+    return subscribeOrigins(read)
+  }, [activeTaskId])
+  // Bumped when the user dismisses the starting kit, to re-evaluate visibility.
+  const [kitDismissTick, setKitDismissTick] = useState(0)
+  // Office-document add chooser (create / import / select-existing) + drop point.
+  const [officeAdd, setOfficeAdd] = useState<{ entry: WidgetCatalogEntry; x: number; y: number } | null>(null)
+  const [syncPickerOpen, setSyncPickerOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [showResume, setShowResume] = useState(false)
   const widgets = useWidgetStore((s) => s.widgets)
+  // Auto-offer the starting kit on a freshly-explored, still-EMPTY node canvas.
+  // "Empty" ignores the auto-created minimap + any pinned chrome.
+  const showStartingKit =
+    kitDismissTick >= 0 &&
+    !!nodeOrigin &&
+    !!activeTaskId &&
+    widgets.filter((w) => w.kind !== 'minimap' && !w.pinned).length === 0 &&
+    !isKitDismissed(activeTaskId)
   const focusedId = useWidgetStore((s) => s.focusedWidgetId)
   const activeId = useWidgetStore((s) => s.activeWidgetId)
   const setActive = useWidgetStore((s) => s.setActive)
   const focusOn = useWidgetStore((s) => s.focusOn)
   const centerToken = useWidgetStore((s) => s.centerToken)
-  const layoutVersion = useWidgetStore((s) => s.layoutVersion)
   const zoom = useWidgetStore((s) => s.zoom)
   const panX = useWidgetStore((s) => s.panX)
   const panY = useWidgetStore((s) => s.panY)
   const setZoom = useWidgetStore((s) => s.setZoom)
   const panBy = useWidgetStore((s) => s.panBy)
+  const nav = useNavPrefs()
   const zoomTowardPoint = useWidgetStore((s) => s.zoomTowardPoint)
   const resetView = useWidgetStore((s) => s.resetView)
   const loadForTask = useWidgetStore((s) => s.loadForTask)
@@ -160,7 +312,42 @@ export default function Canvas(): JSX.Element {
   const createWidget = useWidgetStore((s) => s.create)
   const updateWidget = useWidgetStore((s) => s.update)
   const bumpLayoutVersion = useWidgetStore((s) => s.bumpLayoutVersion)
+  const selectedIds = useWidgetStore((s) => s.selectedIds)
+  const setSelection = useWidgetStore((s) => s.setSelection)
+  const clearSelection = useWidgetStore((s) => s.clearSelection)
+  const removeWidget = useWidgetStore((s) => s.remove)
+  const groupDragActive = useWidgetStore((s) => s.groupDrag !== null)
   const dropRef = useRef<HTMLDivElement | null>(null)
+  // Space taken on the right of the viewport by the assistant panel, measured as
+  // the gap between the canvas's right edge and the window edge. The floating
+  // toolbar (position:fixed) uses this to dock beside the assistant instead of
+  // sliding under it when it opens or is resized.
+  const [toolbarRightInset, setToolbarRightInset] = useState(0)
+  // Live canvas viewport size in screen px, tracked so off-viewport
+  // virtualisation (PLX-APP-012) can recompute the mounted-Object set when the
+  // window or side panels resize. Zero until first measure = "not measured yet".
+  const [viewportSize, setViewportSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = dropRef.current
+    if (!el) return
+    const measure = (): void => {
+      const rect = el.getBoundingClientRect()
+      setToolbarRightInset(Math.max(0, Math.round(window.innerWidth - rect.right)))
+      setViewportSize((prev) => {
+        const w = Math.round(rect.width)
+        const h = Math.round(rect.height)
+        return prev.w === w && prev.h === h ? prev : { w, h }
+      })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
   const setPan = useWidgetStore((s) => s.setPan)
   const [savingTemplate] = useState(false)
   // Controls the SaveTemplateDialog. context distinguishes the toolbar
@@ -173,17 +360,59 @@ export default function Canvas(): JSX.Element {
   // "Done → Reopen → Done" doesn't re-open the prompt in a loop. Reset
   // when the task changes.
   const promptedDoneRef = useRef<Set<string>>(new Set())
-  const [paletteOpen, setPaletteOpen] = useState(true)
+  // (palette state is local to WidgetPalette now — it manages its own
+  // popover open/closed; we removed the canvas-level toggle.)
   const [animatingPan, setAnimatingPan] = useState(false)
+  // (The minimap measures the canvas viewport itself via its own
+  // ResizeObserver — see MinimapWidget — so Canvas no longer tracks a
+  // separate, unread viewportSize here.)
+  // Edge-pan / "infinite map" camera. The hook installs a rAF loop
+  // that pans the canvas when the cursor enters a 80px margin near
+  // any edge — closer to the edge = faster pan (quadratic ramp).
+  // Disabled while a widget is active (the user is editing inside it),
+  // while a zoom-to-fit animation is running, or when keyboard focus is
+  // in a form input. Returns the live per-edge intensity (0-1) for the
+  // visual indicators below.
+  // Any open menu (the control pill's fly-out, a context menu, a dropdown)
+  // stands edge-pan down completely while it is open, so reaching for a menu
+  // that sits near a screen edge never scrolls the camera out from under it.
+  const anyMenuOpen = useOverlayStore(selectAnyMenuOpen)
+  const edgeIntensity = useEdgePan({
+    containerRef: dropRef,
+    // Only animatingPan disables edge-pan. We DELIBERATELY no longer
+    // disable on `activeId !== null`. Reasoning: a user moving the
+    // cursor to the canvas edge is unambiguously asking to navigate
+    // the canvas — even with a widget currently active. The old gate
+    // meant clicking any widget killed edge-pan until the user
+    // remembered to press Escape or click on bare canvas to deselect.
+    // Hiding canvas navigation behind a manual deselect step was the
+    // root cause of "edge-pan stopped working" complaints — paired
+    // with the form-focus gate (now scoped to canvas-internal forms),
+    // any kind of widget interaction would silently kill it.
+    disabled: animatingPan,
+    // Hard-disable (full stop, even mid-drag) when edge-pan is turned off or
+    // any menu is open. A menu being open means the user is interacting with
+    // chrome, not dragging a widget, so the mid-drag pan invariant is not in
+    // play here.
+    hardDisabled: !nav.edgePanEnabled || anyMenuOpen,
+    maxSpeedPerSecond: 1100 * nav.edgePanSpeed
+  })
   const [, setNowTick] = useState(0) // for the running-task clock
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0)
-  const [showResume, setShowResume] = useState(false)
   const [showAISetup, setShowAISetup] = useState(false)
   // AI Builder: free-form "describe what you want" prompt that returns
   // suggested widgets (pages, tables, fields). Independent of the existing
   // AI Setup (which is task-context-driven and uses the older suggestion
   // format).
   const [showAiBuilder, setShowAiBuilder] = useState(false)
+  // When the Ask AI command bar prepares object suggestions it stashes them in
+  // the store; we open the builder preview here, preloaded, so the user goes
+  // straight to picking and placing (no second prompt, no dead-end alert).
+  const aiBuildHandoff = useAiCommandBar((s) => s.handoff)
+  const clearAiBuildHandoff = useAiCommandBar((s) => s.setHandoff)
+  useEffect(() => {
+    if (aiBuildHandoff && aiBuildHandoff.suggestions.length > 0) setShowAiBuilder(true)
+  }, [aiBuildHandoff])
   const welcomedTasksRef = useRef<Set<string>>(new Set())
   const [ctxMenu, setCtxMenu] = useState<{
     screenX: number
@@ -193,6 +422,9 @@ export default function Canvas(): JSX.Element {
   } | null>(null)
 
   const activeTask = activeTaskId ? nodes.find((n) => n.id === activeTaskId) ?? null : null
+  const { assignToRoom, createRoomAndAssign } = useFreeDesk()
+  const focusSessionActive = useFocusSessionStore((s) => !!activeTaskId && s.active?.taskId === activeTaskId)
+  const startFocusSession = useFocusSessionStore((s) => s.start)
 
   // Spatial-link state — load per task, mirror the widgets pattern. The
   // overlay reads this store; Canvas owns the link-arm gesture.
@@ -207,18 +439,196 @@ export default function Canvas(): JSX.Element {
   const loadLinksForTask = useLinksStore((s) => s.loadForTask)
   const clearLinks = useLinksStore((s) => s.clear)
   const createLink = useLinksStore((s) => s.create)
+  const links = useLinksStore((s) => s.links)
+  const dragOverride = useWidgetStore((s) => s.dragOverride)
+  const layoutHydratedFor = useWidgetStore((s) => s.layoutHydratedFor)
+  const customLayout = useWidgetStore((s) => s.customLayout)
+  const setDeskCustomLayout = useWidgetStore((s) => s.setDeskCustomLayout)
+  const accountId = useAccountStore((s) => s.account?.id ?? null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [ghostCursor, setGhostCursor] = useState<{ x: number; y: number } | null>(null)
+  // A freshly-drawn link awaiting the user's "how should this connect?" choice,
+  // anchored at the drop point (raw viewport coords). See LinkOverlay's picker.
+  const [pendingLinkPick, setPendingLinkPick] = useState<PendingLinkPick | null>(null)
+  const clearPendingLinkPick = useCallback(() => setPendingLinkPick(null), [])
+
+  // Off-viewport virtualisation (PLX-APP-012). `visibleObjectIds` is the set of
+  // top-level Objects the render loop mounts this frame; null means "cull nothing"
+  // (Columns view or before the viewport is measured). `visibleIdsRef` feeds the
+  // previous-frame set back into the hysteresis + freeze logic, and the key ref
+  // lets us commit a new set only when membership actually changes, mirroring the
+  // marquee hit-test pattern so pans don't force a re-render every frame.
+  const [visibleObjectIds, setVisibleObjectIds] = useState<Set<string> | null>(null)
+  const visibleIdsRef = useRef<Set<string> | null>(null)
+  const visibleKeyRef = useRef<string>('')
 
   useEffect(() => {
     if (activeTaskId) void loadForTask(activeTaskId)
     else clearWidgets()
   }, [activeTaskId, loadForTask, clearWidgets])
 
+  // Per-widget Context Health frames (plexi-4.0, UX-022 at the Object level). Once
+  // a desk's widgets have loaded, baseline each one's "changed since your last
+  // visit" health so the frames reflect what moved while the user was away. Runs
+  // once per desk open; the ref guards against re-running on later widget edits.
+  const reviewedWidgetsForRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
+    if (reviewedWidgetsForRef.current === activeTaskId) return
+    reviewedWidgetsForRef.current = activeTaskId
+    const ids = widgets
+      .filter((w) => !w.archived && w.parentSectionId === null && w.kind !== 'section')
+      .map((w) => w.id)
+    void useContextHealthStore.getState().reviewWidgets(ids)
+  }, [activeTaskId, layoutHydratedFor, widgets])
+
+  // PLX-APP-010 Phase 1 / UX-032 — persist this user's camera + selection for the
+  // active Desk and device class, debounced, on user action. Gated on
+  // layoutHydratedFor so the reset-to-origin and the restore itself never save a
+  // spurious layout before hydration. Object geometry stays in the shared base
+  // (widgets) per ADR-0006, so objects is empty here; Phase 2 fills it. The last
+  // sub-600ms camera nudge before a fast Desk switch may not persist, which
+  // self-heals on the next visit.
+  // PLX-APP-010 Phase 2 — when the Desk is opted into per-device layout, the
+  // overlay carries eligible Objects' position/size too; otherwise it stays empty
+  // and only camera + selection persist (Phase 1). Recomputed from widgets so a
+  // geometry change re-arms the debounced save; a no-op stable value when off.
+  const overlayObjects = useMemo(
+    () => (customLayout ? serializeOverlayObjects(widgets) : EMPTY_OVERLAY_OBJECTS),
+    [customLayout, widgets]
+  )
+  useEffect(() => {
+    if (!activeTaskId || layoutHydratedFor !== activeTaskId) return
+    const layout = {
+      userId: accountId ?? 'local',
+      deskId: activeTaskId,
+      deviceClass: currentDeviceClass(),
+      customLayout,
+      objects: overlayObjects,
+      scroll: { x: panX, y: panY },
+      selectedObjectIds: selectedIds,
+      zoom
+    }
+    const t = window.setTimeout(() => void window.api.deskLayout.save(layout), 600)
+    return () => window.clearTimeout(t)
+  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds, customLayout, overlayObjects])
+
+  // PLX-APP-012 — world-space bounding boxes for every top-level Object the two
+  // render maps iterate. Camera-independent, so this recomputes only when the
+  // Object set changes, never on a pan frame. Section children are excluded here
+  // and mount through their parent section.
+  const virtualizationBoxes = useMemo<VirtualizationBox[]>(() => {
+    const boxes: VirtualizationBox[] = []
+    for (const w of widgets) {
+      if (w.archived || w.pinned) continue
+      if (w.parentSectionId !== null) continue
+      if (w.kind === 'section') {
+        const children = widgets.filter((c) => c.parentSectionId === w.id)
+        const frame = computeSectionFrame(children, effectiveLayout(w.layout))
+        boxes.push({ id: w.id, x: w.x, y: w.y, width: frame.width, height: frame.height })
+      } else {
+        boxes.push({ id: w.id, x: w.x, y: w.y, width: w.width, height: w.height })
+      }
+    }
+    return boxes
+  }, [widgets])
+
+  // PLX-APP-012 — ids that must never be culled regardless of geometry: the
+  // active, focused and link-armed Object, the whole selection, every stateful
+  // web-kind Object (unmounting a <webview> reloads it), and every link endpoint.
+  // Any exempt Object that lives inside a section also keeps that section mounted,
+  // so the child renders and its DOM node exists for LinkOverlay (linking to
+  // section children is permitted today, so this promotion is load-bearing).
+  // Camera-independent, and deliberately excludes the per-frame drag signal (see
+  // dragExemptIds) so an active drag never rebuilds this Set every frame.
+  const virtualizationExempt = useMemo<Set<string>>(() => {
+    const exempt = new Set<string>()
+    if (activeId) exempt.add(activeId)
+    if (focusedId) exempt.add(focusedId)
+    if (linkSourceId) exempt.add(linkSourceId)
+    for (const id of selectedIds) exempt.add(id)
+    for (const w of widgets) if (isWebKind(w.kind)) exempt.add(w.id)
+    for (const l of links) {
+      exempt.add(l.sourceWidgetId)
+      exempt.add(l.targetWidgetId)
+    }
+    const byId = new Map(widgets.map((w) => [w.id, w]))
+    for (const id of Array.from(exempt)) {
+      const parent = byId.get(id)?.parentSectionId
+      if (parent) exempt.add(parent)
+    }
+    return exempt
+  }, [widgets, links, selectedIds, activeId, focusedId, linkSourceId])
+
+  // PLX-APP-012 — the currently-dragged Object (and its parent section) as a tiny
+  // side channel. `dragOverride` changes x/y every drag frame, but the dragged
+  // *id* is stable for the whole drag, so keying on the id means this recomputes
+  // once per drag rather than per frame, and the heavy exempt Set above is never
+  // rebuilt mid-drag. Passed to computeVisibleObjectIds as extraExemptIds.
+  const draggingId = dragOverride?.widgetId ?? null
+  const dragExemptIds = useMemo<string[] | undefined>(() => {
+    if (!draggingId) return undefined
+    const w = widgets.find((x) => x.id === draggingId)
+    return w?.parentSectionId ? [draggingId, w.parentSectionId] : [draggingId]
+  }, [draggingId, widgets])
+
+  // PLX-APP-012 — recompute the mounted-Object set when the camera or the derived
+  // box/exempt inputs change. Per pan frame only the pure intersection runs, and
+  // the set is committed only when membership actually changes (sorted-key compare,
+  // the marquee hit-test pattern), so a pan that reveals nothing new never forces a
+  // re-render. Hysteresis + the animation freeze come from the pure module.
+  useEffect(() => {
+    if (deskViewMode === 'columns' || viewportSize.w === 0 || viewportSize.h === 0) {
+      // Columns view mounts through its own overlay, and before the first measure
+      // we have no viewport to test against — render everything in both cases.
+      if (visibleIdsRef.current !== null || visibleKeyRef.current !== '') {
+        visibleIdsRef.current = null
+        visibleKeyRef.current = ''
+        setVisibleObjectIds(null)
+      }
+      return
+    }
+    const next = computeVisibleObjectIds(
+      virtualizationBoxes,
+      { panX, panY, zoom, viewportWidth: viewportSize.w, viewportHeight: viewportSize.h },
+      {
+        exemptIds: virtualizationExempt,
+        extraExemptIds: dragExemptIds,
+        previousVisible: visibleIdsRef.current ?? undefined,
+        freezeUnmounts: animatingPan
+      }
+    )
+    const key = Array.from(next).sort().join(',')
+    if (key !== visibleKeyRef.current) {
+      visibleKeyRef.current = key
+      visibleIdsRef.current = next
+      setVisibleObjectIds(next)
+    }
+  }, [
+    virtualizationBoxes,
+    virtualizationExempt,
+    dragExemptIds,
+    panX,
+    panY,
+    zoom,
+    animatingPan,
+    viewportSize,
+    deskViewMode
+  ])
+
   useEffect(() => {
     if (activeTaskId) void loadLinksForTask(activeTaskId)
     else clearLinks()
   }, [activeTaskId, loadLinksForTask, clearLinks])
+
+  // Migrate: remove any legacy minimap widgets — the minimap is now a built-in FAB.
+  useEffect(() => {
+    if (!activeTaskId) return
+    const minimaps = useWidgetStore.getState().widgets.filter(
+      (w) => w.kind === 'minimap' && w.taskId === activeTaskId
+    )
+    minimaps.forEach((w) => void useWidgetStore.getState().remove(w.id))
+  }, [activeTaskId])
 
   // Imperative controller exposed via context to WidgetFrame / SectionWidget.
   // The .start() call is what arms the link gesture — it's invoked from a
@@ -242,11 +652,13 @@ export default function Canvas(): JSX.Element {
     // pin it locally.
     const sourceId: string = linkSourceId
     function onMove(e: MouseEvent): void {
-      if (!dropRef.current) return
-      const rect = dropRef.current.getBoundingClientRect()
-      // Canvas-pane-relative screen coords — same space the LinkOverlay
-      // SVG renders in, so no further conversion needed.
-      setGhostCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      // Raw viewport coords — the LinkOverlay SVG is now position: fixed
+      // covering the viewport, so client coords ARE its coord space.
+      // Previously this subtracted dropRef's left/top; that broke as soon
+      // as the SVG's positioned ancestor diverged from dropRef, which
+      // turned out to be the cause of the long-standing "ghost lines
+      // float off in the middle of nowhere" bug.
+      setGhostCursor({ x: e.clientX, y: e.clientY })
     }
     function endArm(): void {
       setLinkSourceId(null)
@@ -272,16 +684,28 @@ export default function Canvas(): JSX.Element {
         endArm()
         return
       }
-      if (from.pinned || to.pinned) {
-        endArm()
-        return
-      }
-      if (from.parentSectionId !== null || to.parentSectionId !== null) {
-        endArm()
-        return
-      }
-      void createLink(sourceId, toId, activeTaskId)
+      // Pinned widgets are valid endpoints too (widget-link-owner invariant 5):
+      // their rect is read in the same viewport coords as every other widget, so
+      // a line to/from a screen-anchored pinned tool renders correctly.
+      // Linking widgets inside sections — and to sections themselves — is
+      // now permitted. The visual link is drawn between the actual
+      // rendered widget rects (LinkOverlay reads getBoundingClientRect on
+      // [data-widget-id]) so an in-section widget produces a line that
+      // anchors to its visible position inside the section frame, and a
+      // section produces a line that anchors to the section's outer
+      // frame. The persisted row in widget_links stores source + target
+      // widget ids regardless of section membership.
+      //
+      // The link is created immediately as a passive `context` wire (so the
+      // gesture never silently produces nothing), then we offer the intent
+      // picker at the drop point to upgrade its type. Capture the drop coords
+      // BEFORE endArm resets gesture state (widget-link-owner design).
+      const dropX = e.clientX
+      const dropY = e.clientY
       endArm()
+      void createLink(sourceId, toId, activeTaskId).then((link) => {
+        if (link) setPendingLinkPick({ linkId: link.id, x: dropX, y: dropY })
+      })
     }
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') endArm()
@@ -328,7 +752,7 @@ export default function Canvas(): JSX.Element {
       (w) => w.taskId === activeTask.id && !w.archived
     )
     if (!haveWidgets) return
-    if (focusedId !== null || showResume || showAISetup || showAiBuilder) return
+    if (focusedId !== null || showAISetup || showAiBuilder) return
     promptedDoneRef.current.add(activeTask.id)
     setSaveTemplateOpen({ context: 'task-done' })
   }, [
@@ -336,7 +760,6 @@ export default function Canvas(): JSX.Element {
     activeTask?.status,
     widgets,
     focusedId,
-    showResume,
     showAISetup,
     showAiBuilder
   ])
@@ -465,13 +888,28 @@ export default function Canvas(): JSX.Element {
           cx = parent.x + SECTION_PADDING + w.x
           cy = parent.y + SECTION_PADDING + w.y
         } else {
-          // In non-free layouts, child positions are computed; fall back to centering on the section itself
+          // Non-free layouts (grid/stacks/icons/list): the child's stored x/y
+          // are meaningless — its real position is computed by the layout.
+          // Re-run the exact layout math to find this child's cell, so the
+          // camera centres on the item itself, not the whole section.
           const siblings = widgets.filter((c) => c.parentSectionId === parent.id)
           const frame = computeSectionFrame(siblings, parentLayout)
-          cx = parent.x
-          cy = parent.y
-          cw = frame.width
-          ch = frame.height
+          const contentW = frame.width - 2 * SECTION_PADDING
+          const cells = computeLayoutCells(parentLayout, siblings, contentW)
+          const idx = siblings.findIndex((c) => c.id === w.id)
+          const cell = idx >= 0 ? cells[idx] : undefined
+          if (cell) {
+            cx = parent.x + SECTION_PADDING + cell.x
+            cy = parent.y + SECTION_PADDING + cell.y
+            cw = cell.width
+            ch = cell.height
+          } else {
+            // Defensive fallback: centre the section if the child vanished.
+            cx = parent.x
+            cy = parent.y
+            cw = frame.width
+            ch = frame.height
+          }
         }
       }
     } else if (w.kind === 'section') {
@@ -578,13 +1016,13 @@ export default function Canvas(): JSX.Element {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
       const rect = e.currentTarget.getBoundingClientRect()
-      const factor = Math.exp(-e.deltaY * 0.005)
+      const factor = Math.exp(-e.deltaY * 0.005 * nav.zoomSensitivity)
       const cursorX = e.clientX - rect.left
       const cursorY = e.clientY - rect.top
       zoomTowardPoint(zoom * factor, cursorX, cursorY)
     } else {
       e.preventDefault()
-      panBy(-e.deltaX, -e.deltaY)
+      panBy(-e.deltaX * nav.wheelSensitivity, -e.deltaY * nav.wheelSensitivity)
     }
   }
 
@@ -593,6 +1031,441 @@ export default function Canvas(): JSX.Element {
     const target = e.target as HTMLElement
     if (target.dataset.bareCanvas !== undefined && activeId !== null) {
       setActive(null)
+    }
+  }
+
+  // ── Click-drag canvas panning ──────────────────────────────────────────────
+  // Press on bare canvas → a sonar ping + a pulsing ring confirm the grab; hold
+  // and move and the camera pans 1:1 with the cursor (panX/panY are screen-space
+  // translations, so the delta maps directly). A press without a drag still acts
+  // as a click (deactivate the active widget).
+  const panDragRef = useRef<{
+    startX: number
+    startY: number
+    startPanX: number
+    startPanY: number
+    moved: boolean
+    pointerId: number
+  } | null>(null)
+  const [grabbing, setGrabbing] = useState(false)
+  const [panPing, setPanPing] = useState<{ x: number; y: number } | null>(null)
+  // Space-as-pan-modifier (Figma-style): while Space is held over the canvas, a
+  // left-drag pans instead of marquee-selecting. `spaceReady` only drives the
+  // grab cursor; the gesture itself reads the ref so it's always current.
+  const spaceHeldRef = useRef(false)
+  const [spaceReady, setSpaceReady] = useState(false)
+  // ── Rubber-band (marquee) selection ────────────────────────────────────────
+  // rubberRef holds the canvas-space anchor while a Shift+drag is in flight;
+  // rubberRect is the live canvas-space rectangle (rendered as a screen-space
+  // overlay so the dashed border stays crisp at any zoom).
+  const rubberRef = useRef<{ startX: number; startY: number; pointerId: number } | null>(null)
+  const [rubberRect, setRubberRect] = useState<{ x: number; y: number; w: number; h: number } | null>(
+    null
+  )
+  // Last hit-set (sorted, joined) so we only push a new selection when the set
+  // of overlapped widgets actually changes — avoids a re-render every mousemove.
+  const lastHitsRef = useRef<string>('')
+  // Widgets eligible for marquee/selection: top-level, non-pinned, not the
+  // minimap, and not a section (sections can be moved but aren't multi-selected
+  // in v1). Their x/y/width/height are absolute canvas coords.
+  const selectableWidgets = useCallback(
+    () =>
+      useWidgetStore
+        .getState()
+        .widgets.filter(
+          (w) =>
+            w.parentSectionId === null &&
+            !w.pinned &&
+            w.kind !== 'section' &&
+            w.kind !== 'minimap'
+        ),
+    []
+  )
+
+  // Screen-space bounding box of the current selection (for the floating
+  // selection toolbar). Recomputed when the selection or any widget moves.
+  const selectionBBox = useMemo(() => {
+    if (selectedIds.length === 0) return null
+    const sel = widgets.filter((w) => selectedIds.includes(w.id))
+    if (sel.length === 0) return null
+    const minX = Math.min(...sel.map((w) => w.x))
+    const minY = Math.min(...sel.map((w) => w.y))
+    const maxX = Math.max(...sel.map((w) => w.x + w.width))
+    const maxY = Math.max(...sel.map((w) => w.y + w.height))
+    return { minX, minY, maxX, maxY, count: sel.length }
+  }, [selectedIds, widgets])
+
+  // Wrap the selected widgets in a new section that encloses them. The section
+  // is sized to their bounding box (+ padding); each child's absolute canvas
+  // x/y becomes section-local. Free layout preserves their relative positions.
+  const groupIntoSection = useCallback(async (): Promise<void> => {
+    const all = useWidgetStore.getState().widgets
+    const sel = all.filter(
+      (w) =>
+        selectedIds.includes(w.id) &&
+        w.parentSectionId === null &&
+        !w.pinned &&
+        w.kind !== 'section' &&
+        w.kind !== 'minimap'
+    )
+    if (sel.length < 1) return
+    const minX = Math.min(...sel.map((w) => w.x))
+    const minY = Math.min(...sel.map((w) => w.y))
+    const maxX = Math.max(...sel.map((w) => w.x + w.width))
+    const maxY = Math.max(...sel.map((w) => w.y + w.height))
+    const sectionX = minX - SECTION_PADDING
+    const sectionY = minY - SECTION_PADDING
+    const sectionW = Math.max(maxX - minX + 2 * SECTION_PADDING, SECTION_MIN_W)
+    const sectionH = Math.max(maxY - minY + 2 * SECTION_PADDING, SECTION_MIN_H)
+    const section = await createWidget({
+      taskId: sel[0].taskId,
+      kind: 'section',
+      title: 'Group',
+      content: '',
+      x: sectionX,
+      y: sectionY,
+      width: sectionW,
+      height: sectionH
+    })
+    chimeIn()
+    await Promise.all(
+      sel.map((w) =>
+        updateWidget(w.id, {
+          parentSectionId: section.id,
+          x: Math.round(w.x - sectionX - SECTION_PADDING),
+          y: Math.round(w.y - sectionY - SECTION_PADDING)
+        })
+      )
+    )
+    bumpLayoutVersion()
+    clearSelection()
+  }, [selectedIds, createWidget, updateWidget, bumpLayoutVersion, clearSelection])
+
+  // Duplicate every selected widget as an independent copy, offset slightly,
+  // then select the new copies so the user can immediately reposition them.
+  const duplicateSelection = useCallback(async (): Promise<void> => {
+    const all = useWidgetStore.getState().widgets
+    const sel = all.filter((w) => selectedIds.includes(w.id))
+    if (sel.length === 0) return
+    const created = await Promise.all(
+      sel.map((w) =>
+        createWidget({
+          taskId: w.taskId,
+          kind: w.kind,
+          title: w.title,
+          content: w.content,
+          x: w.x + 28,
+          y: w.y + 28,
+          width: w.width,
+          height: w.height,
+          color: w.color,
+          sourceAppId: w.sourceAppId,
+          mode: w.mode
+        })
+      )
+    )
+    setSelection(created.map((w) => w.id))
+  }, [selectedIds, createWidget, setSelection])
+
+  const deleteSelection = useCallback(async (): Promise<void> => {
+    const ids = useWidgetStore.getState().selectedIds.slice()
+    clearSelection()
+    await Promise.all(ids.map((id) => removeWidget(id)))
+  }, [clearSelection, removeWidget])
+
+  // Selected, free, top-level widgets eligible for align/distribute (excludes
+  // pinned, section children, sections themselves, and the minimap — same set
+  // selectableWidgets uses).
+  const alignableSelection = useCallback(() => {
+    const ids = useWidgetStore.getState().selectedIds
+    return selectableWidgets().filter((w) => ids.includes(w.id))
+  }, [selectableWidgets])
+
+  // Apply a map of id -> position delta in ONE undo step, then let the canvas
+  // re-read positions (same commit shape as Tidy).
+  const applyPositions = useCallback(
+    async (targets: Record<string, { x?: number; y?: number }>, label: string): Promise<void> => {
+      const ids = Object.keys(targets)
+      if (ids.length === 0) return
+      const st = useWidgetStore.getState()
+      const hist = useActionHistory.getState()
+      hist.beginBatch()
+      try {
+        await Promise.all(ids.map((id) => st.update(id, targets[id])))
+      } finally {
+        hist.endBatch(label)
+      }
+      bumpLayoutVersion()
+    },
+    [bumpLayoutVersion]
+  )
+
+  const alignSelection = useCallback(
+    (mode: AlignMode): void => {
+      void applyPositions(computeAlign(alignableSelection(), mode), `Align ${mode}`)
+    },
+    [alignableSelection, applyPositions]
+  )
+  const distributeSelection = useCallback(
+    (axis: DistributeAxis): void => {
+      void applyPositions(computeDistribute(alignableSelection(), axis), `Distribute ${axis}`)
+    },
+    [alignableSelection, applyPositions]
+  )
+
+  // Keyboard: Esc clears the selection; Cmd/Ctrl+A selects every selectable
+  // widget on the desk (ignored while typing in a field).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      const el = document.activeElement as HTMLElement | null
+      const typing =
+        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (e.key === 'Escape' && useWidgetStore.getState().selectedIds.length > 0) {
+        clearSelection()
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A') && !typing) {
+        const ids = selectableWidgets().map((w) => w.id)
+        if (ids.length > 0) {
+          e.preventDefault()
+          setSelection(ids)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [clearSelection, selectableWidgets, setSelection])
+
+  // Track the Space bar as a transient pan modifier. Engages only when focus is
+  // on the bare canvas / body (never while typing in a field or interacting with
+  // a widget), so it can't swallow a Space the user meant for something else. We
+  // preventDefault while engaged so the page doesn't scroll.
+  useEffect(() => {
+    function isSafeTarget(): boolean {
+      const ae = document.activeElement as HTMLElement | null
+      if (!ae || ae === document.body) return true
+      if (ae.dataset && ae.dataset.bareCanvas !== undefined) return true
+      const tag = ae.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || ae.isContentEditable) return false
+      // Buttons/links/selects/webviews keep their own Space behaviour.
+      return false
+    }
+    function down(e: KeyboardEvent): void {
+      if (e.code !== 'Space' && e.key !== ' ') return
+      if (e.repeat) return
+      if (!isSafeTarget()) return
+      spaceHeldRef.current = true
+      setSpaceReady(true)
+      e.preventDefault()
+    }
+    function up(e: KeyboardEvent): void {
+      if (e.code !== 'Space' && e.key !== ' ') return
+      if (!spaceHeldRef.current) return
+      spaceHeldRef.current = false
+      setSpaceReady(false)
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
+
+  // Single-key widget quick-add (S=sticky, N=note, T=table, …). Fires only on a
+  // task canvas, with no modifier, when not typing. Reuses the exact same spawn
+  // path as the palette/picker via a ref so position + gating stay consistent.
+  const quickAddRef = useRef<(kind: WidgetKind) => void>(() => {})
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      if (e.key.length !== 1) return
+      const el = document.activeElement as HTMLElement | null
+      const typing =
+        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (typing) return
+      const kind = effectiveShortcutToKind()[e.key.toUpperCase()]
+      if (!kind) return
+      if (!useNodeStore.getState().activeTaskId) return
+      e.preventDefault()
+      quickAddRef.current(kind)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const panPingTimer = useRef<number | null>(null)
+  // Release-inertia state: smoothed velocity (px/frame), last sample, and the
+  // running glide animation frame.
+  const panVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 })
+  const panLastMoveRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const panInertiaRaf = useRef<number | null>(null)
+
+  function cancelPanInertia(): void {
+    if (panInertiaRaf.current !== null) {
+      cancelAnimationFrame(panInertiaRaf.current)
+      panInertiaRaf.current = null
+    }
+  }
+  useEffect(() => cancelPanInertia, [])
+
+  function handleCanvasPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
+    const target = e.target as HTMLElement
+    if (target.dataset.bareCanvas === undefined) return // only on bare canvas
+    const middle = e.button === 1
+    if (!middle && e.button !== 0) return // left or middle button only
+    cancelPanInertia() // a fresh grab stops any in-flight glide
+    panVelocityRef.current = { vx: 0, vy: 0 }
+    const spacePan = e.button === 0 && spaceHeldRef.current
+    // Gesture model: a PAN is middle-mouse, Space+left, or a plain left-drag
+    // when drag-pan is enabled in settings (and Shift isn't held). Anything
+    // else on the bare canvas — Shift+left, or a plain left-drag when drag-pan
+    // is off — draws a rubber-band (marquee) selection. So marquee is always
+    // reachable via Shift, and is the default plain-drag when the user hasn't
+    // opted into drag-pan; pan is always reachable via Space or middle-mouse.
+    const panGesture =
+      middle || spacePan || (e.button === 0 && nav.dragPanEnabled && !e.shiftKey)
+    if (!panGesture) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pt = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      rubberRef.current = { startX: pt.x, startY: pt.y, pointerId: e.pointerId }
+      lastHitsRef.current = ''
+      setRubberRect({ x: pt.x, y: pt.y, w: 0, h: 0 })
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        // pointer capture unsupported — marquee still works while over the surface
+      }
+      return
+    }
+    if (middle || spacePan) e.preventDefault() // pan via middle/space: stop autoscroll + page scroll
+    panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: performance.now() }
+    panDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPanX: panX,
+      startPanY: panY,
+      moved: false,
+      pointerId: e.pointerId
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // pointer capture unsupported — drag still works while over the surface
+    }
+    setGrabbing(true)
+    if (nav.sonarOnGrab) {
+      sonarPing()
+      // Surface-relative coords so the ring positions correctly regardless of
+      // any transformed ancestor (position:absolute inside dropRef).
+      const rect = e.currentTarget.getBoundingClientRect()
+      setPanPing({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      if (panPingTimer.current !== null) window.clearTimeout(panPingTimer.current)
+      panPingTimer.current = window.setTimeout(() => setPanPing(null), 650)
+    }
+  }
+
+  function handleCanvasPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    const rub = rubberRef.current
+    if (rub) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pt = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+      const x = Math.min(rub.startX, pt.x)
+      const y = Math.min(rub.startY, pt.y)
+      const w = Math.abs(pt.x - rub.startX)
+      const h = Math.abs(pt.y - rub.startY)
+      setRubberRect({ x, y, w, h })
+      // Live hit-test in canvas space — highlight everything the box overlaps.
+      const hits = selectableWidgets()
+        .filter(
+          (wd) => x < wd.x + wd.width && x + w > wd.x && y < wd.y + wd.height && y + h > wd.y
+        )
+        .map((wd) => wd.id)
+      const key = hits.slice().sort().join(',')
+      if (key !== lastHitsRef.current) {
+        lastHitsRef.current = key
+        setSelection(hits)
+      }
+      return
+    }
+    const d = panDragRef.current
+    if (!d) return
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+    if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
+    setPan(d.startPanX + dx * nav.dragSensitivity, d.startPanY + dy * nav.dragSensitivity)
+    // Track smoothed velocity (normalised to ~16ms frames) for release inertia.
+    const last = panLastMoveRef.current
+    const now = performance.now()
+    if (last) {
+      const mdt = Math.max(1, now - last.t)
+      const fvx = ((e.clientX - last.x) / mdt) * 16
+      const fvy = ((e.clientY - last.y) / mdt) * 16
+      // Weight the most-recent sample heavily so a fast flick's peak speed
+      // carries into the release (less smoothing = punchier slingshot).
+      panVelocityRef.current = {
+        vx: panVelocityRef.current.vx * 0.35 + fvx * 0.65,
+        vy: panVelocityRef.current.vy * 0.35 + fvy * 0.65
+      }
+    }
+    panLastMoveRef.current = { x: e.clientX, y: e.clientY, t: now }
+  }
+
+  function handleCanvasPointerUp(e: React.PointerEvent<HTMLDivElement>): void {
+    const rub = rubberRef.current
+    if (rub) {
+      try {
+        e.currentTarget.releasePointerCapture(rub.pointerId)
+      } catch {
+        // ignore
+      }
+      rubberRef.current = null
+      setRubberRect(null)
+      // Selection was set live during the move. A shift-click that never moved
+      // leaves the (empty) selection as-is.
+      return
+    }
+    const d = panDragRef.current
+    if (!d) return
+    panDragRef.current = null
+    setGrabbing(false)
+    try {
+      e.currentTarget.releasePointerCapture(d.pointerId)
+    } catch {
+      // ignore
+    }
+    // A press with no drag behaves like a bare-canvas click (idempotent with
+    // onClick, which may not fire reliably after a pointer-capture sequence).
+    if (!d.moved) {
+      const target = e.target as HTMLElement
+      if (target.dataset.bareCanvas !== undefined) {
+        if (activeId !== null) setActive(null)
+        clearSelection() // click empty space → drop the selection
+      }
+      return
+    }
+    // Release inertia: slingshot in the drag direction, then decelerate to a
+    // stop. slingshot × sensitivity multiply the release speed so a flick
+    // coasts past the cursor; glide (friction) sets how long it keeps moving.
+    // All user-configurable in Settings → Navigation.
+    if (!nav.momentumEnabled) return
+    const launch = nav.slingshot * nav.dragSensitivity
+    const MAX_LAUNCH = 160 // px/frame
+    let vx = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vx * launch))
+    let vy = Math.max(-MAX_LAUNCH, Math.min(MAX_LAUNCH, panVelocityRef.current.vy * launch))
+    if (Math.hypot(vx, vy) > 1.2) {
+      const friction = frictionFromGlide(nav.glide)
+      const step = (): void => {
+        panBy(vx, vy)
+        vx *= friction
+        vy *= friction
+        if (Math.hypot(vx, vy) > 0.4) {
+          panInertiaRaf.current = requestAnimationFrame(step)
+        } else {
+          panInertiaRaf.current = null
+        }
+      }
+      panInertiaRaf.current = requestAnimationFrame(step)
     }
   }
 
@@ -618,6 +1491,12 @@ export default function Canvas(): JSX.Element {
     canvasY: number
   ): Promise<void> {
     if (!activeTaskId) return
+    // Office documents go through a chooser (create new / import a real Office
+    // file / place an existing one) rather than dropping a blank widget.
+    if (entry.kind === 'doc' || entry.kind === 'sheet' || entry.kind === 'slides') {
+      setOfficeAdd({ entry, x: canvasX, y: canvasY })
+      return
+    }
     await createWidget({
       taskId: activeTaskId,
       kind: entry.kind,
@@ -627,6 +1506,24 @@ export default function Canvas(): JSX.Element {
       width: entry.defaultWidth,
       height: entry.defaultHeight,
       color: entry.kind === 'sticky' ? '#fef08a' : null
+    })
+  }
+
+  // Create an office-document widget pointing at an already-resolved document id
+  // (from create-new / import / select-existing in the add dialog).
+  async function createOfficeWidget(documentId: string): Promise<void> {
+    const add = officeAdd
+    if (!activeTaskId || !add) return
+    setOfficeAdd(null)
+    await createWidget({
+      taskId: activeTaskId,
+      kind: add.entry.kind,
+      content: documentId,
+      x: Math.round(add.x - add.entry.defaultWidth / 2),
+      y: Math.round(add.y - 20),
+      width: add.entry.defaultWidth,
+      height: add.entry.defaultHeight,
+      color: null
     })
   }
 
@@ -725,17 +1622,20 @@ export default function Canvas(): JSX.Element {
     const cx = ctxMenu.canvasX
     const cy = ctxMenu.canvasY
     const addWidget: CtxMenuItem = {
-      label: 'Add widget',
+      label: 'Add object',
       icon: 'add',
-      children: CATEGORIES.map((cat) => ({
-        label: cat,
-        icon: CATEGORY_ICON[cat],
-        children: WIDGET_CATALOG.filter((e) => e.category === cat).map((entry) => ({
-          label: entry.label,
-          icon: entry.icon,
-          onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
-        }))
-      }))
+      children: CATEGORIES.map((cat) => {
+        const entries = WIDGET_CATALOG.filter((e) => e.category === cat && !e.hideFromPicker)
+        return {
+          label: cat,
+          icon: CATEGORY_ICON[cat],
+          children: entries.map((entry) => ({
+            label: entry.label,
+            icon: entry.icon,
+            onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
+          }))
+        }
+      }).filter((group) => group.children.length > 0)
     }
     const arrange: CtxMenuItem = {
       label: 'Auto-arrange',
@@ -752,9 +1652,32 @@ export default function Canvas(): JSX.Element {
           onClick: () => void groupByType(true)
         },
         {
-          label: 'Clean up (Tidy)',
+          // Tidy modes — every mode keeps linked widgets clustered together.
+          label: 'Tidy',
           icon: 'grid_view',
-          onClick: () => void handleAutoArrange()
+          children: [
+            { label: 'Square grid', icon: 'grid_view', onClick: () => void handleAutoArrange({ mode: 'square' }) },
+            { label: 'Single column (vertical)', icon: 'view_agenda', onClick: () => void handleAutoArrange({ mode: 'vertical' }) },
+            { label: 'Single row (horizontal)', icon: 'view_column', onClick: () => void handleAutoArrange({ mode: 'horizontal' }) },
+            { label: 'Mosaic', icon: 'dashboard', onClick: () => void handleAutoArrange({ mode: 'mosaic' }) },
+            { label: 'Rows of the canvas (flow)', icon: 'reorder', onClick: () => void handleAutoArrange({ mode: 'flow' }) },
+            {
+              label: 'Columns…',
+              icon: 'view_week',
+              children: [2, 3, 4, 5, 6].map((c) => ({
+                label: `${c} columns`,
+                onClick: () => void handleAutoArrange({ mode: 'custom', cols: c })
+              }))
+            },
+            {
+              label: 'Rows…',
+              icon: 'table_rows',
+              children: [2, 3, 4, 5, 6].map((r) => ({
+                label: `${r} rows`,
+                onClick: () => void handleAutoArrange({ mode: 'custom', rows: r })
+              }))
+            }
+          ]
         }
       ]
     }
@@ -774,6 +1697,18 @@ export default function Canvas(): JSX.Element {
         icon: 'center_focus_strong',
         shortcut: '⌘0',
         onClick: () => resetView()
+      },
+      { separator: true },
+      {
+        // Per-device layout customisation (PLX-APP-010 Phase 2, ADR-0006). Off by
+        // default: the Desk follows the shared arrangement. On: this device keeps
+        // its own object positions and sizes, private to this user, and they are
+        // restored on reopen. A checkbox icon signals the toggle state.
+        label: customLayout
+          ? "Stop customising this device's layout"
+          : "Customise this device's layout",
+        icon: customLayout ? 'check_box' : 'check_box_outline_blank',
+        onClick: () => void setDeskCustomLayout(!customLayout)
       }
     ]
   }
@@ -793,16 +1728,26 @@ export default function Canvas(): JSX.Element {
   }
 
   function handleClickAdd(entry: WidgetCatalogEntry): void {
-    const rect = dropRef.current?.getBoundingClientRect()
-    if (!rect) {
-      void placeWidget(entry, 80, 80)
+    // Snap the new widget beside the last-touched widget (right, else left),
+    // falling back to the centre of the current viewport. Replaces the old
+    // centre-plus-jitter drop that often landed off-screen.
+    const { x, y } = spawnPositionFor(entry.defaultWidth, entry.defaultHeight)
+    // Office documents go through the chooser (create new / import / place an
+    // existing one) rather than dropping a blank widget — same as the right-click
+    // add path. Convert the top-left spawn point to the centre point the chooser
+    // expects (createOfficeWidget subtracts width/2 and 20).
+    if (activeTaskId && (entry.kind === 'doc' || entry.kind === 'sheet' || entry.kind === 'slides')) {
+      setOfficeAdd({ entry, x: x + entry.defaultWidth / 2, y: y + 20 })
       return
     }
-    const screenCenterX = rect.width / 2
-    const screenCenterY = rect.height / 2
-    const center = screenToCanvas(screenCenterX, screenCenterY)
-    const jitter = (): number => (Math.random() - 0.5) * 80
-    void placeWidget(entry, center.x - entry.defaultWidth / 2 + jitter(), center.y - entry.defaultHeight / 2 + jitter())
+    void placeWidget(entry, x, y)
+  }
+
+  // Keep the quick-add keyboard shortcut pointed at the live add handler, so a
+  // single key (S, N, T, …) spawns through the exact same path as the picker.
+  quickAddRef.current = (kind: WidgetKind): void => {
+    const entry = catalogFor(kind)
+    if (entry) handleClickAdd(entry)
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
@@ -811,7 +1756,13 @@ export default function Canvas(): JSX.Element {
       types.includes(DRAG_MIME) ||
       types.includes('text/fb-task-link') ||
       types.includes(CONNECTED_APP_DRAG_MIME) ||
-      types.includes('Files')
+      types.includes('Files') ||
+      // A tab or link dragged from an external browser. text/uri-list is the
+      // precise signal; text/plain is the fallback some browsers use. Accepting
+      // the drag here (preventDefault) is what stops the OS default of trying
+      // to navigate the app window to the dropped URL.
+      types.includes('text/uri-list') ||
+      types.includes('text/plain')
     ) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
@@ -853,6 +1804,37 @@ export default function Canvas(): JSX.Element {
         offset += 24 // cascade subsequent drops slightly so they don't stack exactly
       }
       return
+    }
+    // External browser tab or link drop. Dragging a tab out of Chrome / Edge /
+    // Safari (or a link) puts the URL on text/uri-list, with text/plain as a
+    // fallback. Open it as a browser (webview) widget at the cursor, mirroring
+    // the file-drop behaviour. Read uri-list first because that is the precise
+    // type a dragged tab provides, and only accept real http(s) URLs so a stray
+    // text drag does nothing.
+    if (activeTaskId) {
+      const droppedUrl =
+        firstHttpUrl(e.dataTransfer.getData('text/uri-list')) ??
+        firstHttpUrl(e.dataTransfer.getData('text/plain'))
+      if (droppedUrl) {
+        e.preventDefault()
+        const entry = catalogFor('webview')
+        const width = entry?.defaultWidth ?? 560
+        const height = entry?.defaultHeight ?? 400
+        const rect = e.currentTarget.getBoundingClientRect()
+        const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+        await createWidget({
+          taskId: activeTaskId,
+          kind: 'webview',
+          title: '',
+          content: droppedUrl,
+          x: Math.round(cursor.x - width / 2),
+          y: Math.round(cursor.y - 20),
+          width,
+          height,
+          color: null
+        })
+        return
+      }
     }
     // Dragged Connected App from sidebar → spawn a webview widget bound to it.
     // Bound widgets share the app's session partition (so logged-in cookies
@@ -919,9 +1901,22 @@ export default function Canvas(): JSX.Element {
     void placeWidget(entry, cursor.x - entry.defaultWidth / 2, cursor.y - 20)
   }
 
-  function handleSaveTemplate(): void {
-    if (!activeTaskId || widgets.length === 0 || savingTemplate) return
-    setSaveTemplateOpen({ context: 'toolbar' })
+  // Spawn a browser (webview) widget for a standard app — used by the starting
+  // kit's "open a browser" quick-adds. Staggered so multiple don't stack.
+  async function addBrowserApp(app: StandardApp): Promise<void> {
+    if (!activeTaskId) return
+    const entry = catalogFor('webview')
+    const n = useWidgetStore.getState().widgets.filter((w) => !w.pinned).length
+    await createWidget({
+      taskId: activeTaskId,
+      kind: 'webview',
+      title: app.title,
+      content: app.url,
+      x: 60 + (n % 5) * 36,
+      y: 60 + (n % 5) * 36,
+      width: entry?.defaultWidth ?? 520,
+      height: entry?.defaultHeight ?? 360
+    })
   }
 
   // AI Builder accept path. Distinct from handleAISetupAccept because each
@@ -1070,7 +2065,7 @@ export default function Canvas(): JSX.Element {
     setTimeout(() => centerOnHome(), 100)
   }
 
-  async function handleAutoArrange(): Promise<void> {
+  async function handleAutoArrange(opts: TidyOptions = { mode: 'flow' }): Promise<void> {
     if (widgets.length === 0 || !dropRef.current) return
     const rect = dropRef.current.getBoundingClientRect()
     const visibleW = rect.width / zoom
@@ -1114,48 +2109,79 @@ export default function Canvas(): JSX.Element {
     }
     if (items.length === 0) return
 
-    items.sort((a, b) => a.catRank - b.catRank || a.createdAt - b.createdAt)
+    // Baseline ordering: by category, then creation time.
+    const composite = (it: LayoutItem): number => it.catRank * 1e16 + it.createdAt
 
-    let cursorX = PADDING
-    let cursorY = PADDING
-    let rowMaxH = 0
-    const positions = new Map<string, { x: number; y: number }>()
-    for (const item of items) {
-      if (cursorX !== PADDING && cursorX + item.w > PADDING + visibleW) {
-        cursorX = PADDING
-        cursorY += rowMaxH + GAP
-        rowMaxH = 0
+    // Cluster linked widgets: widgets joined by connector lines should land next
+    // to each other so the wires stay short and local instead of arcing across
+    // the canvas over unrelated widgets. Compute connected components over the
+    // link graph (union-find), then order so each component's members are
+    // contiguous, components ordered by their earliest baseline member.
+    const idIndex = new Map(items.map((it, i) => [it.id, i]))
+    const parent = items.map((_, i) => i)
+    const find = (i: number): number => {
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]]
+        i = parent[i]
       }
-      positions.set(item.id, { x: Math.round(cursorX), y: Math.round(cursorY) })
-      cursorX += item.w + GAP
-      rowMaxH = Math.max(rowMaxH, item.h)
+      return i
     }
-    for (const [id, pos] of positions) {
-      await updateWidget(id, { x: pos.x, y: pos.y })
+    const union = (a: number, b: number): void => {
+      const ra = find(a)
+      const rb = find(b)
+      if (ra !== rb) parent[ra] = rb
+    }
+    for (const l of useLinksStore.getState().links) {
+      const ai = idIndex.get(l.sourceWidgetId)
+      const bi = idIndex.get(l.targetWidgetId)
+      if (ai !== undefined && bi !== undefined) union(ai, bi)
+    }
+    // Each component's sort key is the smallest composite among its members, so
+    // a cluster sits where its earliest member would have gone.
+    const compKey = new Map<number, number>()
+    items.forEach((it, i) => {
+      const root = find(i)
+      const c = composite(it)
+      const prev = compKey.get(root)
+      if (prev === undefined || c < prev) compKey.set(root, c)
+    })
+    items.sort((a, b) => {
+      const ia = idIndex.get(a.id)!
+      const ib = idIndex.get(b.id)!
+      const ka = compKey.get(find(ia))!
+      const kb = compKey.get(find(ib))!
+      if (ka !== kb) return ka - kb // different cluster → order by cluster
+      return composite(a) - composite(b) // same cluster → baseline order within
+    })
+
+    // `items` is already ordered (category baseline + linked-cluster contiguity);
+    // the chosen mode only decides the geometry. Linked widgets therefore stay
+    // adjacent in every mode, so wires stay short.
+    const placed = tidyPositions(
+      items.map((it) => ({ id: it.id, w: it.w, h: it.h })),
+      opts,
+      visibleW,
+      GAP,
+      PADDING
+    )
+    for (const p of placed) {
+      await updateWidget(p.id, { x: p.x, y: p.y })
     }
     bumpLayoutVersion()
   }
 
   if (!activeTask) {
+    // No desk open: show a gallery of the org's desks (each a canvas) to open,
+    // rather than a singular "your desk is clear" dead-end.
     return (
       <>
-        <div className="h-full flex items-center justify-center desk-paper">
-          <div className="text-center max-w-md px-6">
-            <Icon name="desk" size={48} className="text-stone-400 dark:text-stone-500 mb-3" />
-            <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100 mb-2">Your desk is clear</h2>
-            <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed">
-              Pick a task from the left to bring it to the desk — its sticky notes, browser windows
-              and tools will appear here.
-            </p>
-          </div>
-        </div>
+        <DeskGallery />
         <WidgetFocusMode />
       </>
     )
   }
 
   const status = STATUS_META[activeTask.status]
-  const zoomPct = Math.round(zoom * 100)
 
   // Task time tracking
   const totalEstimateMin =
@@ -1179,142 +2205,45 @@ export default function Canvas(): JSX.Element {
     return `${sign}${m}:${s.toString().padStart(2, '0')}`
   }
 
+  const timerText = isTracked ? fmtMin(remainingMin) : null
+
+  async function handleDeskChat(): Promise<void> {
+    if (!activeTask) return
+    const convId = await resolveObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
+    if (!convId) {
+      void openObjectChannel('desk', activeTask.id, activeTask.title || 'Desk')
+      return
+    }
+    const existing = widgets.find((w) => {
+      if (w.kind !== 'chat-thread') return false
+      try {
+        return (JSON.parse(w.content || '{}') as { conversationId?: string }).conversationId === convId
+      } catch {
+        return false
+      }
+    })
+    if (existing) {
+      focusOn(existing.id)
+      return
+    }
+    const entry = catalogFor('chat-thread')
+    const pos = spawnPositionFor(entry?.defaultWidth ?? 340, entry?.defaultHeight ?? 460)
+    await createWidget({
+      taskId: activeTask.id,
+      kind: 'chat-thread',
+      title: activeTask.title || 'Desk chat',
+      content: JSON.stringify({ conversationId: convId, channelName: activeTask.title || 'Desk' }),
+      x: pos.x,
+      y: pos.y,
+      width: entry?.defaultWidth ?? 340,
+      height: entry?.defaultHeight ?? 460,
+      color: null
+    })
+  }
+
   return (
     <>
       <div className="h-full flex flex-col">
-        <div className="px-4 py-2.5 border-b border-[color:var(--glass-chrome-border)] fb-glass-chrome flex items-center gap-2">
-          <Icon name="task_alt" size={18} className="text-stone-700 dark:text-stone-300" />
-          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate flex-1">
-            {activeTask.title}
-          </h2>
-          <div className="hidden md:flex items-center gap-3 text-[11px] text-stone-500 dark:text-stone-400">
-            <span className="flex items-center gap-1" title="Priority">
-              <Icon name="priority_high" size={14} />
-              {activeTask.priority}
-            </span>
-            <span className="flex items-center gap-1" title="Interest / Novelty">
-              <Icon name="bolt" size={14} />
-              {activeTask.interest}
-            </span>
-            <span className="flex items-center gap-1" title="Importance">
-              <Icon name="flag" size={14} />
-              {activeTask.importance}
-            </span>
-          </div>
-
-          {isTracked && (
-            <div
-              className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-mono ${
-                isOverdue
-                  ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 animate-pulse'
-                  : remainingMin < 5
-                    ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400'
-                    : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300'
-              }`}
-              title={`${Math.floor(elapsedMin)} of ${totalEstimateMin} min elapsed`}
-            >
-              <Icon name={isOverdue ? 'alarm' : 'timer'} size={14} />
-              <span>{fmtMin(remainingMin)}</span>
-            </div>
-          )}
-
-          {/* Zoom controls */}
-          <div className="flex items-center gap-0.5 px-1 border border-stone-300 dark:border-stone-600 rounded">
-            <button
-              onClick={() => setZoom(zoom - 0.1)}
-              className="icon-btn !h-6 !w-6"
-              title="Zoom out (⌘[)"
-            >
-              <Icon name="remove" size={14} />
-            </button>
-            <button
-              onClick={resetView}
-              className="text-[11px] text-stone-700 dark:text-stone-300 font-mono px-1.5 min-w-[42px] hover:text-stone-900 dark:hover:text-stone-100"
-              title="Reset view (⌘0)"
-            >
-              {zoomPct}%
-            </button>
-            <button
-              onClick={() => setZoom(zoom + 0.1)}
-              className="icon-btn !h-6 !w-6"
-              title="Zoom in (⌘])"
-            >
-              <Icon name="add" size={14} />
-            </button>
-          </div>
-
-          <LoadMeter />
-          <button
-            onClick={() => void handleAutoArrange()}
-            disabled={widgets.length === 0}
-            className="btn-ghost"
-            title="Lay widgets out in tidy rows by category"
-          >
-            <Icon name="grid_view" size={14} />
-            <span>Tidy</span>
-          </button>
-          <button
-            onClick={() => void updateNode(activeTask.id, { status: status.next })}
-            className="btn-ghost"
-            title={`Mark as ${status.next.replace('_', ' ')}`}
-          >
-            <Icon name={status.icon} size={14} />
-            <span>{status.label}</span>
-          </button>
-          <button
-            onClick={() => setShowAiBuilder(true)}
-            className="btn-ghost"
-            title="Describe what you want to build — AI suggests pages, tables, fields, files"
-          >
-            <Icon name="auto_fix_high" size={14} className="text-accent" />
-            <span>Build with AI</span>
-          </button>
-          <button
-            onClick={() => setShowAISetup(true)}
-            className="btn-ghost"
-            title="Let the AI suggest widgets you need to start this task"
-          >
-            <Icon name="auto_awesome" size={14} className="text-accent" />
-            <span>AI Setup</span>
-          </button>
-          <FivePromiseButton taskId={activeTask.id} />
-          <button
-            onClick={() => setShowResume(true)}
-            className={`btn-ghost ${activeTask.resumeMarkdown ? '!text-stone-900' : ''}`}
-            title={
-              activeTask.resumeMarkdown
-                ? 'View / regenerate your handoff document'
-                : 'Generate a handoff document to resume this task later'
-            }
-          >
-            <Icon
-              name="description"
-              size={14}
-              filled={!!activeTask.resumeMarkdown}
-              className={activeTask.resumeMarkdown ? 'text-amber-600' : ''}
-            />
-            <span>Resume</span>
-          </button>
-          <button
-            onClick={() => void handleSaveTemplate()}
-            disabled={widgets.length === 0 || savingTemplate}
-            className="btn-ghost"
-            title="Save this workspace layout as a reusable template"
-          >
-            <Icon name="bookmark_add" size={14} />
-            <span>{savingTemplate ? 'Saving…' : 'Save template'}</span>
-          </button>
-          <button
-            onClick={() => setPaletteOpen((v) => !v)}
-            className="icon-btn"
-            title={paletteOpen ? 'Hide palette' : 'Show palette'}
-          >
-            <Icon name={paletteOpen ? 'unfold_less' : 'unfold_more'} size={16} />
-          </button>
-        </div>
-
-        {paletteOpen && <WidgetPalette onAdd={handleClickAdd} disabled={!activeTaskId} />}
-
         <div
           ref={dropRef}
           data-bare-canvas
@@ -1324,14 +2253,193 @@ export default function Canvas(): JSX.Element {
           onWheel={handleWheel}
           onClick={handleCanvasClick}
           onContextMenu={handleCanvasContextMenu}
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={handleCanvasPointerUp}
+          onPointerCancel={handleCanvasPointerUp}
           className="flex-1 relative overflow-hidden desk-paper"
-          style={{ overscrollBehavior: 'none' }}
+          style={{
+            overscrollBehavior: 'none',
+            cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined
+          }}
         >
+          {/* Breadcrumb — floated top-left of the canvas surface so it
+              sits on the desk itself rather than in a header bar above it. */}
+          <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45] flex items-center gap-2">
+            <CanvasBreadcrumb
+              activeTask={activeTask}
+              nodes={nodes}
+              onOpenTask={(id) => setActiveTask(id)}
+              onRevealFolder={(id) => expandFolder(id, true)}
+              onHome={() => setActiveTask(null)}
+              fromMindmap={!!nodeOrigin}
+              onRenameTask={(id, title) => void updateNode(id, { title })}
+              onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
+              onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
+            />
+            {activeTaskId && deskViewMode !== 'columns' && (
+              <button
+                onClick={() => setDeskViewMode(activeTaskId, 'columns')}
+                data-testid="desk-view-columns"
+                title="Columns view — stack your objects into scrollable columns"
+                className="fb-glass-chrome inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shadow-[0_2px_10px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.06] dark:ring-white/[0.06]"
+              >
+                <Icon name="view_column" size={14} /> Columns
+              </button>
+            )}
+          </div>
+          {/* Context Health (plexi-4.0): floats just under the breadcrumb, showing
+              what changed since last visit and related desks needing attention.
+              Renders nothing when the desk is calm. */}
+          {activeTask && (
+            <div className="absolute top-16 left-4 z-[45]">
+              <ContextHealthStrip deskId={activeTask.id} variant="chrome" />
+            </div>
+          )}
+          {/* Screen-reader linear representation of the spatial canvas (PLX-A11Y-003):
+              visually hidden, fully navigable, opens each object. */}
+          <CanvasLinearView widgets={widgets} onOpen={(id) => focusOn(id)} deskTitle={activeTask?.title ?? null} />
+          {panPing && (
+            <div
+              className="absolute pointer-events-none z-[200]"
+              style={{ left: panPing.x, top: panPing.y, transform: 'translate(-50%, -50%)' }}
+            >
+              <span className="block h-10 w-10 rounded-full border-2 border-accent/70 animate-ping" />
+              <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent shadow" />
+            </div>
+          )}
+          {showStartingKit && nodeOrigin && activeTaskId && (
+            <MindmapStartingKit
+              taskId={activeTaskId}
+              nodeLabel={nodeOrigin.nodeLabel}
+              nodePath={nodeOrigin.nodePath}
+              onAddWidgets={handleAiBuilderAccept}
+              onAddBrowser={addBrowserApp}
+              onDismiss={() => {
+                if (activeTaskId) dismissKit(activeTaskId)
+                setKitDismissTick((t) => t + 1)
+              }}
+            />
+          )}
+          {/* Marquee selection box — screen-space projection of the canvas-space
+              rubber-band rect, so the marching ants stay 1px crisp at any zoom. */}
+          {rubberRect && (
+            <div
+              className="fb-marquee absolute pointer-events-none z-[150]"
+              style={{
+                left: rubberRect.x * zoom + panX,
+                top: rubberRect.y * zoom + panY,
+                width: rubberRect.w * zoom,
+                height: rubberRect.h * zoom
+              }}
+            />
+          )}
+          {/* Floating selection toolbar — appears above the selection's bounding
+              box. Hidden mid-marquee and during a group drag (positions in flux). */}
+          {selectionBBox && !rubberRect && !groupDragActive && (
+            <div
+              className="absolute z-[210]"
+              style={{
+                left: ((selectionBBox.minX + selectionBBox.maxX) / 2) * zoom + panX,
+                top: selectionBBox.minY * zoom + panY - 12,
+                transform: 'translate(-50%, -100%)'
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-0.5 rounded-full bg-stone-900/92 backdrop-blur px-1.5 py-1 shadow-xl ring-1 ring-white/10 text-stone-100">
+                <span className="px-2 text-[11px] font-medium tabular-nums whitespace-nowrap">
+                  {selectionBBox.count} selected
+                </span>
+                <div className="h-4 w-px bg-white/20" />
+                <button
+                  onClick={() => void groupIntoSection()}
+                  title="Group into a section"
+                  className="h-7 px-2 inline-flex items-center gap-1 rounded-full hover:bg-white/15 text-[11px]"
+                >
+                  <Icon name="dashboard" size={13} />
+                  <span>Group</span>
+                </button>
+                <button
+                  onClick={() => void duplicateSelection()}
+                  title="Duplicate all selected"
+                  aria-label="Duplicate selected"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                >
+                  <Icon name="content_copy" size={13} />
+                </button>
+                <button
+                  onClick={() => void deleteSelection()}
+                  title="Delete all selected"
+                  aria-label="Delete selected"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-rose-500/30 text-rose-200"
+                >
+                  <Icon name="delete" size={13} />
+                </button>
+                {/* Align + distribute the selection (needs 2+ to align, 3+ to
+                    distribute). Each is a single undo step. */}
+                {selectionBBox.count >= 2 && (
+                  <>
+                    <div className="h-4 w-px bg-white/20" />
+                    {(
+                      [
+                        ['left', 'align_horizontal_left', 'Align left'],
+                        ['center-h', 'align_horizontal_center', 'Align centre (horizontal)'],
+                        ['right', 'align_horizontal_right', 'Align right'],
+                        ['top', 'align_vertical_top', 'Align top'],
+                        ['center-v', 'align_vertical_center', 'Align centre (vertical)'],
+                        ['bottom', 'align_vertical_bottom', 'Align bottom']
+                      ] as Array<[AlignMode, string, string]>
+                    ).map(([mode, icon, label]) => (
+                      <button
+                        key={mode}
+                        onClick={() => alignSelection(mode)}
+                        title={label}
+                        aria-label={label}
+                        className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                      >
+                        <Icon name={icon} size={13} />
+                      </button>
+                    ))}
+                    {selectionBBox.count >= 3 && (
+                      <>
+                        <button
+                          onClick={() => distributeSelection('horizontal')}
+                          title="Distribute horizontally (equal gaps)"
+                          aria-label="Distribute horizontally"
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                        >
+                          <Icon name="horizontal_distribute" size={13} />
+                        </button>
+                        <button
+                          onClick={() => distributeSelection('vertical')}
+                          title="Distribute vertically (equal gaps)"
+                          aria-label="Distribute vertically"
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                        >
+                          <Icon name="vertical_distribute" size={13} />
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+                <div className="h-4 w-px bg-white/20" />
+                <button
+                  onClick={() => clearSelection()}
+                  title="Clear selection (Esc)"
+                  aria-label="Clear selection"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full hover:bg-white/15"
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+            </div>
+          )}
           {widgets.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-sm text-stone-500">
-                Drag a tool from the palette above onto the desk.
-              </p>
+              <div className="fb-glass-panel rounded-full px-4 py-2 inline-flex items-center gap-2 text-[var(--ink-50)]">
+                <Icon name="widgets" size={16} />
+                <p className="text-sm">Drag an object from the palette onto the desk.</p>
+              </div>
             </div>
           )}
           <LinkDragContext.Provider value={linkDragController}>
@@ -1345,34 +2453,49 @@ export default function Canvas(): JSX.Element {
               transformOrigin: '0 0'
             }}
           >
-            {/* Sections first (render behind non-section widgets). Sections render their own children. */}
-            {widgets.map((w) => {
+            {/* Sections first (render behind non-section widgets). Sections render their own children.
+                Skipped entirely in Columns view so canvas widgets (and their webviews) don't mount
+                under the overlay. */}
+            {deskViewMode !== 'columns' && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
+              // PLX-APP-012: skip sections fully outside the viewport (a section is
+              // exempt when it holds a linked child, so its children's links hold).
+              if (visibleObjectIds && !visibleObjectIds.has(w.id)) return null
               return (
-                <div key={`${w.id}-${layoutVersion}`}>{renderWidget(w)}</div>
+                <div key={w.id}>{renderWidget(w)}</div>
               )
             })}
-            {widgets.map((w) => {
+            {deskViewMode !== 'columns' && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind === 'section') return null
               if (w.parentSectionId !== null) return null // owned by a section, rendered inside it
               // For web kinds, fully UNMOUNT the focused widget so its unmount-flush
               // commits the latest URL before focus mode's separate WebViewWidget mounts.
               if (focusedId === w.id && isWebKind(w.kind)) return null
+              // PLX-APP-012: skip Objects fully outside the viewport. Web kinds and
+              // link/active/selected Objects are exempt (kept in visibleObjectIds),
+              // so this only ever culls cheap, off-screen, unconnected Objects.
+              if (visibleObjectIds && !visibleObjectIds.has(w.id)) return null
               return (
-                <div key={`${w.id}-${layoutVersion}`}>
+                <div key={w.id}>
                   {renderWidget(w)}
                 </div>
               )
             })}
           </div>
+          {deskViewMode === 'columns' && activeTaskId && (
+            <div className="absolute inset-0 z-[60]">
+              <ColumnsView taskId={activeTaskId} widgets={widgets} />
+            </div>
+          )}
           {/* Spatial-link overlay renders in screen-space, OUTSIDE the
               transformed container. It reads each linked widget's actual
               rendered position via getBoundingClientRect on every frame
               during a drag, so lines can never visually detach from the
-              widget they're attached to. Pinned widgets and section
-              children are excluded from linking in v1. */}
+              widget they're attached to. Widgets in sections, sections
+              themselves, and pinned widgets are all valid link endpoints;
+              arming from a section child is the one remaining exception. */}
           <LinkOverlay
             ghost={
               linkSourceId && ghostCursor
@@ -1383,19 +2506,29 @@ export default function Canvas(): JSX.Element {
                   }
                 : null
             }
+            pendingPick={pendingLinkPick}
+            onPendingPickDone={clearPendingLinkPick}
           />
           </LinkDragContext.Provider>
           {/* Pinned-widget layer: screen-space, in front of the transformed canvas.
               Zone-pinned widgets have their position computed here and provided
               via PinLayoutContext so any nested WidgetFrame can look up its
-              docked rect without prop-drilling through every widget kind. */}
-          <PinnedLayer
-            widgets={widgets}
-            layoutVersion={layoutVersion}
-            focusedId={focusedId}
-            renderWidget={renderWidget}
-          />
+              docked rect without prop-drilling through every widget kind.
+              It renders OUTSIDE the canvas's LinkDragContext.Provider (it's a
+              screen-space sibling), so it needs its own provider wired to the
+              same controller — otherwise pinned WidgetFrames read a null
+              linkDrag and their "connect" hub button never appears, and a pinned
+              widget can't be a link source (dropping onto one already works). */}
+          <LinkDragContext.Provider value={linkDragController}>
+            <PinnedLayer widgets={widgets} focusedId={focusedId} renderWidget={renderWidget} />
+          </LinkDragContext.Provider>
           <FloatingToolbar
+            onAddWidget={handleClickAdd}
+            onImport={() => setSyncPickerOpen(true)}
+            paletteDisabled={!activeTaskId}
+            onHistory={() => setHistoryOpen(true)}
+            historyDisabled={!activeTaskId}
+            rightInset={toolbarRightInset}
             actions={(() => {
               // Quick-jump buttons for every section currently on the canvas
               const sections = widgets.filter((w) => w.kind === 'section' && !w.pinned)
@@ -1422,7 +2555,7 @@ export default function Canvas(): JSX.Element {
                   separatorAfter: true
                 },
                 {
-                  icon: 'auto_fix_high',
+                  icon: 'auto_awesome',
                   label: 'Clean up',
                   onClick: () => void handleAutoArrange(),
                   separatorAfter: true
@@ -1443,12 +2576,65 @@ export default function Canvas(): JSX.Element {
               return [...sectionJumps, ...staticActions]
             })()}
           />
+          {/* Floating pill — draggable hub with desk state + quick actions +
+              cognitive-load ring + canvas tools. Uses fixed positioning internally. */}
+          {activeTaskId && (
+            <FloatingPill
+              onTidy={() => void handleAutoArrange()}
+              tidyDisabled={!activeTaskId}
+              onBuild={() => setShowAiBuilder(true)}
+              onSaveTemplate={() => setSaveTemplateOpen({ context: 'toolbar' })}
+              saveDisabled={!activeTaskId || savingTemplate}
+              savingTemplate={savingTemplate}
+              onResume={() => setShowResume(true)}
+              onStatus={() => void updateNode(activeTask.id, { status: status.next })}
+              statusLabel={status.label}
+              statusIcon={status.icon}
+              onFocus={() => {
+                futuristicPowerOn()
+                void startFocusSession(activeTask.id, 5 * 60, '5min')
+              }}
+              focusActive={focusSessionActive}
+              onChat={() => void handleDeskChat()}
+              onMeeting={() => void launchMeeting({ kind: 'desk', nodeId: activeTask.id, title: activeTask.title })}
+              timerText={timerText}
+              timerOverdue={isOverdue}
+            />
+          )}
+          {/* Desk presence — who else is on this desk, floated top-right of canvas surface */}
+          <div data-floating-menu className="fb-floating-chrome absolute top-3 right-3 z-[45] pointer-events-auto">
+            <DeskPresenceBar taskId={activeTask.id} />
+          </div>
           {activeId && !linkSourceId && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/85 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1.5 pointer-events-none">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
               <span>Widget active · click outside or press Esc to pan canvas</span>
             </div>
           )}
+          {/* Edge-pan boundary indicators — subtle violet glow hugging
+              each edge. Idle: faint breathing hairline so the user
+              discovers the affordance. Active: brighter halo that
+              matches the live mouse intensity from useEdgePan. Hidden
+              while a widget is being edited (so editing UI isn't
+              competing with ambient motion) — but EXPLICITLY shown
+              again while the user is mid-drag, which is exactly when
+              edge-pan matters most. */}
+          <CanvasEdgeIndicators
+            intensity={edgeIntensity}
+            visible={!animatingPan}
+          />
+          {/* Minimap FAB — always-present in the canvas bottom-right. */}
+          {activeTaskId && <CanvasMinimapFAB />}
+          {/* Automations FAB — stacked above the minimap: the desk's "what runs
+              on its own" list (reactive wires + agents) with on/off + jump-to. */}
+          {activeTaskId && <AutomationsFAB />}
+          {activeTaskId && <DeskSuggestionChip />}
+          {/* Zoom + pan controls — bottom-left. Mirrors the 2.0 mockup. */}
+          <ZoomControls />
+          {/* The desk-scoped AI rail used to live here, which meant two AI panels
+              showed at once (this one + the app-level Assistant). The assistant is
+              now a single context-aware panel (ChatPanel in App.tsx) that adapts
+              to the desk, so the duplicate canvas rail is removed. */}
           {linkSourceId && (() => {
             const src = widgets.find((w) => w.id === linkSourceId)
             const label = src?.title || src?.kind || 'widget'
@@ -1483,7 +2669,6 @@ export default function Canvas(): JSX.Element {
           })()}
         </div>
 
-        <WidgetDock />
       </div>
       <WidgetFocusMode />
       {saveTemplateOpen && activeTask && (
@@ -1492,9 +2677,6 @@ export default function Canvas(): JSX.Element {
           context={saveTemplateOpen.context}
           onClose={() => setSaveTemplateOpen(null)}
         />
-      )}
-      {showResume && activeTask && (
-        <ResumeModal task={activeTask} onClose={() => setShowResume(false)} />
       )}
       {showAISetup && activeTask && (
         <AISetupDialog
@@ -1506,8 +2688,29 @@ export default function Canvas(): JSX.Element {
       {showAiBuilder && (
         <AiBuilderDialog
           taskId={activeTaskId ?? null}
-          onClose={() => setShowAiBuilder(false)}
+          initialSuggestions={aiBuildHandoff?.suggestions}
+          initialIntent={aiBuildHandoff?.intent}
+          onClose={() => {
+            setShowAiBuilder(false)
+            clearAiBuildHandoff(null)
+          }}
           onAccept={handleAiBuilderAccept}
+        />
+      )}
+      {syncPickerOpen && activeTaskId && (
+        <SyncWidgetPicker targetTaskId={activeTaskId} onClose={() => setSyncPickerOpen(false)} />
+      )}
+      {historyOpen && activeTaskId && (
+        <HistoryPanel taskId={activeTaskId} onClose={() => setHistoryOpen(false)} />
+      )}
+      {showResume && activeTask && (
+        <ResumeModal task={activeTask} onClose={() => setShowResume(false)} />
+      )}
+      {officeAdd && (
+        <OfficeDocAddDialog
+          docType={officeAdd.entry.kind as 'doc' | 'sheet' | 'slides'}
+          onPicked={(id) => void createOfficeWidget(id)}
+          onClose={() => setOfficeAdd(null)}
         />
       )}
       {ctxMenu && (
@@ -1518,6 +2721,13 @@ export default function Canvas(): JSX.Element {
           onClose={() => setCtxMenu(null)}
         />
       )}
+      {/* The single AI Assist preview for the unified context menu. Portals to
+          body, so its placement in the tree does not matter. */}
+      <AiAssistPreview />
+      {/* The per-widget AI setup preview (Build with AI). Also body-portalled. */}
+      <WidgetSetupPreview />
+      {/* The unified menu for non-editable right-clicks inside browser widgets. */}
+      <BrowserContextMenu />
       {showExtensionPrompt && (
         <ExtensionPrompt
           task={activeTask}
@@ -1540,38 +2750,6 @@ export default function Canvas(): JSX.Element {
   )
 }
 
-function FivePromiseButton({ taskId }: { taskId: string }): JSX.Element {
-  const active = useFocusSessionStore((s) => s.active)
-  const start = useFocusSessionStore((s) => s.start)
-  const isOnThisTask = active?.taskId === taskId
-  if (isOnThisTask) {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-accent cursor-default"
-        title="5-Minute Promise running — see the pill at top of canvas"
-      >
-        <Icon name="bolt" size={14} filled />
-        <span>In session</span>
-      </span>
-    )
-  }
-  return (
-    <button
-      onClick={() => {
-        // Fire chime on user gesture (autoplay-friendly) then start the session
-        futuristicPowerOn()
-        void start(taskId, 5 * 60, '5min')
-      }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white transition-all hover:brightness-110"
-      style={{ backgroundColor: 'rgb(var(--accent))' }}
-      title="The 5-Minute Promise: just five minutes, no commitment past that. The most-evidence-backed ADHD initiation technique."
-    >
-      <Icon name="bolt" size={14} />
-      <span>Just 5 min</span>
-    </button>
-  )
-}
-
 // ── Pinned-widget layer ─────────────────────────────────────────────────────
 // Lives screen-space above the transformed canvas. Tracks its own bounding
 // box (the main pane minus the canvas chrome) via ResizeObserver, then
@@ -1582,17 +2760,31 @@ function FivePromiseButton({ taskId }: { taskId: string }): JSX.Element {
 
 function PinnedLayer({
   widgets,
-  layoutVersion,
   focusedId,
   renderWidget
 }: {
   widgets: Widget[]
-  layoutVersion: number
   focusedId: string | null
   renderWidget: (w: Widget) => JSX.Element | null
 }): JSX.Element {
   const layerRef = useRef<HTMLDivElement | null>(null)
   const [bounds, setBounds] = useState({ width: 0, height: 0 })
+  // Subscribe to the AI rail's collapsed state so any change re-runs the
+  // pin-position memo. When the rail opens, BR/TR widgets glide left by
+  // AI_RAIL_WIDTH + gap; when it collapses to the small icon, they glide
+  // back. ChromeInsets is the single point where rail width + (later)
+  // dock height + zoom-controls inset get composed.
+  const railCollapsed = useAIRailCollapsed()
+  const insets: ChromeInsets = useMemo(
+    () => ({
+      top: 0,
+      right: railCollapsed ? AI_RAIL_BUTTON_SIZE + 8 : AI_RAIL_WIDTH + 12,
+      bottom: 0,
+      left: 0
+    }),
+    [railCollapsed]
+  )
+
   useEffect(() => {
     const el = layerRef.current
     if (!el) return
@@ -1601,18 +2793,14 @@ function PinnedLayer({
       if (r) setBounds({ width: r.width, height: r.height })
     })
     ro.observe(el)
-    // Prime with initial size — ResizeObserver fires async on first observe.
     const rect = el.getBoundingClientRect()
     setBounds({ width: rect.width, height: rect.height })
     return () => ro.disconnect()
   }, [])
 
-  // Compute zone-pin positions every render. Cheap — just iterates pinned
-  // widgets. Map identity matters for memo so use useMemo across deps that
-  // genuinely affect output.
   const zonePositions = useMemo(
-    () => computeZonePinPositions(widgets, bounds),
-    [widgets, bounds]
+    () => computeZonePinPositions(widgets, bounds, insets),
+    [widgets, bounds, insets]
   )
 
   return (
@@ -1626,7 +2814,7 @@ function PinnedLayer({
           if (w.archived) return null
           if (!w.pinned || w.kind !== 'section') return null
           return (
-            <div key={`${w.id}-pin-${layoutVersion}`}>{renderWidget(w)}</div>
+            <div key={`${w.id}-pin`}>{renderWidget(w)}</div>
           )
         })}
         {widgets.map((w) => {
@@ -1635,7 +2823,7 @@ function PinnedLayer({
           if (w.parentSectionId !== null) return null
           if (focusedId === w.id && isWebKind(w.kind)) return null
           return (
-            <div key={`${w.id}-pin-${layoutVersion}`}>{renderWidget(w)}</div>
+            <div key={`${w.id}-pin`}>{renderWidget(w)}</div>
           )
         })}
       </div>

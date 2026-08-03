@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FbNode, WidgetSuggestion } from '@shared/types'
 import { catalogFor } from '../lib/widgetCatalog'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 
 interface Props {
   task: FbNode
@@ -17,14 +18,6 @@ type State =
 
 export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.Element {
   const [state, setState] = useState<State>({ stage: 'loading' })
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   useEffect(() => {
     let cancelled = false
@@ -73,21 +66,19 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
   const selectedCount = state.stage === 'ready' ? state.selected.size : 0
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/55 backdrop-blur-md p-6"
-      onClick={onClose}
+    <Modal
+      onClose={onClose}
+      label="Let me set up your desk"
+      z={60}
+      className="bg-[var(--surface-raised)] rounded-lg shadow-2xl border border-[var(--edge-soft)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
     >
-      <div
-        className="bg-white dark:bg-stone-900 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 py-3 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2">
           <Icon name="auto_awesome" size={20} className="text-accent" />
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+            <h3 className="text-sm font-semibold text-[var(--ink-100)]">
               Let me set up your desk
             </h3>
-            <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+            <p className="text-[11px] text-[var(--ink-50)] truncate">
               for: {task.title}
             </p>
           </div>
@@ -102,10 +93,10 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
               <div className="animate-pulse mb-3">
                 <Icon name="auto_awesome" size={36} className="text-accent" />
               </div>
-              <p className="text-sm text-stone-700 dark:text-stone-300">
+              <p className="text-sm text-[var(--ink-70)]">
                 Looking at your task…
               </p>
-              <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1">
+              <p className="text-[11px] text-[var(--ink-50)] mt-1">
                 Picking the widgets you'll need to start
               </p>
             </div>
@@ -118,9 +109,9 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
                 size={28}
                 className="text-amber-700 dark:text-amber-400 mb-2"
               />
-              <p className="text-sm text-stone-800 dark:text-stone-200">
+              <p className="text-sm text-[var(--ink-90)]">
                 {state.needsApiKey
-                  ? 'Add ANTHROPIC_API_KEY to projects/focusbuddy/.env and restart to use AI setup.'
+                  ? 'Open Settings → AI · API keys and paste your Anthropic API key. No restart needed.'
                   : state.message}
               </p>
             </div>
@@ -128,7 +119,7 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
 
           {state.stage === 'ready' && (
             <div className="space-y-2">
-              <p className="text-[12px] text-stone-600 dark:text-stone-400 mb-3 leading-relaxed">
+              <p className="text-[12px] text-[var(--ink-70)] mb-3 leading-relaxed">
                 Based on your task, here's what I think you'll need. Uncheck anything you don't
                 want — defaults are tuned to give you a complete start.
               </p>
@@ -141,7 +132,7 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
                     className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
                       checked
                         ? 'border-accent/40 bg-accent/5 dark:bg-accent/10'
-                        : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700/50'
+                        : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)]'
                     }`}
                   >
                     <input
@@ -159,25 +150,25 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
                       <Icon
                         name={entry?.icon ?? 'apps'}
                         size={18}
-                        className={checked ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}
+                        className={checked ? 'text-accent' : 'text-[var(--ink-50)]'}
                       />
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">
+                        <span className="text-sm font-medium text-[var(--ink-100)] truncate">
                           {s.title || entry?.label || s.kind}
                         </span>
-                        <span className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 shrink-0">
+                        <span className="text-[10px] uppercase tracking-wider text-[var(--ink-40)] shrink-0">
                           {entry?.label ?? s.kind}
                         </span>
                       </div>
                       {s.reason && (
-                        <p className="text-[12px] text-stone-600 dark:text-stone-400 mt-0.5 leading-snug">
+                        <p className="text-[12px] text-[var(--ink-70)] mt-0.5 leading-snug">
                           {s.reason}
                         </p>
                       )}
                       {s.content && (
-                        <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1 truncate font-mono">
+                        <p className="text-[10px] text-[var(--ink-40)] mt-1 truncate font-mono">
                           {s.content}
                         </p>
                       )}
@@ -193,14 +184,14 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
               <div className="animate-pulse mb-3">
                 <Icon name="grid_view" size={36} className="text-accent" />
               </div>
-              <p className="text-sm text-stone-700 dark:text-stone-300">
+              <p className="text-sm text-[var(--ink-70)]">
                 Setting up your desk…
               </p>
             </div>
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex justify-end gap-2">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex justify-end gap-2">
           <button onClick={onClose} className="btn-ghost">
             Cancel
           </button>
@@ -219,7 +210,6 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

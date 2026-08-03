@@ -62,25 +62,25 @@ export default function TodayTasksCard({ taskIds, nodes }: Props): JSX.Element {
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur">
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="checklist" size={12} />
           <span>Open tasks</span>
         </div>
-        <span className="text-[10px] text-stone-500 dark:text-stone-400 font-mono">
+        <span className="text-[10px] text-[var(--ink-50)] font-mono">
           {candidates.length}
         </span>
       </div>
       {rows.length === 0 ? (
         <div className="px-4 pb-4 text-center">
           <div className="text-2xl mb-1">🌤️</div>
-          <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
+          <p className="text-xs text-[var(--ink-50)] leading-relaxed">
             Nothing open in this scope. Either everything's done — or it's time to add the next thing.
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-stone-100 dark:divide-stone-800">
+        <div className="divide-y divide-[var(--edge-soft)]">
           {rows.map((task) => (
             <TaskRow
               key={task.id}
@@ -90,7 +90,7 @@ export default function TodayTasksCard({ taskIds, nodes }: Props): JSX.Element {
             />
           ))}
           {overflow > 0 && (
-            <div className="px-4 py-2 text-[11px] text-stone-500 dark:text-stone-400 text-center">
+            <div className="px-4 py-2 text-[11px] text-[var(--ink-50)] text-center">
               + {overflow} more
             </div>
           )}
@@ -111,7 +111,7 @@ function TaskRow({
 }): JSX.Element {
   const now = Date.now()
   let dueLabel: string | null = null
-  let dueClass = 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+  let dueClass = 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
   if (task.dueDate != null) {
     const daysLeft = Math.ceil((task.dueDate - now) / 86_400_000)
     if (daysLeft < 0) {
@@ -131,7 +131,7 @@ function TaskRow({
   }
 
   return (
-    <div className="px-4 py-2 flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-800/50 group transition-colors">
+    <div className="px-4 py-2 flex items-center gap-2 hover:bg-[var(--surface-sunken)] group transition-colors">
       <Icon
         name={task.status === 'in_progress' ? 'play_arrow' : 'task_alt'}
         size={14}
@@ -139,12 +139,12 @@ function TaskRow({
         className={
           task.status === 'in_progress'
             ? 'text-blue-700 dark:text-blue-400'
-            : 'text-stone-400 dark:text-stone-500'
+            : 'text-[var(--ink-40)]'
         }
       />
       <button
         onClick={onOpen}
-        className="flex-1 text-left text-sm text-stone-900 dark:text-stone-100 truncate hover:text-accent transition-colors min-w-0"
+        className="flex-1 text-left text-sm text-[var(--ink-100)] truncate hover:text-accent transition-colors min-w-0"
       >
         {task.title}
       </button>
@@ -158,7 +158,7 @@ function TaskRow({
       )}
       <button
         onClick={onQuickStart}
-        className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all"
+        className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all"
         style={{ backgroundColor: 'rgb(var(--accent))' }}
         title="Start a 5-minute focus session on this task"
       >

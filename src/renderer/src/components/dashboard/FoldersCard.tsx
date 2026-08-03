@@ -289,9 +289,9 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header row — tabs + a "New folder" button */}
-      <div className="flex items-center justify-between gap-2 mb-2 border-b border-stone-200 dark:border-stone-700">
-        <div role="tablist" aria-label="Folder buckets" className="flex gap-0.5">
+      {/* Header row — tabs + a "New Room" button */}
+      <div className="flex items-center justify-between gap-2 mb-2 border-b border-[var(--edge-soft)]">
+        <div role="tablist" aria-label="Room buckets" className="flex gap-0.5">
           {TABS.map((t) => {
             const active = tab === t.value
             return (
@@ -315,7 +315,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium border-b-2 transition-colors -mb-px ${
                   active
                     ? 'text-accent border-accent'
-                    : 'text-stone-500 dark:text-stone-400 border-transparent hover:text-stone-800 dark:hover:text-stone-200'
+                    : 'text-[var(--ink-50)] border-transparent hover:text-[var(--ink-90)]'
                 }`}
               >
                 <Icon name={t.icon} size={13} />
@@ -325,7 +325,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                     className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${
                       active
                         ? 'bg-accent/15 text-accent'
-                        : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+                        : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
                     }`}
                   >
                     {t.count}
@@ -341,10 +341,10 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
               setDialog({ mode: 'create', parentId: null, kind: 'folder' })
             }
             className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded text-accent hover:bg-accent/10"
-            title="New top-level folder"
+            title="New top-level Room"
           >
             <Icon name="create_new_folder" size={13} />
-            <span>New folder</span>
+            <span>New Room</span>
           </button>
         )}
       </div>
@@ -354,7 +354,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
         className="flex-1 min-h-0 overflow-y-auto"
       >
         {flat.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-stone-400 dark:text-stone-500">
+          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-[var(--ink-40)]">
             <Icon
               name={
                 tab === 'archived'
@@ -364,14 +364,14 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                     : 'folder_open'
               }
               size={28}
-              className="text-stone-300 dark:text-stone-600"
+              className="text-[var(--ink-30)]"
             />
             <span className="text-[12px]">
               {tab === 'active'
-                ? 'No folders with active tasks.'
+                ? 'No Rooms with active Desks.'
                 : tab === 'closed'
-                  ? 'No closed folders yet.'
-                  : 'No archived folders.'}
+                  ? 'No closed Rooms yet.'
+                  : 'No archived Rooms.'}
             </span>
             {tab === 'active' && (
               <button
@@ -380,12 +380,12 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                 }
                 className="text-[11px] text-accent hover:underline"
               >
-                Create your first folder
+                Create your first Room
               </button>
             )}
           </div>
         ) : (
-          <div role="tree" aria-label={`${tab} folders`}>
+          <div role="tree" aria-label={`${tab} Rooms`}>
             {flat.map((item) => {
               const { node, depth } = item
               const hasChildren = item.children.length > 0
@@ -437,7 +437,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                 >
                   <button
                     onClick={() => hasChildren && toggleExpand(node.id)}
-                    className={`w-5 h-5 flex items-center justify-center text-stone-500 hover:text-stone-900 transition-colors ${
+                    className={`w-5 h-5 flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] transition-colors ${
                       hasChildren ? '' : 'invisible'
                     }`}
                     aria-label={isOpen ? 'Collapse' : 'Expand'}
@@ -455,7 +455,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                       if (isFolder && hasChildren) toggleExpand(node.id)
                       openNode(node)
                     }}
-                    className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded min-w-0 cursor-grab active:cursor-grabbing hover:bg-stone-100 dark:hover:bg-stone-800"
+                    className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded min-w-0 cursor-grab active:cursor-grabbing hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon
                       name={isFolder ? 'folder' : 'task_alt'}
@@ -463,31 +463,31 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                       filled
                       className={
                         tab === 'archived'
-                          ? 'text-stone-400 dark:text-stone-500'
+                          ? 'text-[var(--ink-40)]'
                           : isFolder
                             ? 'text-amber-700'
                             : node.status === 'done'
                               ? 'text-emerald-700'
                               : node.status === 'in_progress'
                                 ? 'text-blue-700'
-                                : 'text-stone-500'
+                                : 'text-[var(--ink-50)]'
                       }
                     />
                     <span
                       className={`text-[13px] truncate ${
                         tab === 'archived'
-                          ? 'text-stone-500 dark:text-stone-400'
-                          : 'text-stone-800 dark:text-stone-100'
+                          ? 'text-[var(--ink-50)]'
+                          : 'text-[var(--ink-90)]'
                       } ${
                         node.status === 'done'
-                          ? 'line-through text-stone-400 dark:text-stone-500'
+                          ? 'line-through text-[var(--ink-40)]'
                           : ''
                       }`}
                     >
                       {node.title || '(untitled)'}
                     </span>
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center transition-opacity">
+                  <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-focus-within:opacity-100 flex items-center transition-opacity">
                     {tab === 'archived' ? (
                       <button
                         onClick={() => restore(node.id)}
@@ -508,7 +508,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                                   kind: 'folder'
                                 })
                               }
-                              title="Add sub-folder"
+                              title="Add sub-Room"
                               className="icon-btn"
                             >
                               <Icon name="create_new_folder" size={14} />
@@ -521,7 +521,7 @@ export default function FoldersCard({ nodes }: Props): JSX.Element {
                                   kind: 'task'
                                 })
                               }
-                              title="Add task to this folder"
+                              title="Add Desk to this Room"
                               className="icon-btn"
                             >
                               <Icon name="add_task" size={14} />

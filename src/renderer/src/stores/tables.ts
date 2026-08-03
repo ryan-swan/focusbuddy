@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { recordAction, recordActionWithToast } from './actionHistory'
 import type {
   FbRow,
   FbTable,
@@ -67,6 +68,21 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     const row = await window.api.tables.createRow({ tableId, cells })
     const existing = get().rows[tableId] ?? []
     set({ rows: { ...get().rows, [tableId]: [...existing, row] } })
+    // Undo a row add (covers AI add-table-row applies). Redo re-creates it; the
+    // id changes, so track the live id for a subsequent undo.
+    let rowId = row.id
+    recordAction({
+      label: 'Add row',
+      undo: async () => {
+        await window.api.tables.deleteRow(rowId)
+        set({ rows: { ...get().rows, [tableId]: (get().rows[tableId] ?? []).filter((r) => r.id !== rowId) } })
+      },
+      redo: async () => {
+        const again = await window.api.tables.createRow({ tableId, cells })
+        rowId = again.id
+        set({ rows: { ...get().rows, [tableId]: [...(get().rows[tableId] ?? []), again] } })
+      }
+    })
     return row
   },
   updateCells: async (rowId, cells) => {
@@ -89,22 +105,59 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
       cells: rowsCopy[foundTableId].find((r) => r.id === rowId)?.cells
     })
     if (updated) {
-      const list = rowsCopy[foundTableId]
-      const idx = list.findIndex((r) => r.id === rowId)
+      // Reconcile against the LIVE state, not the pre-await snapshot: another
+      // cell edit or an AI row-add may have landed during the IPC round trip,
+      // and rebuilding from the stale copy silently reverted it (the reported
+      // "cell stays stale until re-selected" bug). Patch only this one row.
+      const live = get().rows[foundTableId] ?? []
+      const idx = live.findIndex((r) => r.id === rowId)
       if (idx !== -1) {
-        const next = [...list]
+        const next = [...live]
         next[idx] = updated
         set({ rows: { ...get().rows, [foundTableId]: next } })
       }
     }
   },
   deleteRow: async (rowId) => {
+    // Capture the row + its table so the delete can be undone (re-created with
+    // the same cell values; the new row lands at the end of the table).
+    let capturedTableId: string | null = null
+    let capturedCells: Record<string, unknown> | null = null
+    for (const [tableId, list] of Object.entries(get().rows)) {
+      const r = list.find((x) => x.id === rowId)
+      if (r) {
+        capturedTableId = tableId
+        capturedCells = r.cells
+        break
+      }
+    }
     await window.api.tables.deleteRow(rowId)
     const rowsCopy: Record<string, FbRow[]> = {}
     for (const [tableId, list] of Object.entries(get().rows)) {
       rowsCopy[tableId] = list.filter((r) => r.id !== rowId)
     }
     set({ rows: rowsCopy })
+    if (capturedTableId && capturedCells) {
+      const tableId = capturedTableId
+      // Rows are soft-deleted now, so undo restores the SAME row (same id and
+      // sort_order) rather than re-inserting a fresh copy. Redo soft-deletes it
+      // again. Keeping the id stable also means the delete/restore propagates as a
+      // clean tombstone/un-tombstone pair to other org members.
+      recordActionWithToast({
+        label: 'Delete row',
+        undo: async () => {
+          const restored = await window.api.tables.restoreRow(rowId)
+          if (restored) {
+            const rest = (get().rows[tableId] ?? []).filter((r) => r.id !== rowId)
+            set({ rows: { ...get().rows, [tableId]: [...rest, restored] } })
+          }
+        },
+        redo: async () => {
+          await window.api.tables.deleteRow(rowId)
+          set({ rows: { ...get().rows, [tableId]: (get().rows[tableId] ?? []).filter((r) => r.id !== rowId) } })
+        }
+      })
+    }
   },
   reorderRows: async (tableId, ids) => {
     const byId = new Map((get().rows[tableId] ?? []).map((r) => [r.id, r]))
@@ -113,3 +166,16 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     await window.api.tables.reorderRows(tableId, ids)
   }
 }))
+
+// Refetch a table's rows whenever any writer changes them (flows and forms run
+// in the main process and used to write behind this cache's back — the rows
+// only appeared after an app restart). Only tables already cached refetch.
+if (typeof window !== 'undefined' && window.api?.tables?.onRowsChanged) {
+  window.api.tables.onRowsChanged((tableId) => {
+    const state = useTablesStore.getState()
+    if (!(tableId in state.rows)) return
+    void window.api.tables.listRows(tableId).then((rows) => {
+      useTablesStore.setState({ rows: { ...useTablesStore.getState().rows, [tableId]: rows } })
+    })
+  })
+}

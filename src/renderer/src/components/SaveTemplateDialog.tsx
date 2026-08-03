@@ -167,7 +167,7 @@ export default function SaveTemplateDialog({
     return (
       <label
         key={widget.id}
-        className={`flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-50 dark:hover:bg-stone-800/40 cursor-pointer ${
+        className={`flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] cursor-pointer ${
           disabled ? 'opacity-60 cursor-not-allowed' : ''
         }`}
         style={{ paddingLeft: `${indent * 16 + 8}px` }}
@@ -181,18 +181,18 @@ export default function SaveTemplateDialog({
           }
           className="mt-0.5 accent-accent shrink-0"
         />
-        <Icon name={icon} size={14} className="text-stone-500 mt-0.5 shrink-0" />
+        <Icon name={icon} size={14} className="text-[var(--ink-50)] mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] text-stone-800 dark:text-stone-100 truncate">
+          <div className="text-[12px] text-[var(--ink-90)] truncate">
             {widget.title || label}
           </div>
           {widget.content && widget.kind !== 'webview' && (
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+            <div className="text-[10px] text-[var(--ink-50)] truncate">
               {widget.content.replace(/\s+/g, ' ').slice(0, 80)}
             </div>
           )}
           {widget.kind === 'webview' && widget.content && (
-            <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate font-mono">
+            <div className="text-[10px] text-[var(--ink-50)] truncate font-mono">
               {widget.content}
             </div>
           )}
@@ -209,20 +209,20 @@ export default function SaveTemplateDialog({
       }}
     >
       <div
-        className="w-[520px] max-h-[85vh] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
+        className="w-[520px] max-h-[85vh] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <div className="h-8 w-8 rounded-full bg-accent/10 inline-flex items-center justify-center">
             <Icon name="bookmark_add" size={16} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+            <h2 className="text-sm font-semibold text-[var(--ink-100)]">
               {context === 'task-done'
                 ? 'Save this as a template?'
                 : 'Save as template'}
             </h2>
-            <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-tight">
+            <p className="text-[11px] text-[var(--ink-50)] leading-tight">
               {context === 'task-done'
                 ? `Reuse this setup when you start another task like "${task.title}"`
                 : 'Reuse this layout for future tasks of the same kind'}
@@ -230,7 +230,7 @@ export default function SaveTemplateDialog({
           </div>
           <button
             onClick={onClose}
-            className="h-7 w-7 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="h-7 w-7 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]"
             aria-label="Close"
           >
             <Icon name="close" size={14} />
@@ -239,7 +239,7 @@ export default function SaveTemplateDialog({
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+            <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
               Name
             </label>
             <input
@@ -247,49 +247,49 @@ export default function SaveTemplateDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Template name"
-              className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md focus:outline-none focus:border-accent"
+              className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
             />
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+            <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
               Description{' '}
-              <span className="text-stone-400 normal-case font-normal">(optional)</span>
+              <span className="text-[var(--ink-40)] normal-case font-normal">(optional)</span>
             </label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this template for?"
-              className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md focus:outline-none focus:border-accent"
+              className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400">
+              <label className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)]">
                 What to include
-                <span className="ml-1 text-stone-400 dark:text-stone-500 normal-case font-normal">
+                <span className="ml-1 text-[var(--ink-40)] normal-case font-normal">
                   ({keptCount} of {totalCount})
                 </span>
               </label>
               <div className="flex items-center gap-1.5 text-[10px]">
                 <button
                   onClick={() => toggleAll(true)}
-                  className="text-stone-600 dark:text-stone-300 hover:text-accent"
+                  className="text-[var(--ink-70)] hover:text-accent"
                 >
                   All
                 </button>
-                <span className="text-stone-300 dark:text-stone-600">·</span>
+                <span className="text-[var(--ink-30)]">·</span>
                 <button
                   onClick={() => toggleAll(false)}
-                  className="text-stone-600 dark:text-stone-300 hover:text-accent"
+                  className="text-[var(--ink-70)] hover:text-accent"
                 >
                   None
                 </button>
               </div>
             </div>
-            <div className="max-h-[260px] overflow-y-auto rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50/40 dark:bg-stone-800/30 py-1">
+            <div className="max-h-[260px] overflow-y-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 py-1">
               {taskWidgets.length === 0 ? (
-                <div className="px-4 py-6 text-center text-[12px] text-stone-500 dark:text-stone-400">
+                <div className="px-4 py-6 text-center text-[12px] text-[var(--ink-50)]">
                   This task has no widgets to template yet.
                 </div>
               ) : (
@@ -317,10 +317,10 @@ export default function SaveTemplateDialog({
           </div>
         </div>
 
-        <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-700 flex justify-end gap-2">
+        <div className="px-4 py-3 border-t border-[var(--edge-soft)] flex justify-end gap-2">
           <button
             onClick={handleSkip}
-            className="text-[12px] px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="text-[12px] px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           >
             {context === 'task-done' ? 'Skip — just close' : 'Cancel'}
           </button>

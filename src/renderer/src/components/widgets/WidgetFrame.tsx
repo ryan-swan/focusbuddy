@@ -1,7 +1,16 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
-import CanvasContextMenu, { type CtxMenuItem } from '../CanvasContextMenu'
+import { type CtxMenuItem } from '../CanvasContextMenu'
+import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
+import WidgetSetupAffordance from './WidgetSetupAffordance'
+import { useAutoGrowHeight, autoGrowsHeight } from '../../lib/useAutoGrowHeight'
+import { getNavPrefs } from '../../lib/navPrefs'
+import { useContextHealthStore } from '../../stores/contextHealth'
+import { healthFrameStyle } from '../../lib/healthFrame'
+import { buildContextForWidget, buildContextForMulti } from '../../lib/contextMenu/buildContext'
+import type { FrameCallbacks } from '../../lib/contextMenu/types'
+import { FrameCallbacksProvider } from '../../lib/contextMenu/frameContext'
 import MakeTaskDialog from '../MakeTaskDialog'
 import ShareDialog from '../ShareDialog'
 import type { PinZone, Widget } from '@shared/types'
@@ -11,11 +20,19 @@ import {
   computeSectionFrame,
   effectiveLayout,
   findNonOverlapPosition,
+  resolvePushFromAnchor,
   SECTION_PADDING
 } from '../../lib/sectionGeometry'
+
+// Registry of imperative Rnd position setters, keyed by widget id. A drop that
+// pushes neighbours out of the way uses this to slide each neighbour's Rnd in
+// place WITHOUT a remount, so their children (webviews especially) stay mounted.
+// Each free-widget frame registers its own setter while mounted.
+const rndPositioners = new Map<string, (x: number, y: number) => void>()
 import { chimeIn, chimeOut } from '../../lib/audioBeep'
 import { useZonePosition } from '../../lib/pinLayout'
 import { LinkDragContext } from '../../lib/linkDragContext'
+import { widgetDisplayName } from '../../lib/widgetDisplayName'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -57,7 +74,6 @@ export default function WidgetFrame({
   const update = useWidgetStore((s) => s.update)
   const remove = useWidgetStore((s) => s.remove)
   const bringToFront = useWidgetStore((s) => s.bringToFront)
-  const archive = useWidgetStore((s) => s.archive)
   const createWidget = useWidgetStore((s) => s.create)
   const setFocused = useWidgetStore((s) => s.setFocused)
   const setActive = useWidgetStore((s) => s.setActive)
@@ -66,7 +82,56 @@ export default function WidgetFrame({
   const unpinWidget = useWidgetStore((s) => s.unpinWidget)
   const setHoveredSection = useWidgetStore((s) => s.setHoveredSection)
   const setDragOverride = useWidgetStore((s) => s.setDragOverride)
-  const focusOn = useWidgetStore((s) => s.focusOn)
+  // ── Multi-select ────────────────────────────────────────────────────────
+  const selected = useWidgetStore((s) => s.selectedIds.includes(widget.id))
+  const toggleSelection = useWidgetStore((s) => s.toggleSelection)
+  const clearSelection = useWidgetStore((s) => s.clearSelection)
+  const beginGroupDrag = useWidgetStore((s) => s.beginGroupDrag)
+  const setGroupDelta = useWidgetStore((s) => s.setGroupDelta)
+  // ── Rename ────────────────────────────────────────────────────────────────
+  // Every widget can be named. Until the user types a name, the header shows a
+  // name inherited from the widget's own content (first line of a note, a
+  // browser's hostname); double-click the header label to set a manual name.
+  const [titleEditing, setTitleEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  // Manual double-click detection. The native `dblclick` event is unreliable on
+  // the header because the first click re-renders the frame (active-state change)
+  // and swaps the label node, so the browser never pairs the two clicks. A ref
+  // timestamp survives the re-render where a node-bound listener wouldn't.
+  const lastTitleClickRef = useRef(0)
+  function beginRename(): void {
+    setTitleDraft(widget.title?.trim() ?? '')
+    setTitleEditing(true)
+  }
+  function commitTitle(): void {
+    const next = titleDraft.trim()
+    if (next !== (widget.title || '')) void update(widget.id, { title: next })
+    setTitleEditing(false)
+  }
+  const endGroupDrag = useWidgetStore((s) => s.endGroupDrag)
+  // groupDrag is read live in the member-follow effect below; subscribe so the
+  // effect re-runs on every delta tick.
+  const groupDrag = useWidgetStore((s) => s.groupDrag)
+  // True while THIS widget is the leader of an in-flight group drag — gates the
+  // onDrag/onDragStop branches without re-subscribing to selection on every tick.
+  const groupLeadRef = useRef(false)
+  // One-shot guard so a non-lead drag drops the selection at most once, on the
+  // FIRST real movement (never on a click — react-rnd fires onDragStart on a
+  // plain mousedown too, so selection-clearing must wait for actual motion).
+  const groupClearedRef = useRef(false)
+  // Shift-select fires from TWO places depending on where you click: the body
+  // routes through onMouseDownCapture, but the header IS react-rnd's drag handle
+  // and only reaches onDragStart. shiftToggle() dedupes so a header click (which
+  // can hit both) toggles exactly once. shiftGestureRef tells onDrag to skip its
+  // "dragging an unselected widget clears the selection" branch for a shift gesture.
+  const lastShiftToggleRef = useRef(0)
+  const shiftGestureRef = useRef(false)
+  function shiftToggle(): void {
+    const now = performance.now()
+    if (now - lastShiftToggleRef.current < 250) return
+    lastShiftToggleRef.current = now
+    toggleSelection(widget.id)
+  }
   const [pinPickerOpen, setPinPickerOpen] = useState(false)
   const [expandPickerOpen, setExpandPickerOpen] = useState(false)
   // Right-click on the widget header opens a small context menu with a
@@ -77,6 +142,13 @@ export default function WidgetFrame({
   const [shareOpen, setShareOpen] = useState(false)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const zoom = useWidgetStore((s) => s.zoom)
+  // Per-widget Context Health frame (plexi-4.0, UX-022). Reads the pre-review
+  // "since your last visit" snapshot captured on desk open; `current` -> no frame.
+  const health = useContextHealthStore((s) => s.lastVisit[widget.id])
+  const healthStyle = health
+    ? healthFrameStyle(health.state, (health.decisionsAtRisk ?? []).map((d) => d.title))
+    : null
+  const zoomToWidget = useWidgetStore((s) => s.zoomToWidget)
   const allWidgets = useWidgetStore((s) => s.widgets)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const lastHoverCheck = useRef(0)
@@ -90,6 +162,55 @@ export default function WidgetFrame({
   // key-change re-mount. Re-mounting is fatal for <webview> children
   // because Electron creates a fresh process and the URL fully reloads.
   const rndRef = useRef<Rnd | null>(null)
+  // Auto-grow: the body's content height drives the widget height for kinds that
+  // grow (everything except long-form text, the browser, and the geometry-
+  // computed kinds). Self-gates by kind / section-child / pinned.
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useAutoGrowHeight(widget, bodyRef)
+
+  // Scale the widget by a multiplicative factor (1.5 = +50%, 1/1.5 = -50%
+  // symmetric inverse). Used by the header +/− buttons and the legacy
+  // enlarge-on-desk popover. Capped at [minWidth, MAX_W] × [minHeight, MAX_H]
+  // so the user can't shrink past Rnd's drag-handle threshold or grow off
+  // the screen. Skips section children — those are auto-arranged.
+  //
+  // Like onEnlargeOnDesk before it, this uses the imperative Rnd update path
+  // (applyRndSizeAndPosition) — NOT bumpLayoutVersion. A key-change re-mount
+  // tears down every <webview> child (each Electron webview is its own
+  // process; remount = full URL reload + lost logged-in state). Same logic
+  // applies to ProseMirror editors and any component with internal state.
+  function scaleWidgetBy(factor: number): void {
+    if (isChildOfSection) return
+    const MAX_W = 1400
+    const MAX_H = 900
+    const MIN_W = 180
+    const MIN_H = 120
+    const newW = Math.max(MIN_W, Math.min(MAX_W, Math.round(widget.width * factor)))
+    const newH = Math.max(MIN_H, Math.min(MAX_H, Math.round(widget.height * factor)))
+    if (newW === widget.width && newH === widget.height) return
+    if (isPinned) {
+      // Pinned widgets are screen-anchored — no overlap-detection needed
+      // because their position is computed by pinLayout. Just resize.
+      void update(widget.id, { width: newW, height: newH })
+      applyRndSizeAndPosition(newW, newH, defaultX, defaultY)
+      return
+    }
+    const latest = useWidgetStore.getState().widgets
+    const siblings = latest.filter(
+      (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+    )
+    const placed = findNonOverlapPosition(
+      { x: widget.x, y: widget.y, width: newW, height: newH },
+      effectiveSiblingsForCheck(siblings, latest)
+    )
+    void update(widget.id, {
+      width: newW,
+      height: newH,
+      x: placed.x,
+      y: placed.y
+    })
+    applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
+  }
 
   // Imperatively push a new size + position into Rnd's internal state.
   // Equivalent to what a key-change re-mount would do via the `default`
@@ -111,6 +232,17 @@ export default function WidgetFrame({
       r.updatePosition.call(rnd, { x, y })
     }
   }
+
+  // Register this frame's imperative positioner so a neighbouring widget's drop
+  // can push us aside in place (no remount). Re-registers when our size changes
+  // so the setter always moves us at our current dimensions.
+  useEffect(() => {
+    rndPositioners.set(widget.id, (x, y) => applyRndSizeAndPosition(widget.width, widget.height, x, y))
+    return () => {
+      rndPositioners.delete(widget.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.id, widget.width, widget.height])
 
   const layoutCtx = useContext(SectionLayoutContext)
   const sectionLayout = layoutCtx ? layoutCtx.layout : 'free'
@@ -176,6 +308,64 @@ export default function WidgetFrame({
     })
   }
 
+  // Duplicate the widget. SYNCED copies share a syncGroupId so content / title /
+  // colour mirror across every copy; INDEPENDENT copies are a one-time snapshot.
+  // Extracted from the old header menu verbatim so the unified menu drives the
+  // exact same behaviour.
+  function duplicateWidgetCopy(synced: boolean): void {
+    void (async () => {
+      let groupId: string | undefined
+      if (synced) {
+        groupId = widget.syncGroupId ?? crypto.randomUUID()
+        if (!widget.syncGroupId) await update(widget.id, { syncGroupId: groupId })
+      }
+      await createWidget({
+        taskId: widget.taskId,
+        kind: widget.kind,
+        title: widget.title,
+        content: widget.content,
+        x: widget.x + 30,
+        y: widget.y + 30,
+        width: widget.width,
+        height: widget.height,
+        color: widget.color,
+        sourceAppId: widget.sourceAppId,
+        mode: widget.mode,
+        syncGroupId: groupId
+      })
+    })()
+  }
+
+  // Move the widget out of its parent section, dropping it directly below the
+  // section and de-overlapping against top-level siblings.
+  function ejectFromSectionFrame(): void {
+    if (!isChildOfSection || !parent) return
+    const ws = useWidgetStore.getState().widgets
+    const canvasX = Math.round(parent.x + SECTION_PADDING + widget.x)
+    const canvasY = Math.round(parent.y + parent.height + 24)
+    const topLevelSiblings = ws.filter((w) => w.id !== widget.id && !w.pinned && !w.parentSectionId)
+    const placed = findNonOverlapPosition(
+      { x: canvasX, y: canvasY, width: widget.width, height: widget.height },
+      effectiveSiblingsForCheck(topLevelSiblings, ws)
+    )
+    void update(widget.id, { parentSectionId: null, x: placed.x, y: placed.y })
+    bumpLayout()
+  }
+
+  // The frame management actions the unified context menu offers. Each is
+  // present only when it applies to this widget.
+  const frameCallbacks: FrameCallbacks = {
+    onMakeTask: () => setMakeTaskOpen(true),
+    onShare: () => setShareOpen(true),
+    onDuplicateSynced: () => duplicateWidgetCopy(true),
+    onDuplicateIndependent: () => duplicateWidgetCopy(false),
+    onDuplicateToFolder: !isChildOfSection && !isSection ? () => setMakeTaskOpen(true) : undefined,
+    onEjectFromSection: isChildOfSection && parent ? ejectFromSectionFrame : undefined,
+    onUnlinkSynced: widget.syncGroupId
+      ? () => void update(widget.id, { syncGroupId: null })
+      : undefined
+  }
+
   function commitDrop(newX: number, newY: number): void {
     // Read the LATEST store state — `allWidgets` from useWidgetStore is the
     // last-render snapshot. Two rapid drops on a fresh section both saw an
@@ -230,6 +420,18 @@ export default function WidgetFrame({
           y: placed.y
         })
         bumpLayout()
+      } else if (isInControlledLayout && layoutCtx) {
+        // Auto-arranged layout (grid/stacks): a drop that stayed inside the
+        // section does NOT reposition — the layout owns placement. The user
+        // was dragging to eject but released inside, so snap Rnd back to the
+        // computed cell (the controlled `position` prop won't reset on its
+        // own when its value is unchanged).
+        applyRndSizeAndPosition(
+          layoutCtx.size.width,
+          layoutCtx.size.height,
+          layoutCtx.position.x,
+          layoutCtx.position.y
+        )
       } else {
         // Moving within the same section. In free layout, snap away from
         // siblings (excluding self). In stack mode, allow overlap — that's
@@ -292,28 +494,44 @@ export default function WidgetFrame({
       }
     }
 
-    // Canvas-level drop. Push the widget away from every other top-level
-    // widget on the canvas — sections + free widgets. This is the
-    // reverse-magnetic behaviour: widgets never overlap on the desk.
-    const rawX = Math.round(newX)
-    const rawY = Math.round(newY)
+    // Canvas-level drop. Priority goes to the object the user is moving: it
+    // STAYS exactly where dropped, and any top-level widgets it now overlaps
+    // flow out of its way to the nearest clear spot (cascading, so pushed
+    // widgets never land on each other). Previously we relocated the DROPPED
+    // widget instead, which fought the user's deliberate placement — the
+    // opposite of what "I put it there" should mean. Sections are treated as
+    // immovable blockers (pushed widgets avoid them; a section itself doesn't
+    // shuffle when a small widget lands near it). Optional snap-to-grid rounds
+    // the drop to an 8px grid first.
+    const grid = getNavPrefs().snapToGridEnabled ? 8 : 1
+    const rawX = Math.round(newX / grid) * grid
+    const rawY = Math.round(newY / grid) * grid
     const topLevelSiblings = latestWidgets.filter(
-      (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
+      (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId && !w.archived && w.kind !== 'minimap'
     )
-    const placed = findNonOverlapPosition(
-      { x: rawX, y: rawY, width: widget.width, height: widget.height },
-      effectiveSiblingsForCheck(topLevelSiblings, latestWidgets)
-    )
-    const moved = snappedAway(rawX, rawY, placed.x, placed.y)
-    void update(widget.id, { x: placed.x, y: placed.y })
-    if (moved) {
-      // Rnd is uncontrolled for free widgets — without an update it would
-      // visually stay at the user's drop point and ignore the snap. We
-      // used to bumpLayout() to force a key-change re-mount, but that
-      // tears down any <webview> child (each Electron webview is its own
-      // process and a full URL reload kicks in on remount). Imperative
-      // updatePosition leaves children mounted.
-      applyRndSizeAndPosition(widget.width, widget.height, placed.x, placed.y)
+    const anchor = { x: rawX, y: rawY, width: widget.width, height: widget.height }
+    // Movable = free (non-section) neighbours; blockers = section frames.
+    const movable = topLevelSiblings
+      .filter((w) => w.kind !== 'section')
+      .map((w) => ({ id: w.id, x: w.x, y: w.y, width: w.width, height: w.height }))
+    const blockers = effectiveSiblingsForCheck(
+      topLevelSiblings.filter((w) => w.kind === 'section'),
+      latestWidgets
+    ).map((s) => ({ x: s.x, y: s.y, width: s.width, height: s.height }))
+
+    // The moved widget commits to its drop point. Only nudge Rnd if grid-snap
+    // actually shifted it (avoids a needless imperative update on a clean drop).
+    void update(widget.id, { x: rawX, y: rawY })
+    if (snappedAway(newX, newY, rawX, rawY)) {
+      applyRndSizeAndPosition(widget.width, widget.height, rawX, rawY)
+    }
+
+    // Push the overlapping neighbours away and slide each imperatively so no
+    // webview reloads. Store stays the source of truth via update().
+    const pushes = resolvePushFromAnchor(anchor, movable, blockers)
+    for (const [id, pos] of pushes) {
+      void update(id, { x: pos.x, y: pos.y })
+      rndPositioners.get(id)?.(pos.x, pos.y)
     }
   }
 
@@ -322,19 +540,67 @@ export default function WidgetFrame({
   // means dragging a zone-pinned widget is a no-op (you can't drag a zone
   // pin — it'd defeat the auto-dock); to move it the user picks a different
   // zone or unpins.
-  const isZonePinned = widget.pinned && widget.pinnedZone !== null && zonePosition
-  const useControlled = isInControlledLayout || Boolean(isZonePinned)
+  // A widget with pinned + pinnedZone set is ALWAYS treated as zone-pinned, even
+  // if the PinLayoutContext map hasn't resolved its position yet — which happens
+  // for a frame after a layoutVersion-keyed remount, after an async widget reload,
+  // or before PinnedLayer's ResizeObserver has measured non-zero bounds. Without
+  // this, a missing zonePosition dropped the widget out of controlled mode and
+  // Rnd fell back to the stored canvas x/y, so the minimap detached to (0,0) and
+  // then drifted with the canvas content as more widgets were added. Falling back
+  // to an off-screen rect keeps Rnd controlled; the next render with a resolved
+  // position snaps it into its corner (invisible in practice).
+  const isZonePinned = widget.pinned && widget.pinnedZone !== null
+  const resolvedZone = zonePosition ?? { x: -9999, y: -9999, width: widget.width, height: widget.height }
+  const useControlled = isInControlledLayout || isZonePinned
   const controlledPos = isZonePinned
-    ? { x: zonePosition!.x, y: zonePosition!.y }
+    ? { x: resolvedZone.x, y: resolvedZone.y }
     : isInControlledLayout
       ? layoutCtx?.position
       : undefined
   const controlledSize = isZonePinned
-    ? { width: zonePosition!.width, height: zonePosition!.height }
+    ? { width: resolvedZone.width, height: resolvedZone.height }
     : isInControlledLayout
       ? layoutCtx?.size
       : undefined
-  const dragDisabled = useControlled
+  // Keep the live (uncontrolled) Rnd in sync when a free widget's size OR
+  // position is changed from OUTSIDE its own drag/resize gesture — e.g. the
+  // browser resolution presets (size) or a group-move commit (position). A free
+  // widget's Rnd only reads `default` at mount, so without this the store
+  // updates but the element keeps its mounted size/position until a remount —
+  // and a <webview> can't be remounted (it would reload the page + lose login).
+  // applyRndSizeAndPosition pushes the new geometry imperatively. The store's
+  // x/y/w/h only change on drag/resize STOP (or a group commit), never mid-
+  // gesture for THIS widget, so re-applying the committed value is a harmless
+  // no-op and never fights a live drag. Controlled widgets track geometry via
+  // props, so they're skipped.
+  useLayoutEffect(() => {
+    if (useControlled) return
+    applyRndSizeAndPosition(widget.width, widget.height, widget.x, widget.y)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.width, widget.height, widget.x, widget.y, useControlled])
+
+  // Group-move follower: while another selected widget is being dragged, move
+  // THIS widget's Rnd imperatively by the live delta (no per-frame store/IPC
+  // write — positions are committed once on drop by endGroupDrag). Only members
+  // that aren't the drag leader follow; the leader is moved by Rnd itself.
+  useLayoutEffect(() => {
+    if (useControlled || !groupDrag || groupDrag.leaderId === widget.id) return
+    const start = useWidgetStore.getState().groupStart?.[widget.id]
+    if (!start) return
+    applyRndSizeAndPosition(
+      widget.width,
+      widget.height,
+      Math.round(start.x + groupDrag.dx),
+      Math.round(start.y + groupDrag.dy)
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupDrag])
+
+  // Zone-pins can't be dragged (they auto-dock). Controlled SECTION children
+  // (grid/stacks), however, ARE draggable — that's how the user drags an item
+  // out of a section onto the desk. Their position is still controlled by the
+  // layout, so a non-eject drop snaps them back to their cell (see commitDrop).
+  const dragDisabled = Boolean(isZonePinned)
 
   return (
     <Rnd
@@ -358,9 +624,13 @@ export default function WidgetFrame({
       minWidth={180}
       minHeight={120}
       dragHandleClassName={draggableHandleClass}
+      // The header label is a drag handle, but the rename affordance inside it
+      // must NOT start a drag — otherwise react-draggable swallows the
+      // double-click that opens the editor. `cancel` excludes it from dragging.
+      cancel=".widget-nodrag"
       disableDragging={dragDisabled}
       enableResizing={
-        dragDisabled
+        useControlled
           ? false
           : {
               top: true,
@@ -373,11 +643,61 @@ export default function WidgetFrame({
               topLeft: true
             }
       }
-      onDragStart={() => {
+      onDragStart={(e) => {
+        // Shift+click on the header is a SELECTION toggle, not a drag — but
+        // react-rnd still fires onDragStart on the mousedown. Bail out before
+        // touching active/selection state so the onClick handler's shift-toggle
+        // can build a multi-selection without this wiping it each click.
+        if ((e as MouseEvent).shiftKey) {
+          groupLeadRef.current = false
+          shiftGestureRef.current = true
+          // Header shift-click reaches us here (onMouseDownCapture doesn't fire
+          // for the drag handle). shiftToggle() dedupes against the body path.
+          if (!isChildOfSection && !isPinned && !isSection) shiftToggle()
+          return
+        }
+        shiftGestureRef.current = false
         void bringToFront(widget.id)
         setActive(widget.id)
+        groupClearedRef.current = false
+        // Multi-select interplay: if this widget is part of a 2+ selection,
+        // become the GROUP-DRAG leader — every selected widget rides along.
+        // (Dropping the selection when you grab an UNSELECTED widget is deferred
+        // to the first real movement in onDrag — never on a click.)
+        // Sections/section-children/pins never lead a group drag.
+        const st = useWidgetStore.getState()
+        const canLead = !isChildOfSection && !isPinned && !isSection
+        if (canLead && st.selectedIds.includes(widget.id) && st.selectedIds.length > 1) {
+          groupLeadRef.current = true
+          beginGroupDrag(widget.id)
+        } else {
+          groupLeadRef.current = false
+        }
+        // Toggle a root-level class so the desk surface can render the
+        // snap-to-grid hint while the user is actively positioning an
+        // object. Removed on dragstop. Cheap to add/remove; CSS does the
+        // heavy lifting.
+        document.documentElement.classList.add('fb-canvas-dragging')
       }}
       onDrag={(_, d) => {
+        // Group-drag leader: push the live delta so co-selected members follow
+        // imperatively (their effect moves their own Rnd — no per-frame IPC).
+        if (groupLeadRef.current) {
+          const start = useWidgetStore.getState().groupStart?.[widget.id]
+          if (start) setGroupDelta(d.x - start.x, d.y - start.y)
+        } else if (
+          !groupClearedRef.current &&
+          !shiftGestureRef.current &&
+          !isChildOfSection &&
+          !isPinned
+        ) {
+          // First real movement of a non-lead, non-shift drag: if we grabbed a
+          // widget that ISN'T in the current selection, drop the selection now
+          // (on motion, never on a click — so shift-clicking builds a selection).
+          groupClearedRef.current = true
+          const st = useWidgetStore.getState()
+          if (st.selectedIds.length && !st.selectedIds.includes(widget.id)) clearSelection()
+        }
         // Live-track the dragging widget's position so the inter-widget
         // links overlay can keep its endpoints attached to the widget in
         // real time (rather than only updating on drop, which would let
@@ -390,14 +710,26 @@ export default function WidgetFrame({
         const now = performance.now()
         if (now - lastHoverCheck.current < HOVER_THROTTLE_MS) return
         lastHoverCheck.current = now
-        if (isChildOfSection || isPinned || isSection) return
+        // Don't hover-target a section while group-dragging — the group commits
+        // as free widgets, not into a section.
+        if (isChildOfSection || isPinned || isSection || groupLeadRef.current) return
         const target = findHoveredSection(d.x, d.y)
         setHoveredSection(target)
       }}
       onDragStop={(_, d) => {
         setHoveredSection(null)
         setDragOverride(null)
-        commitDrop(d.x, d.y)
+        if (groupLeadRef.current) {
+          // Commit every selected widget's final position in one batch; skip the
+          // normal single-widget commitDrop (which would snap/overlap-resolve and
+          // fight the group's relative layout).
+          groupLeadRef.current = false
+          void endGroupDrag()
+        } else {
+          commitDrop(d.x, d.y)
+        }
+        document.documentElement.classList.remove('fb-canvas-dragging')
+        shiftGestureRef.current = false
         // Mark the mouseup as drag-end so the click event that follows
         // doesn't run our onClick activation logic.
         dragJustEnded.current = performance.now()
@@ -472,38 +804,72 @@ export default function WidgetFrame({
       <AgeHalo createdAt={widget.createdAt} variant="widget" />
       <div
         data-widget-id={widget.id}
-        // No onMouseDownCapture here — that was setting `active` so early
-        // that the WebView overlay (showOverlay = !isActive) would unmount
-        // BEFORE the click event fired, robbing the overlay's onClick
-        // (which calls focusOn) of its chance to run. Result: clicking a
-        // browser would activate it but never centre the camera. Rnd's
-        // onDragStart still calls setActive at the start of a drag, so the
-        // active-glow-during-drag path is unaffected.
-        onClick={(e) => {
-          e.stopPropagation()
-          // Suppress the click that fires immediately after a drag-end —
-          // react-rnd doesn't natively distinguish them. A drop is NOT a
-          // request to centre the camera; the user just placed the widget
-          // and would be disoriented by a pan.
-          if (performance.now() - dragJustEnded.current < 250) return
-          // Deliberate click → centre the camera on the widget. Pinned
-          // widgets are always visible (docked to a screen corner) so
-          // centering them would jump to whatever stale world-space coord
-          // they had before pinning — just activate them.
-          if (isPinned) {
-            setActive(widget.id)
-          } else {
-            focusOn(widget.id)
+        data-widget-kind={widget.kind}
+        // Shift-select is handled on mousedown (CAPTURE phase) — not onClick —
+        // because the header IS react-rnd's drag handle: react-draggable's
+        // bubble-phase mousedown consumes the gesture and onClick never fires on
+        // the header. Catching it in capture (before the drag machinery) and
+        // stopPropagation lets us toggle the selection AND suppress the drag.
+        // Shift-only, so a normal mousedown is untouched (the WebView overlay
+        // relies on NOT setting `active` early here, which we preserve).
+        onMouseDownCapture={(e) => {
+          // Shift / ⌘-dive must be handled on mousedown (CAPTURE phase): the
+          // header is react-rnd's drag handle, so a normal mousedown is consumed
+          // by the drag machinery and onClick never fires on the header. Catching
+          // it here (before react-rnd) + stopPropagation toggles/dives AND
+          // suppresses the drag. Body clicks fall through to onClick as before.
+          if (e.shiftKey && !isChildOfSection && !isPinned) {
+            e.stopPropagation()
+            shiftToggle()
+            return
+          }
+          if ((e.metaKey || e.ctrlKey) && zoom < 0.8 && !isChildOfSection) {
+            e.stopPropagation()
+            zoomToWidget(widget.id)
           }
         }}
-        className={`h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-white dark:bg-stone-900 fb-spring-snap ${
-          isActive
-            ? 'border-[rgb(var(--accent)/0.5)] widget-glow'
-            : isPinned
-              ? 'border-amber-400/60'
-              : isChildOfSection
-                ? 'border-[color:var(--edge-soft)]'
-                : 'border-[color:var(--edge-soft)]'
+        onClick={(e) => {
+          e.stopPropagation()
+          // Shift handled on mousedown above — just swallow the click so it
+          // doesn't fall through to centre/zoom.
+          if (e.shiftKey && !isChildOfSection && !isPinned) {
+            e.preventDefault()
+            return
+          }
+          // Cmd/⌘-click while zoomed out (< 80%) → dive into this widget: jump
+          // to 100% with it centred. A fast way to go from an overview to one
+          // thing without reaching for the zoom controls.
+          if ((e.metaKey || e.ctrlKey) && zoom < 0.8) {
+            e.preventDefault()
+            zoomToWidget(widget.id)
+            return
+          }
+          // Suppress the click that fires immediately after a drag-end —
+          // react-rnd doesn't natively distinguish them.
+          if (performance.now() - dragJustEnded.current < 250) return
+          // A single click only ACTIVATES the widget — it never shifts the
+          // world under you. Centring is a deliberate double-click (below).
+          // This is what fixes "the camera drifts after I move it": a click
+          // after a pan used to re-centre the camera on the clicked widget.
+          setActive(widget.id)
+        }}
+        onDoubleClick={(e) => {
+          // Double-click → enter Focus Mode on this widget (full-screen overlay).
+          // Pinned widgets are screen-docked; just activate them instead.
+          e.stopPropagation()
+          if (isPinned) setActive(widget.id)
+          else setFocused(widget.id)
+        }}
+        className={`relative h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
+          selected
+            ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.7)] ring-offset-2 ring-offset-transparent'
+            : isActive
+              ? 'border-[rgb(var(--accent)/0.5)] widget-glow'
+              : isPinned
+                ? 'border-amber-400/60'
+                : isChildOfSection
+                  ? 'border-[color:var(--edge-soft)]'
+                  : 'border-[color:var(--edge-soft)]'
         }`}
         style={{
           // Light-aware cast shadow + inset highlight on top edge. Tightens
@@ -516,6 +882,27 @@ export default function WidgetFrame({
           transitionProperty: 'box-shadow, transform, border-color'
         }}
       >
+        {/* Context Health frame (plexi-4.0, UX-022): a coloured inner ring plus a
+            labelled corner dot, so the state reads without relying on colour
+            (A11Y-004). Rendered above content but click-through. */}
+        {healthStyle && (
+          <div
+            className={`pointer-events-none absolute inset-0 z-[6] rounded-[12px] border-2 ${healthStyle.border}`}
+            aria-hidden="true"
+          />
+        )}
+        {healthStyle && (
+          <span
+            className="pointer-events-none absolute right-1.5 top-1.5 z-[7] inline-flex h-2.5 w-2.5 items-center justify-center"
+            role="img"
+            aria-label={healthStyle.label}
+            title={healthStyle.label}
+            data-testid="widget-health-dot"
+            data-health-state={health!.state}
+          >
+            <span className={`h-2.5 w-2.5 rounded-full ring-2 ring-[var(--surface-raised)] ${healthStyle.dot}`} />
+          </span>
+        )}
         <div
           className={`${draggableHandleClass} ${headerAccent} flex items-center justify-between px-2 py-1 cursor-move select-none border-b border-[color:var(--edge-soft)] backdrop-blur-sm`}
           onContextMenu={(e) => {
@@ -524,7 +911,7 @@ export default function WidgetFrame({
             setHeaderCtxMenu({ x: e.clientX, y: e.clientY })
           }}
         >
-          <span className="text-[10px] uppercase tracking-[0.08em] font-medium text-stone-700 dark:text-stone-300 truncate flex items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-70)] truncate flex items-center gap-1.5">
             {isActive && (
               <span
                 className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"
@@ -551,16 +938,87 @@ export default function WidgetFrame({
                   }).then(() => bumpLayout())
                 }}
                 title="Remove from section (eject to canvas)"
-                className="text-stone-500 hover:text-amber-700 transition-colors"
+                className="text-[var(--ink-50)] hover:text-amber-700 transition-colors"
               >
                 <Icon name="layers_clear" size={11} />
               </button>
             )}
-            {headerLabel}
+            {widget.syncGroupId && (
+              <span
+                title="Synced copy — content, title and colour mirror across all linked copies (even in other tasks). Right-click → ‘Unlink from synced copies’ to make this one independent."
+                className="inline-flex items-center text-accent shrink-0"
+              >
+                <Icon name="link" size={11} />
+              </span>
+            )}
+            {titleEditing ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={commitTitle}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitTitle()
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setTitleEditing(false)
+                  }
+                }}
+                placeholder={widgetDisplayName(widget, headerLabel)}
+                aria-label="Widget name"
+                className="widget-nodrag min-w-0 flex-1 bg-transparent border-b border-accent/60 outline-none text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-90)] placeholder:text-[var(--ink-40)] placeholder:normal-case"
+              />
+            ) : (
+              <span
+                data-testid={`widget-title-${widget.id}`}
+                onClick={(e) => {
+                  // Two clicks within 350ms = rename. The first click still
+                  // propagates so the widget activates normally.
+                  const now = Date.now()
+                  if (now - lastTitleClickRef.current < 350) {
+                    e.stopPropagation()
+                    lastTitleClickRef.current = 0
+                    beginRename()
+                  } else {
+                    lastTitleClickRef.current = now
+                  }
+                }}
+                title="Double-click to rename"
+                className="widget-nodrag truncate cursor-text"
+              >
+                {widgetDisplayName(widget, headerLabel)}
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-0.5">
-            {!isChildOfSection && !isPinned && linkDrag && (
+            {!titleEditing && (
               <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  beginRename()
+                }}
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
+                aria-label="Rename widget"
+                title="Rename"
+              >
+                <Icon name="edit" size={12} />
+              </button>
+            )}
+            {linkDrag && (
+              <button
+                // Any widget with a header is a valid link SOURCE — top-level,
+                // pinned, or a section child (widget-link-owner: sections/children/
+                // pinned are all valid endpoints). No child gate is needed: icons/
+                // list children never mount WidgetFrame (they use CompactChildView,
+                // no header), so the hub only appears where a header exists (free/
+                // grid/stacks). Rects are read in viewport coords like any widget,
+                // so the line anchors to the child's visible edge inside the frame.
                 // mousedown stopPropagation prevents react-rnd from
                 // treating this click as a drag-handle press (the button
                 // lives inside the .widget-handle div). The actual arming
@@ -571,11 +1029,11 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   linkDrag.start(widget.id)
                 }}
-                className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-accent cursor-cell"
+                className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-accent cursor-cell"
                 aria-label="Link to another widget"
                 title="Click, then click another widget to connect them"
               >
-                <Icon name="hub" size={13} />
+                <Icon name="add_link" size={14} />
               </button>
             )}
             {!isChildOfSection && (
@@ -599,44 +1057,25 @@ export default function WidgetFrame({
                 setOpen={setPinPickerOpen}
               />
             )}
+            {!isChildOfSection && (
+              <>
+                <ResizeStepButton
+                  direction="shrink"
+                  widgetId={widget.id}
+                  onClick={() => scaleWidgetBy(1 / 1.5)}
+                />
+                <ResizeStepButton
+                  direction="grow"
+                  widgetId={widget.id}
+                  onClick={() => scaleWidgetBy(1.5)}
+                />
+              </>
+            )}
             <ExpandControl
               open={expandPickerOpen}
               setOpen={setExpandPickerOpen}
               onFocusMode={() => setFocused(widget.id)}
-              onEnlargeOnDesk={() => {
-                // Grow the widget by 30% (capped at 1400 × 900) and run
-                // the result through the same reverse-magnetic snap a
-                // drop would — so an enlarge into a neighbour pushes off
-                // it instead of overlapping silently. Pinned + section-
-                // child widgets are out of scope here.
-                //
-                // Critically, we update Rnd's size + position via the
-                // imperative API (updateSize/updatePosition) rather than
-                // bumpLayout(). bumpLayout would force a key-change
-                // re-mount, which tears down any <webview> child — every
-                // Electron webview is its own process, and re-mount
-                // means a full URL reload (losing logged-in state).
-                if (isPinned || isChildOfSection) return
-                const MAX_W = 1400
-                const MAX_H = 900
-                const newW = Math.min(MAX_W, Math.round(widget.width * 1.3))
-                const newH = Math.min(MAX_H, Math.round(widget.height * 1.3))
-                const latest = useWidgetStore.getState().widgets
-                const siblings = latest.filter(
-                  (w) => w.id !== widget.id && !w.pinned && !w.parentSectionId
-                )
-                const placed = findNonOverlapPosition(
-                  { x: widget.x, y: widget.y, width: newW, height: newH },
-                  effectiveSiblingsForCheck(siblings, latest)
-                )
-                void update(widget.id, {
-                  width: newW,
-                  height: newH,
-                  x: placed.x,
-                  y: placed.y
-                })
-                applyRndSizeAndPosition(newW, newH, placed.x, placed.y)
-              }}
+              onEnlargeOnDesk={() => scaleWidgetBy(1.3)}
             />
             <button
               onMouseDown={(e) => e.stopPropagation()}
@@ -644,82 +1083,47 @@ export default function WidgetFrame({
                 e.stopPropagation()
                 if (confirm('Remove from the desk?')) void remove(widget.id)
               }}
-              className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-red-100 hover:text-red-700"
+              className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-red-100 hover:text-red-700"
               aria-label="Remove widget"
             >
               <Icon name="close" size={13} />
             </button>
           </div>
         </div>
-        <div className="flex-1 min-h-0">{children}</div>
+        <div
+          ref={bodyRef}
+          className={`relative flex-1 min-h-0 ${
+            // Auto-grow widgets size to their content, but cap out (e.g. a very
+            // long sticky) or sit in a fixed slot when pinned / inside a section.
+            // Scroll vertically rather than clipping so the content stays
+            // reachable when the frame can't grow to fit it.
+            autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-y-auto' : ''
+          }`}
+        >
+          <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>
+          <WidgetSetupAffordance widget={widget} />
+        </div>
       </div>
       {headerCtxMenu && (
-        <CanvasContextMenu
-          x={headerCtxMenu.x}
-          y={headerCtxMenu.y}
-          items={(() => {
-            const items: CtxMenuItem[] = []
-            // Kind-specific extras go first so they're discoverable at the
-            // top of the menu (e.g. "Pin to Apps" for a browser widget).
-            if (headerMenuExtras && headerMenuExtras.length > 0) {
-              items.push(...headerMenuExtras)
-              items.push({ separator: true })
+        // Every widget's header right-click now resolves through the one unified
+        // menu. When this widget is part of a 2+ selection, the menu shows the
+        // bulk multi-selection actions instead of the single-widget menu. The
+        // frame management actions (make-task, share, synced / independent
+        // duplicate, eject, unlink, archive) are supplied as callbacks so their
+        // behaviour is identical to the old header menu, and any kind-specific
+        // rows ride in as headerExtras.
+        <UnifiedWidgetMenu
+          menuContext={(() => {
+            const selIds = useWidgetStore.getState().selectedIds
+            if (selIds.length > 1 && selIds.includes(widget.id)) {
+              const sel = allWidgets.filter((w) => selIds.includes(w.id))
+              return buildContextForMulti(sel, { clientX: headerCtxMenu.x, clientY: headerCtxMenu.y })
             }
-            items.push({
-              label: 'Make this a task…',
-              icon: 'task_alt',
-              onClick: () => setMakeTaskOpen(true)
-            })
-            items.push({
-              label: 'Share…',
-              icon: 'share',
-              onClick: () => setShareOpen(true)
-            })
-            items.push({ separator: true })
-            items.push({
-              label: 'Duplicate',
-              icon: 'content_copy',
-              onClick: () => {
-                // Clone the widget's metadata and offset it slightly so the
-                // copy is visible next to the original. Content is copied
-                // verbatim — page widgets get their own independent Tiptap
-                // doc, table widgets stay pointed at the same backing
-                // fb_tables row (two views of one dataset, which is the
-                // common intent for a quick duplicate).
-                void createWidget({
-                  taskId: widget.taskId,
-                  kind: widget.kind,
-                  title: widget.title,
-                  content: widget.content,
-                  x: widget.x + 30,
-                  y: widget.y + 30,
-                  width: widget.width,
-                  height: widget.height,
-                  color: widget.color,
-                  sourceAppId: widget.sourceAppId,
-                  mode: widget.mode
-                })
-              }
-            })
-            items.push({
-              label: 'Bring to front',
-              icon: 'flip_to_front',
-              onClick: () => {
-                void bringToFront(widget.id)
-              }
-            })
-            items.push({ separator: true })
-            items.push({
-              label: 'Archive',
-              icon: 'inventory_2',
-              onClick: () => {
-                // Soft-delete — recoverable from the Archive view. Distinct
-                // from the close-X button which (today) calls confirm()
-                // and is harsher.
-                void archive(widget.id)
-              }
-            })
-            return items
+            return buildContextForWidget(
+              widget,
+              { clientX: headerCtxMenu.x, clientY: headerCtxMenu.y },
+              { frame: frameCallbacks, headerExtras: headerMenuExtras }
+            )
           })()}
           onClose={() => setHeaderCtxMenu(null)}
         />
@@ -750,6 +1154,46 @@ export default function WidgetFrame({
         />
       )}
     </Rnd>
+  )
+}
+
+// ── Resize step button — small +/− in the header for quick scaling ──────────
+//
+// One-click ratchet: every press grows or shrinks the widget by 50%, capped
+// at the same [180×120, 1400×900] envelope as enlarge-on-desk. Used in
+// pairs so the user gets symmetric grow/shrink ergonomics without opening
+// the expand popover. We deliberately use the inverse factor (×1.5 grow,
+// ÷1.5 shrink) so the two operations cancel — pressing + then − returns
+// the widget to its original size within a pixel.
+
+function ResizeStepButton({
+  direction,
+  widgetId,
+  onClick
+}: {
+  direction: 'grow' | 'shrink'
+  widgetId: string
+  onClick: () => void
+}): JSX.Element {
+  const isGrow = direction === 'grow'
+  return (
+    <button
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)] transition-colors"
+      aria-label={isGrow ? 'Grow widget' : 'Shrink widget'}
+      data-testid={isGrow ? `widget-grow-${widgetId}` : `widget-shrink-${widgetId}`}
+      title={
+        isGrow
+          ? 'Grow this widget by 50% (max 1400 × 900)'
+          : 'Shrink this widget by ~33% (min 180 × 120) — inverse of grow so + then − returns to the original size'
+      }
+    >
+      <Icon name={isGrow ? 'add' : 'remove'} size={13} />
+    </button>
   )
 }
 
@@ -849,10 +1293,10 @@ function PinControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className={`h-5 w-5 rounded inline-flex items-center justify-center transition-colors ${
+        className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
           isPinned
             ? 'text-amber-600 hover:bg-amber-100'
-            : 'text-stone-500 hover:bg-stone-300/60 hover:text-stone-900'
+            : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]'
         }`}
         aria-label={isPinned ? 'Pin options' : 'Pin to screen'}
         title={
@@ -874,10 +1318,10 @@ function PinControl({
           // sits above pinned-layer (z-30), floating toolbar (z-20), and
           // anything else in the canvas chrome, but below modal dialogs
           // (typically z-[300]+).
-          className="fixed z-[200] w-44 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-2 cursor-default"
+          className="fixed z-[200] w-44 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 cursor-default"
           style={{ top: popoverPos.top, right: popoverPos.right }}
         >
-          <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1.5">
             Pin to zone
           </div>
           <div className="grid grid-cols-2 gap-1">
@@ -894,7 +1338,7 @@ function PinControl({
                   className={`flex flex-col items-center gap-0.5 py-2 rounded border text-[10px] transition-colors ${
                     active
                       ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
-                      : 'border-stone-200 dark:border-stone-700 hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-stone-600 dark:text-stone-300'
+                      : 'border-[var(--edge-soft)] hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-[var(--ink-70)]'
                   }`}
                 >
                   <Icon name={PIN_ZONE_ICONS[z]} size={14} />
@@ -910,7 +1354,7 @@ function PinControl({
                 onUnpin()
                 setOpen(false)
               }}
-              className="w-full mt-1.5 text-[11px] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 rounded px-2 py-1 text-left inline-flex items-center gap-1"
+              className="w-full mt-1.5 text-[11px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] rounded px-2 py-1 text-left inline-flex items-center gap-1"
             >
               <Icon name="close" size={11} />
               <span>Unpin — return to canvas</span>
@@ -1000,7 +1444,7 @@ function ExpandControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className="h-5 w-5 rounded inline-flex items-center justify-center text-stone-500 hover:bg-stone-300/60 hover:text-stone-900"
+        className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]"
         aria-label="Expand options"
         title="Expand — bigger on desk or full focus mode"
       >
@@ -1010,7 +1454,7 @@ function ExpandControl({
         <div
           ref={popoverRef}
           onMouseDown={(e) => e.stopPropagation()}
-          className="fixed z-[200] w-48 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-xl p-1 cursor-default"
+          className="fixed z-[200] w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1 cursor-default"
           style={{ top: popoverPos.top, right: popoverPos.right }}
         >
           <button
@@ -1019,12 +1463,12 @@ function ExpandControl({
               onEnlargeOnDesk()
               setOpen(false)
             }}
-            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] text-left"
           >
-            <Icon name="zoom_out_map" size={14} className="text-stone-500 mt-[1px] shrink-0" />
+            <Icon name="zoom_out_map" size={14} className="text-[var(--ink-50)] mt-[1px] shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] text-stone-800 dark:text-stone-100">Larger on desk</div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+              <div className="text-[12px] text-[var(--ink-90)]">Larger on desk</div>
+              <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                 Grow in place — keep canvas context
               </div>
             </div>
@@ -1035,12 +1479,12 @@ function ExpandControl({
               onFocusMode()
               setOpen(false)
             }}
-            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-left"
+            className="w-full flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] text-left"
           >
-            <Icon name="open_in_full" size={14} className="text-stone-500 mt-[1px] shrink-0" />
+            <Icon name="open_in_full" size={14} className="text-[var(--ink-50)] mt-[1px] shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] text-stone-800 dark:text-stone-100">Focus mode</div>
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+              <div className="text-[12px] text-[var(--ink-90)]">Focus mode</div>
+              <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                 Full pane — hide everything else
               </div>
             </div>

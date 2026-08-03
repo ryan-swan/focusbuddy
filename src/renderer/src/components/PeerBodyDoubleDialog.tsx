@@ -94,6 +94,12 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
   const [chatDraft, setChatDraft] = useState('')
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
+  // Mock video state — if fb-dev:// can't serve the file (missing in
+  // production builds, missing on disk, codec issue), we render a calm
+  // gradient placeholder instead of a black void with no signal.
+  const [videoFailed, setVideoFailed] = useState(false)
+  const [videoReady, setVideoReady] = useState(false)
+
   // "Hold looking" floor — when the store transitions out of `looking`
   // sooner than MIN_LOOKING_MS, we render the looking UI for the
   // remainder. effectiveStatus is what the body switches on; the actual
@@ -157,19 +163,19 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
       }}
     >
       <div
-        className="w-[460px] max-h-[80vh] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl flex flex-col"
+        className="w-[460px] max-h-[80vh] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header — stays consistent across all phases */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-200 dark:border-stone-700">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <div className="h-8 w-8 rounded-full bg-accent/10 inline-flex items-center justify-center">
             <Icon name="diversity_3" size={18} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+            <h2 className="text-sm font-semibold text-[var(--ink-100)]">
               Body double
             </h2>
-            <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-tight">
+            <p className="text-[11px] text-[var(--ink-50)] leading-tight">
               {effectiveStatus === 'idle' && 'Pair with a stranger to feel less alone while you work'}
               {effectiveStatus === 'looking' && 'Looking for someone with the same vibe…'}
               {effectiveStatus === 'matched' && 'You\'re matched — say hello'}
@@ -178,7 +184,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
           </div>
           <button
             onClick={onClose}
-            className="h-7 w-7 rounded inline-flex items-center justify-center text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="h-7 w-7 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]"
             aria-label="Close panel"
             title={effectiveStatus === 'connected' ? 'Hide panel — session keeps running' : 'Close'}
           >
@@ -210,10 +216,10 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                   when the server ships so users genuinely land together. */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400">
+                  <label className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)]">
                     Public rooms
                   </label>
-                  <span className="text-[9px] text-stone-400 dark:text-stone-500">
+                  <span className="text-[9px] text-[var(--ink-40)]">
                     Skip the queue · always-on
                   </span>
                 </div>
@@ -227,14 +233,14 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                         // queue. Real matcher will route by room id.
                         void startLooking('light', `In ${room.name}`)
                       }}
-                      className="text-left p-2 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 transition-colors flex items-center gap-2"
+                      className="text-left p-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors flex items-center gap-2"
                     >
                       <span className="text-[18px] shrink-0">{room.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-medium text-stone-800 dark:text-stone-100 truncate">
+                        <div className="text-[11px] font-medium text-[var(--ink-90)] truncate">
                           {room.name}
                         </div>
-                        <div className="flex items-center gap-1 text-[9px] text-stone-500 dark:text-stone-400">
+                        <div className="flex items-center gap-1 text-[9px] text-[var(--ink-50)]">
                           <span className="relative inline-flex h-1.5 w-1.5">
                             <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
                             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -252,9 +258,9 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                   share tokens). When a friend signs up via the link they
                   appear in the "friends pool" and get matched with you
                   first before strangers. */}
-              <div className="border-t border-stone-200 dark:border-stone-700 pt-3">
+              <div className="border-t border-[var(--edge-soft)] pt-3">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400">
+                  <label className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)]">
                     Bring a friend
                   </label>
                   <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -277,12 +283,12 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                     // pending friend invite so when someone signs up with
                     // it the pair is auto-friended.
                   }}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-[12px] font-medium text-stone-800 dark:text-stone-100"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-[var(--surface-sunken)] hover:bg-[var(--surface-sunken)] text-[12px] font-medium text-[var(--ink-90)]"
                 >
                   <Icon name="link" size={13} />
                   Copy invite link
                 </button>
-                <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1.5 leading-snug">
+                <p className="text-[10px] text-[var(--ink-50)] mt-1.5 leading-snug">
                   Share with a friend who'd body double with you. When they
                   sign up, you'll match with each other first — before
                   strangers — for every session.
@@ -290,8 +296,8 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
               </div>
 
               {/* Mode picker — for random matching when you don't pick a room */}
-              <div className="border-t border-stone-200 dark:border-stone-700 pt-3">
-                <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+              <div className="border-t border-[var(--edge-soft)] pt-3">
+                <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
                   Or match with a stranger — how much interaction?
                 </label>
                 <div className="space-y-1.5" role="radiogroup" aria-label="Interaction mode">
@@ -307,7 +313,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                         className={`w-full text-left p-2.5 rounded-md border-2 flex items-start gap-2.5 transition-colors ${
                           active
                             ? 'border-accent bg-accent/[0.06]'
-                            : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600'
+                            : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
                         }`}
                       >
                         <Icon
@@ -316,7 +322,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                           className={
                             active
                               ? 'text-accent mt-0.5 shrink-0'
-                              : 'text-stone-400 mt-0.5 shrink-0'
+                              : 'text-[var(--ink-40)] mt-0.5 shrink-0'
                           }
                         />
                         <div className="flex-1 min-w-0">
@@ -324,12 +330,12 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                             className={`text-[13px] font-medium ${
                               active
                                 ? 'text-accent'
-                                : 'text-stone-800 dark:text-stone-100'
+                                : 'text-[var(--ink-90)]'
                             }`}
                           >
                             {meta.label}
                           </div>
-                          <div className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
+                          <div className="text-[11px] text-[var(--ink-50)] leading-snug">
                             {meta.tagline}
                           </div>
                         </div>
@@ -343,22 +349,22 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                 pickedMode === 'light' ||
                 pickedMode === 'open') && (
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 mb-1.5">
+                  <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
                     What are you working on?{' '}
-                    <span className="text-stone-400 normal-case font-normal">(shared with partner — optional)</span>
+                    <span className="text-[var(--ink-40)] normal-case font-normal">(shared with partner — optional)</span>
                   </label>
                   <input
                     value={workingOnDraft}
                     onChange={(e) => setWorkingOnDraft(e.target.value)}
                     placeholder="e.g. drafting Q3 brief, deep work on a paper, inbox triage"
-                    className="w-full text-[13px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md focus:outline-none focus:border-accent"
+                    className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
                     maxLength={80}
                   />
                 </div>
               )}
 
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed bg-stone-50 dark:bg-stone-800/50 p-2 rounded">
-                <strong className="text-stone-700 dark:text-stone-200">Privacy:</strong>{' '}
+              <div className="text-[10px] text-[var(--ink-50)] leading-relaxed bg-[var(--surface-sunken)] p-2 rounded">
+                <strong className="text-[var(--ink-70)]">Privacy:</strong>{' '}
                 You'll be matched with a stranger. No real name, no audio or
                 video in v1 — just a pseudonymous handle and optional text chat
                 if your mode allows it. You can end the session any time, with
@@ -377,22 +383,22 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                 <div className="absolute inset-0 rounded-full border-2 border-accent/40 animate-ping" />
               </div>
               <div className="space-y-1">
-                <div className="text-[14px] font-medium text-stone-800 dark:text-stone-100">
+                <div className="text-[14px] font-medium text-[var(--ink-90)]">
                   Looking for {mode ? MODE_META[mode].label.toLowerCase() : 'a partner'}…
                 </div>
-                <div className="text-[11px] text-stone-500 dark:text-stone-400">
+                <div className="text-[11px] text-[var(--ink-50)]">
                   You're <span className="font-mono text-accent">{myHandle}</span>{' '}
                   while you wait
                 </div>
               </div>
               {workingOn && (
-                <div className="text-[11px] text-stone-600 dark:text-stone-300 italic max-w-[280px]">
+                <div className="text-[11px] text-[var(--ink-70)] italic max-w-[280px]">
                   "{workingOn}"
                 </div>
               )}
               <button
                 onClick={() => void cancelLooking()}
-                className="mt-3 text-[12px] px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="mt-3 text-[12px] px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
               >
                 Cancel
               </button>
@@ -406,24 +412,24 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                 <Icon name="handshake" size={22} className="text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="space-y-1">
-                <div className="text-[13px] text-stone-500 dark:text-stone-400">
+                <div className="text-[13px] text-[var(--ink-50)]">
                   Say hello to
                 </div>
-                <div className="text-[18px] font-semibold text-stone-900 dark:text-stone-100 font-mono">
+                <div className="text-[18px] font-semibold text-[var(--ink-100)] font-mono">
                   {partner.handle}
                 </div>
               </div>
               {partner.workingOn && (
-                <div className="bg-stone-50 dark:bg-stone-800/60 rounded-md px-3 py-2 text-[12px] text-stone-700 dark:text-stone-200 max-w-[320px]">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 block mb-0.5">
+                <div className="bg-[var(--surface-sunken)] rounded-md px-3 py-2 text-[12px] text-[var(--ink-70)] max-w-[320px]">
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] block mb-0.5">
                     Working on
                   </span>
                   {partner.workingOn}
                 </div>
               )}
-              <div className="text-[11px] text-stone-500 dark:text-stone-400 max-w-[320px] leading-snug">
+              <div className="text-[11px] text-[var(--ink-50)] max-w-[320px] leading-snug">
                 You both picked{' '}
-                <strong className="text-stone-700 dark:text-stone-200">
+                <strong className="text-[var(--ink-70)]">
                   {mode ? MODE_META[mode].label : '...'}
                 </strong>
                 .{' '}
@@ -434,7 +440,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => void endSession()}
-                  className="text-[12px] px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="text-[12px] px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                 >
                   Skip
                 </button>
@@ -458,15 +464,59 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                   visual frame stays identical so the eventual swap is
                   invisible to the user. Loops + muted + playsInline so it
                   feels present without competing for audio. */}
-              <div className="relative bg-black overflow-hidden" style={{ height: 200 }}>
-                <video
-                  src="fb-dev://mock-videos/working%20webcam.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative bg-stone-900 overflow-hidden" style={{ height: 200 }}>
+                {!videoFailed ? (
+                  <video
+                    src="fb-dev://mock-videos/working-webcam.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    onCanPlay={() => setVideoReady(true)}
+                    onError={(e) => {
+                      const el = e.currentTarget
+                      // eslint-disable-next-line no-console
+                      console.warn(
+                        '[PeerBodyDoubleDialog] mock video failed to load:',
+                        {
+                          src: el.currentSrc,
+                          error: el.error,
+                          networkState: el.networkState,
+                          readyState: el.readyState
+                        }
+                      )
+                      setVideoFailed(true)
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  // Calm placeholder: a soft gradient + breathing dot so
+                  // the user still feels a "presence" even when the mock
+                  // asset can't be served. Identical chrome (handle pill,
+                  // mock badge) layers on top.
+                  <div className="absolute inset-0 bg-gradient-to-br from-stone-800 via-stone-900 to-stone-950 flex flex-col items-center justify-center gap-2">
+                    <div className="relative inline-flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
+                      <div className="relative h-10 w-10 rounded-full bg-emerald-500/30 inline-flex items-center justify-center">
+                        <Icon name="diversity_3" size={20} className="text-emerald-200" />
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-stone-300">
+                      {partner.handle} is here
+                    </div>
+                    <div className="text-[9px] text-stone-500">
+                      (live video lands when WebRTC ships)
+                    </div>
+                  </div>
+                )}
+                {!videoReady && !videoFailed && (
+                  <div className="absolute inset-0 bg-stone-900/60 flex items-center justify-center pointer-events-none">
+                    <div className="text-[11px] text-stone-300 inline-flex items-center gap-1.5">
+                      <Icon name="hourglass_empty" size={12} />
+                      Loading mock feed…
+                    </div>
+                  </div>
+                )}
                 {/* Partner handle overlay — matches the chrome of the
                     eventual WebRTC video element. */}
                 <div className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 backdrop-blur text-[11px] text-white font-mono">
@@ -483,17 +533,17 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                 </div>
               </div>
               {/* Partner strip + presence dot */}
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-stone-200 dark:border-stone-700">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--edge-soft)]">
                 <span className="relative inline-flex items-center justify-center h-2 w-2">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-medium text-stone-800 dark:text-stone-100 font-mono truncate">
+                  <div className="text-[12px] font-medium text-[var(--ink-90)] font-mono truncate">
                     {partner.handle}
                   </div>
                   {partner.workingOn && (
-                    <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate italic">
+                    <div className="text-[10px] text-[var(--ink-50)] truncate italic">
                       {partner.workingOn}
                     </div>
                   )}
@@ -514,7 +564,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                     className="flex-1 min-h-[200px] max-h-[40vh] overflow-y-auto px-3 py-2 space-y-1.5"
                   >
                     {chat.length === 0 && (
-                      <div className="text-center text-[11px] text-stone-400 dark:text-stone-500 py-4">
+                      <div className="text-center text-[11px] text-[var(--ink-40)] py-4">
                         Say hi to break the ice.
                       </div>
                     )}
@@ -529,7 +579,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                             className={`max-w-[75%] px-2.5 py-1.5 rounded-lg text-[12px] ${
                               mine
                                 ? 'bg-accent text-white'
-                                : 'bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-100'
+                                : 'bg-[var(--surface-sunken)] text-[var(--ink-90)]'
                             }`}
                           >
                             {!mine && (
@@ -545,7 +595,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                   </div>
 
                   {/* Chat composer */}
-                  <div className="border-t border-stone-200 dark:border-stone-700 p-2 flex gap-2">
+                  <div className="border-t border-[var(--edge-soft)] p-2 flex gap-2">
                     <input
                       value={chatDraft}
                       onChange={(e) => setChatDraft(e.target.value)}
@@ -563,7 +613,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                           ? 'Say hi + share what you\'re working on…'
                           : 'Send a message…'
                       }
-                      className="flex-1 text-[12px] px-2.5 py-1.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-md focus:outline-none focus:border-accent"
+                      className="flex-1 text-[12px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
                     />
                     <button
                       onClick={() => {
@@ -583,11 +633,11 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
               ) : (
                 // Silent mode — just the partner strip + a calm reassurance.
                 <div className="flex-1 flex flex-col items-center justify-center gap-2 py-10 px-6 text-center">
-                  <Icon name="volume_off" size={28} className="text-stone-300 dark:text-stone-600" />
-                  <div className="text-[13px] text-stone-700 dark:text-stone-200 font-medium">
+                  <Icon name="volume_off" size={28} className="text-[var(--ink-30)]" />
+                  <div className="text-[13px] text-[var(--ink-70)] font-medium">
                     You're not alone.
                   </div>
-                  <div className="text-[11px] text-stone-500 dark:text-stone-400 max-w-[280px]">
+                  <div className="text-[11px] text-[var(--ink-50)] max-w-[280px]">
                     No chat in silent mode. Close this panel and go work — your
                     partner is sitting beside you (figuratively).
                   </div>
@@ -599,10 +649,10 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
 
         {/* Footer — only on idle */}
         {effectiveStatus === 'idle' && (
-          <div className="px-4 py-3 border-t border-stone-200 dark:border-stone-700 flex justify-end gap-2">
+          <div className="px-4 py-3 border-t border-[var(--edge-soft)] flex justify-end gap-2">
             <button
               onClick={onClose}
-              className="text-[12px] px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+              className="text-[12px] px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
             >
               Cancel
             </button>

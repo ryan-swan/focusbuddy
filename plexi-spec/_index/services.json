@@ -1,0 +1,601 @@
+{
+ "services": {
+  "Workspace Service": {
+   "section": "§47.1",
+   "owns": "Desk lifecycle · workspace layouts · window positions · Sessions · Object placement · visual persistence",
+   "must_not": "Interpreting Object content; computing Context Health; generating Resumes",
+   "store": "Relational (layout, session, membership)",
+   "emits": [
+    "DeskCreated",
+    "DeskActivated",
+    "DeskPaused",
+    "DeskArchived",
+    "DeskArchetypeChanged",
+    "LayoutChanged",
+    "SessionStarted",
+    "SessionEnded",
+    "ObjectPlaced",
+    "ObjectMoved",
+    "ObjectResized"
+   ],
+   "consumes": [
+    "ObjectCreated",
+    "ObjectDeleted",
+    "PermissionChanged"
+   ],
+   "requirements": [
+    "PLX-APP-010",
+    "PLX-APP-011",
+    "PLX-APP-012",
+    "PLX-DOM-050",
+    "PLX-DOM-051",
+    "PLX-PRD-001",
+    "PLX-PRD-002",
+    "PLX-PRD-003",
+    "PLX-PRD-004",
+    "PLX-PRD-005",
+    "PLX-PRD-006",
+    "PLX-PRD-010",
+    "PLX-PRD-011",
+    "PLX-PRD-012",
+    "PLX-PRD-013",
+    "PLX-PRD-014",
+    "PLX-PRD-020",
+    "PLX-PRD-021",
+    "PLX-PRD-022",
+    "PLX-PRD-023",
+    "PLX-PRD-030",
+    "PLX-PRD-031",
+    "PLX-PRD-032",
+    "PLX-PRD-033",
+    "PLX-PRD-034",
+    "PLX-PRD-040",
+    "PLX-PRD-041",
+    "PLX-PRD-042",
+    "PLX-PRD-043",
+    "PLX-PRD-044",
+    "PLX-PRD-050",
+    "PLX-PRD-051",
+    "PLX-PRD-052",
+    "PLX-PRD-053",
+    "PLX-PRD-060",
+    "PLX-PRD-061",
+    "PLX-PRD-062",
+    "PLX-PRD-063",
+    "PLX-PRD-070",
+    "PLX-PRD-071",
+    "PLX-PRD-072",
+    "PLX-UX-030",
+    "PLX-UX-031",
+    "PLX-UX-032",
+    "PLX-UX-033"
+   ],
+   "slo": [
+    "PLX-PERF-001",
+    "PLX-PERF-002"
+   ],
+   "invariants": [
+    "PLX-INV-01",
+    "PLX-INV-02"
+   ],
+   "blocked_by": [
+    "PLX-RSK-13"
+   ]
+  },
+  "Object Service": {
+   "section": "§47.2",
+   "owns": "Object creation · storage · version history · sharing · metadata · lifecycle",
+   "must_not": "Presentation; relationships; Context Health",
+   "store": "Document store + blob store",
+   "emits": [
+    "ObjectCreated",
+    "ObjectUpdated",
+    "ObjectVersioned",
+    "ObjectShared",
+    "ObjectArchived",
+    "ObjectDeleted",
+    "ObjectImported",
+    "ObjectExported"
+   ],
+   "consumes": [
+    "ConnectorSyncCompleted",
+    "PermissionChanged"
+   ],
+   "requirements": [
+    "PLX-DOM-020",
+    "PLX-DOM-030",
+    "PLX-DOM-031",
+    "PLX-DOM-032",
+    "PLX-DOM-040",
+    "PLX-DOM-041",
+    "PLX-DOM-042",
+    "PLX-DOM-043",
+    "PLX-PRD-001",
+    "PLX-PRD-010",
+    "PLX-PRD-011",
+    "PLX-PRD-012",
+    "PLX-PRD-013",
+    "PLX-PRD-014",
+    "PLX-PRD-060",
+    "PLX-PRD-061",
+    "PLX-PRD-062",
+    "PLX-PRD-063"
+   ],
+   "slo": [
+    "PLX-PERF-010"
+   ],
+   "invariants": [
+    "PLX-INV-01",
+    "PLX-INV-02",
+    "PLX-INV-05"
+   ],
+   "blocked_by": [
+    "PLX-RSK-09"
+   ]
+  },
+  "Event Service": {
+   "section": "§47.3",
+   "owns": "Event creation · persistence · distribution · replay · audit",
+   "must_not": "Exposing mutation or deletion of Event records via ANY interface",
+   "store": "Event Store (append-only log) + partitioned bus",
+   "emits": [
+    "ReplayStarted",
+    "ReplayCompleted",
+    "RetentionPolicyApplied"
+   ],
+   "consumes": [
+    "*all Events*"
+   ],
+   "requirements": [
+    "PLX-DATA-002",
+    "PLX-DATA-003",
+    "PLX-ENG-012",
+    "PLX-EVT-010",
+    "PLX-EVT-011",
+    "PLX-EVT-012",
+    "PLX-EVT-013",
+    "PLX-EVT-014",
+    "PLX-EVT-015",
+    "PLX-EVT-020",
+    "PLX-EVT-021",
+    "PLX-EVT-022",
+    "PLX-EVT-023",
+    "PLX-EVT-024",
+    "PLX-EVT-030",
+    "PLX-EVT-031",
+    "PLX-EVT-032",
+    "PLX-EVT-033",
+    "PLX-EVT-034",
+    "PLX-EVT-035",
+    "PLX-EVT-036",
+    "PLX-EVT-040",
+    "PLX-EVT-041",
+    "PLX-EVT-042",
+    "PLX-EVT-043",
+    "PLX-EVT-044",
+    "PLX-EVT-045",
+    "PLX-OPS-014",
+    "PLX-SEC-030"
+   ],
+   "slo": [
+    "PLX-PERF-030",
+    "PLX-PERF-031"
+   ],
+   "invariants": [
+    "PLX-INV-02",
+    "PLX-INV-05",
+    "PLX-INV-08",
+    "PLX-INV-11",
+    "PLX-INV-12"
+   ],
+   "blocked_by": [
+    "PLX-RSK-01",
+    "PLX-RSK-02",
+    "PLX-RSK-08"
+   ]
+  },
+  "Context Engine": {
+   "section": "§47.4",
+   "owns": "Current understanding · Context Health · Resume triggers · dependency tracking · materiality",
+   "must_not": "Calling AI models in the deterministic scoring path",
+   "store": "Context DB (per-user per-Object health; Context Objects)",
+   "emits": [
+    "ContextHealthChanged",
+    "MaterialityScored",
+    "DependencyImpactDetected",
+    "ContextGenerated",
+    "AttentionRaised"
+   ],
+   "consumes": [
+    "*all domain Events*",
+    "RelationshipConfirmed",
+    "DecisionSuperseded"
+   ],
+   "requirements": [
+    "PLX-CTX-001",
+    "PLX-CTX-002",
+    "PLX-CTX-010",
+    "PLX-CTX-011",
+    "PLX-CTX-012",
+    "PLX-CTX-013",
+    "PLX-CTX-014",
+    "PLX-CTX-020",
+    "PLX-CTX-021",
+    "PLX-CTX-022",
+    "PLX-CTX-023",
+    "PLX-CTX-024",
+    "PLX-CTX-025",
+    "PLX-CTX-026",
+    "PLX-CTX-030",
+    "PLX-CTX-031",
+    "PLX-DOM-030",
+    "PLX-EVT-020",
+    "PLX-EVT-021",
+    "PLX-PRD-020",
+    "PLX-PRD-021",
+    "PLX-PRD-022",
+    "PLX-UX-020",
+    "PLX-UX-021",
+    "PLX-UX-022",
+    "PLX-UX-023",
+    "PLX-UX-024",
+    "PLX-UX-025"
+   ],
+   "slo": [
+    "PLX-PERF-020",
+    "PLX-PERF-021"
+   ],
+   "invariants": [
+    "PLX-INV-04",
+    "PLX-INV-06",
+    "PLX-INV-07"
+   ],
+   "blocked_by": [
+    "PLX-RSK-03",
+    "PLX-RSK-12"
+   ]
+  },
+  "Resume Engine": {
+   "section": "§47.5",
+   "owns": "Resume generation · Workspace Memory · context compression · catch-up estimation",
+   "must_not": "Deleting or mutating source Events during compression",
+   "store": "Resume DB (versioned Resume Objects, compression artefacts)",
+   "emits": [
+    "ResumeGenerated",
+    "ResumeSuperseded",
+    "MemoryCompressed",
+    "CatchupEstimated"
+   ],
+   "consumes": [
+    "ContextHealthChanged",
+    "MaterialityScored",
+    "SessionEnded",
+    "DecisionApproved"
+   ],
+   "requirements": [
+    "PLX-DATA-010",
+    "PLX-DATA-011",
+    "PLX-DATA-012",
+    "PLX-PRD-030",
+    "PLX-PRD-031",
+    "PLX-PRD-032",
+    "PLX-PRD-033",
+    "PLX-PRD-034",
+    "PLX-PRD-040",
+    "PLX-PRD-041",
+    "PLX-PRD-042",
+    "PLX-PRD-043",
+    "PLX-PRD-044",
+    "PLX-RES-001",
+    "PLX-RES-002",
+    "PLX-RES-003",
+    "PLX-RES-004",
+    "PLX-RES-010",
+    "PLX-RES-011",
+    "PLX-RES-012",
+    "PLX-RES-013",
+    "PLX-RES-020",
+    "PLX-RES-021",
+    "PLX-RES-022",
+    "PLX-RES-023",
+    "PLX-UX-050",
+    "PLX-UX-051",
+    "PLX-UX-052"
+   ],
+   "slo": [
+    "PLX-PERF-011",
+    "PLX-PERF-012"
+   ],
+   "invariants": [
+    "PLX-INV-05",
+    "PLX-INV-07",
+    "PLX-INV-12"
+   ],
+   "blocked_by": [
+    "PLX-RSK-06"
+   ]
+  },
+  "Graph Engine": {
+   "section": "§47.6",
+   "owns": "Knowledge graph · relationship storage · traversal · discovery · dependency analysis",
+   "must_not": "Emitting confirmed Relationships from AI discovery",
+   "store": "Graph DB (tenant-namespaced)",
+   "emits": [
+    "RelationshipDiscovered",
+    "RelationshipConfirmed",
+    "RelationshipRejected",
+    "RelationshipSuperseded",
+    "DuplicateDetected",
+    "ClusterFormed"
+   ],
+   "consumes": [
+    "*all domain Events*",
+    "EmbeddingUpdated"
+   ],
+   "requirements": [
+    "PLX-CTX-026",
+    "PLX-GPH-001",
+    "PLX-GPH-002",
+    "PLX-GPH-003",
+    "PLX-GPH-004",
+    "PLX-GPH-005",
+    "PLX-GPH-010",
+    "PLX-GPH-011",
+    "PLX-GPH-012",
+    "PLX-GPH-013",
+    "PLX-GPH-020",
+    "PLX-GPH-021",
+    "PLX-GPH-022",
+    "PLX-PRD-050",
+    "PLX-PRD-051",
+    "PLX-PRD-052",
+    "PLX-PRD-053",
+    "PLX-SEC-010",
+    "PLX-SEC-011"
+   ],
+   "slo": [
+    "PLX-PERF-022"
+   ],
+   "invariants": [
+    "PLX-INV-03",
+    "PLX-INV-06"
+   ],
+   "blocked_by": [
+    "PLX-RSK-07",
+    "PLX-RSK-09"
+   ]
+  },
+  "Search Service": {
+   "section": "§47.7",
+   "owns": "Keyword · semantic · graph · hybrid ranking · context-aware search",
+   "must_not": "Returning results before permission filtering",
+   "store": "Search index + vector index",
+   "emits": [
+    "SearchExecuted",
+    "EmbeddingUpdated"
+   ],
+   "consumes": [
+    "ObjectCreated",
+    "ObjectUpdated",
+    "ObjectDeleted",
+    "PermissionChanged",
+    "RelationshipConfirmed"
+   ],
+   "requirements": [
+    "PLX-PRD-014",
+    "PLX-SCH-001",
+    "PLX-SCH-002",
+    "PLX-SCH-003",
+    "PLX-SCH-004",
+    "PLX-SCH-005",
+    "PLX-SEC-023",
+    "PLX-UX-040",
+    "PLX-UX-041"
+   ],
+   "slo": [
+    "PLX-PERF-040",
+    "PLX-PERF-041",
+    "PLX-PERF-042"
+   ],
+   "invariants": [
+    "PLX-INV-06"
+   ],
+   "blocked_by": [
+    "PLX-RSK-07",
+    "PLX-RSK-09"
+   ]
+  },
+  "AI Orchestrator": {
+   "section": "§47.8",
+   "owns": "Model routing · prompt assembly · agent coordination · tool invocation · cost · caching · AI policy",
+   "must_not": "Writing domain state directly; bypassing permission evaluation",
+   "store": "Prompt cache, reasoning cache, cost ledger",
+   "emits": [
+    "ReasoningRequested",
+    "ReasoningCompleted",
+    "ReasoningRejected",
+    "ModelRouted",
+    "CostRecorded",
+    "CostCeilingExceeded"
+   ],
+   "consumes": [
+    "AttentionRaised",
+    "ContextGenerated",
+    "ResumeGenerated",
+    "*agent task requests*"
+   ],
+   "requirements": [
+    "PLX-AI-001",
+    "PLX-AI-002",
+    "PLX-AI-003",
+    "PLX-AI-004",
+    "PLX-AI-005",
+    "PLX-AI-006",
+    "PLX-AI-007",
+    "PLX-AI-010",
+    "PLX-AI-011",
+    "PLX-AI-012",
+    "PLX-AI-013",
+    "PLX-AI-020",
+    "PLX-AI-021",
+    "PLX-AI-022",
+    "PLX-AI-030",
+    "PLX-AI-031",
+    "PLX-AI-032",
+    "PLX-AI-040",
+    "PLX-AI-041",
+    "PLX-AI-042",
+    "PLX-AI-043",
+    "PLX-AI-044",
+    "PLX-AI-045",
+    "PLX-AI-046",
+    "PLX-ARC-022",
+    "PLX-DOM-014",
+    "PLX-EVT-020",
+    "PLX-EVT-021",
+    "PLX-SEC-025",
+    "PLX-UX-060",
+    "PLX-UX-061",
+    "PLX-UX-062",
+    "PLX-UX-063"
+   ],
+   "slo": [
+    "PLX-PERF-050"
+   ],
+   "invariants": [
+    "PLX-INV-04",
+    "PLX-INV-07",
+    "PLX-INV-09"
+   ],
+   "blocked_by": [
+    "PLX-RSK-05",
+    "PLX-RSK-06",
+    "PLX-RSK-10",
+    "PLX-RSK-11"
+   ]
+  },
+  "Automation Engine": {
+   "section": "§47.9",
+   "owns": "Workflow execution · triggers · actions · scheduling · approvals · long-running workflows",
+   "must_not": "Executing an action exceeding the initiating principal's permissions",
+   "store": "Workflow DB (durable execution state)",
+   "emits": [
+    "WorkflowStarted",
+    "WorkflowStepCompleted",
+    "WorkflowCompleted",
+    "WorkflowFailed",
+    "ApprovalRequested",
+    "ApprovalGranted",
+    "ApprovalDeclined"
+   ],
+   "consumes": [
+    "*all Events as trigger sources*"
+   ],
+   "requirements": [
+    "PLX-DOM-040",
+    "PLX-EVT-015",
+    "PLX-SEC-020",
+    "PLX-SEC-021",
+    "PLX-SEC-022"
+   ],
+   "slo": [],
+   "invariants": [
+    "PLX-INV-02",
+    "PLX-INV-06"
+   ],
+   "blocked_by": [
+    "PLX-RSK-10"
+   ]
+  },
+  "Connector Service": {
+   "section": "§47.1",
+   "owns": "External applications · authentication · integrations · webhooks · import · export · sync",
+   "must_not": "Storing third-party credentials outside the credential vault",
+   "store": "Connector config, credential vault references, sync cursors",
+   "emits": [
+    "ConnectorConnected",
+    "ConnectorDisconnected",
+    "ConnectorSyncStarted",
+    "ConnectorSyncCompleted",
+    "ConnectorSyncFailed",
+    "ExternalObjectImported"
+   ],
+   "consumes": [
+    "ObjectUpdated",
+    "WorkflowStepCompleted"
+   ],
+   "requirements": [
+    "PLX-CON-001",
+    "PLX-CON-002",
+    "PLX-CON-003",
+    "PLX-CON-004",
+    "PLX-CON-005",
+    "PLX-CON-006",
+    "PLX-CON-007",
+    "PLX-DATA-006",
+    "PLX-EVT-015",
+    "PLX-PRIN-002",
+    "PLX-SEC-024"
+   ],
+   "slo": [],
+   "invariants": [
+    "PLX-INV-06",
+    "PLX-INV-13"
+   ],
+   "blocked_by": [
+    "PLX-RSK-10"
+   ]
+  },
+  "Identity Service": {
+   "section": "§47.11",
+   "owns": "Authentication · authorisation · users · groups · roles · permissions · audit",
+   "must_not": "Being bypassed by any service for authorisation decisions",
+   "store": "Relational (identity, roles, policy)",
+   "emits": [
+    "UserCreated",
+    "UserDeactivated",
+    "RoleAssigned",
+    "PermissionChanged",
+    "AuthenticationFailed",
+    "PolicyChanged",
+    "ErasureExecuted"
+   ],
+   "consumes": [],
+   "requirements": [
+    "PLX-AGT-001",
+    "PLX-AGT-005",
+    "PLX-EVT-012",
+    "PLX-EVT-033",
+    "PLX-PRD-070",
+    "PLX-PRD-071",
+    "PLX-PRD-072",
+    "PLX-SEC-010",
+    "PLX-SEC-011",
+    "PLX-SEC-020",
+    "PLX-SEC-021",
+    "PLX-SEC-022",
+    "PLX-SEC-023",
+    "PLX-SEC-024",
+    "PLX-SEC-025",
+    "PLX-SEC-026",
+    "PLX-SEC-027",
+    "PLX-SEC-030",
+    "PLX-SEC-031",
+    "PLX-SEC-032",
+    "PLX-SEC-033"
+   ],
+   "slo": [
+    "PLX-PERF-060"
+   ],
+   "invariants": [
+    "PLX-INV-06"
+   ],
+   "blocked_by": [
+    "PLX-RSK-01",
+    "PLX-RSK-07",
+    "PLX-RSK-09",
+    "PLX-RSK-12"
+   ]
+  }
+ }
+}

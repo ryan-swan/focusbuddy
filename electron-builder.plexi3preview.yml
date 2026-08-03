@@ -1,0 +1,84 @@
+# Electron-builder config for the side-by-side "PlexiDesk 3 Preview" build —
+# the Plexi3.0 branch packaged so it can be tested end to end NEXT TO a
+# production PlexiDesk install, without touching its data.
+#
+# What keeps it independent:
+#  - appId app.plexidesk3.preview → its own LaunchServices identity, so macOS
+#    treats it as a different app (it installs alongside, never upgrades the
+#    production install).
+#  - productName "PlexiDesk 3 Preview" → the bundle name the main process's
+#    detectPreviewBuild() recognises from execPath, which switches it to its
+#    own userData directory (…/Application Support/PlexiDesk3Preview), its own
+#    single-instance lock, no haptyx:// protocol claim, and a disabled updater.
+#  - NO publish block and no update manifests: this build is never released or
+#    auto-updated. Testers rebuild with `npm run dist:preview`.
+appId: app.plexidesk3.preview
+productName: PlexiDesk 3 Preview
+copyright: Copyright © 2026 PlexiDesk
+artifactName: PlexiDesk3Preview-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release-preview
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md}"
+  - "!**/*.{ts,tsx,map}"
+
+asarUnpack:
+  - node_modules/better-sqlite3/**/*
+  - node_modules/node-mac-haptics/**/*
+  # PDF text extraction (pdf-parse) + offline OCR for scanned PDFs (tesseract.js
+  # worker/WASM, pdf-to-png-converter, and the @napi-rs/canvas native addon) all
+  # break inside an asar, so keep them unpacked here too.
+  - node_modules/pdf-parse/**/*
+  - node_modules/tesseract.js/**/*
+  - node_modules/tesseract.js-core/**/*
+  - node_modules/pdf-to-png-converter/**/*
+  - node_modules/@napi-rs/**/*
+
+# Bundle the offline OCR training data (no CDN fetch).
+extraResources:
+  - from: resources/tessdata
+    to: tessdata
+
+# Deliberately NO protocols block: the production install keeps sole ownership
+# of haptyx:// deep links (and the main process also declines to claim it at
+# runtime for the preview).
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: zip
+      arch:
+        - arm64
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  identity: null
+  extendInfo:
+    NSMicrophoneUsageDescription: >-
+      PlexiDesk records voice notes you choose to capture. Audio is processed
+      locally or via your configured transcription provider.
+    NSCameraUsageDescription: >-
+      PlexiDesk records video notes when you choose to capture them, stored
+      locally and transcribed only via your configured provider.
+
+afterPack: build/adhoc-sign.cjs
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PlexiDesk 3 Preview
+
+npmRebuild: false

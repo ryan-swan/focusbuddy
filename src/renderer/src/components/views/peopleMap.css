@@ -1,0 +1,223 @@
+/* People Map — aligned to the Plexi design tokens (tokens.css). Chrome follows
+   the active theme (ink / surface / edge ramps), so it reads as one suite in
+   light, dark, futuristic and atelier. Only the world-map "well" stays dark,
+   the way a map widget conventionally does. All pm- prefixed so nothing leaks. */
+
+.pm-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-base);
+  color: var(--ink-100);
+}
+
+.pm-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 20px; }
+
+/* two-column dashboard layout: map column + persistent right rail */
+.pm-layout { display: flex; gap: 16px; align-items: flex-start; }
+.pm-main { flex: 1; min-width: 0; }
+.pm-rail { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; }
+@media (max-width: 1120px) {
+  .pm-rail { display: none; }
+}
+
+/* ── tab bar ── */
+.pm-tabs { display: inline-flex; gap: 4px; background: var(--surface-sunken); padding: 3px; border-radius: 12px; border: 1px solid var(--edge-soft); }
+.pm-tab {
+  font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 9px;
+  color: var(--ink-70); display: inline-flex; align-items: center; gap: 6px;
+  transition: background-color var(--dur-quick) var(--ease-spring-crisp), color var(--dur-quick) var(--ease-spring-crisp);
+}
+.pm-tab:hover { color: var(--ink-90); }
+.pm-tab.is-active { background: rgb(var(--accent) / 0.12); color: rgb(var(--accent)); }
+.pm-iconbtn { color: var(--ink-70); padding: 6px; border-radius: 9px; }
+.pm-iconbtn:hover { background: var(--surface-sunken); color: var(--ink-100); }
+
+.pm-empty { max-width: 460px; margin: 56px auto; text-align: center; color: var(--ink-70); }
+.pm-empty h2 { font-size: 16px; color: var(--ink-100); margin-bottom: 6px; font-weight: 600; }
+.pm-empty p { font-size: 13px; line-height: 1.6; }
+.pm-empty button {
+  margin-top: 14px; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 10px;
+  background: rgb(var(--accent)); color: #fff;
+}
+.pm-empty button:hover { background: rgb(var(--accent-hover)); }
+
+/* ── status + avatar ── */
+.pm-av { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 700; flex-shrink: 0; }
+.pm-dot { border-radius: 50%; display: inline-block; }
+.pm-st-online { background: #10b981; }
+.pm-st-away { background: #f59e0b; }
+.pm-st-focus { background: #8b5cf6; }
+.pm-st-busy { background: #f43f5e; }
+.pm-st-offline { background: #94a3b8; }
+
+/* ── day bar ── */
+.pm-daybar { width: 100%; }
+.pm-daybar__track { position: relative; border-radius: 999px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--edge-firm); }
+.pm-daybar__work { position: absolute; top: 0; bottom: 0; background: rgb(255 255 255 / 0.16); border-left: 1px solid rgb(255 255 255 / 0.45); border-right: 1px solid rgb(255 255 255 / 0.45); }
+.pm-daybar__marker { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 3px; height: 140%; background: #fff; border-radius: 2px; box-shadow: 0 0 6px rgb(255 255 255 / 0.8); }
+.pm-daybar__labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-50); margin-top: 3px; }
+
+/* ── offices grid ── */
+.pm-offices { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.pm-office { background: var(--surface-raised); border: 1px solid var(--edge-soft); border-radius: var(--radius-lg); padding: 14px; box-shadow: var(--shadow-soft); }
+.pm-office__top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pm-office__name { font-size: 14px; font-weight: 700; color: var(--ink-100); }
+.pm-office__kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--ink-50); }
+.pm-office__count { margin-left: auto; font-size: 12px; color: var(--ink-70); }
+.pm-office__where { font-size: 11.5px; color: var(--ink-50); margin-bottom: 8px; }
+.pm-office__pres { display: flex; gap: 12px; margin: 8px 0; font-size: 11.5px; color: var(--ink-70); }
+.pm-office__pres span { display: inline-flex; align-items: center; gap: 5px; }
+.pm-people { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.pm-prow { display: flex; align-items: center; gap: 9px; padding: 4px 2px; border-radius: 8px; }
+.pm-prow:hover { background: var(--surface-sunken); }
+.pm-prow__rel { position: relative; }
+.pm-prow__sdot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid var(--surface-raised); border-radius: 50%; }
+.pm-prow__name { font-size: 12.5px; font-weight: 600; color: var(--ink-100); }
+.pm-prow__sub { font-size: 11px; color: var(--ink-50); }
+.pm-prow__time { margin-left: auto; font-size: 11px; color: var(--ink-50); text-align: right; }
+
+/* ── world map (stays dark — map convention) ── */
+.pm-world {
+  position: relative; width: 100%; aspect-ratio: 72 / 34;
+  background: #0a0f1f; border: 1px solid var(--edge-firm); border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow-cast);
+}
+.pm-world__grid { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pm-land { fill: #243154; }
+.pm-land--night { fill: #161d33; }
+.pm-land--twi { fill: #2a2f57; }
+.pm-pin {
+  position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; width: 22px; height: 22px; font-size: 9px; font-weight: 700; color: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.5); z-index: 3;
+}
+.pm-pin--off { opacity: 0.5; filter: grayscale(0.4); }
+.pm-pin__sdot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid #0a0f1f; border-radius: 50%; }
+.pm-sun, .pm-moon { position: absolute; transform: translate(-50%, -50%); z-index: 2; pointer-events: none; color: #ffd27a; }
+.pm-moon { color: #aab4cc; }
+
+/* ── hierarchy ── */
+.pm-tree { padding: 8px 4px; }
+.pm-node { display: flex; flex-direction: column; }
+.pm-node__self { display: inline-flex; }
+.pm-card { display: inline-flex; align-items: center; gap: 9px; background: var(--surface-raised); border: 1px solid var(--edge-soft); border-radius: var(--radius-md); padding: 7px 11px; margin: 4px 0; box-shadow: var(--shadow-soft); }
+.pm-card__rel { position: relative; }
+.pm-card__sdot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid var(--surface-raised); border-radius: 50%; }
+.pm-card__name { font-size: 12.5px; font-weight: 700; color: var(--ink-100); }
+.pm-card__role { font-size: 11px; color: var(--ink-50); }
+.pm-node__kids { margin-left: 22px; padding-left: 16px; border-left: 1px solid var(--edge-firm); }
+.pm-worktag { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
+.pm-worktag.is-working { color: #059669; background: rgb(16 185 129 / 0.12); }
+.pm-worktag.is-off { color: var(--ink-50); background: var(--surface-sunken); }
+
+/* PlexiPeople reach actions: a hover-revealed message / knock / call cluster on a
+   person row or card. Invisible at rest so the layout never shifts, revealed on
+   row hover or when any action inside it is focused. */
+.pm-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--dur-quick, 120ms) var(--ease-spring-crisp, ease);
+}
+.pm-prow:hover .pm-actions,
+.pm-card:hover .pm-actions,
+.pm-actions:focus-within {
+  opacity: 1;
+}
+
+/* Interactive world-map pins: clickable buttons that open a popover. */
+.pm-global { position: relative; }
+.pm-pin { border: none; padding: 0; cursor: pointer; font-family: inherit; }
+.pm-pin:hover { transform: translate(-50%, -50%) scale(1.14); }
+.pm-pin--sel { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+
+/* The popover over the map: a person's details + reach actions, or an office roster. */
+.pm-pop__backdrop { position: fixed; inset: 0; z-index: 40; }
+.pm-pop {
+  position: absolute; z-index: 41; width: 264px; max-height: 320px; overflow: auto;
+  background: var(--surface-raised); border: 1px solid var(--edge-firm);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-cast); color: var(--ink-100);
+}
+.pm-pop__title {
+  padding: 10px 12px 6px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.pm-pop__sub { font-size: 11px; color: var(--ink-50); font-weight: 500; }
+.pm-pop__list { padding: 0 6px 8px; }
+
+.pm-pcard { padding: 12px; }
+.pm-pcard__head { display: flex; gap: 10px; align-items: center; }
+.pm-pcard__name { font-size: 13px; font-weight: 600; color: var(--ink-100); }
+.pm-pcard__role { font-size: 11.5px; color: var(--ink-50); }
+.pm-pcard__when { font-size: 11.5px; color: var(--ink-70); margin-top: 8px; }
+.pm-pcard__actions { margin-top: 10px; display: flex; }
+/* In the popover the actions are always visible, not hover-revealed. */
+.pm-pcard .pm-actions { opacity: 1; }
+
+/* External-party proxy: a muted badge on a guest (contractor/client/partner). */
+.pm-badge-guest {
+  margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase; vertical-align: middle;
+  color: var(--ink-50); background: var(--surface-sunken); border: 1px solid var(--edge-soft);
+}
+
+/* Collaboration tab: a grid of insight panels, matching the offices grid. */
+.pm-collab {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;
+}
+.pm-collab__empty { font-size: 12px; color: var(--ink-50); line-height: 1.45; }
+.pm-collab__lead { font-size: 12px; color: var(--ink-70); line-height: 1.45; margin-bottom: 8px; }
+.pm-collab__people { display: flex; flex-wrap: wrap; gap: 6px; }
+.pm-collab__pairs { display: flex; flex-direction: column; gap: 8px; }
+.pm-collab__pair { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pm-collab__arrow { color: var(--ink-50); }
+.pm-collab__overlap, .pm-collab__pctx {
+  font-size: 10.5px; color: var(--ink-50); white-space: nowrap;
+}
+.pm-collab__person {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 4px;
+  border-radius: 999px; border: 1px solid var(--edge-soft); background: var(--surface-sunken);
+  color: var(--ink-90); cursor: pointer; max-width: 100%;
+}
+.pm-collab__person:hover { border-color: var(--edge-firm); background: var(--surface-raised); }
+.pm-collab__pname { font-size: 12px; font-weight: 500; color: var(--ink-100); }
+
+/* Avatar photo variant: a real image fills the same circular footprint. */
+.pm-av--photo { object-fit: cover; border-radius: 50%; display: inline-block; }
+
+/* Org editing in the hierarchy: drag-to-reparent + dotted-line chips. */
+.pm-card--draggable { cursor: grab; }
+.pm-card--draggable:active { cursor: grabbing; }
+.pm-card--drop { outline: 2px dashed rgb(var(--accent) / 0.6); outline-offset: 2px; }
+.pm-tree__hint { font-size: 11px; color: var(--ink-50); margin-bottom: 10px; }
+.pm-tree__err { color: rgb(var(--rose, 244 63 94)); }
+.pm-dotted { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px 40px; align-items: center; }
+.pm-dotted__chip {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px;
+  padding: 1px 6px; border-radius: 999px; border: 1px dashed var(--edge-firm);
+  color: var(--ink-70); background: var(--surface-sunken);
+}
+.pm-dotted__x, .pm-dotted__cancel {
+  display: inline-flex; align-items: center; padding: 0; margin-left: 2px;
+  color: var(--ink-50); border: none; background: none; cursor: pointer;
+}
+.pm-dotted__x:hover, .pm-dotted__cancel:hover { color: var(--ink-90); }
+.pm-dotted__add {
+  display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px;
+  padding: 1px 6px; border-radius: 999px; border: 1px dashed var(--edge-soft);
+  color: var(--ink-50); background: none; cursor: pointer;
+}
+.pm-dotted__add:hover { color: var(--ink-90); border-color: var(--edge-firm); }
+.pm-dotted__form { display: inline-flex; align-items: center; gap: 3px; }
+.pm-dotted__form select {
+  font-size: 10.5px; padding: 1px 4px; border-radius: 6px;
+  border: 1px solid var(--edge-soft); background: var(--surface-sunken); color: var(--ink-90);
+}
+.pm-dotted__save {
+  font-size: 10.5px; padding: 1px 8px; border-radius: 6px; border: none;
+  background: rgb(var(--accent)); color: #fff; cursor: pointer;
+}
+.pm-dotted__save:disabled { opacity: 0.4; }

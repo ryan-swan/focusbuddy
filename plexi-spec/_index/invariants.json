@@ -1,0 +1,108 @@
+{
+ "invariants": [
+  {
+   "id": "PLX-INV-01",
+   "statement": "Every Object belongs to exactly one owning Desk",
+   "services": [
+    "Workspace Service",
+    "Object Service"
+   ]
+  },
+  {
+   "id": "PLX-INV-02",
+   "statement": "Every meaningful change produces an Event",
+   "services": [
+    "Workspace Service",
+    "Object Service",
+    "Event Service",
+    "Automation Engine"
+   ]
+  },
+  {
+   "id": "PLX-INV-03",
+   "statement": "Every Relationship has provenance",
+   "services": [
+    "Graph Engine"
+   ]
+  },
+  {
+   "id": "PLX-INV-04",
+   "statement": "AI never bypasses structured data",
+   "services": [
+    "Context Engine",
+    "AI Orchestrator"
+   ]
+  },
+  {
+   "id": "PLX-INV-05",
+   "statement": "Nothing deletes organisational memory",
+   "services": [
+    "Object Service",
+    "Event Service",
+    "Resume Engine"
+   ]
+  },
+  {
+   "id": "PLX-INV-06",
+   "statement": "Permissions propagate through relationships",
+   "services": [
+    "Context Engine",
+    "Graph Engine",
+    "Search Service",
+    "Automation Engine",
+    "Connector Service",
+    "Identity Service"
+   ]
+  },
+  {
+   "id": "PLX-INV-07",
+   "statement": "Everything remains inspectable",
+   "services": [
+    "Context Engine",
+    "Resume Engine",
+    "AI Orchestrator"
+   ]
+  },
+  {
+   "id": "PLX-INV-08",
+   "statement": "Every Event is immutable once written",
+   "services": [
+    "Event Service"
+   ]
+  },
+  {
+   "id": "PLX-INV-09",
+   "statement": "Every recommendation is explainable",
+   "services": [
+    "AI Orchestrator"
+   ]
+  },
+  {
+   "id": "PLX-INV-10",
+   "statement": "Every service owns exactly one domain",
+   "services": []
+  },
+  {
+   "id": "PLX-INV-11",
+   "statement": "No service bypasses the Event Bus",
+   "services": [
+    "Event Service"
+   ]
+  },
+  {
+   "id": "PLX-INV-12",
+   "statement": "Workspace Memory is always recoverable",
+   "services": [
+    "Event Service",
+    "Resume Engine"
+   ]
+  },
+  {
+   "id": "PLX-INV-13",
+   "statement": "Context survives application changes",
+   "services": [
+    "Connector Service"
+   ]
+  }
+ ]
+}

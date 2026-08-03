@@ -13,6 +13,12 @@ export interface WidgetCatalogEntry {
   defaultContent: string
   urlPlaceholder?: string
   isWebBased: boolean
+  // When true, hidden from the picker but still routed correctly when an
+  // existing widget of this kind is rendered. Used to fold redundant kinds
+  // (image / video / pdf / gdoc / gsheet / gslide / email) into the
+  // universal File widget, which now handles upload + URL paste + auto-
+  // detection by MIME or hostname — without breaking existing canvases.
+  hideFromPicker?: boolean
 }
 
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
@@ -33,8 +39,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Note',
     icon: 'description',
     hint: 'Larger paper for longer writing',
-    defaultWidth: 360,
-    defaultHeight: 280,
+    defaultWidth: 400,
+    defaultHeight: 320,
     defaultContent: '',
     isWebBased: false
   },
@@ -43,7 +49,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     category: 'Notes',
     label: 'Markdown',
     icon: 'subject',
-    hint: 'Paste markdown — view as rich text, edit in source',
+    hint: 'One portable note in markdown — slash menu, export, copy out. Use Page for rich multi-block docs.',
     defaultWidth: 460,
     defaultHeight: 360,
     defaultContent: '',
@@ -63,11 +69,22 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   {
     kind: 'file',
     category: 'Files',
-    label: 'File',
+    label: 'File or link',
     icon: 'upload_file',
-    hint: 'Drop any file onto the canvas to preview it — PDF, image, video, audio, anything',
-    defaultWidth: 360,
-    defaultHeight: 280,
+    hint: 'Upload any file (PDF, image, video, audio, doc) or paste a cloud link (Google Doc, Drive, Notion). Auto-detects type and renders the right preview.',
+    defaultWidth: 320,
+    defaultHeight: 240,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'drive',
+    category: 'Files',
+    label: 'Drive (folder)',
+    icon: 'folder_open',
+    hint: 'A folder from your Files, pinned to this desk. Lists its contents, opens it in Files, and any file you drop or add saves straight into that folder.',
+    defaultWidth: 300,
+    defaultHeight: 260,
     defaultContent: '',
     isWebBased: false
   },
@@ -87,7 +104,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     category: 'Notes',
     label: 'Page',
     icon: 'description',
-    hint: 'Notion-style document with headings, lists, todos, and slash-command AI prompts',
+    hint: 'A rich multi-block document (headings, lists, todos, slash-command AI). Use Markdown for a single portable note.',
     defaultWidth: 480,
     defaultHeight: 400,
     defaultContent: '',
@@ -99,8 +116,93 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Table',
     icon: 'table_chart',
     hint: 'Airtable-style database — rows + columns of typed fields',
-    defaultWidth: 560,
-    defaultHeight: 360,
+    // Open wide enough that several typed columns + the add-row control are all
+    // usable without a resize (N3: size scales with the real estate a kind needs).
+    defaultWidth: 680,
+    defaultHeight: 440,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'chart',
+    category: 'Tools',
+    label: 'Chart',
+    icon: 'bar_chart',
+    hint: 'PlexiDash — bar, line, area, pie or KPI charts from a table. Several on a desk make a dashboard.',
+    defaultWidth: 520,
+    defaultHeight: 380,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'doc',
+    category: 'Files',
+    label: 'Document',
+    icon: 'article',
+    hint: 'A Word-class document. Create new, open a .docx, or place an existing one.',
+    // Word-class: needs the toolbar + a full page width (~816px page) usable on
+    // open. Sized so the page and ribbon are readable without a resize.
+    defaultWidth: 860,
+    defaultHeight: 760,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'sheet',
+    category: 'Files',
+    label: 'Spreadsheet',
+    icon: 'grid_on',
+    hint: 'An Excel-class spreadsheet with formulas. Create new, import .xlsx/.csv, or place an existing one.',
+    // Excel-class: formula bar + toolbar + enough columns/rows to be usable at a
+    // glance without a resize.
+    defaultWidth: 880,
+    defaultHeight: 580,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'slides',
+    category: 'Files',
+    label: 'Slides',
+    icon: 'slideshow',
+    hint: 'A PowerPoint-class deck. Create new, import .pptx, or place an existing one.',
+    // PowerPoint-class: a 16:9 slide + the thumbnail rail + toolbar all usable on
+    // open.
+    defaultWidth: 900,
+    defaultHeight: 600,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'map',
+    category: 'Files',
+    label: 'Map',
+    icon: 'account_tree',
+    hint: 'A PlexiMaps diagram and workflow map — flowcharts, process maps, org charts, mind maps. Build by hand or generate with AI.',
+    defaultWidth: 720,
+    defaultHeight: 520,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'design',
+    category: 'Files',
+    label: 'Design',
+    icon: 'palette',
+    hint: 'A PlexiDesign canvas — posters, social posts, one-pagers and more. Size presets, brand templates, AI copy and images.',
+    defaultWidth: 720,
+    defaultHeight: 540,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'streamdeck',
+    category: 'Tools',
+    label: 'SpeedDeck',
+    icon: 'apps',
+    hint: 'Elgato-style 10×3 macro pad — launch apps, run macros, control media, organise with folders. Toggle between this-task and Universal scopes.',
+    defaultWidth: 760,
+    defaultHeight: 260,
     defaultContent: '',
     isWebBased: false
   },
@@ -121,12 +223,22 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Browser',
     icon: 'public',
     hint: 'Any URL — a focused browser tab for this task',
-    defaultWidth: 560,
-    defaultHeight: 400,
+    // Open at Laptop size (1366 × 768) so sites render their desktop layout
+    // instead of a cramped mobile one. The size presets can change it after.
+    defaultWidth: 1366,
+    defaultHeight: 768,
     defaultContent: '',
     urlPlaceholder: 'https://…',
     isWebBased: true
   },
+  // ── Folded into File ───────────────────────────────────────────────────
+  // pdf / gdoc / gsheet / gslide / email / image / video were separate
+  // picker entries — each redundant with the File widget, which now
+  // handles both upload (auto-detects PDF/image/video/audio by MIME) and
+  // URL paste (auto-detects cloud docs by hostname). The kinds remain
+  // valid so existing widgets keep rendering, but they're hidden from
+  // the picker. Users wanting a "live Google Doc iframe" can still drop
+  // a Browser widget and paste the URL.
   {
     kind: 'pdf',
     category: 'Files',
@@ -137,7 +249,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 640,
     defaultContent: '',
     urlPlaceholder: 'https://…/file.pdf',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'gdoc',
@@ -149,7 +262,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 500,
     defaultContent: '',
     urlPlaceholder: 'https://docs.google.com/document/…',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'gsheet',
@@ -161,7 +275,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 480,
     defaultContent: '',
     urlPlaceholder: 'https://docs.google.com/spreadsheets/…',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'gslide',
@@ -173,7 +288,19 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 420,
     defaultContent: '',
     urlPlaceholder: 'https://docs.google.com/presentation/…',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
+  },
+  {
+    kind: 'chat-thread',
+    category: 'Comms',
+    label: 'Chat',
+    icon: 'forum',
+    hint: 'A live chat panel bound to a channel — read and reply without leaving the desk',
+    defaultWidth: 340,
+    defaultHeight: 460,
+    defaultContent: '',
+    isWebBased: false
   },
   {
     kind: 'email',
@@ -185,31 +312,34 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 500,
     defaultContent: 'https://mail.google.com/',
     urlPlaceholder: 'https://mail.google.com/ or any inbox URL',
-    isWebBased: true
+    isWebBased: true,
+    hideFromPicker: true
   },
   {
     kind: 'image',
     category: 'Files',
     label: 'Image',
     icon: 'image',
-    hint: 'Image from URL (or right-click on a webpage image to save here)',
+    hint: 'Image from URL',
     defaultWidth: 360,
     defaultHeight: 280,
     defaultContent: '',
     urlPlaceholder: 'https://…/image.png',
-    isWebBased: false
+    isWebBased: false,
+    hideFromPicker: true
   },
   {
     kind: 'video',
     category: 'Files',
     label: 'Video',
     icon: 'movie',
-    hint: 'Video from URL (mp4 / webm) — right-click webpage videos to save here',
+    hint: 'Video from URL (mp4 / webm)',
     defaultWidth: 480,
     defaultHeight: 320,
     defaultContent: '',
     urlPlaceholder: 'https://…/video.mp4',
-    isWebBased: false
+    isWebBased: false,
+    hideFromPicker: true
   },
   {
     kind: 'calculator',
@@ -217,8 +347,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Calc',
     icon: 'calculate',
     hint: 'Small inline calculator',
-    defaultWidth: 240,
-    defaultHeight: 320,
+    defaultWidth: 208,
+    defaultHeight: 300,
     defaultContent: '',
     isWebBased: false
   },
@@ -228,8 +358,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Color',
     icon: 'palette',
     hint: 'Color picker + screen eyedropper',
-    defaultWidth: 260,
-    defaultHeight: 220,
+    defaultWidth: 220,
+    defaultHeight: 200,
     defaultContent: '#fbbf24',
     isWebBased: false
   },
@@ -239,8 +369,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Timer',
     icon: 'timer',
     hint: 'Countdown timer with audio cues — beeps as time runs out',
-    defaultWidth: 280,
-    defaultHeight: 280,
+    defaultWidth: 224,
+    defaultHeight: 224,
     defaultContent: JSON.stringify({ targetSec: 600, elapsedSec: 0, state: 'idle', startedAt: null }),
     isWebBased: false
   },
@@ -254,6 +384,150 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     defaultHeight: 360,
     defaultContent: '',
     isWebBased: false
+  },
+  {
+    kind: 'minimap',
+    category: 'Layout',
+    label: 'Minimap',
+    icon: 'map',
+    hint: 'Bird\'s-eye view of the canvas — drag the viewport rect to pan, click anywhere to jump there',
+    defaultWidth: 220,
+    defaultHeight: 160,
+    defaultContent: '',
+    isWebBased: false,
+    hideFromPicker: true
+  },
+  {
+    kind: 'voice-recorder',
+    category: 'Tools',
+    label: 'Voice note',
+    icon: 'mic',
+    hint: 'Record a voice note — AI transcribes (full / cleaned / summary), suggests tasks and widgets, then sends results anywhere on the canvas',
+    defaultWidth: 320,
+    defaultHeight: 240,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'mindmap',
+    category: 'Tools',
+    label: 'Mind map',
+    icon: 'account_tree',
+    hint: 'Explore an idea — AI suggests branches, tasks, and the Agent OS agents that can execute on each node',
+    defaultWidth: 720,
+    defaultHeight: 480,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'diagram',
+    category: 'Tools',
+    label: 'Diagram',
+    icon: 'schema',
+    hint: 'Flowcharts, hierarchies, server/software design, Venn — boxes, circles, text & image nodes joined with connectors',
+    defaultWidth: 760,
+    defaultHeight: 520,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'scratchpad',
+    category: 'Tools',
+    label: 'Scratchpad',
+    icon: 'draw',
+    hint: 'Freeform sketch surface — draw, annotate and think visually with pressure-sensitive ink',
+    defaultWidth: 560,
+    defaultHeight: 420,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'shape',
+    category: 'Layout',
+    label: 'Shape',
+    icon: 'category',
+    hint: 'A vector shape — rectangle, ellipse, diamond, triangle, hexagon, star, line or arrow — with fill, stroke and an optional label',
+    defaultWidth: 200,
+    defaultHeight: 160,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'card',
+    category: 'Notes',
+    label: 'Card',
+    icon: 'view_agenda',
+    hint: 'A titled callout card with an accent bar, bold title and body',
+    defaultWidth: 280,
+    defaultHeight: 200,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'custom-block',
+    category: 'Tools',
+    label: 'Custom block',
+    icon: 'dashboard_customize',
+    hint: 'Design your own form/record — drop typed fields and place them where you want; save as a reusable template',
+    defaultWidth: 440,
+    defaultHeight: 380,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'agent',
+    category: 'Tools',
+    label: 'Desk agent',
+    icon: 'smart_toy',
+    hint: 'A standing AI agent. Wire widgets INTO it as inputs, give it an instruction and a trigger, and it works on its own',
+    defaultWidth: 320,
+    defaultHeight: 300,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'webhook',
+    category: 'Tools',
+    label: 'Send to a URL',
+    icon: 'webhook',
+    hint: 'An outbound webhook. Wire a tool into it and its content is POSTed to your URL whenever it changes — send desk data out to Slack, Zapier or any HTTP endpoint',
+    defaultWidth: 320,
+    defaultHeight: 180,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'inbound-hook',
+    category: 'Tools',
+    label: 'Receive from a URL',
+    icon: 'call_received',
+    hint: 'An inbound webhook. Gives you a unique URL — when an external system (Stripe, a form, curl) POSTs to it, the payload lands here and fires any wire drawn OUT of this tool',
+    defaultWidth: 340,
+    defaultHeight: 200,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'portal',
+    category: 'Layout',
+    label: 'Portal',
+    icon: 'picture_in_picture',
+    hint: 'A live window into another task’s desk — watch it at a glance and click to dive in',
+    defaultWidth: 300,
+    defaultHeight: 240,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
+    kind: 'living-doc',
+    category: 'Notes',
+    label: 'Living Doc',
+    icon: 'auto_awesome',
+    hint: 'A doc that writes itself — give it a brief and it keeps a living summary of this desk',
+    defaultWidth: 500,
+    defaultHeight: 400,
+    defaultContent: '',
+    isWebBased: false
   }
 ]
 
@@ -261,8 +535,40 @@ export function catalogFor(kind: WidgetKind): WidgetCatalogEntry | null {
   return WIDGET_CATALOG.find((e) => e.kind === kind) ?? null
 }
 
+// Single-key quick-add shortcuts (no modifier) for the most common widgets,
+// fired on the canvas when a desk is active and the user is not typing. The
+// command palette shows these next to each "Add" command. Kept to memorable,
+// non-conflicting letters that avoid the canvas's existing keys ([ ] 0 H A);
+// widgets that need a dialog or a drag flow (office docs, file upload,
+// task-link, app launcher, minimap) intentionally have no quick-add key.
+export const WIDGET_SHORTCUTS: Partial<Record<WidgetKind, string>> = {
+  sticky: 'S',
+  note: 'N',
+  page: 'P',
+  markdown: 'M',
+  table: 'T',
+  webview: 'B',
+  calculator: 'C',
+  timer: 'I',
+  color: 'O',
+  section: 'R',
+  shape: 'G',
+  card: 'D'
+}
+
+// Reverse map: pressed key (uppercased) -> the widget kind to spawn. Built from
+// WIDGET_SHORTCUTS so the two never drift.
+export const SHORTCUT_TO_KIND: Record<string, WidgetKind> = Object.fromEntries(
+  Object.entries(WIDGET_SHORTCUTS).map(([kind, key]) => [key, kind as WidgetKind])
+) as Record<string, WidgetKind>
+
 export const CATEGORIES: WidgetCategory[] = ['Notes', 'Web', 'Files', 'Tools', 'Comms', 'Layout']
 
+/**
+ * Entries grouped for the picker — excludes anything marked
+ * `hideFromPicker`. Use `WIDGET_CATALOG` directly for the full list
+ * (e.g. when looking up an existing widget's metadata).
+ */
 export function entriesByCategory(): Record<WidgetCategory, WidgetCatalogEntry[]> {
   const out: Record<WidgetCategory, WidgetCatalogEntry[]> = {
     Notes: [],
@@ -272,8 +578,28 @@ export function entriesByCategory(): Record<WidgetCategory, WidgetCatalogEntry[]
     Comms: [],
     Layout: []
   }
-  for (const entry of WIDGET_CATALOG) out[entry.category].push(entry)
+  for (const entry of WIDGET_CATALOG) {
+    if (entry.hideFromPicker) continue
+    out[entry.category].push(entry)
+  }
   return out
 }
 
 export const DRAG_MIME = 'application/x-fb-widget-kind'
+
+// How a widget sits inside a split-view pane (ported from Caleb's Focus Mode).
+// Short/atmospheric widgets are framed as a contained card ('center'); anything
+// with its own scroll/fill surface fills the pane ('fill').
+const CENTER_IN_PANE: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  'sticky',
+  'note',
+  'field',
+  'timer',
+  'color',
+  'calculator',
+  'task-link'
+])
+
+export function fitsPaneFor(kind: WidgetKind): 'center' | 'fill' {
+  return CENTER_IN_PANE.has(kind) ? 'center' : 'fill'
+}

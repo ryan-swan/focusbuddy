@@ -19,7 +19,11 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # Pinned to windows-2022 on purpose: windows-latest moved to a runner image
+    # with Visual Studio 18, which the node-gyp bundled with Electron 37 does not
+    # recognise ("find VS unknown version undefined"), so the native-module
+    # rebuild fails. windows-2022 ships VS 2022, which node-gyp supports.
+    runs-on: windows-2022
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -39,15 +43,35 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      # Set up the MSVC build environment explicitly. On Electron 37, node-gyp's
+      # auto-detection of Visual Studio crashes on the runner with
+      # ERR_CHILD_PROCESS_STDIO_MAXBUFFER ("Could not find any Visual Studio
+      # installation"), even though VS is present. Exposing the toolchain via
+      # this action + pinning GYP_MSVS_VERSION lets node-gyp use it directly
+      # instead of running the crashing probe.
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
       # npm built better-sqlite3 against system Node's ABI; rebuild it against
       # Electron's ABI (electron-builder runs with npmRebuild:false).
       - name: Rebuild native modules for Electron
         run: npm run rebuild:win
+        env:
+          GYP_MSVS_VERSION: '2022'
 
       - name: Typecheck
         run: npm run typecheck
 
+      # Bake the live backend into the renderer, exactly like the local macOS
+      # build does. Without these the build falls back to signalConfig's default
+      # host, so the Windows app could not reach the server at all (signup,
+      # login, sharing, and plan checks all failed with "can't connect").
       - name: Build renderer + main
+        env:
+          VITE_USE_REMOTE_SIGNAL: 'true'
+          VITE_SIGNAL_HTTP_URL: 'https://focusbuddy-signal.fly.dev'
+          VITE_SIGNAL_WS_URL: 'wss://focusbuddy-signal.fly.dev/ws'
+          VITE_VIEWER_URL: 'https://focusbuddy-viewer.vercel.app'
         run: npm run build
 
       # Publish only on a tag push; manual runs stay unpublished. Code signing

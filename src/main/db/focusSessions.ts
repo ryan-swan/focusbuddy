@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type {
   FocusSession,
   FocusSessionCompletePatch,
@@ -38,14 +39,15 @@ export function startFocusSession(draft: FocusSessionStartDraft): FocusSession {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO focus_sessions (id, task_id, kind, planned_seconds, started_at)
-     VALUES (@id, @taskId, @kind, @plannedSeconds, @now)`
+    `INSERT INTO focus_sessions (id, task_id, kind, planned_seconds, started_at, org_id)
+     VALUES (@id, @taskId, @kind, @plannedSeconds, @now, @orgId)`
   ).run({
     id,
     taskId: draft.taskId,
     kind: draft.kind ?? '5min',
     plannedSeconds: draft.plannedSeconds,
-    now
+    now,
+    orgId: getActiveOrgId()
   })
   const row = db.prepare('SELECT * FROM focus_sessions WHERE id = ?').get(id) as
     | FocusSessionRow
@@ -85,7 +87,7 @@ export function listRecentSessions(limit = 30, taskId?: string | null): FocusSes
         )
         .all(taskId, limit) as FocusSessionRow[])
     : (db
-        .prepare(`SELECT * FROM focus_sessions ORDER BY started_at DESC LIMIT ?`)
-        .all(limit) as FocusSessionRow[])
+        .prepare(`SELECT * FROM focus_sessions WHERE org_id = ? ORDER BY started_at DESC LIMIT ?`)
+        .all(getActiveOrgId(), limit) as FocusSessionRow[])
   return rows.map(rowToSession)
 }

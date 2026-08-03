@@ -12,6 +12,7 @@ import FieldEditor from '../fields/FieldEditor'
 import RelationConfigEditor from '../fields/RelationConfigEditor'
 import { useWidgetStore } from '../../stores/widgets'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
 interface Props {
   widget: Widget
@@ -51,6 +52,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   const [state, setState] = useState<FieldState | null>(() =>
     parseFieldState(widget.content)
   )
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     setState(parseFieldState(widget.content))
@@ -98,14 +100,14 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   // Picker — shown when no type chosen yet.
   if (!state) {
     const body = (
-      <div className="h-full w-full bg-stone-50 dark:bg-stone-900 p-3 overflow-y-auto">
+      <div className="min-h-full w-full bg-[var(--surface-sunken)] p-3">
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="tune" size={14} className="text-accent shrink-0" />
-          <div className="text-[11px] uppercase tracking-wider font-semibold text-stone-600 dark:text-stone-300">
+          <div className="text-[11px] uppercase tracking-wider font-semibold text-[var(--ink-70)]">
             Pick a field type
           </div>
         </div>
-        <p className="text-[11px] text-stone-500 dark:text-stone-400 mb-3 leading-snug">
+        <p className="text-[11px] text-[var(--ink-50)] mb-3 leading-snug">
           Choose what this widget captures — once set, you can type its label and enter a value.
         </p>
         <div className="grid grid-cols-2 gap-1.5">
@@ -113,10 +115,10 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
             <button
               key={t}
               onClick={() => void chooseType(t)}
-              className="inline-flex items-center gap-1.5 px-2 py-2 rounded-md border border-stone-200 dark:border-stone-700 hover:border-accent hover:bg-accent/5 text-left transition-colors"
+              className="inline-flex items-center gap-1.5 px-2 py-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 text-left transition-colors"
             >
               <Icon name={FIELD_TYPE_ICONS[t]} size={15} className="text-accent shrink-0" />
-              <span className="text-[12px] text-stone-700 dark:text-stone-200 leading-tight">
+              <span className="text-[12px] text-[var(--ink-70)] leading-tight">
                 {FIELD_TYPE_LABELS[t]}
               </span>
             </button>
@@ -133,8 +135,18 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
   }
 
   const body = (
-    <div className="h-full w-full bg-white dark:bg-stone-900 p-3 flex flex-col gap-2.5 overflow-y-auto">
-      <div className="flex items-center gap-1.5 pb-1.5 border-b border-stone-100 dark:border-stone-800">
+    <div
+      className="min-h-full w-full bg-[var(--surface-raised)] p-3 flex flex-col gap-2.5"
+      onContextMenu={(e) => {
+        // Right-click anywhere on the field body opens the "Create +
+        // connect" menu. Shift bypass restores the native menu on
+        // inputs/selects for cut/copy/paste.
+        if (e.shiftKey) return
+        e.preventDefault()
+        setCtxMenu({ x: e.clientX, y: e.clientY })
+      }}
+    >
+      <div className="flex items-center gap-1.5 pb-1.5 border-b border-[var(--edge-soft)]">
         <Icon
           name={FIELD_TYPE_ICONS[state.def.type]}
           size={15}
@@ -144,14 +156,14 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
           value={state.def.label}
           onChange={(e) => void updateLabel(e.target.value)}
           placeholder="Field label"
-          className="flex-1 bg-transparent text-[13px] font-semibold text-stone-800 dark:text-stone-100 outline-none placeholder-stone-300 dark:placeholder-stone-600"
+          className="flex-1 bg-transparent text-[13px] font-semibold text-[var(--ink-90)] outline-none placeholder:text-[var(--ink-30)]"
         />
-        <span className="text-[9px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+        <span className="text-[9px] uppercase tracking-wider text-[var(--ink-40)]">
           {FIELD_TYPE_LABELS[state.def.type]}
         </span>
       </div>
 
-      <div className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
         Value
       </div>
       <div className="flex-1">
@@ -185,7 +197,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
       )}
 
       {state.def.type === 'relation' && (
-        <div className="border-t border-stone-200 dark:border-stone-700 pt-2 mt-1">
+        <div className="border-t border-[var(--edge-soft)] pt-2 mt-1">
           <RelationConfigEditor
             config={state.def.config as {
               tableId: string | null
@@ -195,6 +207,14 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
             onChange={(c) => void updateConfig(c)}
           />
         </div>
+      )}
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )
@@ -235,8 +255,8 @@ function SelectOptionsEditor({
     onChange(options.filter((o) => o.id !== id))
   }
   return (
-    <div className="border-t border-stone-200 dark:border-stone-700 pt-2 mt-1">
-      <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+    <div className="border-t border-[var(--edge-soft)] pt-2 mt-1">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
         Options
       </div>
       <div className="flex flex-wrap gap-1 mb-1.5">
@@ -265,7 +285,7 @@ function SelectOptionsEditor({
             if (e.key === 'Enter') add()
           }}
           placeholder="New option…"
-          className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1 text-[11px]"
+          className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[11px]"
         />
         <button
           onClick={add}
@@ -287,8 +307,8 @@ function ButtonConfigEditor({
   onChange: (next: typeof config) => void
 }): JSX.Element {
   return (
-    <div className="border-t border-stone-200 dark:border-stone-700 pt-2 mt-1 space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+    <div className="border-t border-[var(--edge-soft)] pt-2 mt-1 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
         Button setup
       </div>
       <select
@@ -296,7 +316,7 @@ function ButtonConfigEditor({
         onChange={(e) =>
           onChange({ ...config, action: e.target.value as 'shell' | 'ai-prompt' })
         }
-        className="w-full text-[11px] bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1"
+        className="w-full text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1"
       >
         <option value="ai-prompt">AI prompt</option>
         <option value="shell">Shell command</option>
@@ -305,7 +325,7 @@ function ButtonConfigEditor({
         value={config.label ?? ''}
         onChange={(e) => onChange({ ...config, label: e.target.value })}
         placeholder="Button label"
-        className="w-full text-[11px] bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1"
+        className="w-full text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1"
       />
       <textarea
         value={config.payload}
@@ -316,7 +336,7 @@ function ButtonConfigEditor({
             : 'Shell command — e.g. say "hello"'
         }
         rows={3}
-        className="w-full text-[11px] bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-2 py-1 resize-y"
+        className="w-full text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 resize-y"
       />
     </div>
   )

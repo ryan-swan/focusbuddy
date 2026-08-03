@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, type LaunchedApp } from './_helpers'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 // Smoke test — does the main window mount + the React tree render?
 // Catches main-process crashes (DB init, IPC handler registration) and renderer
@@ -17,13 +17,10 @@ test('app boots and renders the React shell', async () => {
   launched = await launchApp()
   const { window } = launched
 
-  // The left sidebar's "FocusBuddy" wordmark sits at e16 in the page snapshot
-  // — used as the canary that the React shell mounted past the loading state.
-  // Strict-mode safe: there are two <aside> elements (left sidebar + right
-  // assistant pane), so we anchor on the heading instead.
-  await expect(
-    window.getByRole('heading', { name: 'FocusBuddy', level: 2 })
-  ).toBeVisible({ timeout: 10_000 })
+  // waitForReady gates on (a) window.api being exposed and (b) the
+  // sidebar wordmark heading being visible. Anchors via a regex so
+  // the post-rebrand "FOCUSBUDDY" string still matches.
+  await waitForReady(window)
 
   // window.api must be exposed via the contextBridge — otherwise renderer code
   // would silently fail every IPC call. Easier to catch here than later in a

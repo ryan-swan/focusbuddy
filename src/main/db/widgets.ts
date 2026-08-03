@@ -14,6 +14,7 @@ interface WidgetRow {
   height: number
   z_index: number
   color: string | null
+  status: string | null
   pinned: number | null
   pinned_screen_x: number | null
   pinned_screen_y: number | null
@@ -28,6 +29,7 @@ interface WidgetRow {
   created_at: number
   updated_at: number
   archived: number | null
+  sync_group_id: string | null
 }
 
 function rowToWidget(row: WidgetRow): Widget {
@@ -43,6 +45,7 @@ function rowToWidget(row: WidgetRow): Widget {
     height: row.height,
     zIndex: row.z_index,
     color: row.color,
+    status: row.status ?? null,
     pinned: row.pinned === 1,
     pinnedScreenX: row.pinned_screen_x,
     pinnedScreenY: row.pinned_screen_y,
@@ -56,7 +59,8 @@ function rowToWidget(row: WidgetRow): Widget {
     livingPaused: row.living_paused === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    archived: row.archived === 1
+    archived: row.archived === 1,
+    syncGroupId: row.sync_group_id ?? null
   }
 }
 
@@ -68,11 +72,32 @@ export function getWidget(id: string): Widget | null {
   return row ? rowToWidget(row) : null
 }
 
+let purgedWidgetTrashThisSession = false
+
 export function listWidgetsByTask(taskId: string): Widget[] {
   const db = getDb()
+  if (!purgedWidgetTrashThisSession) {
+    purgedWidgetTrashThisSession = true
+    try {
+      purgeTrashedWidgets()
+    } catch {
+      /* best-effort */
+    }
+  }
   const rows = db
-    .prepare('SELECT * FROM widgets WHERE task_id = ? ORDER BY z_index ASC, created_at ASC')
+    .prepare('SELECT * FROM widgets WHERE task_id = ? AND trashed_at IS NULL ORDER BY z_index ASC, created_at ASC')
     .all(taskId) as WidgetRow[]
+  return rows.map(rowToWidget)
+}
+
+// Every live widget of a given kind across the whole workspace, newest-touched
+// first. Used by the PlexiBrain Agents view to list desk agents wherever they
+// live, since agents are widgets that otherwise only load per desk.
+export function listWidgetsByKind(kind: Widget['kind']): Widget[] {
+  const db = getDb()
+  const rows = db
+    .prepare('SELECT * FROM widgets WHERE kind = ? AND trashed_at IS NULL ORDER BY updated_at DESC, created_at DESC')
+    .all(kind) as WidgetRow[]
   return rows.map(rowToWidget)
 }
 
@@ -88,9 +113,14 @@ export function createWidget(draft: WidgetDraft): Widget {
   const db = getDb()
   const id = randomUUID()
   const now = Date.now()
+  // Optional pin at creation — used by the minimap auto-create flow so the
+  // widget is docked the moment it spawns instead of "flash on canvas, then
+  // jump to corner" on the next render.
+  const pinned = draft.pinned ? 1 : 0
+  const pinnedZone = draft.pinnedZone ?? null
   db.prepare(
-    `INSERT INTO widgets (id, task_id, kind, title, content, x, y, width, height, z_index, color, pinned, pinned_screen_x, pinned_screen_y, parent_section_id, source_app_id, mode, created_at, updated_at)
-     VALUES (@id, @taskId, @kind, @title, @content, @x, @y, @width, @height, @zIndex, @color, 0, NULL, NULL, NULL, @sourceAppId, @mode, @now, @now)`
+    `INSERT INTO widgets (id, task_id, kind, title, content, x, y, width, height, z_index, color, pinned, pinned_screen_x, pinned_screen_y, pinned_zone, parent_section_id, source_app_id, mode, sync_group_id, created_at, updated_at)
+     VALUES (@id, @taskId, @kind, @title, @content, @x, @y, @width, @height, @zIndex, @color, @pinned, NULL, NULL, @pinnedZone, NULL, @sourceAppId, @mode, @syncGroupId, @now, @now)`
   ).run({
     id,
     taskId: draft.taskId,
@@ -99,16 +129,31 @@ export function createWidget(draft: WidgetDraft): Widget {
     content: draft.content,
     x: draft.x ?? 60,
     y: draft.y ?? 60,
-    width: draft.width ?? (draft.kind === 'webview' ? 520 : 260),
-    height: draft.height ?? (draft.kind === 'webview' ? 360 : 200),
+    width: draft.width ?? (draft.kind === 'webview' ? 520 : draft.kind === 'living-doc' ? 500 : 260),
+    height: draft.height ?? (draft.kind === 'webview' ? 360 : draft.kind === 'living-doc' ? 400 : 200),
     zIndex: nextZ(draft.taskId),
     color: draft.color ?? null,
+    pinned,
+    pinnedZone,
     sourceAppId: draft.sourceAppId ?? null,
     mode: draft.mode ?? null,
+    syncGroupId: draft.syncGroupId ?? null,
     now
   })
   const row = db.prepare('SELECT * FROM widgets WHERE id = ?').get(id) as WidgetRow
   return rowToWidget(row)
+}
+
+// Best-effort create for auto-spawned chrome (the minimap): if the parent task
+// no longer exists (a desk switch or a trash landed between the renderer
+// deciding to create and this running), return null instead of letting the
+// task_id foreign key throw a raw SQLite error into the main log. Real,
+// user-driven creates keep using createWidget so genuine bugs stay loud.
+export function createWidgetIfTaskExists(draft: WidgetDraft): Widget | null {
+  const db = getDb()
+  const exists = db.prepare('SELECT 1 FROM nodes WHERE id = ?').get(draft.taskId)
+  if (!exists) return null
+  return createWidget(draft)
 }
 
 export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
@@ -124,6 +169,7 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
     ['height', 'height'],
     ['zIndex', 'z_index'],
     ['color', 'color'],
+    ['status', 'status'],
     ['pinnedScreenX', 'pinned_screen_x'],
     ['pinnedScreenY', 'pinned_screen_y'],
     ['parentSectionId', 'parent_section_id'],
@@ -132,7 +178,8 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
     ['mode', 'mode'],
     ['pinnedZone', 'pinned_zone'],
     ['livingQuery', 'living_query'],
-    ['livingGeneratedAt', 'living_generated_at']
+    ['livingGeneratedAt', 'living_generated_at'],
+    ['syncGroupId', 'sync_group_id']
   ]
   for (const [key, col] of cols) {
     if (patch[key] !== undefined) {
@@ -159,13 +206,62 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
   fields.push('updated_at = @now')
   db.prepare(`UPDATE widgets SET ${fields.join(', ')} WHERE id = @id`).run(params)
   const row = db.prepare('SELECT * FROM widgets WHERE id = ?').get(id) as WidgetRow | undefined
-  return row ? rowToWidget(row) : null
+  const updated = row ? rowToWidget(row) : null
+  // ── Linked-duplicate propagation ────────────────────────────────────────
+  // If this widget belongs to a sync group, mirror the SYNCED fields that
+  // changed in this patch (content / title / colour) to every other copy in
+  // the group — across tasks. A direct DB fan-out: it never re-enters
+  // updateWidget, so there is no propagation loop. Position / size / task are
+  // deliberately NOT synced (each copy lives independently).
+  if (updated?.syncGroupId) {
+    const syncSet: string[] = []
+    const sp: Record<string, unknown> = {
+      sgid: updated.syncGroupId,
+      self: id,
+      now: Date.now()
+    }
+    if (patch.content !== undefined) {
+      syncSet.push('content = @content')
+      sp.content = patch.content
+    }
+    if (patch.title !== undefined) {
+      syncSet.push('title = @title')
+      sp.title = patch.title
+    }
+    if (patch.color !== undefined) {
+      syncSet.push('color = @color')
+      sp.color = patch.color
+    }
+    if (syncSet.length > 0) {
+      syncSet.push('updated_at = @now')
+      db.prepare(
+        `UPDATE widgets SET ${syncSet.join(', ')} WHERE sync_group_id = @sgid AND id != @self`
+      ).run(sp)
+    }
+  }
+  return updated
 }
 
+// Soft-delete so the removal is undoable. The widget's connector links are left
+// intact (the link overlay skips trashed endpoints) and come back on restore.
 export function deleteWidget(id: string): boolean {
   const db = getDb()
-  const result = db.prepare('DELETE FROM widgets WHERE id = ?').run(id)
+  const result = db.prepare('UPDATE widgets SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(Date.now(), id)
   return result.changes > 0
+}
+
+export function restoreWidget(id: string): boolean {
+  const db = getDb()
+  const result = db.prepare('UPDATE widgets SET trashed_at = NULL WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+// Permanently remove widgets trashed longer than maxAgeMs (default 7 days). The
+// hard DELETE cascades their links. Runs once per session.
+export function purgeTrashedWidgets(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
+  const db = getDb()
+  const cutoff = Date.now() - maxAgeMs
+  db.prepare('DELETE FROM widgets WHERE trashed_at IS NOT NULL AND trashed_at < ?').run(cutoff)
 }
 
 export function bringToFront(id: string): Widget | null {

@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ACCENT_OPTIONS,
   THEME_OPTIONS,
   type AccentColor,
+  type FontChoice,
+  type ThemeCustomization,
   type ThemeMode
 } from '../lib/theme'
+import ThemeBuilder from './ThemeBuilder'
+import { readDevForcedTier, setDevForcedTier } from '../stores/capabilities'
+import type { TierId } from '../lib/capabilityDefaults'
 import { captureRitualOrigin, playThemeRitual } from '../lib/themeRitual'
 import {
   getSoundPrefs,
@@ -22,30 +28,79 @@ import {
 } from '../lib/modelPrefs'
 import { haptic } from '../lib/haptics'
 import Icon from './Icon'
+import { useViewStore } from '../stores/view'
+import AccountSection from './settings/AccountSection'
+import OrganisationSection from './settings/OrganisationSection'
+import TemplatesSection from './settings/TemplatesSection'
+import DocumentsSyncSection from './settings/DocumentsSyncSection'
+import ApiKeysSection from './settings/ApiKeysSection'
+import BackupSection from './settings/BackupSection'
+import NavigationSection from './settings/NavigationSection'
+import PrivacyHelpSection from './settings/PrivacyHelpSection'
 
 interface Props {
   mode: ThemeMode
   accent: AccentColor
+  font: FontChoice
+  customAccentHex: string
+  customization: ThemeCustomization
   onModeChange: (m: ThemeMode) => void
   onAccentChange: (a: AccentColor) => void
+  onFontChange: (f: FontChoice) => void
+  onCustomAccentChange: (hex: string) => void
+  onCustomizationChange: (patch: Partial<ThemeCustomization>) => void
+  onResetCustomization: () => void
   onClose: () => void
   anchorX: number
   anchorY: number
 }
 
+// Settings is organised into tabs so each area (appearance, account,
+// organisation, AI, templates, data, advanced) is a short, scannable pane rather
+// than one long scroll. Every section component is unchanged — this shell only
+// decides which ones render for the active tab. Organisation, Templates and the
+// account/user settings all live here, which is the consolidation the roster
+// asked for.
+type SettingsTab = 'appearance' | 'account' | 'organisation' | 'ai' | 'templates' | 'data' | 'advanced'
+const TABS: { id: SettingsTab; label: string; icon: string }[] = [
+  { id: 'appearance', label: 'Appearance', icon: 'palette' },
+  { id: 'account', label: 'Account', icon: 'person' },
+  { id: 'organisation', label: 'Organisation', icon: 'apartment' },
+  { id: 'ai', label: 'AI', icon: 'auto_awesome' },
+  { id: 'templates', label: 'Templates', icon: 'dashboard_customize' },
+  { id: 'data', label: 'Data', icon: 'cloud_sync' },
+  { id: 'advanced', label: 'Advanced', icon: 'tune' }
+]
+
 export default function SettingsPanel({
   mode,
   accent,
+  font,
+  customAccentHex,
+  customization,
   onModeChange,
   onAccentChange,
+  onFontChange,
+  onCustomAccentChange,
+  onCustomizationChange,
+  onResetCustomization,
   onClose,
   anchorX,
   anchorY
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
+  const goOrg = useViewStore((s) => s.goOrg)
+  const [tab, setTab] = useState<SettingsTab>('appearance')
+  const [studioOpen, setStudioOpen] = useState(false)
+  const [devTier, setDevTierState] = useState<TierId | null>(() => readDevForcedTier())
   const [sound, setSound] = useState<SoundPrefs>(() => getSoundPrefs())
   const [modelMode, setModelMode] = useModelMode()
   const [hapticsNative, setHapticsNative] = useState<boolean | null>(null)
+  const [voicePrefs, setVoicePrefs] = useState<{
+    commandMode: 'press-hold' | 'click-toggle'
+    autoStopSilenceMs: number
+    voiceback: boolean
+  } | null>(null)
 
   useEffect(() => {
     window.api.haptics
@@ -53,6 +108,24 @@ export default function SettingsPanel({
       .then((ok) => setHapticsNative(ok))
       .catch(() => setHapticsNative(false))
   }, [])
+
+  useEffect(() => {
+    window.api.voiceCommand
+      .getPrefs()
+      .then((p) => setVoicePrefs(p))
+      .catch(() => {})
+  }, [])
+
+  async function patchVoicePrefs(
+    patch: Partial<{
+      commandMode: 'press-hold' | 'click-toggle'
+      autoStopSilenceMs: number
+      voiceback: boolean
+    }>
+  ): Promise<void> {
+    const next = await window.api.voiceCommand.setPrefs(patch)
+    setVoicePrefs(next)
+  }
 
   useEffect(() => {
     return subscribeSoundPrefs((p) => setSound(p))
@@ -67,7 +140,15 @@ export default function SettingsPanel({
       if (e.key === 'Escape') onClose()
     }
     function onClickOutside(e: MouseEvent): void {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      // ThemeBuilder is portalled to <body>, so it is a DOM sibling of this
+      // popover rather than a descendant of ref. A click inside the studio must
+      // still count as "inside" — otherwise it would close Settings and unmount
+      // the studio between mousedown and click, dropping the actual control's
+      // click and losing the theme change.
+      if ((target as HTMLElement).closest?.('[data-testid="theme-builder"]')) return
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     const armId = window.setTimeout(() => window.addEventListener('mousedown', onClickOutside), 50)
@@ -78,327 +159,565 @@ export default function SettingsPanel({
     }
   }, [onClose])
 
+  // Move focus into the popover when it opens so keyboard users land inside it
+  // rather than being left on the trigger.
+  useEffect(() => {
+    const first = ref.current?.querySelector<HTMLElement>(
+      'input, textarea, select, button, [tabindex]:not([tabindex="-1"])'
+    )
+    first?.focus()
+  }, [])
+
   return (
     <div
       ref={ref}
-      className="fixed z-[200] w-72 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
+      className="fixed z-[200] w-[560px] max-w-[calc(100vw-1.5rem)] max-h-[82vh] flex flex-col rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl backdrop-blur"
       style={{ top: anchorY, right: window.innerWidth - anchorX }}
     >
-      <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
-          Appearance
+      <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between shrink-0">
+        <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+          Settings
         </span>
         <button onClick={onClose} className="icon-btn" aria-label="Close settings">
           <Icon name="close" size={14} />
         </button>
       </div>
 
-      <div className="px-3 py-3 space-y-3">
-        <div>
-          <div className="text-[11px] text-stone-600 dark:text-stone-400 mb-1.5">Theme</div>
-          <div className="grid grid-cols-5 gap-1">
-            {THEME_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                onClick={(e) => {
-                  if (o.value === mode) return
-                  // Capture the click position so the ritual ripple emanates
-                  // from where the user actually clicked. The ritual then
-                  // sandwiches the theme switch inside its veil + ripple.
-                  captureRitualOrigin(e)
-                  playThemeRitual(() => onModeChange(o.value))
-                }}
-                className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
-                  mode === o.value
-                    ? 'border-accent bg-accent/10 text-stone-900 dark:text-stone-100'
-                    : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700'
-                }`}
-              >
-                <Icon
-                  name={o.icon}
-                  size={16}
-                  className={mode === o.value ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}
-                />
-                <span>{o.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] text-stone-600 dark:text-stone-400 mb-1.5">Accent</div>
-          <div className="grid grid-cols-5 gap-1">
-            {ACCENT_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                onClick={(e) => {
-                  if (o.value === accent) return
-                  captureRitualOrigin(e)
-                  playThemeRitual(() => onAccentChange(o.value))
-                }}
-                title={o.label}
-                className={`flex flex-col items-center gap-1 py-2 rounded-md border transition-colors ${
-                  accent === o.value
-                    ? 'border-stone-700 dark:border-stone-300 bg-stone-100 dark:bg-stone-700'
-                    : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700'
-                }`}
-              >
-                <span
-                  className="h-5 w-5 rounded-full border-2 border-white dark:border-stone-900 shadow"
-                  style={{ backgroundColor: o.preview }}
-                />
-                <span className="text-[10px] text-stone-600 dark:text-stone-400">{o.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Tab rail. Horizontal + wrapping so it reads as one compact strip under
+          the header and uses the popover's width. */}
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        className="px-2 py-1.5 border-b border-[var(--edge-soft)] flex flex-wrap gap-1 shrink-0"
+      >
+        {TABS.map((t) => {
+          const active = tab === t.id
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              data-testid={`settings-tab-${t.id}`}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                active
+                  ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                  : 'border-transparent text-[var(--ink-70)] hover:bg-[var(--surface-raised)]'
+              }`}
+            >
+              <Icon name={t.icon} size={13} className={active ? 'text-accent' : 'text-[var(--ink-50)]'} />
+              <span>{t.label}</span>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-1">
-          Sounds
-        </div>
-
-        <label className="flex items-center justify-between py-1 cursor-pointer">
-          <span className="text-xs text-stone-700 dark:text-stone-300">Sound effects</span>
-          <input
-            type="checkbox"
-            checked={sound.enabled}
-            onChange={(e) => updateSound({ enabled: e.target.checked })}
-            className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
-          />
-        </label>
-
-        <div className={sound.enabled ? '' : 'opacity-50 pointer-events-none'}>
-          <div className="py-1">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-stone-700 dark:text-stone-300">Volume</span>
-              <span className="text-[10px] text-stone-500 dark:text-stone-500 font-mono">
-                {Math.round(sound.volume * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(sound.volume * 100)}
-              onChange={(e) => updateSound({ volume: parseInt(e.target.value, 10) / 100 })}
-              className="w-full h-1 accent-violet-600 cursor-pointer"
-            />
-          </div>
-
-          <label className="flex items-center justify-between py-1 cursor-pointer">
-            <span className="text-xs text-stone-700 dark:text-stone-300">Keyboard click</span>
-            <input
-              type="checkbox"
-              checked={sound.typingClick}
-              onChange={(e) => updateSound({ typingClick: e.target.checked })}
-              className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
-            />
-          </label>
-
-          {sound.typingClick && (
-            <div className="pl-3 border-l-2 border-stone-200 dark:border-stone-700 py-1 space-y-3">
-              {(['tactile', 'ambient'] as const).map((family) => {
-                const styles = TYPING_CLICK_STYLES.filter((s) => s.family === family)
-                const heading = family === 'tactile' ? 'Tactile' : 'Ambient · spacey'
-                const subhead =
-                  family === 'tactile'
-                    ? 'Physical key feel'
-                    : 'Low impact, breathy, dopamine'
-                return (
-                  <div key={family} className="space-y-1">
-                    <div className="flex items-baseline gap-1.5">
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        {heading}
-                      </div>
-                      <div className="text-[10px] text-stone-400 dark:text-stone-500 truncate">
-                        {subhead}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-0.5">
-                      {styles.map((s) => {
-                        const active = sound.typingClickStyle === s.value
-                        return (
-                          <button
-                            key={s.value}
-                            type="button"
-                            onClick={() => {
-                              updateSound({ typingClickStyle: s.value as TypingClickStyle })
-                              previewTypingClick(s.value as TypingClickStyle)
-                            }}
-                            className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-left transition-colors ${
-                              active
-                                ? 'bg-accent/10 border border-accent/40 text-stone-900 dark:text-stone-100'
-                                : 'border border-transparent hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300'
-                            }`}
-                          >
-                            <div className="min-w-0">
-                              <div className="text-xs font-medium">{s.label}</div>
-                              <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
-                                {s.blurb}
-                              </div>
-                            </div>
-                            {active ? (
-                              <Icon
-                                name="check_circle"
-                                size={14}
-                                filled
-                                className="text-accent shrink-0"
-                              />
-                            ) : (
-                              <Icon
-                                name="play_arrow"
-                                size={14}
-                                className="text-stone-400 dark:text-stone-500 shrink-0"
-                              />
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <label className="flex items-start justify-between py-1 cursor-pointer gap-2">
-            <div className="flex-1">
-              <span className="text-xs text-stone-700 dark:text-stone-300 block">
-                Quiet while widget active
-              </span>
-              <span className="text-[10px] text-stone-500 dark:text-stone-500">
-                Suppress sounds while you're interacting with a widget (browser, sticky, etc.)
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={sound.quietWhileWidgetActive}
-              onChange={(e) => updateSound({ quietWhileWidgetActive: e.target.checked })}
-              className="h-3.5 w-3.5 accent-violet-600 cursor-pointer mt-0.5"
-            />
-          </label>
-        </div>
-      </div>
-
-      <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium mb-1">
-          AI Model
-        </div>
-        <div className="grid grid-cols-1 gap-0.5">
-          {MODEL_OPTIONS.map((opt) => {
-            const active = modelMode === opt.value
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setModelMode(opt.value)}
-                className={`flex items-start gap-2 px-2 py-1.5 rounded text-left transition-colors ${
-                  active
-                    ? 'bg-accent/10 border border-accent/40 text-stone-900 dark:text-stone-100'
-                    : 'border border-transparent hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300'
-                }`}
-              >
-                <Icon
-                  name={
-                    opt.value === 'auto'
-                      ? 'tune'
-                      : opt.value === 'haiku'
-                        ? 'bolt'
-                        : opt.value === 'sonnet'
-                          ? 'psychology'
-                          : 'auto_awesome'
-                  }
-                  size={14}
-                  className={`mt-0.5 shrink-0 ${active ? 'text-accent' : 'text-stone-500 dark:text-stone-400'}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-xs font-medium">
-                    {opt.label}
-                    <span
-                      className={`text-[9px] font-mono px-1 rounded ${
-                        active
-                          ? 'bg-accent/15 text-accent'
-                          : 'bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-400'
+      {/* Scrollable content pane — only the active tab's sections render. */}
+      <div className="flex-1 overflow-y-auto" data-testid={`settings-pane-${tab}`}>
+        {tab === 'appearance' && (
+          <>
+            <div className="px-3 py-3 space-y-3">
+              <div>
+                <div className="text-[11px] text-[var(--ink-70)] mb-1.5">Theme</div>
+                <div className="grid grid-cols-5 gap-1">
+                  {THEME_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      onClick={(e) => {
+                        if (o.value === mode) return
+                        captureRitualOrigin(e)
+                        playThemeRitual(() => onModeChange(o.value))
+                      }}
+                      className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
+                        mode === o.value
+                          ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                          : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
                       }`}
                     >
-                      {opt.costTier}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug mt-0.5">
-                    {opt.blurb}
+                      <Icon
+                        name={o.icon}
+                        size={16}
+                        className={mode === o.value ? 'text-accent' : 'text-[var(--ink-50)]'}
+                      />
+                      <span>{o.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] text-[var(--ink-70)] mb-1.5">Accent</div>
+                <div className="grid grid-cols-5 gap-1">
+                  {ACCENT_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      onClick={(e) => {
+                        if (o.value === accent) return
+                        captureRitualOrigin(e)
+                        playThemeRitual(() => onAccentChange(o.value))
+                      }}
+                      title={o.label}
+                      className={`flex flex-col items-center gap-1 py-2 rounded-md border transition-colors ${
+                        accent === o.value
+                          ? 'border-stone-700 dark:border-stone-300 bg-[var(--surface-sunken)]'
+                          : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)]'
+                      }`}
+                    >
+                      <span
+                        className="h-5 w-5 rounded-full border-2 border-white dark:border-stone-900 shadow"
+                        style={{ backgroundColor: o.preview }}
+                      />
+                      <span className="text-[10px] text-[var(--ink-70)]">{o.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-3 pb-3 -mt-1">
+              <button
+                onClick={() => setStudioOpen(true)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md border border-accent/40 bg-accent/[0.06] hover:bg-accent/10 text-[var(--ink-90)] transition-colors"
+                data-testid="open-theme-studio"
+              >
+                <Icon name="palette" size={15} className="text-accent" />
+                <div className="flex-1 text-left">
+                  <div className="text-xs font-medium">Theme studio…</div>
+                  <div className="text-[10px] text-[var(--ink-50)]">
+                    Custom accent colour and accessibility fonts. Free for everyone.
                   </div>
                 </div>
-                {active && (
-                  <Icon name="check_circle" size={14} filled className="text-accent shrink-0 mt-0.5" />
-                )}
+                <Icon name="chevron_right" size={14} className="text-[var(--ink-40)]" />
               </button>
-            )
-          })}
-        </div>
 
-        {modelMode === 'auto' && (
-          <div className="mt-2 pl-3 border-l-2 border-stone-200 dark:border-stone-700 space-y-0.5">
-            <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
-              Auto routing
+              {import.meta.env.DEV && (
+                <div className="mt-2 rounded-md border border-amber-300/60 dark:border-amber-600/40 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon name="construction" size={13} className="text-amber-600 dark:text-amber-400" />
+                    <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-amber-700 dark:text-amber-400">
+                      Developer
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-[var(--ink-70)] mb-1.5 leading-snug">
+                    Force a plan tier locally, no login needed. Dev builds only.
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {([null, 'free', 'pro', 'team'] as const).map((t) => {
+                      const active = devTier === t
+                      return (
+                        <button
+                          key={t ?? 'off'}
+                          onClick={() => {
+                            setDevForcedTier(t)
+                            setDevTierState(t)
+                          }}
+                          className={`px-1.5 py-1 rounded text-[10px] capitalize border transition-colors ${
+                            active
+                              ? 'border-accent bg-accent/10 text-[var(--ink-100)] font-medium'
+                              : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                          }`}
+                          data-testid={`dev-tier-${t ?? 'off'}`}
+                        >
+                          {t ?? 'Off'}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-            {Object.entries(AUTO_ROUTING_DISPLAY).map(([purpose, info]) => (
-              <div
-                key={purpose}
-                className="flex items-center justify-between text-[10px] py-0.5"
-              >
-                <span className="text-stone-600 dark:text-stone-400 capitalize">
-                  {purpose.replace('_', ' ')}
-                </span>
-                <span className="font-mono text-stone-700 dark:text-stone-300">
-                  {info.model}{' '}
-                  <span className="text-stone-400 dark:text-stone-500">{info.cost}</span>
+          </>
+        )}
+
+        {tab === 'account' && <AccountSection />}
+
+        {tab === 'organisation' && (
+          <OrganisationSection
+            onManage={() => {
+              goOrg()
+              onClose()
+            }}
+          />
+        )}
+
+        {tab === 'ai' && <ApiKeysSection />}
+
+        {tab === 'templates' && <TemplatesSection />}
+
+        {tab === 'data' && (
+          <>
+            <BackupSection />
+            <DocumentsSyncSection />
+            <PrivacyHelpSection />
+          </>
+        )}
+
+        {tab === 'advanced' && (
+          <>
+            <div className="px-3 py-3 space-y-2">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1">
+                Sounds
+              </div>
+
+              <label className="flex items-center justify-between py-1 cursor-pointer">
+                <span className="text-xs text-[var(--ink-70)]">Sound effects</span>
+                <input
+                  type="checkbox"
+                  checked={sound.enabled}
+                  onChange={(e) => updateSound({ enabled: e.target.checked })}
+                  className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
+                />
+              </label>
+
+              <div className={sound.enabled ? '' : 'opacity-50 pointer-events-none'}>
+                <div className="py-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-[var(--ink-70)]">Volume</span>
+                    <span className="text-[10px] text-[var(--ink-50)] font-mono">
+                      {Math.round(sound.volume * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(sound.volume * 100)}
+                    onChange={(e) => updateSound({ volume: parseInt(e.target.value, 10) / 100 })}
+                    className="w-full h-1 accent-violet-600 cursor-pointer"
+                  />
+                </div>
+
+                <label className="flex items-center justify-between py-1 cursor-pointer">
+                  <span className="text-xs text-[var(--ink-70)]">Keyboard click</span>
+                  <input
+                    type="checkbox"
+                    checked={sound.typingClick}
+                    onChange={(e) => updateSound({ typingClick: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
+                  />
+                </label>
+
+                {sound.typingClick && (
+                  <div className="pl-3 border-l-2 border-[var(--edge-soft)] py-1 space-y-3">
+                    {(['tactile', 'ambient'] as const).map((family) => {
+                      const styles = TYPING_CLICK_STYLES.filter((s) => s.family === family)
+                      const heading = family === 'tactile' ? 'Tactile' : 'Ambient · spacey'
+                      const subhead =
+                        family === 'tactile'
+                          ? 'Physical key feel'
+                          : 'Low impact, breathy, dopamine'
+                      return (
+                        <div key={family} className="space-y-1">
+                          <div className="flex items-baseline gap-1.5">
+                            <div className="text-[10px] text-[var(--ink-50)] uppercase tracking-wider">
+                              {heading}
+                            </div>
+                            <div className="text-[10px] text-[var(--ink-40)] truncate">
+                              {subhead}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 gap-0.5">
+                            {styles.map((s) => {
+                              const active = sound.typingClickStyle === s.value
+                              return (
+                                <button
+                                  key={s.value}
+                                  type="button"
+                                  onClick={() => {
+                                    updateSound({ typingClickStyle: s.value as TypingClickStyle })
+                                    previewTypingClick(s.value as TypingClickStyle)
+                                  }}
+                                  className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                                    active
+                                      ? 'bg-accent/10 border border-accent/40 text-[var(--ink-100)]'
+                                      : 'border border-transparent hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]'
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-medium">{s.label}</div>
+                                    <div className="text-[10px] text-[var(--ink-50)] truncate">
+                                      {s.blurb}
+                                    </div>
+                                  </div>
+                                  {active ? (
+                                    <Icon
+                                      name="check_circle"
+                                      size={14}
+                                      filled
+                                      className="text-accent shrink-0"
+                                    />
+                                  ) : (
+                                    <Icon
+                                      name="play_arrow"
+                                      size={14}
+                                      className="text-[var(--ink-40)] shrink-0"
+                                    />
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <label className="flex items-start justify-between py-1 cursor-pointer gap-2">
+                  <div className="flex-1">
+                    <span className="text-xs text-[var(--ink-70)] block">
+                      Quiet while widget active
+                    </span>
+                    <span className="text-[10px] text-[var(--ink-50)]">
+                      Suppress sounds while you're interacting with a widget (browser, sticky, etc.)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={sound.quietWhileWidgetActive}
+                    onChange={(e) => updateSound({ quietWhileWidgetActive: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-violet-600 cursor-pointer mt-0.5"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+                  Haptics
+                </div>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    hapticsNative === null
+                      ? 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
+                      : hapticsNative
+                        ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+                  }`}
+                >
+                  {hapticsNative === null ? 'checking…' : hapticsNative ? 'native' : 'audio fallback'}
                 </span>
               </div>
-            ))}
-          </div>
+              <p className="text-[10px] text-[var(--ink-50)] leading-snug mb-1">
+                {hapticsNative
+                  ? 'NSHapticFeedbackPerformer is loaded — trackpad pulses fire on supported MacBooks.'
+                  : "Audio-tactile substitute (no native module). Run `npx electron-rebuild -f -w node-mac-haptics` and restart to activate native."}
+              </p>
+              <div className="grid grid-cols-5 gap-1">
+                {(['light', 'medium', 'rigid', 'success', 'warning'] as const).map((feel) => (
+                  <button
+                    key={feel}
+                    onClick={() => haptic(feel)}
+                    className="px-2 py-1.5 rounded text-[10px] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors capitalize"
+                  >
+                    {feel}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <NavigationSection />
+
+            {voicePrefs && (
+              <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+                  Voice command (mic button)
+                </div>
+                <div>
+                  <div className="text-[11px] text-[var(--ink-70)] mb-1.5">
+                    Trigger mode
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {(
+                      [
+                        {
+                          value: 'press-hold' as const,
+                          label: 'Press & hold',
+                          sub: 'Walkie-talkie — release to send'
+                        },
+                        {
+                          value: 'click-toggle' as const,
+                          label: 'Click to toggle',
+                          sub: 'Auto-stops on silence'
+                        }
+                      ]
+                    ).map((o) => (
+                      <button
+                        key={o.value}
+                        onClick={() => void patchVoicePrefs({ commandMode: o.value })}
+                        className={`text-left px-2.5 py-2 rounded-md border text-[11px] transition-colors ${
+                          voicePrefs.commandMode === o.value
+                            ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                            : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                        }`}
+                        data-testid={`voice-mode-${o.value}`}
+                      >
+                        <div className="font-medium">{o.label}</div>
+                        <div className="text-[9px] text-[var(--ink-50)] mt-0.5">
+                          {o.sub}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {voicePrefs.commandMode === 'click-toggle' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] text-[var(--ink-70)]">
+                        Auto-stop after silence
+                      </span>
+                      <span className="text-[10px] font-mono text-[var(--ink-50)]">
+                        {(voicePrefs.autoStopSilenceMs / 1000).toFixed(1)}s
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1000}
+                      max={15000}
+                      step={500}
+                      value={voicePrefs.autoStopSilenceMs}
+                      onChange={(e) =>
+                        void patchVoicePrefs({ autoStopSilenceMs: Number(e.target.value) })
+                      }
+                      className="w-full accent-accent"
+                      data-testid="voice-silence-slider"
+                    />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={voicePrefs.voiceback}
+                    onChange={(e) => void patchVoicePrefs({ voiceback: e.target.checked })}
+                    className="accent-accent"
+                    data-testid="voice-voiceback-checkbox"
+                  />
+                  <span className="text-[11px] text-[var(--ink-70)]">
+                    Speak the AI's reply aloud
+                  </span>
+                </label>
+                <p className="text-[10px] text-[var(--ink-50)] leading-snug">
+                  Press the floating mic at the bottom of the canvas to give the AI a
+                  verbal command. It returns suggestions you can Apply or Dismiss —
+                  just like AI-generated tasks.
+                </p>
+              </div>
+            )}
+
+            {/* AI model routing preferences live here too, alongside the AI tab's
+                key/credit setup. */}
+            <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1">
+                AI model
+              </div>
+              <div className="grid grid-cols-1 gap-0.5">
+                {MODEL_OPTIONS.map((opt) => {
+                  const active = modelMode === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setModelMode(opt.value)}
+                      className={`flex items-start gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                        active
+                          ? 'bg-accent/10 border border-accent/40 text-[var(--ink-100)]'
+                          : 'border border-transparent hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]'
+                      }`}
+                    >
+                      <Icon
+                        name={
+                          opt.value === 'auto'
+                            ? 'tune'
+                            : opt.value === 'haiku'
+                              ? 'bolt'
+                              : opt.value === 'sonnet'
+                                ? 'psychology'
+                                : 'auto_awesome'
+                        }
+                        size={14}
+                        className={`mt-0.5 shrink-0 ${active ? 'text-accent' : 'text-[var(--ink-50)]'}`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                          {opt.label}
+                          <span
+                            className={`text-[9px] font-mono px-1 rounded ${
+                              active
+                                ? 'bg-accent/15 text-accent'
+                                : 'bg-[var(--surface-sunken)] text-[var(--ink-70)]'
+                            }`}
+                          >
+                            {opt.costTier}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-[var(--ink-50)] leading-snug mt-0.5">
+                          {opt.blurb}
+                        </div>
+                      </div>
+                      {active && (
+                        <Icon name="check_circle" size={14} filled className="text-accent shrink-0 mt-0.5" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {modelMode === 'auto' && (
+                <div className="mt-2 pl-3 border-l-2 border-[var(--edge-soft)] space-y-0.5">
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
+                    Auto routing
+                  </div>
+                  {Object.entries(AUTO_ROUTING_DISPLAY).map(([purpose, info]) => (
+                    <div
+                      key={purpose}
+                      className="flex items-center justify-between text-[10px] py-0.5"
+                    >
+                      <span className="text-[var(--ink-70)] capitalize">
+                        {purpose.replace('_', ' ')}
+                      </span>
+                      <span className="font-mono text-[var(--ink-70)]">
+                        {info.model}{' '}
+                        <span className="text-[var(--ink-40)]">{info.cost}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700 space-y-2">
-        <div className="flex items-center justify-between mb-1">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-medium">
-            Haptics
-          </div>
-          <span
-            className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-              hapticsNative === null
-                ? 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
-                : hapticsNative
-                  ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
-            }`}
-          >
-            {hapticsNative === null ? 'checking…' : hapticsNative ? 'native' : 'audio fallback'}
-          </span>
-        </div>
-        <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug mb-1">
-          {hapticsNative
-            ? 'NSHapticFeedbackPerformer is loaded — trackpad pulses fire on supported MacBooks.'
-            : "Audio-tactile substitute (no native module). Run `npx electron-rebuild -f -w node-mac-haptics` and restart to activate native."}
-        </p>
-        <div className="grid grid-cols-5 gap-1">
-          {(['light', 'medium', 'rigid', 'success', 'warning'] as const).map((feel) => (
-            <button
-              key={feel}
-              onClick={() => haptic(feel)}
-              className="px-2 py-1.5 rounded text-[10px] border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 hover:border-accent transition-colors capitalize"
-            >
-              {feel}
-            </button>
-          ))}
-        </div>
+      <div className="px-3 py-2 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/50 text-[11px] text-[var(--ink-70)] shrink-0">
+        Preferences saved locally.
       </div>
 
-      <div className="px-3 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-100/50 dark:bg-stone-800/50 text-[10px] text-stone-500 dark:text-stone-500">
-        Preferences saved locally. Click sounds in browser widgets aren't captured yet — only in stickies, notes, chat, and dialogs.
-      </div>
+      {/* Portalled to <body> so its `fixed inset-0` overlay is relative to the
+          viewport. The Settings popover carries `backdrop-blur`, which makes it a
+          containing block for fixed-position descendants — rendering ThemeBuilder
+          in-tree would center it on the popover (off-screen), not the window. */}
+      {studioOpen &&
+        createPortal(
+          <ThemeBuilder
+            mode={mode}
+            accent={accent}
+            font={font}
+            customAccentHex={customAccentHex}
+            customization={customization}
+            onModeChange={onModeChange}
+            onAccentChange={onAccentChange}
+            onFontChange={onFontChange}
+            onCustomAccentChange={onCustomAccentChange}
+            onCustomizationChange={onCustomizationChange}
+            onResetCustomization={onResetCustomization}
+            onClose={() => setStudioOpen(false)}
+          />,
+          document.body
+        )}
     </div>
   )
 }

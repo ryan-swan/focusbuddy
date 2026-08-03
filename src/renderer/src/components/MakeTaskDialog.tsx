@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { FbNode, Widget } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import Icon from './Icon'
+import Modal from './plexi/Modal'
 
 // "Make this a task" dialog — invoked from a widget or section's right-click
 // context menu. Lets the user create a task in an existing folder OR in a
@@ -40,38 +41,50 @@ export default function MakeTaskDialog({
   const create = useNodeStore((s) => s.create)
   const setActiveTask = useNodeStore((s) => s.setActive)
   const createWidget = useWidgetStore((s) => s.create)
+  const updateWidget = useWidgetStore((s) => s.update)
+  const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const folders = useMemo(
     () => nodes.filter((n) => n.kind === 'folder'),
     [nodes]
   )
+  // The folder the user is currently working in = the active task's parent.
+  // This is what we default the picker to (the operator's explicit ask).
+  const currentFolderId = useMemo(() => {
+    const task = nodes.find((n) => n.id === activeTaskId)
+    const pid = task?.parentId ?? null
+    return pid && folders.some((f) => f.id === pid) ? pid : null
+  }, [nodes, activeTaskId, folders])
 
   const [taskTitle, setTaskTitle] = useState(seedTitle.trim() || 'Untitled task')
+  const [folderQuery, setFolderQuery] = useState('')
   // Default to ON when a source widget was passed — almost always what the
   // user wants from a right-click "make this a task" flow. They can untick
   // if they just want the task and the widget should stay on the current
   // canvas (e.g. a sticky that's a reference, not the task itself).
   const [copyWidget, setCopyWidget] = useState<boolean>(!!sourceWidget)
+  // When copying the widget across, default to a LIVE-synced copy (autolinked) —
+  // the user can choose an independent point-in-time copy instead. This is the
+  // explicit "copy vs sync" choice; synced is the default so edits mirror unless
+  // the user opts out.
+  const [syncCopy, setSyncCopy] = useState<boolean>(true)
   const [switchToNewTask, setSwitchToNewTask] = useState<boolean>(!!sourceWidget)
   // Default the selector to the supplied parent if it's a real folder,
   // otherwise the first existing folder, otherwise the "new folder" path.
   const [folderSel, setFolderSel] = useState<string>(() => {
+    // Default order: explicit prop → the current folder (active task's parent)
+    // → first folder → create-new.
     if (defaultParentId && folders.some((f) => f.id === defaultParentId)) {
       return defaultParentId
     }
+    const task = nodes.find((n) => n.id === activeTaskId)
+    const pid = task?.parentId ?? null
+    if (pid && folders.some((f) => f.id === pid)) return pid
     if (folders.length > 0) return folders[0].id
     return NEW_FOLDER_VALUE
   })
   const [newFolderName, setNewFolderName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   async function handleSubmit(): Promise<void> {
     if (busy) return
@@ -112,6 +125,18 @@ export default function MakeTaskDialog({
       // doesn't collide with the original's stored x/y if the user happens
       // to land on the new task quickly.
       if (sourceWidget && copyWidget) {
+        // SYNCED copy → share a syncGroupId so edits mirror across the two
+        // tasks (tick a checkbox / rename here → it mirrors there). Reuse the
+        // source's group or create one and tag the source too.
+        // INDEPENDENT copy → no syncGroupId: a point-in-time snapshot that
+        // never affects (or is affected by) the source.
+        let groupId: string | undefined
+        if (syncCopy) {
+          groupId = sourceWidget.syncGroupId ?? crypto.randomUUID()
+          if (!sourceWidget.syncGroupId) {
+            await updateWidget(sourceWidget.id, { syncGroupId: groupId })
+          }
+        }
         await createWidget({
           taskId: newTask.id,
           kind: sourceWidget.kind,
@@ -123,7 +148,8 @@ export default function MakeTaskDialog({
           height: sourceWidget.height,
           color: sourceWidget.color,
           sourceAppId: sourceWidget.sourceAppId,
-          mode: sourceWidget.mode
+          mode: sourceWidget.mode,
+          syncGroupId: groupId
         })
       }
       // Switch the active task so the user lands on the new task they
@@ -140,27 +166,21 @@ export default function MakeTaskDialog({
   }
 
   return createPortal(
-    <div
-      // Modal backdrop — click to dismiss, but only on the backdrop
-      // itself (not when the click bubbles up from a child input/button).
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-      className="fixed inset-0 z-[250] bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center"
+    <Modal
+      onClose={onClose}
+      label="Make this a task"
+      z={250}
+      className="w-[380px] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4"
     >
-      <div
-        className="w-[380px] rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl p-4"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="task_alt" size={16} className="text-accent" />
-          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+          <h2 className="text-sm font-semibold text-[var(--ink-100)]">
             Make this a task
           </h2>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
               Task title
             </label>
             <input
@@ -170,45 +190,87 @@ export default function MakeTaskDialog({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleSubmit()
               }}
-              className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
+              className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
               placeholder="What is the task?"
             />
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
               Folder
             </label>
-            <select
-              value={folderSel}
-              onChange={(e) => setFolderSel(e.target.value)}
-              className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
-            >
-              {folders.map((f: FbNode) => (
-                <option key={f.id} value={f.id}>
-                  {f.title || '(untitled folder)'}
-                </option>
-              ))}
-              <option value={NEW_FOLDER_VALUE}>+ Create new folder…</option>
-            </select>
+            {folderSel === NEW_FOLDER_VALUE ? (
+              <div className="space-y-1.5">
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSubmit()
+                  }}
+                  placeholder="New folder name — e.g. Q3 outreach"
+                  className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFolderSel(currentFolderId || folders[0]?.id || NEW_FOLDER_VALUE)}
+                  className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-70)]"
+                >
+                  ← Pick an existing folder
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input
+                  value={folderQuery}
+                  onChange={(e) => setFolderQuery(e.target.value)}
+                  placeholder="Search folders…"
+                  className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
+                />
+                <div className="mt-1 max-h-40 overflow-auto rounded border border-[var(--edge-soft)]">
+                  {folders
+                    .filter((f: FbNode) =>
+                      (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
+                    )
+                    .map((f: FbNode) => (
+                      <button
+                        type="button"
+                        key={f.id}
+                        onClick={() => setFolderSel(f.id)}
+                        className={`w-full text-left px-2.5 py-1.5 text-sm flex items-center justify-between gap-2 ${
+                          folderSel === f.id
+                            ? 'bg-accent/15 text-accent'
+                            : 'text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+                        }`}
+                      >
+                        <span className="truncate">{f.title || '(untitled folder)'}</span>
+                        {f.id === currentFolderId && (
+                          <span className="text-[9px] uppercase tracking-wider text-[var(--ink-40)] shrink-0">
+                            current
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  {folders.filter((f: FbNode) =>
+                    (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
+                  ).length === 0 && (
+                    <div className="px-2.5 py-1.5 text-[11px] text-[var(--ink-40)]">No folders match.</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFolderSel(NEW_FOLDER_VALUE)
+                      if (folderQuery.trim()) setNewFolderName(folderQuery.trim())
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-sm text-accent border-t border-[var(--edge-soft)] hover:bg-accent/5"
+                  >
+                    + Create new folder{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          {folderSel === NEW_FOLDER_VALUE && (
-            <div>
-              <label className="block text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
-                New folder name
-              </label>
-              <input
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSubmit()
-                }}
-                placeholder="e.g. Q3 outreach"
-                className="w-full text-sm px-2.5 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent"
-              />
-            </div>
-          )}
           {sourceWidget && (
-            <div className="pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1.5">
+            <div className="pt-1 border-t border-[var(--edge-soft)] space-y-1.5">
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -217,14 +279,52 @@ export default function MakeTaskDialog({
                   className="mt-0.5 accent-accent"
                 />
                 <div className="flex-1">
-                  <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                  <div className="text-[12px] text-[var(--ink-90)]">
                     Copy this widget into the new task
                   </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
-                    A duplicate {sourceWidget.kind === 'section' ? 'section container' : sourceWidget.kind} lands on the new task's canvas.
+                  <div className="text-[10px] text-[var(--ink-50)] leading-tight">
+                    Bring this widget onto the new task. Choose whether it stays in sync or becomes its own copy.
                   </div>
                 </div>
               </label>
+              {copyWidget && (
+                <div className="ml-6 space-y-1.5 pl-0.5 border-l-2 border-[var(--edge-soft)]">
+                  <label className="flex items-start gap-2 cursor-pointer pl-2">
+                    <input
+                      type="radio"
+                      name="fb-copy-mode"
+                      checked={syncCopy}
+                      onChange={() => setSyncCopy(true)}
+                      className="mt-0.5 accent-accent"
+                    />
+                    <div className="flex-1">
+                      <div className="text-[12px] text-[var(--ink-90)]">
+                        🔗 Keep in sync <span className="text-[var(--ink-40)]">(live)</span>
+                      </div>
+                      <div className="text-[10px] text-[var(--ink-50)] leading-tight">
+                        Content, title and colour mirror both ways. Unlink anytime from the widget menu.
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer pl-2">
+                    <input
+                      type="radio"
+                      name="fb-copy-mode"
+                      checked={!syncCopy}
+                      onChange={() => setSyncCopy(false)}
+                      className="mt-0.5 accent-accent"
+                    />
+                    <div className="flex-1">
+                      <div className="text-[12px] text-[var(--ink-90)]">
+                        Independent copy <span className="text-[var(--ink-40)]">(point-in-time)</span>
+                      </div>
+                      <div className="text-[10px] text-[var(--ink-50)] leading-tight">
+                        A snapshot of the current state. The two never affect each other.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -233,10 +333,10 @@ export default function MakeTaskDialog({
                   className="mt-0.5 accent-accent"
                 />
                 <div className="flex-1">
-                  <div className="text-[12px] text-stone-800 dark:text-stone-100">
+                  <div className="text-[12px] text-[var(--ink-90)]">
                     Switch to the new task
                   </div>
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                  <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                     Otherwise it just appears in your sidebar — you'll stay on the current desk.
                   </div>
                 </div>
@@ -250,7 +350,7 @@ export default function MakeTaskDialog({
         <div className="flex justify-end gap-2 mt-4">
           <button
             onClick={onClose}
-            className="text-xs px-3 py-1.5 rounded text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="text-xs px-3 py-1.5 rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
           >
             Cancel
           </button>
@@ -262,8 +362,7 @@ export default function MakeTaskDialog({
             {busy ? 'Creating…' : 'Create task'}
           </button>
         </div>
-      </div>
-    </div>,
+    </Modal>,
     document.body
   )
 }

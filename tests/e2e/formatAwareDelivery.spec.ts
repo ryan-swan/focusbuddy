@@ -1,0 +1,252 @@
+import { test, expect } from '@playwright/test'
+import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
+
+// Format-aware delivery: when an agent/wire feeds a linked widget, the data is
+// shaped for that widget kind — a card gets title/body, a page gets a real
+// document, and a table is built via its AI (never overwritten with raw text).
+
+let launched: LaunchedApp | null = null
+test.afterEach(async () => {
+  if (launched) {
+    await launched.dispose()
+    launched = null
+  }
+})
+
+async function hideAssistant(window: LaunchedApp['window']): Promise<void> {
+  const btn = window.getByRole('button', { name: 'Hide assistant panel' })
+  if (await btn.isVisible().catch(() => false)) await btn.click().catch(() => {})
+  await window.waitForTimeout(150)
+}
+
+async function widgetContent(
+  window: LaunchedApp['window'],
+  taskId: string,
+  id: string
+): Promise<string | undefined> {
+  return window.evaluate(
+    async ({ taskId, id }: { taskId: string; id: string }) => {
+      const api = (window as unknown as { api: typeof window.api }).api
+      const ws = await api.widgets.listByTask(taskId)
+      return ws.find((w) => w.id === id)?.content
+    },
+    { taskId, id }
+  )
+}
+
+async function openAndTrigger(window: LaunchedApp['window'], taskTitle: RegExp): Promise<void> {
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: taskTitle }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 5_000 })
+  await window.waitForTimeout(400)
+  await hideAssistant(window)
+  // Touch the agent so its content change fires its outgoing wire.
+  await window.locator('[data-testid="agent-instruction"]').fill('go now')
+}
+
+const AGENT = (lastOutput: string): string =>
+  JSON.stringify({ instruction: 'summarize', trigger: 'manual', enabled: true, lastOutput })
+
+test('an agent feeds a card as title + body', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt card' })
+    const card = await api.widgets.create({
+      taskId: task.id, kind: 'card', title: 'out',
+      content: JSON.stringify({ title: '', body: '', accent: '#10b981' }),
+      x: 480, y: 200, width: 280, height: 200
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, card.id, task.id)
+    return { taskId: task.id, cardId: card.id }
+  }, AGENT('Project plan\nShip the MVP this week.'))
+
+  await openAndTrigger(window, /Fmt card/)
+  await expect
+    .poll(async () => {
+      const c = await widgetContent(window, ids.taskId, ids.cardId)
+      try {
+        return JSON.parse(c || '{}') as { title?: string; body?: string; accent?: string }
+      } catch {
+        return {}
+      }
+    }, { timeout: 8_000, intervals: [400, 700] })
+    .toMatchObject({ title: 'Project plan', accent: '#10b981' })
+  const card = JSON.parse((await widgetContent(window, ids.taskId, ids.cardId)) || '{}')
+  expect(card.body).toContain('Ship the MVP')
+})
+
+test('an agent feeds a page as a real document', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt page' })
+    const page = await api.widgets.create({
+      taskId: task.id, kind: 'page', title: 'Doc', content: '',
+      x: 480, y: 200, width: 360, height: 300
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, page.id, task.id)
+    return { taskId: task.id, pageId: page.id }
+  }, AGENT('# Heading\nSome body text\n- item one'))
+
+  await openAndTrigger(window, /Fmt page/)
+  await expect
+    .poll(async () => widgetContent(window, ids.taskId, ids.pageId), { timeout: 8_000, intervals: [400, 700] })
+    .toContain('"type":"doc"')
+  const doc = JSON.parse((await widgetContent(window, ids.taskId, ids.pageId)) || '{}')
+  const flat = JSON.stringify(doc)
+  expect(flat).toContain('Heading')
+  expect(flat).toContain('Some body text')
+  expect(flat).toContain('item one')
+})
+
+test('an agent feeds a number field a typed number, not a string', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt field' })
+    const field = await api.widgets.create({
+      taskId: task.id, kind: 'field', title: 'Count',
+      content: JSON.stringify({ def: { id: 'f1', type: 'number', label: 'Count', config: {} }, value: null }),
+      x: 480, y: 200, width: 220, height: 140
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, field.id, task.id)
+    return { taskId: task.id, fieldId: field.id }
+  }, AGENT('42'))
+
+  await openAndTrigger(window, /Fmt field/)
+  await expect
+    .poll(async () => {
+      const c = await widgetContent(window, ids.taskId, ids.fieldId)
+      try {
+        return JSON.parse(c || '{}').value
+      } catch {
+        return undefined
+      }
+    }, { timeout: 8_000, intervals: [400, 700] })
+    .toBe(42)
+})
+
+test('an agent feeds a mindmap as a node tree', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt map' })
+    const map = await api.widgets.create({
+      taskId: task.id, kind: 'mindmap', title: 'Map', content: '',
+      x: 480, y: 200, width: 420, height: 320
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, map.id, task.id)
+    return { taskId: task.id, mapId: map.id }
+  }, AGENT('Launch plan\nMarketing\nEngineering\nQA'))
+
+  await openAndTrigger(window, /Fmt map/)
+  await expect
+    .poll(async () => widgetContent(window, ids.taskId, ids.mapId), { timeout: 8_000, intervals: [400, 700] })
+    .toContain('"root"')
+  const mm = JSON.parse((await widgetContent(window, ids.taskId, ids.mapId)) || '{}')
+  expect(mm.root?.label).toBe('Launch plan')
+  expect(JSON.stringify(mm.root?.children ?? [])).toContain('Marketing')
+  expect((mm.root?.children ?? []).length).toBeGreaterThanOrEqual(3)
+})
+
+test('a delivery never overwrites a structured target (another agent)', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt skip' })
+    const a = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'A', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    const b = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'B',
+      content: JSON.stringify({ instruction: 'keep notes', trigger: 'manual', enabled: true }),
+      x: 520, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(a.id, b.id, task.id)
+    return { taskId: task.id, aId: a.id, bId: b.id }
+  }, AGENT('arbitrary text the upstream agent produced'))
+
+  await window.reload()
+  await waitForReady(window)
+  await window.getByRole('button', { name: /Fmt skip/ }).first().click()
+  await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 5_000 })
+  await window.waitForTimeout(400)
+  await hideAssistant(window)
+  // Trigger agent A by editing its instruction.
+  await window.locator(`[data-widget-id="${ids.aId}"] [data-testid="agent-instruction"]`).fill('do it')
+  await window.waitForTimeout(1800)
+
+  // Agent B's config was NOT overwritten by A's text — it's still a valid agent.
+  const bContent = await widgetContent(window, ids.taskId, ids.bId)
+  const b = JSON.parse(bContent || '{}')
+  expect(b.instruction).toBe('keep notes')
+})
+
+test('an agent feeding a table never overwrites the table id with text', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  const ids = await window.evaluate(async (content: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Fmt table' })
+    const tbl = await api.tables.create({
+      taskId: task.id, title: 'Tasks',
+      schema: { columns: [{ id: 'c_name', label: 'Name', type: 'text-short', config: {} }] }
+    } as never)
+    // A pre-existing row the user added — it must NEVER be deleted by a feed.
+    await api.tables.createRow({ tableId: tbl.id, cells: { c_name: 'Existing task' } } as never)
+    const table = await api.widgets.create({
+      taskId: task.id, kind: 'table', title: 'Tasks', content: tbl.id,
+      x: 480, y: 200, width: 420, height: 280
+    })
+    const agent = await api.widgets.create({
+      taskId: task.id, kind: 'agent', title: 'Agent', content,
+      x: 120, y: 200, width: 340, height: 320
+    })
+    await api.widgetLinks.create(agent.id, table.id, task.id)
+    return { taskId: task.id, tableId: tbl.id, tableWidgetId: table.id }
+  }, AGENT('Buy milk\nEmail Dana\nShip the build'))
+
+  await openAndTrigger(window, /Fmt table/)
+  await window.waitForTimeout(2500) // let the build attempt run + settle
+
+  // The widget's content is STILL the backing table id — not the agent's text.
+  const content = await widgetContent(window, ids.taskId, ids.tableWidgetId)
+  expect(content).toBe(ids.tableId)
+  // And the user's existing row was NOT deleted (non-destructive upsert).
+  const survived = await window.evaluate(async (tid: string) => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    const rows = await api.tables.listRows(tid)
+    return rows.some((r) => r.cells['c_name'] === 'Existing task')
+  }, ids.tableId)
+  expect(survived).toBe(true)
+})

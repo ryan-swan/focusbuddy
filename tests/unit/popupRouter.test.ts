@@ -77,8 +77,8 @@ describe('decidePopup', () => {
     })
   })
 
-  describe('plain target=_blank links', () => {
-    it('denies the popup and forwards the URL to the renderer', () => {
+  describe('new tabs (target=_blank / window.open without features) → desk widget', () => {
+    it('forwards a plain foreground-tab to a canvas widget with the URL', () => {
       const result = decidePopup(
         {
           url: 'https://docs.example.com/article',
@@ -93,24 +93,24 @@ describe('decidePopup', () => {
       expect(result.forwardToRenderer?.url).toBe('https://docs.example.com/article')
     })
 
-    it('ignores empty / unframed link clicks (no widget spawn)', () => {
+    it('forwards a background-tab to a canvas widget too', () => {
       const result = decidePopup(
-        {
-          url: 'https://x.example',
-          frameName: '',
-          features: '',
-          disposition: 'background-tab'
-        },
+        { url: 'https://x.example', frameName: '', features: '', disposition: 'background-tab' },
         ctx
       )
       expect(result.action).toBe('deny')
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer?.url).toBe('https://x.example')
     })
 
-    it('rejects non-http URLs to avoid spawning widgets for javascript: or data:', () => {
+    it('a "new document" opened as a plain new tab becomes a desk object, not a stranded window', () => {
+      // The user's report: clicking "create new doc" opened a separate window
+      // with no path back to the desk. A plain new tab to a known URL now lands
+      // as a canvas widget instead.
       const result = decidePopup(
         {
-          url: 'javascript:alert(1)',
-          frameName: '_blank',
+          url: 'https://docs.google.com/document/d/abc/edit',
+          frameName: '',
           features: '',
           disposition: 'foreground-tab'
         },
@@ -118,29 +118,50 @@ describe('decidePopup', () => {
       )
       expect(result.action).toBe('deny')
       if (result.action !== 'deny') return
-      expect(result.forwardToRenderer).toBeUndefined()
+      expect(result.forwardToRenderer?.url).toContain('docs.google.com')
+    })
+
+    it('denies non-http schemes (javascript:, data:, mailto:) without forwarding', () => {
+      for (const url of ['javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.com']) {
+        const result = decidePopup(
+          { url, frameName: '_blank', features: '', disposition: 'foreground-tab' },
+          ctx
+        )
+        expect(result.action).toBe('deny')
+        if (result.action !== 'deny') return
+        expect(result.forwardToRenderer).toBeUndefined()
+      }
+    })
+  })
+
+  describe('auth exception — a plain new tab that IS an auth flow stays native', () => {
+    it('keeps a foreground-tab to an auth host (accounts.google.com) as a native window', () => {
+      const result = decidePopup(
+        { url: 'https://accounts.google.com/signin/v2', frameName: '', features: '', disposition: 'foreground-tab' },
+        ctx
+      )
+      expect(result.action).toBe('allow')
+    })
+
+    it('keeps a foreground-tab whose path is an oauth/authorize flow native', () => {
+      const result = decidePopup(
+        { url: 'https://provider.example/oauth2/authorize?client_id=x', frameName: '', features: '', disposition: 'foreground-tab' },
+        ctx
+      )
+      expect(result.action).toBe('allow')
     })
   })
 
   describe('regression guards', () => {
-    it('does NOT treat foreground-tab as a popup (was the original OAuth-killing bug)', () => {
-      // Before the fix, target=_blank links were being routed through the
-      // renderer's new-window interceptor which killed window.opener.
+    it('an explicit new-window still opens as a native window (handle-dependent)', () => {
       const result = decidePopup(
-        {
-          url: 'https://provider.example/oauth',
-          frameName: '_blank',
-          features: '',
-          disposition: 'foreground-tab'
-        },
+        { url: 'https://app.example/tool', frameName: '', features: '', disposition: 'new-window' },
         ctx
       )
-      // Must NOT be 'allow' — that would skip the renderer widget spawn and
-      // open the link as a real popup, which is the wrong UX for a click.
-      expect(result.action).toBe('deny')
+      expect(result.action).toBe('allow')
     })
 
-    it('does NOT route OAuth popups through the renderer (preserves window.opener)', () => {
+    it('OAuth popups stay compact and keep the session (preserves window.opener)', () => {
       const result = decidePopup(
         {
           url: 'https://provider.example/oauth',
@@ -150,9 +171,9 @@ describe('decidePopup', () => {
         },
         ctx
       )
-      // Must be 'allow' — anything else means window.opener gets nulled and
-      // OAuth postMessage callback fails.
       expect(result.action).toBe('allow')
+      if (result.action !== 'allow') return
+      expect(result.overrideBrowserWindowOptions.width).toBe(520)
     })
   })
 })

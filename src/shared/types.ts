@@ -1,5 +1,14 @@
+// Type-only import (erased at build, no runtime cycle) so a document body can be
+// a PlexiDesign canvas. DesignBody is owned by ./design alongside its helpers.
+import type { DesignBody } from './design'
+import type { ChartCore } from './chart'
+
 export type AxisValue = 1 | 2 | 3 | 4 | 5
-export type NodeKind = 'folder' | 'task'
+// 'task-item' is Caleb's lightweight sub-task kind (delivered as its own slice
+// with the node-table migration + task-list widget). Declared here so the
+// Focus-Mode workspace snapshot can classify it; no node of this kind is created
+// until the task-item slice lands.
+export type NodeKind = 'folder' | 'task' | 'task-item'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'parked'
 export type SectionLayout = 'free' | 'grid' | 'stacks' | 'icons' | 'list'
 
@@ -19,6 +28,9 @@ export type WidgetKind =
   | 'gsheet'
   | 'gslide'
   | 'email'
+  // A pinned PlexiChat conversation: stores { conversationId, channelName } in
+  // content, renders a compact live view of the thread with an Open button.
+  | 'chat-thread'
   | 'calculator'
   | 'color'
   | 'image'
@@ -29,9 +41,107 @@ export type WidgetKind =
   | 'local-app-launcher'
   // New: rich data primitives
   | 'file' // unified file widget — type detected from MIME / extension
+  | 'drive' // a bound Files folder on the desk — lists it, opens it, saves into it
   | 'field' // single field (text, number, select, checkbox, etc.) on canvas
   | 'page' // Tiptap-based Notion-style document
   | 'table' // Notion/Airtable-style database with typed columns
+  // Office documents on the canvas — a doc / spreadsheet / slide deck backed by
+  // the fb_documents store (widget.content holds the document id), embedding the
+  // full editor so the same file can live on a canvas and in the Documents view.
+  | 'doc'
+  | 'sheet'
+  | 'slides'
+  // PlexiMaps — a node/edge diagram & workflow map document, embeddable on the
+  // canvas like the other office docs (backed by an fb_documents row of type 'map').
+  | 'map'
+  // PlexiDesign — a Canva/Publisher-class design canvas (arbitrary-size pages of
+  // freely-placed elements), embeddable on the desk like the other office docs
+  // (backed by an fb_documents row of type 'design').
+  | 'design'
+  // Stream Deck — Elgato-style 10×3 button grid with folder navigation,
+  // macros, app launching, media keys, and volume control. Configuration
+  // (buttons, folders, action payloads) lives in widget.content as JSON.
+  | 'streamdeck'
+  // Canvas minimap — bottom-right overview rectangle with widget silhouettes
+  // and a draggable viewport rect. Auto-created on every new task pinned to
+  // BR, but it's a regular widget the user can resize, unpin, drag to the
+  // canvas, delete, or re-add via the widget picker like anything else.
+  | 'minimap'
+  // Voice / video recorder — captures audio (and later webcam video) via
+  // MediaRecorder, persists the blob through the files store, and runs
+  // it through Whisper (OpenAI) for transcription, then Anthropic for
+  // optional cleanup or summary. The widget owns the Record/Stop UI and
+  // the post-record three-way mode picker (Full / Cleaned / Summary). A
+  // separate post-processing modal surfaces extracted ActionProposals
+  // (new tasks, new widgets, etc.) for one-click apply.
+  | 'voice-recorder'
+  // AI mind mapper — root-of-thought node tree. Each node has a label
+  // and an optional kind classifier (idea / task / question / tool /
+  // agent). Clicking a node fires Claude with the full root-path
+  // context and generates 3-5 child branches. A side panel shows
+  // suggested Agent OS agents that could execute on the node's topic,
+  // sourced from .claude/agents/*.md and ranked by Claude.
+  //
+  // PHASE_2: embedded mini-widgets per node (tables, fields, searches)
+  // PHASE_2: agent-creation wizard for "no matching agent" flow
+  // PHASE_3: autonomous agent execution on the canvas via a runtime
+  //   that watches state changes + proposes actions with kill switches
+  | 'mindmap'
+  // Diagram — a React Flow node/edge canvas for structured diagrams: flowcharts,
+  // entity hierarchies, server/software design, mind-map-style trees, and basic
+  // Venn (overlapping translucent circle nodes). Nodes can be boxes, circles,
+  // text, or an uploaded image/icon; edges are connectors. The whole graph
+  // (nodes + edges + viewport) is serialised to widget.content as JSON.
+  | 'diagram'
+  // Scratchpad — a freeform sketch surface (pressure-sensitive ink via
+  // perfect-freehand) for quick drawings, annotations, and visual thinking.
+  // Strokes + background are serialised to widget.content as JSON.
+  | 'scratchpad'
+  // Shape — a vector shape (rect/ellipse/diamond/triangle/hexagon/star/line/
+  // arrow) with fill, stroke and an optional centred label. Stretches to fill
+  // the widget. Config serialised to widget.content as JSON.
+  | 'shape'
+  // Card — a titled callout card: accent bar + bold title + multi-line body.
+  | 'card'
+  // Chart (PlexiDash) — a bar / line / area / pie / KPI view bound to a Table.
+  // It reads the real rows of an fb_tables table and aggregates them per its
+  // config (chart type, category column, value series + aggregation), which is
+  // serialised to widget.content as JSON. Several charts on a desk form a
+  // dashboard. Honest by construction: an unbound or empty chart shows a prompt,
+  // never sample data.
+  | 'chart'
+  // Custom block — a WYSIWYG form/record designer: freely-placed typed fields
+  // the user lays out themselves; doubles as a data-entry form. Layout + values
+  // serialised to widget.content as JSON; can be saved as a reusable template.
+  | 'custom-block'
+  // Desk agent — a standing AI agent placed on the canvas. Its "senses" are the
+  // live wires drawn INTO it (each wired-in widget's content is an input); it
+  // holds a standing instruction and a trigger (manual / interval / on a wired
+  // input changing), runs with a visible kill switch, and keeps a run log in its
+  // own body. Config + history serialised to widget.content as JSON.
+  | 'agent'
+  // Portal — a live window into ANOTHER task's desk. Shows a shrunk,
+  // content-aware miniature of the target desk, refreshed periodically; click to
+  // dive in. The target task id is serialised to widget.content as JSON.
+  | 'portal'
+  // Living doc — a read-only document that writes itself. The user gives it a
+  // brief (stored in livingQuery), and the AI keeps it as a running summary of
+  // the OTHER widgets on the same desk, regenerated on demand and auto-refreshed
+  // when source widgets change (see livingPageScheduler). content is serialized
+  // Tiptap JSON, system-owned (never hand-edited). Reuses the living* fields.
+  | 'living-doc'
+  // Webhook (outbound) — an endpoint tool. Wire a widget INTO it and, on every
+  // source change, the source's content is POSTed to the configured URL (main
+  // process, so no CORS). content holds { url, method } as JSON. The wire's own
+  // run status (freshness / error) reports the last send. This is the outbound
+  // half of external webhooks (Lever 3); the inbound trigger is a separate kind.
+  | 'webhook'
+  // Inbound webhook (trigger) — the receiving half. It self-registers a hook with
+  // the signal server and shows a unique URL; when an external system POSTs there,
+  // the server relays the payload here and it lands in this widget's content,
+  // firing any wire drawn OUT of it. content holds { hookId, url } as JSON. You
+  // wire OUT of this (it's a source) — the mirror of the outbound 'webhook'.
+  | 'inbound-hook'
 
 export type ContextMenuAction =
   | 'createStickyFromSelection'
@@ -76,6 +186,15 @@ export interface FbNode {
   // about the work itself (open / in_progress / done / parked); archived
   // is about whether the node should be visible in day-to-day surfaces.
   archived: boolean
+  // Rooms/Desks/Plans split. Only meaningful on folder nodes: false = a plain
+  // Room (organisation only), true = a Plan that appears in the Plans portfolio
+  // and Gantt. Task nodes (Desks) leave this false; a Desk is never auto-added
+  // to a plan. See migratePlanFlag in main/db/database.ts for the grandfather.
+  isPlan: boolean
+  // Handle of the person who shared this node with you, set when the node
+  // was reconstructed from an accepted share. Null for your own nodes. The
+  // sidebar uses it to show a "Shared by <handle>" badge + avatar.
+  sharedFromHandle: string | null
 }
 
 export interface NodeDraft {
@@ -88,6 +207,12 @@ export interface NodeDraft {
   importance?: AxisValue
   estimateMinutes?: number | null
   dueDate?: number | null
+  // Create this folder as a Plan (is_plan = 1) rather than a plain Room. Only
+  // the Plans view sets this; every other create path leaves it a Room.
+  isPlan?: boolean
+  // Set when reconstructing a node from an accepted share — stamps the
+  // sharer's handle so the UI can badge it.
+  sharedFromHandle?: string | null
 }
 
 export interface NodePatch {
@@ -105,6 +230,62 @@ export interface NodePatch {
   resumeUpdatedAt?: number | null
   dueDate?: number | null
   archived?: boolean
+  // Promote a Room to a Plan or demote it back. Lets the user say "this is a
+  // plan" / "this is just a room" without recreating the node.
+  isPlan?: boolean
+}
+
+// ── Time blocks (calendar time-blocking) ────────────────────────────────────
+// A booked stretch of time on the calendar, optionally tied to a task. This is
+// how the calendar goes from "tasks shown on their due day" to "I've booked
+// 2-3pm to focus on this", and a block can launch a focus session for its task.
+export type TimeBlockStatus = 'planned' | 'done'
+
+// When a time block is a scheduled meeting, it carries the room to join and the
+// people invited to it. The room id is stable so the same link works for the
+// host and every invitee: the join email, the calendar "Join" button, and the
+// haptyx://meet?room= deep link all open this one room.
+export interface TimeBlockMeeting {
+  roomId: string
+  invitees: string[] // email addresses the invite was sent to
+}
+
+export type TimeBlockRecurrence = 'daily' | 'weekly' | 'monthly'
+
+export interface TimeBlock {
+  id: string
+  taskId: string | null // null = a generic focus/time block with no task
+  title: string
+  startMs: number // absolute start time
+  durationMin: number
+  status: TimeBlockStatus
+  meeting?: TimeBlockMeeting | null // set when this block is a video meeting
+  // Repeating blocks: every occurrence is a real row (materialised forward on a
+  // rolling horizon by the main process), grouped by seriesId. recurrence is
+  // carried on every occurrence so the series keeps extending from its newest
+  // row; clearing it (delete "this and future") stops the series.
+  recurrence?: TimeBlockRecurrence | null
+  seriesId?: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface TimeBlockDraft {
+  taskId?: string | null
+  title?: string
+  startMs: number
+  durationMin: number
+  meeting?: TimeBlockMeeting | null
+  recurrence?: TimeBlockRecurrence | null
+}
+
+export interface TimeBlockPatch {
+  taskId?: string | null
+  title?: string
+  startMs?: number
+  durationMin?: number
+  status?: TimeBlockStatus
+  meeting?: TimeBlockMeeting | null
 }
 
 export interface Widget {
@@ -119,6 +300,10 @@ export interface Widget {
   height: number
   zIndex: number
   color: string | null
+  // Optional workflow status, used by the Columns view's status board (To sort /
+  // In progress / Done / Reference). null = unset (reads as "To sort"). A real
+  // synced field so a board means the same thing on every device.
+  status: string | null
   pinned: boolean
   pinnedScreenX: number | null
   pinnedScreenY: number | null
@@ -154,6 +339,11 @@ export interface Widget {
   createdAt: number
   updatedAt: number
   archived: boolean
+  // When set, this widget is a LINKED duplicate: all widgets sharing the same
+  // syncGroupId mirror their content + title + colour to each other (across
+  // tasks). Position / size / which task each copy lives in stay independent.
+  // null = standalone (not linked).
+  syncGroupId: string | null
 }
 
 export interface WidgetDraft {
@@ -168,6 +358,15 @@ export interface WidgetDraft {
   color?: string | null
   sourceAppId?: string | null
   mode?: 'launcher' | 'mirror' | null
+  // Pin a widget to a screen zone at creation time. Used by the minimap
+  // auto-create flow (and any future "always-on" widget that should
+  // dock to a corner from the moment it spawns). Defaults are unpinned
+  // free-positioned via x/y.
+  pinned?: boolean
+  pinnedZone?: PinZone | null
+  // Link this new widget into a sync group (used by Duplicate so the copy stays
+  // in sync with its source).
+  syncGroupId?: string | null
 }
 
 export interface WidgetPatch {
@@ -179,6 +378,7 @@ export interface WidgetPatch {
   height?: number
   zIndex?: number
   color?: string | null
+  status?: string | null
   pinned?: boolean
   pinnedScreenX?: number | null
   pinnedScreenY?: number | null
@@ -191,6 +391,8 @@ export interface WidgetPatch {
   livingGeneratedAt?: number | null
   livingPaused?: boolean
   archived?: boolean
+  // Set to a group id to LINK this widget into a sync group, or null to UNLINK.
+  syncGroupId?: string | null
 }
 
 export type ChatRole = 'user' | 'assistant' | 'system'
@@ -201,9 +403,136 @@ export interface ChatMessage {
   ts: number
 }
 
+// Text pulled from a browser / doc / pdf widget on the canvas, so the assistant
+// can act on what the user is actually looking at (e.g. create calendar events
+// from a booking page, an itinerary doc, or a PDF invoice).
+export interface ChatAttachment {
+  widgetId: string
+  kind: string
+  title: string
+  source?: string // URL for a browser widget, filename for a file, etc.
+  text: string
+}
+
+// ── @-mentions (Phase 4) ────────────────────────────────────────────────────
+// A typed, id-bearing reference to a real workspace object that the user named
+// with "@" (or by clicking it). Deliberately NOT lib/mentions.ts's @handle text
+// tokens, which live in PlexiChat, mean "notify this person", and carry no id —
+// a text token can make no honest claim about what rode the request.
+//
+// This is the WIRE shape: what the main process needs to resolve the reference.
+// The renderer's MentionRef adds an icon and the conversation it belongs to,
+// both of which are presentation/state and stop at the IPC boundary.
+export type ChatMentionKind =
+  | 'document'
+  | 'desk'
+  | 'room'
+  | 'widget'
+  | 'file'
+  | 'knowledge'
+  | 'person'
+
+export interface ChatMentionRef {
+  kind: ChatMentionKind
+  id: string
+  title: string
+  // The desk that owns a widget reference — what lets the resolver read a
+  // widget on a desk the user is not currently looking at. (The renderer's own
+  // attachment gathering stops at the current desk; this is what mentions add.)
+  taskId?: string | null
+}
+
+// What a reference ACTUALLY produced, reported back so the renderer can be
+// honest about it. A reference that resolved to nothing must never render as
+// though the assistant read it.
+export interface ChatMentionResolved {
+  kind: ChatMentionKind
+  id: string
+  title: string
+  // True only when real text was extracted AND genuinely reached the prompt.
+  resolved: boolean
+  // How many characters actually rode, after every cap.
+  chars: number
+  // The prompt budget cut this reference short. Stated, never silent.
+  truncated: boolean
+  // Why it did not resolve, when it did not. Null when it did.
+  reason: string | null
+}
+
 export interface ChatRequest {
   taskId: string | null
   messages: ChatMessage[]
+  // Live content the user has open on the canvas, gathered by the renderer.
+  attachments?: ChatAttachment[]
+  // Workspace objects the user explicitly referenced for this conversation
+  // (Phase 4). Additive and optional, exactly like pinnedWidgetId before it, so
+  // every surface that does not offer mentions is untouched. Their content is
+  // force-included ahead of retrieved material, and the prompt claims a
+  // reference ONLY when its text genuinely rendered (see chatMentions.ts).
+  mentions?: ChatMentionRef[]
+  // Layer-1 structural index of the whole workspace (ids + titles, no bodies),
+  // gathered by the renderer so the assistant knows what exists and can act on
+  // real items. Optional: absent for callers that don't provide it.
+  workspace?: WorkspaceSnapshot
+  // The calling surface can render a structured follow-up question card. Only
+  // then does the system prompt teach the ask-protocol — chat:send is shared
+  // by surfaces (focus chat, dashboard cards, field editor) that have no card
+  // to render, and a model taught to ask there produces turns that dead-end.
+  supportsQuestions?: boolean
+  // The widget the user clicked-to-pin as this conversation's primary
+  // reference (Phase 3a.1). Additive and optional: surfaces with no pin
+  // affordance never set it. The prompt claims a pin only when the id resolves
+  // to an attachment that genuinely rendered (see chatAttachments).
+  pinnedWidgetId?: string
+}
+
+// A retrieved workspace document the assistant was grounded on. Slimmed from
+// the main process's WorkspaceSource: the renderer needs enough to label, order
+// and open a citation — not the full extracted body that went to the model.
+export interface ChatSource {
+  // 1-based citation number. Matches the [n] markers the model is told to use
+  // inline in its reply, so a marker and its chip always refer to the same doc.
+  n: number
+  docId: string
+  title: string
+  docType: string
+  snippet: string
+}
+
+// One action the assistant prepared, surfaced in the retrieval trace the moment
+// its JSON object completes in the stream — before the whole response lands.
+// Deliberately NOT an ActionProposal: this is read off the raw envelope ahead of
+// sanitisation, so `kind` is whatever the model wrote and the entry is a record
+// of what happened, not a promise that a card will appear.
+export interface ChatToolTrace {
+  // 0-based order of arrival within this response.
+  index: number
+  kind: string
+  // The line the trace draws, e.g. "Email draft → Ryan".
+  label: string
+}
+
+// Fired the moment retrieval returns, carrying what it found and how long it
+// actually took. An empty `sources` array is a real result — it means the
+// workspace had nothing relevant, which the trace shows honestly rather than
+// hiding.
+export interface ChatRetrievalTrace {
+  sources: ChatSource[]
+  elapsedMs: number
+}
+
+// A structured follow-up the assistant asks instead of guessing — rendered as
+// a choice card above the composer. Emitted by the model inside the
+// {reply, question, actions} envelope, and only ever taught to surfaces that
+// declared supportsQuestions on the request. Single-select; answering sends
+// the chosen option (or the user's own words) as a normal user turn.
+export interface ChatQuestion {
+  prompt: string
+  // 2–5 short, mutually exclusive choices.
+  options: string[]
+  // Whether typing in the composer is a valid answer ("Or, describe it…").
+  // False means only the listed options make sense.
+  allowFreeText: boolean
 }
 
 export interface ChatResponse {
@@ -215,6 +544,19 @@ export interface ChatResponse {
   // it WOULD do; the renderer shows each as a confirmable card and only
   // executes those the user accepts. Empty/undefined for plain chat replies.
   proposals?: ActionProposal[]
+  // The workspace material this answer was grounded on. Retrieval already ran on
+  // every message to build the prompt; returning it lets the renderer show what
+  // the answer stands on instead of discarding it.
+  sources?: ChatSource[]
+  // A follow-up question the model asked instead of acting on a guess. Present
+  // only when the model actually emitted one — the renderer must never invent
+  // or show a question the model did not ask.
+  question?: ChatQuestion
+  // What each @-mention on the request actually produced (Phase 4). Present
+  // only when the request carried mentions. This is the sole source of truth
+  // for the trace's "Mentioned" lane and for marking a chip broken — the
+  // renderer may not assume a reference resolved just because it was sent.
+  mentions?: ChatMentionResolved[]
 }
 
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───
@@ -223,6 +565,38 @@ export interface ChatResponse {
 // and a typed payload. The renderer's actionExecutor.ts knows how to apply
 // each kind.
 
+// Where the navigate-to proposal can send the user. Each value maps to a
+// useViewStore go* action in actionExecutor's applyNavigateTo.
+export type NavigateTarget =
+  | 'home'
+  | 'rooms'
+  | 'desks'
+  | 'shared'
+  | 'documents'
+  | 'files'
+  | 'mail'
+  | 'messages'
+  | 'inbox'
+  | 'calendar'
+  | 'meetings'
+  | 'forms'
+  | 'vault'
+  | 'search'
+  | 'reports'
+  | 'insights'
+  | 'org'
+  | 'peoplemap'
+  | 'knowledge'
+  | 'apps'
+  | 'sign'
+  | 'projects'
+  | 'flows'
+  | 'marketplace'
+  | 'design'
+  | 'task'
+  | 'document'
+  | 'product'
+
 export type ActionProposal =
   | {
       id: string
@@ -230,6 +604,21 @@ export type ActionProposal =
       widgetKind: WidgetKind
       title?: string
       content?: string
+      reason?: string
+    }
+  | {
+      // Create a configured desk agent in one step. The applier serialises a
+      // real AgentConfig (see deskAgent.ts) from these fields, so the AI can set
+      // up a working agent from a plain instruction rather than emitting an
+      // opaque agent-widget content blob. trigger/intervalSec default to a
+      // manual, disabled agent so nothing runs until the user turns it on.
+      id: string
+      kind: 'create-agent'
+      title?: string
+      instruction: string
+      profileId?: string
+      trigger?: 'manual' | 'interval' | 'onChange'
+      intervalSec?: number
       reason?: string
     }
   | {
@@ -245,6 +634,18 @@ export type ActionProposal =
       kind: 'open-url'
       url: string
       title?: string
+      reason?: string
+    }
+  | {
+      // System-wide navigation: jump to any area of the app. This is what lets the
+      // voice assistant "open my calendar / go to Files / show the org chart" from
+      // anywhere, regardless of the current context. Distinct from open-url, which
+      // opens an external web page in a canvas webview widget.
+      id: string
+      kind: 'navigate-to'
+      target: NavigateTarget
+      targetId?: string // for target 'desks'(roomId) 'task' 'document' 'knowledge' 'product'
+      label: string
       reason?: string
     }
   | {
@@ -281,6 +682,71 @@ export type ActionProposal =
       label: string
       title?: string
       content?: string
+      // Position / size mutations — all optional. Any field omitted is left
+      // unchanged. Voice commands like "move this to the top right" or "make
+      // it bigger" land here.
+      x?: number
+      y?: number
+      width?: number
+      height?: number
+      // For content updates: replace (default) wipes the existing body,
+      // append/prepend tack the new text onto either end with a leading
+      // space/newline. Lets voice commands like "add 'call dentist' to my
+      // todo list" append without obliterating the existing items.
+      operation?: 'replace' | 'append' | 'prepend'
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'link-widgets'
+      // Source / target are widget ids. The voice interpreter resolves
+      // user-friendly references ("the budget table") into ids before
+      // returning this proposal — Apply just calls widgetLinks.create.
+      sourceWidgetId: string
+      targetWidgetId: string
+      sourceLabel: string
+      targetLabel: string
+      // Optional live-wire semantics. Omitted -> a plain context wire (the old
+      // behaviour). A planner that wires a source INTO an agent, or sets up a
+      // transform, uses these so the wire actually carries the relationship.
+      wireType?: WireType
+      verb?: string
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'focus-widget'
+      widgetId: string
+      label: string
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'toggle-todo-item'
+      // Mark an item in a Markdown / Page widget's task list as done/undone.
+      // The renderer finds the line containing `itemMatch` (substring,
+      // case-insensitive) and flips its `- [ ]` ↔ `- [x]` marker.
+      widgetId: string
+      widgetLabel: string
+      itemMatch: string
+      checked: boolean
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'drill-in-widget'
+      // Opens the widget in FocusMode (single-widget zoomed modal).
+      widgetId: string
+      label: string
+      reason?: string
+    }
+  | {
+      id: string
+      kind: 'arrange-widgets'
+      // Auto-layouts widgets into a tidy grid. When widgetIds is
+      // omitted, applies to every non-pinned widget on the active task.
+      widgetIds?: string[] | null
+      label: string
       reason?: string
     }
   | {
@@ -325,6 +791,122 @@ export type ActionProposal =
       options?: string[]
       reason?: string
     }
+  | {
+      // Update an EXISTING task. taskId is a real node id the model was shown in
+      // its context (see taskBlock). Any of the optional fields, when present,
+      // is applied; omitted fields are left unchanged. This lets the assistant
+      // act on work ("mark the Q3 brief done", "push the due date to Friday")
+      // rather than only creating new things.
+      id: string
+      kind: 'update-task'
+      taskId: string
+      label: string // user-facing description of the task ("Q3 brief")
+      title?: string
+      status?: TaskStatus
+      dueDate?: number | null // unix ms; null clears the date
+      notes?: string // maps to the task description
+      reason?: string
+    }
+  | {
+      // Save a fact, decision, or process into PlexiBrain knowledge. Body must
+      // carry real content from the conversation, never fabricated facts.
+      id: string
+      kind: 'create-knowledge-entry'
+      title: string
+      body: string
+      tags?: string[]
+      pinned?: boolean
+      reason?: string
+    }
+  | {
+      // Create a standalone document in the Documents library: a written doc, a
+      // spreadsheet, a slide deck, a diagram/map, or a design canvas. Used when a
+      // conversation produces a real deliverable that belongs as its own file
+      // rather than a canvas widget.
+      id: string
+      kind: 'create-document'
+      docType: 'doc' | 'sheet' | 'slides' | 'map' | 'design'
+      title: string
+      reason?: string
+    }
+  | {
+      // Generate a POPULATED office surface with AI (a spreadsheet, a
+      // presentation, a diagram / map / mind map, or a written document) and
+      // place it on the desk. When `widgetId` names an existing output widget of
+      // that type, its backing document is regenerated in place instead. The real
+      // body is produced by a second AI call at apply time (documents.generate),
+      // so the agent supplies only intent via `prompt` — never a hand-authored
+      // body for schemas it would get wrong. This is how the desk agent creates
+      // decks, sheets, maps and mind maps, not just plain text.
+      id: string
+      kind: 'generate-document'
+      docType: 'doc' | 'sheet' | 'slides' | 'map'
+      title: string
+      prompt: string
+      widgetId?: string
+      reason?: string
+    }
+  | {
+      // Edit an EXISTING document's content. documentId is a real id from the
+      // documents context block, or "$<proposalId>" referencing a sibling
+      // create-document in the same batch. Defaults to append — the least
+      // destructive operation — when the model omits it; replace is available
+      // but the doc_snapshots history makes even that recoverable.
+      id: string
+      kind: 'edit-document'
+      documentId: string
+      label: string // user-facing description ("the Q3 brief")
+      title?: string
+      body?: string // markdown-ish text; converted to the doc body format
+      operation?: 'replace' | 'append' | 'prepend'
+      reason?: string
+    }
+  | {
+      // Write one or more cells in an EXISTING table row. v1 requires a real
+      // rowId surfaced in the table context (no symbolic row refs — rows
+      // created in the same batch are set via add-table-row's cells instead).
+      // tableId may be real or a "$<proposalId>" create-table reference.
+      id: string
+      kind: 'set-cell'
+      tableId: string
+      rowId: string
+      cells: Record<string, string>
+      reason?: string
+    }
+  | {
+      // Schedule a calendar time block. startMs is absolute unix ms — the
+      // model resolves relative phrases itself using the current-time fact in
+      // its context. Undoable via the shared action history.
+      id: string
+      kind: 'schedule-event'
+      title: string
+      startMs: number
+      durationMinutes: number
+      taskId?: string | null
+      recurrence?: 'daily' | 'weekly' | 'monthly' | null
+      reason?: string
+    }
+  | {
+      // DRAFT ONLY: opens the mail composer pre-filled. There is deliberately
+      // no send field — the human always reviews and sends. Never recorded on
+      // the undo timeline (nothing was mutated).
+      id: string
+      kind: 'compose-mail'
+      to?: string[]
+      subject: string
+      body: string
+      reason?: string
+    }
+  | {
+      // DRAFT ONLY: pre-fills the chat composer for a conversation the model
+      // was shown. Same contract as compose-mail: a human presses send.
+      id: string
+      kind: 'post-chat'
+      conversationId: string
+      conversationLabel?: string
+      body: string
+      reason?: string
+    }
 
 // ── AI model routing ─────────────────────────────────────────────────────────
 // The user picks a mode (Auto / Haiku / Sonnet / Opus). In Auto mode, each AI
@@ -341,16 +923,104 @@ export type AIPurpose =
   | 'body_double'
   | 'smart_stack'
   | 'living_page'
+  | 'wire_transform'
+  | 'desk_agent'
+  | 'command_route'
+  | 'document'
+  | 'doc_rewrite'
+  | 'tone_profile'
+  | 'email_reply_draft'
+  | 'file_tag'
+  | 'meeting_end'
 
-// Inter-widget spatial link. Directed (source → target) — users can draw a
-// reverse link as a separate row to express asymmetric relationships.
-// Rendered as a line on the canvas between the two widget centres.
+// Result of asking AI to draft a reply to an open email in the user's voice.
+// `skip` is the expected, non-error outcome for newsletters / no-reply senders /
+// nothing-to-reply-to. `needsApiKey` distinguishes a missing key from a real
+// failure so the UI can point at Settings instead of showing a scary error.
+export interface EmailReplyDraftResult {
+  ok: boolean
+  reply?: string
+  confidence?: number
+  note?: string
+  skip?: boolean
+  skipReason?: string
+  needsApiKey?: boolean
+  error?: string
+}
+
+// Desk time-travel: metadata for one canvas snapshot (the full widget payload
+// lives in the DB and is fetched on demand).
+// Document version history metadata (payload stays in the main process).
+export interface DocSnapshotMeta {
+  id: string
+  docId: string
+  at: number
+  label: string
+  title: string
+}
+
+export interface SnapshotMeta {
+  id: string
+  taskId: string
+  at: number
+  label: string
+  widgetCount: number
+}
+
+// "Live wire" semantics for an inter-widget link. A dead line becomes a pipe:
+//   context   — passive. The target's AI is told this source is a related
+//               family member (the default; never acts on its own).
+//   transform — reactive. When the SOURCE content changes, an AI call runs the
+//               wire's `verb` over the source and writes the result into the
+//               TARGET.
+//   mirror    — reactive. The SOURCE's content is copied into the TARGET on
+//               change (sync expressed as a connection, no AI).
+export type WireType = 'context' | 'transform' | 'mirror'
+
+// Inter-widget spatial link, now a typed "live wire". Directed (source →
+// target) — users can draw a reverse link as a separate row to express
+// asymmetric relationships. Rendered as a line on the canvas between the two
+// widget centres, with a small badge showing its wire type.
 export interface WidgetLink {
   id: string
   sourceWidgetId: string
   targetWidgetId: string
   taskId: string
   createdAt: number
+  // Live-wire fields. Existing rows default to a passive 'context' wire.
+  type: WireType
+  // Free-text instruction for a 'transform' wire, e.g. "extract action items".
+  verb: string
+  // Kill switch — a disabled reactive wire stays drawn but never fires.
+  enabled: boolean
+  // Durable run state (reactive wires only). lastRunAt is when the engine last
+  // fired this wire (including a checked-but-nothing-to-write no-op), so the
+  // badge can show live / stale / just-ran and it survives a reload. lastError
+  // is the last failure message, cleared on the next successful run.
+  lastRunAt?: number | null
+  lastError?: string | null
+}
+
+// A durable record of one reactive-wire WRITE into a target — captured whenever a
+// transform or mirror wire overwrites a text target's content. It stores the
+// before and after so the user can see exactly what an automation did and revert
+// it in one click (the trust core). Table-target writes are structurally
+// different (row-level) and are not recorded here. Pruned per-wire.
+export interface WireRun {
+  id: string
+  wireId: string
+  taskId: string
+  sourceWidgetId: string
+  targetWidgetId: string
+  // Human label for the source (its title or kind) so the activity list reads in
+  // plain language without a second lookup.
+  sourceLabel: string
+  wireType: WireType
+  // The transform instruction, if any (empty for a mirror copy).
+  verb: string
+  at: number
+  prevContent: string
+  nextContent: string
 }
 
 // Result of a living-page regeneration. ok=true → returns freshly-generated
@@ -437,7 +1107,7 @@ export interface BodyDoubleChatMessage {
 
 // ── Universal sharing (folders / tasks / widgets) ───────────────────────────
 //
-// Any user-owned entity in FocusBuddy can be shared via a token. The token
+// Any user-owned entity in PlexiDesk can be shared via a token. The token
 // resolves to a read-only view (no auth required) or a "collaborator" copy
 // the recipient owns once they sign up. Same data model for folder, task,
 // and widget — the kind field discriminates so consumers pick the right
@@ -449,7 +1119,13 @@ export interface BodyDoubleChatMessage {
 // up so the URL resolves to a hosted viewer; the renderer code path stays
 // identical.
 
-export type ShareableKind = 'folder' | 'task' | 'widget'
+// 'document' / 'docfolder' are the office kinds: a single doc/sheet/slides/map,
+// or a Drive folder of them, shared as a read-only browser-renderable snapshot
+// (and importable when the scope is 'copy'). See DocumentSnapshot / DocFolderSnapshot.
+// 'file' is a raw Drive file (PDF, image, video, arbitrary binary): its metadata
+// rides the snapshot while its bytes are hosted publicly by the share token, so
+// the viewer can preview or download it. See FileSnapshot + the share-blob routes.
+export type ShareableKind = 'folder' | 'task' | 'widget' | 'document' | 'docfolder' | 'file'
 
 // Permission level granted by the share. Two levels in v1 — keeping it
 // simple. "view" = read-only render. "copy" = recipient can sign up and
@@ -481,6 +1157,10 @@ export interface ShareLink {
   // Revoke = soft-delete. The token stops resolving and the share manager
   // shows it as "Revoked" so the owner can audit who they shared with.
   revoked: boolean
+  // Who created the share (a handle), so a recipient view can show "invited by
+  // X" and the growth loop can attribute a sign-up to its inviter. Null when the
+  // sharer was signed out or for shares created before attribution existed.
+  createdBy?: string | null
 }
 
 // Items shared WITH the current user — the "Shared with me" sidebar
@@ -590,6 +1270,7 @@ export interface EnergyLogEntry {
 // ── Dashboard layouts (Phase 6) ──────────────────────────────────────────────
 
 export type DashboardCardKind =
+  | 'daily-brief'
   | 'quick-start'
   | 'stats'
   | 'garden'
@@ -597,11 +1278,50 @@ export type DashboardCardKind =
   | 'recent-activity'
   | 'energy'
   | 'folders'
+  | 'workspace-progress'
+  | 'workspace-health'
+  | 'focus-session'
+  | 'ai-assistant'
+  | 'recent-notes'
+
+// ── Unified dashboard model (dashboard unification, docs/DASHBOARD-UNIFICATION.md)
+// The single card taxonomy that supersedes both the domain-specific
+// DashboardCardKind union above and the declarative ModuleDashboard sections, so
+// one engine renders every surface (Home + every module). Five data-shape kinds
+// plus a `custom` escape hatch for genuinely interactive cards. A card instance
+// carries its config (built live per render from the module's real stores); the
+// engine only lays out and chromes cards, it never fetches data.
+export type PlexiCardKind = 'metric-row' | 'chart' | 'breakdown' | 'list' | 'activity' | 'custom'
+
+// The visual size a portlet occupies on the dashboard. Small/Medium/Large map to
+// grid column-span and a min-height so the choice is a real visual difference.
+export type DashboardCardSize = 'small' | 'medium' | 'large'
+
+// How many columns a dashboard flows its portlets into. Responsive rules may
+// collapse this to 1 on narrow widths, but the stored preference is 1, 2 or 3.
+export type DashboardColumns = 1 | 2 | 3
 
 export interface DashboardLayout {
   dashboardKey: string // 'home' for the master dashboard, or a project node id
   cardIds: DashboardCardKind[]
+  // Column count chosen for this dashboard. Defaults to 2 when a legacy layout
+  // (bare card-id array) is loaded and no column preference was ever saved.
+  columns: DashboardColumns
+  // Per-card size overrides. A card absent from this map renders at its default
+  // ('medium'). Legacy layouts load with an empty map so every card is medium.
+  sizes: Partial<Record<DashboardCardKind, DashboardCardSize>>
   updatedAt: number
+}
+
+// Default column count for a dashboard that has never had a preference saved.
+export const DEFAULT_DASHBOARD_COLUMNS: DashboardColumns = 2
+
+// The payload the renderer sends when persisting a dashboard. Columns and sizes
+// are optional so an old-style card-only save preserves the stored preferences.
+export interface DashboardLayoutInput {
+  cardIds: DashboardCardKind[]
+  columns?: DashboardColumns
+  sizes?: Partial<Record<DashboardCardKind, DashboardCardSize>>
 }
 
 // ── Vault (Phase 7) ──────────────────────────────────────────────────────────
@@ -815,3 +1535,802 @@ export interface TemplateDraft {
   sourceTaskId: string | null
   widgets: TemplateWidget[]
 }
+
+// ── Mail (IMAP) ────────────────────────────────────────────────────────────
+// Shapes shared by the main-process IMAP client, the preload bridge and the
+// renderer mail store. The password is never part of any renderer-facing type.
+
+export interface MailAccountInput {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  password: string
+  email?: string
+}
+
+export interface MailAccountPublic {
+  configured: boolean
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  email?: string
+}
+
+export interface MailListItem {
+  uid: number
+  fromName: string
+  fromAddress: string
+  subject: string
+  date: number
+  seen: boolean
+  flagged: boolean
+  hasAttachments: boolean
+  // RFC 5322 threading headers, used to group the mailbox into conversations.
+  // messageId is this message's Message-ID; inReplyTo and references point at the
+  // ancestors it was a reply to. All may be empty for a message with no headers.
+  messageId: string | null
+  inReplyTo: string | null
+  references: string[]
+}
+
+export interface MailFullMessage {
+  uid: number
+  fromName: string
+  fromAddress: string
+  to: string
+  subject: string
+  date: number
+  text: string
+  html: string | null
+  attachments: { filename: string; size: number; contentType: string }[]
+  // RFC822 Message-ID of this message and the References chain it carried, used
+  // to thread a reply correctly (In-Reply-To + References headers on the way
+  // out). Null when the server/message did not provide them.
+  messageId: string | null
+  references: string[]
+  // Every recipient address on the original (To + Cc), so a "Reply all" can be
+  // pre-populated without re-parsing. Excludes the user's own address at send
+  // time, not here.
+  toAddresses: string[]
+  ccAddresses: string[]
+}
+
+// What the renderer hands the main process to send a message. Sent through the
+// same account the user reads with; the main process derives SMTP from the
+// stored IMAP host and reuses the stored app password.
+export interface MailSendInput {
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
+  subject: string
+  // Plain-text body the user typed. HTML is generated from it on send so the
+  // message has both parts; we do not author raw HTML in the composer.
+  text: string
+  // Threading headers when this is a reply — the original's Message-ID and the
+  // References chain to append it to.
+  inReplyTo?: string | null
+  references?: string[]
+}
+
+export type MailSendResult = { ok: true } | { ok: false; error: string }
+
+// ── Office documents (doc / sheet / slides) ─────────────────────────────────
+// Standalone files created and edited as first-class artifacts. One table, one
+// list, one AI-create flow; the body shape switches on docType.
+
+export type DocType = 'doc' | 'sheet' | 'slides' | 'map' | 'design'
+
+// A single global-search result. `type` decides how the renderer routes a click;
+// `taskId` is the canvas to open for widget / table-row hits, `docType` the
+// document kind. `snippet` is a short, match-centred excerpt for display.
+export interface SearchHit {
+  type:
+    | 'task'
+    | 'folder'
+    | 'widget'
+    | 'document'
+    | 'file'
+    | 'table-row'
+    | 'knowledge'
+    | 'event'
+    | 'meeting'
+    | 'sign'
+    | 'mail'
+  id: string
+  title: string
+  snippet: string
+  score: number
+  taskId?: string | null
+  docType?: DocType
+  widgetKind?: string
+  /** For 'event' hits: the block's start, so the calendar can land on its month. */
+  startMs?: number
+}
+
+// ── Spreadsheet body ────────────────────────────────────────────────────────
+// v1 was a single grid of string cells: { columns, rows }. v2 wraps one or more
+// such grids as named tabs and adds per-cell formatting, column widths, a freeze
+// region and charts. v1 bodies on disk stay valid and are lifted to v2 on open
+// by normalizeBody (src/renderer/src/lib/sheetBody.ts); nothing is rewritten at
+// rest until the user edits. A cell whose value starts with '=' is a formula
+// evaluated at render time; what cannot be computed shows #ERR, never a fake
+// number.
+
+export interface SheetBodyV1 {
+  columns: string[]
+  rows: string[][]
+}
+
+// How a value should be displayed (the engine still stores the true value).
+export type SheetNumberFormat =
+  | { kind: 'general' }
+  | { kind: 'number'; decimals: number; thousands?: boolean }
+  | { kind: 'currency'; decimals: number; symbol: string }
+  | { kind: 'percent'; decimals: number }
+  | { kind: 'date'; pattern: string }
+
+export interface SheetCellFormat {
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  color?: string // text colour, hex
+  bg?: string // fill colour, hex
+  align?: 'left' | 'center' | 'right'
+  fontFamily?: string // CSS font-family (e.g. a Google font)
+  numFmt?: SheetNumberFormat
+}
+
+export interface SheetChartSpec {
+  id: string
+  type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'
+  range: string // e.g. 'A1:C10' on the owning tab
+  title?: string
+  headerRow?: boolean // first row holds series labels
+  headerCol?: boolean // first column holds category labels
+  stacked?: boolean // stack bars/areas instead of grouping
+}
+
+// Conditional formatting — a rule paints cells in its A1 range whose computed
+// value satisfies the condition. Rules apply in order; later matching rules
+// override earlier ones for the same property. The cell's true value is never
+// changed, only how it is shown (mirrors the honesty rule for number formats).
+export type SheetCondOp =
+  | 'gt'
+  | 'lt'
+  | 'ge'
+  | 'le'
+  | 'eq'
+  | 'ne'
+  | 'between'
+  | 'contains'
+  | 'notEmpty'
+  | 'empty'
+
+export interface SheetCondRule {
+  id: string
+  range: string // A1 range on the owning tab, e.g. 'B2:B20'
+  // 'compare' (default) paints cells whose value satisfies op/value. The scale /
+  // bar / icon kinds instead map every numeric cell in the range onto a gradient,
+  // proportional bar, or threshold icon computed from the range's min..max.
+  kind?: 'compare' | 'colorScale' | 'dataBar' | 'iconSet'
+  op: SheetCondOp
+  value?: string // comparison operand (number or text depending on op)
+  value2?: string // upper bound for 'between'
+  bg?: string // fill colour to apply when matched (compare)
+  color?: string // text colour to apply when matched (compare)
+  bold?: boolean
+  // colorScale: 2-colour (min/max) or 3-colour when midColor is set.
+  minColor?: string
+  midColor?: string
+  maxColor?: string
+  // dataBar
+  barColor?: string
+  // iconSet
+  iconSet?: 'arrows' | 'traffic' | 'triangles'
+}
+
+// Data validation — constrains what a cell in its range may contain. 'list'
+// renders an in-cell dropdown; numeric/text rules flag invalid entries. The
+// value is never silently changed; invalid input is marked, not faked.
+export type SheetValidationRule =
+  | { kind: 'list'; values: string[] }
+  | { kind: 'number'; op: 'gt' | 'lt' | 'ge' | 'le' | 'eq' | 'between'; value: number; value2?: number }
+  | { kind: 'textNotEmpty' }
+
+export interface SheetValidation {
+  id: string
+  range: string // A1 range on the owning tab
+  rule: SheetValidationRule
+  strict?: boolean // when true, invalid entries are rejected on commit
+}
+
+// A pivot summary over a source range: group rows by one field, optionally
+// across a second field, aggregating a value field. Computed read-only from the
+// live data (honest: aggregates the real values, never fabricated ones).
+export type SheetPivotAgg = 'sum' | 'count' | 'avg' | 'min' | 'max'
+// A slicer: hide the listed values of a field so the pivot recomputes over the
+// rest. Empty exclude = everything shown.
+export interface SheetPivotFilter {
+  field: number // 0-based column index within the range
+  exclude: string[] // field values currently hidden
+}
+
+export interface SheetPivotSpec {
+  id: string
+  range: string // A1 source range INCLUDING the header row
+  rowField: number // 0-based column index within the range to group rows by
+  colField?: number // optional second field to pivot across columns
+  valueField: number // column index whose values are aggregated
+  agg: SheetPivotAgg
+  title?: string
+  // Interactive slicers — live value filters applied before aggregation.
+  filters?: SheetPivotFilter[]
+}
+
+// A merged cell range, 0-based and inclusive of both corners.
+export interface SheetMerge {
+  r1: number
+  c1: number
+  r2: number
+  c2: number
+}
+
+export interface SheetTab {
+  id: string
+  name: string
+  columns: string[]
+  rows: string[][]
+  // Sparse per-cell formatting keyed "r,c". Absent = general/default.
+  formats?: Record<string, SheetCellFormat>
+  colWidths?: Record<number, number> // px; absent = default
+  rowHeights?: Record<number, number> // px; absent = default (0.75cm)
+  // Merged cell ranges (0-based, inclusive). The top-left cell holds the value;
+  // the covered cells are not rendered (the anchor spans them). Excel stores
+  // merges the same way, so they round-trip through .xlsx.
+  merges?: SheetMerge[]
+  freeze?: { rows: number; cols: number }
+  charts?: SheetChartSpec[]
+  pivots?: SheetPivotSpec[]
+  condRules?: SheetCondRule[]
+  validations?: SheetValidation[]
+  // Column filters: per-column-index the set of displayed values to HIDE. A row
+  // is hidden when any filtered column's displayed value is in its hide-set. The
+  // data is untouched; only which rows render changes.
+  filters?: Record<number, string[]>
+  filterActive?: boolean // funnels shown on the headers (Data > Create a filter)
+  // Outline groups (Data > Group). A collapsed group hides its member rows/cols
+  // below/right of the first, which carries the expand/collapse toggle.
+  rowGroups?: Array<{ start: number; end: number; collapsed: boolean }>
+  colGroups?: Array<{ start: number; end: number; collapsed: boolean }>
+  // Power-Query-class data shaping: a snapshot SOURCE table plus ordered transform
+  // STEPS. The tab's cells are the applied output; Refresh re-applies the steps.
+  // Typed loosely here so shared/types stays free of the renderer query lib.
+  query?: {
+    source: { columns: string[]; rows: string[][] }
+    steps: unknown[]
+  }
+}
+
+export interface SheetBodyV2 {
+  version: 2
+  sheets: SheetTab[]
+  activeSheet?: number
+  // Workbook-level named ranges: a name maps to an A1 reference string such as
+  // "A1", "A1:B10" or "Sheet2!A1:C3". Usable in any formula on any sheet.
+  names?: Array<{ name: string; ref: string }>
+}
+
+export type SheetBody = SheetBodyV1 | SheetBodyV2
+
+// ── Slides body ───────────────────────────────────────────────────────────────
+// v1 slides were fixed title + bullets + notes + layout. v2 models each slide as
+// a set of positioned ELEMENTS (text boxes, images, shapes, lines) in a fixed
+// 1280x720 logical space, plus a deck theme and per-slide transition. v1 decks
+// open unchanged and are converted to elements on load by migrateSlidesBody
+// (src/shared/slidesMigrate.ts); the old title/bullets fields are kept optional
+// so a half-migrated body still renders.
+
+export type SlideLayout =
+  | 'title'
+  | 'title-content'
+  | 'two-content'
+  | 'section'
+  | 'blank'
+  | 'image-caption'
+  // legacy value, mapped to 'title-content' on migration
+  | 'bullets'
+
+export type SlideTransition = 'none' | 'fade' | 'slide' | 'zoom' | 'morph'
+
+// An element entrance animation, played when its slide appears in present mode.
+// `order` staggers multiple animated elements; `durationMs` overrides the default.
+export interface SlideAnim {
+  type: 'fadeIn' | 'slideUp' | 'slideLeft' | 'zoomIn'
+  order?: number
+  durationMs?: number
+}
+
+export interface SlideFill {
+  type: 'solid' | 'none' | 'gradient'
+  color?: string
+  // Gradient end color and angle (degrees). Used when type === 'gradient';
+  // `color` is the start. Absent angle defaults to 135deg.
+  color2?: string
+  angle?: number
+}
+export interface SlideBorder {
+  color: string
+  width: number
+  style?: 'solid' | 'dashed'
+}
+
+// Inline text run inside a text element.
+export interface SlideTextRun {
+  text: string
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  color?: string
+  fontSize?: number
+}
+export interface SlideTextParagraph {
+  runs: SlideTextRun[]
+  align?: 'left' | 'center' | 'right'
+  bulletLevel?: number
+  listStyle?: 'bullet' | 'number' | 'none'
+}
+
+interface SlideElementBase {
+  id: string
+  // Position + size in 1280x720 logical units.
+  x: number
+  y: number
+  w: number
+  h: number
+  z: number
+  rotation?: number
+  // Marks elements that a theme is allowed to restyle (title/body/accent).
+  styleRole?: 'title' | 'body' | 'accent'
+  // Elements sharing a groupId select and move together as one group. Optional,
+  // so legacy decks (no groups) are unaffected and need no migration.
+  groupId?: string
+  // Framing, shared by every element type: rounded corners (logical px) and a
+  // drop-shadow preset. Absent means square corners and no shadow.
+  cornerRadius?: number
+  shadow?: 'sm' | 'md' | 'lg'
+  // Element opacity 0..1. Absent means fully opaque.
+  opacity?: number
+  // Entrance animation played when the slide appears in present mode.
+  anim?: SlideAnim
+}
+export interface SlideTextElement extends SlideElementBase {
+  type: 'text'
+  paragraphs: SlideTextParagraph[]
+  fontFamily?: string
+  fill?: SlideFill
+  border?: SlideBorder
+  vAlign?: 'top' | 'middle' | 'bottom'
+}
+export interface SlideImageElement extends SlideElementBase {
+  type: 'image'
+  src: string // data: URI or file path
+  // Alternative text for screen readers / accessibility checks. Absent = none.
+  alt?: string
+  fit?: 'contain' | 'cover' | 'fill'
+  // Optional frame around the image (in addition to the shared cornerRadius +
+  // shadow on the base).
+  border?: SlideBorder
+  // When true, dragging a resize handle preserves the frame's aspect ratio.
+  lockAspect?: boolean
+  // The image's natural width/height, captured on insert, so aspect-lock and
+  // "fit to image" can use the true ratio rather than the current frame.
+  naturalW?: number
+  naturalH?: number
+  // Crop as inset fractions (0..1) from each edge of the source image. The
+  // remaining window fills the element frame. Absent = the whole image.
+  crop?: { l: number; t: number; r: number; b: number }
+}
+export interface SlideShapeElement extends SlideElementBase {
+  type: 'shape'
+  shape: 'rect' | 'ellipse' | 'roundRect' | 'triangle'
+  fill?: SlideFill
+  border?: SlideBorder
+}
+export interface SlideLineElement extends SlideElementBase {
+  type: 'line'
+  // x/y is the start; x2/y2 the end. w/h are ignored.
+  x2: number
+  y2: number
+  stroke: string
+  strokeWidth: number
+  arrowEnd?: boolean
+}
+// A live embed of a desk widget (by id). The element stores only the reference;
+// the renderer resolves the widget's current content at view time, so the deck
+// or design never carries a stale copy. Static exports (pptx/pdf/png) render a
+// labelled placeholder frame rather than pretending to include live content.
+export interface SlideWidgetElement extends SlideElementBase {
+  type: 'widget'
+  widgetId: string
+}
+// A chart on a slide, rendered through the shared chart core. It carries a data
+// snapshot so the deck is self-contained (present/export never depend on a live
+// fetch). When `source` is set, the editor can refresh the snapshot from that
+// sheet document's range, so a slide chart can track live sheet data.
+export interface SlideChartElement extends SlideElementBase {
+  type: 'chart'
+  chart: ChartCore
+  source?: { sheetDocId: string; range: string; headerRow?: boolean; headerCol?: boolean }
+}
+// A native table: a grid of cell text. The first row is styled as a header when
+// headerRow is set. Column widths are fractions of the element width (they sum to
+// ~1); absent means equal columns.
+export interface SlideTableElement extends SlideElementBase {
+  type: 'table'
+  cells: string[][]
+  headerRow?: boolean
+  fontSize?: number
+  accent?: string // header fill / border tint
+}
+export type SlideElement =
+  | SlideTextElement
+  | SlideImageElement
+  | SlideShapeElement
+  | SlideLineElement
+  | SlideWidgetElement
+  | SlideChartElement
+  | SlideTableElement
+
+export interface DeckTheme {
+  id: string
+  name: string
+  background: string
+  fontHeading: string
+  fontBody: string
+  accent: string
+  textColor: string
+  titleStyle: { fontSize: number; bold?: boolean; color?: string }
+  bodyStyle: { fontSize: number; color?: string }
+}
+
+// One slide. v1 fields (title/bullets/layout) are optional and retained for
+// backward-compatible reads; v2 rendering uses `elements`.
+export interface Slide {
+  id: string
+  notes: string
+  title?: string
+  bullets?: string[]
+  layout?: SlideLayout
+  elements?: SlideElement[]
+  transition?: SlideTransition
+  background?: SlideFill
+  schemaVersion?: 2
+}
+
+export interface SlidesBody {
+  slides: Slide[]
+  theme?: DeckTheme | string
+  schemaVersion?: 2
+  size?: { w: number; h: number }
+}
+
+// A 'doc' body is a Tiptap document JSON (the same shape PageWidget stores);
+// it is opaque to everything except the editor, so it is typed loosely here.
+export type DocBody = { type: 'doc'; content?: unknown[] } | Record<string, unknown>
+
+// ── PlexiMaps (the 'map' document type) ─────────────────────────────────────
+// A node-and-edge diagram / workflow map (flowcharts, process maps, org charts,
+// mind maps). The body is a clean, tool-agnostic graph: nodes carry their own
+// position + shape + colour, edges carry an optional label and line style. The
+// editor (MapEditor) renders this on React Flow; the shape stays independent of
+// React Flow so it can sync to the cloud and later export cleanly.
+export type MapShape =
+  | 'process' // rectangle — a step / action
+  | 'decision' // diamond — a branch / yes-no
+  | 'terminator' // pill — start / end
+  | 'data' // parallelogram — input / output
+  | 'database' // cylinder — a store
+  | 'circle' // connector / state
+  | 'note' // free text label
+  | 'hexagon' // preparation / predefined step
+  | 'trapezoid' // manual operation
+  | 'chevron' // process-flow arrow / stage
+  | 'triangle' // basic triangle
+  | 'pentagon' // basic pentagon
+  | 'star' // highlight / callout marker
+  | 'cross' // junction / plus
+  | 'arrow' // right block arrow
+  | 'callout' // speech / annotation bubble
+  | 'lane' // swimlane / container band that groups shapes placed on top of it
+  | 'widget' // live embed of a desk widget (widgetId on the node)
+
+export interface MapNode {
+  id: string
+  x: number
+  y: number
+  label: string
+  shape: MapShape
+  color: string
+  width?: number
+  height?: number
+  // Only meaningful when shape === 'widget': the desk widget this node embeds.
+  // The renderer resolves the widget live; a dangling id renders a missing state.
+  widgetId?: string
+}
+
+export interface MapEdge {
+  id: string
+  source: string
+  target: string
+  label?: string
+  sourceHandle?: string | null
+  targetHandle?: string | null
+  style?: 'solid' | 'dashed'
+  animated?: boolean
+}
+
+export interface MapBody {
+  version: 1
+  nodes: MapNode[]
+  edges: MapEdge[]
+  viewport?: { x: number; y: number; zoom: number }
+}
+
+// The full document, body included.
+export interface FbDocument {
+  id: string
+  docType: DocType
+  title: string
+  body: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
+  archived: boolean
+  createdAt: number
+  updatedAt: number
+  // Owning scope: 'personal' (or null, treated as personal) for a private doc, or
+  // a real org id for an org-shared doc. Drives whether opening it routes into the
+  // CRDT co-editing path (org-shared) instead of the last-write-wins editor.
+  orgId: string | null
+}
+
+// List row — everything except the (potentially large) body.
+export interface DocumentMeta {
+  id: string
+  docType: DocType
+  title: string
+  archived: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface DocumentDraft {
+  docType: DocType
+  title: string
+  body?: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
+}
+
+export interface DocumentPatch {
+  title?: string
+  body?: DocBody | SheetBody | SlidesBody | MapBody | DesignBody
+  archived?: boolean
+}
+
+// ── Focus Mode: split view + clusters (ported from Caleb's handoff) ──────────
+// Session-local split geometry + persisted per-desk clusters. See splitGeometry.ts
+// for the deterministic geometry and focusSplit/focusClusters stores for state.
+export type PaneSource =
+  | { kind: 'widget'; widgetId: string }
+  | { kind: 'chrome'; tab: 'add' | 'chat' }
+  | { kind: 'meet'; roomId: string } // reserved for PlexiMeet — placeholder render in v1
+
+export type SplitShape = 'single' | 'halves' | 'left-2stack' | 'quad'
+export type PaneCell = 'C0' | 'L' | 'R' | 'R1' | 'R2' | 'Q1' | 'Q2' | 'Q3' | 'Q4'
+
+export interface Pane {
+  id: string
+  cell: PaneCell
+  source: PaneSource
+}
+
+export interface SplitRatios {
+  x?: number
+  yRight?: number
+  yQuad?: number
+}
+
+export interface SplitState {
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  activePaneId: string
+}
+
+export interface FocusSavedView {
+  id: string
+  name: string
+  deskId: string | null
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FocusCluster {
+  id: string
+  taskId: string
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  activePaneId: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FocusClusterDraft {
+  id?: string
+  taskId: string
+  shape: SplitShape
+  panes: Pane[]
+  ratios: SplitRatios
+  activePaneId: string
+}
+
+// ── Persisted AI-chat history (local, free-standing conversations) ──────────
+// Ported from Caleb's Focus-Mode branch. Backs the aiChat DB module + the
+// Focus-Mode chat surface. ActionProposal / ChatRole already exist on this line.
+// Where a conversation was started (Phase 4.5). Before unification the
+// assistant re-threaded per screen, so "which screen" WAS the conversation;
+// after it, a conversation remembers its origin and keeps it while you walk
+// away (plan D4). Null on conversations written before unification — they
+// genuinely do not know, and the UI says nothing rather than guessing.
+export interface AiChatConversationContext {
+  kind: string
+  label: string
+  title: string
+  icon: string
+}
+
+// The retrieval trace as persisted. Deliberately NOT the live AssistantTrace:
+// the renderer clock stamps that drive the progressive reveal describe one
+// session's animation, not a durable fact. What survives is what the assistant
+// actually did.
+export interface StoredTrace {
+  sources: ChatSource[]
+  tools: ChatToolTrace[]
+  mentions: ChatMentionResolved[]
+  retrievalMs: number | null
+  error: string | null
+}
+
+export interface AiChatConversationMeta {
+  id: string
+  taskId: string | null
+  title: string
+  createdAt: number
+  updatedAt: number
+  context?: AiChatConversationContext | null
+  // Number of messages — for the history list preview. Populated by the list
+  // query; not stored on the row.
+  messageCount?: number
+  // First user line, for the history list preview.
+  preview?: string
+}
+// A persisted message: the ChatMessage plus its proposals + applied-state, so an
+// assistant turn restores with its green "done" cards intact.
+export interface AiChatStoredMessage {
+  id: string
+  role: ChatRole
+  content: string
+  ts: number
+  // Proposals attached to an assistant turn (empty for user/plain turns).
+  proposals: ActionProposal[]
+  // Approved-card state keyed by proposal id.
+  applied: Record<string, AppliedProposal>
+  // Phase 4.5 — what the panel always showed and persistence used to drop.
+  // Citations this answer stands on.
+  sources: ChatSource[]
+  // The follow-up the model asked on this turn, if it asked one.
+  question: ChatQuestion | null
+  // What the assistant actually did to produce this turn.
+  trace: StoredTrace | null
+  // The references the USER's turn was sent with, so the transcript can redraw
+  // its chips exactly where they were typed.
+  mentions: ChatMentionRef[]
+}
+export interface AiChatConversation {
+  meta: AiChatConversationMeta
+  messages: AiChatStoredMessage[]
+}
+
+// ── Applied action state (approved cards persist in the thread) ─────────────
+// When the user approves an action card it does NOT vanish — it turns green
+// (done) and stays as a durable record, optionally with a "Go to" that jumps to
+// what it made. This is the applied-state we track per proposal id.
+export interface GoToTarget {
+  // What the approved action produced/affected, so "Go to" knows where to jump.
+  kind: 'widget' | 'task' | 'document'
+  id: string
+  // A short label for the target (used in the "Go to" affordance tooltip).
+  label?: string
+}
+export interface AppliedProposal {
+  // The success message from the executor ("Created task …").
+  message: string
+  // Where "Go to" navigates, or null when the action has no navigable target
+  // (e.g. a draft email, an arrange, a focus-session).
+  target: GoToTarget | null
+  // When it was applied (ms). For ordering / future persistence.
+  appliedAt: number
+}
+
+// ── Workspace snapshot (Layer-1 structural index for the assistant) ─────────
+// Ported from Caleb's Focus-Mode branch. A bounded ids+titles map of the whole
+// workspace so the AI knows what exists and can reference/act on real items by
+// id; heavy content is pulled on demand later, keyed on the ids surfaced here.
+export interface WorkspaceDeskSummary {
+  id: string
+  title: string
+  // Task ids belonging to this desk (top-level folder), for the tree shape.
+  taskIds: string[]
+}
+export interface WorkspaceTaskSummary {
+  id: string
+  title: string
+  status: TaskStatus
+  deskId: string | null
+  // Whether this is the task currently open on the desk.
+  active: boolean
+}
+export interface WorkspaceWidgetSummary {
+  id: string
+  taskId: string
+  kind: WidgetKind
+  title: string
+}
+export interface WorkspaceDocumentSummary {
+  id: string
+  docType: DocType
+  title: string
+}
+export interface WorkspaceSnapshot {
+  // The task currently focused on the desk, for "this" references.
+  activeTaskId: string | null
+  desks: WorkspaceDeskSummary[]
+  tasks: WorkspaceTaskSummary[]
+  widgets: WorkspaceWidgetSummary[]
+  documents: WorkspaceDocumentSummary[]
+  // Bookkeeping so a bounded snapshot can honestly say when it was capped.
+  truncated?: boolean
+}
+
+// ── Chat blocks (the typed-block thread) ────────────────────────────────────
+// The agentic chat renders each assistant turn as an ordered list of typed
+// blocks rather than one lump of markdown. Today two block kinds are populated
+// from real data — 'text' (the reply markdown) and 'action' (one per
+// ActionProposal, reusing the existing apply pipeline). The remaining kinds are
+// declared now so the union + renderer registry are stable; they render only
+// when a real data source populates them.
+export type ChatBlock =
+  | { kind: 'text'; markdown: string }
+  | { kind: 'action'; proposal: ActionProposal }
+  | {
+      kind: 'record-table'
+      title?: string
+      columns: string[]
+      rows: Array<{ id?: string; cells: string[] }>
+    }
+  | {
+      kind: 'chart'
+      title?: string
+      chartType: 'bar' | 'line' | 'area' | 'pie' | 'kpi'
+      tableId?: string
+      series?: Array<{ label: string; value: number }>
+    }
+  | { kind: 'widget-card'; widgetId?: string; documentId?: string; title: string; widgetKind?: WidgetKind }
+  | { kind: 'link'; href: string; label: string; external?: boolean }
+  | { kind: 'connector-action'; connector: string; label: string; proposal: ActionProposal }
+  // What the answer was grounded on. Rendered as a row of numbered chips under
+  // the reply, matching the [n] markers inside it.
+  | { kind: 'mentions'; mentions: ChatMentionResolved[] }
+  | { kind: 'sources'; sources: ChatSource[] }

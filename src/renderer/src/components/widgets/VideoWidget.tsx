@@ -42,9 +42,9 @@ export default function VideoWidget({ widget, inline = false }: Props): JSX.Elem
             e.preventDefault()
             commit()
           }}
-          className="w-full h-full flex flex-col justify-center gap-2 p-4 bg-white"
+          className="w-full h-full flex flex-col justify-center gap-2 p-4 bg-[var(--surface-raised)]"
         >
-          <label className="text-xs uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+          <label className="text-xs uppercase tracking-wider text-[var(--ink-50)] flex items-center gap-1.5">
             <Icon name="movie" size={16} />
             Video URL
           </label>
@@ -53,7 +53,7 @@ export default function VideoWidget({ widget, inline = false }: Props): JSX.Elem
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="https://…/video.mp4"
-            className="bg-white border border-stone-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-stone-700 focus:ring-2 focus:ring-stone-200"
+            className="bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
           />
           <div className="flex justify-end pt-1">
             <button type="submit" className="btn-primary">
@@ -75,7 +75,7 @@ export default function VideoWidget({ widget, inline = false }: Props): JSX.Elem
               setEditing(true)
             }}
             title="Change URL"
-            className="absolute top-1 right-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700 z-10"
+            className="absolute top-1 right-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] z-10"
           >
             <Icon name="edit" size={11} />
             <span>edit</span>

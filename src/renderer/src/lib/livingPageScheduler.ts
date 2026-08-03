@@ -36,7 +36,12 @@ const lastRunAt = new Map<string, number>()
 const lastSourceSig = new Map<string, string>()
 
 function isLivingPage(w: Widget): boolean {
-  return w.kind === 'page' && w.livingQuery !== null && w.livingQuery !== undefined
+  // Both a living Page and the dedicated Living Doc widget auto-regenerate.
+  return (
+    (w.kind === 'page' || w.kind === 'living-doc') &&
+    w.livingQuery !== null &&
+    w.livingQuery !== undefined
+  )
 }
 
 function sourceSignature(widgets: Widget[]): string {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { confirmDialog } from '../plexi/PromptDialog'
 import type { VaultEntryStored, VaultSecret } from '@shared/types'
 import { useVaultStore } from '../../stores/vault'
 import { generateTotp, looksLikeTotpSecret } from '../../lib/totp'
@@ -23,7 +24,7 @@ export default function VaultView(): JSX.Element {
   if (initStatus !== 'ready' || meta === null) {
     return (
       <div className="h-full flex items-center justify-center desk-paper no-tod">
-        <Icon name="lock" size={28} className="text-stone-400 dark:text-stone-500 animate-pulse" />
+        <Icon name="lock" size={28} className="text-[var(--ink-40)] animate-pulse" />
       </div>
     )
   }
@@ -31,25 +32,41 @@ export default function VaultView(): JSX.Element {
   if (!meta.exists) return <CreateVaultPanel />
   if (!unlocked) return <UnlockVaultPanel />
 
+  return <UnlockedVaultView onLock={lock} />
+}
+
+// ── Unlocked view shell — header (lock + change password) and the entry list ──
+
+function UnlockedVaultView({ onLock }: { onLock: () => Promise<void> }): JSX.Element {
+  const [changingPassword, setChangingPassword] = useState(false)
+
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
         <header className="flex items-center gap-3">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
+          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
             <Icon name="lock_open" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
+            <h1 className="text-xl font-semibold text-[var(--ink-100)]">
               Vault
             </h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400">
+            <p className="text-[12px] text-[var(--ink-50)]">
               Encrypted at rest with your master password. Stays on this device.
             </p>
           </div>
           <button
+            onClick={() => setChangingPassword(true)}
+            className="btn-ghost"
+            title="Change your master password — re-encrypts every entry under the new key"
+          >
+            <Icon name="password" size={14} />
+            <span>Change password</span>
+          </button>
+          <button
             onClick={() => {
               chimeOut()
-              void lock()
+              void onLock()
             }}
             className="btn-ghost"
             title="Lock vault (clears the master key from memory)"
@@ -61,6 +78,10 @@ export default function VaultView(): JSX.Element {
 
         <UnlockedVault />
       </div>
+
+      {changingPassword && (
+        <ChangeMasterPasswordDialog onClose={() => setChangingPassword(false)} />
+      )}
     </div>
   )
 }
@@ -97,13 +118,13 @@ function CreateVaultPanel(): JSX.Element {
 
   return (
     <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
-      <div className="w-full max-w-md bg-white/85 dark:bg-stone-900/85 backdrop-blur border border-stone-200 dark:border-stone-700 rounded-2xl p-6 shadow-xl">
+      <div className="w-full max-w-md bg-white/85 dark:bg-stone-900/85 backdrop-blur border border-[var(--edge-soft)] rounded-2xl p-6 shadow-xl">
         <div className="text-center mb-5">
           <Icon name="enhanced_encryption" size={32} className="text-accent mx-auto mb-2" />
-          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100">
+          <h1 className="text-lg font-semibold text-[var(--ink-100)]">
             Set up your vault
           </h1>
-          <p className="text-[12px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
+          <p className="text-[12px] text-[var(--ink-50)] mt-1 leading-relaxed">
             Your credentials are encrypted with this master password using AES-256-GCM,
             derived via PBKDF2-SHA256 (600k iterations). The password is never stored —
             if you lose it, the vault is unrecoverable.
@@ -111,7 +132,7 @@ function CreateVaultPanel(): JSX.Element {
         </div>
 
         <label className="block mb-3">
-          <span className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+          <span className="text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
             Master password
           </span>
           <input
@@ -121,11 +142,11 @@ function CreateVaultPanel(): JSX.Element {
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
             placeholder="At least 8 characters"
-            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
           />
         </label>
         <label className="block mb-4">
-          <span className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium">
+          <span className="text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
             Confirm
           </span>
           <input
@@ -133,7 +154,7 @@ function CreateVaultPanel(): JSX.Element {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
-            className="mt-1 w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
           />
         </label>
 
@@ -152,7 +173,7 @@ function CreateVaultPanel(): JSX.Element {
           <span>{busy ? 'Creating…' : 'Create vault'}</span>
         </button>
 
-        <p className="mt-4 text-[10px] text-stone-500 dark:text-stone-500 text-center leading-relaxed">
+        <p className="mt-4 text-[10px] text-[var(--ink-50)] text-center leading-relaxed">
           Tip: use a passphrase you can remember without writing down. No recovery exists.
         </p>
       </div>
@@ -183,10 +204,10 @@ function UnlockVaultPanel(): JSX.Element {
 
   return (
     <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
-      <div className="w-full max-w-sm bg-white/85 dark:bg-stone-900/85 backdrop-blur border border-stone-200 dark:border-stone-700 rounded-2xl p-6 shadow-xl">
+      <div className="w-full max-w-sm bg-white/85 dark:bg-stone-900/85 backdrop-blur border border-[var(--edge-soft)] rounded-2xl p-6 shadow-xl">
         <div className="text-center mb-5">
           <Icon name="lock" size={28} className="text-accent mx-auto mb-2" />
-          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100">
+          <h1 className="text-lg font-semibold text-[var(--ink-100)]">
             Unlock vault
           </h1>
         </div>
@@ -197,7 +218,7 @@ function UnlockVaultPanel(): JSX.Element {
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void submit()}
           placeholder="Master password"
-          className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+          className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
         />
         {error && (
           <div className="mt-3 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/40 rounded p-2">
@@ -240,14 +261,14 @@ function UnlockedVault(): JSX.Element {
           <Icon
             name="search"
             size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-40)]"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search entries…"
-            className="w-full bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 rounded-md pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+            className="w-full bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] rounded-md pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
           />
         </div>
         <button onClick={() => setAdding(true)} className="btn-primary shrink-0">
@@ -257,13 +278,13 @@ function UnlockedVault(): JSX.Element {
       </div>
 
       {entries.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-8 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--edge-firm)] p-8 text-center">
           <Icon
             name="enhanced_encryption"
             size={28}
-            className="text-stone-400 dark:text-stone-500 mx-auto mb-2"
+            className="text-[var(--ink-40)] mx-auto mb-2"
           />
-          <p className="text-sm text-stone-600 dark:text-stone-300 mb-3">
+          <p className="text-sm text-[var(--ink-70)] mb-3">
             Your vault is empty. Add your first credential to start.
           </p>
           <button onClick={() => setAdding(true)} className="btn-primary mx-auto">
@@ -272,8 +293,8 @@ function UnlockedVault(): JSX.Element {
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur overflow-hidden">
-          <ul className="divide-y divide-stone-100 dark:divide-stone-800">
+        <div className="rounded-xl border border-[var(--edge-soft)] bg-white/85 dark:bg-stone-900/85 backdrop-blur overflow-hidden">
+          <ul className="divide-y divide-[var(--edge-soft)]">
             {filtered.map((e) => (
               <EntryRow key={e.id} entry={e} onRemove={() => void removeEntry(e.id)} />
             ))}
@@ -384,16 +405,16 @@ function EntryRow({
   }
 
   return (
-    <li className="px-4 py-3 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
+    <li className="px-4 py-3 hover:bg-[var(--surface-sunken)] transition-colors">
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-md bg-stone-100 dark:bg-stone-800 inline-flex items-center justify-center shrink-0">
-          <Icon name="key" size={16} className="text-stone-500 dark:text-stone-400" />
+        <div className="h-9 w-9 rounded-md bg-[var(--surface-sunken)] inline-flex items-center justify-center shrink-0">
+          <Icon name="key" size={16} className="text-[var(--ink-50)]" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">
+          <div className="text-sm font-medium text-[var(--ink-100)] truncate">
             {entry.title}
           </div>
-          <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+          <div className="text-[11px] text-[var(--ink-50)] truncate">
             {entry.username || hostnameOf(entry.url) || '—'}
           </div>
         </div>
@@ -430,9 +451,16 @@ function EntryRow({
           </button>
           <button
             onClick={() => {
-              if (confirm(`Delete "${entry.title}"? This can't be undone.`)) {
-                onRemove()
-              }
+              // No undo here on purpose: reversing would keep the decrypted
+              // secret alive inside an undo closure. Confirm, honestly worded.
+              void confirmDialog({
+                title: `Delete "${entry.title}"?`,
+                body: 'Vault entries are gone for good once deleted. This cannot be undone.',
+                confirmLabel: 'Delete forever',
+                danger: true
+              }).then((ok) => {
+                if (ok) onRemove()
+              })
             }}
             className="icon-btn hover:!text-red-700"
             title="Delete"
@@ -449,19 +477,19 @@ function EntryRow({
           {secret.password && <Field label="password" value={secret.password} mono mask />}
           {secret.totp && totpCode && (
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 w-20 shrink-0">
+              <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] w-20 shrink-0">
                 totp
               </span>
               <span className="font-mono text-base tabular-nums text-accent">
                 {totpCode.code.slice(0, 3)} {totpCode.code.slice(3)}
               </span>
-              <div className="flex-1 h-1 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden max-w-[100px]">
+              <div className="flex-1 h-1 rounded-full bg-[var(--surface-sunken)] overflow-hidden max-w-[100px]">
                 <div
                   className="h-full bg-accent transition-all"
                   style={{ width: `${(totpCode.remainingSec / 30) * 100}%` }}
                 />
               </div>
-              <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400">
+              <span className="text-[10px] font-mono text-[var(--ink-50)]">
                 {totpCode.remainingSec}s
               </span>
             </div>
@@ -494,15 +522,154 @@ function Field({
 }): JSX.Element {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 w-20 shrink-0">
+      <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] w-20 shrink-0">
         {label}
       </span>
       <span
-        className={`text-stone-800 dark:text-stone-200 truncate ${mono ? 'font-mono' : ''}`}
+        className={`text-[var(--ink-90)] truncate ${mono ? 'font-mono' : ''}`}
         style={mask ? { letterSpacing: '0.04em' } : undefined}
       >
         {value}
       </span>
+    </div>
+  )
+}
+
+// ── Change master password dialog ────────────────────────────────────────────
+
+function ChangeMasterPasswordDialog({ onClose }: { onClose: () => void }): JSX.Element {
+  const changeMasterPassword = useVaultStore((s) => s.changeMasterPassword)
+  const entryCount = useVaultStore((s) => s.entries.length)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function submit(): Promise<void> {
+    if (busy) return
+    setError(null)
+    if (!current) {
+      setError('Enter your current master password.')
+      return
+    }
+    if (next.length < 8) {
+      setError('New master password must be at least 8 characters.')
+      return
+    }
+    if (next !== confirm) {
+      setError('New passwords don\'t match.')
+      return
+    }
+    if (next === current) {
+      setError('The new password is the same as the current one.')
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await changeMasterPassword(current, next)
+      if (!r.ok) {
+        setError(r.error)
+        return
+      }
+      chimeIn()
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[180] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col"
+      >
+        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <Icon name="password" size={18} className="text-accent" />
+            <h3 className="text-base font-semibold text-[var(--ink-100)]">
+              Change master password
+            </h3>
+          </div>
+          <button onClick={onClose} className="icon-btn">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-[12px] text-[var(--ink-50)] leading-relaxed">
+            This re-encrypts {entryCount === 1 ? 'your 1 entry' : `all ${entryCount} entries`} under
+            a new key. There is no recovery if you forget the new password.
+          </p>
+          <PasswordInput label="Current password" value={current} onChange={setCurrent} autoFocus />
+          <PasswordInput label="New password" value={next} onChange={setNext} placeholder="At least 8 characters" />
+          <PasswordInput label="Confirm new password" value={confirm} onChange={setConfirm} onEnter={submit} />
+          {error && (
+            <div className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/40 rounded p-2">
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex justify-end gap-2">
+          <button onClick={onClose} className="btn-ghost">
+            Cancel
+          </button>
+          <button
+            onClick={() => void submit()}
+            disabled={busy || !current || !next || !confirm}
+            className="btn-primary"
+          >
+            <Icon name="password" size={14} />
+            <span>{busy ? 'Re-encrypting…' : 'Change password'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PasswordInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+  onEnter
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  autoFocus?: boolean
+  onEnter?: () => void
+}): JSX.Element {
+  return (
+    <div>
+      <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
+        {label}
+      </label>
+      <input
+        type="password"
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onEnter) void onEnter()
+        }}
+        placeholder={placeholder}
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+      />
     </div>
   )
 }
@@ -568,12 +735,12 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-stone-900 w-full max-w-md mx-4 rounded-lg shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden flex flex-col max-h-[85vh]"
+        className="bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col max-h-[85vh]"
       >
-        <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
             <Icon name="key" size={18} className="text-accent" />
-            <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            <h3 className="text-base font-semibold text-[var(--ink-100)]">
               New entry
             </h3>
           </div>
@@ -586,7 +753,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
           <Input label="URL (optional)" value={url} onChange={setUrl} placeholder="https://…" />
           <Input label="Username / email" value={username} onChange={setUsername} />
           <div>
-            <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+            <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
               Password
             </label>
             <div className="relative">
@@ -594,7 +761,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
                 type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 pr-9 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700"
+                className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 pr-9 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
               />
               <button
                 type="button"
@@ -613,14 +780,14 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
             mono
           />
           <div>
-            <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+            <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
               Notes (optional)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700 resize-none"
+              className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)] resize-none"
             />
           </div>
           {error && (
@@ -629,7 +796,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
             </div>
           )}
         </div>
-        <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 flex justify-end gap-2">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex justify-end gap-2">
           <button onClick={onClose} className="btn-ghost">
             Cancel
           </button>
@@ -664,7 +831,7 @@ function Input({
 }): JSX.Element {
   return (
     <div>
-      <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-medium mb-1.5">
+      <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium mb-1.5">
         {label}
       </label>
       <input
@@ -673,7 +840,7 @@ function Input({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-stone-700 dark:focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:focus:ring-stone-700 ${
+        className={`w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)] ${
           mono ? 'font-mono text-xs' : ''
         }`}
       />

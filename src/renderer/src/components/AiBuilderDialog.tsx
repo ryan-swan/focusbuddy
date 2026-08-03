@@ -10,6 +10,11 @@ interface Props {
   // Called when the user clicks "Add selected" — the picked subset is
   // returned. Caller spawns the widgets on the canvas (Canvas owns layout).
   onAccept: (selected: AiBuildSuggestion[]) => Promise<void>
+  // When the Ask AI command bar has already prepared suggestions, it opens this
+  // dialog preloaded with them so the user goes straight to the preview/pick
+  // step instead of re-typing a prompt.
+  initialSuggestions?: AiBuildSuggestion[]
+  initialIntent?: string
 }
 
 type State =
@@ -26,9 +31,24 @@ type State =
 // Layout: split. Left side = the prompt input (top) + intent summary; right
 // side = scrollable suggestion cards with checkboxes. Bottom action bar with
 // "Generate again" and "Add selected".
-export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): JSX.Element {
+export default function AiBuilderDialog({
+  taskId,
+  onClose,
+  onAccept,
+  initialSuggestions,
+  initialIntent
+}: Props): JSX.Element {
   const [prompt, setPrompt] = useState('')
-  const [state, setState] = useState<State>({ stage: 'prompt' })
+  const [state, setState] = useState<State>(
+    initialSuggestions && initialSuggestions.length > 0
+      ? {
+          stage: 'ready',
+          intent: initialIntent ?? '',
+          suggestions: initialSuggestions,
+          selected: new Set(initialSuggestions.map((s) => s.id))
+        }
+      : { stage: 'prompt' }
+  )
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   // Magnetic refs for primary actions — the generate + apply buttons feel
   // like they're pulled toward your cursor as you approach them.
@@ -103,9 +123,9 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
         className="fb-glass-pillow w-full max-w-3xl mx-4 rounded-[20px] overflow-hidden flex flex-col max-h-[90vh] fb-spring-soft"
       >
         {/* Header */}
-        <div className="px-5 py-3 border-b border-stone-200 dark:border-stone-700 flex items-center gap-2 shrink-0">
+        <div className="px-5 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2 shrink-0">
           <Icon name="auto_awesome" size={18} className="text-accent" />
-          <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100 flex-1">
+          <h3 className="text-base font-semibold text-[var(--ink-100)] flex-1">
             Build with AI
           </h3>
           <button onClick={onClose} className="icon-btn" aria-label="Close">
@@ -114,8 +134,8 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
         </div>
 
         {/* Prompt input */}
-        <div className="px-5 py-3 border-b border-stone-200 dark:border-stone-700 shrink-0">
-          <label className="block text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1.5">
+        <div className="px-5 py-3 border-b border-[var(--edge-soft)] shrink-0">
+          <label className="block text-[11px] uppercase tracking-wider text-[var(--ink-50)] mb-1.5">
             Describe what you want to achieve
           </label>
           <textarea
@@ -130,10 +150,10 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
             }}
             placeholder="e.g. Track my freelance clients with status and contact info, plus a notes page for each project"
             rows={3}
-            className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-md px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-accent resize-none"
+            className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-accent resize-none"
           />
           <div className="flex items-center justify-between mt-2">
-            <span className="text-[10px] text-stone-400">
+            <span className="text-[10px] text-[var(--ink-40)]">
               Cmd+Enter to generate · Esc to close
             </span>
             <button
@@ -161,9 +181,9 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
               <Icon
                 name="auto_awesome"
                 size={28}
-                className="text-stone-300 dark:text-stone-600 mx-auto mb-2"
+                className="text-[var(--ink-30)] mx-auto mb-2"
               />
-              <p className="text-[12px] text-stone-500 dark:text-stone-400 max-w-md mx-auto leading-relaxed">
+              <p className="text-[12px] text-[var(--ink-50)] max-w-md mx-auto leading-relaxed">
                 Describe what you're trying to do. The AI will suggest pages, tables,
                 fields, and other widgets — pre-configured with the right columns,
                 sections, and starter content. Pick what you want and it lands on
@@ -180,7 +200,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
                   <button
                     key={example}
                     onClick={() => setPrompt(example)}
-                    className="text-[10px] px-2 py-1 rounded border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800"
+                    className="text-[10px] px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                   >
                     {example}
                   </button>
@@ -192,20 +212,19 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
           {state.stage === 'thinking' && (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <Icon name="auto_awesome" size={24} className="text-accent animate-pulse" />
-              <span className="text-[12px] text-stone-500">Designing your workspace…</span>
+              <span className="text-[12px] text-[var(--ink-50)]">Designing your workspace…</span>
             </div>
           )}
 
           {state.stage === 'error' && (
             <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
               <Icon name="error_outline" size={24} className="text-amber-500" />
-              <p className="text-[13px] text-stone-700 dark:text-stone-200">
+              <p className="text-[13px] text-[var(--ink-70)]">
                 {state.message}
               </p>
               {state.needsApiKey && (
-                <p className="text-[11px] text-stone-500 dark:text-stone-400 max-w-md">
-                  Add <code className="font-mono">ANTHROPIC_API_KEY</code> to your
-                  .env file and restart FocusBuddy.
+                <p className="text-[11px] text-[var(--ink-50)] max-w-md">
+                  Open <strong>Settings → AI · API keys</strong> and paste your Anthropic API key. No restart needed.
                 </p>
               )}
             </div>
@@ -218,7 +237,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
                   <div className="text-[10px] uppercase tracking-wider text-accent mb-0.5">
                     What I heard
                   </div>
-                  <div className="text-[12px] text-stone-700 dark:text-stone-200">
+                  <div className="text-[12px] text-[var(--ink-70)]">
                     {state.intent}
                   </div>
                 </div>
@@ -239,21 +258,21 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
           {state.stage === 'spawning' && (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <Icon name="auto_awesome" size={24} className="text-accent animate-pulse" />
-              <span className="text-[12px] text-stone-500">Placing widgets…</span>
+              <span className="text-[12px] text-[var(--ink-50)]">Placing widgets…</span>
             </div>
           )}
         </div>
 
         {/* Footer */}
         {state.stage === 'ready' && (
-          <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-700 flex items-center justify-between shrink-0">
-            <span className="text-[11px] text-stone-500 dark:text-stone-400">
+          <div className="px-5 py-3 border-t border-[var(--edge-soft)] flex items-center justify-between shrink-0">
+            <span className="text-[11px] text-[var(--ink-50)]">
               {state.selected.size} of {state.suggestions.length} selected
             </span>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="text-[12px] px-3 py-1.5 rounded border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-stone-800"
+                className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
               >
                 Cancel
               </button>
@@ -291,7 +310,7 @@ function SuggestionCard({
       className={`w-full text-left p-3 rounded-lg border transition-all ${
         selected
           ? 'border-accent bg-accent/5 ring-1 ring-accent/30'
-          : 'border-stone-200 dark:border-stone-700 hover:border-accent/40 hover:bg-stone-50 dark:hover:bg-stone-800/40'
+          : 'border-[var(--edge-soft)] hover:border-accent/40 hover:bg-[var(--surface-sunken)]'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -299,21 +318,21 @@ function SuggestionCard({
           className={`h-8 w-8 rounded-md inline-flex items-center justify-center shrink-0 ${
             selected
               ? 'bg-accent text-white'
-              : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
+              : 'bg-[var(--surface-sunken)] text-[var(--ink-70)]'
           }`}
         >
           <Icon name={catalog?.icon ?? 'widgets'} size={16} />
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-stone-400">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
               {catalog?.label ?? suggestion.kind}
             </span>
           </div>
-          <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 mt-0.5">
+          <div className="text-[13px] font-medium text-[var(--ink-100)] mt-0.5">
             {suggestion.title}
           </div>
-          <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 leading-snug">
+          <div className="text-[11px] text-[var(--ink-50)] mt-0.5 leading-snug">
             {suggestion.reason}
           </div>
           <SuggestionPreview suggestion={suggestion} />
@@ -340,15 +359,15 @@ function SuggestionPreview({ suggestion }: { suggestion: AiBuildSuggestion }): J
         {cols.slice(0, 6).map((c) => (
           <span
             key={c.id}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-sunken)] text-[var(--ink-70)]"
           >
             {c.label}
-            <span className="text-stone-400">·</span>
-            <span className="text-stone-400">{c.type}</span>
+            <span className="text-[var(--ink-40)]">·</span>
+            <span className="text-[var(--ink-40)]">{c.type}</span>
           </span>
         ))}
         {cols.length > 6 && (
-          <span className="text-[10px] text-stone-400">+{cols.length - 6} more</span>
+          <span className="text-[10px] text-[var(--ink-40)]">+{cols.length - 6} more</span>
         )}
       </div>
     )
@@ -362,7 +381,7 @@ function SuggestionPreview({ suggestion }: { suggestion: AiBuildSuggestion }): J
         {headings.slice(0, 5).map((h, i) => (
           <span
             key={i}
-            className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
+            className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[var(--ink-70)]"
           >
             # {h}
           </span>
@@ -372,8 +391,8 @@ function SuggestionPreview({ suggestion }: { suggestion: AiBuildSuggestion }): J
   }
   if (suggestion.kind === 'field' && suggestion.fieldDef) {
     return (
-      <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-stone-500 dark:text-stone-400">
-        <span className="px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800">
+      <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-[var(--ink-50)]">
+        <span className="px-1.5 py-0.5 rounded bg-[var(--surface-sunken)]">
           {suggestion.fieldDef.type}
         </span>
       </div>
@@ -382,7 +401,7 @@ function SuggestionPreview({ suggestion }: { suggestion: AiBuildSuggestion }): J
   if (suggestion.content && suggestion.kind !== 'page' && suggestion.kind !== 'table') {
     const preview = suggestion.content.slice(0, 80)
     return (
-      <div className="mt-1.5 text-[10px] text-stone-500 dark:text-stone-400 font-mono truncate">
+      <div className="mt-1.5 text-[10px] text-[var(--ink-50)] font-mono truncate">
         {preview}
         {suggestion.content.length > 80 ? '…' : ''}
       </div>

@@ -13,6 +13,7 @@ interface ShareLinkRow {
   expires_at: number | null
   view_count: number
   revoked: number
+  created_by: string | null
 }
 
 interface SharedWithMeRow {
@@ -36,7 +37,8 @@ function rowToShareLink(row: ShareLinkRow): ShareLink {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     viewCount: row.view_count,
-    revoked: row.revoked === 1
+    revoked: row.revoked === 1,
+    createdBy: row.created_by ?? null
   }
 }
 
@@ -59,13 +61,17 @@ export function createShareLink(input: {
   label: string
   scope: ShareScope
   expiresAt: number | null
+  // Who is sharing (a handle), so a recipient view can attribute the invite.
+  // Optional: absent when signed out.
+  createdBy?: string | null
 }): ShareLink {
   const db = getDb()
   const id = randomUUID()
   const now = Date.now()
+  const createdBy = input.createdBy ?? null
   db.prepare(
-    `INSERT INTO share_links (id, token, kind, entity_id, label, scope, created_at, expires_at, view_count, revoked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+    `INSERT INTO share_links (id, token, kind, entity_id, label, scope, created_at, expires_at, view_count, revoked, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`
   ).run(
     id,
     input.token,
@@ -74,7 +80,8 @@ export function createShareLink(input: {
     input.label,
     input.scope,
     now,
-    input.expiresAt
+    input.expiresAt,
+    createdBy
   )
   return {
     id,
@@ -86,7 +93,8 @@ export function createShareLink(input: {
     createdAt: now,
     expiresAt: input.expiresAt,
     viewCount: 0,
-    revoked: false
+    revoked: false,
+    createdBy
   }
 }
 
@@ -117,6 +125,16 @@ export function revokeShareLink(id: string): boolean {
     .prepare('UPDATE share_links SET revoked = 1 WHERE id = ?')
     .run(id)
   return result.changes > 0
+}
+
+// Change a share's scope after creation. Used when a meeting-scoped collaborate
+// grant is downgraded to read-only once the meeting ends. Returns the updated
+// link (with its token, so the caller can re-sync the same token to the server).
+export function setShareLinkScope(id: string, scope: ShareScope): ShareLink | null {
+  const db = getDb()
+  db.prepare('UPDATE share_links SET scope = ? WHERE id = ?').run(scope, id)
+  const row = db.prepare('SELECT * FROM share_links WHERE id = ?').get(id) as ShareLinkRow | undefined
+  return row ? rowToShareLink(row) : null
 }
 
 export function deleteShareLink(id: string): boolean {

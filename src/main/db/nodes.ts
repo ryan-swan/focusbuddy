@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
+import { emitAutomationEvent } from './automationEvents'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 
 interface NodeRow {
@@ -23,6 +25,8 @@ interface NodeRow {
   resume_updated_at: number | null
   due_date: number | null
   archived: number | null
+  is_plan: number | null
+  shared_from_handle: string | null
 }
 
 function rowToNode(row: NodeRow): FbNode {
@@ -46,15 +50,29 @@ function rowToNode(row: NodeRow): FbNode {
     resumeMarkdown: row.resume_markdown,
     resumeUpdatedAt: row.resume_updated_at,
     dueDate: row.due_date,
-    archived: row.archived === 1
+    archived: row.archived === 1,
+    isPlan: row.is_plan === 1,
+    sharedFromHandle: row.shared_from_handle ?? null
   }
 }
 
+let purgedTrashThisSession = false
+
 export function listNodes(): FbNode[] {
   const db = getDb()
+  if (!purgedTrashThisSession) {
+    purgedTrashThisSession = true
+    try {
+      purgeTrashedNodes()
+    } catch {
+      /* best-effort */
+    }
+  }
   const rows = db
-    .prepare('SELECT * FROM nodes ORDER BY sort_order ASC, created_at ASC')
-    .all() as NodeRow[]
+    .prepare(
+      'SELECT * FROM nodes WHERE trashed_at IS NULL AND org_id = ? ORDER BY sort_order ASC, created_at ASC'
+    )
+    .all(getActiveOrgId()) as NodeRow[]
   return rows.map(rowToNode)
 }
 
@@ -68,9 +86,9 @@ function nextSortOrder(parentId: string | null): number {
   const db = getDb()
   const row = db
     .prepare(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM nodes WHERE parent_id IS ?'
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM nodes WHERE parent_id IS ? AND org_id = ?'
     )
-    .get(parentId) as { next: number }
+    .get(parentId, getActiveOrgId()) as { next: number }
   return row.next
 }
 
@@ -79,8 +97,8 @@ export function createNode(draft: NodeDraft): FbNode {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date)
-     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate)`
+    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, is_plan, shared_from_handle, org_id)
+     VALUES (@id, @parentId, @kind, @title, @description, 'open', @priority, @interest, @importance, @sortOrder, @now, @now, @estimateMinutes, 0, @dueDate, @isPlan, @sharedFromHandle, @orgId)`
   ).run({
     id,
     parentId: draft.parentId,
@@ -93,6 +111,9 @@ export function createNode(draft: NodeDraft): FbNode {
     sortOrder: nextSortOrder(draft.parentId),
     estimateMinutes: draft.estimateMinutes ?? null,
     dueDate: draft.dueDate ?? null,
+    isPlan: draft.isPlan ? 1 : 0,
+    sharedFromHandle: draft.sharedFromHandle ?? null,
+    orgId: getActiveOrgId(),
     now
   })
   const created = getNode(id)
@@ -131,6 +152,10 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
     fields.push('archived = @archived')
     params.archived = patch.archived ? 1 : 0
   }
+  if (patch.isPlan !== undefined) {
+    fields.push('is_plan = @isPlan')
+    params.isPlan = patch.isPlan ? 1 : 0
+  }
   if (patch.status === 'in_progress' && existing.status !== 'in_progress') {
     fields.push('started_at = @now')
   }
@@ -140,13 +165,119 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
   if (fields.length === 0) return existing
   fields.push('updated_at = @now')
   db.prepare(`UPDATE nodes SET ${fields.join(', ')} WHERE id = @id`).run(params)
+  // Let PlexiFlow react to a task being completed (suppressed during flow runs).
+  if (patch.status === 'done' && existing.status !== 'done' && existing.kind === 'task') {
+    emitAutomationEvent({ name: 'task-completed', nodeId: id })
+  }
   return getNode(id)
 }
 
-export function deleteNode(id: string): boolean {
+// Soft-delete a node and its whole subtree (children would otherwise be
+// hard-cascaded along with all their widgets). Returns the trashed ids so the
+// caller can offer a lossless undo. The rows and widgets are untouched on disk,
+// just hidden, until purgeTrashedNodes removes them.
+export function deleteNode(id: string): string[] {
   const db = getDb()
-  const result = db.prepare('DELETE FROM nodes WHERE id = ?').run(id)
-  return result.changes > 0
+  const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(id)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (nid: string): void => {
+    ids.push(nid)
+    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(id)
+  const now = Date.now()
+  const stmt = db.prepare('UPDATE nodes SET trashed_at = ? WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) stmt.run(now, i)
+  })()
+  return ids
+}
+
+// Re-scope a room/desk (and everything under it) into another org — the explicit
+// "share this desk/room with the team" action. Sets org_id on the node and every
+// descendant node, and marks those nodes AND their widgets needs_sync (with
+// sync_rev reset, since the org store is a separate keyspace from the personal one)
+// so the org sync loop pushes the whole subtree under the new org on its next
+// cycle. Widgets carry no org_id of their own — they derive scope from the parent
+// node — so only their sync bookkeeping is touched. Returns the affected node ids.
+//
+// Note: fb_tables referenced by table widgets keep their own org_id and are not
+// re-scoped here; a table widget moved to the org still reads its table locally.
+// Moving a desk that owns tables into an org is a follow-up.
+export function moveNodeToOrg(rootId: string, orgId: string, teamId: string | null = null): string[] {
+  const db = getDb()
+  if (!orgId) return []
+  const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId)
+  if (!exists) return []
+  const ids: string[] = []
+  const collect = (nid: string): void => {
+    ids.push(nid)
+    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(rootId)
+  // Tables backing any table widget on the moved desks must travel too, or the
+  // widget lands on the other member pointing at a table that never synced (blank
+  // "Loading table…"). A table widget stores its fb_tables id in widget.content.
+  const tableIds = (
+    db
+      .prepare(
+        `SELECT DISTINCT content AS id FROM widgets
+         WHERE task_id IN (${ids.map(() => '?').join(',')})
+           AND kind = 'table' AND content IS NOT NULL AND content != ''`
+      )
+      .all(...ids) as Array<{ id: string }>
+  ).map((r) => r.id)
+
+  // teamId scopes the subtree to a group (null = whole org). Nodes + tables carry
+  // team_id; widgets/rows inherit it from their parent at push time.
+  const setNode = db.prepare('UPDATE nodes SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setWidgets = db.prepare('UPDATE widgets SET needs_sync = 1, sync_rev = 0 WHERE task_id = ?')
+  const setTable = db.prepare('UPDATE fb_tables SET org_id = ?, team_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setRows = db.prepare('UPDATE fb_rows SET needs_sync = 1, sync_rev = 0 WHERE table_id = ?')
+  db.transaction(() => {
+    for (const i of ids) {
+      setNode.run(orgId, teamId, i)
+      setWidgets.run(i)
+    }
+    for (const t of tableIds) {
+      setTable.run(orgId, teamId, t)
+      setRows.run(t)
+    }
+  })()
+  return ids
+}
+
+// Restore trashed nodes (undo of a delete, or redo of a create-undo).
+export function restoreNodes(ids: string[]): boolean {
+  if (!ids.length) return false
+  const db = getDb()
+  const stmt = db.prepare('UPDATE nodes SET trashed_at = NULL WHERE id = ?')
+  db.transaction(() => {
+    for (const i of ids) stmt.run(i)
+  })()
+  return true
+}
+
+// Permanently remove nodes trashed longer than maxAgeMs (default 7 days). The
+// hard DELETE cascades their descendants + widgets. Runs once per session.
+export function purgeTrashedNodes(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
+  const db = getDb()
+  const cutoff = Date.now() - maxAgeMs
+  const rows = db.prepare('SELECT id FROM nodes WHERE trashed_at IS NOT NULL AND trashed_at < ?').all(cutoff) as Array<{
+    id: string
+  }>
+  if (!rows.length) return
+  const del = db.prepare('DELETE FROM nodes WHERE id = ?')
+  db.transaction(() => {
+    for (const r of rows) del.run(r.id)
+  })()
 }
 
 // Returns true if `candidateId` is a descendant of `ancestorId` (or equal). Used to prevent

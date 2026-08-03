@@ -86,13 +86,34 @@ export default function FocusSessionOverlay(): JSX.Element | null {
 
   return (
     <>
+      {/* Objective banner — task title rendered prominently while a session
+          is live. Sits just under the timer pill, in a glass strip. Reads
+          as the "current objective" callout the brief asks for. Hidden
+          when the session has no task (rare: only happens for global
+          timers). */}
+      {task && (
+        <div className="fixed top-[88px] left-1/2 -translate-x-1/2 z-[148] pointer-events-none">
+          <div
+            className="pointer-events-auto fb-glass-chrome px-4 py-1.5 rounded-full border border-[color:var(--glass-chrome-border)] inline-flex items-center gap-2 max-w-[420px]"
+            title={`Current objective: ${taskTitle}`}
+          >
+            <Icon name="my_location" size={11} className="text-accent shrink-0" />
+            <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold shrink-0">
+              Objective
+            </span>
+            <span className="text-[12px] text-[var(--ink-90)] truncate">
+              {taskTitle}
+            </span>
+          </div>
+        </div>
+      )}
       {/* Floating timer pill — top of canvas */}
       <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[150] pointer-events-none">
         <div
           className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2 rounded-full select-none fb-spring-soft ${
             remaining === 0
               ? 'bg-emerald-500/90 border border-emerald-300 text-white animate-pulse'
-              : 'fb-glass-panel text-stone-900 dark:text-stone-100'
+              : 'fb-glass-panel text-[var(--ink-100)]'
           } ${!isEngaged && remaining > 0 ? 'opacity-70' : ''}`}
           title={
             !isEngaged && remaining > 0
@@ -112,7 +133,7 @@ export default function FocusSessionOverlay(): JSX.Element | null {
           {/* Engaged: breathing accent dot. Paused: a muted "pause" glyph
               that stays still — visual cue that the timer isn't counting. */}
           {remaining === 0 ? (
-            <span className="h-2 w-2 rounded-full bg-white" />
+            <span className="h-2 w-2 rounded-full bg-[var(--surface-raised)]" />
           ) : isEngaged ? (
             <span className="h-2 w-2 rounded-full bg-accent fb-breathing" />
           ) : (
@@ -125,19 +146,19 @@ export default function FocusSessionOverlay(): JSX.Element | null {
             {remaining === 0 ? '5 minutes done' : fmt(remaining)}
           </span>
           {!isEngaged && remaining > 0 && (
-            <span className="text-[10px] text-stone-500 dark:text-stone-400 fb-mono">
+            <span className="text-[10px] text-[var(--ink-50)] fb-mono">
               paused{pausedSeconds >= 60 ? ` · ${Math.floor(pausedSeconds / 60)}m away` : ''}
             </span>
           )}
           {renewedCount > 0 && remaining > 0 && (
-            <span className="text-[10px] text-stone-500 dark:text-stone-400">
+            <span className="text-[10px] text-[var(--ink-50)]">
               · renewed {renewedCount}×
             </span>
           )}
           {remaining > 0 && (
             <button
               onClick={handleAbandon}
-              className="ml-1 h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200"
+              className="ml-1 h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-[var(--surface-sunken)] text-[var(--ink-40)] hover:text-[var(--ink-70)]"
               title="End session early (no shame)"
             >
               <Icon name="close" size={11} />
@@ -149,17 +170,17 @@ export default function FocusSessionOverlay(): JSX.Element | null {
       {/* End-of-session choice modal */}
       {showChoice && (
         <div className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/30 backdrop-blur-sm">
-          <div className="bg-white dark:bg-stone-900 w-full max-w-sm mx-4 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 overflow-hidden">
+          <div className="bg-[var(--surface-raised)] w-full max-w-sm mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
             <div className="px-5 py-4 text-center">
               <div className="text-3xl mb-1">✨</div>
-              <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100 mb-1">
+              <h3 className="text-base font-semibold text-[var(--ink-100)] mb-1">
                 {renewedCount === 0
                   ? 'Five minutes done.'
                   : `${renewedCount + 1} × five minutes done.`}
               </h3>
-              <p className="text-[13px] text-stone-600 dark:text-stone-400 leading-relaxed">
+              <p className="text-[13px] text-[var(--ink-70)] leading-relaxed">
                 You showed up — that's the win.{' '}
-                <span className="text-stone-500 dark:text-stone-500">
+                <span className="text-[var(--ink-50)]">
                   ({Math.floor(elapsedTotal / 60)}m on {taskTitle})
                 </span>
               </p>
@@ -182,21 +203,21 @@ export default function FocusSessionOverlay(): JSX.Element | null {
               <div className="flex gap-2">
                 <button
                   onClick={() => void handleKeepGoing(15 * 60)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 text-xs text-stone-700 dark:text-stone-300 transition-colors"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] text-xs text-[var(--ink-70)] transition-colors"
                 >
                   <Icon name="timer" size={13} />
                   15 min
                 </button>
                 <button
                   onClick={() => void handleKeepGoing(25 * 60)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 text-xs text-stone-700 dark:text-stone-300 transition-colors"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] text-xs text-[var(--ink-70)] transition-colors"
                 >
                   <Icon name="timer" size={13} />
                   25 min (pomodoro)
                 </button>
               </div>
             </div>
-            <p className="px-5 pb-4 text-[11px] text-stone-500 dark:text-stone-500 text-center">
+            <p className="px-5 pb-4 text-[11px] text-[var(--ink-50)] text-center">
               No streak to break. Both choices count as a win.
             </p>
           </div>

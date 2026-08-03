@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
 import type { ActivityEvent, ActivityRecordDraft } from '@shared/types'
 
 interface ActivityRow {
@@ -34,13 +35,14 @@ export function recordActivity(draft: ActivityRecordDraft): void {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO activity_log (id, task_id, ts, kind, payload) VALUES (@id, @taskId, @ts, @kind, @payload)`
+    `INSERT INTO activity_log (id, task_id, ts, kind, payload, org_id) VALUES (@id, @taskId, @ts, @kind, @payload, @orgId)`
   ).run({
     id,
     taskId: draft.taskId,
     ts: now,
     kind: draft.kind,
-    payload: draft.payload ? JSON.stringify(draft.payload) : null
+    payload: draft.payload ? JSON.stringify(draft.payload) : null,
+    orgId: getActiveOrgId()
   })
 }
 
@@ -61,8 +63,8 @@ export function getRecentActivity(opts: {
       .all(opts.taskId, sinceMs, limit) as ActivityRow[]
   } else {
     rows = db
-      .prepare(`SELECT * FROM activity_log WHERE ts >= ? ORDER BY ts DESC LIMIT ?`)
-      .all(sinceMs, limit) as ActivityRow[]
+      .prepare(`SELECT * FROM activity_log WHERE ts >= ? AND org_id = ? ORDER BY ts DESC LIMIT ?`)
+      .all(sinceMs, getActiveOrgId(), limit) as ActivityRow[]
   }
   return rows.map(rowToEvent)
 }

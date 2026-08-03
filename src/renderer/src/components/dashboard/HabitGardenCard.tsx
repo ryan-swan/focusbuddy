@@ -40,13 +40,13 @@ export default function HabitGardenCard({ taskIds }: Props): JSX.Element {
   const summary = summarize(buckets)
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur p-4">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="local_florist" size={12} className="text-emerald-600 dark:text-emerald-500" />
           <span>30-day garden</span>
         </div>
-        <span className="text-[10px] text-stone-500 dark:text-stone-400 font-mono">
+        <span className="text-[10px] text-[var(--ink-50)] font-mono">
           {summary.daysWithActivity}/30 days
         </span>
       </div>
@@ -78,7 +78,7 @@ export default function HabitGardenCard({ taskIds }: Props): JSX.Element {
           )
         })}
       </div>
-      <p className="text-[10px] text-stone-500 dark:text-stone-500 leading-snug text-center">
+      <p className="text-[10px] text-[var(--ink-50)] leading-snug text-center">
         No streak to break. Gaps are fine — the bloom stays.
       </p>
     </div>

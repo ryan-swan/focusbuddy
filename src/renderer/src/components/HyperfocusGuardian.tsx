@@ -73,9 +73,9 @@ export default function HyperfocusGuardian(): JSX.Element | null {
     <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[160] pointer-events-none">
       <div className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 shadow-2xl backdrop-blur text-sm animate-[fadeInUp_400ms_ease-out]">
         <Icon name="local_fire_department" size={16} className="text-amber-600 dark:text-amber-400" />
-        <span className="text-stone-800 dark:text-stone-200">
+        <span className="text-[var(--ink-90)]">
           You're on fire —{' '}
-          <span className="text-stone-500 dark:text-stone-400 text-xs font-mono">
+          <span className="text-[var(--ink-50)] text-xs font-mono">
             {fmtRun(state.currentRunMs)} straight
           </span>
         </span>
@@ -88,7 +88,7 @@ export default function HyperfocusGuardian(): JSX.Element | null {
         </button>
         <button
           onClick={handleKeepGoing}
-          className="text-[11px] text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 px-2 py-1"
+          className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-2 py-1"
         >
           keep going
         </button>

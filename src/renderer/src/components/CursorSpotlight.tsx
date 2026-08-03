@@ -63,7 +63,10 @@ export default function CursorSpotlight(): JSX.Element {
       // Probe the element under the cursor — if it's a button/link/role=button,
       // we'll lock the ring's size + position to its bounds for the "absorbed"
       // pointer effect, and brighten the spotlight to signal interaction.
-      const target = e.target as Element | null
+      // A document-level mousemove can fire with a non-Element target (the
+      // document node, or a text node), which has no .closest — guard with an
+      // instanceof check so the handler never throws "closest is not a function".
+      const target = e.target instanceof Element ? e.target : null
       if (target) {
         const interactive = target.closest(
           'button, a, [role="button"], [data-magnetic="true"]'

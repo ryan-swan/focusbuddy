@@ -52,11 +52,11 @@ export default function HabitGardenStrip(): JSX.Element {
       <button
         ref={btnRef}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors group"
+        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[var(--surface-sunken)] transition-colors group"
         title="Your focus garden — last 7 days. Click for full view."
       >
         <Icon name="local_florist" size={14} className="text-emerald-600 dark:text-emerald-500" />
-        <span className="text-[11px] font-mono text-stone-700 dark:text-stone-300 tabular-nums">
+        <span className="text-[11px] font-mono text-[var(--ink-70)] tabular-nums">
           {summary.todaySessions}
         </span>
         <div className="flex items-center gap-[2px]">
@@ -149,17 +149,17 @@ function HabitGardenPopover({ buckets, anchorEl, onClose }: PopoverProps): JSX.E
   return (
     <div
       ref={ref}
-      className="fixed z-[180] w-72 rounded-lg bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 shadow-2xl backdrop-blur"
+      className="fixed z-[180] w-72 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl backdrop-blur"
       style={style}
     >
-      <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Icon name="local_florist" size={14} className="text-emerald-600 dark:text-emerald-500" />
-          <span className="text-[12px] font-semibold text-stone-900 dark:text-stone-100">
+          <span className="text-[12px] font-semibold text-[var(--ink-100)]">
             Focus garden
           </span>
         </div>
-        <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+        <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
           30 days
         </span>
       </div>
@@ -169,14 +169,14 @@ function HabitGardenPopover({ buckets, anchorEl, onClose }: PopoverProps): JSX.E
           {buckets.map((b) => (
             <div key={b.dateKey} className="flex flex-col items-center gap-0.5">
               <Dot bucket={b} size="md" />
-              <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500">
+              <span className="text-[9px] font-mono text-[var(--ink-40)]">
                 {b.date.getDate()}
               </span>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-stone-200 dark:border-stone-700">
+        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--edge-soft)]">
           <Stat label="Today" value={`${summary.todaySessions}`} sub={fmtMin(summary.todaySeconds)} />
           <Stat
             label="Days active"
@@ -186,7 +186,7 @@ function HabitGardenPopover({ buckets, anchorEl, onClose }: PopoverProps): JSX.E
           <Stat label="Total" value={`${summary.totalSessions}`} sub={fmtMin(summary.totalSeconds)} />
         </div>
 
-        <p className="mt-3 text-[10px] text-stone-500 dark:text-stone-500 leading-relaxed text-center">
+        <p className="mt-3 text-[10px] text-[var(--ink-50)] leading-relaxed text-center">
           No streak to break. Gaps are fine — the bloom stays.
         </p>
       </div>
@@ -205,13 +205,13 @@ function Stat({
 }): JSX.Element {
   return (
     <div className="text-center">
-      <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
         {label}
       </div>
-      <div className="text-base font-semibold text-stone-900 dark:text-stone-100 tabular-nums">
+      <div className="text-base font-semibold text-[var(--ink-100)] tabular-nums">
         {value}
       </div>
-      <div className="text-[10px] text-stone-500 dark:text-stone-500 font-mono">{sub}</div>
+      <div className="text-[10px] text-[var(--ink-50)] font-mono">{sub}</div>
     </div>
   )
 }

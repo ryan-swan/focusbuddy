@@ -7,7 +7,9 @@ import { useVaultStore } from '../../stores/vault'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
+import { normalizeUrl, sanitizeWebviewUrl } from '../../lib/browserUrl'
 import Icon from '../Icon'
+import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
 function hostnameOf(url: string): string {
   try {
@@ -17,17 +19,19 @@ function hostnameOf(url: string): string {
   }
 }
 
-function normalizeUrl(input: string): string | null {
-  let url = input.trim()
-  if (!url) return null
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`
-  try {
-    new URL(url)
-    return url
-  } catch {
-    return null
-  }
-}
+
+// Stored viewport presets the user can snap a browser window to. Sizes are
+// the common device classes (CSS px) so a page renders the way it would on
+// that form factor — the user asked for "4 commonly used options".
+const BROWSER_RESOLUTIONS: { label: string; sub: string; width: number; height: number }[] = [
+  { label: 'Mobile', sub: '390 × 844', width: 390, height: 844 },
+  { label: 'Tablet', sub: '768 × 1024', width: 768, height: 1024 },
+  // Tablet landscape — the small-screen-friendly wide option. 1024×768 fits
+  // comfortably where Laptop/Desktop would run off the edges of a small display.
+  { label: 'Tablet (landscape)', sub: '1024 × 768', width: 1024, height: 768 },
+  { label: 'Laptop', sub: '1366 × 768', width: 1366, height: 768 },
+  { label: 'Desktop', sub: '1920 × 1080', width: 1920, height: 1080 }
+]
 
 interface Props {
   widget: Widget
@@ -37,7 +41,11 @@ interface Props {
 export default function WebViewWidget({ widget, inline = false }: Props): JSX.Element {
   const update = useWidgetStore((s) => s.update)
   const create = useWidgetStore((s) => s.create)
-  const focusOn = useWidgetStore((s) => s.focusOn)
+  // setActive (not focusOn): activating a browser widget you can already see
+  // must NOT pan the camera — focusOn bumps centerToken and yanks the world.
+  // The overlay's whole job is to hand the NEXT click to the page, so it just
+  // marks the widget active in place.
+  const setActive = useWidgetStore((s) => s.setActive)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const webviewRef = useRef<HTMLElement | null>(null)
   const entry = catalogFor(widget.kind)
@@ -60,6 +68,13 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // (call loadURL) on Enter or blur, so transient typing doesn't navigate.
   const [urlDraft, setUrlDraft] = useState('')
   const [urlEditing, setUrlEditing] = useState(false)
+  // Resolution-preset dropdown (snap the browser window to a stored viewport).
+  const [resMenuOpen, setResMenuOpen] = useState(false)
+  // Right-click on the widget frame (NOT the inner webview — webviews
+  // own their own context menu). Captures clicks on the chrome / URL
+  // bar area; we ALWAYS suppress the chrome's native menu so the
+  // create-and-connect entry is reachable.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; cellText?: string } | null>(null)
   // Live preview shown in the header — tracks the CURRENT page while navigating.
   const [livePreview, setLivePreview] = useState<{ url: string; title: string } | null>(null)
   // Last URL we persisted into widget.content — avoids redundant DB writes on rapid navs
@@ -75,7 +90,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // this webview: the user typed a new URL in the edit form, or a sibling
   // widget instance (e.g. focus-mode swap) wrote a different URL. The
   // webview navigates organically for everything else.
-  const [webviewSrc, setWebviewSrc] = useState(widget.content)
+  const [webviewSrc, setWebviewSrc] = useState(() => sanitizeWebviewUrl(widget.content))
   const headerLabel = (() => {
     const previewTitle = livePreview?.title
     const previewHost = livePreview ? hostnameOf(livePreview.url) : ''
@@ -94,7 +109,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     setDraft(widget.content)
     setEditing(!widget.content)
     lastPersistedUrl.current = widget.content
-    setWebviewSrc(widget.content)
+    setWebviewSrc(sanitizeWebviewUrl(widget.content))
     setLivePreview(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.id])
@@ -108,7 +123,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     if (widget.content === lastPersistedUrl.current) return
     // Genuine external change — sync to webview + adopt as our new baseline.
     lastPersistedUrl.current = widget.content
-    setWebviewSrc(widget.content)
+    setWebviewSrc(sanitizeWebviewUrl(widget.content))
     setDraft(widget.content)
   }, [widget.content])
 
@@ -364,6 +379,8 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     if (!wv) return
     const entry = vaultEntries.find((e) => e.id === sourceApp.vaultEntryId) ?? null
     if (!entry) return
+    // Origin gate: only auto-fill on the host this Connected App is bound to.
+    const boundHost = hostnameOf(sourceApp.url)
 
     function onFinish(): void {
       try {
@@ -371,7 +388,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           (wv as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
         if (!url || url === autofilledForUrl.current) return
         autofilledForUrl.current = url
-        void autofillWebview(wv as HTMLElement | null, entry)
+        void autofillWebview(wv as HTMLElement | null, entry, boundHost)
       } catch {
         // ignore
       }
@@ -459,7 +476,25 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   }
 
   const body = (
-    <div className="h-full w-full bg-white relative flex flex-col">
+    <div
+      className="h-full w-full bg-[var(--surface-raised)] relative flex flex-col"
+      onContextMenu={(e) => {
+        // The <webview> element owns its inner context menu via
+        // shell-level webContents; we only act on right-clicks landing
+        // on the chrome / URL bar / loading overlay (everything OUTSIDE
+        // the webview). Detect by checking whether the target is
+        // inside the webview element.
+        const t = e.target as HTMLElement
+        if (t.closest && t.closest('webview')) return
+        if (e.shiftKey) return
+        e.preventDefault()
+        // For webview widgets, the most useful seed is the URL — passes
+        // through as content for sticky/note/markdown so the user has
+        // the URL handy in the new tool too.
+        const seed = widget.content || ''
+        setCtxMenu({ x: e.clientX, y: e.clientY, cellText: seed })
+      }}
+    >
       {editing ? (
         <form
           onSubmit={(e) => {
@@ -468,8 +503,8 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           }}
           className="h-full w-full flex flex-col items-stretch justify-center gap-2 p-4"
         >
-          <label className="text-xs uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-            <Icon name={entry?.icon ?? 'public'} size={16} className="text-stone-600" />
+          <label className="text-xs uppercase tracking-wider text-[var(--ink-50)] flex items-center gap-1.5">
+            <Icon name={entry?.icon ?? 'public'} size={16} className="text-[var(--ink-70)]" />
             {entry?.label ?? 'URL'}
           </label>
           <input
@@ -477,9 +512,9 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={placeholder}
-            className="bg-white border border-stone-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-stone-700 focus:ring-2 focus:ring-stone-200"
+            className="bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
           />
-          <p className="text-[11px] text-stone-600">
+          <p className="text-[11px] text-[var(--ink-70)]">
             {entry?.hint ?? 'Renders inside a focused browser tab — no other tabs allowed.'}
           </p>
           <div className="flex justify-end gap-2 pt-1">
@@ -494,11 +529,11 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           {/* Browser-chrome toolbar — back/forward/reload/stop + URL bar.
               Lives above the webview content in a flex column so the
               webview area shrinks to the remaining height. */}
-          <div className="shrink-0 flex items-center gap-1 px-1.5 py-1 border-b border-stone-200 bg-stone-50/80">
+          <div className="shrink-0 flex items-center gap-1 px-1.5 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
             <button
               onClick={navBack}
               disabled={!canGoBack}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:text-[var(--ink-30)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
               title="Back"
               aria-label="Go back"
             >
@@ -507,7 +542,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             <button
               onClick={navForward}
               disabled={!canGoForward}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:text-[var(--ink-30)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
               title="Forward"
               aria-label="Go forward"
             >
@@ -515,7 +550,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             </button>
             <button
               onClick={isLoading ? navStop : navReload}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-stone-600 hover:bg-stone-200"
+              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
               title={isLoading ? 'Stop loading' : 'Reload'}
               aria-label={isLoading ? 'Stop loading' : 'Reload'}
             >
@@ -549,9 +584,66 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                 onMouseDown={(e) => e.stopPropagation()}
                 spellCheck={false}
                 placeholder="https://…"
-                className="w-full h-6 px-2 text-[11px] rounded bg-white border border-stone-200 focus:border-stone-400 focus:outline-none text-stone-800 truncate"
+                className="w-full h-6 px-2 text-[11px] rounded bg-[var(--surface-raised)] border border-[var(--edge-soft)] focus:border-[var(--edge-firm)] focus:outline-none text-[var(--ink-90)] truncate"
                 title={currentUrl}
               />
+            </div>
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setResMenuOpen((v) => !v)
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className={`h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${resMenuOpen ? 'bg-[var(--surface-sunken)]' : ''}`}
+                title="Resize to a stored resolution"
+                aria-label="Resize to a stored resolution"
+              >
+                <Icon name="aspect_ratio" size={14} />
+              </button>
+              {resMenuOpen && (
+                <>
+                  {/* click-away backdrop */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setResMenuOpen(false)
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <div
+                    className="absolute right-0 top-7 z-50 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--ink-40)]">
+                      Window size
+                    </div>
+                    {BROWSER_RESOLUTIONS.map((r) => {
+                      const active =
+                        Math.round(widget.width) === r.width &&
+                        Math.round(widget.height) === r.height
+                      return (
+                        <button
+                          key={r.label}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            update(widget.id, { width: r.width, height: r.height })
+                            setResMenuOpen(false)
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-[var(--surface-sunken)] ${active ? 'text-[var(--ink-100)] font-medium' : 'text-[var(--ink-70)]'}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            {active && <Icon name="check" size={12} />}
+                            <span className={active ? '' : 'pl-[18px]'}>{r.label}</span>
+                          </span>
+                          <span className="text-[10px] text-[var(--ink-40)] tabular-nums">{r.sub}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="flex-1 relative min-h-0">
@@ -559,18 +651,36 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             ref={webviewRef}
             src={webviewSrc}
             partition={partition}
+            // allowpopups MUST be present at attach time — Electron reads it when
+            // the guest webContents is created. Setting it later via setAttribute
+            // (the old approach, kept below as a belt-and-braces no-op) does not
+            // reliably enable window.open for the already-attached contents, which
+            // is why site menus and OAuth "sign in" popups silently did nothing.
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore — allowpopups is a valid <webview> attribute
+            allowpopups="true"
             style={{ width: '100%', height: '100%', display: 'inline-flex' }}
           />
           {showOverlay && (
             <div
               onClick={(e) => {
                 e.stopPropagation()
-                focusOn(widget.id)
+                // ⌘/Ctrl-click while zoomed out dives into this browser: jump
+                // to 100% with it centred. The overlay swallows the event
+                // (stopPropagation) so it never reaches WidgetFrame — we have
+                // to honour the gesture here too, or browsers would be the
+                // one widget kind that can't be dived into.
+                const store = useWidgetStore.getState()
+                if ((e.metaKey || e.ctrlKey) && store.zoom < 0.8) {
+                  store.zoomToWidget(widget.id)
+                  return
+                }
+                setActive(widget.id)
               }}
               className="absolute inset-0 cursor-pointer group bg-transparent"
               title="Click to interact — scroll pans the canvas while not active"
             >
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/80 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/80 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
                 <Icon name="touch_app" size={12} />
                 <span>Click to interact</span>
               </div>
@@ -586,7 +696,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   }}
                   disabled={pinning}
                   title="Pin this site to Connected Apps (shares session + enables vault auto-fill)"
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700 disabled:opacity-60"
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] disabled:opacity-60"
                 >
                   <Icon name="push_pin" size={11} />
                   <span>{pinning ? 'pinning…' : 'pin to apps'}</span>
@@ -595,7 +705,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
               {sourceApp && (
                 <span
                   title={`Linked to "${sourceApp.title}" — session + auto-fill shared`}
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 text-stone-700"
+                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-70)]"
                 >
                   <Icon name="link" size={11} />
                   <span className="truncate max-w-[120px]">{sourceApp.title}</span>
@@ -607,7 +717,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                   setEditing(true)
                 }}
                 title="Change URL (full form)"
-                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-stone-300 hover:bg-stone-100 text-stone-700"
+                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
               >
                 <Icon name="edit" size={11} />
                 <span>edit</span>
@@ -616,6 +726,15 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           )}
           </div>
         </>
+      )}
+      {ctxMenu && (
+        <ConnectedToolMenu
+          sourceWidgetId={widget.id}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          selectionContext={{ selectionText: ctxMenu.cellText }}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )

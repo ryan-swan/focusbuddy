@@ -49,7 +49,7 @@ export default function RelationConfigEditor({
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-stone-400">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
         Linked table
       </div>
       <select
@@ -57,7 +57,7 @@ export default function RelationConfigEditor({
         onChange={(e) =>
           onChange({ ...config, tableId: e.target.value || null, displayColumnId: null })
         }
-        className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-1"
+        className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1"
       >
         <option value="">— pick a table —</option>
         {candidates.map((t) => (
@@ -68,7 +68,7 @@ export default function RelationConfigEditor({
       </select>
       {target && (
         <>
-          <div className="text-[10px] uppercase tracking-wider text-stone-400">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
             Display column
           </div>
           <select
@@ -76,7 +76,7 @@ export default function RelationConfigEditor({
             onChange={(e) =>
               onChange({ ...config, displayColumnId: e.target.value || null })
             }
-            className="w-full text-[11px] bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-1"
+            className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1"
           >
             <option value="">(auto — first text column)</option>
             {target.schema.columns
@@ -87,7 +87,7 @@ export default function RelationConfigEditor({
                 </option>
               ))}
           </select>
-          <label className="inline-flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-300 cursor-pointer">
+          <label className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-70)] cursor-pointer">
             <input
               type="checkbox"
               checked={config.multi !== false}

@@ -1,20 +1,48 @@
 import { create } from 'zustand'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
+import { recordAction, recordActionWithToast } from './actionHistory'
 import { recordTrail } from '../lib/trail'
+import { nudgeSync } from '../lib/syncNudge'
 import { taskComplete } from '../lib/audioBeep'
 import { hapticSuccess } from '../lib/haptics'
+import { canCreateMore, limitFor } from '../lib/gating'
+import { useCapabilityStore } from './capabilities'
+import { promptUpgrade } from './upgradePrompt'
+import { useMessagingStore } from './messaging'
+import { useContextHealthStore } from './contextHealth'
+
+// A "desk" (marketing) / "project" (sidebar) is a top-level folder. The
+// multiple_desks capability caps how many a tier may have. Thrown by
+// create() when a free user would exceed it — callers that don't catch it
+// simply have the creation prevented (the throw happens before the IPC
+// create call, so nothing is persisted).
+export const DESK_LIMIT_ERROR = 'DESK_LIMIT_REACHED'
+
+function isTopLevelDesk(draft: NodeDraft): boolean {
+  return draft.parentId === null && draft.kind === 'folder'
+}
 
 interface NodeStore {
   nodes: FbNode[]
   activeTaskId: string | null
   expanded: Record<string, boolean>
   loading: boolean
+  // Whether a load has ever succeeded, and the last load error if any. These let
+  // the UI tell three states apart that used to look identical: still loading, a
+  // genuinely empty workspace, and a load that FAILED. Conflating the last two is
+  // how a transient failure could read as "all my workspaces disappeared".
+  loaded: boolean
+  error: string | null
   refresh: () => Promise<void>
   create: (draft: NodeDraft) => Promise<FbNode>
   update: (id: string, patch: NodePatch) => Promise<void>
   remove: (id: string) => Promise<void>
   // Atomic reparent + reorder. beforeId=null appends to end of new parent.
   move: (id: string, newParentId: string | null, beforeId: string | null) => Promise<void>
+  // Share a personal room/desk (and everything under it) with an org, optionally
+  // scoped to a single team/group. Re-scopes the subtree + its widgets/tables so
+  // the org sync loop pushes it to the org (or just that group's members).
+  moveToOrg: (id: string, orgId: string, teamId?: string | null) => Promise<string[]>
   setActive: (id: string | null) => void
   toggleExpand: (id: string) => void
   expand: (id: string, on: boolean) => void
@@ -25,15 +53,70 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
   activeTaskId: null,
   expanded: {},
   loading: false,
+  loaded: false,
+  error: null,
   refresh: async () => {
     set({ loading: true })
-    const nodes = await window.api.nodes.list()
-    set({ nodes, loading: false })
+    // Loading the workspace tree must never fail silently into an empty state that
+    // looks like lost data. A transient DB lock (e.g. another installed build
+    // briefly holding the database at boot) can make the first call reject, so we
+    // retry with a short backoff. On real failure we KEEP whatever nodes we already
+    // had and record an honest error the sidebar surfaces, rather than blanking the
+    // tree.
+    const MAX_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const nodes = await window.api.nodes.list()
+        set({ nodes, loading: false, loaded: true, error: null })
+        return
+      } catch (e) {
+        if (attempt === MAX_ATTEMPTS) {
+          set({
+            loading: false,
+            error: e instanceof Error ? e.message : String(e)
+          })
+          return
+        }
+        await new Promise((resolve) => setTimeout(resolve, attempt * 300))
+      }
+    }
   },
   create: async (draft) => {
+    // Hard backstop for the desk limit — catches EVERY create path (sidebar,
+    // dashboard, AI command bar). The sidebar additionally gates the trigger
+    // for nicer UX, but this is what actually prevents a 4th free desk.
+    if (isTopLevelDesk(draft)) {
+      const caps = useCapabilityStore.getState().capabilities
+      const deskCount = get().nodes.filter(
+        (n) => n.parentId === null && n.kind === 'folder'
+      ).length
+      if (!canCreateMore(caps, 'multiple_desks', deskCount)) {
+        const limit = limitFor(caps, 'multiple_desks')
+        promptUpgrade(
+          `You've reached your ${limit}-desk limit on the Free plan. Upgrade for unlimited desks.`,
+          'pro'
+        )
+        throw new Error(DESK_LIMIT_ERROR)
+      }
+    }
     const node = await window.api.nodes.create(draft)
     set({ nodes: [...get().nodes, node] })
+    nudgeSync()
     if (draft.parentId) set({ expanded: { ...get().expanded, [draft.parentId]: true } })
+    // Undo a creation by trashing it; redo restores exactly what was trashed
+    // (it may have gained children by the time you undo).
+    let trashed: string[] = [node.id]
+    recordAction({
+      label: `Create ${node.kind}`,
+      undo: async () => {
+        trashed = await window.api.nodes.delete(node.id)
+        await get().refresh()
+      },
+      redo: async () => {
+        await window.api.nodes.restore(trashed)
+        await get().refresh()
+      }
+    })
     return node
   },
   update: async (id, patch) => {
@@ -41,6 +124,35 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const updated = await window.api.nodes.update(id, patch)
     if (!updated) return
     set({ nodes: get().nodes.map((n) => (n.id === id ? updated : n)) })
+    nudgeSync()
+    // Record an undo only for user-meaningful field edits (not programmatic
+    // patches like resume autosave or timers), restoring the prior values.
+    const UNDOABLE = ['title', 'description', 'status', 'priority', 'interest', 'importance', 'dueDate'] as const
+    const touched = UNDOABLE.filter((k) => k in patch)
+    if (prev && touched.length) {
+      const prevPatch: NodePatch = {}
+      const redoPatch: NodePatch = {}
+      for (const k of touched) {
+        ;(prevPatch as Record<string, unknown>)[k] = (prev as unknown as Record<string, unknown>)[k]
+        ;(redoPatch as Record<string, unknown>)[k] = (patch as unknown as Record<string, unknown>)[k]
+      }
+      const label = touched.includes('title')
+        ? `Rename ${prev.kind}`
+        : touched.includes('status')
+          ? 'Change status'
+          : 'Edit'
+      recordAction({
+        label,
+        undo: async () => {
+          await window.api.nodes.update(id, prevPatch)
+          await get().refresh()
+        },
+        redo: async () => {
+          await window.api.nodes.update(id, redoPatch)
+          await get().refresh()
+        }
+      })
+    }
     // Triumphant chime on task completion — fire only on the open→done transition
     if (
       prev &&
@@ -53,20 +165,74 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     }
   },
   remove: async (id) => {
-    await window.api.nodes.delete(id)
+    const target = get().nodes.find((n) => n.id === id)
+    const ids = await window.api.nodes.delete(id)
     set({
-      nodes: get().nodes.filter((n) => n.id !== id && !descendantOf(get().nodes, n.id, id)),
-      activeTaskId: get().activeTaskId === id ? null : get().activeTaskId
+      nodes: get().nodes.filter((n) => !ids.includes(n.id)),
+      activeTaskId: ids.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
     })
+    nudgeSync()
+    // Best-effort: archive the deleted room/desk's chat channel (keeps history,
+    // hides it from lists). No-op if the object never had a channel.
+    if (target) {
+      void useMessagingStore
+        .getState()
+        .archiveObjectChannel(target.kind === 'folder' ? 'room' : 'desk', id)
+    }
+    if (ids.length) {
+      recordActionWithToast({
+        label: `Delete ${target?.kind ?? 'item'}${target?.title ? ` “${target.title}”` : ''}`,
+        undo: async () => {
+          await window.api.nodes.restore(ids)
+          await get().refresh()
+        },
+        redo: async () => {
+          await window.api.nodes.delete(id)
+          await get().refresh()
+        }
+      })
+    }
+  },
+  moveToOrg: async (id, orgId, teamId) => {
+    const ids = await window.api.nodes.moveToOrg(id, orgId, teamId)
+    if (!ids.length) return ids
+    // The subtree left the active (personal) org; refresh drops it from this view.
+    // It now belongs to the target org and appears when that org is active, and the
+    // nudge pushes it to every member right away.
+    await get().refresh()
+    nudgeSync()
+    return ids
   },
   move: async (id, newParentId, beforeId) => {
+    // Capture the node's current slot so undo can put it back exactly.
+    const before = get().nodes.find((n) => n.id === id)
+    const prevParentId = before?.parentId ?? null
+    const siblings = get()
+      .nodes.filter((n) => n.parentId === prevParentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const idx = siblings.findIndex((n) => n.id === id)
+    const prevBeforeId = idx >= 0 ? siblings[idx + 1]?.id ?? null : null
     const updated = await window.api.nodes.move(id, newParentId, beforeId)
     if (!updated) return // rejected (cycle or missing) — leave state untouched
     // Refresh from server so sort_order on every sibling is correct in one fetch
     const fresh = await window.api.nodes.list()
     set({ nodes: fresh })
+    nudgeSync()
     // Auto-expand the destination parent so the moved node is visible after drop
     if (newParentId) set({ expanded: { ...get().expanded, [newParentId]: true } })
+    if (prevParentId !== newParentId || prevBeforeId !== beforeId) {
+      recordAction({
+        label: 'Move',
+        undo: async () => {
+          await window.api.nodes.move(id, prevParentId, prevBeforeId)
+          set({ nodes: await window.api.nodes.list() })
+        },
+        redo: async () => {
+          await window.api.nodes.move(id, newParentId, beforeId)
+          set({ nodes: await window.api.nodes.list() })
+        }
+      })
+    }
   },
   setActive: (id) => {
     const prev = get().activeTaskId
@@ -81,20 +247,13 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       })
     }
     set({ activeTaskId: id })
+    // Opening a desk is the honest "I am now looking at this" signal: capture what
+    // changed since last visit, mark it reviewed, and refresh related-desk health
+    // so the header surfaces relations (plexi-4.0). Fire-and-forget; never blocks
+    // navigation and degrades to a no-op if the endpoints are absent.
+    if (id) void useContextHealthStore.getState().openDesk(id)
   },
   toggleExpand: (id) =>
     set({ expanded: { ...get().expanded, [id]: !get().expanded[id] } }),
   expand: (id, on) => set({ expanded: { ...get().expanded, [id]: on } })
 }))
-
-function descendantOf(nodes: FbNode[], candidate: string, ancestor: string): boolean {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  let cur: string | null = candidate
-  while (cur) {
-    const node = byId.get(cur)
-    if (!node || !node.parentId) return false
-    if (node.parentId === ancestor) return true
-    cur = node.parentId
-  }
-  return false
-}

@@ -1,5 +1,5 @@
 /*
-  FocusBuddy 2026 design tokens.
+  PlexiDesk 2026 design tokens.
 
   Strategy:
   - Color: OKLCH-based ramps for perceptual uniformity. Each theme provides its
@@ -21,12 +21,15 @@
 
 :root {
   /* ── Typography ─────────────────────────────────────────────────────────── */
+  /* 'Inter Variable' is the self-hosted family name registered by the bundled
+     @fontsource-variable/inter; plain 'Inter' stays as a fallback for any older
+     CDN-loaded copy, then the system stack. */
   --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   /* Display is the same Inter — we lean on weight + tracking, not a separate
      font family, so there's never a fallback surprise that looks cheap. */
   --font-display:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono:
     'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
   --font-hand: 'Patrick Hand', cursive;
@@ -35,9 +38,34 @@
   --ink-100: oklch(15% 0.012 264);     /* primary body */
   --ink-90: oklch(28% 0.011 264);      /* secondary */
   --ink-70: oklch(46% 0.010 264);      /* tertiary, meta */
-  --ink-50: oklch(62% 0.008 264);      /* placeholder, disabled */
-  --ink-30: oklch(78% 0.006 264);      /* hairlines, dim */
+  --ink-60: oklch(54% 0.009 264);      /* between meta and placeholder */
+  /* PLX-A11Y-001: ink-50/ink-40 raised from 62%/70% L so text set in either
+     token (kbd hints, section labels/eyebrows) clears WCAG AA 4.5:1 against
+     every surface tone (base/raised/sunken), not just the lightest one.
+     Relative order is preserved (ink-50 stays a touch more contrasty than
+     ink-40) with a small safety margin above the 4.5:1 floor. */
+  --ink-50: oklch(52.5% 0.008 264);    /* placeholder, disabled */
+  --ink-40: oklch(53.5% 0.007 264);    /* faint meta, section eyebrows */
+  --ink-30: oklch(78% 0.006 264);      /* hairlines, dim — decorative only, not used for text */
   --ink-10: oklch(94% 0.004 264);      /* surface tone */
+
+  /* ── Brand group ink — PLX-A11Y-001 ───────────────────────────────────────
+     The PlexiSuite home (PlexiSuiteHome.tsx) sets each product-group heading's
+     TEXT color straight to that group's vivid brand accent (PLEXI_GROUPS in
+     shared/plexiSuite.ts) — none of the seven clear 4.5:1 against
+     --surface-base. Rather than dim the brand palette itself (used elsewhere
+     for icon fills, badges and card glows, where it still reads fine), these
+     are same-hue TEXT variants: same hue and chroma, lightness pulled just
+     past the WCAG AA floor with a small safety margin (~4.8:1) against the
+     lightest surface these headings render on. Fills/icons/badges keep using
+     the vivid accent unchanged; only heading TEXT reads these tokens. */
+  --brand-office-ink: #ab5a00;   /* PlexiOffice,  accent #f59e0b */
+  --brand-work-ink: #d6272f;     /* PlexiWork,    accent #ef4444 */
+  --brand-ai-ink: #804fe8;       /* PlexiAI,      accent #8b5cf6 */
+  --brand-data-ink: #0074b5;     /* PlexiData,    accent #0ea5e9 */
+  --brand-build-ink: #00804c;    /* PlexiBuild,   accent #10b981 */
+  --brand-connect-ink: #5c5de8;  /* PlexiConnect, accent #6366f1 */
+  --brand-ops-ink: #007e6e;      /* PlexiOps,     accent #14b8a6 */
 
   /* ── Surface (background) — OKLCH ───────────────────────────────────────── */
   --surface-base: oklch(98.5% 0.003 264);     /* document floor */
@@ -85,17 +113,23 @@
   --dur-cinematic: 720ms;
 
   /* ── Glass surface composition ──────────────────────────────────────────── */
-  /* Three tiers: chrome (sidebar/dock), panel (popovers), pillow (modal cards) */
-  --glass-chrome-fill: oklch(98% 0.003 264 / 0.72);
-  --glass-chrome-blur: saturate(160%) blur(24px);
+  /* Three tiers: chrome (sidebar/dock), panel (popovers), pillow (modal cards).
+     The two scale knobs below let the Theme studio tune translucency + blur
+     across every glass surface at once. At scale 1 the values are identical to
+     the hand-tuned originals, so an uncustomised UI looks exactly as before. */
+  --fb-glass-opacity-scale: 1;
+  --fb-glass-blur-scale: 1;
+
+  --glass-chrome-fill: oklch(98% 0.003 264 / calc(0.72 * var(--fb-glass-opacity-scale)));
+  --glass-chrome-blur: saturate(160%) blur(calc(24px * var(--fb-glass-blur-scale)));
   --glass-chrome-border: oklch(100% 0 0 / 0.4);
 
-  --glass-panel-fill: oklch(99% 0.002 264 / 0.78);
-  --glass-panel-blur: saturate(180%) blur(28px);
+  --glass-panel-fill: oklch(99% 0.002 264 / calc(0.78 * var(--fb-glass-opacity-scale)));
+  --glass-panel-blur: saturate(180%) blur(calc(28px * var(--fb-glass-blur-scale)));
   --glass-panel-border: oklch(100% 0 0 / 0.5);
 
-  --glass-pillow-fill: oklch(100% 0 0 / 0.84);
-  --glass-pillow-blur: saturate(170%) blur(40px);
+  --glass-pillow-fill: oklch(100% 0 0 / calc(0.84 * var(--fb-glass-opacity-scale)));
+  --glass-pillow-blur: saturate(170%) blur(calc(40px * var(--fb-glass-blur-scale)));
   --glass-pillow-border: oklch(100% 0 0 / 0.55);
 
   /* ── Radii — a more deliberate scale ────────────────────────────────────── */
@@ -105,6 +139,12 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-2xl: 28px;
+
+  /* Canonical widget BODY text size. One dial so tool bodies read at a consistent
+     size and a widget grows with its content rather than shrinking its text.
+     Chrome labels, headings, table headers and the office editors keep their own
+     scale — this is body copy only. */
+  --fb-body-size: 13px;
 }
 
 /* ── Dark theme overrides ─────────────────────────────────────────────────── */
@@ -112,9 +152,25 @@
   --ink-100: oklch(96% 0.005 264);
   --ink-90: oklch(86% 0.006 264);
   --ink-70: oklch(72% 0.008 264);
-  --ink-50: oklch(56% 0.010 264);
+  --ink-60: oklch(64% 0.009 264);
+  /* PLX-A11Y-001: see :root — raised from 56%/47% so ink-50/ink-40 text meets
+     WCAG AA 4.5:1 against the lightest surface (surface-raised, 18% L). */
+  --ink-50: oklch(60.2% 0.010 264);
+  --ink-40: oklch(59.1% 0.011 264);
   --ink-30: oklch(38% 0.012 264);
   --ink-10: oklch(22% 0.015 264);
+
+  /* PLX-A11Y-001: dark-surface variants of the brand group ink — the vivid
+     accents already clear 4.5:1 against the dark surface for 5 of 7 groups,
+     but PlexiAI and PlexiConnect need a touch of lightening to reach the same
+     ~4.8:1 margin. The rest keep their original accent verbatim. */
+  --brand-office-ink: #f59e0b;
+  --brand-work-ink: #ef4444;
+  --brand-ai-ink: #8c5ef8;
+  --brand-data-ink: #0ea5e9;
+  --brand-build-ink: #10b981;
+  --brand-connect-ink: #686cf7;
+  --brand-ops-ink: #14b8a6;
 
   --surface-base: oklch(14% 0.012 264);
   --surface-raised: oklch(18% 0.014 264);
@@ -140,13 +196,13 @@
     0 32px 80px -16px rgb(var(--accent) / 0.10);
   --shadow-inset-highlight: inset 0 1px 0 oklch(100% 0 0 / 0.06);
 
-  --glass-chrome-fill: oklch(20% 0.014 264 / 0.66);
+  --glass-chrome-fill: oklch(20% 0.014 264 / calc(0.66 * var(--fb-glass-opacity-scale)));
   --glass-chrome-border: oklch(100% 0 0 / 0.06);
 
-  --glass-panel-fill: oklch(22% 0.014 264 / 0.72);
+  --glass-panel-fill: oklch(22% 0.014 264 / calc(0.72 * var(--fb-glass-opacity-scale)));
   --glass-panel-border: oklch(100% 0 0 / 0.08);
 
-  --glass-pillow-fill: oklch(24% 0.014 264 / 0.78);
+  --glass-pillow-fill: oklch(24% 0.014 264 / calc(0.78 * var(--fb-glass-opacity-scale)));
   --glass-pillow-border: oklch(100% 0 0 / 0.10);
 }
 
@@ -177,9 +233,23 @@
   --ink-100: oklch(95% 0.012 80);
   --ink-90: oklch(85% 0.014 80);
   --ink-70: oklch(70% 0.016 80);
-  --ink-50: oklch(54% 0.018 80);
+  --ink-60: oklch(62% 0.017 80);
+  /* PLX-A11Y-001: see :root — raised from 54%/45% so ink-50/ink-40 text meets
+     WCAG AA 4.5:1 against the lightest surface (surface-raised, 20% L). */
+  --ink-50: oklch(61.2% 0.018 80);
+  --ink-40: oklch(60.1% 0.019 80);
   --ink-30: oklch(36% 0.020 80);
   --ink-10: oklch(22% 0.024 250);
+
+  /* PLX-A11Y-001: same brand group ink treatment as .dark, re-checked against
+     Atelier's own (slightly lighter, warmer) surface-base. */
+  --brand-office-ink: #f59e0b;
+  --brand-work-ink: #ef4444;
+  --brand-ai-ink: #8e60fa;
+  --brand-data-ink: #0ea5e9;
+  --brand-build-ink: #10b981;
+  --brand-connect-ink: #696ef9;
+  --brand-ops-ink: #14b8a6;
 
   /* Surfaces — deep navy with a warm undertone, not blue-grey */
   --surface-base: oklch(16% 0.030 250);     /* document floor */
@@ -208,13 +278,13 @@
   --shadow-inset-highlight: inset 0 1px 0 rgb(var(--accent) / 0.12);
 
   /* Glass tiers — warmer fill than .dark, more pronounced gold edge */
-  --glass-chrome-fill: oklch(20% 0.028 250 / 0.72);
+  --glass-chrome-fill: oklch(20% 0.028 250 / calc(0.72 * var(--fb-glass-opacity-scale)));
   --glass-chrome-border: rgb(var(--accent) / 0.10);
 
-  --glass-panel-fill: oklch(22% 0.026 250 / 0.78);
+  --glass-panel-fill: oklch(22% 0.026 250 / calc(0.78 * var(--fb-glass-opacity-scale)));
   --glass-panel-border: rgb(var(--accent) / 0.14);
 
-  --glass-pillow-fill: oklch(24% 0.025 250 / 0.84);
+  --glass-pillow-fill: oklch(24% 0.025 250 / calc(0.84 * var(--fb-glass-opacity-scale)));
   --glass-pillow-border: rgb(var(--accent) / 0.18);
 }
 
@@ -274,6 +344,16 @@
     var(--shadow-inset-highlight);
 }
 
+/* Softer glass treatment for dashboard cards — composes with Tailwind's
+   bg-white/85 dark:bg-stone-900/85 backdrop-blur. Adds the inset highlight
+   that distinguishes a glass surface from a plain card. Used by
+   WorkspaceProgressCard, WorkspaceHealthCard, and any other 2.0-era card. */
+.fb-glass-soft {
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.04),
+    var(--shadow-inset-highlight);
+}
+
 /* Hairline borders — true 1px even on retina, with subpixel separation */
 .fb-hairline {
   border: 1px solid var(--edge-soft);
@@ -328,6 +408,13 @@
   font-size: 0.92em;
 }
 
+/* Canonical widget body copy — one size across tools so text doesn't shrink per
+   widget. Stack .fb-tabular on top for numeric bodies. Independent of theme. */
+.fb-body {
+  font-size: var(--fb-body-size);
+  line-height: 1.5;
+}
+
 /* Subtle ambient breath — apply to status surfaces that should feel "alive"
    at rest. 8s loop, alpha 0.6 ↔ 1.0 on the accent. */
 @keyframes fb-breath {
@@ -353,4 +440,68 @@
 .fb-lift:active {
   transform: translateY(0);
   transition-duration: var(--dur-instant);
+}
+
+/* ── Compact density ────────────────────────────────────────────────────────
+   lib/uiScale.ts sets data-density on the document root. It is auto-chosen for
+   laptop-sized screens on first launch and toggleable in Settings. Compact
+   trims the chrome's padding and tightens the corner radii so more of the
+   screen is the desk. It deliberately does NOT shrink reading text, that is the
+   job of the UI scale (page zoom), so compact keeps everything legible while
+   reclaiming whitespace. The uniform scale is the main real-estate lever; this
+   layer removes the extra padding that a pure zoom cannot. */
+:root[data-density='compact'] {
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 11px;
+  --radius-xl: 16px;
+  --radius-2xl: 22px;
+  /* Fixed-width side menus (segment + PlexiOffice) narrow so the working area
+     grows. The main desk sidebar is user-resizable and keeps its dragged width;
+     it densifies through the padding rules below rather than by force-narrowing. */
+  --fb-sidebar-fixed: 224px;
+}
+
+/* Side-menu inset: less margin around the floating card so it sits closer to
+   the window edge and leaves more room for the content beside it. */
+:root[data-density='compact'] .fb-floating-inset {
+  padding: 6px 5px 6px 6px;
+}
+
+/* Sidebar nav rows: shorter, so more items fit without scrolling. The icon tile
+   and 13px label are left alone; only the vertical padding tightens. */
+:root[data-density='compact'] .fb-nav-item {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Context menus: tighter rows and less top/bottom padding. Text stays at 14px
+   (text-sm) so entries remain easy to read; only the whitespace shrinks. */
+:root[data-density='compact'] .fb-context-menu {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+:root[data-density='compact'] .fb-context-menu [role='menuitem'] {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Global footer: a little shorter, keeping its 11px text. */
+:root[data-density='compact'] footer {
+  height: 1.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* Control pill (FloatingPill): tighter internal padding and shorter buttons.
+   Buttons stay at 22px so they remain easy to hit; icons and labels are left
+   alone. The `.fb-pill` hook is set on both the vertical and horizontal pill
+   roots, so this reaches both without touching other chrome. */
+:root[data-density='compact'] .fb-pill > div {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+:root[data-density='compact'] .fb-pill button {
+  height: 1.375rem;
 }

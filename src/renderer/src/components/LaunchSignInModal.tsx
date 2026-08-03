@@ -1,0 +1,408 @@
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import PlexiiLogo from './PlexiiLogo'
+import { useAccountStore } from '../stores/account'
+import { useSignInPrompt } from '../stores/signInPrompt'
+import { useOnboarding } from '../stores/onboarding'
+import { signalConfig } from '../lib/signalConfig'
+import { forgotPasswordUrl } from '../lib/siteUrls'
+import Icon from './Icon'
+
+// LaunchSignInModal — appears on app boot when the user isn't signed in
+// and hasn't recently skipped the modal.
+//
+// Two tabs:
+//   - Log in (default if cachedEmail exists)
+//   - Sign up
+//
+// Plus a calm "Continue without account" button so existing users who
+// were happy local-only aren't forced into an account. Their choice is
+// remembered for a week (see SKIP_TTL_MS) — after that, the modal
+// surfaces again because eventually most users want shares to sync.
+//
+// All auth goes through the signal server's /accounts/signup and
+// /accounts/login endpoints (see lib/accountClient.ts).
+
+const SKIP_TTL_MS = 7 * 24 * 60 * 60 * 1000 // one week
+
+export default function LaunchSignInModal(): JSX.Element | null {
+  const bootStatus = useAccountStore((s) => s.bootStatus)
+  const account = useAccountStore((s) => s.account)
+  const skippedAt = useAccountStore((s) => s.skippedAt)
+  const cachedEmail = useAccountStore((s) => s.cachedEmail)
+  const signupAction = useAccountStore((s) => s.signup)
+  const loginAction = useAccountStore((s) => s.login)
+  const setSkipped = useAccountStore((s) => s.setSkipped)
+  // Manual open requested from elsewhere (Settings account section, etc.).
+  // When set, the modal shows even if the user previously skipped.
+  const manualOpen = useSignInPrompt((s) => s.open)
+  const closeManual = useSignInPrompt((s) => s.close)
+  const onboardingStatus = useOnboarding((s) => s.status)
+  // Manually dismissed in this session — we don't want it to re-appear
+  // if some other state change fires after the user closed it.
+  const [dismissedThisSession, setDismissedThisSession] = useState(false)
+
+  const [mode, setMode] = useState<'login' | 'signup'>(
+    cachedEmail ? 'login' : 'signup'
+  )
+  // Pre-fill email from the cached value (so a returning user only types
+  // their password). Sync once cachedEmail is loaded.
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // Set once the server says this account has 2FA on; reveals the code field.
+  const [twoFactor, setTwoFactor] = useState(false)
+  const [code, setCode] = useState('')
+
+  useEffect(() => {
+    if (cachedEmail && !email) {
+      setEmail(cachedEmail)
+      setMode('login')
+    }
+  }, [cachedEmail, email])
+
+  // Decide whether to render. Three reasons we don't:
+  //  - Account store hasn't finished booting (don't flash the modal).
+  //  - User is already signed in.
+  //  - User skipped recently (within SKIP_TTL_MS) — but skippedAt is
+  //    wiped on a successful sign-in, so this only blocks while they're
+  //    truly in the "no thanks" state.
+  //  - User dismissed in this session.
+  if (bootStatus !== 'ready') return null
+  if (account) return null
+  // Don't stack on top of first-run onboarding. A fresh user does the welcome +
+  // API-key + starter flow first; the account prompt waits until that's done.
+  if (!manualOpen && onboardingStatus === 'active') return null
+  // A manual open (from Settings) overrides the skip/dismiss throttling — the
+  // user explicitly asked to sign in, so always show it in that case.
+  if (!manualOpen) {
+    if (dismissedThisSession) return null
+    if (skippedAt && Date.now() - skippedAt < SKIP_TTL_MS) return null
+  }
+
+  async function handleSubmit(e: React.FormEvent): Promise<void> {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result =
+        mode === 'login'
+          ? await loginAction({
+              email: email.trim().toLowerCase(),
+              password,
+              code: twoFactor ? code.trim() : undefined
+            })
+          : await signupAction({
+              email: email.trim().toLowerCase(),
+              password,
+              firstName: firstName.trim() || null,
+              lastName: lastName.trim() || null
+            })
+      if (result.ok) {
+        // Modal will unmount because `account` is now populated. No
+        // additional close needed.
+        return
+      }
+      if (result.code === 'TWO_FACTOR') {
+        // Password was accepted; the account needs a code. Reveal the field and
+        // keep the password in place so the user just adds the code.
+        setTwoFactor(true)
+        setError(twoFactor ? result.error : null)
+        return
+      }
+      if (result.code === 'EMAIL_EXISTS') {
+        setError('An account with that email exists. Switched you to log in.')
+        setMode('login')
+        return
+      }
+      if (result.code === 'NETWORK') {
+        setError(
+          'Could not reach the PlexiDesk server. You can continue without an account and try again later.'
+        )
+        return
+      }
+      setError(result.error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleSkip(): Promise<void> {
+    await setSkipped(true)
+    setDismissedThisSession(true)
+    closeManual()
+  }
+
+  // Close without recording a week-long skip — used by the X when the modal
+  // was opened on demand from Settings.
+  function handleClose(): void {
+    setDismissedThisSession(true)
+    closeManual()
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sign in to PlexiDesk"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-6 fb-glass-chrome border border-white/[0.08] shadow-2xl"
+        style={{
+          background: 'rgba(20, 28, 48, 0.96)',
+          boxShadow:
+            'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(139, 92, 246, 0.12), 0 24px 64px -12px rgba(139, 92, 246, 0.28), 0 32px 80px -16px rgba(0, 0, 0, 0.65)'
+        }}
+      >
+        <div className="flex justify-center mb-4">
+          <PlexiiLogo height={26} variant="white" />
+        </div>
+        <div className="flex items-center gap-3 mb-1">
+          <div
+            className="h-10 w-10 rounded-xl inline-flex items-center justify-center text-[20px] shrink-0"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(99, 102, 241, 0.18))',
+              color: 'white'
+            }}
+          >
+            <Icon name="auto_awesome" size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[15px] font-semibold text-stone-100 tracking-[0.04em]">
+              {mode === 'login' ? 'Welcome back' : 'Sign in to PlexiDesk'}
+            </h2>
+            <p className="text-[11px] text-stone-400">
+              {mode === 'login'
+                ? 'Sign in to sync shared items across your devices.'
+                : 'Create an account to receive shares and sync across your devices.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Close"
+            data-testid="signin-close"
+            className="shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-md text-stone-400 hover:text-stone-100 hover:bg-white/[0.06] transition-colors"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+
+        {/* Mode toggle */}
+        <div className="mt-4 flex items-center gap-0.5 p-0.5 rounded-md bg-white/[0.03] border border-white/[0.06] w-fit">
+          <button
+            onClick={() => {
+              setMode('login')
+              setError(null)
+            }}
+            className={`px-3 py-1 rounded text-[11px] font-medium transition-colors ${
+              mode === 'login'
+                ? 'bg-accent/15 text-accent'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+            type="button"
+          >
+            Log in
+          </button>
+          <button
+            onClick={() => {
+              setMode('signup')
+              setError(null)
+            }}
+            className={`px-3 py-1 rounded text-[11px] font-medium transition-colors ${
+              mode === 'signup'
+                ? 'bg-accent/15 text-accent'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+            type="button"
+          >
+            Sign up
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+              style={{
+                background: 'rgba(0,0,0,0.32)',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </div>
+          {mode === 'signup' && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                  First name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Jane"
+                  maxLength={40}
+                  autoComplete="given-name"
+                  data-testid="signup-first-name"
+                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                  Last name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Smith"
+                  maxLength={40}
+                  autoComplete="family-name"
+                  data-testid="signup-last-name"
+                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
+                />
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={mode === 'signup' ? 8 : undefined}
+              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+              style={{
+                background: 'rgba(0,0,0,0.32)',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}
+              placeholder={mode === 'signup' ? 'at least 8 characters' : 'your password'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+            {mode === 'login' && (
+              <div className="text-right mt-1">
+                <button
+                  type="button"
+                  onClick={() => void window.api.files.openExternal(forgotPasswordUrl(email))}
+                  data-testid="signin-forgot"
+                  className="text-[11px] text-stone-400 hover:text-accent transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+          </div>
+
+          {mode === 'login' && twoFactor && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1">
+                Authentication code
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                required
+                autoFocus
+                data-testid="signin-2fa-code"
+                className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none tracking-[0.3em] font-mono"
+                style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
+                placeholder="123456"
+                autoComplete="one-time-code"
+              />
+              <p className="mt-1 text-[10px] text-stone-500">
+                From your authenticator app, or use a recovery code.
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div
+              className="text-[11px] px-3 py-2 rounded-md"
+              style={{
+                background: 'rgba(244,114,182,0.10)',
+                border: '1px solid rgba(244,114,182,0.25)',
+                color: 'rgb(251, 207, 232)'
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => {
+                const domain = email.split('@')[1]?.trim().toLowerCase()
+                if (!domain) {
+                  setError('Enter your work email first, then use Sign in with SSO.')
+                  return
+                }
+                const url = `${signalConfig.httpUrl.replace(/\/+$/, '')}/auth/sso/start?domain=${encodeURIComponent(domain)}`
+                void window.api.files.openExternal(url)
+              }}
+              data-testid="signin-sso"
+              className="w-full text-[12px] text-accent hover:underline py-1"
+            >
+              Sign in with SSO
+            </button>
+          )}
+
+          <div className="pt-1 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSkip()}
+              className="text-[11px] text-stone-400 hover:text-stone-100 transition-colors"
+              title="Use PlexiDesk locally without an account. You can sign in later from Settings."
+            >
+              Continue without account
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !email || !password || (mode === 'login' && twoFactor && !code.trim())}
+              className="btn-primary !text-[12px] disabled:opacity-50"
+            >
+              {busy
+                ? 'Working…'
+                : mode === 'login'
+                  ? twoFactor
+                    ? 'Verify'
+                    : 'Log in'
+                  : 'Create account'}
+            </button>
+          </div>
+        </form>
+
+        <p className="mt-4 pt-3 border-t border-white/[0.04] text-[10px] text-stone-500 leading-relaxed">
+          Your local data stays on this device. Only the items you share, and your
+          email, touch our server. No third-party trackers or ads. Anonymous,
+          aggregate usage helps us improve the app, and you can turn that off in
+          Settings.
+        </p>
+      </div>
+    </div>,
+    document.body
+  )
+}

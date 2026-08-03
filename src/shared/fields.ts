@@ -21,6 +21,7 @@ export type FieldType =
   | 'attachment' // references one or more fb_files entries
   | 'button' // programmable: runs a shell command or AI prompt
   | 'relation' // links to rows of another fb_tables table
+  | 'doc-ref' // references one or more PlexiOffice documents (doc/sheet/slides/draw/design)
 
 // Per-type config. Discriminated by `type` at runtime via a parent
 // FieldDefinition so we never need to inspect this in isolation.
@@ -61,6 +62,13 @@ export interface FieldConfigByType {
     // the cardinality.
     multi?: boolean
   }
+  'doc-ref': {
+    // Optional restriction to a single office document kind (e.g. only sheets).
+    // Empty = any office document may be referenced.
+    docType?: string
+    // false = one document, true = many. Stored as string[] either way.
+    multi?: boolean
+  }
 }
 
 // Type-safe field definition: the runtime value of `type` selects which
@@ -91,6 +99,7 @@ export type FieldValueByType = {
   attachment: string[] // fb_files.id[]
   button: never // buttons don't store values; they have execution history elsewhere
   relation: string[] // fb_rows.id[] in the target table
+  'doc-ref': string[] // documents.id[] (PlexiOffice documents)
 }
 
 export type FieldValue = FieldValueByType[FieldType]
@@ -126,6 +135,8 @@ export function defaultConfig<T extends FieldType>(type: T): FieldConfigByType[T
         displayColumnId: null,
         multi: true
       } as unknown as FieldConfigByType[T]
+    case 'doc-ref':
+      return { multi: true } as unknown as FieldConfigByType[T]
     default:
       return {} as FieldConfigByType[T]
   }
@@ -153,9 +164,56 @@ export function defaultValue<T extends FieldType>(type: T): FieldValueByType[T] 
       return null as unknown as FieldValueByType[T]
     case 'relation':
       return [] as unknown as FieldValueByType[T]
+    case 'doc-ref':
+      return [] as unknown as FieldValueByType[T]
     default:
       return null as unknown as FieldValueByType[T]
   }
+}
+
+// Best-effort conversion of a stored cell value when a column's type changes.
+// Keeps the value where the two shapes are compatible (plain text ↔ text,
+// text ↔ number, date ↔ number) and otherwise resets to the new type's default
+// rather than carrying a value the new type cannot interpret, such as a stale
+// option id rendered as text. text-rich (Tiptap JSON) and the id-bearing types
+// (selects, relation, attachment) never carry across a type change.
+export function coerceFieldValue(from: FieldType, to: FieldType, value: unknown): unknown {
+  if (from === to) return value
+  if (value === null || value === undefined) return defaultValue(to)
+  const plainText = (t: FieldType): boolean => t === 'text-short' || t === 'text-long'
+  if (plainText(to)) {
+    if (plainText(from) || from === 'number') return String(value)
+    if (from === 'date' && typeof value === 'number') return new Date(value).toISOString().slice(0, 10)
+    if (from === 'checkbox') return value ? 'true' : ''
+    return defaultValue(to)
+  }
+  if (to === 'number') {
+    if (from === 'number') return value
+    if (plainText(from)) {
+      const n = parseFloat(String(value))
+      return Number.isFinite(n) ? n : null
+    }
+    if (from === 'date' && typeof value === 'number') return value
+    if (from === 'checkbox') return value ? 1 : 0
+    return null
+  }
+  if (to === 'date') {
+    if (from === 'date' || (from === 'number' && typeof value === 'number')) return value
+    if (plainText(from)) {
+      const t = Date.parse(String(value))
+      return Number.isNaN(t) ? null : t
+    }
+    return null
+  }
+  if (to === 'checkbox') {
+    if (from === 'checkbox') return value
+    if (from === 'number') return value !== 0
+    if (plainText(from)) return String(value).trim().length > 0
+    return false
+  }
+  // single-select, multi-select, attachment, relation, text-rich, button:
+  // no safe carry-over from a different type — start clean.
+  return defaultValue(to)
 }
 
 export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
@@ -169,7 +227,8 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   date: 'Date',
   attachment: 'Attachment',
   button: 'Button',
-  relation: 'Related records'
+  relation: 'Related records',
+  'doc-ref': 'Office file'
 }
 
 export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
@@ -183,7 +242,8 @@ export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
   date: 'calendar_today',
   attachment: 'attach_file',
   button: 'smart_button',
-  relation: 'link'
+  relation: 'link',
+  'doc-ref': 'description'
 }
 
 // ── Tables ──────────────────────────────────────────────────────────────────
@@ -191,6 +251,90 @@ export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
 export interface TableSchema {
   // Ordered list of column definitions. Order in this array == display order.
   columns: FieldDefinition[]
+  // Display view. 'table' is the historic default and stays the implicit
+  // fallback when this field is absent. Each non-table view can carry its
+  // own configuration in `viewConfig` (which column drives kanban lanes,
+  // calendar dates, etc.) — leaving viewConfig undefined uses auto-pick.
+  viewMode?: TableViewMode
+  viewConfig?: TableViewConfig
+}
+
+export type TableViewMode =
+  | 'table'
+  | 'list'
+  | 'cards'
+  | 'kanban'
+  | 'calendar'
+  | 'gantt'
+
+export interface TableViewConfig {
+  // Column shown as the title / primary label in card / list / kanban /
+  // calendar / gantt views. Defaults to the first text-short column.
+  titleColumnId?: string
+  // For kanban: id of a single-select column used to group rows into lanes.
+  // Each lane = one option of that select. If the column has no options or
+  // the chosen column isn't a select, the view shows a configure hint.
+  kanbanColumnId?: string
+  // For calendar: id of a date column. Each row appears as an event on its
+  // date. Multi-day support left for a later iteration.
+  calendarColumnId?: string
+  // For gantt: ids of start + end date columns. Bars span from start→end.
+  ganttStartColumnId?: string
+  ganttEndColumnId?: string
+  // Row filtering. When present, only rows that satisfy the rule set are shown
+  // across every view. Empty rules = no filtering. See tableFilter.ts for the
+  // per-type operator catalogue and evaluation semantics.
+  filter?: TableFilterConfig
+  // Row grouping (table view). When columnId is set, the table view splits rows
+  // into collapsible groups keyed by that column's value.
+  group?: TableGroupConfig
+}
+
+// One predicate against one column. The shape of `value` depends on the
+// operator + column type: a string for text/select-id, a number for
+// number/date(ms), a string[] for the multi-select set operators, and absent
+// for the no-argument operators (is-empty, is-checked, etc.).
+export type FilterOperator =
+  | 'is'
+  | 'is-not'
+  | 'contains'
+  | 'not-contains'
+  | 'is-empty'
+  | 'is-not-empty'
+  | 'gt'
+  | 'lt'
+  | 'gte'
+  | 'lte'
+  | 'is-checked'
+  | 'is-unchecked'
+  | 'is-any-of'
+  | 'has-all-of'
+  | 'has-none-of'
+  | 'before'
+  | 'after'
+  | 'on-or-before'
+  | 'on-or-after'
+
+export interface FilterRule {
+  id: string
+  columnId: string
+  operator: FilterOperator
+  value?: string | number | string[] | null
+}
+
+export interface TableFilterConfig {
+  // 'and' = a row must satisfy every rule; 'or' = any one rule.
+  conjunction: 'and' | 'or'
+  rules: FilterRule[]
+}
+
+export interface TableGroupConfig {
+  // Column whose value defines the groups. null/absent = no grouping.
+  columnId: string | null
+  // Group keys the user has collapsed (hidden rows for).
+  collapsed?: string[]
+  // Order of the groups themselves.
+  direction?: 'asc' | 'desc'
 }
 
 export interface FbTable {
@@ -249,6 +393,26 @@ export interface FbFile {
   createdAt: number
 }
 
+// A single entry in the file/folder manager: a folder, an imported external
+// file, or a reference to an internal document (doc/sheet/slides) filed into a
+// folder. The manager lists these under a parent and the renderer renders them.
+export interface FileEntry {
+  id: string
+  parentId: string | null
+  kind: 'folder' | 'file' | 'doc'
+  name: string
+  ext?: string
+  mimeType?: string
+  sizeBytes?: number
+  // For kind 'doc': the document it points at, resolved live so renames show.
+  docId?: string
+  docType?: 'doc' | 'sheet' | 'slides'
+  // Number of immediate children (folders only) so the UI can show "3 items".
+  childCount?: number
+  createdAt: number
+  updatedAt: number
+}
+
 export interface FbFileMetaOnly {
   // Same as FbFile but without the resolved storedPath. Used by ingest where
   // the renderer only needs to know "where is it filed" via id + ext.
@@ -263,6 +427,33 @@ export interface FbFileMetaOnly {
 // Broad classification used by the file widget to pick a renderer. We keep
 // this in shared/ so renderer + main agree on the same buckets.
 export type FileKind = 'image' | 'pdf' | 'video' | 'audio' | 'generic'
+
+/**
+ * The FileWidget's `widget.content` field can be either:
+ *   - an `fb_files.id` (a UUID v4) — a locally ingested file, or
+ *   - an external http(s) URL — a cloud link (Google Doc, Notion, Drive, etc.)
+ *
+ * No prefix, no migration: a UUID isn't a URL and a URL isn't a UUID, so we
+ * discriminate by content shape. Empty content = uninitialised widget.
+ */
+export function isExternalUrlContent(content: string | null | undefined): boolean {
+  if (!content) return false
+  return /^https?:\/\//i.test(content.trim())
+}
+
+/**
+ * Friendly hostname for a URL — used as the display label on cloud-link
+ * widgets ("docs.google.com", "notion.so") in place of a filename. Returns
+ * the raw string if URL parsing fails so the widget still has something to
+ * show.
+ */
+export function hostnameForUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
 
 export function fileKindFromMime(mime: string, ext: string): FileKind {
   const e = ext.replace(/^\./, '').toLowerCase()

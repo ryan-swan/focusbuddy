@@ -91,29 +91,29 @@ export default function RecentActivityCard({ taskIds }: Props): JSX.Element {
     .slice(0, MAX_ROWS)
 
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/85 backdrop-blur">
-      <div className="px-4 pt-4 pb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-stone-500 dark:text-stone-400 font-semibold">
+    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur">
+      <div className="px-4 pt-4 pb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
         <Icon name="history" size={12} />
         <span>Recent activity</span>
       </div>
       {scoped.length === 0 ? (
-        <div className="px-4 pb-4 text-xs text-stone-500 dark:text-stone-400 text-center italic">
+        <div className="px-4 pb-4 text-xs text-[var(--ink-50)] text-center italic">
           Nothing tracked yet. Activity shows up as you open tasks, browse, and run sessions.
         </div>
       ) : (
-        <ul className="divide-y divide-stone-100 dark:divide-stone-800">
+        <ul className="divide-y divide-[var(--edge-soft)]">
           {scoped.map((e) => (
             <li
               key={e.id}
-              className="px-4 py-2 flex items-center gap-2 text-xs text-stone-700 dark:text-stone-300"
+              className="px-4 py-2 flex items-center gap-2 text-xs text-[var(--ink-70)]"
             >
               <Icon
                 name={KIND_ICON[e.kind] ?? 'circle'}
                 size={13}
-                className="text-stone-400 dark:text-stone-500 shrink-0"
+                className="text-[var(--ink-40)] shrink-0"
               />
               <span className="flex-1 truncate">{summarize(e)}</span>
-              <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono shrink-0">
+              <span className="text-[10px] text-[var(--ink-40)] font-mono shrink-0">
                 {relTime(e.ts)}
               </span>
             </li>

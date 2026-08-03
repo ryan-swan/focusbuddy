@@ -1,5 +1,8 @@
 import { randomUUID } from 'crypto'
+import { notifyRowsChanged } from '../tableEvents'
 import { getDb } from './database'
+import { getActiveOrgId } from './activeOrg'
+import { emitAutomationEvent } from './automationEvents'
 import type {
   FbRow,
   FbRowDraft,
@@ -48,13 +51,14 @@ export function createTable(draft: FbTableDraft): FbTable {
   const now = Date.now()
   const schema: TableSchema = draft.schema ?? { columns: [] }
   db.prepare(
-    `INSERT INTO fb_tables (id, task_id, title, schema_json, created_at, updated_at)
-     VALUES (@id, @taskId, @title, @schema, @now, @now)`
+    `INSERT INTO fb_tables (id, task_id, title, schema_json, created_at, updated_at, org_id)
+     VALUES (@id, @taskId, @title, @schema, @now, @now, @orgId)`
   ).run({
     id,
     taskId: draft.taskId,
     title: draft.title ?? 'Untitled',
     schema: JSON.stringify(schema),
+    orgId: getActiveOrgId(),
     now
   })
   const row = db.prepare('SELECT * FROM fb_tables WHERE id = ?').get(id) as TableRow
@@ -63,7 +67,8 @@ export function createTable(draft: FbTableDraft): FbTable {
 
 export function getTable(id: string): FbTable | null {
   const db = getDb()
-  const row = db.prepare('SELECT * FROM fb_tables WHERE id = ?').get(id) as
+  // Trashed tables read as gone (cross-member deletes are tombstones now).
+  const row = db.prepare('SELECT * FROM fb_tables WHERE id = ? AND trashed_at IS NULL').get(id) as
     | TableRow
     | undefined
   return row ? rowToTable(row) : null
@@ -72,8 +77,8 @@ export function getTable(id: string): FbTable | null {
 export function listTables(): FbTable[] {
   const db = getDb()
   const rows = db
-    .prepare('SELECT * FROM fb_tables ORDER BY updated_at DESC')
-    .all() as TableRow[]
+    .prepare('SELECT * FROM fb_tables WHERE org_id = ? AND trashed_at IS NULL ORDER BY updated_at DESC')
+    .all(getActiveOrgId()) as TableRow[]
   return rows.map(rowToTable)
 }
 
@@ -95,10 +100,21 @@ export function updateTable(id: string, patch: FbTablePatch): FbTable | null {
   return getTable(id)
 }
 
+// Soft-delete so the deletion propagates to other org members as a tombstone
+// (a hard DELETE leaves no trace to sync). The table's live rows are soft-deleted
+// in the same transaction, mirroring the ON DELETE CASCADE the hard delete used,
+// so the rows disappear with the table and tombstone across members too.
 export function deleteTable(id: string): boolean {
   const db = getDb()
-  const r = db.prepare('DELETE FROM fb_tables WHERE id = ?').run(id)
-  return r.changes > 0
+  const now = Date.now()
+  const tx = db.transaction(() => {
+    const info = db.prepare('UPDATE fb_tables SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(now, id)
+    if (info.changes > 0) {
+      db.prepare('UPDATE fb_rows SET trashed_at = ? WHERE table_id = ? AND trashed_at IS NULL').run(now, id)
+    }
+    return info.changes > 0
+  })
+  return tx()
 }
 
 // ── fb_rows ─────────────────────────────────────────────────────────────────
@@ -149,7 +165,7 @@ export function listRows(tableId: string): FbRow[] {
   const db = getDb()
   const rows = db
     .prepare(
-      'SELECT * FROM fb_rows WHERE table_id = ? ORDER BY sort_order ASC, created_at ASC'
+      'SELECT * FROM fb_rows WHERE table_id = ? AND trashed_at IS NULL ORDER BY sort_order ASC, created_at ASC'
     )
     .all(tableId) as RowRow[]
   return rows.map(rowToFbRow)
@@ -170,6 +186,10 @@ export function createRow(draft: FbRowDraft): FbRow {
     now
   })
   const row = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(id) as RowRow
+  // Let PlexiFlow react to a new row (suppressed automatically during flow runs).
+  emitAutomationEvent({ name: 'row-added', tableId: draft.tableId })
+  // And let the renderer invalidate its cached rows for this table.
+  notifyRowsChanged(draft.tableId)
   return rowToFbRow(row)
 }
 
@@ -196,13 +216,35 @@ export function updateRow(id: string, patch: FbRowPatch): FbRow | null {
   const row = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(id) as
     | RowRow
     | undefined
+  if (row) notifyRowsChanged(row.table_id)
   return row ? rowToFbRow(row) : null
 }
 
+// Soft-delete so the deletion propagates to other org members as a row tombstone.
+// The row survives with trashed_at set, which also lets undo restore it in place
+// (see restoreRow) instead of re-inserting a fresh row.
 export function deleteRow(id: string): boolean {
   const db = getDb()
-  const r = db.prepare('DELETE FROM fb_rows WHERE id = ?').run(id)
+  const row = db.prepare('SELECT table_id FROM fb_rows WHERE id = ?').get(id) as
+    | { table_id: string }
+    | undefined
+  const r = db.prepare('UPDATE fb_rows SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(Date.now(), id)
+  if (r.changes > 0 && row) notifyRowsChanged(row.table_id)
   return r.changes > 0
+}
+
+// Undo of deleteRow: clear trashed_at so the row comes back in place with the
+// same id and sort_order. Bumping updated_at trips the dirty trigger so the
+// restore propagates as an upsert (un-tombstone) to other members.
+export function restoreRow(id: string): FbRow | null {
+  const db = getDb()
+  db.prepare('UPDATE fb_rows SET trashed_at = NULL, updated_at = ? WHERE id = ? AND trashed_at IS NOT NULL').run(
+    Date.now(),
+    id
+  )
+  const row = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(id) as RowRow | undefined
+  if (row) notifyRowsChanged(row.table_id)
+  return row ? rowToFbRow(row) : null
 }
 
 export function reorderRows(tableId: string, orderedIds: string[]): void {
