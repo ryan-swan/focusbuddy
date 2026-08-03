@@ -6,7 +6,7 @@ import { useRelatedDesksStore } from '../stores/relatedDesks'
 import { useViewStore } from '../stores/view'
 import { useWidgetStore } from '../stores/widgets'
 import type { WidgetKind, SearchHit } from '@shared/types'
-import { WIDGET_CATALOG } from '../lib/widgetCatalog'
+import { WIDGET_CATALOG, isAdvancedKind } from '../lib/widgetCatalog'
 import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
@@ -549,6 +549,10 @@ export default function CommandCenter({
       // is shown in the row and works directly on the canvas.
       for (const entry of WIDGET_CATALOG) {
         if (entry.hideFromPicker) continue
+        // Match the picker's core/Advanced tiering: at an empty query only the
+        // CORE kinds show, keeping the default palette uncluttered; Advanced kinds
+        // stay fully reachable the moment the user types (scored below).
+        if (q === '' && isAdvancedKind(entry.kind)) continue
         const sc = effectiveQuickAddMap()[entry.kind]
         items.push({
           id: `add-${entry.kind}`,

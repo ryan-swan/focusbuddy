@@ -197,6 +197,8 @@ export const CREATE_AND_CONNECT_MENU: CreateMenuEntry[] = [
   { label: 'Field',          icon: 'input',         kind: 'field' },
   { label: 'Table',          icon: 'table_chart',   kind: 'table' },
   { label: 'Color',          icon: 'palette',       kind: 'color' },
-  { label: 'Email',          icon: 'mail',          kind: 'email',  seedContent: 'https://mail.google.com' },
+  // 'email' was removed: it's a folded kind (hidden from the picker, folded into
+  // File), so offering it for NEW creation here contradicted the fold. An inbox is
+  // reached via File (paste the URL) or a Browser widget.
   { label: 'Task link',      icon: 'task_alt',      kind: 'task-link' }
 ]
