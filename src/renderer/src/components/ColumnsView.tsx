@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Widget } from '@shared/types'
 import { contentToPlainText } from '@shared/widgetText'
 import { renderWidgetInline } from '../lib/renderWidgetInline'
@@ -136,6 +136,55 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     else if (isFreeform) assignTo(widgetId, columnId)
   }
 
+  // ── Edge navigation during a card drag ──────────────────────────────────────
+  // Mirrors the canvas edge-pan: while dragging a card near an edge, auto-scroll
+  // the horizontal column strip (left/right) or the hovered column's card stack
+  // (top/bottom), so you can reach off-screen columns and cards mid-drag. Driven by
+  // the latest pointer position captured on dragover; runs on a rAF loop for the
+  // life of the drag.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
+  const edgeRafRef = useRef<number | null>(null)
+
+  function startEdgeScroll(): void {
+    if (edgeRafRef.current != null) return
+    const EDGE = 64 // px from an edge where auto-scroll kicks in
+    const MAX = 22 // px per frame at the very edge
+    const step = (): void => {
+      const cont = scrollRef.current
+      const p = pointerRef.current
+      if (cont && p) {
+        const r = cont.getBoundingClientRect()
+        // Horizontal: scroll the whole column strip to reach off-screen columns.
+        if (p.x < r.left + EDGE) cont.scrollLeft -= MAX * Math.min(1, (r.left + EDGE - p.x) / EDGE)
+        else if (p.x > r.right - EDGE) cont.scrollLeft += MAX * Math.min(1, (p.x - (r.right - EDGE)) / EDGE)
+        // Vertical: scroll the card stack the pointer is currently over.
+        const bodies = cont.querySelectorAll<HTMLElement>('[data-col-scroll]')
+        for (const b of bodies) {
+          const br = b.getBoundingClientRect()
+          if (p.x >= br.left && p.x <= br.right && p.y >= br.top && p.y <= br.bottom) {
+            if (p.y < br.top + EDGE) b.scrollTop -= MAX * Math.min(1, (br.top + EDGE - p.y) / EDGE)
+            else if (p.y > br.bottom - EDGE) b.scrollTop += MAX * Math.min(1, (p.y - (br.bottom - EDGE)) / EDGE)
+            break
+          }
+        }
+      }
+      edgeRafRef.current = requestAnimationFrame(step)
+    }
+    edgeRafRef.current = requestAnimationFrame(step)
+  }
+
+  function stopEdgeScroll(): void {
+    if (edgeRafRef.current != null) {
+      cancelAnimationFrame(edgeRafRef.current)
+      edgeRafRef.current = null
+    }
+    pointerRef.current = null
+  }
+
+  // Safety net: stop the loop if the component unmounts mid-drag.
+  useEffect(() => () => stopEdgeScroll(), [])
+
   function addColumn(): void {
     const id = 'col-' + Math.random().toString(36).slice(2, 8)
     update({ ...cfg, columns: [...cfg.columns, { id, title: 'New column' }] })
@@ -237,7 +286,16 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
       )}
 
       {/* Horizontally scrolling set of columns */}
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden"
+        // Capture the live pointer position during a drag so the edge-scroll loop
+        // can auto-pan toward off-screen columns/cards. preventDefault keeps the
+        // gap between columns a valid drag surface too.
+        onDragOver={canDrag ? (e) => {
+          if (dragId) pointerRef.current = { x: e.clientX, y: e.clientY }
+        } : undefined}
+      >
         <div className="h-full flex gap-4 p-4 items-stretch">
           {columns.map((col) => (
             <section
@@ -249,10 +307,16 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                   ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.35)]'
                   : 'border-[var(--edge-soft)]'
               }`}
-              // Enter + Over must BOTH preventDefault for Chromium to accept a drop
-              // anywhere in the column, including over a card.
-              onDragEnter={canDrag ? (e) => { e.preventDefault(); setDragOverCol(col.id) } : undefined}
-              onDragOver={canDrag ? (e) => { e.preventDefault(); if (dragOverCol !== col.id) setDragOverCol(col.id) } : undefined}
+              // Enter + Over must BOTH preventDefault AND set dropEffect for Chromium
+              // to actually FIRE the drop (preventDefault alone shows the highlight but
+              // the drop is silently rejected if dropEffect doesn't match effectAllowed).
+              onDragEnter={canDrag ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverCol(col.id) } : undefined}
+              onDragOver={canDrag ? (e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                pointerRef.current = { x: e.clientX, y: e.clientY }
+                if (dragOverCol !== col.id) setDragOverCol(col.id)
+              } : undefined}
               onDrop={
                 canDrag
                   ? (e) => {
@@ -261,6 +325,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                       if (id) dropOn(col.id, id)
                       setDragId(null)
                       setDragOverCol(null)
+                      stopEdgeScroll()
                     }
                   : undefined
               }
@@ -292,8 +357,9 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                 )}
               </div>
 
-              {/* Independently scrolling stack of cards */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+              {/* Independently scrolling stack of cards. Tagged so the drag
+                  edge-scroll can auto-pan this column vertically. */}
+              <div data-col-scroll className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-3">
                 {col.items.length === 0 ? (
                   <div className="text-[11px] text-[var(--ink-40)] text-center py-6">
                     {canDrag ? 'Drag objects here' : 'Empty'}
@@ -319,10 +385,13 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                               e.dataTransfer.setData('text/plain', w.id)
                               e.dataTransfer.effectAllowed = 'move'
                               setDragId(w.id)
+                              pointerRef.current = { x: e.clientX, y: e.clientY }
+                              startEdgeScroll()
                             }}
                             onDragEnd={() => {
                               setDragId(null)
                               setDragOverCol(null)
+                              stopEdgeScroll()
                             }}
                             title="Drag to move"
                             className="shrink-0 -ml-1 px-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-30)] hover:text-[var(--ink-60)]"
