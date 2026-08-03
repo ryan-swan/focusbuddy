@@ -34,7 +34,11 @@ import { listEmbeddings } from '../db/embeddings'
 import { getNode } from '../db/nodes'
 import type { WorkspaceSource } from '../workspaceRank'
 import { embedQuery } from './embedder'
-import { resolveSpine } from './spine'
+import { resolveSpine, SOURCE_TYPE_TO_TABLE } from './spine'
+import { brainPermissionContext } from '../db/brainPermissionFacts'
+import { makeBrainCanRead } from '@shared/brainPermission'
+import type { Principal } from '@shared/permission'
+import { localActor } from '../context/engine'
 import { applySpineRerank, type SpineCandidate, type SpineContext } from '@shared/spineRerank'
 import { fuseCandidates, DEFAULT_RRF_K, type FusionCandidate } from '@shared/rrf'
 
@@ -125,20 +129,26 @@ export async function reorderAsync(sources: WorkspaceSource[], _query: string): 
  * unpermitted candidate that takes a rank slot changes the scores of everything below it, and no
  * amount of filtering afterwards can undo that. See shared/rrf.ts responsibility 0.
  *
- * ⚠ SCOPE — U1a shipped the POSITION of the filter and the injected seam. It did NOT ship
- * multi-user permission. There is no production membership model to answer `canRead` yet, so when
- * `opts.canRead` is omitted the floor permits everything and behaviour is byte-identical to
- * pre-U1a. Wiring it to the real room/desk/widget sharing model is U1b, held pending that model.
- * Do not read "the brain has a permission filter" as "the brain enforces permissions".
+ * U1b — the predicate behind that floor is DERIVED HERE, from the record, and is deliberately NOT
+ * accepted from the caller. A caller-supplied predicate is a caller-supplied permission decision;
+ * the principal and the store's organisation both come off the app's own state (getActiveOrgId /
+ * localActor) and each candidate's organisation comes off its row. See shared/brainPermission.ts.
+ *
+ * ⚠ SCOPE — this is permission-CORRECT for one principal, derived rather than faked. It is not
+ * multi-user permission, because there are no multiple principals and `brain_nodes` has no
+ * permission_scope column yet (that arrives with U3). Every node therefore resolves an empty grant
+ * set, which GPH-021 specifies as "any principal within the organisation" — a real branch of the
+ * rule, not a bypass of it. What IS enforced today: cross-organisation access fails closed, the
+ * restricted tier is withheld, and an unprojected chunk's organisation is refused rather than
+ * guessed once the store stops being provably single-org.
  *
  * @param opts.roomId  active room aperture (null = org-wide, no room gate)
  * @param opts.allowRestricted  permit restricted-sensitivity items (default false)
- * @param opts.canRead  permission floor predicate over chunk ids; omitted = permit all (U1b)
  */
 export async function retrieveViaBrain(
   query: string,
   limit = 6,
-  opts: { roomId?: string | null; allowRestricted?: boolean; canRead?: (id: string) => boolean } = {}
+  opts: { roomId?: string | null; allowRestricted?: boolean } = {}
 ): Promise<WorkspaceSource[]> {
   const q = query.trim()
   if (!q) return []
@@ -204,12 +214,32 @@ export async function retrieveViaBrain(
       importance: importanceSignal(c)
     })
   }
+  // ── STAGE 0 — the permission floor (U1a positioned it, U1b decides it). Built HERE from the
+  // app's own state rather than accepted from the caller: the asking principal is this machine's
+  // account within the active organisation, and every candidate's organisation is read off its own
+  // row (org-agnostically — see brainPermissionFacts.ts for why that matters). The predicate is
+  // handed to fuseCandidates so it runs before any rank, score or count is derived (U-4).
+  const permCtx = brainPermissionContext()
+  const principal: Principal = { id: localActor(), organisationId: permCtx.storeOrgId }
+  const canRead = makeBrainCanRead(
+    principal,
+    (chunkId) => {
+      const c = byId.get(chunkId)
+      if (!c) return null // not a chunk we loaded — no facts, handled as unprojected
+      const table = SOURCE_TYPE_TO_TABLE[c.source_type]
+      return table ? permCtx.lookupBySource(table, c.source_id) : null
+    },
+    {
+      allowRestricted: opts.allowRestricted === true,
+      storeOrgId: permCtx.storeOrgId,
+      storeIsSingleOrg: permCtx.storeIsSingleOrg
+    },
+    now
+  )
+
   const fused = fuseCandidates(fusionCandidates, { vector: vectorRanked, fts: ftsRanked }, {
     k: DEFAULT_RRF_K,
-    // Stage 0 — the permission floor, applied before any rank/score/count is derived (U-4).
-    // Threaded straight through: this file is the impure orchestration, so it carries the
-    // predicate but never decides it (SEC-020 — the enforcement point is not the membership model).
-    canRead: opts.canRead
+    canRead
   })
   if (fused.length === 0) return [] // nothing eligible (e.g. no embed + no lexical tokens)
 
