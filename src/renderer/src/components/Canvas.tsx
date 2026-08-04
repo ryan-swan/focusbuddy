@@ -1955,6 +1955,12 @@ export default function Canvas(): JSX.Element {
     let cursorX = PADDING
     let cursorY = existing.length > 0 ? startBelow + 40 : PADDING
     let rowMaxH = 0
+    // Undo parity: wrap the AI-spawned build in one action-history batch so it
+    // reverses with a single Cmd+Z, like a ProposalCards "Apply all" (createWidget
+    // records into the active batch). Was previously un-undoable.
+    const hist = useActionHistory.getState()
+    hist.beginBatch()
+    try {
     for (const s of suggestions) {
       const entry = catalogFor(s.kind)
       const w = entry?.defaultWidth ?? 300
@@ -2024,6 +2030,9 @@ export default function Canvas(): JSX.Element {
       cursorX += w + GAP
       rowMaxH = Math.max(rowMaxH, h)
     }
+    } finally {
+      hist.endBatch(`Add ${suggestions.length} object${suggestions.length === 1 ? '' : 's'} from Build with AI`)
+    }
     chimeIn()
     bumpLayoutVersion()
     setTimeout(() => centerOnHome(), 100)
@@ -2049,6 +2058,12 @@ export default function Canvas(): JSX.Element {
     let cursorX = PADDING
     let cursorY = existing.length > 0 ? startBelow + 40 : PADDING
     let rowMaxH = 0
+    // Undo parity: wrap the AI-spawned build in one action-history batch so it
+    // reverses with a single Cmd+Z, like a ProposalCards "Apply all" (createWidget
+    // records into the active batch). Was previously un-undoable.
+    const hist = useActionHistory.getState()
+    hist.beginBatch()
+    try {
     for (const s of suggestions) {
       const entry = catalogFor(s.kind)
       const w = entry?.defaultWidth ?? 300
@@ -2071,6 +2086,9 @@ export default function Canvas(): JSX.Element {
       })
       cursorX += w + GAP
       rowMaxH = Math.max(rowMaxH, h)
+    }
+    } finally {
+      hist.endBatch(`Add ${suggestions.length} object${suggestions.length === 1 ? '' : 's'} from AI Setup`)
     }
     chimeIn()
     bumpLayoutVersion()
