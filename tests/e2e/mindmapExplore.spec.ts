@@ -71,7 +71,31 @@ test('Explore a node → creates a task, switches canvas, shows breadcrumb', asy
     return true
   })
   expect(hasExplore).toBe(true)
-  await window.waitForTimeout(600)
+
+  // Wait deterministically for explore to (a) create + persist the node's task
+  // AND (b) switch the active canvas to it, reading the live node store instead
+  // of racing a fixed timeout. The active-task check is what proves the switch
+  // actually happened: the pre-switch host canvas already shows both titles
+  // (sidebar + mindmap node label), so a plain body-text wait could pass before
+  // the async create + task switch had propagated — the old flake.
+  await window.waitForFunction(
+    () => {
+      const store = (
+        window as unknown as {
+          __fbNodes?: {
+            getState: () => {
+              nodes: Array<{ id: string; kind: string; title: string }>
+              activeTaskId: string | null
+            }
+          }
+        }
+      ).__fbNodes?.getState()
+      if (!store) return false
+      const built = store.nodes.find((n) => n.kind === 'task' && n.title === 'Build the API')
+      return !!built && store.activeTaskId === built.id
+    },
+    { timeout: 8_000 }
+  )
 
   // A new task was created for the node and the desk switched to it.
   const tasks = await window.evaluate(async () => {
@@ -81,10 +105,21 @@ test('Explore a node → creates a task, switches canvas, shows breadcrumb', asy
   })
   expect(tasks).toContain('Build the API') // node-task created
 
-  // The active canvas is now the node's task, with a breadcrumb back to the map.
-  const body = await window.evaluate(() => document.body.innerText)
-  expect(body).toContain('Mindmap host') // breadcrumb source
-  expect(body).toContain('Build the API') // current node label
+  // The active canvas is the node's own task — its title is the current crumb.
+  expect(await window.evaluate(() => document.body.innerText)).toContain('Build the API')
+
+  // The way back to the map is the breadcrumb ancestor chain — collapsed by
+  // default, revealed on hover. Expanding it surfaces the host task as a real
+  // clickable crumb, which is the actual "back to the map" affordance.
+  await window.locator('[data-testid="canvas-breadcrumb"]').hover()
+  // The ancestor crumb is the back-to-map link ("Open \"Mindmap host\""). Target
+  // it by title: hovering also opens the stage-manager desk switcher, which lists
+  // a second "Mindmap host" button, so a name-only match would be ambiguous.
+  await expect(
+    window
+      .locator('[data-testid="canvas-breadcrumb"]')
+      .locator('button[title=\'Open "Mindmap host"\']')
+  ).toBeVisible({ timeout: 5_000 })
 
   // Sanity: the host task still exists (we didn't replace it).
   expect(typeof taskId).toBe('string')
