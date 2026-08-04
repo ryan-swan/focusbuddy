@@ -5,9 +5,11 @@ import { personFirstName } from '../../lib/personName'
 import { useDocumentsStore } from '../../stores/documents'
 import { useNodeStore } from '../../stores/nodes'
 import { useAiCommandBar } from '../../stores/aiCommandBar'
+import { useAssistantChrome } from '../../stores/assistantChrome'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { RailCard, PLEXI_CARD } from '../plexi'
 import StandupHome from './StandupHome'
+import StartOrAskPlexi from './StartOrAskPlexi'
 import Icon from '../Icon'
 import type { ActivityEvent, ActivityKind, DocumentMeta, FbNode, TimeBlock } from '@shared/types'
 
@@ -127,6 +129,26 @@ function startOfDay(now: number): number {
   return d.getTime()
 }
 
+// Locally-dismissed activity items (spec §4.2 "Dismiss — remove low-value items
+// from view"). Kept in localStorage so a dismissal sticks across reloads; capped
+// so the list can't grow without bound.
+const DISMISSED_KEY = 'fb.home.dismissedActivity.v1'
+function loadDismissed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+function saveDismissed(s: Set<string>): void {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...s].slice(-500)))
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function HomeDashboard(): JSX.Element {
   const v = useViewStore()
   const account = useAccountStore((s) => s.account)
@@ -150,6 +172,7 @@ export default function HomeDashboard(): JSX.Element {
   // imperatively. null means "still loading"; [] means "loaded, genuinely empty".
   const [agenda, setAgenda] = useState<TimeBlock[] | null>(null)
   const [activity, setActivity] = useState<ActivityEvent[] | null>(null)
+  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed())
   // A clock that ticks each minute so the greeting + relative times stay current.
   const [now, setNow] = useState(() => Date.now())
 
@@ -223,7 +246,10 @@ export default function HomeDashboard(): JSX.Element {
     ]
   }, [nodes, agenda, now])
 
-  const recentActivity = useMemo(() => (activity ?? []).slice(0, 6), [activity])
+  const recentActivity = useMemo(
+    () => (activity ?? []).filter((e) => !dismissed.has(e.id)).slice(0, 6),
+    [activity, dismissed]
+  )
 
   const openDesk = (n: FbNode): void => {
     if (n.kind === 'folder') {
@@ -234,6 +260,34 @@ export default function HomeDashboard(): JSX.Element {
     }
     setActive(n.id)
     v.goTask(n.id)
+  }
+
+  // Activity feed per-item actions (spec §4.2). Only the actions that genuinely
+  // apply to a logged event are offered: Open its source desk, Ask Plexi about it
+  // (open the context-aware assistant on that desk), and Dismiss it. The
+  // content-only actions (Convert to task, Add to desk, Assign, Save) belong to the
+  // richer §4.2 content feed, and Pin arrives with the universal pin layer.
+  const openActivity = (e: ActivityEvent): void => {
+    if (!e.taskId) return
+    setActive(e.taskId)
+    v.goTask(e.taskId)
+  }
+  const askAboutActivity = (e: ActivityEvent): void => {
+    if (e.taskId) {
+      setActive(e.taskId)
+      v.goTask(e.taskId)
+    }
+    const chrome = useAssistantChrome.getState()
+    chrome.setMode('sidebar')
+    chrome.openPanel()
+  }
+  const dismissActivity = (id: string): void => {
+    setDismissed((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      saveDismissed(next)
+      return next
+    })
   }
 
   const onCreate = async (): Promise<void> => {
@@ -295,6 +349,10 @@ export default function HomeDashboard(): JSX.Element {
             {focusActive ? 'End focus mode' : 'Focus mode'}
           </button>
         </header>
+
+        {/* Start or ask Plexi (spec §4.1) — describe a goal, get a real desk with
+            AI-proposed widgets and the assistant beside it. */}
+        <StartOrAskPlexi />
 
         {/* Daily standup — the assistant's look-back/look-forward narrative, the
             hero of home (Assistant 4.5). */}
@@ -524,7 +582,7 @@ export default function HomeDashboard(): JSX.Element {
                   {recentActivity.map((e) => (
                     <li
                       key={e.id}
-                      className="flex items-center gap-2.5 px-1 py-1.5"
+                      className="group flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-[var(--surface-sunken)]"
                       data-testid={`home-activity-item-${e.id}`}
                     >
                       <Icon
@@ -535,8 +593,39 @@ export default function HomeDashboard(): JSX.Element {
                       <span className="flex-1 truncate text-[12px] text-[var(--ink-90)]">
                         {summarizeActivity(e)}
                       </span>
-                      <span className="shrink-0 text-[11px] text-[var(--ink-50)] fb-tabular">
+                      {/* Timestamp normally; a compact action row on hover/focus. */}
+                      <span className="shrink-0 text-[11px] text-[var(--ink-50)] fb-tabular group-hover:hidden">
                         {relTime(e.ts)}
+                      </span>
+                      <span className="shrink-0 hidden group-hover:flex items-center gap-0.5">
+                        {e.taskId && (
+                          <button
+                            onClick={() => openActivity(e)}
+                            title="Open its desk"
+                            data-testid={`home-activity-open-${e.id}`}
+                            className="icon-btn h-6 w-6 text-[var(--ink-50)] hover:text-[rgb(var(--accent))]"
+                          >
+                            <Icon name="open_in_new" size={13} />
+                          </button>
+                        )}
+                        {e.taskId && (
+                          <button
+                            onClick={() => askAboutActivity(e)}
+                            title="Ask Plexi about this"
+                            data-testid={`home-activity-ask-${e.id}`}
+                            className="icon-btn h-6 w-6 text-[var(--ink-50)] hover:text-[rgb(var(--accent))]"
+                          >
+                            <Icon name="auto_awesome" size={13} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => dismissActivity(e.id)}
+                          title="Dismiss"
+                          data-testid={`home-activity-dismiss-${e.id}`}
+                          className="icon-btn h-6 w-6 text-[var(--ink-40)] hover:text-rose-500"
+                        >
+                          <Icon name="close" size={13} />
+                        </button>
                       </span>
                     </li>
                   ))}
