@@ -673,13 +673,13 @@ async function applyCreateTodoList(
 
 async function applyCreatePage(
   p: Extract<ActionProposal, { kind: 'create-page' }>,
-  ctx: { activeTaskId: string | null }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
     return { ok: false, message: 'Open a task first — pages need a canvas.' }
   }
   const entry = catalogFor('page')
-  await useWidgetStore.getState().create({
+  const widget = await useWidgetStore.getState().create({
     taskId: ctx.activeTaskId,
     kind: 'page',
     title: p.title,
@@ -689,6 +689,9 @@ async function applyCreatePage(
     height: entry?.defaultHeight,
     color: null
   })
+  // Stash the new widget id so "Go to" (standard cards) and MindMap's
+  // agent-outcome ref can resolve what was created.
+  if (widget && ctx.resolvedIds) ctx.resolvedIds.set(p.id, widget.id)
   return { ok: true, message: `Added page "${p.title}"` }
 }
 

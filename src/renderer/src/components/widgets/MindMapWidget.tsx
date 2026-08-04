@@ -6,6 +6,7 @@ import Icon from '../Icon'
 import { useWidgetStore } from '../../stores/widgets'
 import { useNodeStore } from '../../stores/nodes'
 import { applyProposal } from '../../lib/actionExecutor'
+import { resolveGoToTarget } from '../../lib/goToTarget'
 import { catalogFor, entriesByCategory } from '../../lib/widgetCatalog'
 import { setOrigin } from '../../lib/nodeCanvasOrigin'
 
@@ -201,6 +202,23 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
 
   const persisted = useRef<PersistedState>(parsePersisted(widget.content))
   const [state, setState] = useState<PersistedState>(persisted.current)
+
+  // Per-turn resolvedIds map, keyed `${conversationKey}:${turnIndex}`. Applying a
+  // proposal stashes the created entity's id under the proposal id here, exactly
+  // as ProposalCards' shared applier does — so a later proposal in the same turn
+  // that $refs an earlier one resolves, and so we can name what was created via
+  // resolveGoToTarget instead of a brittle before/after world diff.
+  const turnResolvedIds = useRef<Map<string, Map<string, string>>>(new Map())
+  function resolvedIdsForTurn(conversationKey: string, turnIndex: number): Map<string, string> {
+    const key = `${conversationKey}:${turnIndex}`
+    let m = turnResolvedIds.current.get(key)
+    if (!m) {
+      m = new Map<string, string>()
+      turnResolvedIds.current.set(key, m)
+    }
+    return m
+  }
+
   function persist(next: PersistedState): void {
     persisted.current = next
     setState(next)
@@ -787,34 +805,18 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
     const ps = turn.proposalStates[proposalIndex]
     if (!ps || ps.state !== 'pending') return
 
-    // Snapshot the world's "what's new" surface before apply so we
-    // can deduce the entity the apply created. Apply currently
-    // returns ok+message, not the id. We diff nodes + widgets before
-    // and after to compute the ref.
-    const beforeNodeIds = new Set(useNodeStore.getState().nodes.map((n) => n.id))
-    const beforeWidgetIds = new Set(
-      useWidgetStore.getState().widgets.map((w) => w.id)
-    )
-    const result = await applyProposal(ps.proposal, { activeTaskId })
+    // Apply through the SAME shared applier + resolvedIds map the standard
+    // ProposalCards use, so a proposal that $refs an earlier one in this turn
+    // resolves. resolveGoToTarget then names what was created (task / widget /
+    // document) from that map, replacing the old brittle before/after world diff.
+    const resolvedIds = resolvedIdsForTurn(conversationKey, turnIndex)
+    const result = await applyProposal(ps.proposal, { activeTaskId, resolvedIds })
     if (!result.ok) {
       setErrorMsg(`Apply failed: ${result.message}`)
       return
     }
-    // Compute the new entity ref.
-    let createdEntityRef: string | null = null
-    const newNodes = useNodeStore
-      .getState()
-      .nodes.filter((n) => !beforeNodeIds.has(n.id))
-    if (newNodes.length > 0) {
-      createdEntityRef = `task:${newNodes[0].id}`
-    } else {
-      const newWidgets = useWidgetStore
-        .getState()
-        .widgets.filter((w) => !beforeWidgetIds.has(w.id))
-      if (newWidgets.length > 0) {
-        createdEntityRef = `widget:${newWidgets[0].id}`
-      }
-    }
+    const target = resolveGoToTarget(ps.proposal, resolvedIds)
+    const createdEntityRef = target ? `${target.kind}:${target.id}` : null
 
     // Tell the history table.
     try {

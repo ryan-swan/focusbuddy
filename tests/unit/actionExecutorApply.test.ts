@@ -403,3 +403,27 @@ describe('applyProposal: create-section', () => {
     expect(result.ok).toBe(false)
   })
 })
+
+describe('applyProposal: create-page', () => {
+  it('stashes the new widget id in resolvedIds so Go-to / undo can resolve it', async () => {
+    const resolvedIds = new Map<string, string>()
+    const p: ActionProposal = {
+      id: 'pg-0',
+      kind: 'create-page',
+      title: 'Notes',
+      content: '{}'
+    }
+    const result = await applyProposal(p, { activeTaskId: 't1', resolvedIds })
+    expect(result.ok).toBe(true)
+    expect(widgetCreateSpy.mock.calls[0][0]).toMatchObject({ kind: 'page', title: 'Notes' })
+    // The created widget id is registered under the proposal id.
+    expect(resolvedIds.get('pg-0')).toBe('sec-new')
+  })
+
+  it('requires an active desk', async () => {
+    const p: ActionProposal = { id: 'pg-1', kind: 'create-page', title: 'X', content: '{}' }
+    const result = await applyProposal(p, { activeTaskId: null })
+    expect(result.ok).toBe(false)
+    expect(widgetCreateSpy).not.toHaveBeenCalled()
+  })
+})
