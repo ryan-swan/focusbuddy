@@ -3,6 +3,7 @@ import type { Widget } from '@shared/types'
 import { contentToPlainText } from '@shared/widgetText'
 import { renderWidgetInline } from '../lib/renderWidgetInline'
 import { widgetDisplayName } from '../lib/widgetDisplayName'
+import ViewSelector from './views/ViewSelector'
 import {
   buildColumns,
   columnsEligible,
@@ -346,14 +347,19 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
           </button>
         )}
         <span className="ml-2 text-[11px] text-[var(--ink-40)] hidden md:inline">{modeHint}</span>
-        <button
-          onClick={() => setViewMode(taskId, 'canvas')}
-          data-testid="columns-to-canvas"
-          className="ml-auto inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
-          title="Back to the canvas"
-        >
-          <Icon name="grid_view" size={14} /> Canvas
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {/* In-view selector so you can jump to any other view (or back to the
+              canvas) without the breadcrumb selector, which this overlay covers. */}
+          <ViewSelector taskId={taskId} />
+          <button
+            onClick={() => setViewMode(taskId, 'canvas')}
+            data-testid="columns-to-canvas"
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+            title="Back to the canvas"
+          >
+            <Icon name="grid_view" size={14} /> Canvas
+          </button>
+        </div>
       </div>
 
       {cfg.groupBy === 'topic' && (topic.needsKey || topic.error) && (

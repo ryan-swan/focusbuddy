@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '../Icon'
 import { useDeskViewStore, type DeskViewMode } from '../../stores/deskView'
 
@@ -42,9 +43,56 @@ function ColumnsPreview(): JSX.Element {
   )
 }
 
+function RowsPreview(): JSX.Element {
+  return (
+    <svg viewBox="0 0 80 52" className="w-full h-full" aria-hidden="true">
+      {[8, 20, 32, 44].map((y) => (
+        <rect key={y} x="8" y={y} width="64" height="8" rx="2" className="fill-[var(--surface-sunken)] stroke-[var(--edge-firm)]" strokeWidth="1" />
+      ))}
+    </svg>
+  )
+}
+
+function TablePreview(): JSX.Element {
+  return (
+    <svg viewBox="0 0 80 52" className="w-full h-full" aria-hidden="true">
+      <rect x="8" y="8" width="64" height="36" rx="2" className="fill-[var(--surface-sunken)] stroke-[var(--edge-firm)]" strokeWidth="1" />
+      <line x1="8" y1="18" x2="72" y2="18" className="stroke-[var(--edge-firm)]" strokeWidth="1" />
+      <line x1="30" y1="8" x2="30" y2="44" className="stroke-[var(--edge-firm)]" strokeWidth="1" />
+      <line x1="50" y1="8" x2="50" y2="44" className="stroke-[var(--edge-firm)]" strokeWidth="1" />
+    </svg>
+  )
+}
+
+function GalleryPreview(): JSX.Element {
+  return (
+    <svg viewBox="0 0 80 52" className="w-full h-full" aria-hidden="true">
+      {[8, 30, 52].map((x) =>
+        [8, 28].map((y) => (
+          <rect key={`${x}-${y}`} x={x} y={y} width="20" height="16" rx="2" className="fill-[var(--surface-sunken)] stroke-[var(--edge-firm)]" strokeWidth="1" />
+        ))
+      )}
+    </svg>
+  )
+}
+
+function CompactPreview(): JSX.Element {
+  return (
+    <svg viewBox="0 0 80 52" className="w-full h-full" aria-hidden="true">
+      {[[8, 10, 22], [34, 10, 16], [54, 10, 18], [8, 24, 16], [28, 24, 24], [56, 24, 16], [8, 38, 20], [32, 38, 20]].map(([x, y, w], i) => (
+        <rect key={i} x={x} y={y} width={w} height="9" rx="4.5" className="fill-[var(--surface-sunken)] stroke-[var(--edge-firm)]" strokeWidth="1" />
+      ))}
+    </svg>
+  )
+}
+
 const VIEWS: ViewDef[] = [
   { mode: 'canvas', label: 'Free canvas', icon: 'dashboard', Preview: CanvasPreview },
-  { mode: 'columns', label: 'Columns', icon: 'view_column', Preview: ColumnsPreview }
+  { mode: 'columns', label: 'Columns', icon: 'view_column', Preview: ColumnsPreview },
+  { mode: 'list', label: 'List', icon: 'view_list', Preview: RowsPreview },
+  { mode: 'table', label: 'Table', icon: 'table_rows', Preview: TablePreview },
+  { mode: 'gallery', label: 'Gallery', icon: 'grid_view', Preview: GalleryPreview },
+  { mode: 'compact', label: 'Compact', icon: 'density_small', Preview: CompactPreview }
 ]
 
 export default function ViewSelector({ taskId }: { taskId: string }): JSX.Element {
@@ -56,12 +104,27 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
   const current = VIEWS.find((v) => v.mode === active) ?? VIEWS[0]
 
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // The menu is PORTALED to document.body so it escapes the desk-view overlay's
+  // stacking context (z-60) and can sit above the floating assistant (z-120);
+  // otherwise its items are unclickable behind the assistant. Position is measured
+  // from the trigger and clamped into the viewport.
+  function openMenu(): void {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 268)) })
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent): void {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return
+      setOpen(false)
     }
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') setOpen(false)
@@ -86,7 +149,8 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
   return (
     <div className="relative" ref={rootRef}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        ref={btnRef}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         data-testid="view-selector-btn"
         title="Change how this desk is shown"
         aria-haspopup="menu"
@@ -98,12 +162,16 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
         <Icon name="expand_more" size={14} className="text-[var(--ink-40)]" />
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={menuRef}
           role="menu"
           data-testid="view-selector-menu"
           onKeyDown={onMenuKey}
-          className="absolute left-0 top-10 z-[95] w-[260px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2"
+          style={{ position: 'fixed', top: pos.top, left: pos.left }}
+          /* Portaled to body + z above the floating assistant (z-120) so items are
+             always clickable, below dialogs/command-center. */
+          className="z-[130] w-[260px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2"
         >
           <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold px-1 pb-1.5">
             Views
@@ -154,7 +222,8 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
           <div className="mt-1.5 px-1 text-[10.5px] text-[var(--ink-40)]">
             The star pins a default view for this desk.
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

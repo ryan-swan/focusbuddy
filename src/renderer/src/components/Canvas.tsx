@@ -51,6 +51,7 @@ import AutomationsFAB from './AutomationsFAB'
 import DeskSuggestionChip from './DeskSuggestionChip'
 import DeskGallery from './DeskGallery'
 import ColumnsView from './ColumnsView'
+import DeskDataViews, { type DataLayout } from './views/DeskDataViews'
 import { useDeskViewStore } from '../stores/deskView'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
@@ -267,6 +268,13 @@ export default function Canvas(): JSX.Element {
   const deskViewMode = activeTaskId
     ? deskViewModes[activeTaskId] ?? deskViewDefaults[activeTaskId] ?? 'canvas'
     : 'canvas'
+  // The spatial canvas renders only in 'canvas' mode; every other mode (columns +
+  // the data views) mounts as its own overlay instead.
+  const isCanvasMode = deskViewMode === 'canvas'
+  const dataLayout: DataLayout | null =
+    deskViewMode === 'list' || deskViewMode === 'table' || deskViewMode === 'gallery' || deskViewMode === 'compact'
+      ? deskViewMode
+      : null
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
@@ -583,9 +591,9 @@ export default function Canvas(): JSX.Element {
   // the marquee hit-test pattern), so a pan that reveals nothing new never forces a
   // re-render. Hysteresis + the animation freeze come from the pure module.
   useEffect(() => {
-    if (deskViewMode === 'columns' || viewportSize.w === 0 || viewportSize.h === 0) {
-      // Columns view mounts through its own overlay, and before the first measure
-      // we have no viewport to test against — render everything in both cases.
+    if (!isCanvasMode || viewportSize.w === 0 || viewportSize.h === 0) {
+      // Non-canvas views mount through their own overlays, and before the first
+      // measure we have no viewport to test against — render everything in both.
       if (visibleIdsRef.current !== null || visibleKeyRef.current !== '') {
         visibleIdsRef.current = null
         visibleKeyRef.current = ''
@@ -2282,7 +2290,10 @@ export default function Canvas(): JSX.Element {
               onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
               onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
             />
-            {activeTaskId && <ViewSelector taskId={activeTaskId} />}
+            {/* The breadcrumb selector shows only in canvas mode; every overlay
+                view (columns + data views) carries its own in-view selector, so
+                exactly one is present at a time (no duplicate testid). */}
+            {activeTaskId && isCanvasMode && <ViewSelector taskId={activeTaskId} />}
           </div>
           {/* Context Health (plexi-4.0): floats just under the breadcrumb, showing
               what changed since last visit and related desks needing attention.
@@ -2452,7 +2463,7 @@ export default function Canvas(): JSX.Element {
             {/* Sections first (render behind non-section widgets). Sections render their own children.
                 Skipped entirely in Columns view so canvas widgets (and their webviews) don't mount
                 under the overlay. */}
-            {deskViewMode !== 'columns' && widgets.map((w) => {
+            {isCanvasMode && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
               // PLX-APP-012: skip sections fully outside the viewport (a section is
@@ -2462,7 +2473,7 @@ export default function Canvas(): JSX.Element {
                 <div key={w.id}>{renderWidget(w)}</div>
               )
             })}
-            {deskViewMode !== 'columns' && widgets.map((w) => {
+            {isCanvasMode && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind === 'section') return null
               if (w.parentSectionId !== null) return null // owned by a section, rendered inside it
@@ -2484,6 +2495,9 @@ export default function Canvas(): JSX.Element {
             <div className="absolute inset-0 z-[60]">
               <ColumnsView taskId={activeTaskId} widgets={widgets} />
             </div>
+          )}
+          {dataLayout && activeTaskId && (
+            <DeskDataViews taskId={activeTaskId} widgets={widgets} layout={dataLayout} />
           )}
           {/* Spatial-link overlay renders in screen-space, OUTSIDE the
               transformed container. It reads each linked widget's actual

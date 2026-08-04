@@ -8,7 +8,11 @@ import { create } from 'zustand'
 //     per desk"), which applies the first time a desk is opened before any toggle.
 // Resolution: last-used wins, else the pinned default, else Canvas.
 
-export type DeskViewMode = 'canvas' | 'columns'
+// canvas = the infinite spatial canvas; columns = stacked walls (its Status
+// group-by is the Kanban board); list/table/gallery/compact = lightweight data
+// views of the same objects (spec §3.4). Timeline/Calendar are intentionally not
+// modeled here — they suit time-bound events, not arbitrary desk objects.
+export type DeskViewMode = 'canvas' | 'columns' | 'list' | 'table' | 'gallery' | 'compact'
 
 const KEY = 'fb.deskView.v1'
 const DEFAULT_KEY = 'fb.deskDefaultView.v1'
