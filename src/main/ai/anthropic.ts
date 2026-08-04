@@ -12,7 +12,7 @@ import { getTable, listRows } from '../db/tables'
 // proved cycle-safe here (getNode/getTable above import the same way).
 import { listDocuments } from '../db/documents'
 import { listBlocksInRange } from '../db/timeBlocks'
-import { buildBriefContext, buildBriefActions, briefIsEmpty } from './dailyBriefContext'
+import { buildBriefContext, buildBriefActions, briefIsEmpty, cleanTitle } from './dailyBriefContext'
 import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
@@ -1316,14 +1316,15 @@ export async function generateProactiveWelcome(taskId: string): Promise<ChatResp
 // returns an honest "your day is clear" without a model call (no fabricated plan).
 export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: string; actions?: import('./dailyBriefContext').BriefAction[]; needsApiKey?: boolean; error?: string }> {
   const now = Date.now()
+  const briefDocLabel: Record<string, string> = { doc: 'Document', sheet: 'Spreadsheet', slides: 'Slides', map: 'Mindmap', design: 'Design' }
   const tasks = listNodes()
     .filter((n) => n.kind === 'task' && (n.status === 'open' || n.status === 'in_progress'))
-    .map((n) => ({ id: n.id, title: n.title, status: n.status, priority: n.priority, importance: n.importance, dueDate: n.dueDate }))
+    .map((n) => ({ id: n.id, title: cleanTitle(n.title, 'Untitled desk'), status: n.status, priority: n.priority, importance: n.importance, dueDate: n.dueDate }))
   const weekBlocks = listBlocksInRange(now, now + 7 * 24 * 60 * 60 * 1000)
-  const blocks = weekBlocks.map((b) => ({ title: b.title, startMs: b.startMs, durationMin: b.durationMin }))
+  const blocks = weekBlocks.map((b) => ({ title: cleanTitle(b.title, 'Time block'), startMs: b.startMs, durationMin: b.durationMin }))
   const docs = listDocuments()
     .slice(0, 8)
-    .map((d) => ({ title: d.title, docType: d.docType }))
+    .map((d) => ({ title: cleanTitle(d.title, briefDocLabel[d.docType] ?? 'Document'), docType: d.docType }))
 
   // Concrete, grounded "block time for this" suggestions the user approves. Built
   // deterministically from real tasks that aren't already on the calendar, so

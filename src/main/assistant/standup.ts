@@ -74,9 +74,10 @@ export function composeStandup(input: StandupInput): Standup {
 
   const lookForward = (() => {
     const top = topTasks(input.tasks, 3)
-    if (top.length === 0) return 'Nothing is currently due or in progress.'
+    if (top.length === 0) return 'Nothing is due or in progress right now.'
     const items = top.map((t) => (t.dueDate ? `${t.title} (due ${new Date(t.dueDate).toLocaleDateString()})` : t.title))
-    return `Next up: ${items.join('; ')}.`
+    const lead = top.length === 1 ? 'Worth picking up next' : 'Worth picking up next, in order'
+    return `${lead}: ${items.join(', ')}.`
   })()
 
   const narrative = hasContent

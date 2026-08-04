@@ -167,11 +167,15 @@ export default function StandupHome(): JSX.Element | null {
               </ul>
             </div>
           )}
-          {state.needsApiKey && (
+          {state.needsApiKey ? (
             <div className="mt-3 text-[11px] text-[var(--ink-50)]">
               Showing a plain summary. Add an Anthropic key in Settings → AI for a written standup.
             </div>
-          )}
+          ) : state.aiUsed === false ? (
+            <div className="mt-3 text-[11px] text-[var(--ink-50)]">
+              Showing a plain summary. The written standup could not be generated just now.
+            </div>
+          ) : null}
         </>
       ) : (
         <div className="text-[13px] text-[var(--ink-40)] py-3">Sign in to see your daily standup.</div>

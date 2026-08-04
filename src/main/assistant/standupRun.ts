@@ -2,7 +2,18 @@ import { getContextEngine, localActor } from '../context/engine'
 import { generateWorkCompleted, type WorkScope } from './workCompleted'
 import { composeStandup } from './standup'
 import { generateStandupNarrative } from '../ai/anthropic'
-import type { BriefTask, BriefBlock, BriefDoc } from '../ai/dailyBriefContext'
+import { cleanTitle, type BriefTask, type BriefBlock, type BriefDoc } from '../ai/dailyBriefContext'
+
+// A human fallback label per document type, used when a doc's title is empty or
+// machine content (e.g. a mindmap whose title is its serialised body).
+const DOC_LABEL: Record<string, string> = {
+  doc: 'Document',
+  sheet: 'Spreadsheet',
+  slides: 'Slides',
+  map: 'Mindmap',
+  design: 'Design'
+}
+const docFallback = (dt: string): string => DOC_LABEL[dt] ?? 'Document'
 // Static imports, NOT lazy require(): electron-vite/Rollup only bundles what the
 // static import graph reaches, so a runtime require('../db/nodes') resolves against
 // out/main/ (which holds only index.js) and throws MODULE_NOT_FOUND in the built
@@ -58,8 +69,9 @@ export async function runStandup(input: StandupRunInput): Promise<StandupRunResu
   const nodes = listNodes()
   const docs = listDocuments()
   const titleById = new Map<string, string>()
-  for (const n of nodes) titleById.set(n.id, n.title || (n.kind === 'folder' ? 'Untitled room' : 'Untitled desk'))
-  for (const d of docs) titleById.set(d.id, d.title || 'Untitled document')
+  for (const n of nodes)
+    titleById.set(n.id, cleanTitle(n.title, n.kind === 'folder' ? 'Untitled room' : 'Untitled desk'))
+  for (const d of docs) titleById.set(d.id, cleanTitle(d.title, docFallback(d.docType)))
   const completedTitles: Record<string, string> = {}
   for (const c of wc.completed) {
     if (c.objectId && titleById.has(c.objectId)) completedTitles[c.objectId] = titleById.get(c.objectId) as string
@@ -69,10 +81,10 @@ export async function runStandup(input: StandupRunInput): Promise<StandupRunResu
   const now = Date.now()
   const tasks: BriefTask[] = nodes
     .filter((n) => n.kind === 'task' && (n.status === 'open' || n.status === 'in_progress'))
-    .map((n) => ({ id: n.id, title: n.title, status: n.status, priority: n.priority, importance: n.importance, dueDate: n.dueDate }))
+    .map((n) => ({ id: n.id, title: cleanTitle(n.title, 'Untitled desk'), status: n.status, priority: n.priority, importance: n.importance, dueDate: n.dueDate }))
   const weekBlocks = listBlocksInRange(now, now + 7 * 24 * 60 * 60 * 1000)
   const blocks: BriefBlock[] = weekBlocks.map((b) => ({ title: b.title, startMs: b.startMs, durationMin: b.durationMin }))
-  const briefDocs: BriefDoc[] = docs.slice(0, 8).map((d) => ({ title: d.title, docType: d.docType }))
+  const briefDocs: BriefDoc[] = docs.slice(0, 8).map((d) => ({ title: cleanTitle(d.title, docFallback(d.docType)), docType: d.docType }))
 
   const subject = input.scope === 'team' ? 'the team' : 'you'
   const composed = composeStandup({
