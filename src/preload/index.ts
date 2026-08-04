@@ -525,7 +525,8 @@ const api = {
       aiUsed: boolean
       needsApiKey?: boolean
       hasContent: boolean
-      completed: Array<{ objectId: string | null; title: string | null; at: string }>
+      completed: Array<{ objectId: string | null; title: string | null; at: string; kind: 'node' | 'document' | null }>
+      nextUp: Array<{ id: string; title: string; kind: 'node' | 'document' }>
       counts: { completed: number; created: number; updated: number; deleted: number }
       fromCursor: number
       toCursor: number

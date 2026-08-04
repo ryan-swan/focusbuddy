@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAccountStore } from '../../stores/account'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
+import { useNodeStore } from '../../stores/nodes'
+import { useViewStore } from '../../stores/view'
 import { getAccountState, setAccountState } from '../../lib/accountStateClient'
 import type { DigestInput } from '../../lib/digestRouter'
 import StandupOutputPicker from './StandupOutputPicker'
@@ -16,15 +18,34 @@ import Icon from '../Icon'
 
 const KEY = 'standup'
 
+interface StandupRef {
+  id: string
+  title: string
+  kind: 'node' | 'document'
+}
+
 interface StandupState {
   cursor: number
   lastRunDate: string
   scope: 'personal' | 'team'
   narrative: string
-  completed: Array<{ objectId: string | null; title: string | null; at: string }>
+  completed: Array<{ objectId: string | null; title: string | null; at: string; kind: 'node' | 'document' | null }>
+  nextUp: StandupRef[]
   counts: { completed: number; created: number; updated: number; deleted: number }
   aiUsed?: boolean
   needsApiKey?: boolean
+}
+
+// Open a referenced object in place — a desk/room/task node opens on the canvas,
+// a document opens in its editor. This is the "hyperlink to it" behaviour.
+function openRef(kind: 'node' | 'document' | null, id: string | null): void {
+  if (!id) return
+  if (kind === 'document') {
+    useViewStore.getState().goDocument(id)
+  } else {
+    useNodeStore.getState().setActive(id)
+    useViewStore.getState().goTask(id)
+  }
 }
 
 function dayKey(d = new Date()): string {
@@ -57,6 +78,7 @@ export default function StandupHome(): JSX.Element | null {
       scope: isTeam ? 'team' : 'personal',
       narrative: res.narrative,
       completed: res.completed,
+      nextUp: res.nextUp ?? [],
       counts: res.counts,
       aiUsed: res.aiUsed,
       needsApiKey: res.needsApiKey
@@ -80,8 +102,11 @@ export default function StandupHome(): JSX.Element | null {
         return
       }
       const saved = await getAccountState<StandupState>(token, KEY)
-      if (saved && saved.lastRunDate === dayKey() && saved.narrative) {
-        setState(saved)
+      // A cache is only usable if it's from today AND carries the current shape
+      // (nextUp arrived later; an older cache without it is treated as stale so the
+      // new clickable refs populate rather than rendering an incomplete state).
+      if (saved && saved.lastRunDate === dayKey() && saved.narrative && Array.isArray(saved.nextUp)) {
+        setState({ ...saved, nextUp: saved.nextUp ?? [], completed: saved.completed ?? [] })
         setScope(saved.scope ?? 'personal')
         setLoading(false)
         return
@@ -157,14 +182,49 @@ export default function StandupHome(): JSX.Element | null {
               <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
                 Completed since last time
               </div>
-              <ul className="space-y-1">
-                {state.completed.slice(0, 8).map((c, i) => (
-                  <li key={c.objectId ?? i} className="flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
-                    <Icon name="check_circle" size={13} className="text-emerald-500 shrink-0" />
-                    <span className="truncate">{c.title ?? 'A task'}</span>
-                  </li>
-                ))}
+              <ul className="space-y-0.5">
+                {state.completed.slice(0, 8).map((c, i) => {
+                  const clickable = !!c.objectId && !!c.kind
+                  return (
+                    <li key={c.objectId ?? i}>
+                      <button
+                        disabled={!clickable}
+                        onClick={() => openRef(c.kind, c.objectId)}
+                        data-testid={c.objectId ? `standup-completed-${c.objectId}` : undefined}
+                        className={`w-full flex items-center gap-2 text-[12px] rounded-md px-1.5 py-1 text-left ${
+                          clickable
+                            ? 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] hover:text-[rgb(var(--accent))]'
+                            : 'text-[var(--ink-70)] cursor-default'
+                        }`}
+                      >
+                        <Icon name="check_circle" size={13} className="text-emerald-500 shrink-0" />
+                        <span className="truncate">{c.title ?? 'A task'}</span>
+                        {clickable && <Icon name="open_in_new" size={11} className="ml-auto shrink-0 text-[var(--ink-30)]" />}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
+            </div>
+          )}
+          {state.nextUp.length > 0 && (
+            <div className="mt-3 border-t border-[var(--edge-soft)] pt-3">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
+                Next up
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.nextUp.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => openRef(r.kind, r.id)}
+                    data-testid={`standup-nextup-${r.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--edge-soft)] px-2.5 h-7 text-[12px] text-[var(--ink-80)] hover:border-[rgb(var(--accent))]/40 hover:text-[rgb(var(--accent))]"
+                  >
+                    <Icon name="arrow_forward" size={12} className="text-[var(--ink-40)]" />
+                    <span className="max-w-[180px] truncate">{r.title}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {state.needsApiKey ? (

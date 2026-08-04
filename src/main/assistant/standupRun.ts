@@ -39,6 +39,17 @@ export interface StandupCompletedItem {
   objectId: string | null
   title: string | null // resolved from a real object, or null — never invented
   at: string
+  // 'node' (desk/room/task) or 'document' — lets the UI open the right surface.
+  // null when the object could not be resolved (so the UI won't offer a dead link).
+  kind: 'node' | 'document' | null
+}
+
+// A navigable reference the UI renders as a clickable link (spec: mentions should
+// hyperlink to the thing for quick access).
+export interface StandupRef {
+  id: string
+  title: string
+  kind: 'node' | 'document'
 }
 
 export interface StandupRunResult {
@@ -48,6 +59,8 @@ export interface StandupRunResult {
   needsApiKey?: boolean
   hasContent: boolean
   completed: StandupCompletedItem[]
+  // The look-forward objects the narrative points at, as clickable refs.
+  nextUp: StandupRef[]
   counts: { completed: number; created: number; updated: number; deleted: number }
   fromCursor: number
   toCursor: number
@@ -69,9 +82,15 @@ export async function runStandup(input: StandupRunInput): Promise<StandupRunResu
   const nodes = listNodes()
   const docs = listDocuments()
   const titleById = new Map<string, string>()
-  for (const n of nodes)
+  const kindById = new Map<string, 'node' | 'document'>()
+  for (const n of nodes) {
     titleById.set(n.id, cleanTitle(n.title, n.kind === 'folder' ? 'Untitled room' : 'Untitled desk'))
-  for (const d of docs) titleById.set(d.id, cleanTitle(d.title, docFallback(d.docType)))
+    kindById.set(n.id, 'node')
+  }
+  for (const d of docs) {
+    titleById.set(d.id, cleanTitle(d.title, docFallback(d.docType)))
+    kindById.set(d.id, 'document')
+  }
   const completedTitles: Record<string, string> = {}
   for (const c of wc.completed) {
     if (c.objectId && titleById.has(c.objectId)) completedTitles[c.objectId] = titleById.get(c.objectId) as string
@@ -85,6 +104,15 @@ export async function runStandup(input: StandupRunInput): Promise<StandupRunResu
   const weekBlocks = listBlocksInRange(now, now + 7 * 24 * 60 * 60 * 1000)
   const blocks: BriefBlock[] = weekBlocks.map((b) => ({ title: b.title, startMs: b.startMs, durationMin: b.durationMin }))
   const briefDocs: BriefDoc[] = docs.slice(0, 8).map((d) => ({ title: cleanTitle(d.title, docFallback(d.docType)), docType: d.docType }))
+
+  // The clickable "next up" refs — the same top open tasks the narrative names,
+  // ordered the same way composeStandup orders them (importance, then priority,
+  // then soonest due).
+  const nextUp: StandupRef[] = [...tasks]
+    .sort((a, b) => b.importance - a.importance || a.priority - b.priority || (a.dueDate ?? Infinity) - (b.dueDate ?? Infinity))
+    .slice(0, 5)
+    .filter((t): t is BriefTask & { id: string } => !!t.id)
+    .map((t) => ({ id: t.id, title: t.title, kind: 'node' as const }))
 
   const subject = input.scope === 'team' ? 'the team' : 'you'
   const composed = composeStandup({
@@ -111,8 +139,10 @@ export async function runStandup(input: StandupRunInput): Promise<StandupRunResu
     completed: wc.completed.map((c) => ({
       objectId: c.objectId,
       title: (c.objectId && completedTitles[c.objectId]) || null,
-      at: c.at
+      at: c.at,
+      kind: (c.objectId && kindById.get(c.objectId)) || null
     })),
+    nextUp,
     counts: {
       completed: wc.completed.length,
       created: wc.createdCount,
