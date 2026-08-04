@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ActionProposal, Widget, WidgetKind } from '@shared/types'
+import type { ActionProposal, GoToTarget, Widget, WidgetKind } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import UnifiedConnectedMenu from '../contextMenu/UnifiedConnectedMenu'
 import Icon from '../Icon'
 import { useWidgetStore } from '../../stores/widgets'
 import { useNodeStore } from '../../stores/nodes'
 import { applyProposal } from '../../lib/actionExecutor'
-import { resolveGoToTarget } from '../../lib/goToTarget'
+import { resolveGoToTarget, goToTarget } from '../../lib/goToTarget'
 import { catalogFor, entriesByCategory } from '../../lib/widgetCatalog'
 import { setOrigin } from '../../lib/nodeCanvasOrigin'
 
@@ -1855,13 +1855,30 @@ function ConversationView({
                     </div>
                   )}
                   {ps.state === 'applied' && ps.createdEntityRef && (
-                    <button
-                      onClick={() => onUndoProposal(conversationKey, ti, pi)}
-                      className="text-[10px] px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 shrink-0"
-                      data-testid={`mindmap-undo-${ps.proposal.id}`}
-                    >
-                      Undo
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      {(() => {
+                        const t = refToGoTarget(
+                          ps.createdEntityRef,
+                          labelForProposal(ps.proposal)
+                        )
+                        return t ? (
+                          <button
+                            onClick={() => void goToTarget(t)}
+                            className="text-[10px] px-1.5 py-0.5 rounded text-accent hover:bg-[var(--surface-sunken)]"
+                            data-testid={`mindmap-goto-${ps.proposal.id}`}
+                          >
+                            Go to
+                          </button>
+                        ) : null
+                      })()}
+                      <button
+                        onClick={() => onUndoProposal(conversationKey, ti, pi)}
+                        className="text-[10px] px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                        data-testid={`mindmap-undo-${ps.proposal.id}`}
+                      >
+                        Undo
+                      </button>
+                    </div>
                   )}
                 </li>
               ))}
@@ -2474,6 +2491,21 @@ function labelForProposal(p: ActionProposal): string {
     default:
       return 'Proposal'
   }
+}
+
+// Parse a stored `${kind}:${id}` agent-outcome ref back into a navigable
+// GoToTarget so an applied proposal's compact card can offer "Go to" — same
+// navigation the standard ProposalCards give, in node-appropriate form.
+function refToGoTarget(ref: string, label: string): GoToTarget | null {
+  const idx = ref.indexOf(':')
+  if (idx < 0) return null
+  const kind = ref.slice(0, idx)
+  const id = ref.slice(idx + 1)
+  if (!id) return null
+  if (kind === 'task' || kind === 'widget' || kind === 'document') {
+    return { kind, id, label }
+  }
+  return null
 }
 
 function parsePersisted(raw: string | null | undefined): PersistedState {
