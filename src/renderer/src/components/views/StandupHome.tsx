@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useAccountStore } from '../../stores/account'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { getAccountState, setAccountState } from '../../lib/accountStateClient'
+import type { DigestInput } from '../../lib/digestRouter'
+import StandupOutputPicker from './StandupOutputPicker'
 import Icon from '../Icon'
 
 // The daily standup, promoted to the home hero (operator decision: the daily
@@ -93,6 +95,18 @@ export default function StandupHome(): JSX.Element | null {
 
   const savedCursor = state?.cursor ?? -1
 
+  // What the output picker routes: the current standup as a portable digest. A
+  // human date label keeps digestRouter free of locale concerns.
+  const digestInput: DigestInput | null = state
+    ? {
+        narrative: state.narrative,
+        completed: state.completed,
+        counts: state.counts,
+        scope: state.scope,
+        dateLabel: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      }
+    : null
+
   return (
     <section
       data-testid="standup-home"
@@ -119,15 +133,18 @@ export default function StandupHome(): JSX.Element | null {
             ))}
           </div>
         )}
-        <button
-          onClick={() => void run(scope, savedCursor, true)}
-          disabled={loading}
-          title="Refresh the standup"
-          data-testid="standup-refresh"
-          className="ml-auto icon-btn h-7 w-7 text-[var(--ink-40)] hover:text-[rgb(var(--accent))] disabled:opacity-50"
-        >
-          <Icon name={loading ? 'autorenew' : 'refresh'} size={15} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <StandupOutputPicker input={digestInput} />
+          <button
+            onClick={() => void run(scope, savedCursor, true)}
+            disabled={loading}
+            title="Refresh the standup"
+            data-testid="standup-refresh"
+            className="icon-btn h-7 w-7 text-[var(--ink-40)] hover:text-[rgb(var(--accent))] disabled:opacity-50"
+          >
+            <Icon name={loading ? 'autorenew' : 'refresh'} size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {loading && !state ? (
