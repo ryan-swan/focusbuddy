@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { collectMenuRects, resolvePosition } from '../lib/floatingChrome'
+import { collectMenuRects, resolvePosition, resolveCenteredTop } from '../lib/floatingChrome'
 import { motion } from 'framer-motion'
 import Icon from './Icon'
 import LoadMeter from './LoadMeter'
@@ -55,6 +55,10 @@ export default function FloatingPill({
   const pillRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [defaultY, setDefaultY] = useState(60)
+  // Vertical-only dodge applied while the pill is in its default centered mode
+  // (pos === null). Kept separate from pos so dodging never costs the pill its
+  // left:50% centering. Null = sit at defaultY.
+  const [dodgeY, setDodgeY] = useState<number | null>(null)
   const [hovered, setHovered] = useState(false)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const { tier } = useCognitiveLoad()
@@ -128,19 +132,36 @@ export default function FloatingPill({
   // on the pill and resumes the instant you move off it.
 
   // Keep the pill on screen and clear of the other floating menus. Runs after a
-  // drag settles, after the labels expand or collapse, shortly after mount (so
-  // the breadcrumb has measured), and on resize. It reads the live rects of the
-  // other floating menus (breadcrumb, toolbar, presence bar, minimap FAB,
-  // context menus) and nudges the pill to the nearest spot that overlaps none of
-  // them and stays in the viewport. The resolve is idempotent, so once the pill
-  // sits clear it stops moving. While the pill is centred by default (no pos) it
-  // only takes an explicit position if it actually needs to dodge something.
+  // drag settles, after the labels collapse, shortly after mount (so the
+  // breadcrumb has measured), and on resize.
+  //
+  // Two rules keep this from fighting the user (the old behavior teleported the
+  // pill out from under a still-hovering cursor, which fired mouseleave and
+  // collapsed the labels before a button could be clicked):
+  //  - Never relocate while the cursor is on the pill or a drag is in flight.
+  //    A transient overlap during hover-expansion is fine; it re-resolves on
+  //    mouseleave once the labels have collapsed.
+  //  - In default centered mode (pos === null) dodge VERTICALLY only, via
+  //    dodgeY, so the pill keeps its left:50% centering instead of being
+  //    side-pushed over the sidebar. Only a user drag (pos set) uses the free
+  //    resolvePosition dodge.
   useEffect(() => {
     function resolve(): void {
       const el = pillRef.current
       if (!el) return
+      if (hovered || dragData.current) return
       const r = el.getBoundingClientRect()
-      const next = resolvePosition(r.left, r.top, r.width, r.height, collectMenuRects(el))
+      const obstacles = collectMenuRects(el)
+      if (pos === null) {
+        const top = resolveCenteredTop(defaultY, r.width, r.height, obstacles)
+        setDodgeY((cur) => {
+          const effective = cur ?? defaultY
+          if (Math.round(top) === Math.round(effective)) return cur
+          return Math.round(top) === Math.round(defaultY) ? null : top
+        })
+        return
+      }
+      const next = resolvePosition(r.left, r.top, r.width, r.height, obstacles)
       if (Math.round(next.left) !== Math.round(r.left) || Math.round(next.top) !== Math.round(r.top)) {
         setPos({ x: next.left, y: next.top })
       }
@@ -152,7 +173,7 @@ export default function FloatingPill({
       clearTimeout(t)
       window.removeEventListener('resize', resolve)
     }
-  }, [hovered, pos])
+  }, [hovered, pos, defaultY])
 
   // Generous zones — vertical when within 200px of either side edge.
   const orient: 'h' | 'v' = useMemo(() => {
@@ -162,7 +183,7 @@ export default function FloatingPill({
 
   const posStyle = pos
     ? { left: pos.x, top: pos.y }
-    : { left: '50%', transform: 'translateX(-50%)', top: defaultY }
+    : { left: '50%', transform: 'translateX(-50%)', top: dodgeY ?? defaultY }
 
   const ringStyle = {
     boxShadow: `0 0 0 2px ${tier.ringColor}, 0 6px 24px ${tier.shadowColor}`,
@@ -177,6 +198,7 @@ export default function FloatingPill({
     onDoubleClick: (e: React.MouseEvent) => {
       if ((e.target as HTMLElement).closest('button')) return
       setPos(null)
+      setDodgeY(null)
     },
     title: 'Drag to reposition · Double-click to re-center',
     'data-testid': 'floating-pill',

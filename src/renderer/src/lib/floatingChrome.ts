@@ -39,6 +39,32 @@ function clampToViewport(left: number, top: number, w: number, h: number): { lef
   }
 }
 
+// Resolve the top for a menu that must stay horizontally centered (the control
+// pill's default mode). Dodging is vertical-only: starting at desiredTop, the
+// menu is pushed straight down below any obstacle it overlaps, so it never
+// trades its centering for a sideways shove. Falls back to the clamped desired
+// top if the column is too crowded to clear. Returns desiredTop unchanged when
+// the centered spot is already clear, so callers can treat "same value" as
+// "no dodge needed".
+export function resolveCenteredTop(
+  desiredTop: number,
+  w: number,
+  h: number,
+  obstacles: MenuRect[]
+): number {
+  const left = (window.innerWidth - w) / 2
+  const maxTop = Math.max(MARGIN, window.innerHeight - h - MARGIN)
+  let top = Math.min(Math.max(MARGIN, desiredTop), maxTop)
+  for (let pass = 0; pass < 6; pass++) {
+    const hit = obstacles.find((o) => overlaps(left, top, w, h, o))
+    if (!hit) return top
+    const pushed = hit.bottom + MARGIN
+    if (pushed > maxTop) return Math.min(Math.max(MARGIN, desiredTop), maxTop) // crowded; best effort
+    top = pushed
+  }
+  return top
+}
+
 // Resolve a desired top-left for a w x h menu so it stays on screen and does not
 // overlap any obstacle. Uses minimal-translation nudges: on each pass it finds
 // the obstacle it overlaps most and pushes out along the cheapest axis, then
