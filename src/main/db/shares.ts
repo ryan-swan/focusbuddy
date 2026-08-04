@@ -159,11 +159,25 @@ export function acceptShare(input: {
   scope: ShareScope
 }): SharedItem {
   const db = getDb()
-  const id = randomUUID()
   const now = Date.now()
+  // Idempotent by token. The app re-pulls and re-accepts org shares on login and
+  // on every sync, so a plain INSERT threw `UNIQUE constraint failed:
+  // shared_with_me.token` the second time a share was seen — surfacing as a
+  // rejected `shares:accept` invoke in the renderer. Upsert instead: refresh the
+  // snapshot/handle/scope and keep the existing row id when one already exists.
+  const existing = db
+    .prepare('SELECT id FROM shared_with_me WHERE token = ?')
+    .get(input.token) as { id: string } | undefined
+  const id = existing?.id ?? randomUUID()
   db.prepare(
     `INSERT INTO shared_with_me (id, token, kind, snapshot_json, from_handle, accepted_at, scope)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(token) DO UPDATE SET
+       kind = excluded.kind,
+       snapshot_json = excluded.snapshot_json,
+       from_handle = excluded.from_handle,
+       accepted_at = excluded.accepted_at,
+       scope = excluded.scope`
   ).run(
     id,
     input.token,
