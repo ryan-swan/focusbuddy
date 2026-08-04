@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon'
+import BrainBulkAdd from '../brain/BrainBulkAdd'
 import { useKnowledgeStore } from '../../stores/knowledge'
 import { useViewStore } from '../../stores/view'
 import type { KnowledgeEntry } from '@shared/knowledge'
@@ -102,6 +103,9 @@ export default function KnowledgeView(): JSX.Element {
             <Icon name="add" size={14} /> New
           </button>
         </div>
+
+        {/* Bulk-add files & folders straight into the Brain (independent of desks). */}
+        <BrainBulkAdd />
 
         <div className="flex-1 overflow-auto px-2 pb-2">
           {loaded && filtered.length === 0 ? (

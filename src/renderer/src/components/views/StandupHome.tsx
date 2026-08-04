@@ -94,13 +94,16 @@ export default function StandupHome(): JSX.Element | null {
   // Daily trigger: show today's cached standup, else run once from the synced cursor.
   useEffect(() => {
     if (ranRef.current) return
+    // Wait until the session is actually hydrated. If we run on the very first
+    // mount before the token lands, give up-and-never-retry would leave the hero
+    // blank; instead we no-op and let this effect re-fire when `account` arrives.
+    const token = useAccountStore.getState().sessionToken
+    if (!account || !token) {
+      setLoading(false)
+      return
+    }
     ranRef.current = true
     void (async () => {
-      const token = useAccountStore.getState().sessionToken
-      if (!token) {
-        setLoading(false)
-        return
-      }
       const saved = await getAccountState<StandupState>(token, KEY)
       // A cache is only usable if it's from today AND carries the current shape
       // (nextUp arrived later; an older cache without it is treated as stale so the
@@ -113,8 +116,9 @@ export default function StandupHome(): JSX.Element | null {
       }
       await run(saved?.scope ?? 'personal', saved?.cursor ?? -1, true)
     })()
+    // Re-fire once the account hydrates (token may not be ready on first mount).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [account])
 
   if (!account) return null // signed-out: the home greeting handles it
 
