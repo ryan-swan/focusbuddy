@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ChatPanel from '../ChatPanel'
 import Icon from '../Icon'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
-import { useAssistantChrome } from '../../stores/assistantChrome'
+import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
+import StandupHome from '../views/StandupHome'
+import AssistantTasksTab from './tabs/AssistantTasksTab'
+import AssistantActivityTab from './tabs/AssistantActivityTab'
+import AssistantWorkTab from './tabs/AssistantWorkTab'
 import { useChatStore } from '../../stores/chat'
 import { useViewStore } from '../../stores/view'
 import { useWidgetStore } from '../../stores/widgets'
@@ -49,10 +53,23 @@ const FULLSCREEN_TAKEOVER = 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
 const FULLSCREEN_PAGE =
   'fixed top-10 bottom-0 right-0 z-[190] bg-[var(--surface-base)] border-l border-[var(--edge-soft)]'
 
+// The persistent assistant's tabs (spec §5.3). Today is the daily standup, Chat is
+// the conversation, the rest read real workspace state. Order matches the store's
+// ASSISTANT_TABS.
+const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
+  { id: 'today', label: 'Today', icon: 'wb_sunny' },
+  { id: 'chat', label: 'Chat', icon: 'forum' },
+  { id: 'tasks', label: 'Tasks', icon: 'checklist' },
+  { id: 'activity', label: 'Activity', icon: 'bolt' },
+  { id: 'work', label: 'Work', icon: 'smart_toy' }
+]
+
 export default function AssistantOverlay(): JSX.Element {
   const open = useAssistantChrome((s) => s.open)
   const mode = useAssistantChrome((s) => s.mode)
   const width = useAssistantChrome((s) => s.width)
+  const activeTab = useAssistantChrome((s) => s.activeTab)
+  const setTab = useAssistantChrome((s) => s.setTab)
   const openPanel = useAssistantChrome((s) => s.openPanel)
   const close = useAssistantChrome((s) => s.close)
   const setWidth = useAssistantChrome((s) => s.setWidth)
@@ -218,14 +235,60 @@ export default function AssistantOverlay(): JSX.Element {
           card's footprint; in fullscreen the panel IS the page — full-bleed,
           no inset box (ChatPanel drops its card chrome there and centers its
           own content columns). */}
+      {/* Tabbed shell (spec §5): a tab strip over the content area. The Chat tab
+          renders the EXISTING ChatPanel, which stays permanently mounted (hidden,
+          never unmounted) so its half-typed draft + TipTap editor survive a tab
+          switch — the same invariant the mode switch already relies on. The other
+          tabs are cheap + stateless, so they mount/unmount freely. */}
       <div
         className={
           mode === 'sidebar'
-            ? `h-full box-border ${FLOATING_MENU_INSET_RIGHT}`
-            : 'h-full w-full'
+            ? `h-full box-border ${FLOATING_MENU_INSET_RIGHT} flex flex-col`
+            : 'h-full w-full flex flex-col'
         }
       >
-        <ChatPanel onCollapse={close} />
+        <div
+          role="tablist"
+          aria-label="Assistant sections"
+          data-testid="assistant-tabs"
+          className="shrink-0 flex items-center gap-0.5 px-1.5 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-raised)]"
+        >
+          {TAB_META.map((t) => {
+            const isActive = activeTab === t.id
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setTab(t.id)}
+                data-testid={`assistant-tab-${t.id}`}
+                title={t.label}
+                className={`flex-1 min-w-0 inline-flex items-center justify-center gap-1 h-7 rounded-md text-[11px] font-medium transition-colors ${
+                  isActive
+                    ? 'bg-accent/10 text-[rgb(var(--accent))]'
+                    : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]'
+                }`}
+              >
+                <Icon name={t.icon} size={14} className="shrink-0" />
+                <span className="truncate">{t.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex-1 min-h-0 relative">
+          {/* Chat: always mounted, shown only on the Chat tab. */}
+          <div className="h-full w-full" style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
+            <ChatPanel onCollapse={close} />
+          </div>
+          {activeTab === 'today' && (
+            <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-today">
+              <StandupHome />
+            </div>
+          )}
+          {activeTab === 'tasks' && <AssistantTasksTab />}
+          {activeTab === 'activity' && <AssistantActivityTab />}
+          {activeTab === 'work' && <AssistantWorkTab />}
+        </div>
       </div>
     </div>
   )
