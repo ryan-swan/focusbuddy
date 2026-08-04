@@ -6,6 +6,7 @@ import { useDocumentsStore } from '../../stores/documents'
 import { useNodeStore } from '../../stores/nodes'
 import { useAiCommandBar } from '../../stores/aiCommandBar'
 import { useAssistantChrome } from '../../stores/assistantChrome'
+import { usePinLayer } from '../../stores/pinLayer'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { RailCard, PLEXI_CARD } from '../plexi'
 import StandupHome from './StandupHome'
@@ -163,6 +164,7 @@ export default function HomeDashboard(): JSX.Element {
   const setActive = useNodeStore((s) => s.setActive)
 
   const openAiBar = useAiCommandBar((s) => s.setOpen)
+  const pin = usePinLayer((s) => s.pin)
 
   const focusActive = useFocusSessionStore((s) => s.active)
   const startFocus = useFocusSessionStore((s) => s.start)
@@ -287,6 +289,15 @@ export default function HomeDashboard(): JSX.Element {
       next.add(id)
       saveDismissed(next)
       return next
+    })
+  }
+  const pinActivity = (e: ActivityEvent): void => {
+    pin({
+      kind: 'activity',
+      refId: e.id,
+      title: summarizeActivity(e),
+      source: 'Home activity',
+      deskId: e.taskId ?? undefined
     })
   }
 
@@ -618,6 +629,14 @@ export default function HomeDashboard(): JSX.Element {
                             <Icon name="auto_awesome" size={13} />
                           </button>
                         )}
+                        <button
+                          onClick={() => pinActivity(e)}
+                          title="Pin to your global pins"
+                          data-testid={`home-activity-pin-${e.id}`}
+                          className="icon-btn h-6 w-6 text-[var(--ink-50)] hover:text-[rgb(var(--accent))]"
+                        >
+                          <Icon name="push_pin" size={13} />
+                        </button>
                         <button
                           onClick={() => dismissActivity(e.id)}
                           title="Dismiss"

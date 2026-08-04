@@ -12,6 +12,7 @@ import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
 import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
 import AssistantOverlay from './components/assistant/AssistantOverlay'
+import PinTray from './components/pins/PinTray'
 import { useAssistantChrome } from './stores/assistantChrome'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
@@ -678,6 +679,9 @@ export default function App(): JSX.Element {
       {/* The assistant: a pill on every screen, opening into sidebar /
           floating / fullscreen over one conversation. */}
       <AssistantOverlay />
+      {/* The universal pin layer (spec §7): a persistent tray of globally pinned
+          items, reachable on every surface, droppable onto the current desk. */}
+      <PinTray />
       <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
       {/* Hover mic bar — collapses to accent strip, expands to voice FAB */}
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-auto">
