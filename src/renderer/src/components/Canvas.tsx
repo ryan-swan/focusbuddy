@@ -35,6 +35,7 @@ import ExtensionPrompt from './ExtensionPrompt'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
 import AiBuilderDialog from './AiBuilderDialog'
+import ViewSelector from './views/ViewSelector'
 import type { AiBuildSuggestion } from '@shared/types'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import AiAssistPreview from './contextMenu/AiAssistPreview'
@@ -260,8 +261,12 @@ export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   // Per-desk view mode: the infinite Canvas (default) or the Columns view.
   const deskViewModes = useDeskViewStore((s) => s.modes)
-  const deskViewMode = activeTaskId ? deskViewModes[activeTaskId] ?? 'canvas' : 'canvas'
-  const setDeskViewMode = useDeskViewStore((s) => s.set)
+  const deskViewDefaults = useDeskViewStore((s) => s.defaults)
+  // Resolution mirrors the store's get(): last-used wins, else the pinned default
+  // for this desk, else Canvas.
+  const deskViewMode = activeTaskId
+    ? deskViewModes[activeTaskId] ?? deskViewDefaults[activeTaskId] ?? 'canvas'
+    : 'canvas'
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
@@ -2277,16 +2282,7 @@ export default function Canvas(): JSX.Element {
               onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
               onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
             />
-            {activeTaskId && deskViewMode !== 'columns' && (
-              <button
-                onClick={() => setDeskViewMode(activeTaskId, 'columns')}
-                data-testid="desk-view-columns"
-                title="Columns view — stack your objects into scrollable columns"
-                className="fb-glass-chrome inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shadow-[0_2px_10px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.06] dark:ring-white/[0.06]"
-              >
-                <Icon name="view_column" size={14} /> Columns
-              </button>
-            )}
+            {activeTaskId && <ViewSelector taskId={activeTaskId} />}
           </div>
           {/* Context Health (plexi-4.0): floats just under the breadcrumb, showing
               what changed since last visit and related desks needing attention.

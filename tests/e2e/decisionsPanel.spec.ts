@@ -132,7 +132,7 @@ test('DECISIONS PANEL — empty state, a flagged decision appears Current, flips
 
   // ── Step 5 (checked before Retire, while the row still exists): Open desk navigates ──
   await window.locator('[data-testid="decision-open-desk"]').click()
-  await expect(window.locator('[data-testid="desk-view-columns"]')).toBeVisible({ timeout: 8_000 })
+  await expect(window.locator('[data-testid="view-selector-btn"]')).toBeVisible({ timeout: 8_000 })
   await expect(window.locator(`[data-widget-id="${ids.widget}"]`)).toBeVisible({ timeout: 8_000 })
 
   // ── Step 4: Retire removes the decision from the panel and from the IPC surface ──

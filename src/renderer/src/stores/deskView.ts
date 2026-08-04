@@ -1,18 +1,21 @@
 import { create } from 'zustand'
 
 // Per-desk view mode. A desk can be shown as the infinite spatial Canvas (the
-// default) or as Columns (stacked scrollable walls). The choice is remembered
-// per desk so switching desks restores how each one was last viewed. Stored in
-// localStorage rather than the synced DB because it is a local viewing
-// preference, not shared content.
+// default) or as Columns (stacked scrollable walls). Two things are remembered per
+// desk, both local viewing preferences (localStorage, not the synced DB):
+//   - the LAST-USED mode, so switching desks restores how each was last viewed;
+//   - an explicit DEFAULT mode the user can pin (spec §3.3 "Allow a default view
+//     per desk"), which applies the first time a desk is opened before any toggle.
+// Resolution: last-used wins, else the pinned default, else Canvas.
 
 export type DeskViewMode = 'canvas' | 'columns'
 
 const KEY = 'fb.deskView.v1'
+const DEFAULT_KEY = 'fb.deskDefaultView.v1'
 
-function load(): Record<string, DeskViewMode> {
+function loadMap(key: string): Record<string, DeskViewMode> {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as Record<string, DeskViewMode>
     return parsed && typeof parsed === 'object' ? parsed : {}
@@ -21,27 +24,44 @@ function load(): Record<string, DeskViewMode> {
   }
 }
 
+function persist(key: string, map: Record<string, DeskViewMode>): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(map))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 interface DeskViewStore {
   modes: Record<string, DeskViewMode>
+  defaults: Record<string, DeskViewMode>
   get: (taskId: string | null) => DeskViewMode
   set: (taskId: string, mode: DeskViewMode) => void
   toggle: (taskId: string) => void
+  getDefault: (taskId: string | null) => DeskViewMode | null
+  setDefault: (taskId: string, mode: DeskViewMode) => void
 }
 
 export const useDeskViewStore = create<DeskViewStore>((setState, getState) => ({
-  modes: load(),
-  get: (taskId) => (taskId ? getState().modes[taskId] ?? 'canvas' : 'canvas'),
+  modes: loadMap(KEY),
+  defaults: loadMap(DEFAULT_KEY),
+  get: (taskId) => {
+    if (!taskId) return 'canvas'
+    const s = getState()
+    return s.modes[taskId] ?? s.defaults[taskId] ?? 'canvas'
+  },
   set: (taskId, mode) => {
     const modes = { ...getState().modes, [taskId]: mode }
     setState({ modes })
-    try {
-      localStorage.setItem(KEY, JSON.stringify(modes))
-    } catch {
-      /* ignore quota / private mode */
-    }
+    persist(KEY, modes)
   },
   toggle: (taskId) => {
-    const cur = getState().modes[taskId] ?? 'canvas'
-    getState().set(taskId, cur === 'canvas' ? 'columns' : 'canvas')
+    getState().set(taskId, getState().get(taskId) === 'canvas' ? 'columns' : 'canvas')
+  },
+  getDefault: (taskId) => (taskId ? getState().defaults[taskId] ?? null : null),
+  setDefault: (taskId, mode) => {
+    const defaults = { ...getState().defaults, [taskId]: mode }
+    setState({ defaults })
+    persist(DEFAULT_KEY, defaults)
   }
 }))
