@@ -29,3 +29,10 @@ export const useAiCommandBar = create<AiCommandBarState>((set) => ({
   handoff: null,
   setHandoff: (handoff) => set({ handoff })
 }))
+
+// Thin handle for debugging + e2e (same convention as __fbView/__fbNodes): lets a
+// test seed a build hand-off to open the AI builder preview deterministically,
+// without a live AI round-trip.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbAiCmd?: typeof useAiCommandBar }).__fbAiCmd = useAiCommandBar
+}
