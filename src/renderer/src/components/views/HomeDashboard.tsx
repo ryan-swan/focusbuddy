@@ -7,6 +7,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useAiCommandBar } from '../../stores/aiCommandBar'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { RailCard, PLEXI_CARD } from '../plexi'
+import StandupHome from './StandupHome'
 import Icon from '../Icon'
 import type { ActivityEvent, ActivityKind, DocumentMeta, FbNode, TimeBlock } from '@shared/types'
 
@@ -294,6 +295,10 @@ export default function HomeDashboard(): JSX.Element {
             {focusActive ? 'End focus mode' : 'Focus mode'}
           </button>
         </header>
+
+        {/* Daily standup — the assistant's look-back/look-forward narrative, the
+            hero of home (Assistant 4.5). */}
+        <StandupHome />
 
         {/* Ask PlexiBrain command bar trigger */}
         <button

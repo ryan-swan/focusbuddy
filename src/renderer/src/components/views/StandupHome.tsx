@@ -1,0 +1,164 @@
+import { useEffect, useRef, useState } from 'react'
+import { useAccountStore } from '../../stores/account'
+import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
+import { getAccountState, setAccountState } from '../../lib/accountStateClient'
+import Icon from '../Icon'
+
+// The daily standup, promoted to the home hero (operator decision: the daily
+// narrative IS the home screen). It weaves Work-Completed (look-back) with the
+// brief (look-forward) into one narrative. The "since last time" cursor is synced
+// per user (accountStateClient), so the diff is consistent across devices, and the
+// day's narrative is cached until the date rolls over (a true DAILY standup, not a
+// re-run on every home visit). Honest by construction: an empty workspace reads
+// "all caught up", and with no AI key it shows the deterministic narrative.
+
+const KEY = 'standup'
+
+interface StandupState {
+  cursor: number
+  lastRunDate: string
+  scope: 'personal' | 'team'
+  narrative: string
+  completed: Array<{ objectId: string | null; title: string | null; at: string }>
+  counts: { completed: number; created: number; updated: number; deleted: number }
+  aiUsed?: boolean
+  needsApiKey?: boolean
+}
+
+function dayKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export default function StandupHome(): JSX.Element | null {
+  const account = useAccountStore((s) => s.account)
+  const activeOrgId = useOrgStore((s) => s.activeOrgId)
+  const orgs = useOrgStore((s) => s.orgs)
+  const inSharedOrg = activeOrgId !== PERSONAL_ORG_ID && orgs.some((o) => o.id === activeOrgId && !o.personal)
+
+  const [state, setState] = useState<StandupState | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [scope, setScope] = useState<'personal' | 'team'>('personal')
+  const ranRef = useRef(false)
+
+  async function run(useScope: 'personal' | 'team', sinceCursor: number, persist: boolean): Promise<void> {
+    setLoading(true)
+    const token = useAccountStore.getState().sessionToken
+    const isTeam = useScope === 'team' && inSharedOrg
+    const res = await window.api.ai.standup({
+      sinceCursor,
+      scope: isTeam ? 'team' : 'personal',
+      organisationId: isTeam ? activeOrgId : null
+    })
+    const next: StandupState = {
+      cursor: res.toCursor,
+      lastRunDate: dayKey(),
+      scope: isTeam ? 'team' : 'personal',
+      narrative: res.narrative,
+      completed: res.completed,
+      counts: res.counts,
+      aiUsed: res.aiUsed,
+      needsApiKey: res.needsApiKey
+    }
+    setState(next)
+    setScope(next.scope)
+    setLoading(false)
+    // Only the daily run (and an explicit refresh) advances the synced cursor; a
+    // scope toggle is view-only so it never eats tomorrow's diff.
+    if (persist && token) void setAccountState(token, KEY, next)
+  }
+
+  // Daily trigger: show today's cached standup, else run once from the synced cursor.
+  useEffect(() => {
+    if (ranRef.current) return
+    ranRef.current = true
+    void (async () => {
+      const token = useAccountStore.getState().sessionToken
+      if (!token) {
+        setLoading(false)
+        return
+      }
+      const saved = await getAccountState<StandupState>(token, KEY)
+      if (saved && saved.lastRunDate === dayKey() && saved.narrative) {
+        setState(saved)
+        setScope(saved.scope ?? 'personal')
+        setLoading(false)
+        return
+      }
+      await run(saved?.scope ?? 'personal', saved?.cursor ?? -1, true)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (!account) return null // signed-out: the home greeting handles it
+
+  const savedCursor = state?.cursor ?? -1
+
+  return (
+    <section
+      data-testid="standup-home"
+      className="mb-6 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-5"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className="h-7 w-7 rounded-full bg-accent/10 inline-flex items-center justify-center">
+          <Icon name="auto_awesome" size={15} className="text-accent" />
+        </span>
+        <span className="text-[13px] font-semibold text-[var(--ink-90)]">Your standup</span>
+        {inSharedOrg && (
+          <div className="ml-2 inline-flex rounded-lg border border-[var(--edge-soft)] overflow-hidden text-[11px]">
+            {(['personal', 'team'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  if (s !== scope) void run(s, savedCursor, false)
+                }}
+                data-testid={`standup-scope-${s}`}
+                className={`px-2.5 h-6 ${scope === s ? 'bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]'}`}
+              >
+                {s === 'personal' ? 'You' : 'Team'}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => void run(scope, savedCursor, true)}
+          disabled={loading}
+          title="Refresh the standup"
+          data-testid="standup-refresh"
+          className="ml-auto icon-btn h-7 w-7 text-[var(--ink-40)] hover:text-[rgb(var(--accent))] disabled:opacity-50"
+        >
+          <Icon name={loading ? 'autorenew' : 'refresh'} size={15} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {loading && !state ? (
+        <div className="text-[13px] text-[var(--ink-40)] py-3">Putting your standup together…</div>
+      ) : state ? (
+        <>
+          <p className="text-[15px] leading-relaxed text-[var(--ink-100)] whitespace-pre-wrap">{state.narrative}</p>
+          {state.completed.length > 0 && (
+            <div className="mt-3 border-t border-[var(--edge-soft)] pt-3">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">
+                Completed since last time
+              </div>
+              <ul className="space-y-1">
+                {state.completed.slice(0, 8).map((c, i) => (
+                  <li key={c.objectId ?? i} className="flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
+                    <Icon name="check_circle" size={13} className="text-emerald-500 shrink-0" />
+                    <span className="truncate">{c.title ?? 'A task'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {state.needsApiKey && (
+            <div className="mt-3 text-[11px] text-[var(--ink-50)]">
+              Showing a plain summary. Add an Anthropic key in Settings → AI for a written standup.
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-[13px] text-[var(--ink-40)] py-3">Sign in to see your daily standup.</div>
+      )}
+    </section>
+  )
+}
