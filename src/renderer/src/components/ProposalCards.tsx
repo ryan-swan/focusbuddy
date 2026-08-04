@@ -26,6 +26,10 @@ import Icon from './Icon'
 interface ProposalCardsProps {
   proposals: ActionProposal[]
   activeTaskId: string | null
+  // Optional destination folder for document-producing proposals (e.g. the
+  // meeting wrap-up files deliverables into the meeting folder). Threaded to the
+  // applier; ignored by proposals that don't create documents.
+  destinationFolderId?: string | null
   // Applied-card state keyed by proposal id (from the host surface's store).
   // Omitted → no card is ever shown as applied (see onApplied).
   appliedProposals?: Record<string, AppliedProposal>
@@ -41,6 +45,7 @@ const NO_APPLIED: Record<string, AppliedProposal> = {}
 export default function ProposalCards({
   proposals,
   activeTaskId,
+  destinationFolderId = null,
   appliedProposals = NO_APPLIED,
   onApplied,
   onConsume
@@ -104,7 +109,7 @@ export default function ProposalCards({
             'Row references a table that was never proposed alongside it — try regenerating the request.'
         }
       }
-      const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
+      const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds, destinationFolderId })
       if (!parentResult.ok) {
         return {
           ok: false,
@@ -132,7 +137,7 @@ export default function ProposalCards({
             message: 'Edit references a document that was never proposed alongside it — try regenerating.'
           }
         }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
+        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds, destinationFolderId })
         if (!parentResult.ok) {
           return { ok: false, message: `Couldn't auto-create the document first: ${parentResult.message}` }
         }
@@ -147,7 +152,7 @@ export default function ProposalCards({
         if (!parent) {
           return { ok: false, message: 'Event references a task that was never proposed alongside it.' }
         }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
+        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds, destinationFolderId })
         if (!parentResult.ok) {
           return { ok: false, message: `Couldn't auto-create the task first: ${parentResult.message}` }
         }
@@ -177,7 +182,7 @@ export default function ProposalCards({
     // clear busy and show an honest failure chip; the card stays for a retry.
     let result: { ok: boolean; message: string }
     try {
-      result = await applyProposal(p, { activeTaskId, resolvedIds: ids })
+      result = await applyProposal(p, { activeTaskId, resolvedIds: ids, destinationFolderId })
     } catch (err) {
       result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
     }

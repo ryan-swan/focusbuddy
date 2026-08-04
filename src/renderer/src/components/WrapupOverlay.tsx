@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon'
+import ProposalCards from './ProposalCards'
 import { useWrapupStore } from '../stores/wrapup'
-import { applyProposal, describeProposal } from '../lib/actionExecutor'
 import { useNodeStore } from '../stores/nodes'
-import type { ActionProposal } from '@shared/types'
+import type { AppliedProposal } from '@shared/types'
 import type { FileEntry } from '@shared/fields'
 
 // End-of-conversation review. Mounted once at the app root. When a meeting or call
@@ -24,8 +24,9 @@ export default function WrapupOverlay(): JSX.Element | null {
   const folderName = useWrapupStore((s) => s.folderName)
   const dismiss = useWrapupStore((s) => s.dismiss)
 
-  const [applied, setApplied] = useState<Record<string, 'ok' | 'fail'>>({})
-  const [busy, setBusy] = useState<string | null>(null)
+  const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  const [applied, setApplied] = useState<Record<string, AppliedProposal>>({})
+  const [consumed, setConsumed] = useState<Set<string>>(new Set())
   // Where the deliverables the user creates should be filed. Defaults to the
   // meeting folder; the picker lets them choose another top-level folder or the
   // workspace root. Documents are filed there; other proposals are unaffected.
@@ -42,24 +43,6 @@ export default function WrapupOverlay(): JSX.Element | null {
   }, [status, folderId])
 
   if (status === 'idle') return null
-
-  async function apply(p: ActionProposal): Promise<void> {
-    setBusy(p.id)
-    const res = await applyProposal(p, {
-      activeTaskId: useNodeStore.getState().activeTaskId,
-      resolvedIds: new Map(),
-      destinationFolderId: dest
-    })
-    setApplied((prev) => ({ ...prev, [p.id]: res.ok ? 'ok' : 'fail' }))
-    setBusy(null)
-  }
-
-  async function applyAll(): Promise<void> {
-    for (const p of proposals) {
-      if (applied[p.id] === 'ok') continue
-      await apply(p)
-    }
-  }
 
   return (
     <div className="fixed inset-0 z-[210] bg-stone-900/40 backdrop-blur-[2px] flex items-start justify-center pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
@@ -130,49 +113,24 @@ export default function WrapupOverlay(): JSX.Element | null {
                 </section>
               )}
 
-              <section className="mt-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
-                    Deliverables{proposals.length ? ` (${proposals.length})` : ''}
-                  </h3>
-                  {proposals.length > 1 && (
-                    <button onClick={() => void applyAll()} data-testid="wrapup-create-all" className="text-[12px] text-[rgb(var(--accent))] hover:underline">
-                      Create all
-                    </button>
-                  )}
-                </div>
+              <section className="mt-5" data-testid="wrapup-deliverables">
+                <h3 className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
+                  Deliverables{proposals.length ? ` (${proposals.length})` : ''}
+                </h3>
                 {proposals.length === 0 ? (
                   <p className="text-[12.5px] text-[var(--ink-50)]">Nothing actionable came out of this conversation.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {proposals.map((p) => {
-                      const d = describeProposal(p)
-                      const state = applied[p.id]
-                      return (
-                        <div key={p.id} className="flex items-start gap-2.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-3 py-2.5" data-testid={`wrapup-proposal-${p.id}`}>
-                          <Icon name={d.icon} size={16} className="text-[var(--ink-50)] mt-0.5 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[12.5px] text-[var(--ink-100)]"><span className="font-medium">{d.verb}</span> · {d.subject}</p>
-                            {'reason' in p && p.reason && <p className="mt-0.5 text-[11px] text-[var(--ink-50)] leading-snug">{p.reason}</p>}
-                          </div>
-                          {state === 'ok' ? (
-                            <span className="shrink-0 inline-flex items-center gap-1 text-[11.5px] text-emerald-600 dark:text-emerald-400">
-                              <Icon name="check_circle" size={14} filled /> Created
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => void apply(p)}
-                              disabled={busy === p.id}
-                              data-testid={`wrapup-apply-${p.id}`}
-                              className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium hover:bg-[rgb(var(--accent-hover))] disabled:opacity-50"
-                            >
-                              {busy === p.id ? '…' : state === 'fail' ? 'Retry' : 'Create'}
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
+                  // The shared approval-card surface (standard accept/approve),
+                  // filing deliverables into the chosen destination folder. Fixes
+                  // the old per-click fresh-Map bug: resolvedIds now batch correctly.
+                  <ProposalCards
+                    proposals={proposals.filter((p) => !consumed.has(p.id))}
+                    activeTaskId={activeTaskId}
+                    destinationFolderId={dest}
+                    appliedProposals={applied}
+                    onApplied={(id, a) => setApplied((prev) => ({ ...prev, [id]: a }))}
+                    onConsume={(id) => setConsumed((prev) => new Set(prev).add(id))}
+                  />
                 )}
               </section>
             </>
