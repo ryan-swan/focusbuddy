@@ -1229,6 +1229,17 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('ai:dailyBrief', () => generateDailyBrief())
+  // Daily standup: the assistant catch-up duo (Work-Completed look-back woven with
+  // the brief look-forward) into one narrative. The caller passes the synced-per-user
+  // cursor and persists the returned toCursor. Read-only + honest-degrading.
+  ipcMain.handle(
+    'assistant:standup',
+    async (_e, input: { sinceCursor: number; scope: 'personal' | 'team'; organisationId?: string | null }) => {
+      const { runStandup } = require('../assistant/standupRun') as typeof import('../assistant/standupRun')
+      recordAiCall()
+      return runStandup(input)
+    }
+  )
   // Save a meeting to the OS default calendar (Apple Calendar / Outlook) by
   // writing a standards .ics and opening it — the universal "add to calendar".
   // Google users use the web URL the renderer builds separately.

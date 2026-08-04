@@ -512,6 +512,24 @@ const api = {
     // process prompt builder can offer real conversation ids to post-chat.
     setConversationSnapshot: (convs: Array<{ id: string; label: string }>): Promise<boolean> =>
       ipcRenderer.invoke('ai:setConversationSnapshot', convs),
+    // Daily standup: Work-Completed (look-back) woven with the brief (look-forward)
+    // into one narrative. Pass the synced-per-user cursor; persist the returned
+    // toCursor. Honest degradation (falls back to a deterministic narrative, no key).
+    standup: (input: {
+      sinceCursor: number
+      scope: 'personal' | 'team'
+      organisationId?: string | null
+    }): Promise<{
+      ok: boolean
+      narrative: string
+      aiUsed: boolean
+      needsApiKey?: boolean
+      hasContent: boolean
+      completed: Array<{ objectId: string | null; title: string | null; at: string }>
+      counts: { completed: number; created: number; updated: number; deleted: number }
+      fromCursor: number
+      toCursor: number
+    }> => ipcRenderer.invoke('assistant:standup', input),
     // Label each desk object with a short topic so the Columns view can lay them
     // out as topical columns. Honest degradation (needsApiKey) when no AI is set.
     groupByTopic: (
