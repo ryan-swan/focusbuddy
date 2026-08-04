@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePosition } from '../../src/renderer/src/lib/floatingChrome'
+import { resolveCenteredTop, resolvePosition } from '../../src/renderer/src/lib/floatingChrome'
 import type { MenuRect } from '../../src/renderer/src/stores/overlay'
 
 // jsdom defaults the viewport to 1024x768.
@@ -37,5 +37,44 @@ describe('resolvePosition — anti-magnetic menu placement', () => {
     const p = resolvePosition(20, 20, 200, 120, [a, b])
     expect(overlaps(p, 200, 120, a)).toBe(false)
     expect(overlaps(p, 200, 120, b)).toBe(false)
+  })
+})
+
+describe('resolveCenteredTop — vertical-only dodge for centered chrome (the pill)', () => {
+  // jsdom viewport 1024 wide → a 300px pill centers at left 362.
+  const W = 300
+  const H = 40
+  const centeredLeft = (1024 - W) / 2
+
+  it('returns the desired top unchanged when the centered spot is clear', () => {
+    expect(resolveCenteredTop(60, W, H, [])).toBe(60)
+    // an obstacle away from center is ignored
+    const sideMenu: MenuRect = { left: 0, top: 40, right: 200, bottom: 120 }
+    expect(resolveCenteredTop(60, W, H, [sideMenu])).toBe(60)
+  })
+
+  it('pushes straight down below an obstacle overlapping the centered spot', () => {
+    const wideBreadcrumb: MenuRect = { left: 100, top: 50, right: 700, bottom: 90 }
+    const top = resolveCenteredTop(60, W, H, [wideBreadcrumb])
+    expect(top).toBe(90 + 8) // obstacle bottom + margin
+    expect(overlaps({ left: centeredLeft, top }, W, H, wideBreadcrumb)).toBe(false)
+  })
+
+  it('settles below stacked obstacles', () => {
+    const a: MenuRect = { left: 100, top: 50, right: 700, bottom: 90 }
+    const b: MenuRect = { left: 300, top: 95, right: 800, bottom: 140 }
+    const top = resolveCenteredTop(60, W, H, [a, b])
+    expect(overlaps({ left: centeredLeft, top }, W, H, a)).toBe(false)
+    expect(overlaps({ left: centeredLeft, top }, W, H, b)).toBe(false)
+  })
+
+  it('clamps the desired top into the viewport', () => {
+    expect(resolveCenteredTop(-100, W, H, [])).toBe(8)
+    expect(resolveCenteredTop(5000, W, H, [])).toBe(768 - H - 8)
+  })
+
+  it('falls back to the clamped desired top when the whole column is blocked', () => {
+    const fullColumn: MenuRect = { left: 0, top: 0, right: 1024, bottom: 768 }
+    expect(resolveCenteredTop(60, W, H, [fullColumn])).toBe(60)
   })
 })
