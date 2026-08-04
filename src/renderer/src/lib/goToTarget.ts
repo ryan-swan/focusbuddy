@@ -31,6 +31,19 @@ export function resolveGoToTarget(
       const id = resolvedIds?.get(p.id)
       return id ? { kind: 'document', id, label: p.title } : null
     }
+    // Widget-producing creates — the executor stashed the new WIDGET id under the
+    // proposal id, so "Go to" (and any host, e.g. MindMap's agent-outcome ref)
+    // can resolve what was made.
+    case 'create-widget':
+    case 'create-page':
+    case 'create-agent': {
+      const id = resolvedIds?.get(p.id)
+      return id ? { kind: 'widget', id, label: p.title ?? '' } : null
+    }
+    case 'create-section': {
+      const id = resolvedIds?.get(p.id)
+      return id ? { kind: 'widget', id, label: p.name } : null
+    }
     case 'create-table': {
       // create-table stashes the backing TABLE id, but the user navigates to the
       // table WIDGET. We don't have the widget id here, so fall back to the most

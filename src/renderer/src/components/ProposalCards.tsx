@@ -38,6 +38,11 @@ interface ProposalCardsProps {
   onApplied?: (proposalId: string, applied: AppliedProposal) => void
   // Remove an un-applied suggestion (dismiss).
   onConsume: (proposalId: string) => void
+  // Optional per-card Undo on an APPLIED card. The host performs the actual
+  // reversal (e.g. deleting the created entity + recording an agent outcome) and
+  // updates its applied-state. When provided, applied cards show an Undo button.
+  // Distinct from the applyAll action-history batch — this is host-owned, per-card.
+  onUndo?: (proposalId: string, applied: AppliedProposal) => void
 }
 
 const NO_APPLIED: Record<string, AppliedProposal> = {}
@@ -48,7 +53,8 @@ export default function ProposalCards({
   destinationFolderId = null,
   appliedProposals = NO_APPLIED,
   onApplied,
-  onConsume
+  onConsume,
+  onUndo
 }: ProposalCardsProps): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [toast, setToast] = useState<{ id: string; ok: boolean; message: string } | null>(
@@ -267,17 +273,30 @@ export default function ProposalCards({
                     {applied.message}
                   </div>
                 </div>
-                {applied.target && (
-                  <button
-                    onClick={() => void goToTarget(applied.target!)}
-                    title="Go to what this created"
-                    data-testid={`proposal-goto-${p.id}`}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-800/60 bg-[var(--surface-raised)] hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
-                  >
-                    <span>Go to</span>
-                    <Icon name="north_east" size={12} />
-                  </button>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {onUndo && (
+                    <button
+                      onClick={() => onUndo(p.id, applied)}
+                      title="Undo this"
+                      data-testid={`proposal-undo-${p.id}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)] px-2 py-1 text-[11px] font-medium text-[var(--ink-60)] transition-colors"
+                    >
+                      <Icon name="undo" size={12} />
+                      <span>Undo</span>
+                    </button>
+                  )}
+                  {applied.target && (
+                    <button
+                      onClick={() => void goToTarget(applied.target!)}
+                      title="Go to what this created"
+                      data-testid={`proposal-goto-${p.id}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-800/60 bg-[var(--surface-raised)] hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
+                    >
+                      <span>Go to</span>
+                      <Icon name="north_east" size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
