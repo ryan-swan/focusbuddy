@@ -1774,6 +1774,49 @@ export async function groupWidgetsByTopic(
   }
 }
 
+// Weave the daily standup's two halves (LOOK BACK = what actually got done, LOOK
+// FORWARD = current state) into ONE short narrative. The caller (assistant/standup.ts)
+// supplies the prompt context and a deterministic fallback narrative that is already
+// honest and grounded. This function only ever REPHRASES those facts — it must not
+// invent tasks, counts or names. Honest degradation: no key (or any failure) returns
+// the deterministic fallback verbatim, never a fabricated standup.
+export async function generateStandupNarrative(input: {
+  promptContext: string
+  fallbackNarrative: string
+  subject?: string
+}): Promise<{ ok: boolean; narrative: string; aiUsed: boolean; needsApiKey?: boolean; error?: string }> {
+  const c = getClient()
+  if (!c) return { ok: true, narrative: input.fallbackNarrative, aiUsed: false, needsApiKey: true }
+  const subject = input.subject ?? 'you'
+  const system =
+    'You write a brief daily standup for a PlexiDesk user. You are given two labelled sections: ' +
+    'LOOK BACK (what actually got completed) and LOOK FORWARD (the current state to pick up from).\n\n' +
+    'Rules:\n' +
+    `- Weave them into ONE short, natural narrative of 2 to 4 sentences: first what ${subject} completed, then what to pick up next.\n` +
+    '- Ground everything strictly in the provided facts. Never invent a task, a count, a name, or a completion that is not listed. If a section is empty, say so plainly.\n' +
+    '- Plain human prose only: no headings, no bullet lists, no markdown, no emoji, and no em dash (use a comma or a full stop).\n' +
+    '- Return only the narrative text, nothing else.'
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('resume'),
+      max_tokens: 512,
+      system,
+      messages: [{ role: 'user', content: input.promptContext }]
+    })
+    if ((resp.stop_reason as string) === 'refusal') return { ok: true, narrative: input.fallbackNarrative, aiUsed: false, error: 'declined' }
+    const out = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    if (!out) return { ok: true, narrative: input.fallbackNarrative, aiUsed: false }
+    return { ok: true, narrative: out, aiUsed: true }
+  } catch (e) {
+    // Any failure degrades to the honest, grounded fallback — never a fake standup.
+    return { ok: true, narrative: input.fallbackNarrative, aiUsed: false, error: (e as Error).message }
+  }
+}
+
 export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestResponse> {
   const c = getClient()
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
