@@ -1,10 +1,18 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { getModelClient, invalidateModelClients } from './modelClient'
 import { BROWSER_TOOLS, runBrowserTool } from './agentBrowser'
-import { getNode } from '../db/nodes'
+import { getNode, listNodes } from '../db/nodes'
 import { getWidget, listWidgetsByTask } from '../db/widgets'
 import { listLinksByTask } from '../db/widgetLinks'
-import { getTable } from '../db/tables'
+import { getTable, listRows } from '../db/tables'
+// Static imports (not lazy require): electron-vite only bundles the static import
+// graph, so a runtime require('../db/documents') resolved against out/main/ (which
+// has no db/ dir) and threw MODULE_NOT_FOUND in the built app — breaking the daily
+// brief and silently emptying the doc/table context blocks. These modules already
+// proved cycle-safe here (getNode/getTable above import the same way).
+import { listDocuments } from '../db/documents'
+import { listBlocksInRange } from '../db/timeBlocks'
+import { buildBriefContext, buildBriefActions, briefIsEmpty } from './dailyBriefContext'
 import { getRecentHistory } from '../db/browsing'
 import { getRecentActivity } from '../db/activity'
 import { markdownToTiptap } from './markdownToTiptap'
@@ -213,10 +221,6 @@ function summarizeWidgets(widgets: Widget[]): string {
     // table widget IS the table id.
     if (w.kind === 'table' && w.content) {
       try {
-        // Lazy import to avoid a circular dep — tables module imports from db
-        // which boots SQLite, and we only need it inside this function.
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { getTable } = require('../db/tables') as typeof import('../db/tables')
         const table = getTable(w.content)
         if (table) {
           const cols = table.schema.columns
@@ -227,8 +231,6 @@ function summarizeWidgets(widgets: Widget[]): string {
           // set-cell can address existing rows. Without real row ids the model
           // cannot legally emit a set-cell at all.
           try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { listRows } = require('../db/tables') as typeof import('../db/tables')
             const rows = listRows(w.content).slice(0, 8)
             if (rows.length > 0) {
               const firstCol = table.schema.columns[0]?.id
@@ -409,8 +411,6 @@ function clockBlock(): string {
 // metadata-only; the model asks for content via the user, not this block.
 function documentsBlock(): string {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { listDocuments } = require('../db/documents') as typeof import('../db/documents')
     const docs = listDocuments().slice(0, 12)
     if (docs.length === 0) return ''
     const lines = docs.map((d) => `- documentId=${d.id} type=${d.docType} "${d.title}"`)
@@ -1315,15 +1315,6 @@ export async function generateProactiveWelcome(taskId: string): Promise<ChatResp
 // first thing opened. Grounded only in the assembled state; an empty workspace
 // returns an honest "your day is clear" without a model call (no fabricated plan).
 export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: string; actions?: import('./dailyBriefContext').BriefAction[]; needsApiKey?: boolean; error?: string }> {
-  const { listNodes } = require('../db/nodes') as typeof import('../db/nodes')
-  const { listBlocksInRange } = require('../db/timeBlocks') as typeof import('../db/timeBlocks')
-  const { listDocuments } = require('../db/documents') as typeof import('../db/documents')
-  const {
-    buildBriefContext,
-    buildBriefActions,
-    briefIsEmpty
-  } = require('./dailyBriefContext') as typeof import('./dailyBriefContext')
-
   const now = Date.now()
   const tasks = listNodes()
     .filter((n) => n.kind === 'task' && (n.status === 'open' || n.status === 'in_progress'))
