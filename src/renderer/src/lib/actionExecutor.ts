@@ -24,6 +24,8 @@ import { useMessagingStore } from '../stores/messaging'
 import { useViewStore } from '../stores/view'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
+import { computeSectionFrame, effectiveLayout } from './sectionGeometry'
+import { pickColors } from './sectionColors'
 import { serializeAgent, DEFAULT_AGENT } from './deskAgent'
 import { useCapabilityStore } from '../stores/capabilities'
 import { capabilityForDocType, DOC_TYPE_LABEL, entitlementFor } from './entitlementReason'
@@ -91,6 +93,8 @@ export async function applyProposal(
       return applyDrillInWidget(proposal)
     case 'arrange-widgets':
       return applyArrangeWidgets(proposal, ctx)
+    case 'create-section':
+      return applyCreateSection(proposal, ctx)
     case 'create-table':
       return applyCreateTable(proposal, ctx)
     case 'add-table-row':
@@ -924,6 +928,64 @@ async function applyArrangeWidgets(
   return { ok: true, message: `Arranged ${ordered.length} widget${ordered.length === 1 ? '' : 's'}` }
 }
 
+// Group existing widgets into a new labelled Section (the Smart Stack action,
+// unified onto the approval-card standard). One card = one group. Ported from
+// SmartStackModal's per-group apply: size the section to its members, place it
+// below existing top-level content, colour it from the shared rotation, then
+// reparent each member into it.
+async function applyCreateSection(
+  p: Extract<ActionProposal, { kind: 'create-section' }>,
+  ctx: { activeTaskId: string | null }
+): Promise<ApplyResult> {
+  if (!ctx.activeTaskId) return { ok: false, message: 'Open a desk first.' }
+  const store = useWidgetStore.getState()
+  const all = store.widgets
+  const members = all.filter((w) => p.widgetIds.includes(w.id) && !w.archived)
+  if (members.length === 0) return { ok: false, message: 'None of those objects are on this desk.' }
+
+  const PADDING = 80
+  const GAP = 40
+  const topLevel = all.filter((w) => !w.parentSectionId && !w.archived && !w.pinned)
+  let startY = PADDING
+  if (topLevel.length > 0) {
+    const bottom = topLevel.reduce((maxY, w) => {
+      let h = w.height
+      if (w.kind === 'section') {
+        const ch = all.filter((c) => c.parentSectionId === w.id)
+        h = computeSectionFrame(ch, effectiveLayout(w.layout)).height
+      }
+      return Math.max(maxY, w.y + h)
+    }, 0)
+    startY = bottom + GAP
+  }
+
+  const synthetic: Widget[] = members.map((w) => ({ ...w, parentSectionId: 'tmp', x: 0, y: 0 }))
+  const frame = computeSectionFrame(synthetic, 'grid')
+  const usedColors = all.filter((w) => w.kind === 'section' && w.color).map((w) => w.color as string)
+  const color = pickColors(usedColors, 1)[0]
+
+  const section = await store.create({
+    taskId: ctx.activeTaskId,
+    kind: 'section',
+    title: p.name,
+    content: '',
+    x: PADDING,
+    y: startY,
+    width: frame.width,
+    height: frame.height,
+    color
+  })
+  await store.update(section.id, { layout: 'grid' })
+  for (const w of members) {
+    await store.update(w.id, { parentSectionId: section.id, x: 0, y: 0 })
+  }
+  store.bumpLayoutVersion()
+  return {
+    ok: true,
+    message: `Created section "${p.name}" with ${members.length} object${members.length === 1 ? '' : 's'}`
+  }
+}
+
 // Translate the AI's column shorthand (label/type/options strings) into the
 // strict FieldDefinition shape the table widget expects, including stable
 // ids + hex colors for select options.
@@ -1294,6 +1356,12 @@ export function describeProposal(
         icon: 'dashboard_customize',
         verb: 'Arrange',
         subject: p.widgetIds && p.widgetIds.length > 0 ? `${p.widgetIds.length} widgets` : p.label
+      }
+    case 'create-section':
+      return {
+        icon: 'dashboard',
+        verb: 'Create section',
+        subject: `${p.name} · ${p.widgetIds.length} widget${p.widgetIds.length === 1 ? '' : 's'}`
       }
     case 'update-task': {
       const bits = [

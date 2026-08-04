@@ -751,6 +751,15 @@ export type ActionProposal =
     }
   | {
       id: string
+      // Group existing widgets into a new labelled Section (the Smart Stack
+      // suggestion, unified onto the approval-card standard). One card per group.
+      kind: 'create-section'
+      name: string
+      widgetIds: string[]
+      reason?: string
+    }
+  | {
+      id: string
       kind: 'create-table'
       title: string
       columns: Array<{
