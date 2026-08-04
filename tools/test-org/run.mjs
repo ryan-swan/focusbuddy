@@ -350,7 +350,11 @@ function launchInstance(state, user) {
   mkdirSync(user.userDataDir, { recursive: true })
   const electron = join(REPO, 'node_modules', '.bin', 'electron')
   if (!existsSync(electron)) die(`electron not found at ${electron}`)
-  const env = { ...process.env, FB_TEST_USER_DATA: user.userDataDir }
+  // Point the MAIN process at the local signal too (the build only wires the
+  // renderer's Vite var). Without this, main's credit-mode AI proxy defaults to
+  // the production signal and a local session token bounces off it as a
+  // "Connection error" instead of using the local proxy's injected key.
+  const env = { ...process.env, FB_TEST_USER_DATA: user.userDataDir, FB_SIGNAL_URL: HTTP }
   delete env.ELECTRON_RUN_AS_NODE // ensure a real GUI window, not a node process
   const child = spawn(electron, ['.'], { cwd: REPO, env, detached: true, stdio: 'ignore' })
   child.unref()
