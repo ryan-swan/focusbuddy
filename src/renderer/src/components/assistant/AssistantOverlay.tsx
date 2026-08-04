@@ -281,7 +281,7 @@ export default function AssistantOverlay(): JSX.Element {
             <ChatPanel onCollapse={close} />
           </div>
           {activeTab === 'today' && (
-            <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-today">
+            <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-today-body">
               <StandupHome />
             </div>
           )}

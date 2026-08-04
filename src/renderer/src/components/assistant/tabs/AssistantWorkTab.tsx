@@ -42,7 +42,7 @@ export default function AssistantWorkTab(): JSX.Element {
   const now = Date.now()
 
   return (
-    <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-work">
+    <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-work-body">
       <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold px-1 pb-1.5">
         Desk agents
       </div>

@@ -29,7 +29,7 @@ export default function AssistantActivityTab(): JSX.Element {
   const now = Date.now()
 
   return (
-    <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-activity">
+    <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-activity-body">
       {events === null ? (
         <div className="py-10 text-center text-[12.5px] text-[var(--ink-40)]">Loading recent activity…</div>
       ) : events.length === 0 ? (
