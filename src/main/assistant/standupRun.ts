@@ -3,6 +3,13 @@ import { generateWorkCompleted, type WorkScope } from './workCompleted'
 import { composeStandup } from './standup'
 import { generateStandupNarrative } from '../ai/anthropic'
 import type { BriefTask, BriefBlock, BriefDoc } from '../ai/dailyBriefContext'
+// Static imports, NOT lazy require(): electron-vite/Rollup only bundles what the
+// static import graph reaches, so a runtime require('../db/nodes') resolves against
+// out/main/ (which holds only index.js) and throws MODULE_NOT_FOUND in the built
+// app. These are leaf DB modules with no cycle back to standupRun.
+import { listNodes } from '../db/nodes'
+import { listBlocksInRange } from '../db/timeBlocks'
+import { listDocuments } from '../db/documents'
 
 // The impure orchestrator for the daily standup: it gathers real workspace state
 // (completed events since the cursor + the look-forward brief inputs), resolves
@@ -36,10 +43,6 @@ export interface StandupRunResult {
 }
 
 export async function runStandup(input: StandupRunInput): Promise<StandupRunResult> {
-  const { listNodes } = require('../db/nodes') as typeof import('../db/nodes')
-  const { listBlocksInRange } = require('../db/timeBlocks') as typeof import('../db/timeBlocks')
-  const { listDocuments } = require('../db/documents') as typeof import('../db/documents')
-
   const e = getContextEngine()
   const actor = localActor()
   const scope: WorkScope =

@@ -479,6 +479,10 @@ import { runSheetMacro } from '../sheetMacro'
 import { exportSlides, importPptx } from '../slidesIo'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
 import { describeWidgetForAgent } from '../ai/agentInputs'
+// Static import (not a lazy require): electron-vite only bundles the static import
+// graph, so a runtime require('../assistant/standupRun') throws MODULE_NOT_FOUND in
+// the built app.
+import { runStandup } from '../assistant/standupRun'
 import type {
   ActivityRecordDraft,
   ChatRequest,
@@ -1235,7 +1239,6 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'assistant:standup',
     async (_e, input: { sinceCursor: number; scope: 'personal' | 'team'; organisationId?: string | null }) => {
-      const { runStandup } = require('../assistant/standupRun') as typeof import('../assistant/standupRun')
       recordAiCall()
       return runStandup(input)
     }
