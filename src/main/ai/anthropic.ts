@@ -37,6 +37,7 @@ import type { SlidesBody } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
 import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
 import { groundingBlock, type GroundingSource } from './grounding'
+import { cachedSystem, cachedUserContent, cacheTokens, type CacheTextBlock } from './cacheControl'
 import type {
   ActionProposal,
   ActivityEvent,
@@ -877,7 +878,11 @@ export function parseChatJson(raw: string): {
 // non-streaming path doesn't. `retrievalMs` is the real elapsed time, measured
 // here, so the trace reports what actually happened rather than an estimate.
 interface PreparedChatCall {
-  system: string
+  // System as cache-controlled blocks: a cached stable-instructions prefix
+  // (buildSystemPrompt) + an uncached dynamic suffix (mentions + per-turn
+  // retrieval + attachments). Caching the instruction prefix saves on every turn
+  // in a session; the varying suffix stays out of the cached hash.
+  system: CacheTextBlock[]
   msgs: Array<{ role: 'user' | 'assistant'; content: string }>
   sources: ChatSource[]
   retrievalMs: number
@@ -966,12 +971,14 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
     citedSources = []
   }
   return {
-    system:
-      buildSystemPrompt(req.taskId, req.supportsQuestions) +
+    // Cache the stable instruction prefix; keep the per-turn dynamic parts
+    // (mentions, retrieval, attachments) as an uncached suffix so they don't
+    // change the cached hash.
+    system: cachedSystem(
+      buildSystemPrompt(req.taskId, req.supportsQuestions),
       // What the user named by hand leads what the system went looking for.
-      renderedMentions.block +
-      retrieval +
-      renderAttachments(req.attachments, req.pinnedWidgetId),
+      renderedMentions.block + retrieval + renderAttachments(req.attachments, req.pinnedWidgetId)
+    ),
     msgs: req.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -1041,6 +1048,10 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       system,
       messages: msgs
     })
+    {
+      const ct = cacheTokens(resp.usage)
+      recordAiUsage(resolveModel('chat'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0, ct.read, ct.write)
+    }
     if ((resp.stop_reason as string) === 'refusal') {
       return { ok: false, error: 'Claude declined this request. Try rephrasing or breaking it into smaller steps.' }
     }
@@ -1188,6 +1199,10 @@ export async function sendChatStream(
     stream.on('text', (delta: string) => consumer.push(delta))
 
     const finalMsg = await stream.finalMessage()
+    {
+      const ct = cacheTokens(finalMsg.usage)
+      recordAiUsage(resolveModel('chat'), finalMsg.usage?.input_tokens ?? 0, finalMsg.usage?.output_tokens ?? 0, ct.read, ct.write)
+    }
     stopReason = (finalMsg.stop_reason as string) ?? ''
     if (stopReason === 'refusal') {
       cb.onError({
@@ -1416,15 +1431,22 @@ export async function askWorkspace(
   const convo = history.length
     ? 'Earlier in this conversation:\n' + history.map((h) => `Q: ${h.question}\nA: ${h.answer}`).join('\n') + '\n\n'
     : ''
-  const userMsg = `${convo}Question: ${question}\n\nWorkspace documents:\n${docList}\n\nReturn the JSON now.`
+  // Documents lead as the cacheable prefix; the conversation + question are the
+  // uncached suffix. On a follow-up that retrieves the same documents (notably the
+  // single-document scope), the doc prefix is read from cache instead of re-billed.
+  const docsContext = `Workspace documents:\n${docList}`
+  const tail = `${convo}Question: ${question}\n\nReturn the JSON now.`
   try {
     const resp = await c.messages.create({
       model: resolveModel('chat'),
       max_tokens: 1500,
       system,
-      messages: [{ role: 'user', content: userMsg }]
+      messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
     })
-    recordAiUsage(resolveModel('chat'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0)
+    {
+      const ct = cacheTokens(resp.usage)
+      recordAiUsage(resolveModel('chat'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0, ct.read, ct.write)
+    }
     if ((resp.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
     if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
       return { ok: false, error: 'Too much to read at once — try a narrower question.' }
@@ -1481,13 +1503,17 @@ export async function askWorkspaceStream(
   const convo = history.length
     ? 'Earlier in this conversation:\n' + history.map((h) => `Q: ${h.question}\nA: ${h.answer}`).join('\n') + '\n\n'
     : ''
-  const userMsg = `${convo}Question: ${question}\n\nWorkspace documents:\n${docList}\n\nAnswer now:`
+  // Documents lead as the cacheable prefix; conversation + question are the
+  // uncached suffix (see askWorkspace). The single-document scope, where the same
+  // doc is asked about repeatedly, reads the doc prefix from cache each follow-up.
+  const docsContext = `Workspace documents:\n${docList}`
+  const tail = `${convo}Question: ${question}\n\nAnswer now:`
   try {
     const stream = c.messages.stream({
       model: resolveModel('chat'),
       max_tokens: 1500,
       system,
-      messages: [{ role: 'user', content: userMsg }]
+      messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
     })
     let full = ''
     stream.on('text', (delta: string) => {
@@ -1495,7 +1521,10 @@ export async function askWorkspaceStream(
       onDelta(delta)
     })
     const final = await stream.finalMessage()
-    recordAiUsage(resolveModel('chat'), final.usage?.input_tokens ?? 0, final.usage?.output_tokens ?? 0)
+    {
+      const ct = cacheTokens(final.usage)
+      recordAiUsage(resolveModel('chat'), final.usage?.input_tokens ?? 0, final.usage?.output_tokens ?? 0, ct.read, ct.write)
+    }
     if ((final.stop_reason as string) === 'refusal') return { ok: false, error: 'Claude declined this request.' }
     const answer = full.trim().slice(0, 4000)
     const citedDocIds = sources

@@ -39,12 +39,31 @@ function bumpCounter(key: string, n: number): void {
 }
 
 // Record REAL token usage from one model response, plus its estimated cost.
-// Never throws — telemetry must not break a feature.
-export function recordAiUsage(model: string, inputTokens: number, outputTokens: number): void {
+// `inputTokens` is the uncached input (Anthropic's `input_tokens`, i.e. tokens
+// after the last cache breakpoint). Cache reads/writes are billed at different
+// rates (reads ~0.1x, 5-minute writes ~1.25x of base input), so they are counted
+// separately and priced accordingly — the cost estimate reflects the caching
+// saving rather than pretending every token was full price. Never throws.
+export function recordAiUsage(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheReadTokens = 0,
+  cacheWriteTokens = 0
+): void {
   try {
-    bumpCounter('ai_input_tokens', Math.max(0, Math.round(inputTokens || 0)))
-    bumpCounter('ai_output_tokens', Math.max(0, Math.round(outputTokens || 0)))
-    bumpCounter('ai_cost_micros', estimateCostMicros(model, inputTokens || 0, outputTokens || 0))
+    const inp = Math.max(0, Math.round(inputTokens || 0))
+    const out = Math.max(0, Math.round(outputTokens || 0))
+    const cr = Math.max(0, Math.round(cacheReadTokens || 0))
+    const cw = Math.max(0, Math.round(cacheWriteTokens || 0))
+    bumpCounter('ai_input_tokens', inp)
+    bumpCounter('ai_output_tokens', out)
+    bumpCounter('ai_cache_read_tokens', cr)
+    bumpCounter('ai_cache_write_tokens', cw)
+    let micros = estimateCostMicros(model, inp, out)
+    if (cr) micros += Math.round(estimateCostMicros(model, cr, 0) * 0.1)
+    if (cw) micros += Math.round(estimateCostMicros(model, cw, 0) * 1.25)
+    bumpCounter('ai_cost_micros', micros)
   } catch {
     // swallow
   }
