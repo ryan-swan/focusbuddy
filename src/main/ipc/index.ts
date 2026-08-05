@@ -1219,6 +1219,7 @@ export function registerIpcHandlers(): void {
         systemPrompt?: string
         messages: Array<{ role: 'user' | 'assistant'; content: string }>
         priorFailedCount?: number
+        context?: string
       }
     ) => {
       recordAiCall()

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { runAgentLoop, formatObservations, type AgentRunDeps } from '../../src/renderer/src/lib/agentRunner'
-import type { ActionProposal, AgentStepResult, AgentActionOutcome } from '../../src/shared/types'
+import { runAgentLoop, formatObservations, formatInboxContext, type AgentRunDeps } from '../../src/renderer/src/lib/agentRunner'
+import type { ActionProposal, AgentStepResult, AgentActionOutcome, MailListItem } from '../../src/shared/types'
 
 // Control-flow tests for the agent loop driver, with fully injected deps (no
 // Electron, no real model, no stores). Proves: rounds advance, observations are
@@ -167,5 +167,30 @@ describe('runAgentLoop', () => {
     expect(r.status).toBe('blocked')
     expect(r.blocker).toBe('No AI key configured.')
     expect(deps.applyAction).not.toHaveBeenCalled()
+  })
+})
+
+const mail = (over: Partial<MailListItem> & { uid: number }): MailListItem =>
+  ({ fromName: 'Ana', fromAddress: 'ana@x.com', subject: 'Hi', date: 0, seen: false, flagged: false, hasAttachments: false, messageId: null, inReplyTo: null, references: [], ...over } as MailListItem)
+
+describe('formatInboxContext', () => {
+  it('summarises recent unread mail with a draft-only instruction', () => {
+    const out = formatInboxContext([mail({ uid: 1, fromName: 'Ben', subject: 'Q3 budget' })])
+    expect(out).toContain('YOUR INBOX')
+    expect(out).toContain('Ben')
+    expect(out).toContain('Q3 budget')
+    expect(out).toMatch(/draft/i)
+  })
+  it('returns undefined when there is nothing unread', () => {
+    expect(formatInboxContext([])).toBeUndefined()
+    expect(formatInboxContext([mail({ uid: 1, seen: true })])).toBeUndefined()
+  })
+})
+
+describe('runAgentLoop context', () => {
+  it('passes the run context (inbox) into the round-0 step call', async () => {
+    const deps = makeDeps()
+    await runAgentLoop({ goal: 'clear my inbox', taskId: null, context: 'YOUR INBOX\n- from Ben: "x"' }, deps)
+    expect((deps.step as ReturnType<typeof vi.fn>).mock.calls[0][0].context).toContain('YOUR INBOX')
   })
 })

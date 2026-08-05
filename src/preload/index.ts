@@ -1792,6 +1792,7 @@ const api = {
       systemPrompt?: string
       messages: Array<{ role: 'user' | 'assistant'; content: string }>
       priorFailedCount?: number
+      context?: string
     }): Promise<import('@shared/types').AgentStepResult> => ipcRenderer.invoke('agent:step', input),
     // Self-verification once a run claims done: {met, score, gaps}. The driver
     // re-enters the loop with the gaps when the goal isn't fully met.

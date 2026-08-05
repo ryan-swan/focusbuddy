@@ -1552,6 +1552,10 @@ export async function runAgentStep(input: {
   // How many actions failed in the immediately-preceding round (for the no-fakery
   // downgrade). 0 on round 0.
   priorFailedCount?: number
+  // Extra grounding the driver gathered for THIS run (e.g. the real inbox), seeded
+  // into the round-0 message so the agent can work over it. Ignored after round 0
+  // (later rounds carry the full transcript).
+  context?: string
 }): Promise<AgentStepResult> {
   const systemPrompt = input.systemPrompt ?? buildAgentSystemPrompt(input.taskId)
   const fail = (error: string, blocker: string): AgentStepResult => ({
@@ -1567,7 +1571,9 @@ export async function runAgentStep(input: {
   const c = getClient()
   if (!c) return { ...fail('No Anthropic API key set. Open Settings → AI → API keys.', 'No AI key configured.'), needsApiKey: true }
   const messages =
-    input.messages.length > 0 ? input.messages : [{ role: 'user' as const, content: `GOAL: ${input.goal}` }]
+    input.messages.length > 0
+      ? input.messages
+      : [{ role: 'user' as const, content: `GOAL: ${input.goal}${input.context ? `\n\n${input.context}` : ''}` }]
   try {
     const resp = await c.messages.create({
       model: resolveModel('agent_step'),

@@ -1,4 +1,4 @@
-import type { ActionProposal, AgentStatus, AgentStepResult, AgentActionOutcome } from '@shared/types'
+import type { ActionProposal, AgentStatus, AgentStepResult, AgentActionOutcome, MailListItem } from '@shared/types'
 import { applyProposal, ensureDependencies, isAutoApplyable } from './actionExecutor'
 import { useNodeStore } from '../stores/nodes'
 import { useActionHistory } from '../stores/actionHistory'
@@ -24,6 +24,7 @@ export interface AgentRunDeps {
     systemPrompt?: string
     messages: Array<{ role: 'user' | 'assistant'; content: string }>
     priorFailedCount?: number
+    context?: string
   }) => Promise<AgentStepResult>
   // Apply one proposal (resolving its $ref deps first) and report the outcome.
   applyAction: (
@@ -49,6 +50,25 @@ export interface AgentRunResult {
   pendingApprovals: ActionProposal[]
 }
 
+// Build the round-0 INBOX grounding from recent unread mail, so a goal like
+// "draft replies to the emails that need them" works over the REAL inbox. Reply
+// drafting goes through compose-mail (draft-only), so nothing is ever sent
+// without the user. Returns undefined when the inbox is empty. Pure + exported.
+export function formatInboxContext(messages: MailListItem[]): string | undefined {
+  const unread = messages.filter((m) => !m.seen).slice(0, 12)
+  if (unread.length === 0) return undefined
+  const clip = (s: string): string => (s.length > 100 ? s.slice(0, 97) + '…' : s)
+  const lines = unread.map(
+    (m) => `- from ${m.fromName?.trim() || m.fromAddress}: "${clip(m.subject?.trim() || '(no subject)')}"`
+  )
+  return (
+    'YOUR INBOX (recent unread — reply-needed candidates). To draft a reply, use a ' +
+    'compose-mail action with "to" set to the sender and a "Re:" subject; it stays a ' +
+    'DRAFT the user reviews and sends. Never claim a message was sent.\n' +
+    lines.join('\n')
+  )
+}
+
 // Render the round's real outcomes into the OBSERVATIONS block the next round
 // reads. Outcome-first and terse. Pure + exported for tests.
 export function formatObservations(applied: AgentActionOutcome[], deferred: ActionProposal[]): string {
@@ -68,7 +88,7 @@ export function formatObservations(applied: AgentActionOutcome[], deferred: Acti
 }
 
 export async function runAgentLoop(
-  opts: { goal: string; taskId: string | null; maxRounds?: number; maxQcRetries?: number },
+  opts: { goal: string; taskId: string | null; maxRounds?: number; maxQcRetries?: number; context?: string },
   deps: AgentRunDeps
 ): Promise<AgentRunResult> {
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
@@ -93,7 +113,7 @@ export async function runAgentLoop(
     for (; round < maxRounds; round++) {
       let res: AgentStepResult
       try {
-        res = await deps.step({ goal: opts.goal, taskId: opts.taskId, systemPrompt, messages: [...messages], priorFailedCount })
+        res = await deps.step({ goal: opts.goal, taskId: opts.taskId, systemPrompt, messages: [...messages], priorFailedCount, context: opts.context })
       } catch (e) {
         status = 'blocked'
         blocker = e instanceof Error ? e.message : 'The agent step call failed.'
@@ -210,9 +230,18 @@ export async function startAgentRun(goal: string): Promise<AgentRunResult> {
   if (store.running) return { status: 'blocked', blocker: 'An agent run is already in progress.', rounds: 0, pendingApprovals: [] }
   const taskId = useNodeStore.getState().activeTaskId
   store.start(goal)
+  // Gather the real inbox so the agent can work over it (draft replies etc.).
+  // Best-effort: no mail account → no inbox context, the run just proceeds.
+  let context: string | undefined
+  try {
+    const r = await window.api.mail.list(20)
+    if (r.ok) context = formatInboxContext(r.items)
+  } catch {
+    /* no mail account / mail unavailable */
+  }
   const history = useActionHistory.getState()
   const result = await runAgentLoop(
-    { goal, taskId },
+    { goal, taskId, context },
     {
       step: (input) => window.api.agent.step(input),
       applyAction: applyActionReal,
