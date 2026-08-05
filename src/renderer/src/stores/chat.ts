@@ -641,6 +641,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         messages: next,
         attachments,
         supportsQuestions: true,
+        // Conversational surface: inject the "what I know about you" memory block.
+        includeMemory: true,
         pinnedWidgetId,
         mentions: wireMentions
       })
@@ -664,6 +666,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           attachments,
           requestId,
           supportsQuestions: true,
+          includeMemory: true,
           pinnedWidgetId,
           mentions: wireMentions
         },

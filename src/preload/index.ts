@@ -1800,6 +1800,20 @@ const api = {
       applied: string
     }): Promise<{ met: boolean; score: number; gaps: string[] }> => ipcRenderer.invoke('agent:verify', input)
   },
+  // Self-building memory: what the assistant durably knows about the user + their
+  // work. list / remember (manual) / forget, plus a local-model backfill.
+  memory: {
+    list: (): Promise<import('@shared/types').MemoryItem[]> => ipcRenderer.invoke('memory:list'),
+    remember: (input: {
+      kind: import('@shared/types').MemoryKind
+      text: string
+      subject?: string
+      due?: string
+    }): Promise<import('@shared/types').MemoryItem | null> => ipcRenderer.invoke('memory:remember', input),
+    forget: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:forget', id),
+    extractDocuments: (): Promise<{ scanned: number; added: number; reason?: string }> =>
+      ipcRenderer.invoke('memory:extractDocuments')
+  },
   // People the app has fetched, published to the main process so an @-mention
   // can resolve one. Coverage is honestly partial: whatever the renderer has
   // actually loaded, never a promise of the whole directory.

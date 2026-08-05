@@ -479,6 +479,10 @@ export interface ChatRequest {
   // by surfaces (focus chat, dashboard cards, field editor) that have no card
   // to render, and a model taught to ask there produces turns that dead-end.
   supportsQuestions?: boolean
+  // Whether to inject the self-building memory block ("what I know about you").
+  // On only for conversational surfaces (assistant panel / focus chat), off for
+  // the field editor / command bar / one-off completions where it's noise + cost.
+  includeMemory?: boolean
   // The widget the user clicked-to-pin as this conversation's primary
   // reference (Phase 3a.1). Additive and optional: surfaces with no pin
   // affordance never set it. The prompt claims a pin only when the id resolves

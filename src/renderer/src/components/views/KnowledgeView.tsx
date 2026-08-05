@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon'
 import BrainBulkAdd from '../brain/BrainBulkAdd'
+import MemoryPanel from '../brain/MemoryPanel'
 import { useKnowledgeStore } from '../../stores/knowledge'
 import { useViewStore } from '../../stores/view'
 import type { KnowledgeEntry } from '@shared/knowledge'
@@ -106,6 +107,9 @@ export default function KnowledgeView(): JSX.Element {
 
         {/* Bulk-add files & folders straight into the Brain (independent of desks). */}
         <BrainBulkAdd />
+
+        {/* Self-building memory: what the assistant durably knows about the user. */}
+        <MemoryPanel />
 
         <div className="flex-1 overflow-auto px-2 pb-2">
           {loaded && filtered.length === 0 ? (
