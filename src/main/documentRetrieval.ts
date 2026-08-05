@@ -11,6 +11,7 @@ import { extractDocText, type WorkspaceSource } from './workspaceRank'
 import { embedTexts, embedQuery } from './ai/embeddings'
 import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
 import { listDocMetadata, getDocMetadata, type DocMetadata } from './db/docMetadata'
+import { bumpAnswerCacheVersion } from './ai/answerCache'
 import { cosineSim, blendSemantic, type ScoredItem } from '@shared/semantic'
 
 const KIND = 'document'
@@ -89,6 +90,9 @@ function snippet(text: string, query: string): string {
 // Embed one document and store its vector. Best-effort: no key is a silent no-op
 // so saving a document never blocks or errors on a missing key.
 export async function embedDocument(docId: string): Promise<void> {
+  // A document changed (this is the save/restore chokepoint), so any cached
+  // workspace answer is now potentially stale — invalidate the answer cache.
+  bumpAnswerCacheVersion()
   const full = getDocument(docId)
   if (!full) return
   const meta = listDocuments().find((m) => m.id === docId)

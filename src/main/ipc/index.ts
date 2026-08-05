@@ -324,6 +324,8 @@ import { localModelStatus } from '../ai/localModel'
 import { getDocMetadata } from '../db/docMetadata'
 import { listMemories, addMemory, forgetMemory } from '../db/memory'
 import { extractMemoryFromDocuments } from '../ai/extractMemory'
+import { embedQuery } from '../ai/embeddings'
+import { lookupAnswer, storeAnswer, bumpAnswerCacheVersion } from '../ai/answerCache'
 import type { MemoryKind } from '@shared/types'
 import {
   getProjectPlan,
@@ -1868,6 +1870,25 @@ export function registerIpcHandlers(): void {
       // still pulls the documents the conversation is actually about.
       const query = [...hist.map((h) => h.question), question].join(' ')
       const sources = await retrieveSources(query, 6)
+      const buildSourceMeta = (citedIds: Set<string>): Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }> =>
+        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, snippet: s.snippet, cited: citedIds.has(s.docId) }))
+      // Semantic answer cache: a near-identical question, with the workspace
+      // unchanged since (version-stamped, so any doc edit invalidates it), reuses
+      // the prior answer for free — no model call. Embedding is LOCAL/free.
+      const qvec = await embedQuery(query)
+      if (qvec) {
+        const hit = lookupAnswer(qvec, Date.now())
+        if (hit) {
+          return {
+            ok: true,
+            answer: hit.answer,
+            citedDocIds: hit.citedDocIds,
+            cached: true,
+            sources: buildSourceMeta(new Set(hit.citedDocIds)),
+            proposals: [] as ActionProposal[]
+          }
+        }
+      }
       if (sources.length) recordAiCall()
       const res = await askWorkspace(
         question,
@@ -1883,14 +1904,10 @@ export function registerIpcHandlers(): void {
         })),
         hist
       )
+      // Cache a successful answer for the current workspace version.
+      if (res.ok && res.answer && qvec) storeAnswer(qvec, res.answer, res.citedDocIds ?? [], Date.now())
       const cited = new Set(res.citedDocIds ?? [])
-      const sourceMeta = sources.map((s) => ({
-        docId: s.docId,
-        title: s.title,
-        docType: s.docType,
-        snippet: s.snippet,
-        cited: cited.has(s.docId)
-      }))
+      const sourceMeta = buildSourceMeta(cited)
       // "Offer to create anything": once the answer is in, let the brain propose
       // concrete things it could build from it. Approval happens in the renderer;
       // a failure here never blocks the answer.
@@ -2589,7 +2606,10 @@ export function registerIpcHandlers(): void {
   // "Delete" from the editors and the Documents list is a soft-delete into the
   // Documents Trash — the menu item says "Move to trash" and now means it.
   // Permanent removal is only the Trash view's explicit "Delete forever".
-  ipcMain.handle('documents:delete', (_e, id: string) => trashDocument(id))
+  ipcMain.handle('documents:delete', (_e, id: string) => {
+    bumpAnswerCacheVersion() // the doc set changed — invalidate cached answers
+    return trashDocument(id)
+  })
   ipcMain.handle('documents:listTrashed', () => listTrashedDocuments())
   ipcMain.handle('documents:restore', (_e, id: string) => {
     const ok = restoreDocument(id)
@@ -2598,6 +2618,7 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('documents:purge', (_e, id: string) => {
     deleteEmbedding('document', id)
+    bumpAnswerCacheVersion() // the doc set changed — invalidate cached answers
     return deleteDocument(id)
   })
   // Version history.
