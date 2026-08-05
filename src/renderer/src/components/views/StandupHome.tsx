@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { getAccountState, setAccountState } from '../../lib/accountStateClient'
 import type { DigestInput } from '../../lib/digestRouter'
 import StandupOutputPicker from './StandupOutputPicker'
+import RadarSuggestions from '../assistant/RadarSuggestions'
 import Icon from '../Icon'
 
 // The daily standup, promoted to the home hero (operator decision: the daily
@@ -181,6 +182,9 @@ export default function StandupHome(): JSX.Element | null {
       ) : state ? (
         <>
           <p className="text-[15px] leading-relaxed text-[var(--ink-100)] whitespace-pre-wrap">{state.narrative}</p>
+          <div className="mt-3">
+            <RadarSuggestions />
+          </div>
           {state.completed.length > 0 && (
             <div className="mt-3 border-t border-[var(--edge-soft)] pt-3">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold mb-1.5">

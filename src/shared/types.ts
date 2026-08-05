@@ -601,6 +601,21 @@ export interface AgentActionOutcome {
   createdId: string | null
 }
 
+// ── Situational proactivity (workspace radar) ────────────────────────────────
+// A cheap, deterministic (no-LLM) detector surfaces actionable situations in the
+// workspace as one-tap suggestions the user can act on or dismiss.
+export type RadarKind = 'overdue' | 'due_soon' | 'stalled'
+
+export interface RadarSuggestion {
+  // Stable per (kind + underlying entity), so re-runs dedupe and a dismiss sticks.
+  id: string
+  kind: RadarKind
+  title: string
+  detail: string
+  taskId: string
+  severity: 'info' | 'warn'
+}
+
 // ── Self-building memory ─────────────────────────────────────────────────────
 export type MemoryKind = 'fact' | 'preference' | 'commitment'
 
