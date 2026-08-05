@@ -9,7 +9,13 @@ import { listDocuments, getDocument } from '../db/documents'
 import { extractDocText } from '../workspaceRank'
 import { localChat, localModelStatus } from './localModel'
 import { setDocMetadata, hasDocMetadata } from '../db/docMetadata'
-import { ENRICH_SYSTEM, buildEnrichPrompt, parseEnrichResponse, countWords } from './enrichParse'
+import {
+  ENRICH_SYSTEM,
+  buildEnrichPrompt,
+  parseEnrichResponse,
+  verifyAgainstSource,
+  countWords
+} from './enrichParse'
 
 // Enrich a single document. Returns why it couldn't when it couldn't, so the UI
 // and the backfill stay honest.
@@ -25,8 +31,12 @@ export async function enrichDocument(
   if (!raw) return { ok: false, reason: 'no_local_model' }
   const parsed = parseEnrichResponse(raw)
   if (!parsed) return { ok: false, reason: 'parse_failed' }
+  // Ground the header facts: drop any entity/date the model produced that isn't
+  // actually in the document, so the grounding header can never assert something
+  // the source doesn't contain. Summary (the one allowed generated line) stays.
+  const verified = verifyAgainstSource(parsed, text)
   const status = await localModelStatus()
-  setDocMetadata({ docId, ...parsed, wordCount: countWords(text), model: status.chatModel ?? 'local' })
+  setDocMetadata({ docId, ...verified, wordCount: countWords(text), model: status.chatModel ?? 'local' })
   return { ok: true }
 }
 

@@ -86,3 +86,52 @@ export function countWords(text: string): number {
   const t = text.trim()
   return t ? t.split(/\s+/).length : 0
 }
+
+// ── Verify-against-source hardening ──────────────────────────────────────────
+// The grounding header shows model-extracted entities + dates as if they were
+// fact. To guarantee the header can only ever contain things that actually appear
+// in the document, we drop any entity or date not found in the source text. The
+// summary is the one deliberately-allowed piece of generated prose (and the raw
+// body still follows it in the prompt), so it is not filtered.
+
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/(\d+)(st|nd|rd|th)\b/g, '$1') // 1st -> 1, so ordinals match plain numbers
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // punctuation -> space (Campfire.AI -> campfire ai)
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// An entity survives if its normalized form appears as a substring of the
+// normalized source — verbatim names match even across punctuation/spacing
+// differences, while an invented name (or an added suffix not in the doc) drops.
+function entityInSource(entity: string, normSource: string): boolean {
+  const e = normalizeForMatch(entity)
+  return e.length > 0 && normSource.includes(e)
+}
+
+// A date survives if it appears verbatim, OR every meaningful token in it (any
+// number, or a word of 3+ chars like a month name) appears in the source. This
+// blocks a wholesale-invented date (a year or month not in the doc) while letting
+// a mere reformat of a real date through ("August 1, 2026" -> "1 August 2026").
+function dateInSource(date: string, normSource: string, sourceWords: Set<string>): boolean {
+  const norm = normalizeForMatch(date)
+  if (!norm) return false
+  if (normSource.includes(norm)) return true
+  const tokens = norm.split(' ').filter((t) => /\d/.test(t) || t.length >= 3)
+  if (tokens.length === 0) return false
+  return tokens.every((t) => sourceWords.has(t) || normSource.includes(t))
+}
+
+// Filter a parsed enrichment so its entities + dates are grounded in the source.
+// Summary, category, keywords and language pass through unchanged.
+export function verifyAgainstSource(parsed: ParsedEnrichment, sourceText: string): ParsedEnrichment {
+  const normSource = normalizeForMatch(sourceText)
+  const sourceWords = new Set(normSource.split(' '))
+  return {
+    ...parsed,
+    entities: parsed.entities.filter((e) => entityInSource(e, normSource)),
+    dates: parsed.dates.filter((d) => dateInSource(d, normSource, sourceWords))
+  }
+}

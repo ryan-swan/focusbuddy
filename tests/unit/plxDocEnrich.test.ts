@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   buildEnrichPrompt,
   parseEnrichResponse,
+  verifyAgainstSource,
   countWords,
-  ENRICH_CHARS
+  ENRICH_CHARS,
+  type ParsedEnrichment
 } from '../../src/main/ai/enrichParse'
 import { groundingBlock } from '../../src/main/ai/grounding'
 
@@ -143,5 +145,53 @@ describe('countWords', () => {
     expect(countWords('one two three')).toBe(3)
     expect(countWords('   ')).toBe(0)
     expect(countWords('')).toBe(0)
+  })
+})
+
+describe('verifyAgainstSource', () => {
+  const base: ParsedEnrichment = {
+    summary: 'A rollout plan.',
+    category: 'implementation-guide',
+    entities: [],
+    dates: [],
+    keywords: ['rollout'],
+    language: 'en'
+  }
+  const source =
+    'A 30-60-90 day rollout plan for deploying Campfire.AI at Cynder. ' +
+    'Kickoff is August 1, 2026 and go-live is 30 October 2026. Owner: Michael.'
+
+  it('keeps entities present in the source (across punctuation/spacing)', () => {
+    const r = verifyAgainstSource({ ...base, entities: ['Campfire.AI', 'Cynder', 'Michael'] }, source)
+    expect(r.entities).toEqual(['Campfire.AI', 'Cynder', 'Michael'])
+  })
+
+  it('drops an entity that is NOT in the source (hallucination guard)', () => {
+    const r = verifyAgainstSource({ ...base, entities: ['Cynder', 'Acme Corp', 'Google'] }, source)
+    expect(r.entities).toEqual(['Cynder'])
+  })
+
+  it('drops an added suffix not present in the source', () => {
+    const r = verifyAgainstSource({ ...base, entities: ['Cynder Ltd'] }, source)
+    expect(r.entities).toEqual([]) // "Cynder Ltd" not literally in the doc
+  })
+
+  it('keeps a date even when the model reformats it', () => {
+    // Source has "August 1, 2026"; model normalised to "1 August 2026".
+    const r = verifyAgainstSource({ ...base, dates: ['1 August 2026', '30 October 2026'] }, source)
+    expect(r.dates).toEqual(['1 August 2026', '30 October 2026'])
+  })
+
+  it('drops a date whose components are not in the source (invention guard)', () => {
+    const r = verifyAgainstSource({ ...base, dates: ['5 September 2027', '30 October 2026'] }, source)
+    expect(r.dates).toEqual(['30 October 2026']) // Sept/2027 invented -> dropped
+  })
+
+  it('leaves summary, category, keywords and language untouched', () => {
+    const r = verifyAgainstSource({ ...base, entities: ['Nope'], dates: ['1999'] }, source)
+    expect(r.summary).toBe('A rollout plan.')
+    expect(r.category).toBe('implementation-guide')
+    expect(r.keywords).toEqual(['rollout'])
+    expect(r.language).toBe('en')
   })
 })
