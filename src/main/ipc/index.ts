@@ -475,7 +475,8 @@ import {
   suggestFormula,
   fillSheetRange,
   generateSlideElements,
-  runAgentStep
+  runAgentStep,
+  verifyAgentGoal
 } from '../ai/anthropic'
 import { importDocx, exportDocx, exportPdf, pickImage, type PageSetupInput } from '../officeDocx'
 import { importSheet, exportSheet } from '../sheetIo'
@@ -1219,6 +1220,12 @@ export function registerIpcHandlers(): void {
       return runAgentStep(input)
     }
   )
+  // Self-verification of a completed run: judge whether the goal was met given
+  // only what was applied. One model call, so it counts as an AI call.
+  ipcMain.handle('agent:verify', (_e, input: { goal: string; applied: string }) => {
+    recordAiCall()
+    return verifyAgentGoal(input)
+  })
   // Streaming variant — retrieval, reply and each prepared action arrive on a
   // per-request channel `chat:stream:<reqId>` so the assistant can show the work
   // as it happens. Caller mints the reqId. `chat:send` above is untouched and

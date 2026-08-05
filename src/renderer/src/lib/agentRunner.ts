@@ -34,6 +34,9 @@ export interface AgentRunDeps {
   // True when a proposal must NOT be auto-applied (consequential) — deferred for
   // the user's approval instead.
   isGated: (p: ActionProposal) => boolean
+  // Self-verification: given the goal + a summary of what was applied, judge
+  // whether the goal is met. Called once each time the model claims 'done'.
+  verify: (goal: string, applied: string) => Promise<{ met: boolean; score: number; gaps: string[] }>
   onStep: (step: AgentRunStep) => void
   beginBatch: () => void
   endBatch: (label: string) => void
@@ -65,15 +68,19 @@ export function formatObservations(applied: AgentActionOutcome[], deferred: Acti
 }
 
 export async function runAgentLoop(
-  opts: { goal: string; taskId: string | null; maxRounds?: number },
+  opts: { goal: string; taskId: string | null; maxRounds?: number; maxQcRetries?: number },
   deps: AgentRunDeps
 ): Promise<AgentRunResult> {
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
+  const maxQcRetries = opts.maxQcRetries ?? 2
   const resolvedIds = new Map<string, string>()
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
   const pendingApprovals: ActionProposal[] = []
+  // Running log of what was actually applied, fed to the self-verification pass.
+  const appliedLog: string[] = []
   let systemPrompt: string | undefined
   let priorFailedCount = 0
+  let qcRetries = 0
   let status: AgentStatus = 'working'
   let blocker: string | null = null
   let round = 0
@@ -114,6 +121,9 @@ export async function runAgentLoop(
         applied.push(await deps.applyAction(p, res.actions, resolvedIds))
       }
       priorFailedCount = applied.filter((o) => !o.ok).length
+      for (const o of applied) {
+        if (o.ok) appliedLog.push(`${o.kind}${o.createdId ? ` (id=${o.createdId})` : ''}${o.message ? `: ${o.message}` : ''}`)
+      }
       messages.push({ role: 'assistant', content: res.rawAssistant })
       messages.push({ role: 'user', content: formatObservations(applied, deferredThisRound) })
       deps.onStep({
@@ -126,7 +136,39 @@ export async function runAgentLoop(
       })
       status = res.status
       blocker = res.blocker
-      if (status === 'done' || status === 'blocked' || status === 'need_input') break
+      if (status === 'blocked' || status === 'need_input') break
+      if (status === 'done') {
+        // Self-verification: judge the goal against ONLY what was applied. If it's
+        // not fully met and retries remain, re-enter the loop with the gaps as an
+        // observation; otherwise finish honestly (met, or "as far as I could").
+        const verdict = await deps.verify(opts.goal, appliedLog.join('\n'))
+        deps.onStep({
+          round,
+          narration: verdict.met
+            ? `Verified the goal is met (${Math.round(verdict.score * 100)}%).`
+            : `Verified ${Math.round(verdict.score * 100)}% — ${verdict.gaps.length} gap(s) to address.`,
+          outcomes: [],
+          deferred: [],
+          status: verdict.met ? 'done' : 'working',
+          blocker: verdict.met ? null : verdict.gaps.join('; ') || null
+        })
+        if (verdict.met || qcRetries >= maxQcRetries) {
+          status = verdict.met ? 'done' : 'blocked'
+          blocker = verdict.met
+            ? null
+            : `Completed as far as I could. Remaining gaps: ${verdict.gaps.join('; ') || 'unclear'}`
+          break
+        }
+        qcRetries++
+        messages.push({
+          role: 'user',
+          content:
+            'VERIFICATION: the goal is NOT fully met yet. Address these gaps this round, then set status "done":\n' +
+            verdict.gaps.map((g) => `- ${g}`).join('\n')
+        })
+        status = 'working'
+        // fall through → continue the loop for a corrective round
+      }
       // status === 'working' → keep going, unless this was the last allowed round.
       if (round === maxRounds - 1) {
         status = 'blocked'
@@ -175,6 +217,7 @@ export async function startAgentRun(goal: string): Promise<AgentRunResult> {
       step: (input) => window.api.agent.step(input),
       applyAction: applyActionReal,
       isGated: (p) => !isAutoApplyable(p),
+      verify: (goal, applied) => window.api.agent.verify({ goal, applied }),
       onStep: (s) => useAgentLoop.getState().pushStep(s),
       beginBatch: () => history.beginBatch(),
       endBatch: (label) => history.endBatch(label)

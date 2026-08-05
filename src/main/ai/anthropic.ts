@@ -38,7 +38,7 @@ import { resolveAnthropicKey } from '../settingsStore'
 import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
 import { groundingBlock, type GroundingSource } from './grounding'
 import { cachedSystem, cachedUserContent, cacheTokens, type CacheTextBlock } from './cacheControl'
-import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus } from './agentEnvelope'
+import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus, parseVerifyResult, type VerifyVerdict } from './agentEnvelope'
 import type { AgentStatus, AgentStepResult } from '@shared/types'
 import type {
   ActionProposal,
@@ -1535,6 +1535,37 @@ export async function runAgentStep(input: {
     }
   } catch (e) {
     return fail((e as Error).message, (e as Error).message)
+  }
+}
+
+// Self-verification (QC): when a run claims done, judge whether the GOAL was
+// actually met given ONLY what was applied. Conservative + grounded — an
+// unconfirmable part is a gap, and an unreadable verdict is not "met". The loop
+// driver re-enters with the gaps as an observation when the goal isn't met yet.
+export async function verifyAgentGoal(input: { goal: string; applied: string }): Promise<VerifyVerdict> {
+  const c = getClient()
+  if (!c) return { met: false, score: 0, gaps: ['No AI key available to verify the run.'] }
+  const system =
+    'You are a STRICT quality reviewer for an autonomous agent. Given a GOAL and the exact list of what was actually applied in the workspace, judge whether the goal is FULLY met. Ground your judgement ONLY in what was applied — never assume anything not on the list. Be conservative: if you cannot confirm a part of the goal from the applied list, it is a gap. Return ONLY a JSON object, no prose, no code fences: {"met": boolean, "score": number between 0 and 1, "gaps": ["short description of each part of the goal not yet met"]}.'
+  const user = `GOAL:\n${input.goal}\n\nWHAT WAS ACTUALLY APPLIED:\n${input.applied || '(nothing was applied)'}\n\nReturn the JSON verdict now.`
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('agent_step'),
+      max_tokens: 600,
+      system: cachedSystem(system) as never,
+      messages: [{ role: 'user', content: user }]
+    })
+    const ct = cacheTokens(resp.usage)
+    recordAiUsage(resolveModel('agent_step'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0, ct.read, ct.write)
+    if ((resp.stop_reason as string) === 'refusal') return { met: false, score: 0, gaps: ['Verification was declined by the model.'] }
+    const raw = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('')
+      .trim()
+    return parseVerifyResult(raw)
+  } catch (e) {
+    return { met: false, score: 0, gaps: [`Verification failed: ${(e as Error).message}`] }
   }
 }
 

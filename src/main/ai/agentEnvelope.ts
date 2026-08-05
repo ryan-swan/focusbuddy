@@ -51,3 +51,35 @@ export function enforceAgentStatus(input: {
   }
   return { status, blocker }
 }
+
+// ── Self-verification (QC) ───────────────────────────────────────────────────
+// A run's own honesty check: when the model claims 'done', a separate review
+// judges whether the GOAL was actually met given only what was applied. Parse its
+// JSON verdict tolerantly.
+export interface VerifyVerdict {
+  met: boolean
+  score: number
+  gaps: string[]
+}
+
+export function parseVerifyResult(raw: string): VerifyVerdict {
+  let obj: { met?: unknown; score?: unknown; gaps?: unknown } | null = null
+  const m = raw.match(/\{[\s\S]*\}/)
+  if (m) {
+    try {
+      obj = JSON.parse(m[0])
+    } catch {
+      obj = null
+    }
+  }
+  const score =
+    obj && typeof obj.score === 'number' && isFinite(obj.score) ? Math.max(0, Math.min(1, obj.score)) : 0
+  const gaps =
+    obj && Array.isArray(obj.gaps)
+      ? obj.gaps.filter((g): g is string => typeof g === 'string').map((g) => g.trim()).filter(Boolean).slice(0, 10)
+      : []
+  // Trust an explicit boolean; otherwise derive from a high score with no gaps.
+  // A parse failure is NOT "met" — an unreadable verdict must not pass a goal.
+  const met = obj && typeof obj.met === 'boolean' ? obj.met : score >= 0.9 && gaps.length === 0
+  return { met, score, gaps }
+}

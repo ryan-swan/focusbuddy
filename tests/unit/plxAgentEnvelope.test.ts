@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus } from '../../src/main/ai/agentEnvelope'
+import {
+  coerceAgentStatus,
+  normalizeBlocker,
+  enforceAgentStatus,
+  parseVerifyResult
+} from '../../src/main/ai/agentEnvelope'
 
 // Pure tests for the agent-step envelope discipline: status coercion, blocker
 // normalisation, and the honesty downgrades (empty-blocker dead-end, and a
@@ -73,5 +78,31 @@ describe('enforceAgentStatus', () => {
       status: 'working',
       blocker: null
     })
+  })
+})
+
+describe('parseVerifyResult', () => {
+  it('reads an explicit met verdict + gaps', () => {
+    expect(parseVerifyResult('{"met":true,"score":0.95,"gaps":[]}')).toEqual({ met: true, score: 0.95, gaps: [] })
+    expect(parseVerifyResult('{"met":false,"score":0.4,"gaps":["no table","no agent"]}')).toEqual({
+      met: false,
+      score: 0.4,
+      gaps: ['no table', 'no agent']
+    })
+  })
+  it('clamps score to [0,1]', () => {
+    expect(parseVerifyResult('{"met":true,"score":1.7,"gaps":[]}').score).toBe(1)
+    expect(parseVerifyResult('{"met":false,"score":-2,"gaps":["x"]}').score).toBe(0)
+  })
+  it('derives met from a high score + no gaps when met is absent', () => {
+    expect(parseVerifyResult('{"score":0.95,"gaps":[]}').met).toBe(true)
+    expect(parseVerifyResult('{"score":0.95,"gaps":["one thing left"]}').met).toBe(false)
+    expect(parseVerifyResult('{"score":0.6,"gaps":[]}').met).toBe(false)
+  })
+  it('tolerates prose around the JSON', () => {
+    expect(parseVerifyResult('Here is my verdict: {"met":true,"score":1,"gaps":[]} done').met).toBe(true)
+  })
+  it('an unreadable verdict is NOT met (never passes a goal by accident)', () => {
+    expect(parseVerifyResult('I cannot produce JSON')).toEqual({ met: false, score: 0, gaps: [] })
   })
 })

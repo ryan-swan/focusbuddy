@@ -1792,7 +1792,13 @@ const api = {
       systemPrompt?: string
       messages: Array<{ role: 'user' | 'assistant'; content: string }>
       priorFailedCount?: number
-    }): Promise<import('@shared/types').AgentStepResult> => ipcRenderer.invoke('agent:step', input)
+    }): Promise<import('@shared/types').AgentStepResult> => ipcRenderer.invoke('agent:step', input),
+    // Self-verification once a run claims done: {met, score, gaps}. The driver
+    // re-enters the loop with the gaps when the goal isn't fully met.
+    verify: (input: {
+      goal: string
+      applied: string
+    }): Promise<{ met: boolean; score: number; gaps: string[] }> => ipcRenderer.invoke('agent:verify', input)
   },
   // People the app has fetched, published to the main process so an @-mention
   // can resolve one. Coverage is honestly partial: whatever the renderer has

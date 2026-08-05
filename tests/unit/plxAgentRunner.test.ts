@@ -34,6 +34,7 @@ function makeDeps(over: Partial<AgentRunDeps> = {}): AgentRunDeps & {
       async (p: ActionProposal): Promise<AgentActionOutcome> => ({ kind: p.kind, ok: true, message: 'ok', createdId: `${p.id}-new` })
     ),
     isGated: () => false,
+    verify: vi.fn(async () => ({ met: true, score: 1, gaps: [] })),
     onStep: vi.fn(),
     beginBatch: vi.fn(),
     endBatch: vi.fn(),
@@ -60,15 +61,47 @@ describe('formatObservations', () => {
 })
 
 describe('runAgentLoop', () => {
-  it('single done round: one step, undo batch opened+closed, one emitted step', async () => {
+  it('single done round: verified once, undo batch opened+closed, done', async () => {
     const deps = makeDeps()
     const r = await runAgentLoop({ goal: 'g', taskId: 't' }, deps)
     expect(r.status).toBe('done')
     expect(r.rounds).toBe(1)
     expect(deps.step).toHaveBeenCalledTimes(1)
+    expect(deps.verify).toHaveBeenCalledTimes(1) // QC ran on the done claim
     expect(deps.beginBatch).toHaveBeenCalledTimes(1)
     expect(deps.endBatch).toHaveBeenCalledTimes(1)
-    expect(deps.onStep).toHaveBeenCalledTimes(1)
+    // Two emitted steps: the round itself + the verification result.
+    expect(deps.onStep).toHaveBeenCalledTimes(2)
+  })
+
+  it('QC not-met re-enters the loop with the gaps, then finishes done', async () => {
+    const seq = [stepResult({ status: 'done' }), stepResult({ status: 'done', actions: [prop('t1', 'create-task')] })]
+    const verifySeq = [
+      { met: false, score: 0.5, gaps: ['the tracker table is missing'] },
+      { met: true, score: 1, gaps: [] }
+    ]
+    const deps = makeDeps({
+      step: vi.fn(async () => seq.shift()!),
+      verify: vi.fn(async () => verifySeq.shift()!)
+    })
+    const r = await runAgentLoop({ goal: 'g', taskId: 't' }, deps)
+    expect(r.status).toBe('done')
+    expect(deps.verify).toHaveBeenCalledTimes(2)
+    // The corrective round's step received the VERIFICATION gap as an observation.
+    const secondStepMessages = (deps.step as ReturnType<typeof vi.fn>).mock.calls[1][0].messages
+    expect(secondStepMessages.some((m: { content: string }) => /VERIFICATION.*tracker table is missing/s.test(m.content))).toBe(true)
+  })
+
+  it('QC still failing after the retry cap ends blocked with the gaps', async () => {
+    const deps = makeDeps({
+      step: vi.fn(async () => stepResult({ status: 'done' })),
+      verify: vi.fn(async () => ({ met: false, score: 0.3, gaps: ['nothing was actually created'] }))
+    })
+    const r = await runAgentLoop({ goal: 'g', taskId: 't', maxQcRetries: 1 }, deps)
+    expect(r.status).toBe('blocked')
+    expect(r.blocker).toMatch(/nothing was actually created/)
+    // initial verify + 1 retry verify = 2
+    expect(deps.verify).toHaveBeenCalledTimes(2)
   })
 
   it('applies a safe action, threads observations, then finishes on done', async () => {
