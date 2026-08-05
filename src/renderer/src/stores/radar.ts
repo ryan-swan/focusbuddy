@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import type { RadarSuggestion, RadarKind } from '@shared/types'
-import { detectTaskRadar } from '../lib/radar'
+import type { RadarSuggestion, RadarKind, MailListItem, TimeBlock } from '@shared/types'
+import { detectTaskRadar, detectMailRadar, detectCalendarRadar } from '../lib/radar'
 import { useNodeStore } from './nodes'
 
 // Holds the current radar suggestions + the per-kind accept counters that are the
@@ -23,8 +23,9 @@ interface RadarState {
   suggestions: RadarSuggestion[]
   dismissed: Set<string>
   accepts: Record<string, number>
-  // Re-run the detectors over the current tasks and update the visible list.
-  refresh: () => void
+  // Re-run the detectors over tasks + inbound mail + the calendar, and update the
+  // visible list. Async: mail and calendar are read via read-only IPC.
+  refresh: () => Promise<void>
   dismiss: (id: string) => void
   // Record that the user acted on a suggestion of this kind (learned-autonomy
   // signal) and drop it from the list.
@@ -35,9 +36,30 @@ export const useRadar = create<RadarState>((set, get) => ({
   suggestions: [],
   dismissed: new Set<string>(),
   accepts: loadAccepts(),
-  refresh: () => {
+  refresh: async () => {
+    const now = Date.now()
     const tasks = useNodeStore.getState().nodes
-    const all = detectTaskRadar(tasks, Date.now())
+    // Calendar (local, cheap) + mail (best-effort; empty when no account). Read
+    // via read-only IPC so we never clobber the calendar/mail view stores.
+    let blocks: TimeBlock[] = []
+    let messages: MailListItem[] = []
+    try {
+      blocks = await window.api.timeBlocks.list(now - 20 * 60_000, now + 26 * 3_600_000)
+    } catch {
+      /* no calendar available */
+    }
+    try {
+      const r = await window.api.mail.list(30)
+      if (r.ok) messages = r.items
+    } catch {
+      /* no mail account */
+    }
+    // Most time-sensitive first: imminent meetings, then tasks, then mail.
+    const all = [
+      ...detectCalendarRadar(blocks, now),
+      ...detectTaskRadar(tasks, now),
+      ...detectMailRadar(messages, now)
+    ]
     const { dismissed } = get()
     set({ suggestions: all.filter((s) => !dismissed.has(s.id)) })
   },

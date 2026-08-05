@@ -407,7 +407,13 @@ function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean, i
   // Memory only for conversational surfaces that opt in (assistant panel / focus
   // chat), never the field editor / command bar / one-off completions — a
   // "what I know about you" block is noise + cost there.
-  const extras = [clockBlock(), includeMemory ? memoryBlock() : '', documentsBlock(), conversationsBlock()]
+  const extras = [
+    clockBlock(),
+    includeMemory ? memoryBlock() : '',
+    includeMemory ? calendarBlock() : '',
+    documentsBlock(),
+    conversationsBlock()
+  ]
     .filter(Boolean)
     .join('\n')
   const withExtras = `${base}\n\n${extras}`
@@ -460,6 +466,18 @@ function memoryBlock(): string {
   }
   lines.push('--- END ---')
   return lines.join('\n')
+}
+
+// The user's real calendar for the week ahead (local time_blocks), so the
+// assistant can reason over the schedule ("you have a meeting before that") and
+// place new blocks around what's there. Empty → empty string.
+function calendarBlock(): string {
+  const now = Date.now()
+  const blocks = listBlocksInRange(now, now + 7 * 86_400_000).slice(0, 12)
+  if (blocks.length === 0) return ''
+  const fmt = (ms: number): string => new Date(ms).toISOString().slice(0, 16).replace('T', ' ')
+  const lines = blocks.map((b) => `- ${fmt(b.startMs)} UTC — ${b.title?.trim() || 'Untitled'}`)
+  return 'Upcoming on the calendar (next 7 days):\n' + lines.join('\n')
 }
 
 // Recent documents so edit-document has real ids to target. Capped and
@@ -1479,7 +1497,9 @@ function buildAgentSystemPrompt(taskId: string | null): string {
     '- NEVER set status "done" if a prior OBSERVATION shows [FAILED] for something you did not either retry this round or explain in "narration". Never claim an action happened; only the OBSERVATIONS say what actually happened (no-fakery).\n' +
     '- Keep each round small and focused; do not re-propose actions already [applied]. Prefer the single most useful next step.\n' +
     '- compose-mail and post-chat are DRAFTS the user sends themselves; never imply they were sent. Never invent ids, columns, facts, names or dates — leave out anything the context does not support.\n'
-  const extras = [clockBlock(), memoryBlock(), documentsBlock(), conversationsBlock()].filter(Boolean).join('\n')
+  const extras = [clockBlock(), memoryBlock(), calendarBlock(), documentsBlock(), conversationsBlock()]
+    .filter(Boolean)
+    .join('\n')
   let out = `${base}\n\n${extras}`
   if (taskId) {
     const block = taskBlock(taskId)

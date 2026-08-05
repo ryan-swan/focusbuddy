@@ -1,7 +1,17 @@
 import { useEffect } from 'react'
 import Icon from '../Icon'
 import { useRadar } from '../../stores/radar'
+import { useViewStore } from '../../stores/view'
 import { goToTarget } from '../../lib/goToTarget'
+import type { RadarKind } from '@shared/types'
+
+const ICON: Record<RadarKind, string> = {
+  overdue: 'schedule',
+  due_soon: 'upcoming',
+  stalled: 'hourglass_empty',
+  reply_needed: 'mail',
+  meeting_soon: 'event'
+}
 
 // The proactive surface: one-tap suggestions the workspace radar found (overdue /
 // due-soon / stalled tasks). Deterministic and honest — each points at a real
@@ -33,7 +43,7 @@ export default function RadarSuggestions(): JSX.Element | null {
           data-testid={`radar-${s.id}`}
         >
           <Icon
-            name={s.kind === 'overdue' ? 'schedule' : s.kind === 'due_soon' ? 'upcoming' : 'hourglass_empty'}
+            name={ICON[s.kind]}
             size={14}
             className={`mt-0.5 shrink-0 ${s.severity === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-[var(--ink-50)]'}`}
           />
@@ -45,7 +55,9 @@ export default function RadarSuggestions(): JSX.Element | null {
             <button
               onClick={() => {
                 accept(s)
-                void goToTarget({ kind: 'task', id: s.taskId, label: '' })
+                if (s.nav.view === 'task') void goToTarget({ kind: 'task', id: s.nav.taskId, label: '' })
+                else if (s.nav.view === 'mail') useViewStore.getState().goMail()
+                else useViewStore.getState().goCalendar()
               }}
               className="text-[11px] px-2 py-0.5 rounded-md text-accent hover:bg-[var(--surface-sunken)]"
               data-testid={`radar-open-${s.id}`}

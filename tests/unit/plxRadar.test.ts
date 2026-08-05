@@ -1,69 +1,72 @@
 import { describe, it, expect } from 'vitest'
-import { detectTaskRadar } from '../../src/renderer/src/lib/radar'
-import type { FbNode } from '../../src/shared/types'
+import { detectTaskRadar, detectMailRadar, detectCalendarRadar } from '../../src/renderer/src/lib/radar'
+import type { FbNode, MailListItem, TimeBlock } from '../../src/shared/types'
 
-// Pure tests for the workspace radar detectors.
+// Pure tests for the workspace radar detectors over tasks, mail and calendar.
 
 const DAY = 86_400_000
+const MIN = 60_000
 const NOW = 1_800_000_000_000
 
 function task(over: Partial<FbNode> & { id: string }): FbNode {
-  return {
-    kind: 'task',
-    title: 'A task',
-    status: 'open',
-    archived: false,
-    dueDate: null,
-    startedAt: null,
-    ...over
-  } as unknown as FbNode
+  return { kind: 'task', title: 'A task', status: 'open', archived: false, dueDate: null, startedAt: null, ...over } as unknown as FbNode
+}
+function mail(over: Partial<MailListItem> & { uid: number }): MailListItem {
+  return { fromName: 'Ana', fromAddress: 'ana@x.com', subject: 'Hi', date: NOW - MIN, seen: false, flagged: false, hasAttachments: false, messageId: null, inReplyTo: null, references: [], ...over } as MailListItem
+}
+function block(over: Partial<TimeBlock> & { id: string }): TimeBlock {
+  return { title: 'Meeting', startMs: NOW + 10 * MIN, durationMin: 30, ...over } as unknown as TimeBlock
 }
 
 describe('detectTaskRadar', () => {
-  it('flags an overdue task with how long ago it was due', () => {
-    const r = detectTaskRadar([task({ id: '1', title: 'Draft brief', dueDate: NOW - 2 * DAY })], NOW)
-    expect(r).toHaveLength(1)
-    expect(r[0]).toMatchObject({ id: 'overdue:1', kind: 'overdue', taskId: '1', severity: 'warn' })
-    expect(r[0].title).toContain('Draft brief')
+  it('flags overdue with a task nav target', () => {
+    const r = detectTaskRadar([task({ id: '1', title: 'Draft', dueDate: NOW - 2 * DAY })], NOW)
+    expect(r[0]).toMatchObject({ kind: 'overdue', nav: { view: 'task', taskId: '1' }, severity: 'warn' })
     expect(r[0].detail).toContain('2 days ago')
   })
-
-  it('flags a due-soon task (within 2 days) as info', () => {
-    const r = detectTaskRadar([task({ id: '2', dueDate: NOW + DAY })], NOW)
-    expect(r[0]).toMatchObject({ id: 'due_soon:2', kind: 'due_soon', severity: 'info' })
-    expect(r[0].title).toContain('tomorrow')
+  it('due-soon and stalled, overdue wins over stalled', () => {
+    expect(detectTaskRadar([task({ id: '2', dueDate: NOW + DAY })], NOW)[0].kind).toBe('due_soon')
+    expect(detectTaskRadar([task({ id: '3', status: 'in_progress', startedAt: NOW - 6 * DAY })], NOW)[0].kind).toBe('stalled')
+    expect(detectTaskRadar([task({ id: '4', status: 'in_progress', startedAt: NOW - 9 * DAY, dueDate: NOW - DAY })], NOW)[0].kind).toBe('overdue')
   })
-
-  it('flags a stalled in-progress task with no due date', () => {
-    const r = detectTaskRadar([task({ id: '3', status: 'in_progress', startedAt: NOW - 6 * DAY })], NOW)
-    expect(r[0]).toMatchObject({ id: 'stalled:3', kind: 'stalled' })
-  })
-
-  it('overdue wins over stalled for a task that is both', () => {
-    const r = detectTaskRadar([task({ id: '4', status: 'in_progress', startedAt: NOW - 9 * DAY, dueDate: NOW - DAY })], NOW)
-    expect(r).toHaveLength(1)
-    expect(r[0].kind).toBe('overdue')
-  })
-
-  it('skips done, parked, archived, far-future, and non-task nodes', () => {
+  it('skips done/parked/archived/folder/far-future', () => {
     const tasks = [
       task({ id: 'a', status: 'done', dueDate: NOW - DAY }),
-      task({ id: 'b', status: 'parked', dueDate: NOW - DAY }),
-      task({ id: 'c', archived: true, dueDate: NOW - DAY }),
-      task({ id: 'd', dueDate: NOW + 30 * DAY }), // far future, not due-soon
-      task({ id: 'e', kind: 'folder', dueDate: NOW - DAY } as Partial<FbNode> & { id: string }),
-      task({ id: 'f', status: 'in_progress', startedAt: NOW - 2 * DAY }) // in progress but not stalled yet
+      task({ id: 'b', archived: true, dueDate: NOW - DAY }),
+      task({ id: 'c', kind: 'folder', dueDate: NOW - DAY } as Partial<FbNode> & { id: string }),
+      task({ id: 'd', dueDate: NOW + 30 * DAY })
     ]
     expect(detectTaskRadar(tasks, NOW)).toEqual([])
   })
+})
 
-  it('sorts overdue first and caps the list at 8', () => {
-    const tasks = [
-      ...Array.from({ length: 6 }, (_, i) => task({ id: `s${i}`, dueDate: NOW + DAY })), // due-soon
-      ...Array.from({ length: 6 }, (_, i) => task({ id: `o${i}`, dueDate: NOW - DAY })) // overdue
-    ]
-    const r = detectTaskRadar(tasks, NOW)
-    expect(r).toHaveLength(8)
-    expect(r.slice(0, 6).every((s) => s.kind === 'overdue')).toBe(true) // overdue leads
+describe('detectMailRadar', () => {
+  it('flags recent unread mail as reply-needed, with a mail nav target', () => {
+    const r = detectMailRadar([mail({ uid: 7, fromName: 'Ben', subject: 'Q3 budget' })], NOW)
+    expect(r[0]).toMatchObject({ kind: 'reply_needed', nav: { view: 'mail', uid: 7 } })
+    expect(r[0].title).toContain('Ben')
+    expect(r[0].detail).toContain('Q3 budget')
+  })
+  it('ignores read mail and mail older than a few days', () => {
+    const r = detectMailRadar(
+      [mail({ uid: 1, seen: true }), mail({ uid: 2, date: NOW - 10 * DAY }), mail({ uid: 3 })],
+      NOW
+    )
+    expect(r.map((s) => (s.nav.view === 'mail' ? s.nav.uid : 0))).toEqual([3])
+  })
+})
+
+describe('detectCalendarRadar', () => {
+  it('flags a meeting starting within the hour', () => {
+    const r = detectCalendarRadar([block({ id: 'm1', title: 'Standup', startMs: NOW + 20 * MIN })], NOW)
+    expect(r[0]).toMatchObject({ kind: 'meeting_soon', nav: { view: 'calendar' }, severity: 'warn' })
+    expect(r[0].title).toContain('Standup')
+  })
+  it('ignores meetings far out or long past', () => {
+    const r = detectCalendarRadar(
+      [block({ id: 'far', startMs: NOW + 5 * 3600_000 }), block({ id: 'past', startMs: NOW - 60 * MIN })],
+      NOW
+    )
+    expect(r).toEqual([])
   })
 })

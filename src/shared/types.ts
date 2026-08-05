@@ -602,9 +602,16 @@ export interface AgentActionOutcome {
 }
 
 // ── Situational proactivity (workspace radar) ────────────────────────────────
-// A cheap, deterministic (no-LLM) detector surfaces actionable situations in the
-// workspace as one-tap suggestions the user can act on or dismiss.
-export type RadarKind = 'overdue' | 'due_soon' | 'stalled'
+// A cheap, deterministic (no-LLM) detector surfaces actionable situations across
+// the user's REAL work in Plexi — tasks, inbound mail, and the calendar — as
+// one-tap suggestions they can act on or dismiss.
+export type RadarKind = 'overdue' | 'due_soon' | 'stalled' | 'reply_needed' | 'meeting_soon'
+
+// Where a suggestion's "Open" navigates.
+export type RadarNav =
+  | { view: 'task'; taskId: string }
+  | { view: 'mail'; uid: number }
+  | { view: 'calendar' }
 
 export interface RadarSuggestion {
   // Stable per (kind + underlying entity), so re-runs dedupe and a dismiss sticks.
@@ -612,7 +619,7 @@ export interface RadarSuggestion {
   kind: RadarKind
   title: string
   detail: string
-  taskId: string
+  nav: RadarNav
   severity: 'info' | 'warn'
 }
 
