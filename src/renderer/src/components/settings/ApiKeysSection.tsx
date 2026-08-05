@@ -12,6 +12,7 @@
 // new props to a new <ApiKeyRow>; no further changes here.
 
 import { useEffect, useState } from 'react'
+import LocalAiSection from './LocalAiSection'
 
 type Status =
   | { kind: 'idle' }
@@ -377,6 +378,8 @@ function AiSourceSection(): JSX.Element {
           {note}
         </div>
       )}
+
+      <LocalAiSection />
     </div>
   )
 }

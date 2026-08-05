@@ -1751,7 +1751,37 @@ const api = {
     // with no embedding key it is a silent no-op and grounding stays keyword-based.
     reindex: (): Promise<{ embedded: number; reason?: string }> =>
       ipcRenderer.invoke('documents:reindex'),
-    semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
+    semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive'),
+    // Local-model (Ollama) enrichment: distil every document into metadata that
+    // feeds the AI's retrieval + grounding. Honest when no local model is present.
+    enrich: (docId: string): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke('documents:enrich', docId),
+    enrichAll: (
+      force?: boolean
+    ): Promise<{ enriched: number; skipped: number; failed: number; reason?: string }> =>
+      ipcRenderer.invoke('documents:enrichAll', force),
+    metadata: (
+      docId: string
+    ): Promise<{
+      docId: string
+      summary: string
+      category: string
+      entities: string[]
+      dates: string[]
+      keywords: string[]
+      language: string
+      wordCount: number
+      model: string
+      enrichedAt: number
+    } | null> => ipcRenderer.invoke('documents:metadata', docId)
+  },
+  localAi: {
+    status: (): Promise<{
+      available: boolean
+      baseUrl: string
+      chatModel: string | null
+      embedModel: string | null
+    }> => ipcRenderer.invoke('ai:localModelStatus')
   },
   // People the app has fetched, published to the main process so an @-mention
   // can resolve one. Coverage is honestly partial: whatever the renderer has

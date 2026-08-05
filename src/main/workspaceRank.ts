@@ -10,6 +10,14 @@ export interface WorkspaceSource {
   // Truncated extracted text, fed to the model as the grounding for this source.
   text: string
   score: number
+  // Optional AI-enriched metadata (local model), present for documents that have
+  // been enriched. Used to build a richer grounding header (so the model sees a
+  // source's category, dates, key entities and a summary before its body) without
+  // changing behaviour for un-enriched sources, where these are simply absent.
+  summary?: string
+  category?: string
+  dates?: string[]
+  entities?: string[]
 }
 
 // Best-effort plain text from a document body, by type. Shared with the

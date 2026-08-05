@@ -10,6 +10,7 @@ import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, type WorkspaceSource } from './workspaceRank'
 import { embedTexts, embedQuery } from './ai/embeddings'
 import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
+import { listDocMetadata, getDocMetadata, type DocMetadata } from './db/docMetadata'
 import { cosineSim, blendSemantic, type ScoredItem } from '@shared/semantic'
 
 const KIND = 'document'
@@ -23,25 +24,40 @@ interface DocItem {
   title: string
   docType: string
   text: string
+  // AI-enriched metadata (local model), when the doc has been enriched.
+  meta?: DocMetadata
 }
 
 // Build the full document pool once: metadata joined to extracted body text,
 // skipping archived docs (listDocuments already excludes them) and any that
-// extract to nothing so an empty doc never becomes a phantom source.
+// extract to nothing so an empty doc never becomes a phantom source. AI-enriched
+// metadata is joined in one query so retrieval + grounding can use it.
 function loadDocItems(): DocItem[] {
+  const metaMap = listDocMetadata()
   const items: DocItem[] = []
   for (const m of listDocuments()) {
     const full = getDocument(m.id)
     if (!full) continue
     const text = extractDocText(m.docType, full.body)
     if (text.length === 0) continue
-    items.push({ docId: m.id, title: m.title, docType: m.docType as string, text })
+    items.push({ docId: m.id, title: m.title, docType: m.docType as string, text, meta: metaMap.get(m.id) })
   }
   return items
 }
 
+// The text we embed for a document. When enriched, the distilled metadata
+// (category, summary, keywords, entities) leads the vector so a long doc's whole
+// gist is captured, not just the head that fits under EMBED_CHARS. Un-enriched
+// docs fall back to the original title + body, so behaviour is unchanged for them.
 function embedText(item: DocItem): string {
-  return `${item.title}\n${item.text}`.trim().slice(0, EMBED_CHARS)
+  const m = item.meta
+  const metaLead = m
+    ? [m.category, m.summary, m.keywords.join(' '), m.entities.join(' ')]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .join('\n')
+    : ''
+  return `${item.title}\n${metaLead}\n${item.text}`.replace(/\n{2,}/g, '\n').trim().slice(0, EMBED_CHARS)
 }
 
 // Keyword overlap on the same scale the knowledge scorer uses, so the blend
@@ -78,7 +94,7 @@ export async function embedDocument(docId: string): Promise<void> {
   const meta = listDocuments().find((m) => m.id === docId)
   const text = extractDocText(full.docType, full.body)
   if (text.length === 0) return
-  const item: DocItem = { docId, title: meta?.title ?? '', docType: full.docType, text }
+  const item: DocItem = { docId, title: meta?.title ?? '', docType: full.docType, text, meta: getDocMetadata(docId) ?? undefined }
   const r = await embedTexts([embedText(item)])
   if (r.ok && r.vectors[0]) setEmbedding(KIND, docId, r.vectors[0], r.model)
 }
@@ -112,7 +128,11 @@ export async function semanticSearchDocuments(query: string, limit = 6): Promise
     return {
       item: d,
       keyword: keywordScore(d, query),
-      semantic: qvec && vec ? cosineSim(qvec, vec) : null
+      // Guard the dimension: a stored vector from a different embedding model
+      // (e.g. after switching to a local embedder) must not be compared against a
+      // query vector of another size, which would score garbage. Mismatches fall
+      // back to keyword-only for that item until it's reindexed.
+      semantic: qvec && vec && vec.length === qvec.length ? cosineSim(qvec, vec) : null
     }
   })
   return blendSemantic(scored, { limit }).map((d, i) => ({
@@ -122,7 +142,14 @@ export async function semanticSearchDocuments(query: string, limit = 6): Promise
     snippet: snippet(d.text, query),
     text: d.text.slice(0, 6000),
     // Descending by blended rank so the strongest source leads the grounding.
-    score: 1 - i * 0.01
+    score: 1 - i * 0.01,
+    // Carry AI-enriched metadata through so the grounding header can frame this
+    // source (category, dates, entities, summary) before its body. Absent for
+    // un-enriched docs — the header simply omits those lines.
+    summary: d.meta?.summary || undefined,
+    category: d.meta?.category || undefined,
+    dates: d.meta?.dates,
+    entities: d.meta?.entities
   }))
 }
 

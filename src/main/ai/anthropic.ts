@@ -36,6 +36,7 @@ import type { MapShape } from '@shared/types'
 import type { SlidesBody } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
 import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
+import { groundingBlock, type GroundingSource } from './grounding'
 import type {
   ActionProposal,
   ActivityEvent,
@@ -1389,7 +1390,7 @@ const VALID_KINDS: WidgetKind[] = [
 // actually used. Returns the answer plus the doc ids it cited.
 export async function askWorkspace(
   question: string,
-  sources: Array<{ docId: string; title: string; docType: string; text: string }>,
+  sources: GroundingSource[],
   history: Array<{ question: string; answer: string }> = []
 ): Promise<{
   ok: boolean
@@ -1411,7 +1412,7 @@ export async function askWorkspace(
     '- Be concise and direct.\n' +
     'Return ONLY a single valid JSON object, no prose outside it, no markdown fences. The first character must be { and the last must be }.\n' +
     'Schema: {"answer":"string (may include [n] citation markers)","sources":[1,2]} — sources is the 1-based numbers of the documents you actually used, empty if the answer is not in the documents.'
-  const docList = sources.map((s, i) => `[${i + 1}] ${s.title} (${s.docType})\n${s.text}`).join('\n\n---\n\n')
+  const docList = sources.map(groundingBlock).join('\n\n---\n\n')
   const convo = history.length
     ? 'Earlier in this conversation:\n' + history.map((h) => `Q: ${h.question}\nA: ${h.answer}`).join('\n') + '\n\n'
     : ''
@@ -1459,7 +1460,7 @@ export async function askWorkspace(
 // markers present in the final answer. Feels alive without losing citations.
 export async function askWorkspaceStream(
   question: string,
-  sources: Array<{ docId: string; title: string; docType: string; text: string }>,
+  sources: GroundingSource[],
   history: Array<{ question: string; answer: string }>,
   onDelta: (text: string) => void
 ): Promise<{ ok: boolean; answer?: string; citedDocIds?: string[]; needsApiKey?: boolean; error?: string }> {
@@ -1476,7 +1477,7 @@ export async function askWorkspaceStream(
     '- This may be a follow-up: resolve references like "it" or "that" using the earlier conversation, but still ground the answer in the documents.\n' +
     '- Cite the documents you used inline with [n] markers matching their numbers.\n' +
     '- Be concise and direct. Write a plain-text answer only — no JSON, no markdown code fences.'
-  const docList = sources.map((s, i) => `[${i + 1}] ${s.title} (${s.docType})\n${s.text}`).join('\n\n---\n\n')
+  const docList = sources.map(groundingBlock).join('\n\n---\n\n')
   const convo = history.length
     ? 'Earlier in this conversation:\n' + history.map((h) => `Q: ${h.question}\nA: ${h.answer}`).join('\n') + '\n\n'
     : ''

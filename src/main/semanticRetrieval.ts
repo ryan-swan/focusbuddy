@@ -63,7 +63,11 @@ export async function semanticSearchKnowledge(query: string, limit = 20): Promis
     return {
       item: e,
       keyword: keywordScore(knowledgeText(e), e.title, query),
-      semantic: qvec && vec ? cosineSim(qvec, vec) : null
+      // Dimension guard: a stored vector from a different embedding model (e.g.
+      // after switching to a local embedder) must not be compared against a query
+      // vector of another size. Mismatches fall back to keyword-only until
+      // reindexed, rather than scoring garbage.
+      semantic: qvec && vec && vec.length === qvec.length ? cosineSim(qvec, vec) : null
     }
   })
   return blendSemantic(scored, { limit })

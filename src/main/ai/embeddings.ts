@@ -6,6 +6,7 @@
 // later without changing callers, the contract is just "texts in, vectors out".
 
 import { resolveOpenAIKey } from '../settingsStore'
+import { localEmbed } from './localModel'
 
 export const EMBED_MODEL = 'text-embedding-3-small'
 
@@ -15,6 +16,16 @@ export type EmbedResult =
 
 export async function embedTexts(texts: string[]): Promise<EmbedResult> {
   if (texts.length === 0) return { ok: true, vectors: [], model: EMBED_MODEL }
+  // Prefer the LOCAL embedder (Ollama): free, private, no key. This lights up
+  // semantic search the moment a local embedding model is installed, with no
+  // cloud key at all. The model name is tagged so a later dimension guard can
+  // tell local vectors from cloud ones and skip mismatches. Falls through to
+  // OpenAI, then to the honest no_key fallback (keyword search) when neither is
+  // available — nothing is faked.
+  const local = await localEmbed(texts)
+  if (local && local.vectors.length === texts.length) {
+    return { ok: true, vectors: local.vectors, model: `ollama:${local.model}` }
+  }
   const key = resolveOpenAIKey()
   if (!key) return { ok: false, reason: 'no_key' }
   try {

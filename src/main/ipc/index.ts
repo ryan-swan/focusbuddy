@@ -319,6 +319,9 @@ import {
   reindexDocuments,
   documentSemanticActive
 } from '../documentRetrieval'
+import { enrichDocument, enrichAllDocuments } from '../ai/enrichDocuments'
+import { localModelStatus } from '../ai/localModel'
+import { getDocMetadata } from '../db/docMetadata'
 import {
   getProjectPlan,
   setTaskPlan,
@@ -1829,7 +1832,16 @@ export function registerIpcHandlers(): void {
       if (sources.length) recordAiCall()
       const res = await askWorkspace(
         question,
-        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
+        sources.map((s) => ({
+          docId: s.docId,
+          title: s.title,
+          docType: s.docType,
+          text: s.text,
+          summary: s.summary,
+          category: s.category,
+          dates: s.dates,
+          entities: s.entities
+        })),
         hist
       )
       const cited = new Set(res.citedDocIds ?? [])
@@ -1878,7 +1890,16 @@ export function registerIpcHandlers(): void {
       const channel = `workspace:askStream:${requestId}`
       const res = await askWorkspaceStream(
         question,
-        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
+        sources.map((s) => ({
+          docId: s.docId,
+          title: s.title,
+          docType: s.docType,
+          text: s.text,
+          summary: s.summary,
+          category: s.category,
+          dates: s.dates,
+          entities: s.entities
+        })),
         hist,
         (delta) => e.sender.send(channel, { type: 'delta', payload: delta })
       )
@@ -2557,6 +2578,20 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('docComments:resolve', (_e, id: string, resolved: boolean) => resolveDocComment(id, resolved))
   ipcMain.handle('documents:reindex', () => reindexDocuments())
   ipcMain.handle('documents:semanticActive', () => documentSemanticActive())
+  // Local-model document enrichment (Ollama). Status lets the UI show honestly
+  // whether local AI is available; enrichAll distils every document into metadata
+  // and then reindexes so the enriched summary/keywords feed the vectors too.
+  ipcMain.handle('ai:localModelStatus', () => localModelStatus())
+  ipcMain.handle('documents:metadata', (_e, docId: string) => getDocMetadata(docId))
+  ipcMain.handle('documents:enrich', (_e, docId: string) => enrichDocument(docId))
+  ipcMain.handle('documents:enrichAll', async (_e, force?: boolean) => {
+    const res = await enrichAllDocuments(force === true)
+    // Refresh vectors so the freshly-enriched metadata lands in the embeddings
+    // that retrieval ranks on. Best-effort: a missing embedder just leaves the
+    // metadata for the grounding header, which still helps.
+    if (res.enriched > 0) await reindexDocuments(true).catch(() => ({ embedded: 0 }))
+    return res
+  })
 
   // Persisted AI-assistant chat history (local, free-standing conversations) —
   // backs the Focus-Mode chat surface.

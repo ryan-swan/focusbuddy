@@ -247,6 +247,28 @@ CREATE TABLE IF NOT EXISTS fb_embeddings (
   PRIMARY KEY (item_type, item_id)
 );
 
+-- ── AI-enriched document metadata ────────────────────────────────────────────
+-- A distilled, structured description of a document, generated at rest by the
+-- LOCAL model (Ollama) so it costs no cloud credit. Feeds two things: the
+-- embedding text (so a long doc's whole gist is indexed, not just its head) and
+-- the grounding header the workspace-ask answer sends the model (title +
+-- category + date + entities + summary before the body). Entities/dates/keywords
+-- are JSON arrays of strings. Nullable + additive: a doc with no row simply falls
+-- back to the pre-enrichment behaviour, and enrichment never fabricates — an
+-- unreachable local model leaves the row unwritten rather than inventing a summary.
+CREATE TABLE IF NOT EXISTS fb_document_metadata (
+  doc_id TEXT PRIMARY KEY,
+  summary TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
+  entities_json TEXT NOT NULL DEFAULT '[]',
+  dates_json TEXT NOT NULL DEFAULT '[]',
+  keywords_json TEXT NOT NULL DEFAULT '[]',
+  language TEXT NOT NULL DEFAULT '',
+  word_count INTEGER NOT NULL DEFAULT 0,
+  model TEXT NOT NULL DEFAULT '',
+  enriched_at INTEGER NOT NULL
+);
+
 -- ── PlexiProjects task dependencies ──────────────────────────────────────────
 -- Finish-to-start links between task nodes that drive the Gantt schedule and the
 -- critical path. pred_id must finish before succ_id can start. Both reference
