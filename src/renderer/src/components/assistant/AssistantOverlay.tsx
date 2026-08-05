@@ -7,6 +7,7 @@ import StandupHome from '../views/StandupHome'
 import AssistantTasksTab from './tabs/AssistantTasksTab'
 import AssistantActivityTab from './tabs/AssistantActivityTab'
 import AssistantWorkTab from './tabs/AssistantWorkTab'
+import AssistantAgentTab from './tabs/AssistantAgentTab'
 import { useChatStore } from '../../stores/chat'
 import { useViewStore } from '../../stores/view'
 import { useWidgetStore } from '../../stores/widgets'
@@ -59,6 +60,7 @@ const FULLSCREEN_PAGE =
 const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
   { id: 'today', label: 'Today', icon: 'wb_sunny' },
   { id: 'chat', label: 'Chat', icon: 'forum' },
+  { id: 'agent', label: 'Agent', icon: 'rocket_launch' },
   { id: 'tasks', label: 'Tasks', icon: 'checklist' },
   { id: 'activity', label: 'Activity', icon: 'bolt' },
   { id: 'work', label: 'Work', icon: 'smart_toy' }
@@ -285,6 +287,7 @@ export default function AssistantOverlay(): JSX.Element {
               <StandupHome />
             </div>
           )}
+          {activeTab === 'agent' && <AssistantAgentTab />}
           {activeTab === 'tasks' && <AssistantTasksTab />}
           {activeTab === 'activity' && <AssistantActivityTab />}
           {activeTab === 'work' && <AssistantWorkTab />}

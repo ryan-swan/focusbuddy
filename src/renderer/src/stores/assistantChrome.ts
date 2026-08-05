@@ -15,8 +15,8 @@ export type AssistantMode = 'sidebar' | 'floating' | 'fullscreen'
 // The persistent assistant is a tabbed control surface (spec §5): Today (the daily
 // standup), Chat (the conversation), Tasks, Activity, Work (desk agents). The tab
 // is chrome, not conversation state, so it lives here beside mode/width.
-export type AssistantTab = 'today' | 'chat' | 'tasks' | 'activity' | 'work'
-export const ASSISTANT_TABS: AssistantTab[] = ['today', 'chat', 'tasks', 'activity', 'work']
+export type AssistantTab = 'today' | 'chat' | 'agent' | 'tasks' | 'activity' | 'work'
+export const ASSISTANT_TABS: AssistantTab[] = ['today', 'chat', 'agent', 'tasks', 'activity', 'work']
 
 const OPEN_KEY = 'fb.assistant.open'
 const MODE_KEY = 'fb.assistant.mode'
