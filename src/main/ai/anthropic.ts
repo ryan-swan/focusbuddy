@@ -38,6 +38,8 @@ import { resolveAnthropicKey } from '../settingsStore'
 import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
 import { groundingBlock, type GroundingSource } from './grounding'
 import { cachedSystem, cachedUserContent, cacheTokens, type CacheTextBlock } from './cacheControl'
+import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus } from './agentEnvelope'
+import type { AgentStatus, AgentStepResult } from '@shared/types'
 import type {
   ActionProposal,
   ActivityEvent,
@@ -317,6 +319,36 @@ function taskBlock(taskId: string): string {
   return lines.join('\n')
 }
 
+// The catalog of valid action-object JSON shapes. Shared verbatim by the chat
+// prompt and the agent-loop prompt so a newly-added ActionProposal kind can never
+// be documented to one brain and not the other. Contains NO envelope-field refs
+// (those differ: chat uses "reply", the agent uses "narration").
+const ACTION_KINDS_CATALOG =
+  'Each action object has a "kind" plus its required fields. Valid kinds:\n' +
+  '\n' +
+  '  { "kind": "create-todo-list", "title": "Launch checklist", "items": ["Buy hosting", "Record pilot"], "reason": "checklist for launch" }\n' +
+  '  { "kind": "open-url", "url": "https://docs.google.com/...", "title": "Brief draft", "reason": "..." }\n' +
+  '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
+  '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "reason": "..." }\n' +
+  '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }\n' +
+  '  { "kind": "create-table", "id": "tbl-1", "title": "Episodes", "columns": [{"label":"Title","type":"text-short"},{"label":"Status","type":"single-select","options":["Draft","Recorded","Live"]}], "reason": "..." }\n' +
+  '  { "kind": "add-table-row", "tableId": "$tbl-1", "cells": {"Title":"Pilot","Status":"Draft"}, "reason": "..." }\n' +
+  '  { "kind": "create-field", "label": "Energy", "fieldType": "single-select", "options": ["Low","Med","High"], "reason": "..." }\n' +
+  '  { "kind": "create-agent", "id": "agent-1", "title": "Lead researcher", "instruction": "For each row in the leads table, research the company and add a one-line summary of what they do.", "trigger": "manual", "reason": "automates the research" }\n' +
+  '  { "kind": "link-widgets", "sourceWidgetId": "$tbl-1", "targetWidgetId": "$agent-1", "sourceLabel": "leads table", "targetLabel": "research agent", "wireType": "context", "verb": "research", "reason": "feed the table into the agent" }\n' +
+  '  { "kind": "update-widget", "widgetId": "<from canvas summary>", "label": "the launch checklist", "title": "...", "content": "...", "reason": "..." }\n' +
+  '  { "kind": "delete-widget", "widgetId": "<from canvas summary>", "label": "the empty sticky", "reason": "..." }\n' +
+  '  { "kind": "start-focus-session", "minutes": 5, "reason": "..." }\n' +
+  '  { "kind": "update-task", "taskId": "<the Task id shown above>", "label": "this task", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }\n' +
+  '  { "kind": "create-knowledge-entry", "title": "Brand voice rule", "body": "We write in first-person plural and never use em dashes.", "tags": ["brand"], "reason": "user stated this as a rule" }\n' +
+  '  { "kind": "edit-document", "documentId": "<from the documents list>", "label": "the Q3 brief", "body": "New section text...", "operation": "append", "reason": "..." }\n' +
+  '  { "kind": "generate-document", "docType": "slides"|"sheet"|"map"|"doc", "title": "Q3 launch deck", "prompt": "<what to make, grounded only in the request/context>", "reason": "..." }  (slides=presentation, sheet=spreadsheet, map=diagram/flowchart/mind map/org chart, doc=written document; the real content is generated in a follow-up step, so the prompt must restate only what was asked and invent nothing, and your text must not claim it already exists)\n' +
+  '  { "kind": "set-cell", "tableId": "<from canvas summary>", "rowId": "<from rowIds>", "cells": {"Status":"Live"}, "reason": "..." }\n' +
+  '  { "kind": "schedule-event", "title": "Deep work: brief", "startMs": 1780000000000, "durationMinutes": 60, "recurrence": null, "reason": "..." }\n' +
+  '  { "kind": "compose-mail", "to": ["ana@example.com"], "subject": "Q3 brief attached", "body": "Hi Ana, ...", "reason": "..." }\n' +
+  '  { "kind": "post-chat", "conversationId": "<from chat conversations>", "conversationLabel": "#launch", "body": "Draft update: ...", "reason": "..." }\n' +
+  '\n'
+
 function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean): string {
   const base =
     'You are PlexiDesk, the in-app pair-worker for an ADHD-friendly task-execution desktop app. ' +
@@ -330,30 +362,7 @@ function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean): 
     '  "reply": "1-2 short markdown sentences shown to the user as your chat message",\n' +
     '  "actions": [ /* zero or more action objects */ ]\n' +
     '}\n\n' +
-    'Each action object has a "kind" plus its required fields. Valid kinds:\n' +
-    '\n' +
-    '  { "kind": "create-todo-list", "title": "Launch checklist", "items": ["Buy hosting", "Record pilot"], "reason": "checklist for launch" }\n' +
-    '  { "kind": "open-url", "url": "https://docs.google.com/...", "title": "Brief draft", "reason": "..." }\n' +
-    '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
-    '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "reason": "..." }\n' +
-    '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }\n' +
-    '  { "kind": "create-table", "id": "tbl-1", "title": "Episodes", "columns": [{"label":"Title","type":"text-short"},{"label":"Status","type":"single-select","options":["Draft","Recorded","Live"]}], "reason": "..." }\n' +
-    '  { "kind": "add-table-row", "tableId": "$tbl-1", "cells": {"Title":"Pilot","Status":"Draft"}, "reason": "..." }\n' +
-    '  { "kind": "create-field", "label": "Energy", "fieldType": "single-select", "options": ["Low","Med","High"], "reason": "..." }\n' +
-    '  { "kind": "create-agent", "id": "agent-1", "title": "Lead researcher", "instruction": "For each row in the leads table, research the company and add a one-line summary of what they do.", "trigger": "manual", "reason": "automates the research" }\n' +
-    '  { "kind": "link-widgets", "sourceWidgetId": "$tbl-1", "targetWidgetId": "$agent-1", "sourceLabel": "leads table", "targetLabel": "research agent", "wireType": "context", "verb": "research", "reason": "feed the table into the agent" }\n' +
-    '  { "kind": "update-widget", "widgetId": "<from canvas summary>", "label": "the launch checklist", "title": "...", "content": "...", "reason": "..." }\n' +
-    '  { "kind": "delete-widget", "widgetId": "<from canvas summary>", "label": "the empty sticky", "reason": "..." }\n' +
-    '  { "kind": "start-focus-session", "minutes": 5, "reason": "..." }\n' +
-    '  { "kind": "update-task", "taskId": "<the Task id shown above>", "label": "this task", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }\n' +
-    '  { "kind": "create-knowledge-entry", "title": "Brand voice rule", "body": "We write in first-person plural and never use em dashes.", "tags": ["brand"], "reason": "user stated this as a rule" }\n' +
-    '  { "kind": "edit-document", "documentId": "<from the documents list>", "label": "the Q3 brief", "body": "New section text...", "operation": "append", "reason": "..." }\n' +
-    '  { "kind": "generate-document", "docType": "slides"|"sheet"|"map"|"doc", "title": "Q3 launch deck", "prompt": "<what to make, grounded only in the request/context>", "reason": "..." }  (slides=presentation, sheet=spreadsheet, map=diagram/flowchart/mind map/org chart, doc=written document; the real content is generated in a follow-up step, so the prompt must restate only what was asked and invent nothing, and your reply must not claim it already exists)\n' +
-    '  { "kind": "set-cell", "tableId": "<from canvas summary>", "rowId": "<from rowIds>", "cells": {"Status":"Live"}, "reason": "..." }\n' +
-    '  { "kind": "schedule-event", "title": "Deep work: brief", "startMs": 1780000000000, "durationMinutes": 60, "recurrence": null, "reason": "..." }\n' +
-    '  { "kind": "compose-mail", "to": ["ana@example.com"], "subject": "Q3 brief attached", "body": "Hi Ana, ...", "reason": "..." }\n' +
-    '  { "kind": "post-chat", "conversationId": "<from chat conversations>", "conversationLabel": "#launch", "body": "Draft update: ...", "reason": "..." }\n' +
-    '\n' +
+    ACTION_KINDS_CATALOG +
     '⚠ HARD RULES:\n' +
     '1. The user sees ONLY two things: (a) the "reply" field rendered as markdown, and (b) one action card for each item in the "actions" array. They do NOT see anything else you write. Describing widgets in prose inside "reply" does NOT create them — the actions array must contain the entries.\n' +
     '2. For pure chat / questions / no-action requests: actions = []. Just put your answer in reply.\n' +
@@ -1403,6 +1412,132 @@ const VALID_KINDS: WidgetKind[] = [
 // (the "workslop" failure mode is ungrounded answers): the model is told to say
 // it can't find the answer rather than invent one, and to cite the documents it
 // actually used. Returns the answer plus the doc ids it cited.
+// ── Agentic loop: one step (stateless; the renderer drives the rounds) ───────
+// The driver applies the actions we return, builds an OBSERVATIONS block from the
+// real outcomes, appends [assistant: our raw JSON, user: OBSERVATIONS] to
+// `messages`, and calls us again. The system prompt is built once (round 0) and
+// echoed back verbatim so the cached prefix stays byte-identical every round.
+function buildAgentSystemPrompt(taskId: string | null): string {
+  const base =
+    'You are PlexiDesk operating in AUTONOMOUS AGENT mode. You are given a GOAL and you carry it out over MULTIPLE ROUNDS: propose the next actions, the app applies them and returns the results, you read those results and continue until the goal is done.\n\n' +
+    'OUTPUT FORMAT: every response MUST be a single valid JSON object. No prose outside it, no markdown code fences. Shape:\n' +
+    '{\n' +
+    '  "narration": "1-2 sentences: what you are doing this round, or what you concluded",\n' +
+    '  "actions": [ /* zero or more action objects to apply THIS round */ ],\n' +
+    '  "status": "working" | "done" | "blocked" | "need_input",\n' +
+    '  "blocker": null  /* a sentence WHEN status is blocked or need_input; otherwise null */\n' +
+    '}\n\n' +
+    ACTION_KINDS_CATALOG +
+    'LOOP RULES:\n' +
+    '- Each round the app applies your actions and returns an OBSERVATIONS block: one line per action, [applied] or [FAILED], with any created id. READ it before deciding the next round.\n' +
+    '- To reference something you created earlier THIS RUN, use "$<id>" with the id you gave that create action (e.g. create-table "id":"leads" then a later add-table-row "tableId":"$leads"). Only the OBSERVATIONS confirm what exists.\n' +
+    '- status "working": there is more to do — propose the next actions. "done": the goal is fully achieved AND no observation shows an unaddressed failure. "blocked": you genuinely cannot proceed — say why in "blocker". "need_input": you need a decision from the user — ask it in "blocker".\n' +
+    '- NEVER set status "done" if a prior OBSERVATION shows [FAILED] for something you did not either retry this round or explain in "narration". Never claim an action happened; only the OBSERVATIONS say what actually happened (no-fakery).\n' +
+    '- Keep each round small and focused; do not re-propose actions already [applied]. Prefer the single most useful next step.\n' +
+    '- compose-mail and post-chat are DRAFTS the user sends themselves; never imply they were sent. Never invent ids, columns, facts, names or dates — leave out anything the context does not support.\n'
+  const extras = [clockBlock(), documentsBlock(), conversationsBlock()].filter(Boolean).join('\n')
+  let out = `${base}\n\n${extras}`
+  if (taskId) {
+    const block = taskBlock(taskId)
+    if (block) out += `\n\n${block}`
+  }
+  return out
+}
+
+// Parse the agent envelope. Reuses the proven chat action parser for the
+// `actions` array (feed it a synthetic {reply, actions} — take only its
+// proposals) so the two envelopes can never drift on action shapes. Status +
+// blocker go through the pure agentEnvelope discipline, including the no-fakery
+// downgrade against the prior round's failure count.
+function parseAgentEnvelope(
+  raw: string,
+  priorFailedCount: number
+): { narration: string; actions: ActionProposal[]; status: AgentStatus; blocker: string | null } | null {
+  const jsonStr = extractJson(raw)
+  if (!jsonStr) return null
+  let obj: { narration?: unknown; reply?: unknown; actions?: unknown; status?: unknown; blocker?: unknown }
+  try {
+    obj = JSON.parse(jsonStr)
+  } catch {
+    return null
+  }
+  const narration =
+    typeof obj.narration === 'string' ? obj.narration : typeof obj.reply === 'string' ? obj.reply : ''
+  const viaChat = parseChatJson(
+    JSON.stringify({ reply: narration || '.', actions: Array.isArray(obj.actions) ? obj.actions : [] })
+  )
+  const actions = viaChat?.proposals ?? []
+  const { status, blocker } = enforceAgentStatus({
+    status: coerceAgentStatus(obj.status),
+    blocker: normalizeBlocker(obj.blocker),
+    actionCount: actions.length,
+    narration,
+    priorFailedCount
+  })
+  return { narration, actions, status, blocker }
+}
+
+export async function runAgentStep(input: {
+  goal: string
+  taskId: string | null
+  // Provided from round 1 onward so the cached system prefix stays byte-identical.
+  systemPrompt?: string
+  // Full running transcript: round 0 is [] (we seed the goal); later rounds carry
+  // [assistant: prior raw JSON, user: OBSERVATIONS] pairs the driver appended.
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  // How many actions failed in the immediately-preceding round (for the no-fakery
+  // downgrade). 0 on round 0.
+  priorFailedCount?: number
+}): Promise<AgentStepResult> {
+  const systemPrompt = input.systemPrompt ?? buildAgentSystemPrompt(input.taskId)
+  const fail = (error: string, blocker: string): AgentStepResult => ({
+    ok: false,
+    error,
+    narration: '',
+    actions: [],
+    status: 'blocked',
+    blocker,
+    rawAssistant: '',
+    systemPrompt
+  })
+  const c = getClient()
+  if (!c) return { ...fail('No Anthropic API key set. Open Settings → AI → API keys.', 'No AI key configured.'), needsApiKey: true }
+  const messages =
+    input.messages.length > 0 ? input.messages : [{ role: 'user' as const, content: `GOAL: ${input.goal}` }]
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('agent_step'),
+      max_tokens: 4096,
+      system: cachedSystem(systemPrompt) as never,
+      messages: messages as never
+    })
+    const ct = cacheTokens(resp.usage)
+    recordAiUsage(resolveModel('agent_step'), resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0, ct.read, ct.write)
+    if ((resp.stop_reason as string) === 'refusal') return fail('Claude declined this request.', 'The model declined this request.')
+    if ((resp.stop_reason as string) === 'model_context_window_exceeded') {
+      return fail('The run grew past the model context window.', 'Too much context for one step — start a narrower goal.')
+    }
+    const rawAssistant = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    const parsed = parseAgentEnvelope(rawAssistant, input.priorFailedCount ?? 0)
+    if (!parsed) return { ...fail('The agent step did not return usable JSON.', 'Could not read the model output this round.'), rawAssistant }
+    return {
+      ok: true,
+      narration: parsed.narration,
+      actions: parsed.actions,
+      status: parsed.status,
+      blocker: parsed.blocker,
+      rawAssistant,
+      systemPrompt
+    }
+  } catch (e) {
+    return fail((e as Error).message, (e as Error).message)
+  }
+}
+
 export async function askWorkspace(
   question: string,
   sources: GroundingSource[],

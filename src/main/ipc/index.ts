@@ -474,7 +474,8 @@ import {
   suggestSheetColumns,
   suggestFormula,
   fillSheetRange,
-  generateSlideElements
+  generateSlideElements,
+  runAgentStep
 } from '../ai/anthropic'
 import { importDocx, exportDocx, exportPdf, pickImage, type PageSetupInput } from '../officeDocx'
 import { importSheet, exportSheet } from '../sheetIo'
@@ -1199,6 +1200,25 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return sendChat(req)
   })
+  // One step of the autonomous agent loop. Stateless: the renderer drives the
+  // rounds (applies actions, builds observations, calls again). Each round is a
+  // real model call, so it counts as an AI call.
+  ipcMain.handle(
+    'agent:step',
+    (
+      _e,
+      input: {
+        goal: string
+        taskId: string | null
+        systemPrompt?: string
+        messages: Array<{ role: 'user' | 'assistant'; content: string }>
+        priorFailedCount?: number
+      }
+    ) => {
+      recordAiCall()
+      return runAgentStep(input)
+    }
+  )
   // Streaming variant — retrieval, reply and each prepared action arrive on a
   // per-request channel `chat:stream:<reqId>` so the assistant can show the work
   // as it happens. Caller mints the reqId. `chat:send` above is untouched and
