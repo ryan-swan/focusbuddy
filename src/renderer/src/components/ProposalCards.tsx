@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { ActionProposal, AppliedProposal } from '@shared/types'
 import { useActionHistory } from '../stores/actionHistory'
 import { applyProposal, describeProposal, ensureDependencies } from '../lib/actionExecutor'
+import { useAgentLoop } from '../stores/agentLoop'
 import { resolveGoToTarget, goToTarget } from '../lib/goToTarget'
 import Icon from './Icon'
 
@@ -60,6 +61,10 @@ export default function ProposalCards({
   const [toast, setToast] = useState<{ id: string; ok: boolean; message: string } | null>(
     null
   )
+  // Run-lock: while an autonomous agent run is applying proposals into one shared
+  // undo batch, a manual Apply here would fold into that batch (wrong attribution)
+  // or race its applies. Disable manual apply for the duration of a run.
+  const agentRunning = useAgentLoop((s) => s.running)
 
   // resolvedIds threads newly-created entity ids (today: tables) through a
   // batch so a follow-up proposal (today: add-table-row) can reference what
@@ -95,7 +100,7 @@ export default function ProposalCards({
     p: ActionProposal,
     resolvedIds?: Map<string, string>
   ): Promise<void> {
-    if (busy) return
+    if (busy || agentRunning) return
     const ids = resolvedIds ?? batchResolvedIds.current
     setBusy(p.id)
     // Resolve any not-yet-applied parent this proposal forward-references, via the
@@ -136,7 +141,7 @@ export default function ProposalCards({
   }
 
   async function applyAll(): Promise<void> {
-    if (busy) return
+    if (busy || agentRunning) return
     // Only apply the ones not already done (applied cards stay as green records).
     const pending = proposals.filter((p) => !appliedProposals[p.id])
     if (pending.length === 0) return
@@ -236,7 +241,7 @@ export default function ProposalCards({
           <button
             key={p.id}
             onClick={() => void applyOne(p)}
-            disabled={isBusy}
+            disabled={isBusy || agentRunning}
             data-testid={`proposal-card-${p.id}`}
             className="text-left rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
           >
@@ -287,7 +292,7 @@ export default function ProposalCards({
       {pendingCount > 1 && (
         <button
           onClick={() => void applyAll()}
-          disabled={busy !== null}
+          disabled={busy !== null || agentRunning}
           className="text-[11px] text-accent self-start px-1.5 py-0.5 hover:underline disabled:opacity-50"
         >
           Apply all {pendingCount}

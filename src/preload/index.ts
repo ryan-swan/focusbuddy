@@ -1783,6 +1783,17 @@ const api = {
       embedModel: string | null
     }> => ipcRenderer.invoke('ai:localModelStatus')
   },
+  agent: {
+    // One round of the autonomous agent loop, driven by lib/agentRunner. The
+    // renderer applies the returned actions, builds observations, and calls again.
+    step: (input: {
+      goal: string
+      taskId: string | null
+      systemPrompt?: string
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>
+      priorFailedCount?: number
+    }): Promise<import('@shared/types').AgentStepResult> => ipcRenderer.invoke('agent:step', input)
+  },
   // People the app has fetched, published to the main process so an @-mention
   // can resolve one. Coverage is honestly partial: whatever the renderer has
   // actually loaded, never a promise of the whole directory.
