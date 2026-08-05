@@ -55,7 +55,13 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // End-of-meeting wrap-up: summarise a whole conversation AND propose the
   // deliverables that came out of it. Both halves are quality-sensitive and the
   // user reads them back, so Sonnet is the right default. Runs once per meeting.
-  meeting_end: SONNET
+  meeting_end: SONNET,
+  // One step of the multi-round agentic loop: read the goal + prior-round
+  // observations, propose the next actions, decide whether the goal is done. This
+  // is planning + tool selection under real results, so Sonnet is the right
+  // default; kept as its own purpose (not reused 'chat') so per-round cost rolls
+  // up separately in telemetry and can be tuned independently later.
+  agent_step: SONNET
 }
 
 let currentMode: ModelMode = 'auto'

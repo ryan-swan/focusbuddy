@@ -154,7 +154,7 @@ vi.mock('../../src/renderer/src/lib/spawnPosition', () => ({
 
 // ── Subject under test ───────────────────────────────────────────────────────
 // Imported AFTER mocks so vi.mock hoisting replaces the real modules.
-import { applyProposal } from '../../src/renderer/src/lib/actionExecutor'
+import { applyProposal, isAutoApplyable } from '../../src/renderer/src/lib/actionExecutor'
 import type { ActionProposal } from '../../src/shared/types'
 
 // ── Test reset ───────────────────────────────────────────────────────────────
@@ -401,6 +401,30 @@ describe('applyProposal: create-section', () => {
     const p: ActionProposal = { id: 'ss-2', kind: 'create-section', name: 'X', widgetIds: ['w1'] }
     const result = await applyProposal(p, { activeTaskId: null })
     expect(result.ok).toBe(false)
+  })
+
+  it('registers the new section id in resolvedIds (so later refs / Go-to resolve)', async () => {
+    storedWidgets = [fakeWidget({ id: 'w1' }), fakeWidget({ id: 'w2' })]
+    const resolvedIds = new Map<string, string>()
+    const p: ActionProposal = { id: 'ss-3', kind: 'create-section', name: 'Research', widgetIds: ['w1'] }
+    const result = await applyProposal(p, { activeTaskId: 't1', resolvedIds })
+    expect(result.ok).toBe(true)
+    expect(resolvedIds.get('ss-3')).toBe('sec-new') // was previously never set
+  })
+})
+
+describe('isAutoApplyable', () => {
+  const mk = (kind: ActionProposal['kind']): ActionProposal =>
+    ({ id: 'x', kind } as unknown as ActionProposal)
+  it('gates destructive / external / real-world-commitment kinds', () => {
+    for (const k of ['delete-widget', 'schedule-event', 'compose-mail', 'post-chat', 'start-focus-session'] as const) {
+      expect(isAutoApplyable(mk(k))).toBe(false)
+    }
+  })
+  it('allows workspace-internal, reversible kinds', () => {
+    for (const k of ['create-widget', 'create-task', 'create-page', 'create-section', 'create-table', 'add-table-row', 'update-widget', 'update-task', 'set-cell', 'edit-document', 'navigate-to'] as const) {
+      expect(isAutoApplyable(mk(k))).toBe(true)
+    }
   })
 })
 

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ActionProposal, AppliedProposal } from '@shared/types'
 import { useActionHistory } from '../stores/actionHistory'
-import { applyProposal, describeProposal } from '../lib/actionExecutor'
+import { applyProposal, describeProposal, ensureDependencies } from '../lib/actionExecutor'
 import { resolveGoToTarget, goToTarget } from '../lib/goToTarget'
 import Icon from './Icon'
 
@@ -91,83 +91,6 @@ export default function ProposalCards({
     }
   }
 
-  // Detect "I depend on a proposal that hasn't been applied yet" cases.
-  // When the user clicks Apply on a single dependent card (e.g. an
-  // add-table-row pointing at $tbl-1), we look up the parent in the
-  // current proposals array and run it first, threading the resolved id
-  // into the batch map so the child's apply succeeds. Today only
-  // add-table-row → create-table exists; the helper is structured so
-  // new dependent kinds slot in by adding a case to the switch.
-  async function ensureDependencies(
-    p: ActionProposal,
-    resolvedIds: Map<string, string>
-  ): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (p.kind === 'add-table-row' && p.tableId.startsWith('$')) {
-      const refKey = p.tableId.slice(1)
-      if (resolvedIds.has(refKey)) return { ok: true }
-      const parent = proposals.find(
-        (x) => x.id === refKey && x.kind === 'create-table'
-      )
-      if (!parent) {
-        return {
-          ok: false,
-          message:
-            'Row references a table that was never proposed alongside it — try regenerating the request.'
-        }
-      }
-      const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds, destinationFolderId })
-      if (!parentResult.ok) {
-        return {
-          ok: false,
-          message: `Couldn't auto-create parent table: ${parentResult.message}`
-        }
-      }
-      // Parent landed — mark it applied (green record) rather than removing it,
-      // so an auto-created dependency reads the same as a manually-applied one.
-      recordApplied(parent, parentResult.message, resolvedIds)
-    }
-    // edit-document → create-document in the same batch, same shape.
-    // `generate-document` counts as a parent too: it also produces a document,
-    // so an edit referencing one must resolve against it. Carried over from
-    // da4938b, which added it to the inlined copy this component replaced —
-    // converging the fork must not drop the fix that lived in the fork.
-    if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
-      const refKey = p.documentId.slice(1)
-      if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find(
-          (x) => x.id === refKey && (x.kind === 'create-document' || x.kind === 'generate-document')
-        )
-        if (!parent) {
-          return {
-            ok: false,
-            message: 'Edit references a document that was never proposed alongside it — try regenerating.'
-          }
-        }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds, destinationFolderId })
-        if (!parentResult.ok) {
-          return { ok: false, message: `Couldn't auto-create the document first: ${parentResult.message}` }
-        }
-        recordApplied(parent, parentResult.message, resolvedIds)
-      }
-    }
-    // schedule-event bound to a create-task in the same batch.
-    if (p.kind === 'schedule-event' && p.taskId && p.taskId.startsWith('$')) {
-      const refKey = p.taskId.slice(1)
-      if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-task')
-        if (!parent) {
-          return { ok: false, message: 'Event references a task that was never proposed alongside it.' }
-        }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds, destinationFolderId })
-        if (!parentResult.ok) {
-          return { ok: false, message: `Couldn't auto-create the task first: ${parentResult.message}` }
-        }
-        recordApplied(parent, parentResult.message, resolvedIds)
-      }
-    }
-    return { ok: true }
-  }
-
   async function applyOne(
     p: ActionProposal,
     resolvedIds?: Map<string, string>
@@ -175,13 +98,19 @@ export default function ProposalCards({
     if (busy) return
     const ids = resolvedIds ?? batchResolvedIds.current
     setBusy(p.id)
-    const dep = await ensureDependencies(p, ids)
+    // Resolve any not-yet-applied parent this proposal forward-references, via the
+    // shared resolver (so this card path and the agent loop can never drift).
+    // The resolver is UI-free, so we do the "mark applied" bookkeeping here for
+    // each parent it auto-created — an auto-created dependency then reads the same
+    // as a manually-applied one (green record, not removed).
+    const dep = await ensureDependencies(p, proposals, { activeTaskId, resolvedIds: ids, destinationFolderId })
     if (!dep.ok) {
       setBusy(null)
       setToast({ id: p.id, ok: false, message: dep.message })
       setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2800)
       return
     }
+    for (const parent of dep.appliedParents) recordApplied(parent.proposal, parent.message, ids)
     // A canvas handler (or its store IPC) can throw rather than return a
     // failure envelope. Without this guard the throw skipped setBusy(null), so
     // every Apply button stayed disabled and the panel looked frozen. Always

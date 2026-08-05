@@ -132,6 +132,74 @@ export async function applyProposal(
   }
 }
 
+// ── Autonomy classification + dependency resolution (shared) ─────────────────
+// Which proposals may be applied autonomously (workspace-internal, reversible via
+// undo or a follow-up, no external channel, no real-world commitment) vs which
+// MUST be gated behind explicit user approval. This is the source of truth for
+// the agent loop's auto-apply decision AND anywhere else that needs to know a
+// proposal is consequential. Per proposal-applier-owner's definitive split.
+const GATED_KINDS: ReadonlySet<ActionProposal['kind']> = new Set<ActionProposal['kind']>([
+  'delete-widget', // destructive; the only existing confirm lives in ProposalCards.applyAll, not here
+  'schedule-event', // commits real calendar time on the user's actual day
+  'compose-mail', // primes a live external channel + hijacks the foreground view
+  'post-chat', // primes a live external channel + hijacks the foreground view
+  'start-focus-session' // starts a real timer on the user's behalf
+])
+
+// True when a proposal is safe for an autonomous loop to apply without asking.
+export function isAutoApplyable(p: ActionProposal): boolean {
+  return !GATED_KINDS.has(p.kind)
+}
+
+// Resolve a proposal's forward-references ($<id>) by applying any not-yet-resolved
+// parent it depends on, threading the created id into ctx.resolvedIds. Shared by
+// ProposalCards (single-batch) and the agent loop (multi-round) so the two can
+// never drift. Deliberately UI-free: it does NOT mark anything "applied" — it
+// returns the parents it auto-applied so the caller does its own bookkeeping.
+export async function ensureDependencies(
+  p: ActionProposal,
+  pool: ActionProposal[],
+  ctx: { activeTaskId: string | null; resolvedIds: Map<string, string>; destinationFolderId?: string | null }
+): Promise<
+  | { ok: true; appliedParents: Array<{ proposal: ActionProposal; message: string }> }
+  | { ok: false; message: string }
+> {
+  const appliedParents: Array<{ proposal: ActionProposal; message: string }> = []
+  async function resolveParent(
+    refKey: string,
+    kinds: ReadonlyArray<ActionProposal['kind']>,
+    missing: string
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (ctx.resolvedIds.has(refKey)) return { ok: true }
+    const parent = pool.find((x) => x.id === refKey && (kinds as string[]).includes(x.kind))
+    if (!parent) return { ok: false, message: missing }
+    const r = await applyProposal(parent, ctx)
+    if (!r.ok) return { ok: false, message: `Couldn't auto-create the dependency first: ${r.message}` }
+    appliedParents.push({ proposal: parent, message: r.message })
+    return { ok: true }
+  }
+  if (p.kind === 'add-table-row' && p.tableId.startsWith('$')) {
+    const r = await resolveParent(p.tableId.slice(1), ['create-table'], 'Row references a table that was never proposed alongside it — try regenerating the request.')
+    if (!r.ok) return r
+  }
+  // set-cell resolves a $-prefixed tableId exactly like add-table-row, but was
+  // missing from the original dependency resolver — a later-round set-cell that
+  // referenced an earlier create-table failed. Covered now.
+  if (p.kind === 'set-cell' && p.tableId.startsWith('$')) {
+    const r = await resolveParent(p.tableId.slice(1), ['create-table'], 'Cell references a table that was never proposed alongside it.')
+    if (!r.ok) return r
+  }
+  if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
+    const r = await resolveParent(p.documentId.slice(1), ['create-document', 'generate-document'], 'Edit references a document that was never proposed alongside it — try regenerating.')
+    if (!r.ok) return r
+  }
+  if (p.kind === 'schedule-event' && p.taskId && p.taskId.startsWith('$')) {
+    const r = await resolveParent(p.taskId.slice(1), ['create-task'], 'Event references a task that was never proposed alongside it.')
+    if (!r.ok) return r
+  }
+  return { ok: true, appliedParents }
+}
+
 // ── The suite-wide actions (Plexi 3.0): the AI acts beyond the canvas ────────
 
 // Minimal markdown-ish text → Tiptap nodes: '#'-prefixed lines become headings,
@@ -938,7 +1006,7 @@ async function applyArrangeWidgets(
 // reparent each member into it.
 async function applyCreateSection(
   p: Extract<ActionProposal, { kind: 'create-section' }>,
-  ctx: { activeTaskId: string | null }
+  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) return { ok: false, message: 'Open a desk first.' }
   const store = useWidgetStore.getState()
@@ -983,6 +1051,10 @@ async function applyCreateSection(
     await store.update(w.id, { parentSectionId: section.id, x: 0, y: 0 })
   }
   store.bumpLayoutVersion()
+  // Register the new section id so "Go to" resolves it and a later batch/round
+  // proposal can reference it via "$<proposal.id>". (Was previously unset, which
+  // made resolveGoToTarget's create-section case always return null.)
+  if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, section.id)
   return {
     ok: true,
     message: `Created section "${p.name}" with ${members.length} object${members.length === 1 ? '' : 's'}`

@@ -559,6 +559,44 @@ export interface ChatResponse {
   mentions?: ChatMentionResolved[]
 }
 
+// ── Agentic loop (multi-round: propose → apply → observe → re-plan) ──────────
+// One step of the agent loop returns the same ActionProposal[] the chat uses,
+// plus a status the host loop-driver reads to decide whether to continue. The
+// model NEVER reports a round number (host-tracked); `blocker` is required and
+// nullable so a driver can never optional-chain past a missing reason.
+export type AgentStatus = 'working' | 'done' | 'blocked' | 'need_input'
+
+export interface AgentStepResult {
+  ok: boolean
+  needsApiKey?: boolean
+  error?: string
+  // Short first-person narration of what this step is doing / found.
+  narration: string
+  // The actions to apply this round (same union + applier as chat).
+  actions: ActionProposal[]
+  status: AgentStatus
+  // Why the loop stopped or what it needs, when status is blocked/need_input;
+  // null when status is working/done. Never optional — always present.
+  blocker: string | null
+  // The raw assistant JSON of this round, so the driver can thread it back as an
+  // assistant turn on the next round (the loop's memory lives in `messages`).
+  rawAssistant: string
+  // The system prompt used this round. Built once at round 0 and echoed back so
+  // the driver can pass it verbatim on later rounds, keeping the cached prefix
+  // byte-identical across the whole run.
+  systemPrompt: string
+}
+
+// The outcome of applying one proposal in a round, rendered into the OBSERVATIONS
+// block fed to the next round. createdId is null honestly when the kind registers
+// no id (never fabricated).
+export interface AgentActionOutcome {
+  kind: string
+  ok: boolean
+  message: string
+  createdId: string | null
+}
+
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───
 // The assistant can propose to create widgets, spawn tasks, open URLs, start
 // focus sessions, etc. Each proposal has a stable id (for selection state)
@@ -941,6 +979,7 @@ export type AIPurpose =
   | 'email_reply_draft'
   | 'file_tag'
   | 'meeting_end'
+  | 'agent_step'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /
