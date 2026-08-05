@@ -597,6 +597,27 @@ export interface AgentActionOutcome {
   createdId: string | null
 }
 
+// ── Self-building memory ─────────────────────────────────────────────────────
+export type MemoryKind = 'fact' | 'preference' | 'commitment'
+
+export interface MemoryItem {
+  id: string
+  kind: MemoryKind
+  text: string
+  // The entity this concerns (person/org/project), when there is one.
+  subject: string
+  // For a commitment: the deadline phrase, verbatim from the source (may be '').
+  due: string
+  // 'user' = stated explicitly; 'extracted' = distilled by the local model.
+  source: 'user' | 'extracted'
+  // The doc/chat id it was extracted from, when source is 'extracted'.
+  sourceRef: string
+  confidence: number
+  active: boolean
+  createdAt: number
+  updatedAt: number
+}
+
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───
 // The assistant can propose to create widgets, spawn tasks, open URLs, start
 // focus sessions, etc. Each proposal has a stable id (for selection state)

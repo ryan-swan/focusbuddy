@@ -322,6 +322,9 @@ import {
 import { enrichDocument, enrichAllDocuments } from '../ai/enrichDocuments'
 import { localModelStatus } from '../ai/localModel'
 import { getDocMetadata } from '../db/docMetadata'
+import { listMemories, addMemory, forgetMemory } from '../db/memory'
+import { extractMemoryFromDocuments } from '../ai/extractMemory'
+import type { MemoryKind } from '@shared/types'
 import {
   getProjectPlan,
   setTaskPlan,
@@ -1226,6 +1229,15 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return verifyAgentGoal(input)
   })
+  // Self-building memory: list / remember (manual) / forget, plus a local-model
+  // backfill over documents. Extraction is local (no cloud call), so it does not
+  // count as an AI call.
+  ipcMain.handle('memory:list', () => listMemories())
+  ipcMain.handle('memory:remember', (_e, input: { kind: MemoryKind; text: string; subject?: string; due?: string }) =>
+    addMemory({ ...input, source: 'user', confidence: 1 })
+  )
+  ipcMain.handle('memory:forget', (_e, id: string) => forgetMemory(id))
+  ipcMain.handle('memory:extractDocuments', () => extractMemoryFromDocuments())
   // Streaming variant — retrieval, reply and each prepared action arrive on a
   // per-request channel `chat:stream:<reqId>` so the assistant can show the work
   // as it happens. Caller mints the reqId. `chat:send` above is untouched and

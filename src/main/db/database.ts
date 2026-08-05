@@ -269,6 +269,32 @@ CREATE TABLE IF NOT EXISTS fb_document_metadata (
   enriched_at INTEGER NOT NULL
 );
 
+-- ── Self-building memory ─────────────────────────────────────────────────────
+-- Durable things the assistant knows about the user and their work, so it stops
+-- starting cold. Two sources: 'user' (things stated explicitly / "remember this")
+-- and 'extracted' (facts + commitments the LOCAL model distilled from the user's
+-- own documents/chats — grounded, never invented). kind is fact / preference /
+-- commitment. subject is the entity it concerns (person/org/project) when there
+-- is one; due carries a commitment's deadline phrase verbatim. dedup_key is a
+-- normalised form of the text so the same memory isn't stored twice. active lets
+-- a memory be forgotten without losing the audit row.
+CREATE TABLE IF NOT EXISTS fb_memory (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL DEFAULT 'fact',
+  text TEXT NOT NULL,
+  subject TEXT NOT NULL DEFAULT '',
+  due TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'user',
+  source_ref TEXT NOT NULL DEFAULT '',
+  confidence REAL NOT NULL DEFAULT 1,
+  active INTEGER NOT NULL DEFAULT 1,
+  dedup_key TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_memory_active ON fb_memory(active, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fb_memory_dedup ON fb_memory(dedup_key);
+
 -- ── PlexiProjects task dependencies ──────────────────────────────────────────
 -- Finish-to-start links between task nodes that drive the Gantt schedule and the
 -- critical path. pred_id must finish before succ_id can start. Both reference
