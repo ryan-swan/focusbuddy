@@ -36,9 +36,9 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '3.9.9',
+    version: '4.0.0',
     date: '2026-08-11T00:00:00Z',
-    title: 'PlexiDesk 3.9.9 — share a desk with people, live',
+    title: 'PlexiDesk 4.0 — share a desk with people, live',
     tag: 'feature',
     summary:
       'You can now share a single desk with named people and everyone with access sees each other’s changes as they happen, both ways, without putting it in a whole organisation. Shared rooms and desks show their name and who shared them, and a desk that changed while you were away is framed so you can see what moved. The right-click "Add object" menu now matches the tool palette, and connected apps stay logged in when you switch desks.',
