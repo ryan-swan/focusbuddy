@@ -21,6 +21,7 @@ import {
 } from '../lib/shareSnapshot'
 import { buildDocumentSnapshot, buildFolderShareSnapshot } from '../lib/officeShareSnapshot'
 import Icon from './Icon'
+import LiveDeskSharing from './LiveDeskSharing'
 
 // Universal share dialog — opens from a folder, task, or widget right-click.
 // One flow regardless of the entity kind: pick scope (view-only or
@@ -274,6 +275,26 @@ export default function ShareDialog({
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          {/* Live sharing (real-time, per-desk ACL) — the primary path for a desk.
+              A desk is a folder or task node whose id is the desk root id. */}
+          {(kind === 'folder' || kind === 'task') && <LiveDeskSharing rootId={entityId} />}
+
+          {/* Guardrail: on a desk/room both paths are offered, so make it
+              unmistakable that the link below is a FROZEN snapshot, not live — this
+              is the footgun where someone shares a link expecting live updates. */}
+          {(kind === 'folder' || kind === 'task') && (
+            <div className="flex items-start gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-2.5">
+              <Icon name="info" size={14} className="text-[var(--ink-40)] mt-0.5 shrink-0" />
+              <div className="text-[11px] text-[var(--ink-60)] leading-snug">
+                <span className="font-semibold text-[var(--ink-80)]">Or send a read-only snapshot link.</span>{' '}
+                A link is a frozen copy of this {KIND_LABEL[kind]} as it is right now. It does not update and
+                changes are not shared back. For people who should see each other&apos;s changes live, add them
+                under <span className="font-semibold text-[var(--ink-80)]">Live sharing</span> above instead.
+              </div>
+            </div>
+          )}
+
+          {/* Read-only link + snapshot sharing below. */}
           {/* Scope picker */}
           <div>
             <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">

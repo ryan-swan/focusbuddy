@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ActionProposal, Widget, WidgetKind } from '@shared/types'
+import type { ActionProposal, AppliedProposal, Widget, WidgetKind } from '@shared/types'
+import ProposalCards from '../ProposalCards'
 import WidgetFrame from './WidgetFrame'
 import Icon from '../Icon'
 import { useWidgetStore } from '../../stores/widgets'
 import { useNodeStore } from '../../stores/nodes'
 import { useFilesStore } from '../../stores/files'
-import { applyProposal } from '../../lib/actionExecutor'
 
 // Voice/video-note recorder + AI pipeline widget.
 //
@@ -100,6 +100,8 @@ export default function VoiceRecorderWidget({ widget, inline = false }: Props): 
   // persisted — purely a UX preview. The authoritative transcript comes
   // from Whisper on stop.
   const [liveCaption, setLiveCaption] = useState<string>('')
+  // Applied-state for the shared ProposalCards (the approval-card standard).
+  const [appliedProposals, setAppliedProposals] = useState<Record<string, AppliedProposal>>({})
 
   // ── Recording machinery ──────────────────────────────────────────────────
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -394,25 +396,10 @@ export default function VoiceRecorderWidget({ widget, inline = false }: Props): 
   }
 
   // ── Action proposals ─────────────────────────────────────────────────────
-  async function applyOne(p: ActionProposal): Promise<void> {
-    if (!activeTaskId) return
-    const result = await applyProposal(p, { activeTaskId })
-    if (result.ok) {
-      persist({
-        ...state,
-        proposals: state.proposals.filter((x) => x.id !== p.id)
-      })
-    } else {
-      setErrorMsg(`Apply failed: ${result.message}`)
-    }
-  }
-  async function applyAll(): Promise<void> {
-    if (!activeTaskId) return
-    for (const p of state.proposals) {
-      await applyProposal(p, { activeTaskId })
-    }
-    persist({ ...state, proposals: [] })
-  }
+  // Apply is owned by the shared ProposalCards (the approval-card standard) — it
+  // handles resolvedIds batching correctly (the old bespoke applyAll here passed
+  // no resolvedIds, so a create-table + add-table-row batch from one note failed).
+  // This widget only removes a card when it's dismissed/consumed.
   function dismiss(id: string): void {
     persist({
       ...state,
@@ -549,9 +536,10 @@ export default function VoiceRecorderWidget({ widget, inline = false }: Props): 
           state={state}
           mediaUrl={mediaUrl}
           onSwitchMode={(m) => void switchMode(m)}
-          onApplyAll={() => void applyAll()}
-          onApplyOne={(p) => void applyOne(p)}
-          onDismiss={dismiss}
+          activeTaskId={activeTaskId}
+          appliedProposals={appliedProposals}
+          onApplied={(id, a) => setAppliedProposals((prev) => ({ ...prev, [id]: a }))}
+          onConsume={dismiss}
           onRecordAgain={(m) => void startRecording(m)}
           onOpenDestinationPicker={() => setDestinationOpen(true)}
         />
@@ -798,18 +786,20 @@ function ReadyState({
   state,
   mediaUrl,
   onSwitchMode,
-  onApplyAll,
-  onApplyOne,
-  onDismiss,
+  activeTaskId,
+  appliedProposals,
+  onApplied,
+  onConsume,
   onRecordAgain,
   onOpenDestinationPicker
 }: {
   state: PersistedState
   mediaUrl: string | null
   onSwitchMode: (m: ProcessMode) => void
-  onApplyAll: () => void
-  onApplyOne: (p: ActionProposal) => void
-  onDismiss: (id: string) => void
+  activeTaskId: string | null
+  appliedProposals: Record<string, AppliedProposal>
+  onApplied: (id: string, applied: AppliedProposal) => void
+  onConsume: (id: string) => void
   onRecordAgain: (m: CaptureMode) => void
   onOpenDestinationPicker: () => void
 }): JSX.Element {
@@ -863,55 +853,18 @@ function ReadyState({
       )}
 
       {state.proposals.length > 0 && (
-        <div className="border-t border-[var(--edge-soft)] px-2 py-1.5 max-h-[140px] overflow-y-auto">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
-              AI proposed actions · {state.proposals.length}
-            </span>
-            <button
-              onClick={onApplyAll}
-              className="text-[10px] text-accent hover:underline"
-            >
-              Apply all
-            </button>
+        <div className="border-t border-[var(--edge-soft)] px-2 py-1.5 max-h-[180px] overflow-y-auto">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-1">
+            AI proposed actions · {state.proposals.length}
           </div>
-          <ul className="space-y-1">
-            {state.proposals.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-start gap-1.5 text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1"
-              >
-                <Icon
-                  name={iconForProposal(p)}
-                  size={12}
-                  className="text-[var(--ink-50)] mt-0.5 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-[var(--ink-90)] truncate">
-                    {labelForProposal(p)}
-                  </div>
-                  {p.reason && (
-                    <div className="text-[10px] text-[var(--ink-50)] truncate">
-                      {p.reason}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => onApplyOne(p)}
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-white hover:opacity-90"
-                >
-                  Add
-                </button>
-                <button
-                  onClick={() => onDismiss(p.id)}
-                  className="text-[10px] text-[var(--ink-40)] hover:text-[var(--ink-70)]"
-                  title="Dismiss"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
+          {/* The shared approval-card surface (standard accept/approve). */}
+          <ProposalCards
+            proposals={state.proposals}
+            activeTaskId={activeTaskId}
+            appliedProposals={appliedProposals}
+            onApplied={onApplied}
+            onConsume={onConsume}
+          />
         </div>
       )}
 
@@ -1197,36 +1150,6 @@ function iconForKind(kind: WidgetKind): string {
       return 'description'
     default:
       return 'widgets'
-  }
-}
-
-function iconForProposal(p: ActionProposal): string {
-  switch (p.kind) {
-    case 'create-task':
-      return 'task_alt'
-    case 'create-todo-list':
-      return 'checklist'
-    case 'create-widget':
-      return 'widgets'
-    case 'create-page':
-      return 'description'
-    default:
-      return 'auto_awesome'
-  }
-}
-
-function labelForProposal(p: ActionProposal): string {
-  switch (p.kind) {
-    case 'create-task':
-      return `New task — ${p.title}`
-    case 'create-todo-list':
-      return `Todo list — ${p.title} (${p.items.length} items)`
-    case 'create-widget':
-      return `New ${p.widgetKind} — ${p.title || '(no title)'}`
-    case 'create-page':
-      return `New page — ${p.title}`
-    default:
-      return 'Proposal'
   }
 }
 

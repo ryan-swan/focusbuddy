@@ -13,6 +13,30 @@ export interface BriefTask {
   dueDate: number | null
 }
 
+// Defensive title cleanup for anything surfaced to a human (the standup, the daily
+// brief, the AI prompt). Some objects carry an ugly or machine title — most often a
+// map/mindmap whose title is the serialised body JSON. Never show that: pull a
+// human label out of the JSON if there is one, collapse whitespace, and cap the
+// length. Falls back to a kind-appropriate label when nothing usable remains.
+export function cleanTitle(raw: string | null | undefined, fallback = 'Untitled'): string {
+  let s = (raw ?? '').trim()
+  if (!s) return fallback
+  // JSON-looking title (e.g. a serialised MapBody) — try to recover a real label.
+  if (s.startsWith('{') || s.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(s) as Record<string, unknown>
+      const root = (parsed.root ?? parsed) as Record<string, unknown>
+      const label = root.label ?? root.title ?? root.name ?? parsed.label ?? parsed.title ?? parsed.name
+      s = typeof label === 'string' && label.trim() ? label.trim() : fallback
+    } catch {
+      s = fallback
+    }
+  }
+  s = s.replace(/\s+/g, ' ').trim()
+  if (!s) return fallback
+  return s.length > 60 ? s.slice(0, 59).trimEnd() + '…' : s
+}
+
 // A concrete, grounded action the brief proposes and the user approves: block
 // time for a real task. Computed deterministically from the task list, not by
 // the model, so it never proposes work that doesn't exist.

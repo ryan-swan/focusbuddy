@@ -195,6 +195,10 @@ export interface FbNode {
   // was reconstructed from an accepted share. Null for your own nodes. The
   // sidebar uses it to show a "Shared by <handle>" badge + avatar.
   sharedFromHandle: string | null
+  // The desk root id when this node belongs to a desk shared with named
+  // individuals (per-desk ACL live share). Non-null = a live-shared room/desk, so
+  // the galleries can mark it "Shared" and distinguish it from a personal one.
+  sharedRootId: string | null
 }
 
 export interface NodeDraft {
@@ -479,6 +483,10 @@ export interface ChatRequest {
   // by surfaces (focus chat, dashboard cards, field editor) that have no card
   // to render, and a model taught to ask there produces turns that dead-end.
   supportsQuestions?: boolean
+  // Whether to inject the self-building memory block ("what I know about you").
+  // On only for conversational surfaces (assistant panel / focus chat), off for
+  // the field editor / command bar / one-off completions where it's noise + cost.
+  includeMemory?: boolean
   // The widget the user clicked-to-pin as this conversation's primary
   // reference (Phase 3a.1). Additive and optional: surfaces with no pin
   // affordance never set it. The prompt claims a pin only when the id resolves
@@ -557,6 +565,87 @@ export interface ChatResponse {
   // for the trace's "Mentioned" lane and for marking a chip broken — the
   // renderer may not assume a reference resolved just because it was sent.
   mentions?: ChatMentionResolved[]
+}
+
+// ── Agentic loop (multi-round: propose → apply → observe → re-plan) ──────────
+// One step of the agent loop returns the same ActionProposal[] the chat uses,
+// plus a status the host loop-driver reads to decide whether to continue. The
+// model NEVER reports a round number (host-tracked); `blocker` is required and
+// nullable so a driver can never optional-chain past a missing reason.
+export type AgentStatus = 'working' | 'done' | 'blocked' | 'need_input'
+
+export interface AgentStepResult {
+  ok: boolean
+  needsApiKey?: boolean
+  error?: string
+  // Short first-person narration of what this step is doing / found.
+  narration: string
+  // The actions to apply this round (same union + applier as chat).
+  actions: ActionProposal[]
+  status: AgentStatus
+  // Why the loop stopped or what it needs, when status is blocked/need_input;
+  // null when status is working/done. Never optional — always present.
+  blocker: string | null
+  // The raw assistant JSON of this round, so the driver can thread it back as an
+  // assistant turn on the next round (the loop's memory lives in `messages`).
+  rawAssistant: string
+  // The system prompt used this round. Built once at round 0 and echoed back so
+  // the driver can pass it verbatim on later rounds, keeping the cached prefix
+  // byte-identical across the whole run.
+  systemPrompt: string
+}
+
+// The outcome of applying one proposal in a round, rendered into the OBSERVATIONS
+// block fed to the next round. createdId is null honestly when the kind registers
+// no id (never fabricated).
+export interface AgentActionOutcome {
+  kind: string
+  ok: boolean
+  message: string
+  createdId: string | null
+}
+
+// ── Situational proactivity (workspace radar) ────────────────────────────────
+// A cheap, deterministic (no-LLM) detector surfaces actionable situations across
+// the user's REAL work in Plexi — tasks, inbound mail, and the calendar — as
+// one-tap suggestions they can act on or dismiss.
+export type RadarKind = 'overdue' | 'due_soon' | 'stalled' | 'reply_needed' | 'meeting_soon'
+
+// Where a suggestion's "Open" navigates.
+export type RadarNav =
+  | { view: 'task'; taskId: string }
+  | { view: 'mail'; uid: number }
+  | { view: 'calendar' }
+
+export interface RadarSuggestion {
+  // Stable per (kind + underlying entity), so re-runs dedupe and a dismiss sticks.
+  id: string
+  kind: RadarKind
+  title: string
+  detail: string
+  nav: RadarNav
+  severity: 'info' | 'warn'
+}
+
+// ── Self-building memory ─────────────────────────────────────────────────────
+export type MemoryKind = 'fact' | 'preference' | 'commitment'
+
+export interface MemoryItem {
+  id: string
+  kind: MemoryKind
+  text: string
+  // The entity this concerns (person/org/project), when there is one.
+  subject: string
+  // For a commitment: the deadline phrase, verbatim from the source (may be '').
+  due: string
+  // 'user' = stated explicitly; 'extracted' = distilled by the local model.
+  source: 'user' | 'extracted'
+  // The doc/chat id it was extracted from, when source is 'extracted'.
+  sourceRef: string
+  confidence: number
+  active: boolean
+  createdAt: number
+  updatedAt: number
 }
 
 // ── Action proposals (AI → workspace actions, gated by user confirmation) ───
@@ -751,6 +840,15 @@ export type ActionProposal =
     }
   | {
       id: string
+      // Group existing widgets into a new labelled Section (the Smart Stack
+      // suggestion, unified onto the approval-card standard). One card per group.
+      kind: 'create-section'
+      name: string
+      widgetIds: string[]
+      reason?: string
+    }
+  | {
+      id: string
       kind: 'create-table'
       title: string
       columns: Array<{
@@ -932,6 +1030,7 @@ export type AIPurpose =
   | 'email_reply_draft'
   | 'file_tag'
   | 'meeting_end'
+  | 'agent_step'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /

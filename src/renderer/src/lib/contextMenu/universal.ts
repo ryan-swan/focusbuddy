@@ -44,6 +44,11 @@ const seedText = (ctx: MenuContext): string => workingText(ctx).text
 
 export function buildCreate(ctx: MenuContext): MenuContribution[] {
   const seed = seedText(ctx)
+  // The create + connect menu is a deliberately CURATED quick-create set kept two
+  // levels deep (Create -> targets); the resolver reserves the third level for AI
+  // Assist alone. The full consolidated core/Advanced catalog lives in the palette
+  // and the bare-canvas "Add object" menu. Capability gating happens in
+  // createWidget (actions.ts), so a Pro-locked kind here also prompts to upgrade.
   return [
     {
       id: 'core/create',

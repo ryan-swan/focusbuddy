@@ -70,39 +70,49 @@ export function shouldUseCredits(): boolean {
 // or lets the 402 surface so the UI can prompt a top-up.
 function meteredFetch(): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const res = await fetch(input, init)
+    // Transparently re-run the same request against Anthropic on the user's own
+    // key — but only in 'auto' mode (in 'credits' mode they explicitly chose the
+    // proxy, so we never spend their key without consent). Returns null when no
+    // fall-back is possible.
+    const ownKeyRetry = (): Promise<Response> | null => {
+      const ownKey = resolveAnthropicKey()
+      if (getAiMode() === 'auto' && ownKey && init?.body) {
+        const headers = new Headers(init?.headers as HeadersInit | undefined)
+        headers.delete('authorization')
+        headers.set('x-api-key', ownKey)
+        return fetch(REAL_ANTHROPIC, { ...init, headers })
+      }
+      return null
+    }
+
+    let res: Response
+    try {
+      res = await fetch(input, init)
+    } catch (err) {
+      // The proxy is unreachable (network/DNS/TLS, or a misconfigured base URL).
+      // A personal-key user must never be stranded behind a bare "Connection
+      // error" — in auto mode, use their key directly; otherwise record the
+      // outage so getClient prefers BYOK next time, and rethrow.
+      creditCache.proxyAvailable = false
+      const fb = ownKeyRetry()
+      if (fb) return fb
+      throw err
+    }
 
     if (res.status === 402) {
       creditCache.outOfCredits = true
       creditCache.balanceUsd = 0
-      const ownKey = resolveAnthropicKey()
-      // In 'auto' mode with a personal key available, the user expects to keep
-      // working — silently re-run the same request against Anthropic directly.
-      // In 'credits' mode they explicitly chose the proxy, so we surface the
-      // 402 instead of spending their key without consent.
-      if (getAiMode() === 'auto' && ownKey && init?.body) {
-        const headers = new Headers(init.headers as HeadersInit | undefined)
-        headers.delete('authorization')
-        headers.set('x-api-key', ownKey)
-        return fetch(REAL_ANTHROPIC, { ...init, headers })
-      }
-      return res
+      const fb = ownKeyRetry()
+      return fb ?? res
     }
 
-    if (res.status === 503) {
-      // Server has no proxy key configured — record it so getClient prefers
-      // BYOK next time instead of bouncing off the proxy.
+    // 503 (no proxy key), 404 (endpoint missing), or any 5xx — the proxy cannot
+    // serve this call. Prefer the personal key in auto mode; otherwise mark the
+    // proxy unavailable and surface an actionable message rather than a raw error.
+    if (res.status === 503 || res.status === 404 || res.status >= 500) {
       creditCache.proxyAvailable = false
-      const ownKey = resolveAnthropicKey()
-      if (getAiMode() === 'auto' && ownKey && init?.body) {
-        const headers = new Headers(init.headers as HeadersInit | undefined)
-        headers.delete('authorization')
-        headers.set('x-api-key', ownKey)
-        return fetch(REAL_ANTHROPIC, { ...init, headers })
-      }
-      // No fall-back available (no personal key, or 'credits' mode). Replace the
-      // proxy's terse 503 with an actionable message so the user knows to add
-      // their own key, instead of seeing "Credit mode is not available right now".
+      const fb = ownKeyRetry()
+      if (fb) return fb
       return new Response(
         JSON.stringify({
           type: 'error',

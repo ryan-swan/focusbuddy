@@ -247,6 +247,54 @@ CREATE TABLE IF NOT EXISTS fb_embeddings (
   PRIMARY KEY (item_type, item_id)
 );
 
+-- ── AI-enriched document metadata ────────────────────────────────────────────
+-- A distilled, structured description of a document, generated at rest by the
+-- LOCAL model (Ollama) so it costs no cloud credit. Feeds two things: the
+-- embedding text (so a long doc's whole gist is indexed, not just its head) and
+-- the grounding header the workspace-ask answer sends the model (title +
+-- category + date + entities + summary before the body). Entities/dates/keywords
+-- are JSON arrays of strings. Nullable + additive: a doc with no row simply falls
+-- back to the pre-enrichment behaviour, and enrichment never fabricates — an
+-- unreachable local model leaves the row unwritten rather than inventing a summary.
+CREATE TABLE IF NOT EXISTS fb_document_metadata (
+  doc_id TEXT PRIMARY KEY,
+  summary TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
+  entities_json TEXT NOT NULL DEFAULT '[]',
+  dates_json TEXT NOT NULL DEFAULT '[]',
+  keywords_json TEXT NOT NULL DEFAULT '[]',
+  language TEXT NOT NULL DEFAULT '',
+  word_count INTEGER NOT NULL DEFAULT 0,
+  model TEXT NOT NULL DEFAULT '',
+  enriched_at INTEGER NOT NULL
+);
+
+-- ── Self-building memory ─────────────────────────────────────────────────────
+-- Durable things the assistant knows about the user and their work, so it stops
+-- starting cold. Two sources: 'user' (things stated explicitly / "remember this")
+-- and 'extracted' (facts + commitments the LOCAL model distilled from the user's
+-- own documents/chats — grounded, never invented). kind is fact / preference /
+-- commitment. subject is the entity it concerns (person/org/project) when there
+-- is one; due carries a commitment's deadline phrase verbatim. dedup_key is a
+-- normalised form of the text so the same memory isn't stored twice. active lets
+-- a memory be forgotten without losing the audit row.
+CREATE TABLE IF NOT EXISTS fb_memory (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL DEFAULT 'fact',
+  text TEXT NOT NULL,
+  subject TEXT NOT NULL DEFAULT '',
+  due TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'user',
+  source_ref TEXT NOT NULL DEFAULT '',
+  confidence REAL NOT NULL DEFAULT 1,
+  active INTEGER NOT NULL DEFAULT 1,
+  dedup_key TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_memory_active ON fb_memory(active, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fb_memory_dedup ON fb_memory(dedup_key);
+
 -- ── PlexiProjects task dependencies ──────────────────────────────────────────
 -- Finish-to-start links between task nodes that drive the Gantt schedule and the
 -- critical path. pred_id must finish before succ_id can start. Both reference
@@ -954,6 +1002,23 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'documents', 'team_id', 'TEXT')
   ensureColumn(db, 'fb_files', 'team_id', 'TEXT')
   ensureColumn(db, 'fb_tables', 'team_id', 'TEXT')
+
+  // Per-desk sharing: the desk (root node id) this row belongs to when the desk is
+  // shared with named individuals rather than a whole org. NULL for ordinary
+  // personal/org content. A row with shared_root_id set syncs ONLY through the
+  // ACL-scoped shared path (collectPendingShared / applyRemoteShared), never the
+  // personal or org loops, so the scopes are mutually exclusive and nothing
+  // double-pushes. Stamped on every row of the subtree at share time and preserved
+  // on the recipient so their later edits re-push to the same desk. Every content
+  // table a desk can contain gets the column so the collect needs no joins.
+  ensureColumn(db, 'nodes', 'shared_root_id', 'TEXT')
+  ensureColumn(db, 'widgets', 'shared_root_id', 'TEXT')
+  ensureColumn(db, 'fb_tables', 'shared_root_id', 'TEXT')
+  ensureColumn(db, 'fb_rows', 'shared_root_id', 'TEXT')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_nodes_shared_root ON nodes(shared_root_id)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_widgets_shared_root ON widgets(shared_root_id)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_tables_shared_root ON fb_tables(shared_root_id)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_rows_shared_root ON fb_rows(shared_root_id)')
 
   // Remaining top-level user-content surfaces get the same per-org scoping so
   // switching organisation shows only that org's automations, reports, apps,

@@ -3,12 +3,14 @@ import type { Widget } from '@shared/types'
 import { contentToPlainText } from '@shared/widgetText'
 import { renderWidgetInline } from '../lib/renderWidgetInline'
 import { widgetDisplayName } from '../lib/widgetDisplayName'
+import ViewSelector from './views/ViewSelector'
 import {
   buildColumns,
   columnsEligible,
   itemCardHeight,
   loadColumnsConfig,
   saveColumnsConfig,
+  reorderColumns,
   COLUMN_MIN_W,
   COLUMN_MAX_W,
   type DeskColumnsConfig,
@@ -55,6 +57,9 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
   const [cfg, setCfgState] = useState<DeskColumnsConfig>(() => loadColumnsConfig(taskId))
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
+  // Freeform column reorder (spec §3.3) — drag a column by its header handle.
+  const [colDragId, setColDragId] = useState<string | null>(null)
+  const [colDragOverId, setColDragOverId] = useState<string | null>(null)
   // A floating label that follows the cursor during a card drag (pointer-based
   // dragging has no native drag image).
   const [ghost, setGhost] = useState<{ x: number; y: number; name: string } | null>(null)
@@ -236,6 +241,29 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
     window.addEventListener('mouseup', onUp, { once: true })
   }
 
+  // Pointer-based freeform column reorder — drag a column by its header handle
+  // onto another column to drop it just before that one. Same reliable pointer
+  // approach as the card drag; commits + persists on release.
+  function beginColumnDrag(colId: string, e: React.MouseEvent): void {
+    if (!isFreeform || e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    setColDragId(colId)
+    setColDragOverId(colId)
+    const onMove = (ev: MouseEvent): void => {
+      setColDragOverId(columnAtPoint(ev.clientX, ev.clientY))
+    }
+    const onUp = (ev: MouseEvent): void => {
+      window.removeEventListener('mousemove', onMove)
+      const target = columnAtPoint(ev.clientX, ev.clientY)
+      if (target && target !== colId) update({ ...cfg, columns: reorderColumns(cfg.columns, colId, target) })
+      setColDragId(null)
+      setColDragOverId(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp, { once: true })
+  }
+
   // Stop any active drag loop if the component unmounts mid-gesture.
   useEffect(() => () => stopEdgeScroll(), [])
 
@@ -319,14 +347,19 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
           </button>
         )}
         <span className="ml-2 text-[11px] text-[var(--ink-40)] hidden md:inline">{modeHint}</span>
-        <button
-          onClick={() => setViewMode(taskId, 'canvas')}
-          data-testid="columns-to-canvas"
-          className="ml-auto inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
-          title="Back to the canvas"
-        >
-          <Icon name="grid_view" size={14} /> Canvas
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {/* In-view selector so you can jump to any other view (or back to the
+              canvas) without the breadcrumb selector, which this overlay covers. */}
+          <ViewSelector taskId={taskId} />
+          <button
+            onClick={() => setViewMode(taskId, 'canvas')}
+            data-testid="columns-to-canvas"
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+            title="Back to the canvas"
+          >
+            <Icon name="grid_view" size={14} /> Canvas
+          </button>
+        </div>
       </div>
 
       {cfg.groupBy === 'topic' && (topic.needsKey || topic.error) && (
@@ -346,15 +379,25 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
               data-testid={`column-${col.id}`}
               data-col-id={col.id}
               style={{ width: col.width }}
-              className={`relative shrink-0 h-full flex flex-col rounded-xl border bg-[var(--surface-raised)] overflow-hidden transition-[border-color,box-shadow] ${
-                dragOverCol === col.id && dragId
+              className={`relative shrink-0 h-full flex flex-col rounded-xl border bg-[var(--surface-raised)] overflow-hidden transition-[border-color,box-shadow,opacity] ${
+                (dragOverCol === col.id && dragId) || (colDragId && colDragOverId === col.id && colDragId !== col.id)
                   ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.35)]'
                   : 'border-[var(--edge-soft)]'
-              }`}
+              } ${colDragId === col.id ? 'opacity-50' : ''}`}
             >
               {/* Column header */}
               <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-[var(--edge-soft)]">
                 {col.swatch && <span className="h-3 w-3 rounded-full shrink-0" style={{ background: col.swatch }} />}
+                {isFreeform && (
+                  <span
+                    onMouseDown={(e) => beginColumnDrag(col.id, e)}
+                    title="Drag to reorder this column"
+                    data-testid={`column-move-${col.id}`}
+                    className="shrink-0 -ml-0.5 px-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-30)] hover:text-[var(--ink-60)]"
+                  >
+                    <Icon name="drag_indicator" size={14} />
+                  </span>
+                )}
                 {isFreeform ? (
                   <input
                     defaultValue={col.title}

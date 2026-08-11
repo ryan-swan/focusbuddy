@@ -82,7 +82,8 @@ test('Columns click-to-move: move button + context menu reorganise cards via rea
   await goToDesk(window, taskId)
   await expect(window.locator('text=Something went wrong')).toHaveCount(0)
 
-  await window.locator('[data-testid="desk-view-columns"]').click()
+  await window.locator('[data-testid="view-selector-btn"]').click()
+  await window.locator('[data-testid="view-opt-columns"]').click()
   await expect(window.locator('[data-testid="columns-view"]')).toBeVisible()
 
   // ── Status board ─────────────────────────────────────────────────────────
@@ -136,7 +137,8 @@ test('Columns click-to-move: move button + context menu reorganise cards via rea
   await window.locator('[data-testid="columns-to-canvas"]').click()
   await window.waitForTimeout(200)
   await goToDesk(window, taskId)
-  await window.locator('[data-testid="desk-view-columns"]').click()
+  await window.locator('[data-testid="view-selector-btn"]').click()
+  await window.locator('[data-testid="view-opt-columns"]').click()
   await window.waitForTimeout(200)
   await window.locator('[data-testid="columns-groupby-status"]').click()
   await window.waitForTimeout(300)

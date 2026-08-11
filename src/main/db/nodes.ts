@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
-import { getActiveOrgId } from './activeOrg'
+import { getActiveOrgId, PERSONAL_ORG_ID } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 
@@ -27,6 +27,7 @@ interface NodeRow {
   archived: number | null
   is_plan: number | null
   shared_from_handle: string | null
+  shared_root_id: string | null
 }
 
 function rowToNode(row: NodeRow): FbNode {
@@ -52,7 +53,8 @@ function rowToNode(row: NodeRow): FbNode {
     dueDate: row.due_date,
     archived: row.archived === 1,
     isPlan: row.is_plan === 1,
-    sharedFromHandle: row.shared_from_handle ?? null
+    sharedFromHandle: row.shared_from_handle ?? null,
+    sharedRootId: row.shared_root_id ?? null
   }
 }
 
@@ -119,6 +121,34 @@ export function createNode(draft: NodeDraft): FbNode {
   const created = getNode(id)
   if (!created) throw new Error('Node creation failed post-insert')
   return created
+}
+
+// The recipient-side top-level "Shared with me" folder that materialized shared
+// desks hang under. Created once in the PERSONAL org (a per-desk share always lives
+// in the recipient's personal bucket) regardless of which org is active when the
+// shared sync runs, so it mirrors the renderer's ensureSharedFolder. Idempotent.
+export function ensureSharedContainer(): string {
+  const db = getDb()
+  const existing = db
+    .prepare(
+      `SELECT id FROM nodes WHERE parent_id IS NULL AND kind = 'folder' AND title = ? AND trashed_at IS NULL AND org_id = ? LIMIT 1`
+    )
+    .get('Shared with me', PERSONAL_ORG_ID) as { id: string } | undefined
+  if (existing) return existing.id
+  const id = randomUUID()
+  const now = Date.now()
+  const sortOrder = (
+    db
+      .prepare(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM nodes WHERE parent_id IS NULL AND org_id = ?'
+      )
+      .get(PERSONAL_ORG_ID) as { next: number }
+  ).next
+  db.prepare(
+    `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, extensions_minutes, is_plan, org_id)
+     VALUES (@id, NULL, 'folder', @title, '', 'open', 3, 3, 3, @sortOrder, @now, @now, 0, 0, @orgId)`
+  ).run({ id, title: 'Shared with me', sortOrder, now, orgId: PERSONAL_ORG_ID })
+  return id
 }
 
 export function updateNode(id: string, patch: NodePatch): FbNode | null {

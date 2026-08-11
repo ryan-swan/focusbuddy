@@ -35,13 +35,14 @@ test('desk Columns view: toggle, group-by, content-driven width, independent scr
     }, SALES_PIPELINE_TASK_ID)
     await window.waitForTimeout(1000)
 
-    // 1. Columns toggle appears on desk chrome.
-    const toggle = window.locator('[data-testid="desk-view-columns"]')
+    // 1. Views selector appears on desk chrome.
+    const toggle = window.locator('[data-testid="view-selector-btn"]')
     await expect(toggle).toBeVisible({ timeout: 10_000 })
 
-    // 2. Click it: Columns view renders with multiple columns and cards
-    // showing real widget content.
+    // 2. Open it and pick Columns: Columns view renders with multiple columns
+    // and cards showing real widget content.
     await toggle.click()
+    await window.locator('[data-testid="view-opt-columns"]').click()
     const columnsView = window.locator('[data-testid="columns-view"]')
     await expect(columnsView).toBeVisible()
     await expect(window.locator('text=Something went wrong')).toHaveCount(0)

@@ -1,5 +1,6 @@
 import { getDb } from './database'
 import { PERSONAL_ORG_ID } from './activeOrg'
+import { emitObjectEvent } from '../context/engine'
 
 // Main-process half of multi-device workspace sync. The renderer owns the network
 // (it has the signal URL + token); this layer owns the local SQLite. It collects
@@ -34,11 +35,17 @@ export interface PendingUpsert {
   // Group scope carried alongside the body (not inside it): null/undefined = whole
   // org, a team id = that group only. widgets/rows inherit their parent's team.
   teamId?: string | null
+  // Per-desk scope carried alongside the body: the desk root id this item belongs
+  // to, for items on the ACL-scoped shared path. Absent for personal/org items.
+  rootId?: string | null
 }
 export interface PendingDelete {
   id: string
   itemType: ItemType
   baseRev: number
+  // Same per-desk scope as PendingUpsert — the shared DELETE route needs the desk
+  // id to authorize and bind the tombstone.
+  rootId?: string | null
 }
 export interface RemoteItem {
   id: string
@@ -47,12 +54,48 @@ export interface RemoteItem {
   rev: number
   deleted: boolean
   teamId?: string | null
+  rootId?: string | null
+}
+
+// Tables that carry a shared_root_id column (the desk-scope discriminator). Used to
+// keep the personal/org collects from double-pushing a shared-desk row, and to
+// drive the shared collect. time_blocks/documents/fb_files never belong to a
+// per-desk share, so they have no column and are excluded structurally.
+const SHARED_COL_TABLES: ReadonlySet<SyncTable> = new Set(['nodes', 'widgets', 'fb_tables', 'fb_rows'])
+
+// Pure decision for applying one pulled shared-desk item. Extracted so the
+// security-critical rule is unit-tested without a DB:
+//   - a shared item must name a desk (incomingRootId) or it is refused;
+//   - if a local row with that id already exists but belongs to a DIFFERENT desk
+//     (or to none — the recipient's own personal content), it is refused as
+//     'skip-foreign' so a crafted id can never clobber the recipient's data;
+//   - if the local row is at or ahead of the incoming rev, it is 'skip-echo';
+//   - otherwise 'apply'.
+export type SharedApplyVerdict = 'apply' | 'skip-foreign' | 'skip-echo'
+export function sharedApplyVerdict(opts: {
+  incomingRootId: string | null
+  localExists: boolean
+  localRootId: string | null
+  localRev: number | null
+  incomingRev: number
+}): SharedApplyVerdict {
+  if (!opts.incomingRootId) return 'skip-foreign'
+  if (opts.localExists && (opts.localRootId ?? null) !== opts.incomingRootId) return 'skip-foreign'
+  if (opts.localExists && (opts.localRev ?? -1) >= opts.incomingRev) return 'skip-echo'
+  return 'apply'
+}
+
+// Which locally-materialized shared desks are no longer granted (a revoke): the
+// local set minus the server's granted set. Pure so the prune diff is testable.
+export function rootsToPrune(local: string[], granted: string[]): string[] {
+  const g = new Set(granted)
+  return local.filter((r) => !!r && !g.has(r))
 }
 
 // Columns we never round-trip through the server body (local-only sync bookkeeping,
 // plus team_id which travels as its own scope field, and the __team_id alias the
 // widget/row joins use to carry the parent's team).
-const SYNC_COLS = new Set(['sync_rev', 'needs_sync', 'team_id', '__team_id'])
+const SYNC_COLS = new Set(['sync_rev', 'needs_sync', 'team_id', '__team_id', 'shared_root_id', '__shared_root_id'])
 
 function tableCols(table: SyncTable): string[] {
   const db = getDb()
@@ -109,6 +152,17 @@ export function setSyncCursorOrg(orgId: string, n: number): void {
   writeCursor(cursorKeyForOrg(orgId), n)
 }
 
+// Shared-desk pull cursor. One cursor across all desks shared with this account
+// (the server returns a single monotonic clock for the whole shared delta), kept
+// separate from personal/org cursors so the scopes never disturb each other.
+const SHARED_CURSOR_KEY = 'workspace_cursor:shared'
+export function getSyncCursorShared(): number {
+  return readCursor(SHARED_CURSOR_KEY)
+}
+export function setSyncCursorShared(n: number): void {
+  writeCursor(SHARED_CURSOR_KEY, n)
+}
+
 // ── Collect local changes to push ────────────────────────────────────────────
 // A dirty row that is trashed becomes a delete (tombstone); otherwise an upsert.
 export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDelete[] } {
@@ -133,10 +187,14 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
   // Tables joined the personal loop when the mobile web app learned to render
   // table and chart widgets: their data must reach the server to be drawable on
   // another device. fb_tables carries org_id directly, same as nodes.
+  // A shared-desk row (shared_root_id set) syncs ONLY via the shared path, so it is
+  // excluded here even though it still lives in the personal org locally — that is
+  // what keeps the personal and shared scopes mutually exclusive (no double-push).
   for (const itemType of ['node', 'timeblock', 'table'] as ItemType[]) {
     const table = TABLE[itemType]
+    const sharedGuard = SHARED_COL_TABLES.has(table) ? ' AND shared_root_id IS NULL' : ''
     const rows = db
-      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
+      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?${sharedGuard}`)
       .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
     for (const row of rows) pushRow(row, itemType)
   }
@@ -145,12 +203,13 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
   // parent node (the established precedent). So the personal loop takes only the
   // widgets whose parent node is personal, joining widgets to nodes on task_id.
   // A widget on an org node is excluded here and picked up by collectPendingOrg
-  // instead, which is the mirror of the node filter above.
+  // instead, which is the mirror of the node filter above. Shared-desk widgets are
+  // excluded by their own shared_root_id.
   const widgetRows = db
     .prepare(
       `SELECT w.* FROM widgets w
        JOIN nodes n ON w.task_id = n.id
-       WHERE w.needs_sync = 1 AND n.org_id = ?`
+       WHERE w.needs_sync = 1 AND n.org_id = ? AND w.shared_root_id IS NULL`
     )
     .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
   for (const row of widgetRows) pushRow(row, 'widget')
@@ -160,7 +219,7 @@ export function collectPending(): { upserts: PendingUpsert[]; deletes: PendingDe
     .prepare(
       `SELECT r.* FROM fb_rows r
        JOIN fb_tables t ON r.table_id = t.id
-       WHERE r.needs_sync = 1 AND t.org_id = ?`
+       WHERE r.needs_sync = 1 AND t.org_id = ? AND r.shared_root_id IS NULL`
     )
     .all(PERSONAL_ORG_ID) as Array<Record<string, unknown>>
   for (const row of rowRows) pushRow(row, 'row')
@@ -207,9 +266,13 @@ export function collectPendingOrg(orgId: string): {
     ['document', TABLE.document],
     ['table', TABLE.table]
   ]
+  // A shared-desk row lives in the personal org locally (org_id = 'personal') so it
+  // never matches org_id = <realOrg> here anyway; the explicit shared_root_id guard
+  // is future-proofing against ever sharing an org desk per-person (still one path).
   for (const [itemType, table] of directTypes) {
+    const sharedGuard = SHARED_COL_TABLES.has(table) ? ' AND shared_root_id IS NULL' : ''
     const rows = db
-      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?`)
+      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND org_id = ?${sharedGuard}`)
       .all(orgId) as Array<Record<string, unknown>>
     for (const row of rows) pushRow(row, itemType)
   }
@@ -221,7 +284,7 @@ export function collectPendingOrg(orgId: string): {
     .prepare(
       `SELECT w.*, n.team_id AS __team_id FROM widgets w
        JOIN nodes n ON w.task_id = n.id
-       WHERE w.needs_sync = 1 AND n.org_id = ?`
+       WHERE w.needs_sync = 1 AND n.org_id = ? AND w.shared_root_id IS NULL`
     )
     .all(orgId) as Array<Record<string, unknown>>
   for (const row of widgetRows) pushRow(row, 'widget')
@@ -232,7 +295,7 @@ export function collectPendingOrg(orgId: string): {
     .prepare(
       `SELECT r.*, t.team_id AS __team_id FROM fb_rows r
        JOIN fb_tables t ON r.table_id = t.id
-       WHERE r.needs_sync = 1 AND t.org_id = ?`
+       WHERE r.needs_sync = 1 AND t.org_id = ? AND r.shared_root_id IS NULL`
     )
     .all(orgId) as Array<Record<string, unknown>>
   for (const row of rows) pushRow(row, 'row')
@@ -248,6 +311,157 @@ export function collectPendingOrg(orgId: string): {
   return { upserts, deletes }
 }
 
+// Shared-desk collect: every dirty row that belongs to a desk shared with named
+// individuals (shared_root_id set), regardless of local org bucket. Each item
+// carries its desk root id so the shared push route can authorize + bind it. This
+// is the ONLY collect that emits shared-desk rows (they are excluded from both the
+// personal and org collects), so a shared desk syncs down exactly one path.
+export function collectPendingShared(): { upserts: PendingUpsert[]; deletes: PendingDelete[] } {
+  const db = getDb()
+  const upserts: PendingUpsert[] = []
+  const deletes: PendingDelete[] = []
+
+  // Tag any content added to a shared desk since it was shared (new notes, widgets,
+  // child desks, tables, rows) so it actually pushes. Without this, only the
+  // share-time snapshot and edits to it would ever sync. Cheap: only walks desks
+  // that are actually shared locally, and only writes to still-untagged rows.
+  for (const root of listLocalSharedRoots()) reconcileSharedDescendants(root)
+
+  const pushRow = (row: Record<string, unknown>, itemType: ItemType): void => {
+    const id = String(row.id)
+    const baseRev = Number(row.sync_rev) || 0
+    const rootId = (row.shared_root_id ?? null) as string | null
+    if (!rootId) return
+    if (row.trashed_at != null) deletes.push({ id, itemType, baseRev, rootId })
+    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev, rootId })
+  }
+
+  // Every desk-content table carries shared_root_id directly (stamped across the
+  // whole subtree at share time), so no joins are needed.
+  const typeToTable: Array<[ItemType, SyncTable]> = [
+    ['node', TABLE.node],
+    ['table', TABLE.table],
+    ['widget', TABLE.widget],
+    ['row', TABLE.row]
+  ]
+  for (const [itemType, table] of typeToTable) {
+    const rows = db
+      .prepare(`SELECT * FROM ${table} WHERE needs_sync = 1 AND shared_root_id IS NOT NULL`)
+      .all() as Array<Record<string, unknown>>
+    for (const row of rows) pushRow(row, itemType)
+  }
+  return { upserts, deletes }
+}
+
+// Walk a desk's structural subtree: the root node, every descendant node (by
+// parent_id, any depth), and the tables backed by table-widgets anywhere in it. The
+// walk is by structure, NOT by shared_root_id, so it deliberately finds content that
+// has NOT been tagged yet (a note added after the share). Returns node ids (root
+// first) and the distinct backing-table ids.
+function collectDeskSubtree(rootId: string): { nodeIds: string[]; tableIds: string[] } {
+  const db = getDb()
+  const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId)
+  if (!exists) return { nodeIds: [], tableIds: [] }
+  const nodeIds: string[] = []
+  const collect = (nid: string): void => {
+    nodeIds.push(nid)
+    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
+      id: string
+    }>
+    for (const k of kids) collect(k.id)
+  }
+  collect(rootId)
+  const tableIds = (
+    db
+      .prepare(
+        `SELECT DISTINCT content AS id FROM widgets
+         WHERE task_id IN (${nodeIds.map(() => '?').join(',')})
+           AND kind = 'table' AND content IS NOT NULL AND content != ''`
+      )
+      .all(...nodeIds) as Array<{ id: string }>
+  ).map((r) => r.id)
+  return { nodeIds, tableIds }
+}
+
+// Stamp a desk subtree with shared_root_id and reset sync_rev so it re-pushes fresh
+// onto the shared path. Mirrors moveNodeToOrg's collection but for the ACL-shared
+// scope. Run once at share time. Returns the stamped node ids (root first).
+export function stampSharedDesk(rootId: string): string[] {
+  const db = getDb()
+  const { nodeIds, tableIds } = collectDeskSubtree(rootId)
+  if (nodeIds.length === 0) return []
+  const setNode = db.prepare('UPDATE nodes SET shared_root_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setWidgets = db.prepare('UPDATE widgets SET shared_root_id = ?, needs_sync = 1, sync_rev = 0 WHERE task_id = ?')
+  const setTable = db.prepare('UPDATE fb_tables SET shared_root_id = ?, needs_sync = 1, sync_rev = 0 WHERE id = ?')
+  const setRows = db.prepare('UPDATE fb_rows SET shared_root_id = ?, needs_sync = 1, sync_rev = 0 WHERE table_id = ?')
+  db.transaction(() => {
+    for (const i of nodeIds) {
+      setNode.run(rootId, i)
+      setWidgets.run(rootId, i)
+    }
+    for (const t of tableIds) {
+      setTable.run(rootId, t)
+      setRows.run(rootId, t)
+    }
+  })()
+  return nodeIds
+}
+
+// Propagate a shared desk's tag DOWN to any descendant created after the share:
+// stampSharedDesk only tags what existed at share time, and createNode/createWidget/
+// createTable/createRow do not inherit shared_root_id, so a note added five minutes
+// later would otherwise never sync. This re-walks the subtree and stamps only the
+// still-untagged members (both the owner's and, on the other side, the recipient's
+// new content), marking them dirty so the next collect pushes them. It touches ONLY
+// rows whose shared_root_id IS NULL, so already-synced content is never re-dirtied.
+// Returns how many rows it newly tagged. Called at the top of every shared collect,
+// which is what makes "changes as they happen" actually hold for new content.
+export function reconcileSharedDescendants(rootId: string): number {
+  const db = getDb()
+  const root = db.prepare('SELECT shared_root_id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId) as
+    | { shared_root_id: string | null }
+    | undefined
+  if (!root || root.shared_root_id !== rootId) return 0 // only reconcile a genuine, still-shared root
+  const { nodeIds, tableIds } = collectDeskSubtree(rootId)
+  if (nodeIds.length === 0) return 0
+  const inNodes = nodeIds.map(() => '?').join(',')
+  const inTables = tableIds.length ? tableIds.map(() => '?').join(',') : null
+  let changed = 0
+  const tx = db.transaction(() => {
+    changed += db
+      .prepare(`UPDATE nodes SET shared_root_id = ?, needs_sync = 1 WHERE id IN (${inNodes}) AND shared_root_id IS NULL`)
+      .run(rootId, ...nodeIds).changes as number
+    changed += db
+      .prepare(
+        `UPDATE widgets SET shared_root_id = ?, needs_sync = 1 WHERE task_id IN (${inNodes}) AND shared_root_id IS NULL`
+      )
+      .run(rootId, ...nodeIds).changes as number
+    if (inTables) {
+      changed += db
+        .prepare(`UPDATE fb_tables SET shared_root_id = ?, needs_sync = 1 WHERE id IN (${inTables}) AND shared_root_id IS NULL`)
+        .run(rootId, ...tableIds).changes as number
+      changed += db
+        .prepare(
+          `UPDATE fb_rows SET shared_root_id = ?, needs_sync = 1 WHERE table_id IN (${inTables}) AND shared_root_id IS NULL`
+        )
+        .run(rootId, ...tableIds).changes as number
+    }
+  })
+  tx()
+  return changed
+}
+
+// Distinct desk ids currently materialized locally as shared. Used to prune desks
+// the account has lost access to: any local shared root the server no longer lists
+// in the caller's granted set is removed (see pruneSharedDesk).
+export function listLocalSharedRoots(): string[] {
+  const db = getDb()
+  const rows = db
+    .prepare('SELECT DISTINCT shared_root_id AS r FROM nodes WHERE shared_root_id IS NOT NULL')
+    .all() as Array<{ r: string | null }>
+  return rows.map((x) => x.r).filter((r): r is string => !!r)
+}
+
 // Clear the dirty flag and record the server rev after a successful push. Updating
 // sync_rev means the dirty trigger does not re-fire (it guards on sync cols).
 export function markPushed(itemType: ItemType, id: string, rev: number): void {
@@ -257,12 +471,62 @@ export function markPushed(itemType: ItemType, id: string, rev: number): void {
 
 // ── Apply rows pulled from the server ────────────────────────────────────────
 // Nodes are applied before widgets so a widget's task always exists first.
+// A change applied from a remote pull, for the Context Health "changed while you
+// were away" frame.
+interface RemoteApplied {
+  id: string
+  itemType: ItemType
+  deleted: boolean
+  deskId: string | null
+}
+
+// The parent a health event should hang under: a widget's desk (task_id) or a
+// node's parent (parent_id). Null for deletes (no body) and other types.
+function deskIdOfRemote(it: RemoteItem): string | null {
+  const b = it.body as Record<string, unknown> | null
+  if (!b) return null
+  const v = it.itemType === 'widget' ? b.task_id : it.itemType === 'node' ? b.parent_id : null
+  return typeof v === 'string' ? v : null
+}
+
+// Emit a Context-Engine Object Event for each genuinely-new remote change, so a
+// widget or desk changed on another device or by another member lights its "changed
+// since your last visit" frame when the user returns. Only nodes and widgets carry
+// that frame, so only they emit. MUST run AFTER the apply transaction commits: the
+// event store's append opens its own db.transaction and better-sqlite3 forbids
+// nesting (a nested attempt would be swallowed, silently dropping the signal).
+// Deliberately does NOT advance the review point, so the change stays surfaced until
+// the user actually opens the desk. Non-fatal (emitObjectEvent swallows failures).
+function emitRemoteChangeEvents(changes: RemoteApplied[], orgId?: string): void {
+  const orgOpt = orgId && orgId !== PERSONAL_ORG_ID ? { organisationId: orgId } : {}
+  for (const c of changes) {
+    if (c.itemType !== 'node' && c.itemType !== 'widget') continue
+    const eventType =
+      c.itemType === 'widget'
+        ? c.deleted
+          ? 'WidgetDeleted'
+          : 'WidgetUpdated'
+        : c.deleted
+          ? 'DeskDeleted'
+          : 'DeskUpdated'
+    emitObjectEvent({
+      eventType,
+      category: 'system',
+      objectId: c.id,
+      deskId: c.deskId,
+      changeSummary: 'Changed on another device',
+      ...orgOpt
+    })
+  }
+}
+
 export function applyRemote(items: RemoteItem[]): { applied: number } {
   const db = getDb()
   // Nodes first: widgets and time blocks may reference them by foreign key.
   const rank = (t: ItemType): number => (t === 'node' ? 0 : 1)
   const ordered = [...items].sort((a, b) => rank(a.itemType) - rank(b.itemType))
   let applied = 0
+  const changes: RemoteApplied[] = []
   const tx = db.transaction(() => {
     for (const item of ordered) {
       const table = TABLE[item.itemType]
@@ -277,6 +541,7 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
             `UPDATE ${table} SET trashed_at = COALESCE(trashed_at, ?), sync_rev = ?, needs_sync = 0 WHERE id = ?`
           ).run(Date.now(), item.rev, item.id)
           applied++
+          changes.push({ id: item.id, itemType: item.itemType, deleted: true, deskId: null })
         }
         continue
       }
@@ -307,6 +572,7 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
           `INSERT INTO ${table} (${insertList}) VALUES (${valueList}) ON CONFLICT(id) DO UPDATE SET ${updateList}`
         ).run(params)
         applied++
+        changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
       } catch {
         // One bad row (e.g. a foreign key whose parent has not synced yet)
         // must not abort the whole batch; the next cycle retries it.
@@ -314,6 +580,7 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
     }
   })
   tx()
+  emitRemoteChangeEvents(changes)
   return { applied }
 }
 
@@ -410,6 +677,7 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
   if (!orgId || orgId === PERSONAL_ORG_ID) return { applied: 0 }
   const ordered = orderOrgItemsForApply(items)
   let applied = 0
+  const changes: RemoteApplied[] = []
   const tx = db.transaction(() => {
     for (const item of ordered) {
       const table = TABLE[item.itemType]
@@ -424,6 +692,7 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
             `UPDATE ${table} SET trashed_at = COALESCE(trashed_at, ?), sync_rev = ?, needs_sync = 0 WHERE id = ?`
           ).run(Date.now(), item.rev, item.id)
           applied++
+          changes.push({ id: item.id, itemType: item.itemType, deleted: true, deskId: null })
         }
         continue
       }
@@ -461,6 +730,7 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
           `INSERT INTO ${table} (${insertList}) VALUES (${valueList}) ON CONFLICT(id) DO UPDATE SET ${updateList}`
         ).run(params)
         applied++
+        changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
       } catch {
         // A single bad row (e.g. a foreign key whose parent table has not synced
         // yet) must not abort the batch; the next cycle retries it.
@@ -468,5 +738,157 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
     }
   })
   tx()
+  emitRemoteChangeEvents(changes, orgId)
   return { applied }
+}
+
+// Apply a batch pulled from the ACL-scoped shared endpoint (desks shared with this
+// account by name). Materializes the desk into the recipient's PERSONAL bucket,
+// preserving the server ids so the two sides converge, and tags every row with its
+// desk id so the recipient's later edits re-push to the same desk. Three rules make
+// it safe and coherent:
+//
+//   1. Integrity guard: a shared item is applied only when there is no local row
+//      with that id, OR the local row already belongs to THIS desk (same
+//      shared_root_id). A shared item can therefore never overwrite the recipient's
+//      own personal content, nor another desk's, even if a malicious owner crafts an
+//      item id equal to one the recipient already has.
+//   2. Root anchoring: the desk ROOT node (id === rootId) is parented under the
+//      local "Shared with me" container on first materialization and left wherever
+//      it sits thereafter, so a later owner edit never re-orphans or moves it.
+//   3. Local scoping: org_id is forced to the personal sentinel and shared_root_id
+//      to the desk id, regardless of what the serialized body carried.
+//
+// Each row is applied under its own try/catch so one not-yet-synced foreign key
+// never aborts the batch (the next cycle retries).
+export function applyRemoteShared(
+  items: RemoteItem[],
+  opts: { sharedContainerId: string; ownerHandles?: Record<string, string> }
+): { applied: number } {
+  const db = getDb()
+  const ordered = orderOrgItemsForApply(items)
+  let applied = 0
+  const changes: RemoteApplied[] = []
+  const tx = db.transaction(() => {
+    for (const item of ordered) {
+      const table = TABLE[item.itemType]
+      if (!table) continue
+      const rootId = item.rootId ?? null
+      if (!rootId) continue // a shared item must name its desk
+      if (!SHARED_COL_TABLES.has(table)) continue // only desk-content tables carry the column
+
+      // Single read of the local row's desk tag + rev, routed through the pure guard
+      // so the security-critical decision (never overwrite a foreign row, suppress
+      // echoes) is unit-tested in isolation.
+      const localRow = db.prepare(`SELECT shared_root_id, sync_rev FROM ${table} WHERE id = ?`).get(item.id) as
+        | { shared_root_id: string | null; sync_rev: number | null }
+        | undefined
+      const verdict = sharedApplyVerdict({
+        incomingRootId: rootId,
+        localExists: !!localRow,
+        localRootId: localRow?.shared_root_id ?? null,
+        localRev: localRow?.sync_rev ?? null,
+        incomingRev: item.rev
+      })
+
+      if (item.deleted) {
+        // Tombstone only when the local row exists AND belongs to this desk AND the
+        // delete is not stale (verdict 'apply' encodes all three).
+        if (verdict === 'apply' && localRow) {
+          db.prepare(
+            `UPDATE ${table} SET trashed_at = COALESCE(trashed_at, ?), sync_rev = ?, needs_sync = 0 WHERE id = ?`
+          ).run(Date.now(), item.rev, item.id)
+          applied++
+          changes.push({ id: item.id, itemType: item.itemType, deleted: true, deskId: null })
+        }
+        continue
+      }
+      if (verdict !== 'apply') continue
+      if (!item.body || typeof item.body !== 'object') continue
+
+      const cols = tableCols(table)
+      const present = cols.filter((c) => !SYNC_COLS.has(c) && c in item.body!)
+      if (!present.includes('id')) continue
+      const params: Record<string, unknown> = {}
+      for (const c of present) params[c] = (item.body as Record<string, unknown>)[c]
+      // Rule 3: force local scoping.
+      if (cols.includes('org_id')) params.org_id = PERSONAL_ORG_ID
+      params.shared_root_id = rootId
+      // Rule 2: anchor the desk root under the local container on first receipt,
+      // else keep wherever it already sits.
+      if (item.id === rootId && cols.includes('parent_id')) {
+        const existing = db.prepare('SELECT parent_id FROM nodes WHERE id = ?').get(item.id) as
+          | { parent_id: string | null }
+          | undefined
+        params.parent_id = existing ? existing.parent_id : opts.sharedContainerId
+        // Attribution: stamp who shared it so the recipient sees "Shared by X" on the
+        // desk. Only on the root node, only when the server supplied the owner name
+        // (never for a desk this account owns). shared_from_handle rides the body, so
+        // overriding params here is enough for it to persist.
+        const ownerHandle = opts.ownerHandles?.[rootId]
+        if (ownerHandle && cols.includes('shared_from_handle')) {
+          params.shared_from_handle = ownerHandle
+          if (!present.includes('shared_from_handle')) present.push('shared_from_handle')
+        }
+      }
+      params.sync_rev = item.rev
+      params.needs_sync = 0
+      const allCols = [...present]
+      if (cols.includes('org_id') && !allCols.includes('org_id')) allCols.push('org_id')
+      if (!allCols.includes('shared_root_id')) allCols.push('shared_root_id')
+      allCols.push('sync_rev', 'needs_sync')
+      const insertList = allCols.join(', ')
+      const valueList = allCols.map((c) => `@${c}`).join(', ')
+      const updateList = allCols.filter((c) => c !== 'id').map((c) => `${c} = @${c}`).join(', ')
+      try {
+        db.prepare(
+          `INSERT INTO ${table} (${insertList}) VALUES (${valueList}) ON CONFLICT(id) DO UPDATE SET ${updateList}`
+        ).run(params)
+        applied++
+        changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
+      } catch {
+        // FK not present yet (a parent arriving in a later cycle) — retry next cycle.
+      }
+    }
+  })
+  tx()
+  emitRemoteChangeEvents(changes)
+  return { applied }
+}
+
+// Owner-side adoption: when a desk this account OWNS is discovered as shared but a
+// pre-existing local copy is still untagged (the classic "shared from my other
+// device" case), fold that local copy into shared scope so it converges instead of
+// diverging. Only ever called for desks the SERVER confirmed the caller owns, so a
+// recipient can never adopt (and thus never absorb) a colliding local row. Returns
+// true if it adopted (there was an untagged local copy), false otherwise. The
+// caller applies the server delta straight after, so the local copy reconciles to
+// the shared truth (last-write-wins) without losing rows the server didn't have.
+export function adoptSharedDesk(rootId: string): boolean {
+  const db = getDb()
+  const row = db.prepare('SELECT shared_root_id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId) as
+    | { shared_root_id: string | null }
+    | undefined
+  if (!row) return false // not on this device — applyRemoteShared materializes it fresh
+  if (row.shared_root_id === rootId) return false // already shared here
+  stampSharedDesk(rootId)
+  return true
+}
+
+// Prune a desk that this account no longer has access to (revoked, or never
+// re-granted). Removes the local materialized copy of the desk's rows. Only ever
+// touches rows tagged with this desk id, so it can never delete personal content.
+// Returns the number of rows removed.
+export function pruneSharedDesk(rootId: string): number {
+  const db = getDb()
+  if (!rootId) return 0
+  let removed = 0
+  const tx = db.transaction(() => {
+    for (const table of ['fb_rows', 'widgets', 'fb_tables', 'nodes'] as SyncTable[]) {
+      const r = db.prepare(`DELETE FROM ${table} WHERE shared_root_id = ?`).run(rootId)
+      removed += r.changes
+    }
+  })
+  tx()
+  return removed
 }

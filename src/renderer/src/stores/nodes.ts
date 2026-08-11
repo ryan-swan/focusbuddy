@@ -257,3 +257,9 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     set({ expanded: { ...get().expanded, [id]: !get().expanded[id] } }),
   expand: (id, on) => set({ expanded: { ...get().expanded, [id]: on } })
 }))
+
+// Thin handle for debugging + e2e (same convention as __fbView/__fbWidgets): the
+// real store, not a mock. Changes nothing about user behaviour.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbNodes?: typeof useNodeStore }).__fbNodes = useNodeStore
+}

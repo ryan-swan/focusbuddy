@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { ActionProposal, AppliedProposal } from '@shared/types'
 import { useActionHistory } from '../stores/actionHistory'
-import { applyProposal, describeProposal } from '../lib/actionExecutor'
+import { applyProposal, describeProposal, ensureDependencies } from '../lib/actionExecutor'
+import { useAgentLoop } from '../stores/agentLoop'
 import { resolveGoToTarget, goToTarget } from '../lib/goToTarget'
 import Icon from './Icon'
 
@@ -26,6 +27,10 @@ import Icon from './Icon'
 interface ProposalCardsProps {
   proposals: ActionProposal[]
   activeTaskId: string | null
+  // Optional destination folder for document-producing proposals (e.g. the
+  // meeting wrap-up files deliverables into the meeting folder). Threaded to the
+  // applier; ignored by proposals that don't create documents.
+  destinationFolderId?: string | null
   // Applied-card state keyed by proposal id (from the host surface's store).
   // Omitted → no card is ever shown as applied (see onApplied).
   appliedProposals?: Record<string, AppliedProposal>
@@ -34,6 +39,11 @@ interface ProposalCardsProps {
   onApplied?: (proposalId: string, applied: AppliedProposal) => void
   // Remove an un-applied suggestion (dismiss).
   onConsume: (proposalId: string) => void
+  // Optional per-card Undo on an APPLIED card. The host performs the actual
+  // reversal (e.g. deleting the created entity + recording an agent outcome) and
+  // updates its applied-state. When provided, applied cards show an Undo button.
+  // Distinct from the applyAll action-history batch — this is host-owned, per-card.
+  onUndo?: (proposalId: string, applied: AppliedProposal) => void
 }
 
 const NO_APPLIED: Record<string, AppliedProposal> = {}
@@ -41,14 +51,20 @@ const NO_APPLIED: Record<string, AppliedProposal> = {}
 export default function ProposalCards({
   proposals,
   activeTaskId,
+  destinationFolderId = null,
   appliedProposals = NO_APPLIED,
   onApplied,
-  onConsume
+  onConsume,
+  onUndo
 }: ProposalCardsProps): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [toast, setToast] = useState<{ id: string; ok: boolean; message: string } | null>(
     null
   )
+  // Run-lock: while an autonomous agent run is applying proposals into one shared
+  // undo batch, a manual Apply here would fold into that batch (wrong attribution)
+  // or race its applies. Disable manual apply for the duration of a run.
+  const agentRunning = useAgentLoop((s) => s.running)
 
   // resolvedIds threads newly-created entity ids (today: tables) through a
   // batch so a follow-up proposal (today: add-table-row) can reference what
@@ -80,104 +96,33 @@ export default function ProposalCards({
     }
   }
 
-  // Detect "I depend on a proposal that hasn't been applied yet" cases.
-  // When the user clicks Apply on a single dependent card (e.g. an
-  // add-table-row pointing at $tbl-1), we look up the parent in the
-  // current proposals array and run it first, threading the resolved id
-  // into the batch map so the child's apply succeeds. Today only
-  // add-table-row → create-table exists; the helper is structured so
-  // new dependent kinds slot in by adding a case to the switch.
-  async function ensureDependencies(
-    p: ActionProposal,
-    resolvedIds: Map<string, string>
-  ): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (p.kind === 'add-table-row' && p.tableId.startsWith('$')) {
-      const refKey = p.tableId.slice(1)
-      if (resolvedIds.has(refKey)) return { ok: true }
-      const parent = proposals.find(
-        (x) => x.id === refKey && x.kind === 'create-table'
-      )
-      if (!parent) {
-        return {
-          ok: false,
-          message:
-            'Row references a table that was never proposed alongside it — try regenerating the request.'
-        }
-      }
-      const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
-      if (!parentResult.ok) {
-        return {
-          ok: false,
-          message: `Couldn't auto-create parent table: ${parentResult.message}`
-        }
-      }
-      // Parent landed — mark it applied (green record) rather than removing it,
-      // so an auto-created dependency reads the same as a manually-applied one.
-      recordApplied(parent, parentResult.message, resolvedIds)
-    }
-    // edit-document → create-document in the same batch, same shape.
-    // `generate-document` counts as a parent too: it also produces a document,
-    // so an edit referencing one must resolve against it. Carried over from
-    // da4938b, which added it to the inlined copy this component replaced —
-    // converging the fork must not drop the fix that lived in the fork.
-    if (p.kind === 'edit-document' && p.documentId.startsWith('$')) {
-      const refKey = p.documentId.slice(1)
-      if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find(
-          (x) => x.id === refKey && (x.kind === 'create-document' || x.kind === 'generate-document')
-        )
-        if (!parent) {
-          return {
-            ok: false,
-            message: 'Edit references a document that was never proposed alongside it — try regenerating.'
-          }
-        }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
-        if (!parentResult.ok) {
-          return { ok: false, message: `Couldn't auto-create the document first: ${parentResult.message}` }
-        }
-        recordApplied(parent, parentResult.message, resolvedIds)
-      }
-    }
-    // schedule-event bound to a create-task in the same batch.
-    if (p.kind === 'schedule-event' && p.taskId && p.taskId.startsWith('$')) {
-      const refKey = p.taskId.slice(1)
-      if (!resolvedIds.has(refKey)) {
-        const parent = proposals.find((x) => x.id === refKey && x.kind === 'create-task')
-        if (!parent) {
-          return { ok: false, message: 'Event references a task that was never proposed alongside it.' }
-        }
-        const parentResult = await applyProposal(parent, { activeTaskId, resolvedIds })
-        if (!parentResult.ok) {
-          return { ok: false, message: `Couldn't auto-create the task first: ${parentResult.message}` }
-        }
-        recordApplied(parent, parentResult.message, resolvedIds)
-      }
-    }
-    return { ok: true }
-  }
-
   async function applyOne(
     p: ActionProposal,
     resolvedIds?: Map<string, string>
   ): Promise<void> {
-    if (busy) return
+    if (busy || agentRunning) return
     const ids = resolvedIds ?? batchResolvedIds.current
     setBusy(p.id)
-    const dep = await ensureDependencies(p, ids)
+    // Resolve any not-yet-applied parent this proposal forward-references, via the
+    // shared resolver (so this card path and the agent loop can never drift).
+    // The resolver is UI-free, so we do the "mark applied" bookkeeping here for
+    // each parent it auto-created — an auto-created dependency then reads the same
+    // as a manually-applied one (green record, not removed).
+    const dep = await ensureDependencies(p, proposals, { activeTaskId, resolvedIds: ids, destinationFolderId })
     if (!dep.ok) {
       setBusy(null)
       setToast({ id: p.id, ok: false, message: dep.message })
       setTimeout(() => setToast((t) => (t?.id === p.id ? null : t)), 2800)
       return
     }
+    for (const parent of dep.appliedParents) recordApplied(parent.proposal, parent.message, ids)
     // A canvas handler (or its store IPC) can throw rather than return a
     // failure envelope. Without this guard the throw skipped setBusy(null), so
     // every Apply button stayed disabled and the panel looked frozen. Always
     // clear busy and show an honest failure chip; the card stays for a retry.
     let result: { ok: boolean; message: string }
     try {
-      result = await applyProposal(p, { activeTaskId, resolvedIds: ids })
+      result = await applyProposal(p, { activeTaskId, resolvedIds: ids, destinationFolderId })
     } catch (err) {
       result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
     }
@@ -196,7 +141,7 @@ export default function ProposalCards({
   }
 
   async function applyAll(): Promise<void> {
-    if (busy) return
+    if (busy || agentRunning) return
     // Only apply the ones not already done (applied cards stay as green records).
     const pending = proposals.filter((p) => !appliedProposals[p.id])
     if (pending.length === 0) return
@@ -262,17 +207,30 @@ export default function ProposalCards({
                     {applied.message}
                   </div>
                 </div>
-                {applied.target && (
-                  <button
-                    onClick={() => void goToTarget(applied.target!)}
-                    title="Go to what this created"
-                    data-testid={`proposal-goto-${p.id}`}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-800/60 bg-[var(--surface-raised)] hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
-                  >
-                    <span>Go to</span>
-                    <Icon name="north_east" size={12} />
-                  </button>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {onUndo && (
+                    <button
+                      onClick={() => onUndo(p.id, applied)}
+                      title="Undo this"
+                      data-testid={`proposal-undo-${p.id}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)] px-2 py-1 text-[11px] font-medium text-[var(--ink-60)] transition-colors"
+                    >
+                      <Icon name="undo" size={12} />
+                      <span>Undo</span>
+                    </button>
+                  )}
+                  {applied.target && (
+                    <button
+                      onClick={() => void goToTarget(applied.target!)}
+                      title="Go to what this created"
+                      data-testid={`proposal-goto-${p.id}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-800/60 bg-[var(--surface-raised)] hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
+                    >
+                      <span>Go to</span>
+                      <Icon name="north_east" size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -283,7 +241,7 @@ export default function ProposalCards({
           <button
             key={p.id}
             onClick={() => void applyOne(p)}
-            disabled={isBusy}
+            disabled={isBusy || agentRunning}
             data-testid={`proposal-card-${p.id}`}
             className="text-left rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
           >
@@ -334,7 +292,7 @@ export default function ProposalCards({
       {pendingCount > 1 && (
         <button
           onClick={() => void applyAll()}
-          disabled={busy !== null}
+          disabled={busy !== null || agentRunning}
           className="text-[11px] text-accent self-start px-1.5 py-0.5 hover:underline disabled:opacity-50"
         >
           Apply all {pendingCount}

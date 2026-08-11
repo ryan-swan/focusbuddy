@@ -550,12 +550,12 @@ export const ADVANCED_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
   'markdown',
   'card',
   'living-doc',
-  // Files — Document/Spreadsheet/Slides/File/Map/Drive are core. Drive (a shared
-  // folder pinned to the desk) is promoted to core per go-live feedback: shared-
-  // file access is a headline promise, so it shouldn't sit behind Advanced.
-  'design',
-  // Tools/data — Table + Chart are core; these are power or niche.
-  'field',
+  // Files — Document/Spreadsheet/Slides/File/Map/Drive/Design are core. Drive (a
+  // shared folder pinned to the desk) and Design (a PlexiDesign canvas) are core
+  // per the product spec §2.4 core-14 set; both are ungated at the spawn layer.
+  // Tools/data — Table + Chart + Field are core; Field is the spec's configurable
+  // utility slot (one typed value, type chosen after drop). custom-block below is a
+  // heavier design-your-own authoring flow and stays advanced.
   'custom-block',
   'calculator',
   'color',
@@ -602,7 +602,8 @@ export const WIDGET_SHORTCUTS: Partial<Record<WidgetKind, string>> = {
   color: 'O',
   section: 'R',
   shape: 'G',
-  card: 'D'
+  card: 'D',
+  field: 'F'
 }
 
 // Reverse map: pressed key (uppercased) -> the widget kind to spawn. Built from

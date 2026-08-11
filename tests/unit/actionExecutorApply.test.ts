@@ -20,7 +20,39 @@
 // No IPC, no Electron, no network.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { FbNode } from '../../src/shared/types'
+import type { FbNode, Widget } from '../../src/shared/types'
+
+function fakeWidget(over: Partial<Widget> & { id: string }): Widget {
+  return {
+    taskId: 't1',
+    kind: 'sticky',
+    title: over.id,
+    content: '',
+    x: 0,
+    y: 0,
+    width: 240,
+    height: 200,
+    zIndex: 1,
+    color: null,
+    status: null,
+    pinned: false,
+    pinnedScreenX: null,
+    pinnedScreenY: null,
+    pinnedZone: null,
+    parentSectionId: null,
+    layout: null,
+    sourceAppId: null,
+    mode: null,
+    livingQuery: null,
+    livingGeneratedAt: null,
+    livingPaused: false,
+    createdAt: 1000,
+    updatedAt: 1000,
+    archived: false,
+    syncGroupId: null,
+    ...over
+  } as Widget
+}
 
 // ── Minimal fake node ────────────────────────────────────────────────────────
 function fakeNode(over: Partial<FbNode> = {}): FbNode {
@@ -59,6 +91,12 @@ let storedNodes: FbNode[] = []
 const knowledgeCreateSpy = vi.fn()
 let knowledgeCreateResult: unknown = null
 
+// Widget store mock state (for create-section). Seeded per test.
+let storedWidgets: Widget[] = []
+const widgetCreateSpy = vi.fn()
+const widgetUpdateSpy = vi.fn().mockResolvedValue(undefined)
+const widgetBumpSpy = vi.fn()
+
 // ── Store mocks ──────────────────────────────────────────────────────────────
 // vi.mock is hoisted before imports, but the factory captures the spies via
 // closure so re-assignments in beforeEach reach them.
@@ -82,7 +120,21 @@ vi.mock('../../src/renderer/src/stores/knowledge', () => ({
 // Stub the other stores that actionExecutor imports but the tested cases
 // don't use — avoids "module not found" on window.api calls inside them.
 vi.mock('../../src/renderer/src/stores/widgets', () => ({
-  useWidgetStore: { getState: () => ({ widgets: [], create: vi.fn(), update: vi.fn(), bringToFront: vi.fn(), setActive: vi.fn(), focusOn: vi.fn(), setFocused: vi.fn(), remove: vi.fn() }) }
+  useWidgetStore: {
+    getState: () => ({
+      get widgets() {
+        return storedWidgets
+      },
+      create: widgetCreateSpy,
+      update: widgetUpdateSpy,
+      bumpLayoutVersion: widgetBumpSpy,
+      bringToFront: vi.fn(),
+      setActive: vi.fn(),
+      focusOn: vi.fn(),
+      setFocused: vi.fn(),
+      remove: vi.fn()
+    })
+  }
 }))
 vi.mock('../../src/renderer/src/stores/focusSession', () => ({
   useFocusSessionStore: { getState: () => ({ start: vi.fn() }) }
@@ -102,15 +154,18 @@ vi.mock('../../src/renderer/src/lib/spawnPosition', () => ({
 
 // ── Subject under test ───────────────────────────────────────────────────────
 // Imported AFTER mocks so vi.mock hoisting replaces the real modules.
-import { applyProposal } from '../../src/renderer/src/lib/actionExecutor'
+import { applyProposal, isAutoApplyable } from '../../src/renderer/src/lib/actionExecutor'
 import type { ActionProposal } from '../../src/shared/types'
 
 // ── Test reset ───────────────────────────────────────────────────────────────
 beforeEach(() => {
   vi.clearAllMocks()
   storedNodes = [fakeNode()]
+  storedWidgets = []
   knowledgeCreateResult = null
   knowledgeCreateSpy.mockImplementation(() => Promise.resolve(knowledgeCreateResult))
+  widgetCreateSpy.mockImplementation((draft) => Promise.resolve({ ...fakeWidget({ id: 'sec-new' }), ...draft, id: 'sec-new' }))
+  widgetUpdateSpy.mockResolvedValue(undefined)
 })
 
 // ── update-task ──────────────────────────────────────────────────────────────
@@ -310,5 +365,89 @@ describe('applyProposal: create-knowledge-entry', () => {
     const result = await applyProposal(p, { activeTaskId: null })
     expect(result.ok).toBe(false)
     expect(result.message).toMatch(/could not save|plexibrain/i)
+  })
+})
+
+// ── create-section (Smart Stack, unified onto the approval card) ──────────────
+describe('applyProposal: create-section', () => {
+  it('creates a section and reparents the named widgets into it', async () => {
+    storedWidgets = [fakeWidget({ id: 'w1' }), fakeWidget({ id: 'w2' }), fakeWidget({ id: 'w3' })]
+    const p: ActionProposal = {
+      id: 'ss-0',
+      kind: 'create-section',
+      name: 'Research',
+      widgetIds: ['w1', 'w2']
+    }
+    const result = await applyProposal(p, { activeTaskId: 't1' })
+    expect(result.ok).toBe(true)
+    expect(result.message).toContain('Research')
+    // A section widget was created with the group's name.
+    expect(widgetCreateSpy).toHaveBeenCalledOnce()
+    expect(widgetCreateSpy.mock.calls[0][0]).toMatchObject({ kind: 'section', title: 'Research' })
+    // Each member (and only members) was reparented into the new section.
+    const reparent = widgetUpdateSpy.mock.calls.filter((c) => c[1]?.parentSectionId === 'sec-new')
+    expect(reparent.map((c) => c[0]).sort()).toEqual(['w1', 'w2'])
+  })
+
+  it('no-ops honestly when none of the named widgets exist', async () => {
+    storedWidgets = [fakeWidget({ id: 'w1' })]
+    const p: ActionProposal = { id: 'ss-1', kind: 'create-section', name: 'Ghosts', widgetIds: ['zzz'] }
+    const result = await applyProposal(p, { activeTaskId: 't1' })
+    expect(result.ok).toBe(false)
+    expect(widgetCreateSpy).not.toHaveBeenCalled()
+  })
+
+  it('requires an active desk', async () => {
+    const p: ActionProposal = { id: 'ss-2', kind: 'create-section', name: 'X', widgetIds: ['w1'] }
+    const result = await applyProposal(p, { activeTaskId: null })
+    expect(result.ok).toBe(false)
+  })
+
+  it('registers the new section id in resolvedIds (so later refs / Go-to resolve)', async () => {
+    storedWidgets = [fakeWidget({ id: 'w1' }), fakeWidget({ id: 'w2' })]
+    const resolvedIds = new Map<string, string>()
+    const p: ActionProposal = { id: 'ss-3', kind: 'create-section', name: 'Research', widgetIds: ['w1'] }
+    const result = await applyProposal(p, { activeTaskId: 't1', resolvedIds })
+    expect(result.ok).toBe(true)
+    expect(resolvedIds.get('ss-3')).toBe('sec-new') // was previously never set
+  })
+})
+
+describe('isAutoApplyable', () => {
+  const mk = (kind: ActionProposal['kind']): ActionProposal =>
+    ({ id: 'x', kind } as unknown as ActionProposal)
+  it('gates destructive / external / real-world-commitment kinds', () => {
+    for (const k of ['delete-widget', 'schedule-event', 'compose-mail', 'post-chat', 'start-focus-session'] as const) {
+      expect(isAutoApplyable(mk(k))).toBe(false)
+    }
+  })
+  it('allows workspace-internal, reversible kinds', () => {
+    for (const k of ['create-widget', 'create-task', 'create-page', 'create-section', 'create-table', 'add-table-row', 'update-widget', 'update-task', 'set-cell', 'edit-document', 'navigate-to'] as const) {
+      expect(isAutoApplyable(mk(k))).toBe(true)
+    }
+  })
+})
+
+describe('applyProposal: create-page', () => {
+  it('stashes the new widget id in resolvedIds so Go-to / undo can resolve it', async () => {
+    const resolvedIds = new Map<string, string>()
+    const p: ActionProposal = {
+      id: 'pg-0',
+      kind: 'create-page',
+      title: 'Notes',
+      content: '{}'
+    }
+    const result = await applyProposal(p, { activeTaskId: 't1', resolvedIds })
+    expect(result.ok).toBe(true)
+    expect(widgetCreateSpy.mock.calls[0][0]).toMatchObject({ kind: 'page', title: 'Notes' })
+    // The created widget id is registered under the proposal id.
+    expect(resolvedIds.get('pg-0')).toBe('sec-new')
+  })
+
+  it('requires an active desk', async () => {
+    const p: ActionProposal = { id: 'pg-1', kind: 'create-page', title: 'X', content: '{}' }
+    const result = await applyProposal(p, { activeTaskId: null })
+    expect(result.ok).toBe(false)
+    expect(widgetCreateSpy).not.toHaveBeenCalled()
   })
 })

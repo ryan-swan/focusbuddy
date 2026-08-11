@@ -105,6 +105,20 @@ export function saveColumnsConfig(taskId: string, cfg: DeskColumnsConfig): void 
   }
 }
 
+// Move the dragged freeform column so it sits just before the target column
+// (spec §3.3 "columns … reordered"). Pure: returns a new array, leaves the input
+// untouched, and no-ops on a self-drop or an unknown id.
+export function reorderColumns(columns: DeskColumn[], dragId: string, targetId: string): DeskColumn[] {
+  if (dragId === targetId) return columns
+  const from = columns.findIndex((c) => c.id === dragId)
+  if (from < 0 || !columns.some((c) => c.id === targetId)) return columns
+  const next = columns.slice()
+  const [moved] = next.splice(from, 1)
+  const insertAt = next.findIndex((c) => c.id === targetId)
+  next.splice(insertAt, 0, moved)
+  return next
+}
+
 // The width a widget wants to be shown at in a column. Uses the catalog's ideal
 // width for the kind (docs/sheets/slides/design/maps are wide; stickies,
 // calculators, colours are narrow), falling back to the widget's own width, then

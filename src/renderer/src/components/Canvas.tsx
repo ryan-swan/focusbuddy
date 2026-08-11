@@ -35,6 +35,7 @@ import ExtensionPrompt from './ExtensionPrompt'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
 import AiBuilderDialog from './AiBuilderDialog'
+import ViewSelector from './views/ViewSelector'
 import type { AiBuildSuggestion } from '@shared/types'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import AiAssistPreview from './contextMenu/AiAssistPreview'
@@ -50,6 +51,7 @@ import AutomationsFAB from './AutomationsFAB'
 import DeskSuggestionChip from './DeskSuggestionChip'
 import DeskGallery from './DeskGallery'
 import ColumnsView from './ColumnsView'
+import DeskDataViews, { type DataLayout } from './views/DeskDataViews'
 import { useDeskViewStore } from '../stores/deskView'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
 import MindMapWidget from './widgets/MindMapWidget'
@@ -78,9 +80,14 @@ import {
   DRAG_MIME,
   WIDGET_CATALOG,
   catalogFor,
+  entriesByCategory,
+  isAdvancedKind,
   type WidgetCatalogEntry,
   type WidgetCategory
 } from '../lib/widgetCatalog'
+import { canCreateWidget } from '../lib/gating'
+import { useCapabilityStore } from '../stores/capabilities'
+import { promptUpgrade } from '../stores/upgradePrompt'
 import { useActionHistory } from '../stores/actionHistory'
 import { computeAlign, computeDistribute, type AlignMode, type DistributeAxis } from '../lib/canvasAlign'
 import {
@@ -258,10 +265,25 @@ const STATUS_META: Record<
 
 export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  // Capability gating for the right-click "Add object" menu, so it matches the
+  // widget palette (core widgets first, an Advanced group, and Pro-gated kinds
+  // prompt to upgrade rather than silently creating).
+  const caps = useCapabilityStore((s) => s.capabilities)
   // Per-desk view mode: the infinite Canvas (default) or the Columns view.
   const deskViewModes = useDeskViewStore((s) => s.modes)
-  const deskViewMode = activeTaskId ? deskViewModes[activeTaskId] ?? 'canvas' : 'canvas'
-  const setDeskViewMode = useDeskViewStore((s) => s.set)
+  const deskViewDefaults = useDeskViewStore((s) => s.defaults)
+  // Resolution mirrors the store's get(): last-used wins, else the pinned default
+  // for this desk, else Canvas.
+  const deskViewMode = activeTaskId
+    ? deskViewModes[activeTaskId] ?? deskViewDefaults[activeTaskId] ?? 'canvas'
+    : 'canvas'
+  // The spatial canvas renders only in 'canvas' mode; every other mode (columns +
+  // the data views) mounts as its own overlay instead.
+  const isCanvasMode = deskViewMode === 'canvas'
+  const dataLayout: DataLayout | null =
+    deskViewMode === 'list' || deskViewMode === 'table' || deskViewMode === 'gallery' || deskViewMode === 'compact'
+      ? deskViewMode
+      : null
   const nodes = useNodeStore((s) => s.nodes)
   const updateNode = useNodeStore((s) => s.update)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
@@ -578,9 +600,9 @@ export default function Canvas(): JSX.Element {
   // the marquee hit-test pattern), so a pan that reveals nothing new never forces a
   // re-render. Hysteresis + the animation freeze come from the pure module.
   useEffect(() => {
-    if (deskViewMode === 'columns' || viewportSize.w === 0 || viewportSize.h === 0) {
-      // Columns view mounts through its own overlay, and before the first measure
-      // we have no viewport to test against — render everything in both cases.
+    if (!isCanvasMode || viewportSize.w === 0 || viewportSize.h === 0) {
+      // Non-canvas views mount through their own overlays, and before the first
+      // measure we have no viewport to test against — render everything in both.
       if (visibleIdsRef.current !== null || visibleKeyRef.current !== '') {
         visibleIdsRef.current = null
         visibleKeyRef.current = ''
@@ -1621,21 +1643,42 @@ export default function Canvas(): JSX.Element {
     if (!ctxMenu || !activeTaskId) return []
     const cx = ctxMenu.canvasX
     const cy = ctxMenu.canvasY
+    // Consolidated to match the widget palette: core widgets grouped by category,
+    // then a single "Advanced" group for the powerful-but-intimidating kinds
+    // (agents, webhooks, diagram, mindmap, …), instead of the old flat everything-
+    // per-category list. Each item is capability-gated the same way the palette is:
+    // a Pro-locked kind prompts to upgrade rather than silently creating.
+    const grouped = entriesByCategory()
+    const addObject = (entry: WidgetCatalogEntry): void => {
+      if (!canCreateWidget(caps, entry.kind)) {
+        promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
+        return
+      }
+      void placeWidgetAtCanvas(entry, cx, cy)
+    }
+    const toItem = (entry: WidgetCatalogEntry): CtxMenuItem => ({
+      label: entry.label,
+      icon: entry.icon,
+      onClick: () => addObject(entry)
+    })
+    const coreGroups: CtxMenuItem[] = CATEGORIES.map((cat) => ({
+      label: cat,
+      icon: CATEGORY_ICON[cat],
+      children: grouped[cat].filter((e) => !isAdvancedKind(e.kind)).map(toItem)
+    })).filter((group) => (group.children?.length ?? 0) > 0)
+    // Advanced kinds across every category, kept individually selectable (diagram +
+    // mindmap must stay distinct from the base Map, per the catalog rationale).
+    const advancedEntries = CATEGORIES.flatMap((cat) =>
+      grouped[cat].filter((e) => isAdvancedKind(e.kind))
+    )
+    const advancedGroup: CtxMenuItem[] =
+      advancedEntries.length > 0
+        ? [{ label: 'Advanced', icon: 'tune', children: advancedEntries.map(toItem) }]
+        : []
     const addWidget: CtxMenuItem = {
       label: 'Add object',
       icon: 'add',
-      children: CATEGORIES.map((cat) => {
-        const entries = WIDGET_CATALOG.filter((e) => e.category === cat && !e.hideFromPicker)
-        return {
-          label: cat,
-          icon: CATEGORY_ICON[cat],
-          children: entries.map((entry) => ({
-            label: entry.label,
-            icon: entry.icon,
-            onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
-          }))
-        }
-      }).filter((group) => group.children.length > 0)
+      children: [...coreGroups, ...advancedGroup]
     }
     const arrange: CtxMenuItem = {
       label: 'Auto-arrange',
@@ -1942,6 +1985,12 @@ export default function Canvas(): JSX.Element {
     let cursorX = PADDING
     let cursorY = existing.length > 0 ? startBelow + 40 : PADDING
     let rowMaxH = 0
+    // Undo parity: wrap the AI-spawned build in one action-history batch so it
+    // reverses with a single Cmd+Z, like a ProposalCards "Apply all" (createWidget
+    // records into the active batch). Was previously un-undoable.
+    const hist = useActionHistory.getState()
+    hist.beginBatch()
+    try {
     for (const s of suggestions) {
       const entry = catalogFor(s.kind)
       const w = entry?.defaultWidth ?? 300
@@ -2011,6 +2060,9 @@ export default function Canvas(): JSX.Element {
       cursorX += w + GAP
       rowMaxH = Math.max(rowMaxH, h)
     }
+    } finally {
+      hist.endBatch(`Add ${suggestions.length} object${suggestions.length === 1 ? '' : 's'} from Build with AI`)
+    }
     chimeIn()
     bumpLayoutVersion()
     setTimeout(() => centerOnHome(), 100)
@@ -2036,6 +2088,12 @@ export default function Canvas(): JSX.Element {
     let cursorX = PADDING
     let cursorY = existing.length > 0 ? startBelow + 40 : PADDING
     let rowMaxH = 0
+    // Undo parity: wrap the AI-spawned build in one action-history batch so it
+    // reverses with a single Cmd+Z, like a ProposalCards "Apply all" (createWidget
+    // records into the active batch). Was previously un-undoable.
+    const hist = useActionHistory.getState()
+    hist.beginBatch()
+    try {
     for (const s of suggestions) {
       const entry = catalogFor(s.kind)
       const w = entry?.defaultWidth ?? 300
@@ -2058,6 +2116,9 @@ export default function Canvas(): JSX.Element {
       })
       cursorX += w + GAP
       rowMaxH = Math.max(rowMaxH, h)
+    }
+    } finally {
+      hist.endBatch(`Add ${suggestions.length} object${suggestions.length === 1 ? '' : 's'} from AI Setup`)
     }
     chimeIn()
     bumpLayoutVersion()
@@ -2277,16 +2338,10 @@ export default function Canvas(): JSX.Element {
               onAssignToRoom={(deskId, roomId) => void assignToRoom(deskId, roomId)}
               onCreateRoomFromDesk={(deskId) => void createRoomAndAssign(deskId)}
             />
-            {activeTaskId && deskViewMode !== 'columns' && (
-              <button
-                onClick={() => setDeskViewMode(activeTaskId, 'columns')}
-                data-testid="desk-view-columns"
-                title="Columns view — stack your objects into scrollable columns"
-                className="fb-glass-chrome inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shadow-[0_2px_10px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.06] dark:ring-white/[0.06]"
-              >
-                <Icon name="view_column" size={14} /> Columns
-              </button>
-            )}
+            {/* The breadcrumb selector shows only in canvas mode; every overlay
+                view (columns + data views) carries its own in-view selector, so
+                exactly one is present at a time (no duplicate testid). */}
+            {activeTaskId && isCanvasMode && <ViewSelector taskId={activeTaskId} />}
           </div>
           {/* Context Health (plexi-4.0): floats just under the breadcrumb, showing
               what changed since last visit and related desks needing attention.
@@ -2456,7 +2511,7 @@ export default function Canvas(): JSX.Element {
             {/* Sections first (render behind non-section widgets). Sections render their own children.
                 Skipped entirely in Columns view so canvas widgets (and their webviews) don't mount
                 under the overlay. */}
-            {deskViewMode !== 'columns' && widgets.map((w) => {
+            {isCanvasMode && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind !== 'section') return null
               // PLX-APP-012: skip sections fully outside the viewport (a section is
@@ -2466,7 +2521,7 @@ export default function Canvas(): JSX.Element {
                 <div key={w.id}>{renderWidget(w)}</div>
               )
             })}
-            {deskViewMode !== 'columns' && widgets.map((w) => {
+            {isCanvasMode && widgets.map((w) => {
               if (w.archived) return null
               if (w.pinned || w.kind === 'section') return null
               if (w.parentSectionId !== null) return null // owned by a section, rendered inside it
@@ -2488,6 +2543,9 @@ export default function Canvas(): JSX.Element {
             <div className="absolute inset-0 z-[60]">
               <ColumnsView taskId={activeTaskId} widgets={widgets} />
             </div>
+          )}
+          {dataLayout && activeTaskId && (
+            <DeskDataViews taskId={activeTaskId} widgets={widgets} layout={dataLayout} />
           )}
           {/* Spatial-link overlay renders in screen-space, OUTSIDE the
               transformed container. It reads each linked widget's actual

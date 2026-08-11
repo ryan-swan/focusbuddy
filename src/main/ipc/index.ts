@@ -25,13 +25,21 @@ import { searchGifs } from '../gifSearch'
 import {
   collectPending,
   collectPendingOrg,
+  collectPendingShared,
   markPushed,
   applyRemote,
   applyRemoteOrg,
+  applyRemoteShared,
+  stampSharedDesk,
+  adoptSharedDesk,
+  pruneSharedDesk,
   getSyncCursor,
   setSyncCursor,
   getSyncCursorOrg,
   setSyncCursorOrg,
+  getSyncCursorShared,
+  setSyncCursorShared,
+  listLocalSharedRoots,
   type RemoteItem
 } from '../db/workspaceSync'
 import { invalidateAnthropicClient } from '../ai/anthropic'
@@ -88,7 +96,8 @@ import {
   getNode,
   listNodes,
   moveNode,
-  updateNode
+  updateNode,
+  ensureSharedContainer
 } from '../db/nodes'
 import { relateNodes, unrelateNodes, listRelatedNodeIds } from '../db/nodeRelations'
 import {
@@ -319,6 +328,14 @@ import {
   reindexDocuments,
   documentSemanticActive
 } from '../documentRetrieval'
+import { enrichDocument, enrichAllDocuments } from '../ai/enrichDocuments'
+import { localModelStatus } from '../ai/localModel'
+import { getDocMetadata } from '../db/docMetadata'
+import { listMemories, addMemory, forgetMemory } from '../db/memory'
+import { extractMemoryFromDocuments } from '../ai/extractMemory'
+import { embedQuery } from '../ai/embeddings'
+import { lookupAnswer, storeAnswer, bumpAnswerCacheVersion } from '../ai/answerCache'
+import type { MemoryKind } from '@shared/types'
 import {
   getProjectPlan,
   setTaskPlan,
@@ -471,7 +488,9 @@ import {
   suggestSheetColumns,
   suggestFormula,
   fillSheetRange,
-  generateSlideElements
+  generateSlideElements,
+  runAgentStep,
+  verifyAgentGoal
 } from '../ai/anthropic'
 import { importDocx, exportDocx, exportPdf, pickImage, type PageSetupInput } from '../officeDocx'
 import { importSheet, exportSheet } from '../sheetIo'
@@ -479,6 +498,10 @@ import { runSheetMacro } from '../sheetMacro'
 import { exportSlides, importPptx } from '../slidesIo'
 import { getModelMode, setModelMode } from '../ai/modelRouting'
 import { describeWidgetForAgent } from '../ai/agentInputs'
+// Static import (not a lazy require): electron-vite only bundles the static import
+// graph, so a runtime require('../assistant/standupRun') throws MODULE_NOT_FOUND in
+// the built app.
+import { runStandup } from '../assistant/standupRun'
 import type {
   ActivityRecordDraft,
   ChatRequest,
@@ -1192,6 +1215,41 @@ export function registerIpcHandlers(): void {
     recordAiCall()
     return sendChat(req)
   })
+  // One step of the autonomous agent loop. Stateless: the renderer drives the
+  // rounds (applies actions, builds observations, calls again). Each round is a
+  // real model call, so it counts as an AI call.
+  ipcMain.handle(
+    'agent:step',
+    (
+      _e,
+      input: {
+        goal: string
+        taskId: string | null
+        systemPrompt?: string
+        messages: Array<{ role: 'user' | 'assistant'; content: string }>
+        priorFailedCount?: number
+        context?: string
+      }
+    ) => {
+      recordAiCall()
+      return runAgentStep(input)
+    }
+  )
+  // Self-verification of a completed run: judge whether the goal was met given
+  // only what was applied. One model call, so it counts as an AI call.
+  ipcMain.handle('agent:verify', (_e, input: { goal: string; applied: string }) => {
+    recordAiCall()
+    return verifyAgentGoal(input)
+  })
+  // Self-building memory: list / remember (manual) / forget, plus a local-model
+  // backfill over documents. Extraction is local (no cloud call), so it does not
+  // count as an AI call.
+  ipcMain.handle('memory:list', () => listMemories())
+  ipcMain.handle('memory:remember', (_e, input: { kind: MemoryKind; text: string; subject?: string; due?: string }) =>
+    addMemory({ ...input, source: 'user', confidence: 1 })
+  )
+  ipcMain.handle('memory:forget', (_e, id: string) => forgetMemory(id))
+  ipcMain.handle('memory:extractDocuments', () => extractMemoryFromDocuments())
   // Streaming variant — retrieval, reply and each prepared action arrive on a
   // per-request channel `chat:stream:<reqId>` so the assistant can show the work
   // as it happens. Caller mints the reqId. `chat:send` above is untouched and
@@ -1229,6 +1287,16 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('chat:hasApiKey', () => Boolean(resolveAnthropicKey()))
   ipcMain.handle('ai:dailyBrief', () => generateDailyBrief())
+  // Daily standup: the assistant catch-up duo (Work-Completed look-back woven with
+  // the brief look-forward) into one narrative. The caller passes the synced-per-user
+  // cursor and persists the returned toCursor. Read-only + honest-degrading.
+  ipcMain.handle(
+    'assistant:standup',
+    async (_e, input: { sinceCursor: number; scope: 'personal' | 'team'; organisationId?: string | null }) => {
+      recordAiCall()
+      return runStandup(input)
+    }
+  )
   // Save a meeting to the OS default calendar (Apple Calendar / Outlook) by
   // writing a standards .ics and opening it — the universal "add to calendar".
   // Google users use the web URL the renderer builds separately.
@@ -1812,20 +1880,44 @@ export function registerIpcHandlers(): void {
       // still pulls the documents the conversation is actually about.
       const query = [...hist.map((h) => h.question), question].join(' ')
       const sources = await retrieveSources(query, 6)
+      const buildSourceMeta = (citedIds: Set<string>): Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }> =>
+        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, snippet: s.snippet, cited: citedIds.has(s.docId) }))
+      // Semantic answer cache: a near-identical question, with the workspace
+      // unchanged since (version-stamped, so any doc edit invalidates it), reuses
+      // the prior answer for free — no model call. Embedding is LOCAL/free.
+      const qvec = await embedQuery(query)
+      if (qvec) {
+        const hit = lookupAnswer(qvec, Date.now())
+        if (hit) {
+          return {
+            ok: true,
+            answer: hit.answer,
+            citedDocIds: hit.citedDocIds,
+            cached: true,
+            sources: buildSourceMeta(new Set(hit.citedDocIds)),
+            proposals: [] as ActionProposal[]
+          }
+        }
+      }
       if (sources.length) recordAiCall()
       const res = await askWorkspace(
         question,
-        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
+        sources.map((s) => ({
+          docId: s.docId,
+          title: s.title,
+          docType: s.docType,
+          text: s.text,
+          summary: s.summary,
+          category: s.category,
+          dates: s.dates,
+          entities: s.entities
+        })),
         hist
       )
+      // Cache a successful answer for the current workspace version.
+      if (res.ok && res.answer && qvec) storeAnswer(qvec, res.answer, res.citedDocIds ?? [], Date.now())
       const cited = new Set(res.citedDocIds ?? [])
-      const sourceMeta = sources.map((s) => ({
-        docId: s.docId,
-        title: s.title,
-        docType: s.docType,
-        snippet: s.snippet,
-        cited: cited.has(s.docId)
-      }))
+      const sourceMeta = buildSourceMeta(cited)
       // "Offer to create anything": once the answer is in, let the brain propose
       // concrete things it could build from it. Approval happens in the renderer;
       // a failure here never blocks the answer.
@@ -1864,7 +1956,16 @@ export function registerIpcHandlers(): void {
       const channel = `workspace:askStream:${requestId}`
       const res = await askWorkspaceStream(
         question,
-        sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, text: s.text })),
+        sources.map((s) => ({
+          docId: s.docId,
+          title: s.title,
+          docType: s.docType,
+          text: s.text,
+          summary: s.summary,
+          category: s.category,
+          dates: s.dates,
+          entities: s.entities
+        })),
         hist,
         (delta) => e.sender.send(channel, { type: 'delta', payload: delta })
       )
@@ -2515,7 +2616,10 @@ export function registerIpcHandlers(): void {
   // "Delete" from the editors and the Documents list is a soft-delete into the
   // Documents Trash — the menu item says "Move to trash" and now means it.
   // Permanent removal is only the Trash view's explicit "Delete forever".
-  ipcMain.handle('documents:delete', (_e, id: string) => trashDocument(id))
+  ipcMain.handle('documents:delete', (_e, id: string) => {
+    bumpAnswerCacheVersion() // the doc set changed — invalidate cached answers
+    return trashDocument(id)
+  })
   ipcMain.handle('documents:listTrashed', () => listTrashedDocuments())
   ipcMain.handle('documents:restore', (_e, id: string) => {
     const ok = restoreDocument(id)
@@ -2524,6 +2628,7 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('documents:purge', (_e, id: string) => {
     deleteEmbedding('document', id)
+    bumpAnswerCacheVersion() // the doc set changed — invalidate cached answers
     return deleteDocument(id)
   })
   // Version history.
@@ -2543,6 +2648,20 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('docComments:resolve', (_e, id: string, resolved: boolean) => resolveDocComment(id, resolved))
   ipcMain.handle('documents:reindex', () => reindexDocuments())
   ipcMain.handle('documents:semanticActive', () => documentSemanticActive())
+  // Local-model document enrichment (Ollama). Status lets the UI show honestly
+  // whether local AI is available; enrichAll distils every document into metadata
+  // and then reindexes so the enriched summary/keywords feed the vectors too.
+  ipcMain.handle('ai:localModelStatus', () => localModelStatus())
+  ipcMain.handle('documents:metadata', (_e, docId: string) => getDocMetadata(docId))
+  ipcMain.handle('documents:enrich', (_e, docId: string) => enrichDocument(docId))
+  ipcMain.handle('documents:enrichAll', async (_e, force?: boolean) => {
+    const res = await enrichAllDocuments(force === true)
+    // Refresh vectors so the freshly-enriched metadata lands in the embeddings
+    // that retrieval ranks on. Best-effort: a missing embedder just leaves the
+    // metadata for the grounding header, which still helps.
+    if (res.enriched > 0) await reindexDocuments(true).catch(() => ({ embedded: 0 }))
+    return res
+  })
 
   // Persisted AI-assistant chat history (local, free-standing conversations) —
   // backs the Focus-Mode chat surface.
@@ -2853,6 +2972,26 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:setCursorOrg', (_e, orgId: string, n: number) =>
     setSyncCursorOrg(String(orgId || ''), typeof n === 'number' ? n : 0)
   )
+
+  // Per-desk shared sync (desks shared with named individuals via ACL). Separate
+  // handlers again so the shared scope is never confused with personal/org. The
+  // apply path resolves the local "Shared with me" container itself, so a
+  // materialized desk always anchors correctly regardless of the active org.
+  ipcMain.handle('workspace:pendingShared', () => collectPendingShared())
+  ipcMain.handle('workspace:applyRemoteShared', (_e, items: RemoteItem[], ownerHandles?: Record<string, string>) =>
+    applyRemoteShared(Array.isArray(items) ? items : [], {
+      sharedContainerId: ensureSharedContainer(),
+      ownerHandles: ownerHandles && typeof ownerHandles === 'object' ? ownerHandles : undefined
+    })
+  )
+  ipcMain.handle('workspace:getCursorShared', () => getSyncCursorShared())
+  ipcMain.handle('workspace:setCursorShared', (_e, n: number) =>
+    setSyncCursorShared(typeof n === 'number' ? n : 0)
+  )
+  ipcMain.handle('workspace:stampSharedDesk', (_e, rootId: string) => stampSharedDesk(String(rootId || '')))
+  ipcMain.handle('workspace:adoptSharedDesk', (_e, rootId: string) => adoptSharedDesk(String(rootId || '')))
+  ipcMain.handle('workspace:pruneSharedDesk', (_e, rootId: string) => pruneSharedDesk(String(rootId || '')))
+  ipcMain.handle('workspace:localSharedRoots', () => listLocalSharedRoots())
 
   // Cross-member Drive file bytes. A file's metadata syncs over the org loop
   // above; these move the actual bytes. The renderer reads a local file's bytes to

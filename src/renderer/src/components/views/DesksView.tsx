@@ -7,6 +7,7 @@ import { useDeskWidgets, realWidgetCount } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import DeskMiniature from '../DeskMiniature'
 import Icon from '../Icon'
+import SharedBadge from '../SharedBadge'
 import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
 import ShareDialog from '../ShareDialog'
@@ -112,6 +113,15 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     items: desks,
     idOf: (d) => d.id,
     titleOf: (d) => d.title || 'Untitled desk',
+    // Mark a desk shared with you by name, so it's obviously not one of your own and
+    // you can see who shared it. Only live-shared desks (sharedRootId set) get this.
+    badge: (d) =>
+      d.sharedRootId ? (
+        <SharedBadge
+          handle={d.sharedFromHandle ?? '?'}
+          label={d.sharedFromHandle ? `Shared by ${d.sharedFromHandle}` : 'Shared with you'}
+        />
+      ) : null,
     searchText: (d) => `${d.title} ${d.description}`,
     thumb: (d) => (
       <div className="h-full w-full flex items-center justify-center">{deskThumb(d, 320, 144)}</div>

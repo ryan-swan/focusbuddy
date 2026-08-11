@@ -117,9 +117,10 @@ test('Columns view: all 8 group-by modes render, status board drags+persists, fr
   await expect(window.locator('text=Something went wrong')).toHaveCount(0)
 
   // Enter the Columns view.
-  const toggle = window.locator('[data-testid="desk-view-columns"]')
+  const toggle = window.locator('[data-testid="view-selector-btn"]')
   await expect(toggle).toBeVisible({ timeout: 10_000 })
   await toggle.click()
+  await window.locator('[data-testid="view-opt-columns"]').click()
   const columnsView = window.locator('[data-testid="columns-view"]')
   await expect(columnsView).toBeVisible()
   await expect(window.locator('text=Something went wrong')).toHaveCount(0)
@@ -191,7 +192,8 @@ test('Columns view: all 8 group-by modes render, status board drags+persists, fr
   await window.locator('[data-testid="columns-to-canvas"]').click()
   await window.waitForTimeout(200)
   await goToDesk(window, taskId)
-  await window.locator('[data-testid="desk-view-columns"]').click()
+  await window.locator('[data-testid="view-selector-btn"]').click()
+  await window.locator('[data-testid="view-opt-columns"]').click()
   await window.waitForTimeout(200)
   await window.locator('[data-testid="columns-groupby-status"]').click()
   await window.waitForTimeout(300)

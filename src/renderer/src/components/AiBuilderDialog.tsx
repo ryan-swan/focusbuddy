@@ -304,35 +304,35 @@ function SuggestionCard({
   onToggle: () => void
 }): JSX.Element {
   const catalog = catalogFor(suggestion.kind)
+  // Same visual language as the shared ProposalCards (rounded-md, edge-soft
+  // border on a raised surface, accent-tinted icon chip, 10/12/10 verb-subject-
+  // reason type scale). The checkbox + rich per-kind preview stay — they are
+  // this dialog's multi-select-and-preview job, which the standard card doesn't do.
   return (
     <button
       onClick={onToggle}
-      className={`w-full text-left p-3 rounded-lg border transition-all ${
+      className={`w-full text-left rounded-md border px-2.5 py-1.5 transition-colors ${
         selected
           ? 'border-accent bg-accent/5 ring-1 ring-accent/30'
-          : 'border-[var(--edge-soft)] hover:border-accent/40 hover:bg-[var(--surface-sunken)]'
+          : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5'
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         <span
-          className={`h-8 w-8 rounded-md inline-flex items-center justify-center shrink-0 ${
-            selected
-              ? 'bg-accent text-white'
-              : 'bg-[var(--surface-sunken)] text-[var(--ink-70)]'
+          className={`h-6 w-6 rounded-md inline-flex items-center justify-center shrink-0 ${
+            selected ? 'bg-accent text-white' : 'bg-accent/10 text-accent'
           }`}
         >
-          <Icon name={catalog?.icon ?? 'widgets'} size={16} />
+          <Icon name={catalog?.icon ?? 'widgets'} size={13} />
         </span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
-              {catalog?.label ?? suggestion.kind}
-            </span>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
+            {catalog?.label ?? suggestion.kind}
           </div>
-          <div className="text-[13px] font-medium text-[var(--ink-100)] mt-0.5">
+          <div className="text-[12px] font-medium text-[var(--ink-100)] truncate mt-0.5">
             {suggestion.title}
           </div>
-          <div className="text-[11px] text-[var(--ink-50)] mt-0.5 leading-snug">
+          <div className="text-[10px] text-[var(--ink-50)] mt-0.5 leading-snug">
             {suggestion.reason}
           </div>
           <SuggestionPreview suggestion={suggestion} />

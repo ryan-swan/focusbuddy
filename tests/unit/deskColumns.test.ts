@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Widget, WidgetLink } from '../../src/shared/types'
-import { buildColumns, STATUS_COLUMNS, statusColumnId } from '../../src/renderer/src/lib/deskColumns'
+import { buildColumns, STATUS_COLUMNS, statusColumnId, reorderColumns } from '../../src/renderer/src/lib/deskColumns'
 
 // buildColumns is a pure function over (widgets, config, ctx); these lock the new
 // grouping modes added for the Columns view (status board, connections, sections,
@@ -120,5 +120,25 @@ describe('buildColumns topic', () => {
     expect(pricing.items.map((i) => i.id).sort()).toEqual(['a', 'b'])
     expect(cols[cols.length - 1].title).toBe('Uncategorised')
     expect(cols[cols.length - 1].items.map((i) => i.id)).toEqual(['c'])
+  })
+})
+
+describe('reorderColumns', () => {
+  const cols = [
+    { id: 'a', title: 'A' },
+    { id: 'b', title: 'B' },
+    { id: 'c', title: 'C' }
+  ]
+  it('moves a column to sit just before the target (drag right)', () => {
+    expect(reorderColumns(cols, 'a', 'c').map((c) => c.id)).toEqual(['b', 'a', 'c'])
+  })
+  it('moves a column before the target (drag left)', () => {
+    expect(reorderColumns(cols, 'c', 'a').map((c) => c.id)).toEqual(['c', 'a', 'b'])
+  })
+  it('no-ops on a self-drop or an unknown id, and never mutates the input', () => {
+    expect(reorderColumns(cols, 'a', 'a')).toBe(cols)
+    expect(reorderColumns(cols, 'zzz', 'a')).toBe(cols)
+    expect(reorderColumns(cols, 'a', 'zzz')).toBe(cols)
+    expect(cols.map((c) => c.id)).toEqual(['a', 'b', 'c'])
   })
 })

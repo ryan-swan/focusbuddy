@@ -512,6 +512,25 @@ const api = {
     // process prompt builder can offer real conversation ids to post-chat.
     setConversationSnapshot: (convs: Array<{ id: string; label: string }>): Promise<boolean> =>
       ipcRenderer.invoke('ai:setConversationSnapshot', convs),
+    // Daily standup: Work-Completed (look-back) woven with the brief (look-forward)
+    // into one narrative. Pass the synced-per-user cursor; persist the returned
+    // toCursor. Honest degradation (falls back to a deterministic narrative, no key).
+    standup: (input: {
+      sinceCursor: number
+      scope: 'personal' | 'team'
+      organisationId?: string | null
+    }): Promise<{
+      ok: boolean
+      narrative: string
+      aiUsed: boolean
+      needsApiKey?: boolean
+      hasContent: boolean
+      completed: Array<{ objectId: string | null; title: string | null; at: string; kind: 'node' | 'document' | null }>
+      nextUp: Array<{ id: string; title: string; kind: 'node' | 'document' }>
+      counts: { completed: number; created: number; updated: number; deleted: number }
+      fromCursor: number
+      toCursor: number
+    }> => ipcRenderer.invoke('assistant:standup', input),
     // Label each desk object with a short topic so the Columns view can lay them
     // out as topical columns. Honest degradation (needsApiKey) when no AI is set.
     groupByTopic: (
@@ -1609,6 +1628,24 @@ const api = {
     getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
     setCursorOrg: (orgId: string, n: number): Promise<void> =>
       ipcRenderer.invoke('workspace:setCursorOrg', orgId, n),
+    // Per-desk shared sync (desks shared with named individuals). One cursor across
+    // all such desks; each pending item carries the desk root id it belongs to.
+    pendingShared: (): Promise<{
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number; rootId?: string | null }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number; rootId?: string | null }>
+    }> => ipcRenderer.invoke('workspace:pendingShared'),
+    applyRemoteShared: (
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean; rootId?: string | null }>,
+      ownerHandles?: Record<string, string>
+    ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteShared', items, ownerHandles),
+    getCursorShared: (): Promise<number> => ipcRenderer.invoke('workspace:getCursorShared'),
+    setCursorShared: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursorShared', n),
+    // Stamp a desk subtree for shared sync (owner side, at share time) / prune a
+    // desk this account no longer has access to (recipient side, after a revoke).
+    stampSharedDesk: (rootId: string): Promise<string[]> => ipcRenderer.invoke('workspace:stampSharedDesk', rootId),
+    adoptSharedDesk: (rootId: string): Promise<boolean> => ipcRenderer.invoke('workspace:adoptSharedDesk', rootId),
+    pruneSharedDesk: (rootId: string): Promise<number> => ipcRenderer.invoke('workspace:pruneSharedDesk', rootId),
+    localSharedRoots: (): Promise<string[]> => ipcRenderer.invoke('workspace:localSharedRoots'),
     // Cross-member Drive file bytes. Metadata rides the loops above; these move the
     // bytes: read a local file to upload, check whether a pulled file's bytes are
     // already here, and write downloaded bytes to disk.
@@ -1732,7 +1769,69 @@ const api = {
     // with no embedding key it is a silent no-op and grounding stays keyword-based.
     reindex: (): Promise<{ embedded: number; reason?: string }> =>
       ipcRenderer.invoke('documents:reindex'),
-    semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive')
+    semanticActive: (): Promise<boolean> => ipcRenderer.invoke('documents:semanticActive'),
+    // Local-model (Ollama) enrichment: distil every document into metadata that
+    // feeds the AI's retrieval + grounding. Honest when no local model is present.
+    enrich: (docId: string): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke('documents:enrich', docId),
+    enrichAll: (
+      force?: boolean
+    ): Promise<{ enriched: number; skipped: number; failed: number; reason?: string }> =>
+      ipcRenderer.invoke('documents:enrichAll', force),
+    metadata: (
+      docId: string
+    ): Promise<{
+      docId: string
+      summary: string
+      category: string
+      entities: string[]
+      dates: string[]
+      keywords: string[]
+      language: string
+      wordCount: number
+      model: string
+      enrichedAt: number
+    } | null> => ipcRenderer.invoke('documents:metadata', docId)
+  },
+  localAi: {
+    status: (): Promise<{
+      available: boolean
+      baseUrl: string
+      chatModel: string | null
+      embedModel: string | null
+    }> => ipcRenderer.invoke('ai:localModelStatus')
+  },
+  agent: {
+    // One round of the autonomous agent loop, driven by lib/agentRunner. The
+    // renderer applies the returned actions, builds observations, and calls again.
+    step: (input: {
+      goal: string
+      taskId: string | null
+      systemPrompt?: string
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>
+      priorFailedCount?: number
+      context?: string
+    }): Promise<import('@shared/types').AgentStepResult> => ipcRenderer.invoke('agent:step', input),
+    // Self-verification once a run claims done: {met, score, gaps}. The driver
+    // re-enters the loop with the gaps when the goal isn't fully met.
+    verify: (input: {
+      goal: string
+      applied: string
+    }): Promise<{ met: boolean; score: number; gaps: string[] }> => ipcRenderer.invoke('agent:verify', input)
+  },
+  // Self-building memory: what the assistant durably knows about the user + their
+  // work. list / remember (manual) / forget, plus a local-model backfill.
+  memory: {
+    list: (): Promise<import('@shared/types').MemoryItem[]> => ipcRenderer.invoke('memory:list'),
+    remember: (input: {
+      kind: import('@shared/types').MemoryKind
+      text: string
+      subject?: string
+      due?: string
+    }): Promise<import('@shared/types').MemoryItem | null> => ipcRenderer.invoke('memory:remember', input),
+    forget: (id: string): Promise<boolean> => ipcRenderer.invoke('memory:forget', id),
+    extractDocuments: (): Promise<{ scanned: number; added: number; reason?: string }> =>
+      ipcRenderer.invoke('memory:extractDocuments')
   },
   // People the app has fetched, published to the main process so an @-mention
   // can resolve one. Coverage is honestly partial: whatever the renderer has

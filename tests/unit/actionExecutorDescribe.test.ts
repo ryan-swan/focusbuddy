@@ -77,3 +77,17 @@ describe('describeProposal: AI-acts-across-suite ops', () => {
     }
   })
 })
+
+describe('describeProposal: create-section (Smart Stack on the standard card)', () => {
+  it('reads as a section create with the group name + widget count', () => {
+    const d = describeProposal({
+      id: 's1',
+      kind: 'create-section',
+      name: 'Research',
+      widgetIds: ['a', 'b', 'c']
+    })
+    expect(d.verb).toBe('Create section')
+    expect(d.subject).toContain('Research')
+    expect(d.subject).toContain('3 widgets')
+  })
+})

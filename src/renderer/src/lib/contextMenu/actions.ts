@@ -11,6 +11,9 @@ import { recordActionWithToast } from '../../stores/actionHistory'
 import { useAiAssistPreview } from '../../stores/aiAssistPreview'
 import { catalogFor } from '../widgetCatalog'
 import { createConnectedTool, createAgentFromSources } from '../createConnectedTool'
+import { canCreateWidget } from '../gating'
+import { useCapabilityStore } from '../../stores/capabilities'
+import { promptUpgrade } from '../../stores/upgradePrompt'
 import type { MenuContext } from './types'
 
 // The text a context can offer for seeding or AI work: the selection if there
@@ -47,6 +50,14 @@ export function hasWorkableText(ctx: MenuContext): boolean {
 // seeded; from empty canvas it drops at the click point.
 export async function createWidget(ctx: MenuContext, kind: WidgetKind, seedText?: string): Promise<void> {
   const entry = catalogFor(kind)
+  // Capability gate, same as the widget palette: a Pro-locked kind prompts to
+  // upgrade instead of silently creating. Applies to the whole create + connect
+  // menu (curated and Advanced alike), closing the gap where right-click could
+  // spawn a gated kind ungated.
+  if (!canCreateWidget(useCapabilityStore.getState().capabilities, kind)) {
+    promptUpgrade(`The ${entry?.label ?? 'this'} widget is a Pro feature.`)
+    return
+  }
   const src = sourceWidget(ctx)
   if (src) {
     await createConnectedTool({
