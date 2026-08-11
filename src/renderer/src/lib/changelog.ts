@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.9.9',
+    date: '2026-08-11T00:00:00Z',
+    title: 'PlexiDesk 3.9.9 — share a desk with people, live',
+    tag: 'feature',
+    summary:
+      'You can now share a single desk with named people and everyone with access sees each other’s changes as they happen, both ways, without putting it in a whole organisation. Shared rooms and desks show their name and who shared them, and a desk that changed while you were away is framed so you can see what moved. The right-click "Add object" menu now matches the tool palette, and connected apps stay logged in when you switch desks.',
+    highlights: [
+      'Share a desk with specific people (by email) for live two-way updates — only the people you name can open it.',
+      'A shared room or desk shows its name and a “Shared by” badge so you know what it is and who sent it.',
+      'A desk changed by someone else while you were away is framed on your return, so you can see what moved.',
+      'Right-click “Add object” now shows core tools first with an Advanced group, matching the tool palette.',
+      'Connected apps (Google, Slack and the rest) stay signed in when you switch between desks.'
+    ]
+  },
+  {
     version: '3.9.8',
     date: '2026-07-21T00:00:00Z',
     title: 'PlexiDesk 3.9.8 — screen share in meetings, Design on your desk, and the desk build wizard is back',
