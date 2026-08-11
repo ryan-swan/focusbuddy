@@ -25,13 +25,21 @@ import { searchGifs } from '../gifSearch'
 import {
   collectPending,
   collectPendingOrg,
+  collectPendingShared,
   markPushed,
   applyRemote,
   applyRemoteOrg,
+  applyRemoteShared,
+  stampSharedDesk,
+  adoptSharedDesk,
+  pruneSharedDesk,
   getSyncCursor,
   setSyncCursor,
   getSyncCursorOrg,
   setSyncCursorOrg,
+  getSyncCursorShared,
+  setSyncCursorShared,
+  listLocalSharedRoots,
   type RemoteItem
 } from '../db/workspaceSync'
 import { invalidateAnthropicClient } from '../ai/anthropic'
@@ -88,7 +96,8 @@ import {
   getNode,
   listNodes,
   moveNode,
-  updateNode
+  updateNode,
+  ensureSharedContainer
 } from '../db/nodes'
 import { relateNodes, unrelateNodes, listRelatedNodeIds } from '../db/nodeRelations'
 import {
@@ -2963,6 +2972,26 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:setCursorOrg', (_e, orgId: string, n: number) =>
     setSyncCursorOrg(String(orgId || ''), typeof n === 'number' ? n : 0)
   )
+
+  // Per-desk shared sync (desks shared with named individuals via ACL). Separate
+  // handlers again so the shared scope is never confused with personal/org. The
+  // apply path resolves the local "Shared with me" container itself, so a
+  // materialized desk always anchors correctly regardless of the active org.
+  ipcMain.handle('workspace:pendingShared', () => collectPendingShared())
+  ipcMain.handle('workspace:applyRemoteShared', (_e, items: RemoteItem[], ownerHandles?: Record<string, string>) =>
+    applyRemoteShared(Array.isArray(items) ? items : [], {
+      sharedContainerId: ensureSharedContainer(),
+      ownerHandles: ownerHandles && typeof ownerHandles === 'object' ? ownerHandles : undefined
+    })
+  )
+  ipcMain.handle('workspace:getCursorShared', () => getSyncCursorShared())
+  ipcMain.handle('workspace:setCursorShared', (_e, n: number) =>
+    setSyncCursorShared(typeof n === 'number' ? n : 0)
+  )
+  ipcMain.handle('workspace:stampSharedDesk', (_e, rootId: string) => stampSharedDesk(String(rootId || '')))
+  ipcMain.handle('workspace:adoptSharedDesk', (_e, rootId: string) => adoptSharedDesk(String(rootId || '')))
+  ipcMain.handle('workspace:pruneSharedDesk', (_e, rootId: string) => pruneSharedDesk(String(rootId || '')))
+  ipcMain.handle('workspace:localSharedRoots', () => listLocalSharedRoots())
 
   // Cross-member Drive file bytes. A file's metadata syncs over the org loop
   // above; these move the actual bytes. The renderer reads a local file's bytes to

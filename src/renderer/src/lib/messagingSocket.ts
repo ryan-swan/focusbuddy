@@ -100,6 +100,11 @@ let onOrgWorkspaceChangedCb: ((orgId: string) => void) | null = null
 export function setOrgWorkspaceChangedHandler(cb: ((orgId: string) => void) | null): void {
   onOrgWorkspaceChangedCb = cb
 }
+// A desk shared with this user by name changed → pull the ACL-scoped shared delta.
+let onSharedWorkspaceChangedCb: ((rootId: string) => void) | null = null
+export function setSharedWorkspaceChangedHandler(cb: ((rootId: string) => void) | null): void {
+  onSharedWorkspaceChangedCb = cb
+}
 
 // Someone is typing in a conversation. Ephemeral; the store clears it on a timeout.
 export type TypingEvent = { conversationId: string; accountId: string; handle: string; firstName?: string | null; lastName?: string | null }
@@ -279,6 +284,10 @@ function open(): void {
       // A teammate changed shared org data → pull the org delta immediately.
       const p = msg.payload as { orgId?: string } | undefined
       if (p?.orgId) onOrgWorkspaceChangedCb?.(p.orgId)
+    } else if (msg.type === 'sharedWorkspaceChanged') {
+      // A desk shared with me by name changed → pull the ACL-scoped shared delta.
+      const p = msg.payload as { rootId?: string } | undefined
+      if (p?.rootId) onSharedWorkspaceChangedCb?.(p.rootId)
     } else if (msg.type === 'presenceSnapshot' || msg.type === 'presenceUpdate') {
       // Account-level presence (who's online across the org/team) → presence store.
       onPresenceCb?.({ type: msg.type, payload: msg.payload } as PresenceSocketEvent)

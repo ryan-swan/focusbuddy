@@ -9,7 +9,7 @@ import { useDocumentsStore } from '../stores/documents'
 import { useTablesStore } from '../stores/tables'
 import { useFileManagerStore } from '../stores/fileManager'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
-import { setOrgWorkspaceChangedHandler } from './messagingSocket'
+import { setOrgWorkspaceChangedHandler, setSharedWorkspaceChangedHandler } from './messagingSocket'
 import { registerSyncNudge } from './syncNudge'
 
 // Every item type carried over the sync transport. The personal loop has always
@@ -51,6 +51,7 @@ interface ServerItem {
   rev: number
   deleted: boolean
   teamId?: string | null
+  rootId?: string | null
 }
 
 async function pullChanges(token: string, since: number): Promise<{ items: ServerItem[]; now: number } | null> {
@@ -424,6 +425,163 @@ async function refreshCachedTables(): Promise<void> {
   }
 }
 
+// ── Per-desk shared transport (desks shared with named individuals) ──────────
+// The ACL-scoped sibling of the org transport. Auth is the plain account bearer
+// token (no x-plexi-org): the server resolves the caller's desks from resource_acls
+// grants, so access rides the grant, not org membership. Each write names the desk
+// root id it belongs to; the server binds and authorizes on it.
+async function pullChangesShared(
+  token: string,
+  since: number
+): Promise<{ items: ServerItem[]; now: number; roots: string[]; owned: string[]; ownerHandles: Record<string, string> } | null> {
+  try {
+    const res = await fetch(urlFor(`/workspace/shared/sync?since=${since}`), {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) {
+      noteServerError()
+      return null
+    }
+    const json = (await res.json()) as {
+      ok: boolean
+      items?: ServerItem[]
+      now?: number
+      roots?: string[]
+      owned?: string[]
+      ownerHandles?: Record<string, string>
+    }
+    if (!json.ok) {
+      noteServerError()
+      return null
+    }
+    return {
+      items: json.items ?? [],
+      now: json.now ?? since,
+      roots: json.roots ?? [],
+      owned: json.owned ?? [],
+      ownerHandles: json.ownerHandles ?? {}
+    }
+  } catch {
+    noteOffline()
+    return null
+  }
+}
+
+async function putItemShared(
+  token: string,
+  id: string,
+  itemType: SyncItemType,
+  body: Record<string, unknown>,
+  baseRev: number,
+  rootId: string
+): Promise<PutResult> {
+  try {
+    const res = await fetch(urlFor(`/workspace/shared/items/${id}`), {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemType, body, baseRev: baseRev || undefined, rootId })
+    })
+    if (res.status === 409) {
+      const json = (await res.json()) as { item?: ServerItem }
+      if (json.item) return { ok: false, conflict: true, item: json.item }
+      return { ok: false, conflict: false }
+    }
+    if (!res.ok) {
+      noteServerError()
+      return { ok: false, conflict: false }
+    }
+    const json = (await res.json()) as { ok: boolean; item?: { rev: number } }
+    return json.ok && json.item ? { ok: true, rev: json.item.rev } : { ok: false, conflict: false }
+  } catch {
+    noteOffline()
+    return { ok: false, conflict: false }
+  }
+}
+
+async function deleteItemShared(token: string, id: string, rootId: string): Promise<{ ok: boolean; rev: number }> {
+  try {
+    const res = await fetch(urlFor(`/workspace/shared/items/${id}?rootId=${encodeURIComponent(rootId)}`), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.status === 404) return { ok: true, rev: 0 } // server never had it; treat as done
+    if (!res.ok) {
+      noteServerError()
+      return { ok: false, rev: 0 }
+    }
+    const json = (await res.json()) as { ok: boolean; item?: { rev: number } }
+    return { ok: !!json.ok, rev: json.item?.rev ?? 0 }
+  } catch {
+    noteOffline()
+    return { ok: false, rev: 0 }
+  }
+}
+
+// One full push+pull cycle for every desk shared with this account by name. Pushes
+// locally-changed shared-desk rows (each tagged with its desk id), pulls the
+// ACL-scoped delta and materializes it, then prunes any desk the server no longer
+// lists in the caller's granted set (a revoke). Returns rows applied locally.
+async function syncSharedWorkspaceOnce(token: string): Promise<number> {
+  // ── Push local changes ──
+  const pending = await window.api.workspaceSync.pendingShared()
+  for (const u of pending.upserts) {
+    if (!u.rootId) continue
+    const res = await putItemShared(token, u.id, u.itemType, u.body, u.baseRev, u.rootId)
+    if (res.ok) await window.api.workspaceSync.markPushed(u.itemType, u.id, res.rev)
+    else if (res.conflict) {
+      await window.api.workspaceSync.applyRemoteShared([
+        {
+          id: res.item.id,
+          itemType: res.item.itemType,
+          body: res.item.body,
+          rev: res.item.rev,
+          deleted: res.item.deleted,
+          rootId: res.item.rootId
+        }
+      ])
+    }
+  }
+  for (const d of pending.deletes) {
+    if (!d.rootId) continue
+    const res = await deleteItemShared(token, d.id, d.rootId)
+    if (res.ok) await window.api.workspaceSync.markPushed(d.itemType, d.id, res.rev || d.baseRev)
+  }
+
+  // ── Pull remote changes ──
+  const since = await window.api.workspaceSync.getCursorShared()
+  const pulled = await pullChangesShared(token, since)
+  if (!pulled) return 0
+  // Owner-side adoption BEFORE apply: a desk I own but still hold as an untagged
+  // local copy (shared from my other device) is folded into shared scope so the
+  // apply below reconciles it instead of refusing it as foreign. Only desks the
+  // server confirmed I own are adopted.
+  for (const root of pulled.owned) await window.api.workspaceSync.adoptSharedDesk(root)
+  let applied = 0
+  if (pulled.items.length > 0) {
+    const r = await window.api.workspaceSync.applyRemoteShared(pulled.items, pulled.ownerHandles)
+    applied = r.applied
+  }
+  await window.api.workspaceSync.setCursorShared(pulled.now)
+
+  // Prune desks I no longer have access to: any locally-materialized shared desk the
+  // server did not list in my granted set has been revoked. Only ever runs after a
+  // successful pull, so an offline cycle never wrongly prunes.
+  const granted = new Set(pulled.roots)
+  const local = await window.api.workspaceSync.localSharedRoots()
+  let pruned = 0
+  for (const root of local) {
+    if (!granted.has(root)) pruned += await window.api.workspaceSync.pruneSharedDesk(root)
+  }
+
+  if (applied > 0 || pruned > 0) {
+    await useNodeStore.getState().refresh()
+    const activeTaskId = useNodeStore.getState().activeTaskId
+    if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
+    await refreshCachedTables()
+  }
+  return applied
+}
+
 // Which org scopes sync this cycle, in order. Every membership is included —
 // the active org first (freshest on screen), then the rest. Personal is not in
 // this list; the personal loop always runs after these. Pure so the coverage
@@ -481,6 +639,10 @@ export async function syncWorkspaceOnce(): Promise<number> {
       orgApplied += await syncOrgWorkspaceOnce(token, orgId)
     }
 
+    // Per-desk shared scope: desks shared with this account by name, independent of
+    // org membership. Runs once per cycle alongside the org loops.
+    const sharedApplied = await syncSharedWorkspaceOnce(token)
+
     // ── Push local changes (personal scope) ──
     const pending = await window.api.workspaceSync.pending()
     for (const u of pending.upserts) {
@@ -530,7 +692,7 @@ export async function syncWorkspaceOnce(): Promise<number> {
       // Calendar blocks sync too (rung 1): refresh whatever range is loaded.
       await useTimeBlockStore.getState().reload()
     }
-    return applied + orgApplied
+    return applied + orgApplied + sharedApplied
   } finally {
     running = false
   }
@@ -554,12 +716,24 @@ function onOrgWorkspaceChanged(orgId: string): void {
   }, 400)
 }
 
+// A desk shared with me by name changed → kick a (debounced) cycle. The shared
+// loop inside it pulls the ACL-scoped delta, so the desk updates in ~1-2s. Shares
+// the same debounce as the org nudge since a cycle covers every scope anyway.
+function onSharedWorkspaceChanged(_rootId: string): void {
+  if (pushDebounce != null) return
+  pushDebounce = window.setTimeout(() => {
+    pushDebounce = null
+    void syncWorkspaceOnce()
+  }, 400)
+}
+
 // Start the periodic sync loop (idempotent). Runs once immediately, then on an
 // interval. Safe to call on every sign-in; stops cleanly on sign-out.
 export function startWorkspaceSync(): void {
   initPreviewGuard()
   if (timer != null) return
   setOrgWorkspaceChangedHandler(onOrgWorkspaceChanged)
+  setSharedWorkspaceChangedHandler(onSharedWorkspaceChanged)
   // Local edits nudge an immediate (debounced) push so a change reaches teammates
   // in ~1-2s instead of waiting up to a full poll interval. The interval below
   // stays as the backstop.
@@ -571,6 +745,7 @@ export function startWorkspaceSync(): void {
 export function stopWorkspaceSync(): void {
   useSyncStatus.getState().setDisabled()
   setOrgWorkspaceChangedHandler(null)
+  setSharedWorkspaceChangedHandler(null)
   registerSyncNudge(null)
   if (pushDebounce != null) {
     window.clearTimeout(pushDebounce)

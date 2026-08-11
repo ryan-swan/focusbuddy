@@ -21,6 +21,7 @@ import {
 } from '../lib/shareSnapshot'
 import { buildDocumentSnapshot, buildFolderShareSnapshot } from '../lib/officeShareSnapshot'
 import Icon from './Icon'
+import LiveDeskSharing from './LiveDeskSharing'
 
 // Universal share dialog — opens from a folder, task, or widget right-click.
 // One flow regardless of the entity kind: pick scope (view-only or
@@ -274,6 +275,11 @@ export default function ShareDialog({
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          {/* Live sharing (real-time, per-desk ACL) — the primary path for a desk.
+              A desk is a folder or task node whose id is the desk root id. */}
+          {(kind === 'folder' || kind === 'task') && <LiveDeskSharing rootId={entityId} />}
+
+          {/* Read-only link + snapshot sharing below. */}
           {/* Scope picker */}
           <div>
             <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">

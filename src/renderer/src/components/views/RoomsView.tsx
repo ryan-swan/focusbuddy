@@ -8,6 +8,7 @@ import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
 import Icon from '../Icon'
+import SharedBadge from '../SharedBadge'
 import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
 import ShareDialog from '../ShareDialog'
@@ -100,6 +101,14 @@ export default function RoomsView(): JSX.Element {
     items: rooms,
     idOf: (r) => r.id,
     titleOf: (r) => r.title || 'Untitled room',
+    // Mark a room shared with you by name (live per-desk share), with who shared it.
+    badge: (r) =>
+      r.sharedRootId ? (
+        <SharedBadge
+          handle={r.sharedFromHandle ?? '?'}
+          label={r.sharedFromHandle ? `Shared by ${r.sharedFromHandle}` : 'Shared with you'}
+        />
+      ) : null,
     searchText: (r) => `${r.title} ${r.description}`,
     thumb: (r) => <RoomThumb deskWidgetSets={roomDeskSets(r)} width={320} height={144} />,
     smallIcon: (r) => (

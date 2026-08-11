@@ -80,9 +80,14 @@ import {
   DRAG_MIME,
   WIDGET_CATALOG,
   catalogFor,
+  entriesByCategory,
+  isAdvancedKind,
   type WidgetCatalogEntry,
   type WidgetCategory
 } from '../lib/widgetCatalog'
+import { canCreateWidget } from '../lib/gating'
+import { useCapabilityStore } from '../stores/capabilities'
+import { promptUpgrade } from '../stores/upgradePrompt'
 import { useActionHistory } from '../stores/actionHistory'
 import { computeAlign, computeDistribute, type AlignMode, type DistributeAxis } from '../lib/canvasAlign'
 import {
@@ -260,6 +265,10 @@ const STATUS_META: Record<
 
 export default function Canvas(): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  // Capability gating for the right-click "Add object" menu, so it matches the
+  // widget palette (core widgets first, an Advanced group, and Pro-gated kinds
+  // prompt to upgrade rather than silently creating).
+  const caps = useCapabilityStore((s) => s.capabilities)
   // Per-desk view mode: the infinite Canvas (default) or the Columns view.
   const deskViewModes = useDeskViewStore((s) => s.modes)
   const deskViewDefaults = useDeskViewStore((s) => s.defaults)
@@ -1634,21 +1643,42 @@ export default function Canvas(): JSX.Element {
     if (!ctxMenu || !activeTaskId) return []
     const cx = ctxMenu.canvasX
     const cy = ctxMenu.canvasY
+    // Consolidated to match the widget palette: core widgets grouped by category,
+    // then a single "Advanced" group for the powerful-but-intimidating kinds
+    // (agents, webhooks, diagram, mindmap, …), instead of the old flat everything-
+    // per-category list. Each item is capability-gated the same way the palette is:
+    // a Pro-locked kind prompts to upgrade rather than silently creating.
+    const grouped = entriesByCategory()
+    const addObject = (entry: WidgetCatalogEntry): void => {
+      if (!canCreateWidget(caps, entry.kind)) {
+        promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
+        return
+      }
+      void placeWidgetAtCanvas(entry, cx, cy)
+    }
+    const toItem = (entry: WidgetCatalogEntry): CtxMenuItem => ({
+      label: entry.label,
+      icon: entry.icon,
+      onClick: () => addObject(entry)
+    })
+    const coreGroups: CtxMenuItem[] = CATEGORIES.map((cat) => ({
+      label: cat,
+      icon: CATEGORY_ICON[cat],
+      children: grouped[cat].filter((e) => !isAdvancedKind(e.kind)).map(toItem)
+    })).filter((group) => (group.children?.length ?? 0) > 0)
+    // Advanced kinds across every category, kept individually selectable (diagram +
+    // mindmap must stay distinct from the base Map, per the catalog rationale).
+    const advancedEntries = CATEGORIES.flatMap((cat) =>
+      grouped[cat].filter((e) => isAdvancedKind(e.kind))
+    )
+    const advancedGroup: CtxMenuItem[] =
+      advancedEntries.length > 0
+        ? [{ label: 'Advanced', icon: 'tune', children: advancedEntries.map(toItem) }]
+        : []
     const addWidget: CtxMenuItem = {
       label: 'Add object',
       icon: 'add',
-      children: CATEGORIES.map((cat) => {
-        const entries = WIDGET_CATALOG.filter((e) => e.category === cat && !e.hideFromPicker)
-        return {
-          label: cat,
-          icon: CATEGORY_ICON[cat],
-          children: entries.map((entry) => ({
-            label: entry.label,
-            icon: entry.icon,
-            onClick: () => void placeWidgetAtCanvas(entry, cx, cy)
-          }))
-        }
-      }).filter((group) => group.children.length > 0)
+      children: [...coreGroups, ...advancedGroup]
     }
     const arrange: CtxMenuItem = {
       label: 'Auto-arrange',

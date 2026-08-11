@@ -350,8 +350,17 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   const sourceApp = widget.sourceAppId
     ? apps.find((a) => a.id === widget.sourceAppId) ?? null
     : null
-  const partition = sourceApp
-    ? `persist:connectedapp-${sourceApp.id}`
+  // Derive the persistent partition from the id the widget ALREADY carries, not
+  // from the looked-up app object. Electron locks a webview's partition at attach
+  // time and it can never change afterward, so if the connected-apps store hasn't
+  // hydrated yet when this mounts (or during the rapid remount on a desk switch),
+  // reading it off `sourceApp` would fall back to the empty default partition and
+  // strand the app there — logged out, even though its real cookies live under
+  // persist:connectedapp-<id>. Keying off widget.sourceAppId removes that race so
+  // the session survives desk switches and cold boots alike. (sourceApp is still
+  // looked up above for the vault/autofill logic that needs the full object.)
+  const partition = widget.sourceAppId
+    ? `persist:connectedapp-${widget.sourceAppId}`
     : 'persist:webview-default'
 
   // Bump the connected app's usage when this widget is first focused — signals

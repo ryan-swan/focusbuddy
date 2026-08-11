@@ -1628,6 +1628,24 @@ const api = {
     getCursorOrg: (orgId: string): Promise<number> => ipcRenderer.invoke('workspace:getCursorOrg', orgId),
     setCursorOrg: (orgId: string, n: number): Promise<void> =>
       ipcRenderer.invoke('workspace:setCursorOrg', orgId, n),
+    // Per-desk shared sync (desks shared with named individuals). One cursor across
+    // all such desks; each pending item carries the desk root id it belongs to.
+    pendingShared: (): Promise<{
+      upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number; rootId?: string | null }>
+      deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number; rootId?: string | null }>
+    }> => ipcRenderer.invoke('workspace:pendingShared'),
+    applyRemoteShared: (
+      items: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown> | null; rev: number; deleted: boolean; rootId?: string | null }>,
+      ownerHandles?: Record<string, string>
+    ): Promise<{ applied: number }> => ipcRenderer.invoke('workspace:applyRemoteShared', items, ownerHandles),
+    getCursorShared: (): Promise<number> => ipcRenderer.invoke('workspace:getCursorShared'),
+    setCursorShared: (n: number): Promise<void> => ipcRenderer.invoke('workspace:setCursorShared', n),
+    // Stamp a desk subtree for shared sync (owner side, at share time) / prune a
+    // desk this account no longer has access to (recipient side, after a revoke).
+    stampSharedDesk: (rootId: string): Promise<string[]> => ipcRenderer.invoke('workspace:stampSharedDesk', rootId),
+    adoptSharedDesk: (rootId: string): Promise<boolean> => ipcRenderer.invoke('workspace:adoptSharedDesk', rootId),
+    pruneSharedDesk: (rootId: string): Promise<number> => ipcRenderer.invoke('workspace:pruneSharedDesk', rootId),
+    localSharedRoots: (): Promise<string[]> => ipcRenderer.invoke('workspace:localSharedRoots'),
     // Cross-member Drive file bytes. Metadata rides the loops above; these move the
     // bytes: read a local file to upload, check whether a pulled file's bytes are
     // already here, and write downloaded bytes to disk.

@@ -69,6 +69,14 @@ function upsertWidgetRow(w: Widget, taskId: string): void {
 
 export function createSnapshot(taskId: string, widgets: Widget[], label = ''): SnapshotMeta {
   const db = getDb()
+  // Tolerate a missing parent: a debounced history snapshot can fire moments after
+  // the desk it belongs to was removed (e.g. a shared desk revoked seconds after an
+  // edit landed). canvas_snapshots.task_id has a FK to nodes(id), so inserting
+  // against a deleted desk throws. No-op gracefully instead, mirroring
+  // createWidgetIfTaskExists — there is nothing meaningful to snapshot for a desk
+  // that no longer exists.
+  const taskExists = db.prepare('SELECT 1 FROM nodes WHERE id = ?').get(taskId)
+  if (!taskExists) return { id: '', taskId, at: Date.now(), label, widgetCount: widgets.length }
   const payload = JSON.stringify(widgets)
   // Dedup: if the desk is identical to the most recent snapshot, don't record a
   // duplicate. (Compare payloads ignoring volatile updatedAt churn is overkill;

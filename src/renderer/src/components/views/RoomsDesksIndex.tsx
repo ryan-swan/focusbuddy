@@ -54,6 +54,9 @@ export interface IndexConfig<T> {
   // through to the node sortOrder. Absent = reorder disabled.
   onReorder?: (orderedIds: string[]) => void
   headerActions?: ReactNode
+  // Small marker rendered next to the title (gallery + list), e.g. a "Shared by X"
+  // badge on a room/desk shared with you. Absent = no badge.
+  badge?: (item: T) => ReactNode
 }
 
 const MODES: Array<{ key: IndexMode; icon: string; label: string }> = [
@@ -104,7 +107,8 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
     newLabel,
     actions,
     onReorder,
-    headerActions
+    headerActions,
+    badge
   } = config
 
   const [mode, setMode] = usePersistedString(`${storageKey}.mode`, 'gallery') as [
@@ -325,6 +329,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                         key={idOf(it)}
                         id={idOf(it)}
                         title={titleOf(it)}
+                        badge={badge?.(it)}
                         thumb={thumb(it)}
                         meta={metaLine(it)}
                         actions={actions?.(it)}
@@ -343,6 +348,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                         key={idOf(it)}
                         id={idOf(it)}
                         title={titleOf(it)}
+                        badge={badge?.(it)}
                         icon={smallIcon(it)}
                         meta={metaLine(it)}
                         actions={actions?.(it)}
@@ -385,6 +391,7 @@ function bucketByFirstGroup<T>(
 function GalleryCard(props: {
   id: string
   title: string
+  badge?: ReactNode
   thumb: ReactNode
   meta: ReactNode
   actions?: ReactNode
@@ -410,7 +417,10 @@ function GalleryCard(props: {
           {props.thumb}
         </div>
         <div className="px-3 py-2">
-          <div className="truncate text-[13px] font-medium text-[var(--ink-100)]">{props.title}</div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="truncate text-[13px] font-medium text-[var(--ink-100)]">{props.title}</span>
+            {props.badge}
+          </div>
           <div className="text-[11px] text-[var(--ink-50)] mt-0.5 truncate">{props.meta}</div>
         </div>
       </button>
@@ -426,6 +436,7 @@ function GalleryCard(props: {
 function ListRow(props: {
   id: string
   title: string
+  badge?: ReactNode
   icon: ReactNode
   meta: ReactNode
   actions?: ReactNode
@@ -453,7 +464,10 @@ function ListRow(props: {
         {props.icon}
       </div>
       <button onClick={props.onOpen} className="flex-1 min-w-0 text-left">
-        <div className="truncate text-[13px] text-[var(--ink-100)]">{props.title}</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="truncate text-[13px] text-[var(--ink-100)]">{props.title}</span>
+          {props.badge}
+        </div>
         <div className="truncate text-[11px] text-[var(--ink-50)]">{props.meta}</div>
       </button>
       {props.actions && (

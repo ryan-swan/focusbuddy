@@ -1003,6 +1003,23 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_files', 'team_id', 'TEXT')
   ensureColumn(db, 'fb_tables', 'team_id', 'TEXT')
 
+  // Per-desk sharing: the desk (root node id) this row belongs to when the desk is
+  // shared with named individuals rather than a whole org. NULL for ordinary
+  // personal/org content. A row with shared_root_id set syncs ONLY through the
+  // ACL-scoped shared path (collectPendingShared / applyRemoteShared), never the
+  // personal or org loops, so the scopes are mutually exclusive and nothing
+  // double-pushes. Stamped on every row of the subtree at share time and preserved
+  // on the recipient so their later edits re-push to the same desk. Every content
+  // table a desk can contain gets the column so the collect needs no joins.
+  ensureColumn(db, 'nodes', 'shared_root_id', 'TEXT')
+  ensureColumn(db, 'widgets', 'shared_root_id', 'TEXT')
+  ensureColumn(db, 'fb_tables', 'shared_root_id', 'TEXT')
+  ensureColumn(db, 'fb_rows', 'shared_root_id', 'TEXT')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_nodes_shared_root ON nodes(shared_root_id)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_widgets_shared_root ON widgets(shared_root_id)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_tables_shared_root ON fb_tables(shared_root_id)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_rows_shared_root ON fb_rows(shared_root_id)')
+
   // Remaining top-level user-content surfaces get the same per-org scoping so
   // switching organisation shows only that org's automations, reports, apps,
   // forms, meetings, signature requests and saved file views. Existing rows

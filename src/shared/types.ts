@@ -195,6 +195,10 @@ export interface FbNode {
   // was reconstructed from an accepted share. Null for your own nodes. The
   // sidebar uses it to show a "Shared by <handle>" badge + avatar.
   sharedFromHandle: string | null
+  // The desk root id when this node belongs to a desk shared with named
+  // individuals (per-desk ACL live share). Non-null = a live-shared room/desk, so
+  // the galleries can mark it "Shared" and distinguish it from a personal one.
+  sharedRootId: string | null
 }
 
 export interface NodeDraft {
