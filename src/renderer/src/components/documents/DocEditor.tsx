@@ -45,6 +45,23 @@ const COMMENT_CSS = `
 .ProseMirror .fb-comment:hover { background: rgba(250, 204, 21, .38); }
 `
 
+// Keep wide, non-wrapping content inside the page so nothing spills past the
+// margins or off the sheet (the bug where a long code line or URL ran off the
+// right edge). Long code lines scroll within the content column instead of
+// widening the page, images scale down to the column, tables scroll in their own
+// wrapper, and long unbreakable tokens (URLs, paths) wrap. `overflow-wrap:
+// anywhere` also collapses the text's min-content width, which stops a wide child
+// from blowing out the page's flex width. Scoped per editor instance, so it
+// applies in both page view and continuous view without leaking to other prose.
+function overflowCss(scope: string): string {
+  return `
+.${scope} .ProseMirror { overflow-wrap: anywhere; }
+.${scope} .ProseMirror pre { max-width: 100%; overflow-x: auto; }
+.${scope} .ProseMirror img { max-width: 100%; height: auto; }
+.${scope} .ProseMirror .tableWrapper { max-width: 100%; overflow-x: auto; }
+`
+}
+
 // Page geometry at 96dpi (the CSS reference), so a Letter portrait sheet is the
 // familiar 816x1056, A4 is 794x1123, and landscape swaps the long and short
 // edges. Margins come from the document's own page setup (per side, in inches),
@@ -421,6 +438,7 @@ export default function DocEditor({
       <style dangerouslySetInnerHTML={{ __html: headingCss(scopeClass, headingStyles) }} />
       <style dangerouslySetInnerHTML={{ __html: FOCUS_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: COMMENT_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: overflowCss(scopeClass) }} />
 
       <div className="relative flex-1 min-w-0 overflow-auto">
       {!focusMode && (
@@ -1011,7 +1029,12 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
       className="flex justify-center py-8 px-4 overflow-x-auto bg-stone-300/50 dark:bg-black/40"
       data-testid="doc-page-canvas"
     >
-      <div className="relative" data-testid="doc-page" data-orientation={page.orientation} data-pages={pageCount} style={{ width: geom.w, minHeight: totalH }}>
+      {/* minWidth:0 + flexShrink:0 pin the sheet to its true paper width inside the
+          centering flex row. Without minWidth:0 a flex item's auto min-content
+          floor lets a wide child (a long code line, a big table) stretch the whole
+          page past the paper edge, dragging the margins and sheet backgrounds with
+          it. Pinned here, wide content is instead contained by overflowCss above. */}
+      <div className="relative" data-testid="doc-page" data-orientation={page.orientation} data-pages={pageCount} style={{ width: geom.w, minWidth: 0, maxWidth: geom.w, flexShrink: 0, minHeight: totalH }}>
         {/* One white sheet per page, each the real paper height, stacked with the
             gap between them so the grey canvas shows through as a true page split. */}
         <div className="absolute inset-0 pointer-events-none" aria-hidden>
