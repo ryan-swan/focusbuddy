@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.1',
+    date: '2026-08-12T00:00:00Z',
+    title: 'PlexiDesk 4.0.1 — documents keep every edit, and pages stay in their margins',
+    tag: 'fix',
+    summary:
+      'Two fixes for the document editors. Switching quickly between documents no longer drops the last change in the one you were leaving, so nothing is lost as you move around your files. And in page view, wide content like code blocks, long links, big tables and oversized images now stays inside the page margins instead of running off the edge of the sheet, at any zoom level.',
+    highlights: [
+      'Documents no longer lose the last edit when you switch between them quickly.',
+      'Page view keeps wide content (code blocks, long links, tables, images) within the margins, the way a printed page does, at any zoom.'
+    ]
+  },
+  {
     version: '4.0.0',
     date: '2026-08-11T00:00:00Z',
     title: 'PlexiDesk 4.0 — share a desk with people, live',
