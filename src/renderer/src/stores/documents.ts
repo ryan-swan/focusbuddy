@@ -14,7 +14,14 @@ import { useMessagingStore } from './messaging'
 // section any time after), and only purge() — the Trash view's "Delete
 // forever" — actually destroys the row and tells the cloud to forget it.
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
+// Per-document debounce state, keyed by document id. A single module-global timer
+// used to drop a document's pending save when you switched to another document
+// within the debounce window (the flush then saw a different active doc and
+// skipped the write). Now each document's timer flushes independently, and
+// pendingBodies holds the freshest body per document so the flush writes the right
+// content even after the active document has changed.
+const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingBodies = new Map<string, FbDocument['body']>()
 
 interface DocumentsStore {
   list: DocumentMeta[]
@@ -72,18 +79,20 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   },
 
   close: () => {
-    // Flush any pending body save before leaving the editor. A failure here is
-    // logged (not swallowed) so a lost final buffer is at least diagnosable.
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-      const a = get().active
-      if (a) {
-        void window.api.documents.update(a.id, { body: a.body }).catch((err) => {
-          // eslint-disable-next-line no-console
-          console.error('[documents.close] final flush failed', err)
-        })
-      }
+    // Flush the active document's pending body save before leaving the editor.
+    // Other documents keep their own timers and flush independently. A failure
+    // here is logged (not swallowed) so a lost final buffer is at least diagnosable.
+    const a = get().active
+    if (a && (saveTimers.has(a.id) || pendingBodies.has(a.id))) {
+      const t = saveTimers.get(a.id)
+      if (t) clearTimeout(t)
+      saveTimers.delete(a.id)
+      const body = pendingBodies.get(a.id) ?? a.body
+      pendingBodies.delete(a.id)
+      void window.api.documents.update(a.id, { body }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[documents.close] final flush failed', err)
+      })
     }
     set({ active: null })
   },
@@ -141,30 +150,43 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   saveBody: (body) => {
     const a = get().active
     if (!a) return
+    const id = a.id
     set({ active: { ...a, body: body as FbDocument['body'] }, saving: true })
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(async () => {
-      saveTimer = null
-      const cur = get().active
-      if (!cur || cur.id !== a.id) return
-      try {
-        await window.api.documents.update(cur.id, { body: cur.body })
-        set({ saving: false, saveError: false })
-        nudgeSync()
-      } catch (err) {
-        // Never lose work silently: keep the in-memory edit, drop the stuck
-        // "Saving" state, and flag the error so the editor shows a banner. The
-        // next edit re-attempts the write.
-        // eslint-disable-next-line no-console
-        console.error('[documents.saveBody] persist failed', err)
-        set({ saving: false, saveError: true })
-        return
-      }
-      // Mirror to the cloud (no-op when the flag is off). On a rev conflict the
-      // server copy wins and is reflected in the open editor.
-      const { conflictedTo } = await pushCloudDoc(cur).catch(() => ({ conflictedTo: undefined }))
-      if (conflictedTo && get().active?.id === conflictedTo.id) set({ active: conflictedTo })
-    }, 600)
+    // Queue the freshest body for THIS document and (re)arm only this document's
+    // timer. Switching to another document no longer cancels this write.
+    pendingBodies.set(id, body as FbDocument['body'])
+    const existing = saveTimers.get(id)
+    if (existing) clearTimeout(existing)
+    saveTimers.set(
+      id,
+      setTimeout(async () => {
+        saveTimers.delete(id)
+        const bodyToSave = pendingBodies.get(id)
+        pendingBodies.delete(id)
+        if (bodyToSave === undefined) return
+        try {
+          // Write to THIS document's id with its queued body, regardless of which
+          // document is on screen now.
+          await window.api.documents.update(id, { body: bodyToSave })
+          // Only touch the shared saving/error UI state for the document still open.
+          if (get().active?.id === id) set({ saving: false, saveError: false })
+          nudgeSync()
+        } catch (err) {
+          // Never lose work silently: re-queue the body so the next edit or close
+          // retries, drop the stuck "Saving" state, and flag the error.
+          // eslint-disable-next-line no-console
+          console.error('[documents.saveBody] persist failed', err)
+          pendingBodies.set(id, bodyToSave)
+          if (get().active?.id === id) set({ saving: false, saveError: true })
+          return
+        }
+        // Mirror to the cloud for the document we just saved (by id, even if the
+        // active document has since changed). On a rev conflict the server wins.
+        const saved = get().active?.id === id ? get().active! : ({ ...a, body: bodyToSave } as FbDocument)
+        const { conflictedTo } = await pushCloudDoc(saved).catch(() => ({ conflictedTo: undefined }))
+        if (conflictedTo && get().active?.id === conflictedTo.id) set({ active: conflictedTo })
+      }, 600)
+    )
   },
 
   rename: async (title) => {

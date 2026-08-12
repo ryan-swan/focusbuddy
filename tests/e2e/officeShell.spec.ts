@@ -32,10 +32,15 @@ test.describe('PlexiOffice segment', () => {
     for (const a of ['docs', 'sheets', 'slides', 'draw', 'design']) {
       await expect(window.locator(`[data-testid="office-app-${a}"]`)).toBeVisible()
     }
-    // Sign, Mail, Chat, Meet and Inbox are now communication apps in the office
-    // side menu rather than document tiles.
-    for (const a of ['mail', 'inbox', 'chat', 'meet', 'sign']) {
-      await expect(window.locator(`[data-testid="office-comms-app-${a}"]`)).toBeVisible()
+    // The document apps above are free-tier (office_* default free:true). The
+    // Communicate apps are split: Inbox is core (notifications + share invites)
+    // and always shows, while Mail, Chat, Meet and Sign gate on their Pro
+    // capabilities (mail/chat/meet/esign default free:false). On this fresh
+    // free-tier profile only Inbox is present; the four Pro comms apps are hidden
+    // by the same capability MainPane enforces, so nav and surface never disagree.
+    await expect(window.locator('[data-testid="office-comms-app-inbox"]')).toBeVisible()
+    for (const a of ['mail', 'chat', 'meet', 'sign']) {
+      await expect(window.locator(`[data-testid="office-comms-app-${a}"]`)).toHaveCount(0)
     }
     // The Ask-AI bar and upgrade affordance are present.
     await expect(window.locator('[data-testid="office-ask-ai"]')).toBeVisible()

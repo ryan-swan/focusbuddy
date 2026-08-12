@@ -2,7 +2,9 @@ import type { Collaborator } from '../../lib/presence'
 
 // The presence bar for a shared document: an overlapping stack of collaborator
 // avatars, the live editor ringed in green. Hover a face for the handle and
-// whether they are editing. Awareness only for now; live cursors come later.
+// whether they are editing. This bar shows the roster; the live carets/selections
+// themselves render inside the editor via the CollaborationCaret extension wired
+// to the same awareness (see documents/editor/extensions.ts).
 
 export default function CollaboratorBar({ people }: { people: Collaborator[] }): JSX.Element | null {
   if (!people.length) return null
