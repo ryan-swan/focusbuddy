@@ -36,6 +36,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.11',
+    date: '2026-08-13T12:00:00Z',
+    title: 'PlexiDesk 4.0.11 — one assistant, taking shape',
+    tag: 'polish',
+    summary:
+      'The AI assistant is being unified into a single surface across the whole app. This update gives the assistant panel a solid background on every tab, so it is never see-through, and the PlexiOffice "Ask AI" bar now opens that one assistant rather than a separate box. More of the consolidation is on the way: choosing whether it floats or docks to the right, a scope selector to ask about this page, other desks, or the whole workspace, and offering to place non-document things like tables on a desk.',
+    highlights: [
+      'The assistant panel now has a solid background on every tab, not just Chat.',
+      'The PlexiOffice "Ask AI" bar opens the single assistant instead of a separate panel.'
+    ]
+  },
+  {
     version: '4.0.1',
     date: '2026-08-12T00:00:00Z',
     title: 'PlexiDesk 4.0.1 — documents keep every edit and pages behave like real paper',

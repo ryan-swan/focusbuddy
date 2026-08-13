@@ -66,6 +66,10 @@ const panel = (window: Page) => window.locator('[data-testid="assistant-panel"]'
 
 async function openViaPill(window: Page): Promise<void> {
   await pill(window).click()
+  // The assistant opens on the Today tab; the Chat panel (assistant-panel) is
+  // mounted but hidden until the Chat tab is selected. Switch to Chat so tests
+  // that assert on the conversation panel see it.
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
   await panel(window).waitFor({ state: 'visible', timeout: 8000 })
 }
 
@@ -173,6 +177,8 @@ test('AC-4 — fb:open-assistant still summons the assistant, into the Notion-sh
 
   await expect(panel(window)).toHaveCount(0)
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  // Opens on Today; select Chat to reach the conversation's empty state.
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
   await expect(panel(window)).toBeVisible({ timeout: 8000 })
 
   // Fresh thread → the mirror empty state: avatar block with the greeting,
@@ -227,6 +233,9 @@ test('AC-5 — focus mode suppresses the assistant entirely; exit restores it as
 
   // Open the panel first, so suppression has real chrome state to preserve.
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  // Select Chat so the conversation panel is shown (the assistant opens on Today);
+  // the tab is chrome state, preserved across focus-mode suppress/restore.
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
   await expect(panel(window)).toBeVisible({ timeout: 8000 })
 
   // Enter focus mode through the widget's real entry point.

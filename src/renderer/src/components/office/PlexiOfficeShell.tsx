@@ -736,7 +736,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
               <div className="text-[11.5px] text-[var(--ink-50)] truncate">Ask anything about your documents, data or presentations.</div>
             </div>
             <button
-              onClick={() => window.dispatchEvent(new CustomEvent('fb:open-ai-bar'))}
+              onClick={() => window.dispatchEvent(new CustomEvent('fb:open-assistant'))}
               data-testid="office-ask-ai"
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-medium hover:bg-[rgb(var(--accent-hover))]"
             >

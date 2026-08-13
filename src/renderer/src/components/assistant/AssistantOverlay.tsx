@@ -277,7 +277,10 @@ export default function AssistantOverlay(): JSX.Element {
             )
           })}
         </div>
-        <div className="flex-1 min-h-0 relative">
+        {/* Opaque surface so the non-Chat tabs (Today/Agent/Tasks/Activity/Work)
+            are never see-through — the Chat tab supplies its own card. Fullscreen
+            uses the wrapper's own base surface. */}
+        <div className={`flex-1 min-h-0 relative ${mode !== 'fullscreen' ? 'bg-[var(--surface-raised)]' : ''}`}>
           {/* Chat: always mounted, shown only on the Chat tab. */}
           <div className="h-full w-full" style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
             <ChatPanel onCollapse={close} />
