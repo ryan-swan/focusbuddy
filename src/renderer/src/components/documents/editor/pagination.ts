@@ -39,21 +39,99 @@ function spacerDom(px: number): HTMLElement {
   const el = document.createElement('div')
   el.className = 'fb-page-spacer'
   el.style.height = `${px}px`
+  // Force a full-width block so the spacer reliably ends the current line and
+  // opens the gap even when inserted mid-paragraph (a within-block page break).
+  el.style.display = 'block'
+  el.style.width = '100%'
+  el.style.flexBasis = '100%'
+  el.style.userSelect = 'none'
+  el.style.pointerEvents = 'none'
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
   return el
 }
 
-// Place a spacer before every top-level block that would cross a page bottom, so
-// no block straddles the grey gap. Correctness hinges on using the blocks' REAL
-// laid-out positions rather than summing per-block heights: CSS collapses the
-// margin between adjacent blocks, so summing marginTop+marginBottom drifts from
-// reality and makes spacers land short (text spilling into the gap). Instead we
-// read each block's actual top/bottom from the DOM and subtract the heights of
-// the spacers already inserted above it, which recovers the natural (un-
-// paginated) flow position exactly, margin-collapse included. Measuring against
-// the natural flow means the result is stable: re-measuring with the spacers in
-// place reproduces the same natural positions and therefore the same breaks.
+// One visual line box (screen coordinates) inside a block.
+interface LineBox {
+  top: number
+  bottom: number
+  left: number
+}
+
+// The visual line boxes of a block, top to bottom. For a text block we ask the
+// DOM for the real line fragments via a Range (getClientRects returns one rect
+// per line fragment) and merge fragments that share a line, so a long paragraph
+// can be broken between its own lines — the way Word paginates. Blocks that must
+// not be split mid-content (tables, images, rules, code blocks) report a single
+// box so they move whole, overflowing only if taller than a page.
+function lineBoxesOf(dom: HTMLElement): LineBox[] {
+  const tag = dom.tagName
+  const atomic =
+    tag === 'TABLE' ||
+    tag === 'IMG' ||
+    tag === 'HR' ||
+    tag === 'FIGURE' ||
+    tag === 'PRE' ||
+    dom.classList.contains('tableWrapper') ||
+    !!dom.querySelector('table, img')
+  if (atomic) {
+    const r = dom.getBoundingClientRect()
+    return [{ top: r.top, bottom: r.bottom, left: r.left }]
+  }
+  // Measure the block's TEXT lines only. Ranging over the element's contents
+  // would also return the rect of any spacer we already inserted inside it (a
+  // within-block break), and a tall spacer rect measured as a "line" would
+  // trigger a runaway extra break. Walking text nodes skips element children
+  // (spacers, widgets) entirely while still capturing every line fragment,
+  // including text inside inline spans (bold, links, code).
+  let raw: DOMRect[] = []
+  try {
+    const walker = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode()
+    while (node) {
+      if (node.nodeValue && node.nodeValue.trim()) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.width > 0.5 && r.height > 0.5) raw.push(r)
+        }
+      }
+      node = walker.nextNode()
+    }
+  } catch {
+    /* fall through to the bounding box */
+  }
+  if (!raw.length) {
+    const r = dom.getBoundingClientRect()
+    return [{ top: r.top, bottom: r.bottom, left: r.left }]
+  }
+  const lines: LineBox[] = []
+  for (const r of raw.slice().sort((a, b) => a.top - b.top || a.left - b.left)) {
+    const last = lines[lines.length - 1]
+    // A fragment belongs to the current line when it overlaps it vertically.
+    if (last && r.top < last.bottom - 2) {
+      last.top = Math.min(last.top, r.top)
+      last.bottom = Math.max(last.bottom, r.bottom)
+      last.left = Math.min(last.left, r.left)
+    } else {
+      lines.push({ top: r.top, bottom: r.bottom, left: r.left })
+    }
+  }
+  return lines
+}
+
+// Insert a transparent spacer wherever a LINE would cross a page bottom, so no
+// line straddles the grey gap — between blocks AND within a long paragraph. A
+// pasted wall of text is one giant paragraph, so between-block breaks alone left
+// it flowing continuously through every gap; breaking at line boundaries binds it
+// to the content zone the way Word does.
+//
+// Correctness hinges on using the REAL laid-out line positions rather than summed
+// heights, and on subtracting the spacers already inserted above a line to
+// recover its natural (un-paginated) flow position. Measuring against the natural
+// flow makes the result stable: re-measuring with the spacers in place reproduces
+// the same natural positions and therefore the same breaks, so the
+// measure -> dispatch -> update loop settles.
 function computeDecorations(view: EditorView): { set: DecorationSet; pages: number; sig: string } {
   if (!cfg.enabled || cfg.pageContentPx <= 0) return { set: DecorationSet.empty, pages: 1, sig: 'off' }
   const { pageContentPx, gapPx, mTop, mBottom } = cfg
@@ -62,8 +140,6 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
   const doc = view.state.doc
 
   const contentTop = (view.dom as HTMLElement).getBoundingClientRect().top
-  // Heights + tops of spacers already in the DOM, so we can subtract the ones
-  // sitting above any given block to get its natural (un-spacered) position.
   const spacerRects = Array.from(
     (view.dom as HTMLElement).querySelectorAll('.fb-page-spacer')
   ).map((el) => {
@@ -73,30 +149,42 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
   const spacerAbove = (domTop: number): number =>
     spacerRects.reduce((sum, s) => (s.top < domTop - 0.5 ? sum + s.h : sum), 0)
 
-  // pageTop is the natural-flow Y at which the current page's content begins.
-  // It rebaselines to a pushed block's own natural top so subsequent blocks are
+  // pageTop is the natural-flow Y at which the current page's content begins. It
+  // rebaselines to the pushed line's own natural top so subsequent lines are
   // measured against the page they actually land on.
   let pageTop = 0
+  const addBreak = (pos: number, nTop: number, key: string): void => {
+    // Fill the rest of this page, its bottom margin, the gap and the next page's
+    // top margin, so the pushed line starts exactly at the next content top.
+    const px = Math.max(0, Math.round(pageTop + pageContentPx - nTop + mBottom + gapPx + mTop))
+    decos.push(Decoration.widget(pos, () => spacerDom(px), { side: -1, key: `pb-${key}-${px}` }))
+    parts.push(`${key}:${px}`)
+    pageTop = nTop
+  }
+
   doc.forEach((_node, offset) => {
     const dom = view.nodeDOM(offset)
     if (!(dom instanceof HTMLElement) || typeof dom.getBoundingClientRect !== 'function') return
-    const r = dom.getBoundingClientRect()
-    const above = spacerAbove(r.top)
-    const nTop = r.top - contentTop - above
-    const nBottom = r.bottom - contentTop - above
-    // Push when this block's box would cross the page bottom, unless it is the
-    // first block on the page (a block taller than a whole page simply overflows,
-    // as it does in every word processor).
-    if (nBottom > pageTop + pageContentPx + 0.5 && nTop > pageTop + 0.5) {
-      // Fill the rest of this page, cross the bottom margin, the gap, and the
-      // next page's top margin, so the block starts exactly at the next page's
-      // content top.
-      const spacerPx = pageTop + pageContentPx - nTop + mBottom + gapPx + mTop
-      const px = Math.max(0, Math.round(spacerPx))
-      decos.push(Decoration.widget(offset, () => spacerDom(px), { side: -1, key: `pb-${offset}-${px}` }))
-      parts.push(`${offset}:${px}`)
-      // The pushed block now begins a fresh page at its own natural top.
-      pageTop = nTop
+    const lines = lineBoxesOf(dom)
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i]
+      const above = spacerAbove(ln.top)
+      const nTop = ln.top - contentTop - above
+      const nBottom = ln.bottom - contentTop - above
+      // Break when this line's box would cross the page bottom, unless it is the
+      // first line on the page (a single line taller than a page just overflows).
+      if (nBottom > pageTop + pageContentPx + 0.5 && nTop > pageTop + 0.5) {
+        if (i === 0) {
+          // The whole block moves to the next page — spacer before the block.
+          addBreak(offset, nTop, `${offset}`)
+        } else {
+          // Break inside the block, before the line that would spill. Map the
+          // line's start point to a document position for the spacer.
+          const coord = view.posAtCoords({ left: ln.left + 2, top: ln.top + 1 })
+          if (coord && typeof coord.pos === 'number') addBreak(coord.pos, nTop, `${coord.pos}`)
+          else addBreak(offset, nTop, `${offset}`)
+        }
+      }
     }
   })
   const pages = parts.length + 1

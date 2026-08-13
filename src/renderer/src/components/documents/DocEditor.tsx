@@ -62,6 +62,27 @@ function overflowCss(scope: string): string {
 `
 }
 
+// Page view shows real paper: the sheet is always white with dark ink, in any app
+// theme (like Word and Google Docs), rather than inverting to a dark sheet in dark
+// mode. Scoped to the page canvas only, so continuous view still follows the
+// theme. Forces a light colour-scheme and the light Tailwind-typography variables
+// so dark:prose-invert does not lighten the text on white paper.
+function pagePaperCss(scope: string): string {
+  const s = `.${scope} [data-testid="doc-page"]`
+  return `
+${s} { color-scheme: light; }
+${s} .ProseMirror { color: #1c1917; }
+${s} .prose {
+  --tw-prose-body:#3f3f46; --tw-prose-headings:#18181b; --tw-prose-lead:#3f3f46;
+  --tw-prose-links:#2563eb; --tw-prose-bold:#18181b; --tw-prose-counters:#52525b;
+  --tw-prose-bullets:#a1a1aa; --tw-prose-hr:#e4e4e7; --tw-prose-quotes:#18181b;
+  --tw-prose-quote-borders:#e4e4e7; --tw-prose-captions:#52525b; --tw-prose-code:#18181b;
+  --tw-prose-pre-code:#e5e7eb; --tw-prose-pre-bg:#1f2937;
+  --tw-prose-th-borders:#d4d4d8; --tw-prose-td-borders:#e4e4e7;
+}
+`
+}
+
 // Page geometry at 96dpi (the CSS reference), so a Letter portrait sheet is the
 // familiar 816x1056, A4 is 794x1123, and landscape swaps the long and short
 // edges. Margins come from the document's own page setup (per side, in inches),
@@ -439,6 +460,7 @@ export default function DocEditor({
       <style dangerouslySetInnerHTML={{ __html: FOCUS_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: COMMENT_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: overflowCss(scopeClass) }} />
+      <style dangerouslySetInnerHTML={{ __html: pagePaperCss(scopeClass) }} />
 
       <div className="relative flex-1 min-w-0 overflow-auto">
       {!focusMode && (
@@ -1042,7 +1064,7 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
             <div
               key={i}
               data-testid="doc-page-sheet"
-              className="absolute left-0 right-0 bg-white dark:bg-stone-900 shadow-xl rounded-[2px]"
+              className="absolute left-0 right-0 bg-white shadow-xl rounded-[2px]"
               style={{ top: i * stride, height: geom.h }}
             />
           ))}

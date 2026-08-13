@@ -38,13 +38,15 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '4.0.1',
     date: '2026-08-12T00:00:00Z',
-    title: 'PlexiDesk 4.0.1 — documents keep every edit, and pages stay in their margins',
+    title: 'PlexiDesk 4.0.1 — documents keep every edit and pages behave like real paper',
     tag: 'fix',
     summary:
-      'Two fixes for the document editors. Switching quickly between documents no longer drops the last change in the one you were leaving, so nothing is lost as you move around your files. And in page view, wide content like code blocks, long links, big tables and oversized images now stays inside the page margins instead of running off the edge of the sheet, at any zoom level.',
+      'A round of document-editor fixes. Switching quickly between documents no longer drops the last change in the one you were leaving, so nothing is lost as you move around your files. In page view, long and pasted text now flows onto discrete pages within the margins instead of running continuously through the page breaks, wide content like code blocks, long links, big tables and images stays inside the margins at any zoom, and every page is white paper with dark text in any theme, the way Word and Google Docs show it.',
     highlights: [
       'Documents no longer lose the last edit when you switch between them quickly.',
-      'Page view keeps wide content (code blocks, long links, tables, images) within the margins, the way a printed page does, at any zoom.'
+      'Pasted and long text paginates onto real pages: it breaks at line boundaries and stays in the content zone instead of overflowing the page breaks.',
+      'Page view keeps wide content (code blocks, long links, tables, images) within the margins, at any zoom.',
+      'Pages are always white paper with dark text, even when the app is in dark mode.'
     ]
   },
   {
