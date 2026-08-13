@@ -48,6 +48,10 @@ interface Props {
   // The name to greet the writer with. Falls back to a neutral greeting when the
   // user is not signed in (no fabricated name).
   userName?: string | null
+  // Show the in-panel AI tab. False in the main app, where the one global
+  // assistant owns AI (this panel keeps only Comments + Outline). True in the
+  // standalone PlexiOffice build, which has no global overlay.
+  showAiTab?: boolean
   tab: DocSidePanelTab
   onTab: (tab: DocSidePanelTab) => void
   onCollapse: () => void
@@ -479,6 +483,7 @@ export default function DocSidePanel({
   editor,
   ai,
   userName,
+  showAiTab = true,
   tab,
   onTab,
   onCollapse,
@@ -524,12 +529,13 @@ export default function DocSidePanel({
       data-testid="doc-side-panel"
     >
       <div className="flex shrink-0 items-center border-b border-[var(--edge-soft)] px-1">
-        {tabBtn(
-          'ai',
-          'AI Assistant',
-          'doc-tab-ai',
-          <span className="rounded bg-[rgb(var(--accent)/0.14)] px-1 text-[9px] uppercase tracking-wide text-[rgb(var(--accent))]">Beta</span>
-        )}
+        {showAiTab &&
+          tabBtn(
+            'ai',
+            'AI Assistant',
+            'doc-tab-ai',
+            <span className="rounded bg-[rgb(var(--accent)/0.14)] px-1 text-[9px] uppercase tracking-wide text-[rgb(var(--accent))]">Beta</span>
+          )}
         {tabBtn(
           'comments',
           'Comments',
@@ -543,7 +549,7 @@ export default function DocSidePanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === 'ai' && (
+        {showAiTab && tab === 'ai' && (
           <div className="h-full overflow-auto">
             <AiTab ai={ai} userName={userName} editor={editor} />
           </div>

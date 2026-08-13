@@ -40,10 +40,13 @@ test.describe('PlexiOffice Home', () => {
     await app.dispose()
   })
 
-  test('OH-1 the app cards include Meet', async () => {
+  test('OH-1 the document app cards render (Meet gates on entitlement)', async () => {
     await openOffice(window)
-    await expect(window.locator('[data-testid="office-app-docs"]')).toBeVisible()
-    await expect(window.locator('[data-testid="office-app-meet"]')).toBeVisible()
+    for (const a of ['docs', 'sheets', 'slides', 'draw', 'design']) {
+      await expect(window.locator(`[data-testid="office-app-${a}"]`)).toBeVisible()
+    }
+    // Meet is a Pro capability, hidden on the free-tier test profile.
+    await expect(window.locator('[data-testid="office-app-meet"]')).toHaveCount(0)
   })
 
   test('OH-2 the Recent table renders a real doc and the Sheets tab filters', async () => {
@@ -81,7 +84,8 @@ test.describe('PlexiOffice Home', () => {
 
   test('OH-4 Quick actions render and New document opens a doc', async () => {
     await expect(window.locator('[data-testid="office-home-quickactions"]')).toBeVisible()
-    for (const id of ['compose', 'doc', 'sheet', 'slides', 'meet']) {
+    // The always-available document quick actions (Compose / Meet gate on Pro).
+    for (const id of ['doc', 'sheet', 'slides']) {
       await expect(window.locator(`[data-testid="office-qa-${id}"]`)).toBeVisible()
     }
     await window.locator('[data-testid="office-qa-doc"]').click()
@@ -89,7 +93,7 @@ test.describe('PlexiOffice Home', () => {
     await expect(window.locator('button[title="Back to PlexiOffice"]')).toBeVisible({ timeout: 8_000 })
     await window.locator('button[title="Back to PlexiOffice"]').click()
     await window.locator('[data-testid="office-nav-home"]').click()
-    await expect(window.locator('[data-testid="office-app-meet"]')).toBeVisible({ timeout: 8_000 })
+    await expect(window.locator('[data-testid="office-app-docs"]')).toBeVisible({ timeout: 8_000 })
   })
 
   test('OH-5 the Unread card shows real counts or an honest caught-up state', async () => {

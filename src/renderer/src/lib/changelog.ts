@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.12',
+    date: '2026-08-13T18:00:00Z',
+    title: 'PlexiDesk 4.0.12 — one assistant, finished',
+    tag: 'feature',
+    summary:
+      'The consolidation from 4.0.11 is done. There is now a single assistant everywhere. Inside a document the old separate AI tab is gone, and the document assistant control opens that one assistant, which can drop its answer straight into the page you are writing. When the assistant proposes something that is not a document, like a table, and you are not on a desk, it no longer stops with an error. It asks whether to make a new desk for it or add it to one you already have, then takes you there with the item in place. The assistant already reads across your whole workspace for context and lets you set it floating or docked to the right.',
+    highlights: [
+      'One assistant in documents too: the in-document AI tab is retired and the doc assistant control opens the single overlay.',
+      'The assistant can insert its answer directly into the document you have open.',
+      'Proposing a non-document thing like a table off a desk now offers to create a new desk or pick an existing one, then applies it there.'
+    ]
+  },
+  {
     version: '4.0.11',
     date: '2026-08-13T12:00:00Z',
     title: 'PlexiDesk 4.0.11 — one assistant, taking shape',

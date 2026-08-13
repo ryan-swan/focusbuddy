@@ -3,8 +3,25 @@ import type { ActionProposal, AppliedProposal } from '@shared/types'
 import { useActionHistory } from '../stores/actionHistory'
 import { applyProposal, describeProposal, ensureDependencies } from '../lib/actionExecutor'
 import { useAgentLoop } from '../stores/agentLoop'
+import { useNodeStore } from '../stores/nodes'
+import { useViewStore } from '../stores/view'
 import { resolveGoToTarget, goToTarget } from '../lib/goToTarget'
 import Icon from './Icon'
+
+// Proposal kinds that create content ON a desk canvas and therefore need an
+// active desk. When the assistant proposes one of these off a desk (e.g. a table
+// while you're in a document), we offer to create a new desk or pick an existing
+// one and apply it there — rather than the old dead-end "Open a task first".
+const DESK_KINDS = new Set<ActionProposal['kind']>([
+  'create-widget',
+  'create-table',
+  'add-table-row',
+  'create-field',
+  'create-agent',
+  'create-section',
+  'create-todo-list',
+  'create-page'
+])
 
 // ── Inline action-proposal cards ────────────────────────────────────────────
 //
@@ -66,6 +83,13 @@ export default function ProposalCards({
   // or race its applies. Disable manual apply for the duration of a run.
   const agentRunning = useAgentLoop((s) => s.running)
 
+  // Desk-offer: when a desk-kind proposal is applied off a desk, hold the
+  // pending proposal(s) here and show the create-or-pick-a-desk chooser instead
+  // of failing. Existing desks come from the node store (task nodes).
+  const [deskOffer, setDeskOffer] = useState<ActionProposal[] | null>(null)
+  const [newDeskName, setNewDeskName] = useState('')
+  const desks = useNodeStore((s) => s.nodes).filter((n) => n.kind === 'task' && !n.archived)
+
   // resolvedIds threads newly-created entity ids (today: tables) through a
   // batch so a follow-up proposal (today: add-table-row) can reference what
   // an earlier one created via "$<proposalId>" symbolic refs. Held in a ref
@@ -101,6 +125,12 @@ export default function ProposalCards({
     resolvedIds?: Map<string, string>
   ): Promise<void> {
     if (busy || agentRunning) return
+    // A desk-kind proposal with no active desk: offer to create/pick one rather
+    // than dead-end. The chooser then applies it on the chosen desk.
+    if (!activeTaskId && DESK_KINDS.has(p.kind)) {
+      setDeskOffer([p])
+      return
+    }
     const ids = resolvedIds ?? batchResolvedIds.current
     setBusy(p.id)
     // Resolve any not-yet-applied parent this proposal forward-references, via the
@@ -145,6 +175,14 @@ export default function ProposalCards({
     // Only apply the ones not already done (applied cards stay as green records).
     const pending = proposals.filter((p) => !appliedProposals[p.id])
     if (pending.length === 0) return
+    // Off a desk, gather the desk-kind proposals and offer a desk for them first.
+    if (!activeTaskId) {
+      const deskPending = pending.filter((p) => DESK_KINDS.has(p.kind))
+      if (deskPending.length > 0) {
+        setDeskOffer(deskPending)
+        return
+      }
+    }
     // Confirm before a batch that destroys anything — undo exists as a backstop,
     // but a one-click bulk delete deserves a heads-up.
     const destructive = pending.filter((p) => p.kind === 'delete-widget')
@@ -172,11 +210,107 @@ export default function ProposalCards({
     }
   }
 
+  // Apply the offered desk-kind proposals on the chosen desk, then navigate there
+  // so the user sees what was created. One undo batch for the lot.
+  async function applyOnDesk(deskId: string): Promise<void> {
+    const offered = deskOffer ?? []
+    setDeskOffer(null)
+    setNewDeskName('')
+    useViewStore.getState().goTask(deskId)
+    const ids = batchResolvedIds.current
+    useActionHistory.getState().beginBatch()
+    try {
+      for (const p of offered) {
+        try {
+          const dep = await ensureDependencies(p, proposals, {
+            activeTaskId: deskId,
+            resolvedIds: ids,
+            destinationFolderId
+          })
+          if (dep.ok) {
+            for (const parent of dep.appliedParents) recordApplied(parent.proposal, parent.message, ids)
+          }
+          const result = await applyProposal(p, { activeTaskId: deskId, resolvedIds: ids, destinationFolderId })
+          if (result.ok) recordApplied(p, result.message, ids)
+          else setToast({ id: p.id, ok: false, message: result.message })
+        } catch (err) {
+          setToast({ id: p.id, ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' })
+        }
+      }
+    } finally {
+      useActionHistory
+        .getState()
+        .endBatch(`Add ${offered.length} to a desk`)
+    }
+  }
+
+  async function createDeskAndApply(): Promise<void> {
+    const title = newDeskName.trim() || 'New desk'
+    try {
+      const desk = await useNodeStore.getState().create({ parentId: null, kind: 'task', title })
+      await applyOnDesk(desk.id)
+    } catch {
+      setToast({ id: 'desk', ok: false, message: 'Could not create the desk.' })
+    }
+  }
+
   // Only the not-yet-applied proposals are candidates for "Apply all".
   const pendingCount = proposals.filter((p) => !appliedProposals[p.id]).length
 
   return (
     <div className="ml-0 mr-auto max-w-[92%] flex flex-col gap-1">
+      {deskOffer && (
+        <div
+          data-testid="desk-offer"
+          className="rounded-md border border-accent/40 bg-accent/5 p-2.5 flex flex-col gap-2"
+        >
+          <div className="text-[11px] text-[var(--ink-80)] leading-snug">
+            {deskOffer.length === 1 ? 'This lives on a desk' : `These ${deskOffer.length} live on a desk`}, not in a
+            document. Create a desk for it, or pick one.
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              value={newDeskName}
+              onChange={(e) => setNewDeskName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void createDeskAndApply()
+              }}
+              placeholder="New desk name"
+              data-testid="desk-offer-name"
+              className="flex-1 min-w-0 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            />
+            <button
+              onClick={() => void createDeskAndApply()}
+              data-testid="desk-offer-create"
+              className="shrink-0 rounded bg-[rgb(var(--accent))] text-white px-2.5 py-1 text-[11px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+            >
+              Create + add
+            </button>
+          </div>
+          {desks.length > 0 && (
+            <div className="flex flex-col gap-0.5 max-h-40 overflow-auto">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] px-0.5">Or an existing desk</div>
+              {desks.slice(0, 8).map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => void applyOnDesk(d.id)}
+                  data-testid={`desk-offer-existing-${d.id}`}
+                  className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+                >
+                  <Icon name="desktop_windows" size={13} className="text-[var(--ink-40)] shrink-0" />
+                  <span className="truncate">{d.title || 'Untitled desk'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setDeskOffer(null)}
+            className="text-[10px] text-[var(--ink-50)] self-start hover:underline"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       {proposals.map((p) => {
         const desc = describeProposal(p)
         const isBusy = busy === p.id

@@ -21,10 +21,17 @@
 // renamed PlexiDesk build. Asset filenames stay "Haptyx-…" so the hardcoded
 // auto-update URL in shipped clients keeps resolving across the rename.
 
+// Notarisation can authenticate two ways, both of which electron-builder reads
+// from the environment and passes to notarytool:
+//   - App Store Connect API key: APPLE_API_KEY (path to the .p8), APPLE_API_KEY_ID,
+//     APPLE_API_ISSUER  (preferred — no app-specific password to rotate); or
+//   - Apple ID + app-specific password: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD.
+// Either way APPLE_TEAM_ID pins the team. Signing itself uses the Developer ID
+// Application identity in the keychain (auto-picked, or pinned via CSC_NAME).
 const hasNotaryCreds =
   !!process.env.APPLE_TEAM_ID &&
-  !!process.env.APPLE_ID &&
-  !!process.env.APPLE_APP_SPECIFIC_PASSWORD
+  ((!!process.env.APPLE_API_KEY && !!process.env.APPLE_API_KEY_ID && !!process.env.APPLE_API_ISSUER) ||
+    (!!process.env.APPLE_ID && !!process.env.APPLE_APP_SPECIFIC_PASSWORD))
 
 const macSigning = hasNotaryCreds
   ? {

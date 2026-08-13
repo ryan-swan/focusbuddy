@@ -24,6 +24,12 @@ import '@fontsource/patrick-hand'
 import '@fontsource/atkinson-hyperlegible'
 import './styles/globals.css'
 
+// This is the MAIN PlexiDesk renderer, which mounts the one global AssistantOverlay.
+// The flag lets shared editors (DocEditor, used here AND in the standalone
+// PlexiOffice build that has no overlay) route their AI affordance to the single
+// overlay here, and fall back to their own in-panel assistant in the standalone app.
+;(window as unknown as { __fbHasGlobalAssistant?: boolean }).__fbHasGlobalAssistant = true
+
 // Restore the user's chosen UI scale and density before the app renders. On the
 // very first launch this persists a screen-fit default so the app opens sized
 // for the display; after that it just re-applies whatever is stored. See

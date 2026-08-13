@@ -195,7 +195,14 @@ export default function DocEditor({
   // The persistent right-side panel: open/collapsed plus the active tab. The old
   // floating-outline toggle now drives this panel's Outline tab instead.
   const [panelOpen, setPanelOpen] = useState(true)
-  const [panelTab, setPanelTab] = useState<DocSidePanelTab>('ai')
+  // In the main PlexiDesk app the ONE global assistant (AssistantOverlay) owns AI,
+  // so the doc's in-panel AI tab is retired and its toggle opens the overlay
+  // (contextual to this doc, and able to insert its answers here). The standalone
+  // PlexiOffice build has no overlay, so it keeps its own in-panel assistant.
+  const hasGlobalAssistant =
+    typeof window !== 'undefined' &&
+    (window as unknown as { __fbHasGlobalAssistant?: boolean }).__fbHasGlobalAssistant === true
+  const [panelTab, setPanelTab] = useState<DocSidePanelTab>(hasGlobalAssistant ? 'comments' : 'ai')
   // Page vs continuous layout is a personal viewing preference (remembered across
   // sessions). Paper size, orientation and margins are part of the document and
   // travel with it, so they live on the body, not in localStorage.
@@ -641,6 +648,11 @@ export default function DocEditor({
               </button>
               <button
                 onClick={() => {
+                  if (hasGlobalAssistant) {
+                    // The one assistant, docked/floating, contextual to this doc.
+                    window.dispatchEvent(new CustomEvent('fb:open-assistant'))
+                    return
+                  }
                   if (panelOpen && panelTab === 'ai') setPanelOpen(false)
                   else {
                     setPanelTab('ai')
@@ -648,7 +660,7 @@ export default function DocEditor({
                   }
                 }}
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
-                  panelOpen && panelTab === 'ai'
+                  !hasGlobalAssistant && panelOpen && panelTab === 'ai'
                     ? 'text-accent bg-accent/10'
                     : 'hover:bg-[var(--surface-sunken)]/70'
                 }`}
@@ -888,6 +900,7 @@ export default function DocEditor({
           editor={editor}
           ai={ai}
           userName={userName}
+          showAiTab={!hasGlobalAssistant}
           tab={panelTab}
           onTab={setPanelTab}
           onCollapse={() => setPanelOpen(false)}

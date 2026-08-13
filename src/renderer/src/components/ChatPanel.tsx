@@ -172,6 +172,15 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
     ed.chain().focus().clearContent().insertContent(text).run()
     setDraft(text)
   }, [])
+  // Insert an answer into the document currently open in the editor (the doc
+  // exposes itself as window.__docEditor). This gives the one assistant the
+  // "drop the answer into my doc" capability the old in-doc panel had, so the
+  // separate doc AI tab is no longer needed.
+  const insertIntoDoc = useCallback((content: string): void => {
+    const ed = (window as unknown as { __docEditor?: import('@tiptap/core').Editor }).__docEditor
+    if (!ed) return
+    ed.chain().focus().insertContent(content).run()
+  }, [])
   const [summarizing, setSummarizing] = useState(false)
   // Which turn most recently had its text copied — drives the ✓ confirmation on
   // the copy button, then clears itself.
@@ -793,6 +802,17 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
                 >
                   <Icon name={copiedTs === m.ts ? 'check' : 'content_copy'} size={12} />
                 </button>
+                {typeof window !== 'undefined' &&
+                  !!(window as unknown as { __docEditor?: unknown }).__docEditor && (
+                    <button
+                      onClick={() => insertIntoDoc(m.content)}
+                      title="Insert this into the document"
+                      className="icon-btn !h-6 !w-6"
+                      data-testid="turn-insert-doc"
+                    >
+                      <Icon name="post_add" size={12} />
+                    </button>
+                  )}
                 <button
                   onClick={() => void retryFrom(i)}
                   disabled={sending}
