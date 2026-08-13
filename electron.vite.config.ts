@@ -55,6 +55,31 @@ export default defineConfig({
           // Second product entry — the standalone PlexiOffice app. Same built
           // bundle; the main process loads this HTML when running as PlexiOffice.
           plexioffice: resolve('src/renderer/plexioffice.html')
+        },
+        output: {
+          // Split the heavy, feature-specific vendor libraries into their own
+          // chunks instead of folding them into one ~5MB blob. This does not
+          // shrink first-load bytes on its own (these still load), but it isolates
+          // the weight so an app update that only touches our code no longer forces
+          // clients to re-download the editor/flow/chart/office vendors, which the
+          // differential updater then ships as a much smaller delta. It also lets
+          // the runtime fetch chunks in parallel, and it draws the boundaries a
+          // later lazy-load pass (the real cold-start fix) will defer.
+          manualChunks(id: string): string | undefined {
+            if (!id.includes('node_modules')) return undefined
+            if (/node_modules\/(@tiptap|prosemirror|tiptap-markdown|y-prosemirror)\//.test(id)) {
+              return 'vendor-editor'
+            }
+            if (id.includes('node_modules/@xyflow/')) return 'vendor-flow'
+            if (/node_modules\/(recharts|d3-|internmap|victory-vendor)\//.test(id)) {
+              return 'vendor-charts'
+            }
+            if (/node_modules\/(exceljs|xlsx|pptxgenjs|@turbodocx)\//.test(id)) {
+              return 'vendor-office'
+            }
+            if (/node_modules\/yjs\//.test(id)) return 'vendor-yjs'
+            return undefined
+          }
         }
       }
     }
