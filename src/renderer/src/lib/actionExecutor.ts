@@ -62,7 +62,15 @@ export interface ApplyResult {
  */
 export async function applyProposal(
   proposal: ActionProposal,
-  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string>; destinationFolderId?: string | null }
+  ctx: {
+    activeTaskId: string | null
+    resolvedIds?: Map<string, string>
+    destinationFolderId?: string | null
+    // When true, a document-producing proposal is saved to Files rather than
+    // dropped on a desk as a widget. Only generate-document acts on it today;
+    // create-document already lives in Files, and desk-only kinds never see it.
+    toFiles?: boolean
+  }
 ): Promise<ApplyResult> {
   switch (proposal.kind) {
     case 'create-widget':
@@ -532,7 +540,12 @@ async function applyCreateDocument(
 // failures: no API key, generation failed, or the surface is off-plan.
 async function applyGenerateDocument(
   p: Extract<ActionProposal, { kind: 'generate-document' }>,
-  ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string>; destinationFolderId?: string | null }
+  ctx: {
+    activeTaskId: string | null
+    resolvedIds?: Map<string, string>
+    destinationFolderId?: string | null
+    toFiles?: boolean
+  }
 ): Promise<ApplyResult> {
   const cap = capabilityForDocType(p.docType)
   if (useCapabilityStore.getState().get(cap) !== true) {
@@ -569,6 +582,28 @@ async function applyGenerateDocument(
     if (store.active?.id === docId) await store.open(docId)
     if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
     return { ok: true, message: `Filled ${label.toLowerCase()} "${p.title || widget.title}" — recoverable in Version history` }
+  }
+
+  // Files destination: generate the document and keep it in Files, without
+  // dropping a widget on any desk. This is what "Add to files" on the card
+  // chooses, so a generated document can live in the file tree like any other.
+  if (ctx.toFiles) {
+    const res = await useDocumentsStore.getState().createWithAI({ docType: p.docType, prompt: p.prompt })
+    if (!res.ok || !res.id) {
+      return {
+        ok: false,
+        message: res.needsApiKey
+          ? 'Add an Anthropic API key in Settings to generate documents.'
+          : res.error ?? `Could not generate the ${label.toLowerCase()}.`
+      }
+    }
+    const docId = res.id
+    if (p.title) await window.api.documents.update(docId, { title: p.title }).catch(() => null)
+    if (ctx.destinationFolderId) {
+      await window.api.fileManager.fileDocument(docId, ctx.destinationFolderId).catch(() => null)
+    }
+    if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+    return { ok: true, message: `Created ${label.toLowerCase()} "${p.title}" in Files` }
   }
 
   // Create a new populated document and drop it on the desk as a widget.

@@ -10,8 +10,7 @@ import Icon from './Icon'
 
 // Proposal kinds that create content ON a desk canvas and therefore need an
 // active desk. When the assistant proposes one of these off a desk (e.g. a table
-// while you're in a document), we offer to create a new desk or pick an existing
-// one and apply it there — rather than the old dead-end "Open a task first".
+// while you're in a document), we offer a place for it rather than dead-ending.
 const DESK_KINDS = new Set<ActionProposal['kind']>([
   'create-widget',
   'create-table',
@@ -23,6 +22,35 @@ const DESK_KINDS = new Set<ActionProposal['kind']>([
   'create-page'
 ])
 
+// Kinds whose result is a document that can live in Files instead of (or as well
+// as) on a desk. create-document already lands in Files; generate-document can be
+// routed there via the applier's toFiles mode instead of dropping a desk widget.
+const FILE_KINDS = new Set<ActionProposal['kind']>(['create-document', 'generate-document'])
+
+// Can this proposal be placed on a desk? Everything in DESK_KINDS, plus a
+// generated document (which normally drops a desk widget).
+function isDeskCapable(kind: ActionProposal['kind']): boolean {
+  return DESK_KINDS.has(kind) || kind === 'generate-document'
+}
+function isFileCapable(kind: ActionProposal['kind']): boolean {
+  return FILE_KINDS.has(kind)
+}
+// A card gets the "choose where" control only when there is a real choice to
+// make — i.e. it can go on a desk (and so also possibly to Files). A files-only
+// kind has one home, so its plain Apply already does the right thing.
+function hasPlacementChoice(kind: ActionProposal['kind']): boolean {
+  return isDeskCapable(kind)
+}
+
+// The word the Apply affordance shows WHILE a card is being applied, so a slow
+// step reads as what it is instead of a bare "…". Generating a document can take
+// several seconds; saying so is the whole point of this.
+function busyVerb(kind: ActionProposal['kind']): string {
+  if (kind === 'generate-document') return 'generating…'
+  if (kind === 'create-document') return 'creating…'
+  return '…'
+}
+
 // ── Inline action-proposal cards ────────────────────────────────────────────
 //
 // Each ActionProposal renders as a clickable card. On apply, the executor
@@ -30,16 +58,15 @@ const DESK_KINDS = new Set<ActionProposal['kind']>([
 // thread as a durable record with an optional "Go to". Dismiss (×) removes an
 // un-applied suggestion. Multiple cards can be applied; "Apply all" runs them.
 //
+// Placement: cards that create content can go somewhere other than the current
+// desk. A "choose where" control opens an inline chooser (never a floating
+// dropdown, so it can't get trapped under the overlay's stacking) offering: this
+// desk, another desk, a new desk, or Files for a document. Clicking the card
+// itself still applies to the sensible default.
+//
 // Store-agnostic: the applied-state + the mark-applied callback are passed in by
 // the host surface, so the SAME component works for the in-memory side-panel
 // assistant (useChatStore) AND the persisted Focus chat (useFocusChatStore).
-//
-// Both are OPTIONAL so a surface can adopt this component before it has anywhere
-// to keep applied-state. Omit them and an applied card is simply consumed on
-// success (the pre-durable-record behaviour) — no store change required. Pass
-// them and the card becomes a durable green record with a "Go to". PlexiChat
-// (MessagesView) is on the fallback today; wiring applied-state into
-// stores/messaging.ts is all it needs to gain the richer behaviour.
 
 interface ProposalCardsProps {
   proposals: ActionProposal[]
@@ -83,27 +110,23 @@ export default function ProposalCards({
   // or race its applies. Disable manual apply for the duration of a run.
   const agentRunning = useAgentLoop((s) => s.running)
 
-  // Desk-offer: when a desk-kind proposal is applied off a desk, hold the
-  // pending proposal(s) here and show the create-or-pick-a-desk chooser instead
-  // of failing. Existing desks come from the node store (task nodes).
-  const [deskOffer, setDeskOffer] = useState<ActionProposal[] | null>(null)
+  // Placement chooser: the proposal(s) awaiting a destination. Opened either by
+  // the per-card "choose where" control, or automatically when a desk-kind
+  // proposal is applied with no active desk. Rendered inline (see the panel
+  // below) rather than as a popover, so it can never be clipped or z-trapped.
+  const [placeOffer, setPlaceOffer] = useState<ActionProposal[] | null>(null)
   const [newDeskName, setNewDeskName] = useState('')
   const desks = useNodeStore((s) => s.nodes).filter((n) => n.kind === 'task' && !n.archived)
 
   // resolvedIds threads newly-created entity ids (today: tables) through a
   // batch so a follow-up proposal (today: add-table-row) can reference what
   // an earlier one created via "$<proposalId>" symbolic refs. Held in a ref
-  // so a per-card click survives outside of a single applyAll() loop —
-  // without this, clicking Apply on an add-table-row card after manually
-  // applying its parent create-table card would still fail because the
-  // resolution map was local to applyAll's stack frame.
+  // so a per-card click survives outside of a single applyAll() loop.
   const batchResolvedIds = useRef<Map<string, string>>(new Map())
 
   // Single place the "what happens to a card once it succeeds" decision lives.
   // With an applied-state store the card becomes a durable green record with a
   // "Go to"; without one it is consumed, matching the pre-durable behaviour.
-  // Every success path (direct apply + each auto-applied parent dependency)
-  // routes through here so the two modes can never drift apart.
   function recordApplied(
     p: ActionProposal,
     message: string,
@@ -125,19 +148,16 @@ export default function ProposalCards({
     resolvedIds?: Map<string, string>
   ): Promise<void> {
     if (busy || agentRunning) return
-    // A desk-kind proposal with no active desk: offer to create/pick one rather
-    // than dead-end. The chooser then applies it on the chosen desk.
-    if (!activeTaskId && DESK_KINDS.has(p.kind)) {
-      setDeskOffer([p])
+    // A desk-capable proposal with no active desk: offer a place rather than
+    // dead-end. The chooser then applies it wherever the user picks.
+    if (!activeTaskId && isDeskCapable(p.kind)) {
+      setPlaceOffer([p])
       return
     }
     const ids = resolvedIds ?? batchResolvedIds.current
     setBusy(p.id)
     // Resolve any not-yet-applied parent this proposal forward-references, via the
     // shared resolver (so this card path and the agent loop can never drift).
-    // The resolver is UI-free, so we do the "mark applied" bookkeeping here for
-    // each parent it auto-created — an auto-created dependency then reads the same
-    // as a manually-applied one (green record, not removed).
     const dep = await ensureDependencies(p, proposals, { activeTaskId, resolvedIds: ids, destinationFolderId })
     if (!dep.ok) {
       setBusy(null)
@@ -147,9 +167,8 @@ export default function ProposalCards({
     }
     for (const parent of dep.appliedParents) recordApplied(parent.proposal, parent.message, ids)
     // A canvas handler (or its store IPC) can throw rather than return a
-    // failure envelope. Without this guard the throw skipped setBusy(null), so
-    // every Apply button stayed disabled and the panel looked frozen. Always
-    // clear busy and show an honest failure chip; the card stays for a retry.
+    // failure envelope. Always clear busy and show an honest failure chip; the
+    // card stays for a retry.
     let result: { ok: boolean; message: string }
     try {
       result = await applyProposal(p, { activeTaskId, resolvedIds: ids, destinationFolderId })
@@ -157,11 +176,6 @@ export default function ProposalCards({
       result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
     }
     setBusy(null)
-    // On success the card is NOT removed — it turns green + gains a "Go to" and
-    // stays in the thread as a durable record. We resolve where "Go to" jumps
-    // from the proposal + the ids the executor stashed for creations. Failures
-    // keep the card clickable (so the user can read the message + retry) and are
-    // shown as an inline toast.
     if (result.ok) {
       recordApplied(p, result.message, ids)
     } else {
@@ -175,11 +189,11 @@ export default function ProposalCards({
     // Only apply the ones not already done (applied cards stay as green records).
     const pending = proposals.filter((p) => !appliedProposals[p.id])
     if (pending.length === 0) return
-    // Off a desk, gather the desk-kind proposals and offer a desk for them first.
+    // Off a desk, gather the desk-kind proposals and offer a place for them first.
     if (!activeTaskId) {
-      const deskPending = pending.filter((p) => DESK_KINDS.has(p.kind))
+      const deskPending = pending.filter((p) => isDeskCapable(p.kind))
       if (deskPending.length > 0) {
-        setDeskOffer(deskPending)
+        setPlaceOffer(deskPending)
         return
       }
     }
@@ -210,17 +224,18 @@ export default function ProposalCards({
     }
   }
 
-  // Apply the offered desk-kind proposals on the chosen desk, then navigate there
-  // so the user sees what was created. One undo batch for the lot.
+  // Apply the offered proposals on a specific desk, then navigate there so the
+  // user sees what was created. One undo batch for the lot.
   async function applyOnDesk(deskId: string): Promise<void> {
-    const offered = deskOffer ?? []
-    setDeskOffer(null)
+    const offered = placeOffer ?? []
+    setPlaceOffer(null)
     setNewDeskName('')
     useViewStore.getState().goTask(deskId)
     const ids = batchResolvedIds.current
     useActionHistory.getState().beginBatch()
     try {
       for (const p of offered) {
+        setBusy(p.id)
         try {
           const dep = await ensureDependencies(p, proposals, {
             activeTaskId: deskId,
@@ -238,9 +253,38 @@ export default function ProposalCards({
         }
       }
     } finally {
-      useActionHistory
-        .getState()
-        .endBatch(`Add ${offered.length} to a desk`)
+      setBusy(null)
+      useActionHistory.getState().endBatch(`Add ${offered.length} to a desk`)
+    }
+  }
+
+  // Save the offered document proposal(s) to Files, without dropping a desk
+  // widget. Only file-capable kinds are ever offered this route (see the panel).
+  async function applyToFiles(): Promise<void> {
+    const offered = placeOffer ?? []
+    setPlaceOffer(null)
+    setNewDeskName('')
+    const ids = batchResolvedIds.current
+    useActionHistory.getState().beginBatch()
+    try {
+      for (const p of offered) {
+        setBusy(p.id)
+        try {
+          const result = await applyProposal(p, {
+            activeTaskId: null,
+            resolvedIds: ids,
+            destinationFolderId,
+            toFiles: true
+          })
+          if (result.ok) recordApplied(p, result.message, ids)
+          else setToast({ id: p.id, ok: false, message: result.message })
+        } catch (err) {
+          setToast({ id: p.id, ok: false, message: err instanceof Error ? err.message : 'Could not save to Files.' })
+        }
+      }
+    } finally {
+      setBusy(null)
+      useActionHistory.getState().endBatch(`Add ${offered.length} to Files`)
     }
   }
 
@@ -257,54 +301,90 @@ export default function ProposalCards({
   // Only the not-yet-applied proposals are candidates for "Apply all".
   const pendingCount = proposals.filter((p) => !appliedProposals[p.id]).length
 
+  // Which destination options the current chooser should show, from the kinds of
+  // the offered proposals. Desk options appear when any can live on a desk; the
+  // Files option appears only when EVERY offered proposal can go to Files, so it
+  // never silently drops a desk-only sibling.
+  const offerShowsDesk = (placeOffer ?? []).some((p) => isDeskCapable(p.kind))
+  const offerShowsFiles = (placeOffer ?? []).length > 0 && (placeOffer ?? []).every((p) => isFileCapable(p.kind))
+  const offerLabel =
+    placeOffer && placeOffer.length === 1
+      ? describeProposal(placeOffer[0]).subject
+      : `these ${placeOffer?.length ?? 0}`
+
   return (
     <div className="ml-0 mr-auto max-w-[92%] flex flex-col gap-1">
-      {deskOffer && (
+      {placeOffer && (
         <div
           data-testid="desk-offer"
           className="rounded-md border border-accent/40 bg-accent/5 p-2.5 flex flex-col gap-2"
         >
           <div className="text-[11px] text-[var(--ink-80)] leading-snug">
-            {deskOffer.length === 1 ? 'This lives on a desk' : `These ${deskOffer.length} live on a desk`}, not in a
-            document. Create a desk for it, or pick one.
+            Where should <span className="font-medium">{offerLabel}</span> go?
           </div>
-          <div className="flex items-center gap-1.5">
-            <input
-              value={newDeskName}
-              onChange={(e) => setNewDeskName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void createDeskAndApply()
-              }}
-              placeholder="New desk name"
-              data-testid="desk-offer-name"
-              className="flex-1 min-w-0 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
-            />
+          {offerShowsDesk && activeTaskId && (
             <button
-              onClick={() => void createDeskAndApply()}
-              data-testid="desk-offer-create"
-              className="shrink-0 rounded bg-[rgb(var(--accent))] text-white px-2.5 py-1 text-[11px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+              onClick={() => void applyOnDesk(activeTaskId)}
+              data-testid="place-this-desk"
+              className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
             >
-              Create + add
+              <Icon name="space_dashboard" size={13} className="text-accent shrink-0" />
+              <span className="truncate">This desk</span>
             </button>
-          </div>
-          {desks.length > 0 && (
-            <div className="flex flex-col gap-0.5 max-h-40 overflow-auto">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] px-0.5">Or an existing desk</div>
-              {desks.slice(0, 8).map((d) => (
+          )}
+          {offerShowsFiles && (
+            <button
+              onClick={() => void applyToFiles()}
+              data-testid="place-files"
+              className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+            >
+              <Icon name="folder" size={13} className="text-accent shrink-0" />
+              <span className="truncate">Add to Files</span>
+            </button>
+          )}
+          {offerShowsDesk && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={newDeskName}
+                  onChange={(e) => setNewDeskName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void createDeskAndApply()
+                  }}
+                  placeholder="New desk name"
+                  data-testid="desk-offer-name"
+                  className="flex-1 min-w-0 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                />
                 <button
-                  key={d.id}
-                  onClick={() => void applyOnDesk(d.id)}
-                  data-testid={`desk-offer-existing-${d.id}`}
-                  className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+                  onClick={() => void createDeskAndApply()}
+                  data-testid="desk-offer-create"
+                  className="shrink-0 rounded bg-[rgb(var(--accent))] text-white px-2.5 py-1 text-[11px] font-medium hover:bg-[rgb(var(--accent-hover))]"
                 >
-                  <Icon name="desktop_windows" size={13} className="text-[var(--ink-40)] shrink-0" />
-                  <span className="truncate">{d.title || 'Untitled desk'}</span>
+                  New desk
                 </button>
-              ))}
-            </div>
+              </div>
+              {desks.length > 0 && (
+                <div className="flex flex-col gap-0.5 max-h-40 overflow-auto">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] px-0.5">
+                    Or another desk
+                  </div>
+                  {desks.slice(0, 8).map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => void applyOnDesk(d.id)}
+                      data-testid={`desk-offer-existing-${d.id}`}
+                      className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+                    >
+                      <Icon name="desktop_windows" size={13} className="text-[var(--ink-40)] shrink-0" />
+                      <span className="truncate">{d.title || 'Untitled desk'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <button
-            onClick={() => setDeskOffer(null)}
+            onClick={() => setPlaceOffer(null)}
             className="text-[10px] text-[var(--ink-50)] self-start hover:underline"
           >
             Cancel
@@ -370,7 +450,8 @@ export default function ProposalCards({
           )
         }
 
-        // ── Pending card: clickable to apply, × to dismiss.
+        // ── Pending card: clickable to apply, a "choose where" control for
+        //    placeable kinds, and × to dismiss.
         return (
           <button
             key={p.id}
@@ -402,6 +483,20 @@ export default function ProposalCards({
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {!isBusy && hasPlacementChoice(p.kind) && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPlaceOffer([p])
+                    }}
+                    title="Choose where to add this"
+                    role="button"
+                    data-testid={`proposal-place-${p.id}`}
+                    className="icon-btn !h-5 !w-5"
+                  >
+                    <Icon name="drive_file_move" size={12} />
+                  </span>
+                )}
                 {!isBusy && (
                   <span
                     onClick={(e) => {
@@ -416,7 +511,7 @@ export default function ProposalCards({
                   </span>
                 )}
                 <span className="text-[10px] text-accent font-medium px-1">
-                  {isBusy ? '…' : 'apply'}
+                  {isBusy ? busyVerb(p.kind) : 'apply'}
                 </span>
               </div>
             </div>
