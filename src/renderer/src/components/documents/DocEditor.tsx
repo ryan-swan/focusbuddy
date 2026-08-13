@@ -201,6 +201,18 @@ export default function DocEditor({
   // travel with it, so they live on the body, not in localStorage.
   const [pageView, setPageView] = useState<boolean>(() => readPref('fb.doc.pageView', ['0', '1'] as const, '0') === '1')
   const [showMargins, setShowMargins] = useState(false)
+  // Word-style margin ruler in page view; on by default, remembered per user.
+  const [showRuler, setShowRuler] = useState<boolean>(() => readPref('fb.doc.ruler', ['0', '1'] as const, '1') === '1')
+  const toggleRuler = (): void =>
+    setShowRuler((v) => {
+      const next = !v
+      try {
+        localStorage.setItem('fb.doc.ruler', next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
   const [showHeaderFooter, setShowHeaderFooter] = useState(false)
   const [aiInstruction, setAiInstruction] = useState('')
   const [busyOffice, setBusyOffice] = useState<string | null>(null)
@@ -555,6 +567,15 @@ export default function DocEditor({
                     <MarginMenu margin={page.margin} onPick={(m) => updatePageSetup({ margin: m })} onClose={() => setShowMargins(false)} />
                   )}
                 </div>
+                <button
+                  onClick={toggleRuler}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${showRuler ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
+                  title="Show the ruler — drag the markers to set page margins"
+                  data-testid="doc-ruler-btn"
+                >
+                  <Icon name="straighten" size={13} />
+                  <span>Ruler</span>
+                </button>
                 <div className="relative">
                   <button
                     onClick={() => setShowHeaderFooter((v) => !v)}
@@ -815,7 +836,7 @@ export default function DocEditor({
       </div>
 
       {showPage ? (
-        <PageSheet editor={editor} page={page} />
+        <PageSheet editor={editor} page={page} showRuler={showRuler} onChangeMargin={(m) => updatePageSetup({ margin: m })} />
       ) : (
         // Continuous view: a comfortable reading column that is centred in the
         // available space and widens with the window, so the editor uses the
@@ -1024,13 +1045,32 @@ const PAGE_GAP = 28
 // gap. The pagination extension measures the blocks and inserts spacers so a block
 // never straddles a page edge; this component draws one white sheet per page under
 // the flowing content and lets the grey canvas show through the gaps.
-function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.Element {
-  const geom = pageGeometry(page)
+const RULER_PX = 22 // ruler thickness
+const RULER_DPI = 96 // css px per inch, matching pageGeometry
+
+function PageSheet({
+  editor,
+  page,
+  showRuler,
+  onChangeMargin
+}: {
+  editor: Editor
+  page: PageSetup
+  showRuler: boolean
+  onChangeMargin: (margin: PageSetup['margin']) => void
+}): JSX.Element {
+  // While a ruler marker is being dragged we preview the new margin locally so the
+  // page reflows live, and only commit (persist) on release.
+  const [liveMargin, setLiveMargin] = useState<PageSetup['margin'] | null>(null)
+  const pendingMargin = useRef<PageSetup['margin'] | null>(null)
+  const effPage = liveMargin ? { ...page, margin: liveMargin } : page
+  const geom = pageGeometry(effPage)
   const usable = Math.max(1, geom.h - geom.mTop - geom.mBottom)
   const [pageCount, setPageCount] = useState(1)
 
   // Feed the live page metrics to the pagination plugin while this sheet is
-  // mounted, and switch pagination off again when we leave page view.
+  // mounted, and switch pagination off again when we leave page view. Depending
+  // on the effective margins means dragging a ruler marker re-paginates live.
   useEffect(() => {
     setPaginationConfig({
       enabled: true,
@@ -1046,11 +1086,128 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
   const stride = geom.h + PAGE_GAP
   const totalH = pageCount * geom.h + (pageCount - 1) * PAGE_GAP
 
+  // Drag a margin marker. The ruler element gives us page-space pixels directly
+  // (getBoundingClientRect is in CSS px, invariant under Chromium page zoom).
+  // Snap to 1/16 inch and keep at least an inch of content in each dimension.
+  const rulerH = useRef<HTMLDivElement>(null)
+  const rulerV = useRef<HTMLDivElement>(null)
+  function beginDrag(side: 'left' | 'right' | 'top' | 'bottom', el: HTMLDivElement | null, ev: React.PointerEvent): void {
+    if (!el) return
+    ev.preventDefault()
+    const rect = el.getBoundingClientRect()
+    const base = { ...(liveMargin ?? page.margin) }
+    const SNAP = 6
+    const MIN_CONTENT = 96
+    const toIn = (px: number): number => (Math.round(px / SNAP) * SNAP) / RULER_DPI
+    const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+    const move = (e: PointerEvent): void => {
+      const m = { ...base }
+      if (side === 'left') m.left = toIn(clamp(e.clientX - rect.left, 0, geom.w - geom.mRight - MIN_CONTENT))
+      else if (side === 'right') m.right = toIn(clamp(rect.right - e.clientX, 0, geom.w - geom.mLeft - MIN_CONTENT))
+      else if (side === 'top') m.top = toIn(clamp(e.clientY - rect.top, 0, geom.h - geom.mBottom - MIN_CONTENT))
+      else m.bottom = toIn(clamp(rect.bottom - e.clientY, 0, geom.h - geom.mTop - MIN_CONTENT))
+      pendingMargin.current = m
+      setLiveMargin(m)
+    }
+    const up = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      if (pendingMargin.current) onChangeMargin(pendingMargin.current)
+      pendingMargin.current = null
+      setLiveMargin(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  const inchTicks = (lengthPx: number): number[] => {
+    const out: number[] = []
+    for (let k = 0, x = 0; x <= lengthPx + 1; k++, x = k * RULER_DPI) out.push(x)
+    return out
+  }
+  const markerCls = 'absolute z-10 flex items-center justify-center text-[var(--ink-70)]'
+
   return (
     <div
-      className="flex justify-center py-8 px-4 overflow-x-auto bg-stone-300/50 dark:bg-black/40"
+      className="py-8 px-4 overflow-x-auto bg-stone-300/50 dark:bg-black/40"
       data-testid="doc-page-canvas"
     >
+      {/* Horizontal ruler — sticky so it stays put while scrolling. A corner
+          spacer of the vertical ruler's width keeps it aligned above the page. */}
+      {showRuler && (
+        <div className="sticky top-0 z-30 flex justify-center mb-1">
+          <div style={{ width: RULER_PX }} className="shrink-0" />
+          <div
+            ref={rulerH}
+            data-testid="doc-ruler-h"
+            className="relative shrink-0 select-none"
+            style={{ width: geom.w, height: RULER_PX, background: 'var(--surface-raised)', border: '1px solid var(--edge-soft)', borderRadius: 3 }}
+          >
+            {inchTicks(geom.w).map((x, k) => (
+              <div key={k} className="absolute top-0 bottom-0 w-px bg-[var(--edge-firm)]/50" style={{ left: x }}>
+                {k > 0 && <span className="absolute top-0.5 left-1 text-[9px] text-[var(--ink-40)] fb-tabular">{k}</span>}
+              </div>
+            ))}
+            <div className="absolute top-0 bottom-0 left-0 bg-[var(--ink-40)]/20" style={{ width: geom.mLeft }} />
+            <div className="absolute top-0 bottom-0 right-0 bg-[var(--ink-40)]/20" style={{ width: geom.mRight }} />
+            <div
+              data-testid="ruler-handle-left"
+              onPointerDown={(e) => beginDrag('left', rulerH.current, e)}
+              className={`${markerCls} top-0 bottom-0 w-3 -ml-1.5 cursor-col-resize`}
+              style={{ left: geom.mLeft }}
+              title={`Left margin ${effPage.margin.left}"`}
+            >
+              <span style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid var(--ink-70)' }} />
+            </div>
+            <div
+              data-testid="ruler-handle-right"
+              onPointerDown={(e) => beginDrag('right', rulerH.current, e)}
+              className={`${markerCls} top-0 bottom-0 w-3 -ml-1.5 cursor-col-resize`}
+              style={{ left: geom.w - geom.mRight }}
+              title={`Right margin ${effPage.margin.right}"`}
+            >
+              <span style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid var(--ink-70)' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-center">
+        {/* Vertical ruler — spans the first page; the top/bottom markers set the
+            document-wide top/bottom margins. */}
+        {showRuler && (
+          <div
+            ref={rulerV}
+            data-testid="doc-ruler-v"
+            className="relative shrink-0 select-none self-start"
+            style={{ width: RULER_PX, height: geom.h, background: 'var(--surface-raised)', border: '1px solid var(--edge-soft)', borderRadius: 3, marginRight: 4 }}
+          >
+            {inchTicks(geom.h).map((y, k) => (
+              <div key={k} className="absolute left-0 right-0 h-px bg-[var(--edge-firm)]/50" style={{ top: y }} />
+            ))}
+            <div className="absolute left-0 right-0 top-0 bg-[var(--ink-40)]/20" style={{ height: geom.mTop }} />
+            <div className="absolute left-0 right-0 bottom-0 bg-[var(--ink-40)]/20" style={{ height: geom.mBottom }} />
+            <div
+              data-testid="ruler-handle-top"
+              onPointerDown={(e) => beginDrag('top', rulerV.current, e)}
+              className={`${markerCls} left-0 right-0 h-3 -mt-1.5 cursor-row-resize`}
+              style={{ top: geom.mTop }}
+              title={`Top margin ${effPage.margin.top}"`}
+            >
+              <span style={{ width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: '7px solid var(--ink-70)' }} />
+            </div>
+            <div
+              data-testid="ruler-handle-bottom"
+              onPointerDown={(e) => beginDrag('bottom', rulerV.current, e)}
+              className={`${markerCls} left-0 right-0 h-3 -mt-1.5 cursor-row-resize`}
+              style={{ top: geom.h - geom.mBottom }}
+              title={`Bottom margin ${effPage.margin.bottom}"`}
+            >
+              <span style={{ width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: '7px solid var(--ink-70)' }} />
+            </div>
+          </div>
+        )}
+
       {/* minWidth:0 + flexShrink:0 pin the sheet to its true paper width inside the
           centering flex row. Without minWidth:0 a flex item's auto min-content
           floor lets a wide child (a long code line, a big table) stretch the whole
@@ -1133,6 +1290,7 @@ function PageSheet({ editor, page }: { editor: Editor; page: PageSetup }): JSX.E
         >
           <EditorContent editor={editor} />
         </div>
+      </div>
       </div>
     </div>
   )

@@ -46,7 +46,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Documents no longer lose the last edit when you switch between them quickly.',
       'Pasted and long text paginates onto real pages: it breaks at line boundaries and stays in the content zone instead of overflowing the page breaks.',
       'Page view keeps wide content (code blocks, long links, tables, images) within the margins, at any zoom.',
-      'Pages are always white paper with dark text, even when the app is in dark mode.'
+      'Pages are always white paper with dark text, even when the app is in dark mode.',
+      'A Word-style ruler with draggable markers on the top and left lets you set the left, right, top and bottom page margins yourself.'
     ]
   },
   {
