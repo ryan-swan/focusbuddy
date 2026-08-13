@@ -90,3 +90,50 @@ describe('tidyPositions — flow', () => {
     expect(tidyPositions([], { mode: 'flow' }, 800)).toEqual([])
   })
 })
+
+// Tidy resizes to remove wasted space: every mode grows widgets to fill the gaps
+// its layout would otherwise leave. Positions above are unchanged; these pin the
+// new w/h.
+describe('tidyPositions — fills gaps (no wasted space)', () => {
+  it('grid: every widget grows to its whole cell (column width × row height)', () => {
+    // 2×2 square. col0 = a,c (widest 100); col1 = b,d (widest 200).
+    //             row0 = a,b (tallest 80); row1 = c,d (tallest 150).
+    const varied: TidyItem[] = [
+      { id: 'a', w: 100, h: 80 },
+      { id: 'b', w: 200, h: 80 },
+      { id: 'c', w: 100, h: 150 },
+      { id: 'd', w: 100, h: 80 }
+    ]
+    const p = Object.fromEntries(
+      tidyPositions(varied, { mode: 'square' }, 2000, 40, 60).map((x) => [x.id, x])
+    )
+    expect(p.a.w).toBe(100)
+    expect(p.b.w).toBe(200)
+    expect(p.d.w).toBe(200) // grew from 100 to its column width
+    expect(p.a.h).toBe(80)
+    expect(p.c.h).toBe(150)
+    expect(p.d.h).toBe(150) // grew from 80 to its row height
+  })
+
+  it('flow: a row is filled edge to edge and every item shares the row height', () => {
+    // width 260, three 100-wide items, gap 40 → row1 = [w0, w1].
+    const p = tidyPositions(items(3, 100, 80), { mode: 'flow' }, 260, 40, 60)
+    const row1 = p.filter((x) => x.y === p[0].y)
+    expect(row1.length).toBe(2)
+    expect(row1[0].h).toBe(row1[1].h) // uniform row height
+    const last = row1[row1.length - 1]
+    // The last item's right edge reaches padding + flowWidth (no trailing gap).
+    expect((last.x ?? 0) + (last.w ?? 0)).toBe(60 + 260)
+  })
+
+  it('mosaic: every item grows to the column width so columns are flush', () => {
+    const mixed: TidyItem[] = [
+      { id: 'a', w: 120, h: 200 },
+      { id: 'b', w: 90, h: 80 },
+      { id: 'c', w: 100, h: 80 }
+    ]
+    const p = tidyPositions(mixed, { mode: 'mosaic', cols: 2 }, 2000, 40, 60)
+    // Column width is the widest item (120); every item fills it.
+    for (const it of p) expect(it.w).toBe(120)
+  })
+})

@@ -10,6 +10,12 @@ export interface ArrangedPosition {
   id: string
   x: number
   y: number
+  // Tidy also RESIZES to remove wasted space: every mode grows widgets to fill
+  // the gaps its layout would otherwise leave (a grid fills each cell, flow fills
+  // each row to full width, mosaic flushes column widths). Callers apply these
+  // when present; a widget the mode chooses not to resize simply omits them.
+  w?: number
+  h?: number
 }
 
 // Tidy layout modes the user can pick from the Tidy menu. 'flow' is the classic
@@ -65,21 +71,42 @@ function columnsFor(opts: TidyOptions, n: number): number {
   return Math.ceil(Math.sqrt(n))
 }
 
-// Wrap into rows at flowWidth — the classic tidy. Row height = tallest in row.
+// Wrap into rows at flowWidth — the classic tidy — then fill each row so it has
+// no wasted space: every item in a row grows to the row's tallest height, and the
+// row's leftover horizontal space is shared out so the items span the full width
+// edge to edge.
 function flowRows(items: TidyItem[], flowWidth: number, gap: number, padding: number): ArrangedPosition[] {
-  const out: ArrangedPosition[] = []
-  let cursorX = padding
-  let cursorY = padding
-  let rowMaxH = 0
+  // Pass 1 — assign items to rows, wrapping when the next would overflow.
+  const rows: TidyItem[][] = []
+  let row: TidyItem[] = []
+  let rowW = 0
   for (const it of items) {
-    if (cursorX !== padding && cursorX + it.w > padding + flowWidth) {
-      cursorX = padding
-      cursorY += rowMaxH + gap
-      rowMaxH = 0
+    const addW = row.length === 0 ? it.w : gap + it.w
+    if (row.length > 0 && rowW + addW > flowWidth) {
+      rows.push(row)
+      row = []
+      rowW = 0
     }
-    out.push({ id: it.id, x: Math.round(cursorX), y: Math.round(cursorY) })
-    cursorX += it.w + gap
-    rowMaxH = Math.max(rowMaxH, it.h)
+    row.push(it)
+    rowW += row.length === 1 ? it.w : gap + it.w
+  }
+  if (row.length > 0) rows.push(row)
+
+  // Pass 2 — fill each row. Height = tallest member; width = natural width plus an
+  // equal share of the leftover so the row reaches flowWidth with no trailing gap.
+  const out: ArrangedPosition[] = []
+  let y = padding
+  for (const r of rows) {
+    const rowMaxH = Math.max(...r.map((it) => it.h))
+    const naturalW = r.reduce((s, it) => s + it.w, 0) + gap * (r.length - 1)
+    const extraPerItem = Math.max(0, flowWidth - naturalW) / r.length
+    let x = padding
+    for (const it of r) {
+      const w = Math.round(it.w + extraPerItem)
+      out.push({ id: it.id, x: Math.round(x), y: Math.round(y), w, h: rowMaxH })
+      x += w + gap
+    }
+    y += rowMaxH + gap
   }
   return out
 }
@@ -110,10 +137,14 @@ function gridPlace(items: TidyItem[], columns: number, gap: number, padding: num
     rowY[r] = y
     y += rowH[r] + gap
   }
+  // Each widget grows to fill its whole cell (column width × row height), so an
+  // aligned grid has no gaps around a smaller-than-its-neighbours widget.
   return items.map((it, i) => ({
     id: it.id,
     x: Math.round(colX[i % cols]),
-    y: Math.round(rowY[Math.floor(i / cols)])
+    y: Math.round(rowY[Math.floor(i / cols)]),
+    w: colW[i % cols],
+    h: rowH[Math.floor(i / cols)]
   }))
 }
 
@@ -129,7 +160,9 @@ function masonry(items: TidyItem[], columns: number, gap: number, padding: numbe
     const x = padding + c * (colWidth + gap)
     const y = colHeights[c]
     colHeights[c] += it.h + gap
-    return { id: it.id, x: Math.round(x), y: Math.round(y) }
+    // Grow each item to the column width so the columns are flush; heights are
+    // left alone because varying heights packing tightly is the point of mosaic.
+    return { id: it.id, x: Math.round(x), y: Math.round(y), w: colWidth }
   })
 }
 

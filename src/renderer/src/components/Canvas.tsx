@@ -2240,8 +2240,17 @@ export default function Canvas(): JSX.Element {
       GAP,
       PADDING
     )
+    // Tidy also resizes widgets to fill the gaps its layout leaves, so there is
+    // no wasted space. A section is never resized here — it auto-sizes to its
+    // children, so forcing a cell size on it would fight that.
+    const sectionIds = new Set(widgets.filter((w) => w.kind === 'section').map((w) => w.id))
     for (const p of placed) {
-      await updateWidget(p.id, { x: p.x, y: p.y })
+      const patch: { x: number; y: number; width?: number; height?: number } = { x: p.x, y: p.y }
+      if (!sectionIds.has(p.id)) {
+        if (typeof p.w === 'number') patch.width = p.w
+        if (typeof p.h === 'number') patch.height = p.h
+      }
+      await updateWidget(p.id, patch)
     }
     bumpLayoutVersion()
   }
