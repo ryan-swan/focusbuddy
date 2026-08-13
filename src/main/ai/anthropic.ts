@@ -1210,6 +1210,11 @@ export interface ChatStreamCallbacks {
   onSources: (trace: ChatRetrievalTrace) => void
   onReply: (replyText: string) => void
   onTool: (tool: ChatToolTrace) => void
+  // Fired when an action STARTS arriving (its `"kind"` just landed) — the
+  // in-progress counterpart of onTool, so the UI can narrate "Generating a
+  // document…" while the object is still being written. Optional: a listener
+  // that ignores it sees exactly the pre-existing event sequence.
+  onActivity?: (activity: ChatToolTrace) => void
   // Fired the moment the envelope's optional question object closes — between
   // reply and tools per the mandated key order. The durable copy still rides
   // the `complete` response, so a listener that misses this event loses only
@@ -1255,6 +1260,7 @@ export async function sendChatStream(
   const consumer = createChatStreamConsumer({
     onReply: cb.onReply,
     onTool: cb.onTool,
+    onActivity: cb.onActivity,
     onQuestion: cb.onQuestion
   })
   let stopReason = ''

@@ -404,6 +404,9 @@ const api = {
         onMentions?: (mentions: ChatMentionResolved[]) => void
         onSources?: (trace: ChatRetrievalTrace) => void
         onReply?: (text: string) => void
+        // In-progress counterpart of onTool: fires when an action STARTS
+        // arriving, so the UI can say what the assistant is doing right now.
+        onActivity?: (activity: ChatToolTrace) => void
         onTool?: (tool: ChatToolTrace) => void
         onQuestion?: (question: ChatQuestion) => void
         onError?: (error: { ok: false; error: string; needsApiKey?: boolean }) => void
@@ -415,6 +418,7 @@ const api = {
         | { type: 'mentions'; payload: ChatMentionResolved[] }
         | { type: 'sources'; payload: ChatRetrievalTrace }
         | { type: 'reply'; payload: string }
+        | { type: 'activity'; payload: ChatToolTrace }
         | { type: 'tool'; payload: ChatToolTrace }
         | { type: 'question'; payload: ChatQuestion }
         | { type: 'error'; payload: { ok: false; error: string; needsApiKey?: boolean } }
@@ -432,6 +436,9 @@ const api = {
             break
           case 'reply':
             callbacks.onReply?.(ev.payload)
+            break
+          case 'activity':
+            callbacks.onActivity?.(ev.payload)
             break
           case 'tool':
             callbacks.onTool?.(ev.payload)

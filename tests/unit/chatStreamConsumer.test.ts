@@ -128,6 +128,68 @@ describe('createChatStreamConsumer', () => {
   })
 })
 
+describe('createChatStreamConsumer — activity (in-progress narration)', () => {
+  function runWithActivity(chunks: string[]): {
+    activities: ChatToolTrace[]
+    tools: ChatToolTrace[]
+  } {
+    const activities: ChatToolTrace[] = []
+    const tools: ChatToolTrace[] = []
+    const consumer = createChatStreamConsumer({
+      onReply: () => {},
+      onTool: (t) => tools.push(t),
+      onActivity: (a) => activities.push(a)
+    })
+    for (const c of chunks) consumer.push(c)
+    return { activities, tools }
+  }
+
+  it('announces an action the moment its kind lands, BEFORE the object closes', () => {
+    const activities: ChatToolTrace[] = []
+    const tools: ChatToolTrace[] = []
+    const consumer = createChatStreamConsumer({
+      onReply: () => {},
+      onTool: (t) => tools.push(t),
+      onActivity: (a) => activities.push(a)
+    })
+    consumer.push('{"reply":"On it.","actions":[{"kind":"generate-document"')
+    // The kind has landed; the object is wide open — narration must already say so.
+    expect(activities).toEqual([
+      { index: 0, kind: 'generate-document', label: 'Generating a document' }
+    ])
+    expect(tools).toEqual([]) // completion has NOT been claimed
+    consumer.push(',"title":"Q3 plan"}]}')
+    expect(tools).toHaveLength(1) // now it has
+  })
+
+  it('numbers activities to line up with the tools that follow, whatever the chunking', () => {
+    for (const size of [1, 3, 7, 64]) {
+      const { activities, tools } = runWithActivity(chunked(ENVELOPE, size))
+      expect(activities.map((a) => a.index)).toEqual([0, 1])
+      expect(activities.map((a) => a.kind)).toEqual(tools.map((t) => t.kind))
+    }
+  })
+
+  it('is not fooled by the word kind appearing in the reply prose', () => {
+    const tricky =
+      '{"reply":"Set \\"kind\\": \\"generate-document\\" in the config.","actions":[{"kind":"create-task","title":"A"}]}'
+    const { activities } = runWithActivity(chunked(tricky, 5))
+    expect(activities.map((a) => a.kind)).toEqual(['create-task'])
+  })
+
+  it('gives an unknown kind an honest fallback label', () => {
+    const { activities } = runWithActivity(['{"reply":"x","actions":[{"kind":"summon-dragon","title":"A"}]}'])
+    expect(activities[0].label).toBe('Working on summon dragon')
+  })
+
+  it('emits nothing when no onActivity listener is provided', () => {
+    // The pre-existing event sequence must be exactly unchanged for old callers.
+    const { replies, tools } = run(chunked(ENVELOPE, 7))
+    expect(replies).toHaveLength(1)
+    expect(tools).toHaveLength(2)
+  })
+})
+
 describe('createChatStreamConsumer — question', () => {
   const QUESTION_ENVELOPE =
     '{"reply":"One thing first.","question":' +

@@ -39,6 +39,11 @@ export interface AssistantTrace {
   // Citation chips are derived separately, from the [n] markers in the prose.
   sources: ChatSource[]
   tools: ChatToolTrace[]
+  // The action the model is writing RIGHT NOW — announced the moment its
+  // `"kind"` lands in the stream, before the object closes. Drawn as the
+  // active line only while the action it names has not yet completed
+  // (activity.index >= tools.length); a completed action supersedes it.
+  activity: ChatToolTrace | null
   error: string | null
 }
 
@@ -261,10 +266,20 @@ export function getTraceView(trace: AssistantTrace, revealedCount: number): Trac
       icon: 'bolt',
       leaves: toolLeaves(trace)
     })
+  }
+  if (trace.status === 'running') {
+    // The specific in-flight action, announced the moment its kind landed —
+    // "Generating a document…" during the longest write instead of a generic
+    // spinner. Only trusted while the action it names is still open; once it
+    // completes (index < tools.length) we fall back to the count line below.
+    const act = trace.activity
+    if (act && act.index >= trace.tools.length) {
+      return stop({ key: `activity-${act.index}`, label: `${act.label}…`, icon: toolIcon(act.kind) })
+    }
     // Still streaming after at least one action landed: more may be coming, and
     // saying so is true. With none yet we stay silent rather than promising
     // tools that may never appear.
-    if (trace.status === 'running') {
+    if (trace.tools.length > 0) {
       return stop({ key: 'tools-active', label: 'Preparing actions…', icon: 'bolt' })
     }
   }

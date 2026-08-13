@@ -35,6 +35,7 @@ function newTrace(): AssistantTrace {
     mentions: [],
     sources: [],
     tools: [],
+    activity: null,
     error: null
   }
 }
@@ -209,6 +210,8 @@ function fromStoredTrace(t: StoredTrace | null): AssistantTrace | null {
     mentions: t.mentions ?? [],
     sources: t.sources ?? [],
     tools: t.tools ?? [],
+    // A restored trace is finished work — there is no in-flight action to name.
+    activity: null,
     error: t.error
   }
 }
@@ -682,6 +685,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             patchTrace({ repliedAt: Date.now() })
             if (answerTs === null && text.trim()) appendAnswer(text)
           },
+          // What the model is writing RIGHT NOW ("Generating a document…").
+          // Kept until superseded by a newer activity; the view ignores it once
+          // the action it names has completed, so it can never claim stale work.
+          onActivity: (activity) => patchTrace({ activity }),
           onTool: (tool) => {
             const live = get().liveTraceByThread[key]
             if (!live) return

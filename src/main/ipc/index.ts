@@ -1276,6 +1276,7 @@ export function registerIpcHandlers(): void {
           onMentions: (m) => send('mentions', m),
           onSources: (t) => send('sources', t),
           onReply: (text) => send('reply', text),
+          onActivity: (a) => send('activity', a),
           onTool: (tool) => send('tool', tool),
           onQuestion: (q) => send('question', q),
           onError: (err) => send('error', err),

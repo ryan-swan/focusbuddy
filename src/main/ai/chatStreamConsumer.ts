@@ -13,7 +13,7 @@
 // finished writing, in the order it finished writing it, and nothing else.
 
 import { StreamingEnvelopeScanner } from './streamingEnvelope'
-import { describeAction } from './actionLabel'
+import { describeAction, describeActivity } from './actionLabel'
 import { validateChatQuestion } from './chatQuestion'
 import type { ChatQuestion, ChatToolTrace } from '@shared/types'
 
@@ -24,6 +24,11 @@ export interface ChatStreamConsumerCallbacks {
   onReply: (replyText: string) => void
   // Fires once per action object as it completes, in arrival order.
   onTool: (tool: ChatToolTrace) => void
+  // Fires once per action object as it STARTS arriving — the moment its
+  // `"kind"` lands, long before the object closes. This is what lets the UI
+  // say "Generating a document…" during the longest write instead of sitting
+  // on a generic spinner. index lines up with the onTool that will follow.
+  onActivity?: (activity: ChatToolTrace) => void
   // Fires at most once, when the envelope's optional question object closes —
   // after the reply, before any tools that would follow it (per the envelope's
   // key order, a turn that asks should carry no actions at all). Only a
@@ -49,10 +54,32 @@ export function createChatStreamConsumer(
   let replySeen = false
   let questionArrived = false
   let toolIndex = 0
+  let activityAnnounced = 0
+
+  // In-progress peek: count `"kind": "…"` occurrences past the actions-array
+  // marker in the accumulated text and announce each new one the moment it
+  // lands. Scanning only after `"actions"` keeps reply/question prose (which
+  // could legitimately contain the words) from producing phantom activity.
+  const KIND_RE = /"kind"\s*:\s*"([a-z0-9-]+)"/g
+  const announceActivity = (): void => {
+    if (!cb.onActivity) return
+    const full = scanner.fullText()
+    const arrayAt = full.lastIndexOf('"actions"')
+    if (arrayAt < 0) return
+    const tail = full.slice(arrayAt)
+    const kinds: string[] = []
+    for (const m of tail.matchAll(KIND_RE)) kinds.push(m[1])
+    while (activityAnnounced < kinds.length) {
+      const kind = kinds[activityAnnounced]
+      cb.onActivity({ index: activityAnnounced, kind, label: describeActivity(kind) })
+      activityAnnounced++
+    }
+  }
 
   return {
     push(delta: string): void {
       scanner.push(delta)
+      announceActivity()
       if (!replySeen) {
         const r = scanner.extractReply()
         if (r !== null) {

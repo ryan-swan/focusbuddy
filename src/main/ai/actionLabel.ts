@@ -47,6 +47,42 @@ const KIND_TITLE: Record<string, string> = {
   'post-chat': 'Message'
 }
 
+// In-progress phrasing for each kind — what the trace says WHILE the model is
+// still writing the action out ("Generating the document…"), before the object
+// closes and the completed label above takes over. Same coverage rule as
+// KIND_TITLE: unknown kinds still get a readable line.
+const KIND_ACTIVITY: Record<string, string> = {
+  'create-widget': 'Adding a widget',
+  'create-agent': 'Setting up an agent',
+  'link-widgets': 'Wiring widgets together',
+  'open-url': 'Opening a link',
+  'create-todo-list': 'Building a to-do list',
+  'create-page': 'Creating a page',
+  'create-document': 'Creating a document',
+  'generate-document': 'Generating a document',
+  'create-task': 'Creating a desk',
+  'start-focus-session': 'Starting a focus session',
+  'delete-widget': 'Removing a widget',
+  'update-widget': 'Updating a widget',
+  'create-table': 'Building a table',
+  'add-table-row': 'Adding a table row',
+  'create-field': 'Adding a field',
+  'update-task': 'Updating the desk',
+  'create-knowledge-entry': 'Saving a knowledge entry',
+  'edit-document': 'Editing a document',
+  'set-cell': 'Updating a cell',
+  'schedule-event': 'Scheduling an event',
+  'compose-mail': 'Drafting an email',
+  'post-chat': 'Writing a message'
+}
+
+// The in-progress line for a kind the scanner has just seen open. Falls back to
+// "Working on <kind>" so a model-invented kind still narrates honestly.
+export function describeActivity(kind: string): string {
+  const k = kind.trim()
+  return KIND_ACTIVITY[k] ?? `Working on ${humaniseKind(k).toLowerCase()}`
+}
+
 // Turn a kebab-case kind we have no title for into something readable, so an
 // action kind added elsewhere in the codebase still reads as English here
 // instead of forcing an edit to this file.

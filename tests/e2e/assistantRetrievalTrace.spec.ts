@@ -80,6 +80,9 @@ async function stubStream(app: ElectronApplication, script: StreamScript): Promi
 
 async function openAssistant(window: Page): Promise<void> {
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  // The overlay defaults to the Today tab (Assistant 4.5); the chat panel only
+  // renders visible on the Chat tab, so select it before waiting on the panel.
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
   await window.locator('[data-testid="assistant-panel"]').waitFor({ state: 'visible', timeout: 8000 })
 }
 
