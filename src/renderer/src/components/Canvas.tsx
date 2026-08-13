@@ -6,6 +6,7 @@ import { useMessagingStore } from '../stores/messaging'
 import { useAiCommandBar } from '../stores/aiCommandBar'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
+import WidgetErrorBoundary from './WidgetErrorBoundary'
 import StickyWidget from './widgets/StickyWidget'
 import WebViewWidget from './widgets/WebViewWidget'
 import NoteWidget from './widgets/NoteWidget'
@@ -169,7 +170,21 @@ const EMPTY_OVERLAY_OBJECTS: never[] = []
 const WEB_KINDS: WidgetKind[] = ['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email']
 const isWebKind = (k: WidgetKind): boolean => WEB_KINDS.includes(k)
 
+// Wrap every widget in its own error boundary so one widget throwing during
+// render degrades to a small in-place "hit a problem" card instead of unmounting
+// the whole canvas. Section children route through renderWidget too (see the
+// 'section' case), so they are isolated the same way.
 function renderWidget(w: Widget): JSX.Element | null {
+  const inner = renderWidgetInner(w)
+  if (inner === null) return null
+  return (
+    <WidgetErrorBoundary widgetId={w.id} label={w.title || w.kind}>
+      {inner}
+    </WidgetErrorBoundary>
+  )
+}
+
+function renderWidgetInner(w: Widget): JSX.Element | null {
   switch (w.kind) {
     case 'sticky':
       return <StickyWidget widget={w} />
