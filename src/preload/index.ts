@@ -734,7 +734,25 @@ const api = {
         appVersion: string
         context: string | null
       }>
-    > => ipcRenderer.invoke('crash:list', limit)
+    > => ipcRenderer.invoke('crash:list', limit),
+    // Forwarding to the signal server: read not-yet-sent crashes, then mark the
+    // ones the server accepted.
+    unforwarded: (
+      limit?: number
+    ): Promise<
+      Array<{
+        id: string
+        ts: number
+        source: string
+        kind: string
+        message: string
+        stack: string | null
+        componentStack: string | null
+        appVersion: string
+        context: string | null
+      }>
+    > => ipcRenderer.invoke('crash:unforwarded', limit),
+    markForwarded: (ids: string[]): Promise<void> => ipcRenderer.invoke('crash:markForwarded', ids)
   },
   connectedApps: {
     list: (): Promise<ConnectedApp[]> => ipcRenderer.invoke('connectedApps:list'),

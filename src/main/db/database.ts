@@ -666,10 +666,13 @@ export function getDb(): Database.Database {
       stack TEXT,
       component_stack TEXT,
       app_version TEXT,
-      context TEXT
+      context TEXT,
+      forwarded INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_crash_events_ts ON crash_events(ts DESC);
   `)
+  // Migration for DBs created before crash forwarding: add the flag if missing.
+  ensureColumn(db, 'crash_events', 'forwarded', 'INTEGER NOT NULL DEFAULT 0')
   // Mark a row dirty on any content update so the sync engine knows to push it.
   // The WHEN guard fires only on a content change (sync columns untouched) of a
   // currently-clean row, so a sync-bookkeeping write (which sets sync_rev /

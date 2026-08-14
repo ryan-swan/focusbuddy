@@ -56,4 +56,33 @@ test.describe('crash telemetry', () => {
     expect(order.ib).toBeGreaterThanOrEqual(0)
     expect(order.ib).toBeLessThan(order.ia)
   })
+  test('unforwarded lists a new crash and markForwarded clears it', async () => {
+    const marker = 'fwd-' + Date.now()
+    const id = await window.evaluate(async (msg) => {
+      // @ts-expect-error preload bridge
+      await window.api.crash.report({ kind: 'fwd-test', message: msg })
+      // @ts-expect-error preload bridge
+      const un = await window.api.crash.unforwarded(50)
+      return (un.find((c: { message: string }) => c.message === msg) ?? {}).id ?? null
+    }, marker)
+    expect(id).not.toBeNull()
+
+    const clearedOut = await window.evaluate(async ({ id, msg }) => {
+      // @ts-expect-error preload bridge
+      await window.api.crash.markForwarded([id])
+      // @ts-expect-error preload bridge
+      const un = await window.api.crash.unforwarded(50)
+      return un.some((c: { message: string }) => c.message === msg)
+    }, { id, msg: marker })
+    // After marking forwarded, it no longer appears in the unforwarded queue.
+    expect(clearedOut).toBe(false)
+
+    // ...but it is still in the full crash log (forwarded, not deleted).
+    const stillLogged = await window.evaluate(async (msg) => {
+      // @ts-expect-error preload bridge
+      const list = await window.api.crash.list(50)
+      return list.some((c: { message: string }) => c.message === msg)
+    }, marker)
+    expect(stillLogged).toBe(true)
+  })
 })

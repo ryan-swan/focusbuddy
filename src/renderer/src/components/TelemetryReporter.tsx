@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react'
 import { useAccountStore } from '../stores/account'
 import { signalConfig } from '../lib/signalConfig'
 import { deliverTelemetry } from '../lib/telemetryReport'
+import { deliverCrashes } from '../lib/crashReport'
 import { telemetryEnabled } from '../lib/telemetryPrefs'
 
 const REPORT_INTERVAL_MS = 6 * 60 * 60 * 1000 // every 6 hours while open
@@ -47,6 +48,10 @@ export default function TelemetryReporter(): null {
           isCancelled: () => cancelled
         })
         if (ok) lastReportAt.current = Date.now()
+        // Flush any captured crashes on the same cadence + opt-out (crashes are
+        // technical telemetry). Best-effort and independent of the telemetry
+        // result, so a crash still forwards even if the usage snapshot failed.
+        if (!cancelled) await deliverCrashes({ httpUrl: signalConfig.httpUrl, token })
       } finally {
         inFlight.current = false
       }

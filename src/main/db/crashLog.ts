@@ -133,6 +133,34 @@ export function listCrashes(limit = 50): CrashEvent[] {
   }
 }
 
+// Crashes not yet forwarded to the signal server, oldest-first so the flush
+// preserves chronological order over the wire. Never throws.
+export function listUnforwarded(limit = 50): CrashEvent[] {
+  try {
+    const rows = getDb()
+      .prepare('SELECT * FROM crash_events WHERE forwarded = 0 ORDER BY ts ASC, rowid ASC LIMIT ?')
+      .all(Math.max(1, Math.min(limit, CAP))) as CrashRow[]
+    return rows.map(rowTo)
+  } catch {
+    return []
+  }
+}
+
+// Mark the given crashes as forwarded once the server has accepted them, so the
+// next flush doesn't resend. Never throws.
+export function markForwarded(ids: string[]): void {
+  if (ids.length === 0) return
+  try {
+    const db = getDb()
+    const stmt = db.prepare('UPDATE crash_events SET forwarded = 1 WHERE id = ?')
+    db.transaction((list: string[]) => {
+      for (const id of list) stmt.run(id)
+    })(ids)
+  } catch {
+    // best-effort
+  }
+}
+
 // Install the main-process global handlers. Idempotent per process. An uncaught
 // error is recorded and logged but NOT rethrown, so a single stray rejection no
 // longer takes the app down silently.

@@ -127,7 +127,7 @@ import {
   listWidgetsByKind,
   updateWidget, createWidgetIfTaskExists } from '../db/widgets'
 import { collectTelemetry, recordAiCall, setOnboardingSummary } from '../db/telemetry'
-import { recordCrash, listCrashes } from '../db/crashLog'
+import { recordCrash, listCrashes, listUnforwarded, markForwarded } from '../db/crashLog'
 import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
@@ -1445,6 +1445,10 @@ export function registerIpcHandlers(): void {
     recordCrash({ ...input, source: 'renderer' })
   )
   ipcMain.handle('crash:list', (_e, limit?: number) => listCrashes(limit))
+  // Forwarding: the renderer reads not-yet-sent crashes, POSTs them to the signal
+  // server (it holds the session token), then marks them forwarded.
+  ipcMain.handle('crash:unforwarded', (_e, limit?: number) => listUnforwarded(limit))
+  ipcMain.handle('crash:markForwarded', (_e, ids: string[]) => markForwarded(ids))
   // Persist onboarding progress locally so it rides the next telemetry snapshot.
   ipcMain.handle(
     'onboarding:record',
