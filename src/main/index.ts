@@ -16,7 +16,7 @@ import { installAutoUpdater, checkForUpdates } from './autoUpdate'
 import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
 import { runDueReports } from './db/reports'
-import { installMainCrashHandlers } from './db/crashLog'
+import { installMainCrashHandlers, recordCrash } from './db/crashLog'
 
 // Capture uncaught errors + unhandled rejections from the main process before
 // anything else runs, so a startup failure is recorded instead of lost. The
@@ -335,6 +335,25 @@ function createCommandCenter(): BrowserWindow {
   } else {
     win.loadFile(join(__dirname, `../renderer/${rendererHtml}`))
   }
+
+  // Capture a renderer/GPU process death (WS03). This is the most severe crash
+  // class: the window goes blank or closes, and the renderer's own JS error
+  // handlers never fire, so it was previously invisible. Record it (in the main
+  // process, which survives) so the reason is not lost.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    recordCrash({
+      source: 'main',
+      kind: 'render-process-gone',
+      message: `renderer ${details.reason}${typeof details.exitCode === 'number' ? ` (exit ${details.exitCode})` : ''}`
+    })
+    // eslint-disable-next-line no-console
+    console.error('[crash] render-process-gone', details)
+  })
+  win.on('unresponsive', () => {
+    recordCrash({ source: 'main', kind: 'unresponsive', message: 'the window stopped responding' })
+    // eslint-disable-next-line no-console
+    console.error('[crash] window unresponsive')
+  })
 
   return win
 }
