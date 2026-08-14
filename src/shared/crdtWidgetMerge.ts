@@ -24,25 +24,36 @@ export interface WidgetGeom {
   height: number
 }
 
-export type CrdtField = 'geom' | 'members'
-// 'register' is the LWW class used for geometry; 'set' is the OR-Set class used for
-// membership. Both are deterministic — neither ever surfaces a manual conflict.
+// Fields across all migrated types: widget geometry ('geom') + membership
+// ('members'), and node 'title' + 'parent'. New types add their fields here as they
+// migrate, keeping ChangeEvent one shape on the wire.
+export type CrdtField = 'geom' | 'members' | 'title' | 'parent'
+// 'register' is the LWW class used for geometry and node scalar fields; 'set' is the
+// OR-Set class used for membership. Both are deterministic — neither ever surfaces a
+// manual conflict.
 export type CrdtDataClass = 'register' | 'set'
 
 export interface ChangeEvent {
   id: string // client-generated UUIDv7, never renumbered (SYN-010)
   ts: string // ISO occurrence time, preserved on ingestion (SYN-011)
   partitionKey: string // the room this object syncs in, e.g. `w:acct:<accountId>`
-  objectType: 'widget'
+  objectType: 'widget' | 'node'
   objectId: string
   field: CrdtField
   dataClass: CrdtDataClass
   actor: string // device/account id — the LWW tiebreak, deterministic
-  payload: GeomPayload | MembersPayload
+  payload: GeomPayload | MembersPayload | RegisterPayload
   // Server-assigned authoritative sequence, present once the event is on the log.
   // Consumers order catch-up by this, never by wall-clock (SYN-011). Absent on a
   // freshly-minted local event before it has been appended.
   seq?: number
+}
+
+// A generic scalar LWW register payload (a node's title or parent). `value` carries
+// the field value; `at` is the occurrence time in ms — the register timestamp.
+export interface RegisterPayload {
+  value: unknown
+  at: number
 }
 
 export interface GeomPayload {
@@ -64,6 +75,15 @@ export function isGeomPayload(p: ChangeEvent['payload']): p is GeomPayload {
 }
 export function isMembersPayload(p: ChangeEvent['payload']): p is MembersPayload {
   return (p as MembersPayload).op !== undefined
+}
+export function isRegisterPayload(p: ChangeEvent['payload']): p is RegisterPayload {
+  return (p as RegisterPayload).at !== undefined && 'value' in (p as RegisterPayload)
+}
+
+// The LWW register a scalar (node title/parent) event represents.
+export function registerOf(ev: ChangeEvent): import('./crdt').LWWRegister<unknown> {
+  const p = ev.payload as RegisterPayload
+  return { value: p.value, timestamp: p.at, actor: ev.actor }
 }
 
 // The LWW register a single geometry event represents.

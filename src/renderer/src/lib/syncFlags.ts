@@ -16,6 +16,18 @@ export function crdtWidgetsEnabled(): boolean {
   }
 }
 
+// Nodes (tasks / folders / desks). This slice syncs the node's title and its
+// parent as LWW registers; ordering (sortOrder / beforeId) stays on the poll until
+// a fractional-index ordering CRDT lands, so a reparent converges live while
+// sibling order still reconciles via the poll. Default OFF.
+export function crdtNodesEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.nodes') === '1'
+  } catch {
+    return false
+  }
+}
+
 // A stable per-install id, minted once and reused. It is the LWW tiebreak actor, so
 // it MUST be distinct per device: two devices of the same account editing at the
 // same millisecond would otherwise share an actor and could diverge. Combined with
@@ -40,4 +52,10 @@ export function deviceId(): string {
 // shared-desk partitions come with their own access check in a later step.
 export function widgetPartition(accountId: string): string {
   return `w:acct:${accountId}`
+}
+
+// The sync partition for an account's nodes. Separate from widgets so each type's
+// log and catch-up are independent (the server sequences each partition on its own).
+export function nodePartition(accountId: string): string {
+  return `n:acct:${accountId}`
 }

@@ -10,8 +10,10 @@ import {
   type GeomPayload,
   type MembersPayload
 } from '@shared/crdtWidgetMerge'
+import { registerOf, type RegisterPayload } from '@shared/crdtNodeMerge'
 import { useAccountStore } from '../stores/account'
 import { useWidgetStore } from '../stores/widgets'
+import { useNodeStore } from '../stores/nodes'
 import {
   sendSocketMessage,
   setCrdtSocketHandler,
@@ -19,26 +21,34 @@ import {
   type CrdtSocketEvent
 } from './messagingSocket'
 import { registerCrdtEmit } from './crdtBridge'
-import { crdtWidgetsEnabled, deviceId, widgetPartition } from './syncFlags'
+import {
+  crdtWidgetsEnabled,
+  crdtNodesEnabled,
+  deviceId,
+  widgetPartition,
+  nodePartition
+} from './syncFlags'
 import type { Widget } from '@shared/types'
 
-// WS01 sync substrate — the client sync engine for widgets.
+// WS01 sync substrate — the client sync engine.
 //
-// This is the first type routed through the one CRDT change log. A local widget edit
-// becomes a ChangeEvent: geometry (position + size) as an LWW register, section
-// membership as an OR-Set. Each event is persisted to the local change log (the
-// offline queue) and sent over the existing websocket; incoming events are merged
-// and applied. It runs ALONGSIDE the twenty-second workspace poll, not instead of
-// it, so nothing regresses while the flag is off and the poll stays the safety net
-// for a dropped frame. The merge logic itself lives in @shared/crdtWidgetMerge and
-// is exercised directly by the convergence test.
+// Every migrated type routes through the one CRDT change log: a local edit becomes
+// a ChangeEvent, persisted to the local log (the offline queue) and sent over the
+// existing websocket; incoming events are merged and applied. Widgets were first
+// (geometry as an LWW register, section membership as an OR-Set); nodes are second
+// (title + parent as LWW registers). Each type has its own flag and its own
+// partition, and runs ALONGSIDE the twenty-second poll, so nothing regresses while
+// a flag is off and the poll stays the safety net for a dropped frame. The merge
+// algebra lives in @shared/crdtWidgetMerge and @shared/crdtNodeMerge and is proven
+// directly by the convergence tests.
 
-let partition: string | null = null
+let widgetPart: string | null = null
+let nodePart: string | null = null
 let actor = ''
 let started = false
 
-// In-memory converged state, seeded lazily. Geometry: the current LWW register per
-// widget. Membership: the OR-Set add tags and remove tombstones per widget.
+// Widget in-memory state: the current geometry LWW register per widget, and the
+// section-membership OR-Set (add tags + remove tombstones) per widget.
 const geomRegs = new Map<string, LWWRegister<WidgetGeom>>()
 interface MemberState {
   adds: Map<string, string> // tag -> section
@@ -59,26 +69,31 @@ function liveSections(st: MemberState): string[] {
   return [...live]
 }
 
+// Node in-memory state: one LWW register per (field, node), keyed `${field}:${id}`.
+const nodeRegs = new Map<string, LWWRegister<unknown>>()
+
 function geomOf(w: Widget): WidgetGeom {
   return { x: w.x, y: w.y, width: w.width, height: w.height }
 }
 
 function mkEvent(
+  partitionKey: string,
+  objectType: 'widget' | 'node',
   objectId: string,
-  field: CrdtField,
+  field: CrdtField | 'title' | 'parent',
   dataClass: CrdtDataClass,
-  payload: GeomPayload | MembersPayload
+  payload: GeomPayload | MembersPayload | RegisterPayload
 ): ChangeEvent {
   return {
     id: plexiId(),
     ts: new Date().toISOString(),
-    partitionKey: partition ?? '',
-    objectType: 'widget',
+    partitionKey,
+    objectType,
     objectId,
-    field,
+    field: field as CrdtField,
     dataClass,
     actor,
-    payload
+    payload: payload as ChangeEvent['payload']
   }
 }
 
@@ -107,17 +122,17 @@ function send(ev: ChangeEvent): void {
 // ── Emit (local edits) ───────────────────────────────────────────────────────
 
 function emitGeom(w: Widget): void {
-  if (!partition) return
+  if (!widgetPart) return
   const geom = geomOf(w)
   const at = Date.now()
   geomRegs.set(w.id, { value: geom, timestamp: at, actor })
-  const ev = mkEvent(w.id, 'geom', 'register', { geom, at })
+  const ev = mkEvent(widgetPart, 'widget', w.id, 'geom', 'register', { geom, at })
   recordLocal(ev, false)
   send(ev)
 }
 
 function emitMembership(widgetId: string, from: string | null, to: string | null): void {
-  if (!partition) return
+  if (!widgetPart) return
   const st = memberState(widgetId)
   const events: ChangeEvent[] = []
   if (from) {
@@ -127,12 +142,12 @@ function emitMembership(widgetId: string, from: string | null, to: string | null
     // add for that section has also flowed through the log.
     const tags = [...st.adds].filter(([t, s]) => s === from && !st.removes.has(t)).map(([t]) => t)
     for (const t of tags) st.removes.add(t)
-    events.push(mkEvent(widgetId, 'members', 'set', { op: 'remove', section: from, tags }))
+    events.push(mkEvent(widgetPart, 'widget', widgetId, 'members', 'set', { op: 'remove', section: from, tags }))
   }
   if (to) {
     const tag = plexiId()
     st.adds.set(tag, to)
-    events.push(mkEvent(widgetId, 'members', 'set', { op: 'add', section: to, tags: [tag] }))
+    events.push(mkEvent(widgetPart, 'widget', widgetId, 'members', 'set', { op: 'add', section: to, tags: [tag] }))
   }
   for (const ev of events) {
     recordLocal(ev, false)
@@ -140,17 +155,33 @@ function emitMembership(widgetId: string, from: string | null, to: string | null
   }
 }
 
+function emitNodeRegister(nodeId: string, field: 'title' | 'parent', value: unknown): void {
+  if (!nodePart) return
+  const at = Date.now()
+  nodeRegs.set(`${field}:${nodeId}`, { value, timestamp: at, actor })
+  const ev = mkEvent(nodePart, 'node', nodeId, field, 'register', { value, at })
+  recordLocal(ev, false)
+  send(ev)
+}
+
+function emitNodeTitle(nodeId: string, title: string): void {
+  emitNodeRegister(nodeId, 'title', title)
+}
+function emitNodeParent(nodeId: string, parentId: string | null): void {
+  emitNodeRegister(nodeId, 'parent', parentId)
+}
+
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
-// Persist a remotely-won geometry and reflect it in the store WITHOUT going through
-// the store's update() (which would re-emit and loop). window.api.widgets.update
-// writes the base row (and marks it for the poll — the intended dual-write);
-// setState updates the open canvas in place.
+// Persist a remotely-won value and reflect it in the store WITHOUT going through
+// the store's own mutation (which would re-emit and loop). The window.api.* write
+// hits the base row (and marks it for the poll — the intended dual-write); setState
+// updates the open view in place.
 async function applyGeomToWidget(id: string, geom: WidgetGeom): Promise<void> {
   try {
     await window.api.widgets.update(id, geom)
   } catch {
-    /* the widget may not be on this device's open task; the base write still lands */
+    /* not on this device's open task; the base write still lands */
   }
   useWidgetStore.setState((s) => ({
     widgets: s.widgets.map((w) => (w.id === id ? { ...w, ...geom } : w))
@@ -168,29 +199,60 @@ async function applyMemberToWidget(id: string, section: string | null): Promise<
   }))
 }
 
+async function applyNodeTitle(id: string, title: string): Promise<void> {
+  try {
+    await window.api.nodes.update(id, { title })
+  } catch {
+    /* best effort; the poll remains the safety net */
+  }
+  useNodeStore.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, title } : n)) }))
+}
+
+async function applyNodeParent(id: string, parentId: string | null): Promise<void> {
+  try {
+    // move() is the validated reparent path (rejects cycles); beforeId null appends
+    // at the end since sibling ordering isn't part of this slice.
+    await window.api.nodes.move(id, parentId, null)
+  } catch {
+    /* rejected (cycle/missing) or not present locally — leave state as is */
+  }
+  useNodeStore.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)) }))
+}
+
 function applyEvent(ev: ChangeEvent): void {
-  if (ev.objectType !== 'widget') return
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
-  if (ev.field === 'geom' && (ev.payload as GeomPayload).geom !== undefined) {
-    const remote = geomRegisterOf(ev)
-    const local = geomRegs.get(ev.objectId) ?? null
-    const merged = local ? lwwMerge(local, remote) : remote
-    geomRegs.set(ev.objectId, merged)
-    // merged === remote means the remote won (or it's the first we've seen) — adopt
-    // it. If local won, merged === local and there is nothing to write.
-    if (merged === remote) void applyGeomToWidget(ev.objectId, remote.value)
-  } else if (ev.field === 'members' && (ev.payload as MembersPayload).op !== undefined) {
-    const p = ev.payload as MembersPayload
-    const st = memberState(ev.objectId)
-    if (p.op === 'add') {
-      for (const t of p.tags) st.adds.set(t, p.section)
-    } else {
-      for (const t of p.tags) st.removes.add(t)
+  if (ev.objectType === 'widget') {
+    if (ev.field === 'geom' && (ev.payload as GeomPayload).geom !== undefined) {
+      const remote = geomRegisterOf(ev)
+      const local = geomRegs.get(ev.objectId) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      geomRegs.set(ev.objectId, merged)
+      if (merged === remote) void applyGeomToWidget(ev.objectId, remote.value)
+    } else if (ev.field === 'members' && (ev.payload as MembersPayload).op !== undefined) {
+      const p = ev.payload as MembersPayload
+      const st = memberState(ev.objectId)
+      if (p.op === 'add') {
+        for (const t of p.tags) st.adds.set(t, p.section)
+      } else {
+        for (const t of p.tags) st.removes.add(t)
+      }
+      const next = resolvedSection({ geom: null, sections: liveSections(st) })
+      const cur = useWidgetStore.getState().widgets.find((w) => w.id === ev.objectId)?.parentSectionId ?? null
+      if (next !== cur) void applyMemberToWidget(ev.objectId, next)
     }
-    const next = resolvedSection({ geom: null, sections: liveSections(st) })
-    const cur = useWidgetStore.getState().widgets.find((w) => w.id === ev.objectId)?.parentSectionId ?? null
-    if (next !== cur) void applyMemberToWidget(ev.objectId, next)
+  } else if (ev.objectType === 'node') {
+    if ((ev.field === 'title' || ev.field === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
+      const remote = registerOf(ev)
+      const key = `${ev.field}:${ev.objectId}`
+      const local = nodeRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      nodeRegs.set(key, merged)
+      if (merged === remote) {
+        if (ev.field === 'title') void applyNodeTitle(ev.objectId, remote.value as string)
+        else void applyNodeParent(ev.objectId, remote.value as string | null)
+      }
+    }
   }
 }
 
@@ -211,10 +273,12 @@ function onCrdt(e: CrdtSocketEvent): void {
 }
 
 function onReauth(): void {
-  if (!partition) return
-  // Join first (the server relays only to joined sockets), then flush the queue.
-  sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: partition } })
-  void flushUnsynced()
+  // Join each enabled partition (the server relays only to joined sockets), then
+  // flush the shared offline queue.
+  for (const pk of [widgetPart, nodePart]) {
+    if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
+  }
+  if (widgetPart || nodePart) void flushUnsynced()
 }
 
 async function flushUnsynced(): Promise<void> {
@@ -226,20 +290,19 @@ async function flushUnsynced(): Promise<void> {
         id: e.id,
         ts: e.ts,
         partitionKey: e.partitionKey,
-        objectType: e.objectType as 'widget',
+        objectType: e.objectType as 'widget' | 'node',
         objectId: e.objectId,
         field: e.field as CrdtField,
         dataClass: e.dataClass as CrdtDataClass,
         actor: e.actor,
-        payload: e.payload as GeomPayload | MembersPayload,
+        payload: e.payload as GeomPayload | MembersPayload | RegisterPayload,
         seq: e.seq ?? undefined
-      })
+      } as ChangeEvent)
     }
     // Optimistic mark: the frames went out over an open socket, the server dedupes
-    // by id, and the base geometry also rides the workspace poll — so marking these
+    // by id, and the base data also rides the workspace poll — so marking these
     // synced now cannot lose data even if a frame drops (at worst the log entry
-    // reappears on the next join replay). It stops us re-flushing the same queue
-    // forever.
+    // reappears on the next join replay). It stops us re-flushing forever.
     await window.api.crdt.markSynced(pending.map((e) => ({ id: e.id })))
   } catch {
     /* best effort — the poll remains the safety net */
@@ -247,21 +310,29 @@ async function flushUnsynced(): Promise<void> {
 }
 
 // Start the engine for the signed-in account. Idempotent. No-op (and unregisters
-// any prior wiring) when the flag is off, so toggling the flag off and reloading
-// returns the app to pure-poll behaviour.
+// any prior wiring) when every type flag is off, so toggling the flags off and
+// reloading returns the app to pure-poll behaviour.
 export function initCrdtSync(): void {
-  if (!crdtWidgetsEnabled()) {
+  const wEnabled = crdtWidgetsEnabled()
+  const nEnabled = crdtNodesEnabled()
+  if (!wEnabled && !nEnabled) {
     stopCrdtSync()
     return
   }
   const acct = useAccountStore.getState().account
   if (!acct) return // called again by App once signed in
   actor = `${acct.id}:${deviceId()}`
-  partition = widgetPartition(acct.id)
+  widgetPart = wEnabled ? widgetPartition(acct.id) : null
+  nodePart = nEnabled ? nodePartition(acct.id) : null
   if (!started) {
     setCrdtSocketHandler(onCrdt)
     setCrdtOpenHandler(onReauth)
-    registerCrdtEmit({ geom: emitGeom, membership: emitMembership })
+    registerCrdtEmit({
+      geom: emitGeom,
+      membership: emitMembership,
+      nodeTitle: emitNodeTitle,
+      nodeParent: emitNodeParent
+    })
     started = true
   }
   // If the socket is already authenticated, onReauth won't fire again on its own —
@@ -270,13 +341,17 @@ export function initCrdtSync(): void {
 }
 
 export function stopCrdtSync(): void {
-  if (partition) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: partition } })
+  for (const pk of [widgetPart, nodePart]) {
+    if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
+  }
   registerCrdtEmit(null)
   setCrdtSocketHandler(null)
   setCrdtOpenHandler(null)
   geomRegs.clear()
   memberStates.clear()
-  partition = null
+  nodeRegs.clear()
+  widgetPart = null
+  nodePart = null
   actor = ''
   started = false
 }

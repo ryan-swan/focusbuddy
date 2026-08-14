@@ -11,6 +11,8 @@ import type { Widget } from '@shared/types'
 export interface CrdtEmit {
   geom: (w: Widget) => void
   membership: (widgetId: string, from: string | null, to: string | null) => void
+  nodeTitle: (nodeId: string, title: string) => void
+  nodeParent: (nodeId: string, parentId: string | null) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -25,4 +27,12 @@ export function crdtEmitGeom(w: Widget): void {
 
 export function crdtEmitMembership(widgetId: string, from: string | null, to: string | null): void {
   impl?.membership(widgetId, from, to)
+}
+
+export function crdtEmitNodeTitle(nodeId: string, title: string): void {
+  impl?.nodeTitle(nodeId, title)
+}
+
+export function crdtEmitNodeParent(nodeId: string, parentId: string | null): void {
+  impl?.nodeParent(nodeId, parentId)
 }

@@ -1863,41 +1863,13 @@ export default function Canvas(): JSX.Element {
       }
       return
     }
-    // External browser tab or link drop. Dragging a tab out of Chrome / Edge /
-    // Safari (or a link) puts the URL on text/uri-list, with text/plain as a
-    // fallback. Open it as a browser (webview) widget at the cursor, mirroring
-    // the file-drop behaviour. Read uri-list first because that is the precise
-    // type a dragged tab provides, and only accept real http(s) URLs so a stray
-    // text drag does nothing.
-    if (activeTaskId) {
-      const droppedUrl =
-        firstHttpUrl(e.dataTransfer.getData('text/uri-list')) ??
-        firstHttpUrl(e.dataTransfer.getData('text/plain'))
-      if (droppedUrl) {
-        e.preventDefault()
-        const entry = catalogFor('webview')
-        const width = entry?.defaultWidth ?? 560
-        const height = entry?.defaultHeight ?? 400
-        const rect = e.currentTarget.getBoundingClientRect()
-        const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
-        await createWidget({
-          taskId: activeTaskId,
-          kind: 'webview',
-          title: '',
-          content: droppedUrl,
-          x: Math.round(cursor.x - width / 2),
-          y: Math.round(cursor.y - 20),
-          width,
-          height,
-          color: null
-        })
-        return
-      }
-    }
     // Dragged Connected App from sidebar → spawn a webview widget bound to it.
     // Bound widgets share the app's session partition (so logged-in cookies
     // persist between full-pane view and canvas widget) and inherit its vault
-    // auto-fill binding.
+    // auto-fill binding. This MUST be checked before the generic URL branch
+    // below: a connected-app drag also carries the app's URL on text/plain /
+    // text/uri-list as a fallback, so if the URL branch ran first it would
+    // consume the drop and spawn an unbound webview (losing sourceAppId).
     const connectedAppId = e.dataTransfer.getData(CONNECTED_APP_DRAG_MIME)
     if (connectedAppId && activeTaskId) {
       e.preventDefault()
@@ -1926,6 +1898,38 @@ export default function Canvas(): JSX.Element {
       })
       void appsState.touch(app.id)
       return
+    }
+    // External browser tab or link drop. Dragging a tab out of Chrome / Edge /
+    // Safari (or a link) puts the URL on text/uri-list, with text/plain as a
+    // fallback. Open it as a browser (webview) widget at the cursor, mirroring
+    // the file-drop behaviour. Read uri-list first because that is the precise
+    // type a dragged tab provides, and only accept real http(s) URLs so a stray
+    // text drag does nothing. This is the GENERIC fallback, so it runs after the
+    // specific connected-app branch above (which also carries a URL fallback).
+    if (activeTaskId) {
+      const droppedUrl =
+        firstHttpUrl(e.dataTransfer.getData('text/uri-list')) ??
+        firstHttpUrl(e.dataTransfer.getData('text/plain'))
+      if (droppedUrl) {
+        e.preventDefault()
+        const entry = catalogFor('webview')
+        const width = entry?.defaultWidth ?? 560
+        const height = entry?.defaultHeight ?? 400
+        const rect = e.currentTarget.getBoundingClientRect()
+        const cursor = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top)
+        await createWidget({
+          taskId: activeTaskId,
+          kind: 'webview',
+          title: '',
+          content: droppedUrl,
+          x: Math.round(cursor.x - width / 2),
+          y: Math.round(cursor.y - 20),
+          width,
+          height,
+          color: null
+        })
+        return
+      }
     }
     // Dragged task from sidebar → spawn a task-link widget
     const taskId = e.dataTransfer.getData('text/fb-task-link')

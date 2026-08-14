@@ -3,6 +3,7 @@ import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import { recordTrail } from '../lib/trail'
 import { nudgeSync } from '../lib/syncNudge'
+import { crdtEmitNodeTitle, crdtEmitNodeParent } from '../lib/crdtBridge'
 import { taskComplete } from '../lib/audioBeep'
 import { hapticSuccess } from '../lib/haptics'
 import { canCreateMore, limitFor } from '../lib/gating'
@@ -125,6 +126,10 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     if (!updated) return
     set({ nodes: get().nodes.map((n) => (n.id === id ? updated : n)) })
     nudgeSync()
+    // WS01 sync substrate (flagged, off by default): mirror a title or parent change
+    // into the one CRDT change log. No-ops until the engine registers (flag on).
+    if (patch.title !== undefined) crdtEmitNodeTitle(id, updated.title)
+    if ('parentId' in patch) crdtEmitNodeParent(id, patch.parentId ?? null)
     // Record an undo only for user-meaningful field edits (not programmatic
     // patches like resume autosave or timers), restoring the prior values.
     const UNDOABLE = ['title', 'description', 'status', 'priority', 'interest', 'importance', 'dueDate'] as const
@@ -218,6 +223,10 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const fresh = await window.api.nodes.list()
     set({ nodes: fresh })
     nudgeSync()
+    // WS01 sync substrate (flagged): a reparent is a node 'parent' register change.
+    // Sibling ordering (beforeId) is not part of this slice; it reconciles via the
+    // poll. No-op until the engine registers (flag on).
+    crdtEmitNodeParent(id, newParentId)
     // Auto-expand the destination parent so the moved node is visible after drop
     if (newParentId) set({ expanded: { ...get().expanded, [newParentId]: true } })
     if (prevParentId !== newParentId || prevBeforeId !== beforeId) {
