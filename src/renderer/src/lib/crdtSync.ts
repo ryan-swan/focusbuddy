@@ -23,6 +23,7 @@ import { useTablesStore } from '../stores/tables'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useFileManagerStore } from '../stores/fileManager'
 import { useDocumentsStore } from '../stores/documents'
+import { useOrgStore } from '../stores/org'
 import {
   sendSocketMessage,
   setCrdtSocketHandler,
@@ -38,12 +39,7 @@ import {
   crdtFilesEnabled,
   crdtDocumentsEnabled,
   deviceId,
-  widgetPartition,
-  nodePartition,
-  rowPartition,
-  timeBlockPartition,
-  filePartition,
-  documentPartition
+  crdtScopeSuffix
 } from './syncFlags'
 import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
@@ -1152,6 +1148,58 @@ async function flushUnsynced(): Promise<void> {
   }
 }
 
+// The partition scope suffix for the CURRENTLY ACTIVE workspace. The renderer is
+// single-org-at-a-time — the main DB scopes every read by getActiveOrgId(), and
+// widgets/rows derive scope from their parent, so every in-memory object belongs to
+// the active workspace. That makes routing correct without any per-object lookup:
+//   - active org is a real org  → `org:<orgId>`  (all members converge; server
+//     authorises via orgs.isMember)
+//   - active org is personal    → `acct:<accountId>` (this account's devices)
+// A shared-desk under the personal scope still rides the poll's shared cycle for
+// now; `desk:<id>` routing is a later slice.
+function scopeSuffix(accountId: string): string {
+  return crdtScopeSuffix(useOrgStore.getState().activeOrgId, accountId)
+}
+
+// (Re)compute the per-type partition keys from the flags + the active scope.
+function computePartitions(accountId: string): void {
+  const s = scopeSuffix(accountId)
+  widgetPart = crdtWidgetsEnabled() ? `w:${s}` : null
+  nodePart = crdtNodesEnabled() ? `n:${s}` : null
+  rowPart = crdtTablesEnabled() ? `r:${s}` : null
+  tbPart = crdtTimeBlocksEnabled() ? `t:${s}` : null
+  filePart = crdtFilesEnabled() ? `f:${s}` : null
+  docPart = crdtDocumentsEnabled() ? `d:${s}` : null
+}
+
+function currentParts(): (string | null)[] {
+  return [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]
+}
+
+// Re-scope when the active org changes: leave the old scope's rooms, recompute the
+// partitions for the new scope, and join them. Registered once and kept across
+// stop/start so an org switch always re-routes. In-memory registers are cleared
+// because they belong to the previous scope's objects.
+let orgUnsub: (() => void) | null = null
+function applyScopeChange(): void {
+  if (!started) return
+  for (const pk of currentParts()) {
+    if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
+  }
+  geomRegs.clear()
+  memberStates.clear()
+  nodeRegs.clear()
+  attrRegs.clear()
+  rowRegs.clear()
+  tbRegs.clear()
+  fileRegs.clear()
+  widgetFieldRegs.clear()
+  const acct = useAccountStore.getState().account
+  if (!acct) return
+  computePartitions(acct.id)
+  onReauth()
+}
+
 // Start the engine for the signed-in account. Idempotent. No-op (and unregisters
 // any prior wiring) when every type flag is off, so toggling the flags off and
 // reloading returns the app to pure-poll behaviour.
@@ -1169,12 +1217,13 @@ export function initCrdtSync(): void {
   const acct = useAccountStore.getState().account
   if (!acct) return // called again by App once signed in
   actor = `${acct.id}:${deviceId()}`
-  widgetPart = wEnabled ? widgetPartition(acct.id) : null
-  nodePart = nEnabled ? nodePartition(acct.id) : null
-  rowPart = tEnabled ? rowPartition(acct.id) : null
-  tbPart = tbEnabled ? timeBlockPartition(acct.id) : null
-  filePart = fEnabled ? filePartition(acct.id) : null
-  docPart = dEnabled ? documentPartition(acct.id) : null
+  computePartitions(acct.id)
+  // Re-route on org switch (subscribe once; survives stop/start).
+  if (!orgUnsub) {
+    orgUnsub = useOrgStore.subscribe((st, prev) => {
+      if (st.activeOrgId !== prev.activeOrgId) applyScopeChange()
+    })
+  }
   if (!started) {
     setCrdtSocketHandler(onCrdt)
     setCrdtOpenHandler(onReauth)

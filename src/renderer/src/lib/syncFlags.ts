@@ -124,3 +124,13 @@ export function filePartition(accountId: string): string {
 export function documentPartition(accountId: string): string {
   return `d:acct:${accountId}`
 }
+
+// The partition SCOPE suffix for the currently-active workspace. The renderer is
+// single-org-at-a-time, so this alone routes every object correctly: a real active
+// org → `org:<orgId>` (all members converge), otherwise the account's own devices →
+// `acct:<accountId>`. Pure + unit-tested; the engine prepends the per-type prefix.
+// 'personal' mirrors PERSONAL_ORG_ID in stores/org (kept literal to avoid importing
+// the zustand store into this pure module).
+export function crdtScopeSuffix(activeOrgId: string | null | undefined, accountId: string): string {
+  return activeOrgId && activeOrgId !== 'personal' ? `org:${activeOrgId}` : `acct:${accountId}`
+}
