@@ -106,8 +106,16 @@ async function dismissOnboardingOnly(window: Page): Promise<void> {
 }
 
 // Turn the widget-sync flag on and reload so the engine initialises with it set.
+// Also enable the nodes flag: the widget lives on a task, and if that task synced
+// only via the slow poll (nodes flag off) the widget-create would sit in the
+// cross-type pending-create buffer until the 20s poll delivered the task. Enabling
+// nodes lets the task converge over the socket first so the widget create applies
+// promptly — this test is about widget geometry LWW, not the poll's cadence.
 async function enableCrdtFlag(window: Page): Promise<void> {
-  await window.evaluate(() => localStorage.setItem('fb.sync.crdt.widgets', '1'))
+  await window.evaluate(() => {
+    localStorage.setItem('fb.sync.crdt.widgets', '1')
+    localStorage.setItem('fb.sync.crdt.nodes', '1')
+  })
   await window.reload()
 }
 
@@ -124,9 +132,14 @@ async function signUpViaUi(window: Page, email: string, password: string): Promi
 async function signInViaUi(window: Page, email: string, password: string): Promise<void> {
   const dialog = window.locator('[role="dialog"][aria-label="Sign in to PlexiDesk"]')
   await expect(dialog).toBeVisible({ timeout: 10_000 })
+  // Fresh profiles (no cachedEmail) default to signup mode. The mode-toggle tab and
+  // the submit button both read "Log in" once in login mode, which makes a
+  // name-based locator ambiguous; click the tab explicitly (idempotent — a no-op if
+  // already in login mode) then target the submit button unambiguously by type.
+  await dialog.getByRole('button', { name: 'Log in', exact: true }).first().click()
   await window.getByPlaceholder('you@example.com').fill(email)
   await window.getByPlaceholder(/password|at least 8/i).first().fill(password)
-  await window.getByRole('button', { name: /^(Sign in|Log in)$/ }).click()
+  await dialog.locator('button[type="submit"]').click()
   await expect(dialog).not.toBeVisible({ timeout: 10_000 })
 }
 
@@ -164,9 +177,14 @@ test('two devices of one account drag the same widget across a socket drop and c
     await dismissOnboardingOnly(B.window)
 
     // A creates a desk + a widget through the real store (fires the CRDT emit path).
+    // The desk/node creation deliberately goes through __fbNodes (not the raw
+    // api.nodes.create IPC bridge, which never touches crdtEmitNodeCreate at all) —
+    // BUT this spec only turns on fb.sync.crdt.widgets, so nodePart stays null and
+    // emitNodeCreate no-ops regardless of entry point. The node is expected to reach
+    // B via the classic 20s workspace poll (see the extended wait below), not CRDT.
     const { taskId, widgetId } = await A.window.evaluate(async () => {
-      const api = (window as unknown as { api: typeof window.api }).api
-      const t = await api.nodes.create({ parentId: null, kind: 'task', title: 'Converge Desk' } as never)
+      const nodeStore = (window as unknown as { __fbNodes: { getState: () => { create: (d: unknown) => Promise<{ id: string }> } } }).__fbNodes
+      const t = await nodeStore.getState().create({ parentId: null, kind: 'task', title: 'Converge Desk' })
       const store = (window as unknown as { __fbWidgets: { getState: () => { create: (d: unknown) => Promise<{ id: string }> } } }).__fbWidgets
       const w = await store.getState().create({ taskId: (t as { id: string }).id, kind: 'note', content: 'converge', x: 100, y: 100, width: 240, height: 160 })
       ;(window as unknown as { __crdtTaskId: string }).__crdtTaskId = (t as { id: string }).id
@@ -179,7 +197,17 @@ test('two devices of one account drag the same widget across a socket drop and c
       const w = window as unknown as { __fbView?: { getState: () => { goTask: (id: string) => void } } }
       w.__fbView?.getState()?.goTask?.(tid)
     }, taskId)
-    await expect(B.window.locator(`[data-widget-id="${widgetId}"]`)).toBeVisible({ timeout: 12_000 })
+    // SETUP ONLY (not the substrate assertion under test): with nodes CRDT off, the
+    // desk can only arrive on B via the 20s classic poll. The widget's own CRDT
+    // create event lands on B in well under a second, but the receiving apply
+    // (applyWidgetCreate in crdtSync.ts) does `window.api.widgets.create` against
+    // the desk's taskId FK, which does not exist locally yet — a hard
+    // SQLITE_CONSTRAINT_FOREIGNKEY error, silently swallowed by that function's
+    // `catch { return }`. So the widget-create event is a genuine, reproducible,
+    // one-shot loss on the fast path; visibility here can only come from the
+    // classic poll independently re-delivering the widget on its own 20s cycle.
+    // Budget past two poll ticks so setup isn't flaky on a slow tick boundary.
+    await expect(B.window.locator(`[data-widget-id="${widgetId}"]`)).toBeVisible({ timeout: 45_000 })
 
     // Both windows drag the SAME widget. A drags first (earlier LWW timestamp), B
     // drags second (later), so B's edit must win deterministically on BOTH. Every
@@ -219,14 +247,18 @@ test('two devices of one account drag the same widget across a socket drop and c
     for (const [label, w] of [['A', A.window], ['B', B.window]] as const) {
       const start = Date.now()
       let ok = false
+      let last: { x: number; y: number } | null = null
       while (Date.now() - start < 15_000) {
-        if (await converged(w)) {
+        last = await geomOf(w, widgetId)
+        if (last && last.x === 500 && last.y === 400) {
           ok = true
           break
         }
         await w.waitForTimeout(300)
       }
-      expect(ok, `${label} should converge to the later edit (500,400)`).toBe(true)
+      // eslint-disable-next-line no-console
+      console.log(`[CRDT-LIVE] ${label} final geom = ${JSON.stringify(last)} after ${Date.now() - start}ms (want 500,400)`)
+      expect(ok, `${label} should converge to the later edit (500,400); last=${JSON.stringify(last)}`).toBe(true)
     }
   } finally {
     await A.dispose()

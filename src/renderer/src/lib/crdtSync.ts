@@ -513,6 +513,51 @@ function emitDocumentAttrs(docId: string, attrs: Record<string, unknown>): void 
 
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
+// ── Cross-type create ordering: pending-create buffer ─────────────────────────
+// A create event can arrive before the parent it references exists locally — a
+// widget before its task's node, a row before its table, a subtask before its
+// parent — because each type syncs in its own partition and events race. The
+// window.api.*.create then fails a FOREIGN KEY check. Dropping the create there
+// (the old `catch { return }`) was silent data loss; instead we buffer the attempt
+// and retry it: immediately when any create succeeds (a freshly-arrived parent may
+// unblock a dependent) and on a short backstop timer (covers a parent that lands
+// via the poll rather than the log). Attempts are idempotent (create-if-missing)
+// and bounded, and the poll remains the ultimate safety net.
+interface PendingCreate {
+  attempt: () => Promise<boolean> // resolves true when it succeeded (or is moot)
+  tries: number
+}
+const pendingCreates = new Map<string, PendingCreate>()
+let drainTimer: ReturnType<typeof setTimeout> | null = null
+
+function armDrain(): void {
+  if (drainTimer || pendingCreates.size === 0) return
+  drainTimer = setTimeout(() => {
+    drainTimer = null
+    void drainPending()
+  }, 1500)
+}
+async function drainPending(): Promise<void> {
+  for (const [key, p] of [...pendingCreates.entries()]) {
+    const ok = await p.attempt().catch(() => false)
+    if (ok) pendingCreates.delete(key)
+    else if (++p.tries >= 40) pendingCreates.delete(key) // ~60s; give up, the poll backstops
+  }
+  if (pendingCreates.size) armDrain()
+}
+// Run a create attempt; on failure buffer it for retry so it is never dropped. On
+// success, poke the buffer in case the new object unblocks a waiting dependent.
+function applyCreateGuarded(key: string, attempt: () => Promise<boolean>): void {
+  void attempt().then((ok) => {
+    if (ok) {
+      if (pendingCreates.size) void drainPending()
+    } else if (!pendingCreates.has(key)) {
+      pendingCreates.set(key, { attempt, tries: 0 })
+      armDrain()
+    }
+  })
+}
+
 // Persist a remotely-won value and reflect it in the store WITHOUT going through
 // the store's own mutation (which would re-emit and loop). The window.api.* write
 // hits the base row (and marks it for the poll — the intended dual-write); setState
@@ -528,18 +573,23 @@ async function applyGeomToWidget(id: string, geom: WidgetGeom): Promise<void> {
   }))
 }
 
-async function applyWidgetCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyWidgetCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`widget:${id}`, () => tryCreateWidget(snapshot))
+}
+async function tryCreateWidget(snapshot: Record<string, unknown>): Promise<boolean> {
+  const id = snapshot.id as string
+  if (tombstoned.has(id)) return true // deleted meanwhile — nothing to create
   let created: Widget | null = null
   try {
     // create-if-missing by id (main honours the provided id + returns the existing
     // row if it is already there), so a replayed/echoed create never duplicates.
     created = await window.api.widgets.create(snapshot as never)
   } catch {
-    return
+    return false // parent task not present locally yet — keep buffered, retry
   }
-  if (!created) return
+  if (!created) return false
   // Reflect only if the widget's task is already loaded in the store (its desk is
   // open); otherwise it materialises when that desk is next opened. The base write
   // above is what makes it durable regardless.
@@ -547,6 +597,7 @@ async function applyWidgetCreate(snapshot: Record<string, unknown>): Promise<voi
   if (st.widgets.some((w) => w.taskId === created!.taskId) && !st.widgets.some((w) => w.id === created!.id)) {
     useWidgetStore.setState({ widgets: [...st.widgets, created] })
   }
+  return true
 }
 
 async function applyWidgetDelete(id: string): Promise<void> {
@@ -607,20 +658,26 @@ async function applyNodeParent(id: string, parentId: string | null): Promise<voi
   useNodeStore.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)) }))
 }
 
-async function applyNodeCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyNodeCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`node:${id}`, () => tryCreateNode(snapshot))
+}
+async function tryCreateNode(snapshot: Record<string, unknown>): Promise<boolean> {
+  const id = snapshot.id as string
+  if (tombstoned.has(id)) return true
   let created: FbNode | null = null
   try {
     created = await window.api.nodes.create(snapshot as never)
   } catch {
-    return
+    return false // parent node not present yet — keep buffered
   }
-  if (!created) return
+  if (!created) return false
   const st = useNodeStore.getState()
   if (!st.nodes.some((n) => n.id === created!.id)) {
     useNodeStore.setState({ nodes: [...st.nodes, created] })
   }
+  return true
 }
 
 async function applyNodeDelete(id: string): Promise<void> {
@@ -670,22 +727,28 @@ async function applyCellToRow(rowId: string, column: string, value: unknown): Pr
   if (changed) useTablesStore.setState({ rows: next })
 }
 
-async function applyRowCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyRowCreate(snapshot: Record<string, unknown>): void {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`row:${id}`, () => tryCreateRow(snapshot))
+}
+async function tryCreateRow(snapshot: Record<string, unknown>): Promise<boolean> {
   const id = snapshot.id as string
   const tableId = snapshot.tableId as string
-  if (!id || tombstoned.has(id)) return
+  if (tombstoned.has(id)) return true
   let created: FbRow | null = null
   try {
     created = await window.api.tables.createRow(snapshot as never)
   } catch {
-    return
+    return false // parent table not present yet — keep buffered
   }
-  if (!created) return
+  if (!created) return false
   // Reflect only if that table's rows are already loaded in the store.
   const rows = useTablesStore.getState().rows
   if (rows[tableId] && !rows[tableId].some((r) => r.id === id)) {
     useTablesStore.setState({ rows: { ...rows, [tableId]: [...rows[tableId], created] } })
   }
+  return true
 }
 
 async function applyRowAttr(id: string, attr: string, value: unknown): Promise<void> {
@@ -729,14 +792,20 @@ async function applyRowDelete(id: string): Promise<void> {
   if (changed) useTablesStore.setState({ rows: next })
 }
 
-async function applyTableCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyTableCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`table:${id}`, () => tryCreateTable(snapshot))
+}
+async function tryCreateTable(snapshot: Record<string, unknown>): Promise<boolean> {
+  if (tombstoned.has(snapshot.id as string)) return true
   try {
     const created = await window.api.tables.create(snapshot as never)
-    if (created) useTablesStore.setState((s) => ({ tables: { ...s.tables, [created.id]: created } }))
+    if (!created) return false
+    useTablesStore.setState((s) => ({ tables: { ...s.tables, [created.id]: created } }))
+    return true
   } catch {
-    /* best effort */
+    return false // parent task not present yet — keep buffered
   }
 }
 
@@ -795,15 +864,20 @@ async function applyFile(id: string, field: CrdtField, value: unknown): Promise<
   void useFileManagerStore.getState().refresh()
 }
 
-async function applyTimeBlockCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyTimeBlockCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`timeblock:${id}`, () => tryCreateTimeBlock(snapshot))
+}
+async function tryCreateTimeBlock(snapshot: Record<string, unknown>): Promise<boolean> {
+  if (tombstoned.has(snapshot.id as string)) return true
   try {
     await window.api.timeBlocks.create(snapshot as never)
   } catch {
-    return
+    return false // linked task not present yet — keep buffered
   }
   void useTimeBlockStore.getState().reload()
+  return true
 }
 async function applyTimeBlockDelete(id: string): Promise<void> {
   tombstoned.add(id)
@@ -815,19 +889,24 @@ async function applyTimeBlockDelete(id: string): Promise<void> {
   void useTimeBlockStore.getState().reload()
 }
 
-async function applyFileCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyFileCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`file:${id}`, () => tryCreateFile(snapshot))
+}
+async function tryCreateFile(snapshot: Record<string, unknown>): Promise<boolean> {
+  if (tombstoned.has(snapshot.id as string)) return true
   try {
     await window.api.fileManager.createFolder(
       (snapshot.parentId as string | null) ?? null,
       snapshot.name as string,
-      id
+      snapshot.id as string
     )
   } catch {
-    return
+    return false // parent folder not present yet — keep buffered
   }
   void useFileManagerStore.getState().refresh()
+  return true
 }
 async function applyFileDelete(id: string): Promise<void> {
   tombstoned.add(id)
@@ -839,15 +918,20 @@ async function applyFileDelete(id: string): Promise<void> {
   void useFileManagerStore.getState().refresh()
 }
 
-async function applyDocumentCreate(snapshot: Record<string, unknown>): Promise<void> {
+function applyDocumentCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`document:${id}`, () => tryCreateDocument(snapshot))
+}
+async function tryCreateDocument(snapshot: Record<string, unknown>): Promise<boolean> {
+  if (tombstoned.has(snapshot.id as string)) return true
   try {
     await window.api.documents.create(snapshot as never)
   } catch {
-    return
+    return false
   }
   void useDocumentsStore.getState().refresh()
+  return true
 }
 async function applyDocumentDelete(id: string): Promise<void> {
   tombstoned.add(id)
@@ -1146,6 +1230,11 @@ export function stopCrdtSync(): void {
   fileRegs.clear()
   widgetFieldRegs.clear()
   tombstoned.clear()
+  pendingCreates.clear()
+  if (drainTimer) {
+    clearTimeout(drainTimer)
+    drainTimer = null
+  }
   widgetPart = null
   nodePart = null
   rowPart = null

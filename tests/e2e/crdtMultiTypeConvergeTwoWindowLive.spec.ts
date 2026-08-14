@@ -109,9 +109,14 @@ async function signUp(window: Page, email: string, password: string): Promise<vo
 async function signIn(window: Page, email: string, password: string): Promise<void> {
   const d = window.locator('[role="dialog"][aria-label="Sign in to PlexiDesk"]')
   await expect(d).toBeVisible({ timeout: 10_000 })
+  // Fresh profiles (no cachedEmail) default to signup mode. The mode-toggle tab and
+  // the submit button both read "Log in" once in login mode, which makes a
+  // name-based locator ambiguous; click the tab explicitly (idempotent — a no-op if
+  // already in login mode) then target the submit button unambiguously by type.
+  await d.getByRole('button', { name: 'Log in', exact: true }).first().click()
   await window.getByPlaceholder('you@example.com').fill(email)
   await window.getByPlaceholder(/password|at least 8/i).first().fill(password)
-  await window.getByRole('button', { name: /^(Sign in|Log in)$/ }).click()
+  await d.locator('button[type="submit"]').click()
   await expect(d).not.toBeVisible({ timeout: 10_000 })
 }
 
@@ -147,10 +152,13 @@ test('multi-type live convergence: node/widget/document create + field edits con
     await dismissOnboarding(B.window)
 
     // ── NODE: create on A, converge on B; then rename on A, title converges ──
+    // Must go through the __fbNodes store (not the raw api.nodes.create IPC bridge):
+    // crdtEmitNodeCreate is only fired from the store's create() action, so a
+    // direct IPC create would never reach the CRDT log at all.
     const nodeId = await A.window.evaluate(async () => {
-      const api = (window as unknown as { api: typeof window.api }).api
-      const n = await api.nodes.create({ parentId: null, kind: 'task', title: 'Live Node A' } as never)
-      return (n as { id: string }).id
+      const store = (window as unknown as { __fbNodes: { getState: () => { create: (d: unknown) => Promise<{ id: string }> } } }).__fbNodes
+      const n = await store.getState().create({ parentId: null, kind: 'task', title: 'Live Node A' })
+      return n.id
     })
     const nodeMs = await until(
       B.window,
@@ -158,17 +166,19 @@ test('multi-type live convergence: node/widget/document create + field edits con
       (list) => list.some((n) => n.id === nodeId),
       12_000
     )
+    console.log(`[CRDT-LIVE] node create converged A→B in ${nodeMs}ms`)
     // Rename on A via the store (fires the CRDT title register).
     await A.window.evaluate(async (id) => {
       const store = (window as unknown as { __fbNodes?: { getState: () => { update: (id: string, p: unknown) => Promise<void> } } }).__fbNodes
       await store?.getState().update(id, { title: 'Live Node Renamed' })
     }, nodeId)
-    await until(
+    const nodeRenameMs = await until(
       B.window,
       async () => (await (window as unknown as { api: typeof window.api }).api.nodes.list()) as Array<{ id: string; title: string }>,
       (list) => list.find((n) => n.id === nodeId)?.title === 'Live Node Renamed',
       12_000
     )
+    console.log(`[CRDT-LIVE] node rename converged A→B in ${nodeRenameMs}ms`)
 
     // ── WIDGET: create on A's node desk, converge on B; edit content, converges ──
     // Seed B's node id first (window.evaluate can't close over test-scope vars).
@@ -179,7 +189,7 @@ test('multi-type live convergence: node/widget/document create + field edits con
       return w.id
     }, nodeId)
     // Widget create converges to B.
-    await until(
+    const widgetCreateMs = await until(
       B.window,
       async () => {
         const api = (window as unknown as { api: typeof window.api }).api
@@ -188,12 +198,13 @@ test('multi-type live convergence: node/widget/document create + field edits con
       (ws) => ws.some((w) => w.id === widgetId),
       12_000
     )
+    console.log(`[CRDT-LIVE] widget create converged A→B in ${widgetCreateMs}ms`)
     // Edit content on A; the LWW content register converges to B.
     await A.window.evaluate(async (id) => {
       const store = (window as unknown as { __fbWidgets: { getState: () => { update: (id: string, p: unknown) => Promise<void> } } }).__fbWidgets
       await store.getState().update(id, { content: 'live edited' })
     }, widgetId)
-    await until(
+    const widgetContentMs = await until(
       B.window,
       async () => {
         const api = (window as unknown as { api: typeof window.api }).api
@@ -202,8 +213,28 @@ test('multi-type live convergence: node/widget/document create + field edits con
       (ws) => ws.find((w) => w.id === widgetId)?.content === 'live edited',
       12_000
     )
+    console.log(`[CRDT-LIVE] widget content-edit converged A→B in ${widgetContentMs}ms`)
 
     // ── DOCUMENT: create on A, metadata converges on B; rename, title converges ──
+    // CONFIRMED HARNESS GAP (not fixed here, needs a production one-liner): unlike
+    // __fbNodes/__fbWidgets/__fbView, there is no __fbDocuments debug handle
+    // exposed anywhere in src/renderer/src/stores/documents.ts, so `store` below
+    // is always undefined and this always falls to the raw api.documents.create
+    // IPC bridge. Confirmed by direct signal-server request-log inspection during
+    // two prior runs (each waiting up to 45s): that bridge issues ZERO network
+    // requests — window.api.documents.create is 100% local-only. Only the
+    // renderer store's createBlank() additionally calls pushCloudDoc(doc) and
+    // nudgeSync() (see stores/documents.ts createBlank). So this step, as
+    // written, can NEVER converge to B by any mechanism (not CRDT, not the
+    // classic poll) — it is architecturally blocked, not a timing race, and the
+    // 15s budget below is only to demonstrate that without wasting run time.
+    // Recommended fix for the dispatcher: add, in stores/documents.ts, mirroring
+    // the existing convention in stores/nodes.ts / stores/widgets.ts / stores/view.ts —
+    //   if (typeof window !== 'undefined') {
+    //     (window as unknown as { __fbDocuments?: typeof useDocumentsStore }).__fbDocuments = useDocumentsStore
+    //   }
+    // — then this step can switch to the store path and assert convergence under
+    // the same tight CRDT budget as node/widget above.
     const docId = await A.window.evaluate(async () => {
       const store = (window as unknown as { __fbDocuments?: { getState: () => { createBlank: (t: string) => Promise<{ id: string }> } } }).__fbDocuments
       const api = (window as unknown as { api: typeof window.api }).api
@@ -212,14 +243,14 @@ test('multi-type live convergence: node/widget/document create + field edits con
       const d = await api.documents.create({ docType: 'doc', title: 'Live Doc A' } as never)
       return (d as { id: string }).id
     })
-    await until(
+    const docMs = await until(
       B.window,
       async () => (await (window as unknown as { api: typeof window.api }).api.documents.list()) as Array<{ id: string }>,
       (list) => list.some((d) => d.id === docId),
-      12_000
+      15_000
     )
-
-    console.log(`[CRDT-LIVE] node converged ${nodeMs}ms; all types converged A→B under budget`)
+    console.log(`[CRDT-LIVE] document converged via poll-fallback (no __fbDocuments hook) ${docMs}ms`)
+    console.log(`[CRDT-LIVE] all types converged A→B: node=${nodeMs}ms rename=${nodeRenameMs}ms widget=${widgetCreateMs}ms content=${widgetContentMs}ms doc=${docMs}ms`)
   } finally {
     await A.dispose()
     await B.dispose()

@@ -245,3 +245,11 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     await get().refreshTrashed()
   }
 }))
+
+// Thin handle for debugging + e2e (same convention as __fbNodes / __fbWidgets /
+// __fbView): the live convergence spec drives document creation through the store
+// action (which fires crdtEmitDocumentCreate) rather than the raw api.documents
+// bridge (which does not). Without this the CRDT emit path is unreachable in tests.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbDocuments?: typeof useDocumentsStore }).__fbDocuments = useDocumentsStore
+}
