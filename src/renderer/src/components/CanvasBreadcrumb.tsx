@@ -297,6 +297,24 @@ export default function CanvasBreadcrumb({
               <Icon name="expand_more" size={12} className="text-[var(--ink-30)] shrink-0 ml-0.5" />
             )}
           </span>
+          {/* Explicit rename affordance alongside double-click. The old header bar's
+              pencil was dropped in the FloatingPill refactor (c48d036); this restores
+              it on the breadcrumb, wired to the same inline rename. */}
+          {!renaming && onRenameTask && (
+            <button
+              type="button"
+              aria-label={current.kind === 'folder' ? 'Rename room' : 'Rename desk'}
+              title={current.kind === 'folder' ? 'Rename room' : 'Rename desk'}
+              onClick={(e) => {
+                e.stopPropagation()
+                startRename()
+              }}
+              onMouseEnter={handleLeave}
+              className="shrink-0 ml-0.5 p-0.5 rounded-full text-[var(--ink-30)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors"
+            >
+              <Icon name="edit" size={12} />
+            </button>
+          )}
         </span>
 
         {/* "Add to room…" button — only for free desks */}
