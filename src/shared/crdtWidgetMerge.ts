@@ -63,7 +63,7 @@ export interface ChangeEvent {
   id: string // client-generated UUIDv7, never renumbered (SYN-010)
   ts: string // ISO occurrence time, preserved on ingestion (SYN-011)
   partitionKey: string // the room this object syncs in, e.g. `w:acct:<accountId>`
-  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file'
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document'
   objectId: string
   field: CrdtField
   dataClass: CrdtDataClass

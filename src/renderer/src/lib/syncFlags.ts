@@ -62,6 +62,17 @@ export function crdtFilesEnabled(): boolean {
   }
 }
 
+// Document METADATA (title / archived / create / delete). The document BODY is not
+// carried here: org-shared bodies live on Yjs, and personal bodies still ride the
+// poll until the Yjs text-class fold moves them. Default OFF.
+export function crdtDocumentsEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.documents') === '1'
+  } catch {
+    return false
+  }
+}
+
 // A stable per-install id, minted once and reused. It is the LWW tiebreak actor, so
 // it MUST be distinct per device: two devices of the same account editing at the
 // same millisecond would otherwise share an actor and could diverge. Combined with
@@ -107,4 +118,9 @@ export function timeBlockPartition(accountId: string): string {
 // The sync partition for an account's file/folder entries.
 export function filePartition(accountId: string): string {
   return `f:acct:${accountId}`
+}
+
+// The sync partition for an account's document metadata.
+export function documentPartition(accountId: string): string {
+  return `d:acct:${accountId}`
 }

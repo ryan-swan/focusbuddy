@@ -22,6 +22,7 @@ import { useNodeStore } from '../stores/nodes'
 import { useTablesStore } from '../stores/tables'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useFileManagerStore } from '../stores/fileManager'
+import { useDocumentsStore } from '../stores/documents'
 import {
   sendSocketMessage,
   setCrdtSocketHandler,
@@ -35,14 +36,16 @@ import {
   crdtTablesEnabled,
   crdtTimeBlocksEnabled,
   crdtFilesEnabled,
+  crdtDocumentsEnabled,
   deviceId,
   widgetPartition,
   nodePartition,
   rowPartition,
   timeBlockPartition,
-  filePartition
+  filePartition,
+  documentPartition
 } from './syncFlags'
-import type { Widget, FbNode, TimeBlock } from '@shared/types'
+import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
 
 // The node scalar attributes carried as generic 'attr' registers. title + parent
@@ -85,6 +88,7 @@ let nodePart: string | null = null
 let rowPart: string | null = null
 let tbPart: string | null = null
 let filePart: string | null = null
+let docPart: string | null = null
 let actor = ''
 let started = false
 
@@ -136,7 +140,7 @@ function geomOf(w: Widget): WidgetGeom {
 
 function mkEvent(
   partitionKey: string,
-  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file',
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document',
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
@@ -477,6 +481,36 @@ function emitFileDelete(entryId: string): void {
   send(ev)
 }
 
+function emitDocumentCreate(doc: FbDocument): void {
+  if (!docPart) return
+  // Metadata only — the body is carried by Yjs (org) / the poll (personal) until
+  // the text-class fold. A create materialises an empty doc of the right type; the
+  // body then flows through its own channel.
+  const snapshot: Record<string, unknown> = { id: doc.id, docType: doc.docType, title: doc.title }
+  const ev = mkEvent(docPart, 'document', doc.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitDocumentDelete(docId: string): void {
+  if (!docPart) return
+  tombstoned.add(docId)
+  const ev = mkEvent(docPart, 'document', docId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitDocumentAttrs(docId: string, attrs: Record<string, unknown>): void {
+  if (!docPart) return
+  const at = Date.now()
+  for (const attr of ['title', 'archived'] as const) {
+    if (!(attr in attrs)) continue
+    const value = attrs[attr]
+    attrRegs.set(`document:${docId}:${attr}`, { value, timestamp: at, actor })
+    const ev = mkEvent(docPart, 'document', docId, 'attr', 'register', { attr, value, at })
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
 // Persist a remotely-won value and reflect it in the store WITHOUT going through
@@ -805,6 +839,34 @@ async function applyFileDelete(id: string): Promise<void> {
   void useFileManagerStore.getState().refresh()
 }
 
+async function applyDocumentCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  try {
+    await window.api.documents.create(snapshot as never)
+  } catch {
+    return
+  }
+  void useDocumentsStore.getState().refresh()
+}
+async function applyDocumentDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.documents.delete(id)
+  } catch {
+    /* not present locally — tombstone still guards a later create */
+  }
+  void useDocumentsStore.getState().refresh()
+}
+async function applyDocumentAttr(id: string, attr: string, value: unknown): Promise<void> {
+  try {
+    await window.api.documents.update(id, { [attr]: value } as never)
+  } catch {
+    /* not present locally — the poll reconciles it */
+  }
+  void useDocumentsStore.getState().refresh()
+}
+
 function applyEvent(ev: ChangeEvent): void {
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
@@ -935,6 +997,20 @@ function applyEvent(ev: ChangeEvent): void {
       fileRegs.set(key, merged)
       if (merged === remote) void applyFile(ev.objectId, f, remote.value)
     }
+  } else if (ev.objectType === 'document') {
+    if (ev.field === 'create') {
+      void applyDocumentCreate((ev.payload as CreatePayload).snapshot)
+    } else if (ev.field === 'delete') {
+      void applyDocumentDelete(ev.objectId)
+    } else if (ev.field === 'attr' && (ev.payload as AttrPayload).at !== undefined) {
+      const p = ev.payload as AttrPayload
+      const remote = registerOf(ev)
+      const key = `document:${ev.objectId}:${p.attr}`
+      const local = attrRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      attrRegs.set(key, merged)
+      if (merged === remote) void applyDocumentAttr(ev.objectId, p.attr, remote.value)
+    }
   }
 }
 
@@ -957,7 +1033,7 @@ function onCrdt(e: CrdtSocketEvent): void {
 function onReauth(): void {
   // Join each enabled partition (the server relays only to joined sockets), then
   // flush the shared offline queue.
-  const parts = [widgetPart, nodePart, rowPart, tbPart, filePart]
+  const parts = [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]
   for (const pk of parts) {
     if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
   }
@@ -973,7 +1049,7 @@ async function flushUnsynced(): Promise<void> {
         id: e.id,
         ts: e.ts,
         partitionKey: e.partitionKey,
-        objectType: e.objectType as 'widget' | 'node' | 'row' | 'timeblock' | 'file',
+        objectType: e.objectType as 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document',
         objectId: e.objectId,
         field: e.field as CrdtField,
         dataClass: e.dataClass as CrdtDataClass,
@@ -1001,7 +1077,8 @@ export function initCrdtSync(): void {
   const tEnabled = crdtTablesEnabled()
   const tbEnabled = crdtTimeBlocksEnabled()
   const fEnabled = crdtFilesEnabled()
-  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled) {
+  const dEnabled = crdtDocumentsEnabled()
+  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled && !dEnabled) {
     stopCrdtSync()
     return
   }
@@ -1013,6 +1090,7 @@ export function initCrdtSync(): void {
   rowPart = tEnabled ? rowPartition(acct.id) : null
   tbPart = tbEnabled ? timeBlockPartition(acct.id) : null
   filePart = fEnabled ? filePartition(acct.id) : null
+  docPart = dEnabled ? documentPartition(acct.id) : null
   if (!started) {
     setCrdtSocketHandler(onCrdt)
     setCrdtOpenHandler(onReauth)
@@ -1040,7 +1118,10 @@ export function initCrdtSync(): void {
       fileName: emitFileName,
       fileParent: emitFileParent,
       fileCreate: emitFileCreate,
-      fileDelete: emitFileDelete
+      fileDelete: emitFileDelete,
+      documentCreate: emitDocumentCreate,
+      documentDelete: emitDocumentDelete,
+      documentAttrs: emitDocumentAttrs
     })
     started = true
   }
@@ -1050,7 +1131,7 @@ export function initCrdtSync(): void {
 }
 
 export function stopCrdtSync(): void {
-  for (const pk of [widgetPart, nodePart, rowPart, tbPart, filePart]) {
+  for (const pk of [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]) {
     if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   }
   registerCrdtEmit(null)
@@ -1070,6 +1151,7 @@ export function stopCrdtSync(): void {
   rowPart = null
   tbPart = null
   filePart = null
+  docPart = null
   actor = ''
   started = false
 }

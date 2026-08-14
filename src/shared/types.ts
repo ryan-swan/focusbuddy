@@ -2212,6 +2212,8 @@ export interface DocumentMeta {
 }
 
 export interface DocumentDraft {
+  // Optional client-provided id (WS01 sync substrate) for idempotent create.
+  id?: string
   docType: DocType
   title: string
   body?: DocBody | SheetBody | SlidesBody | MapBody | DesignBody

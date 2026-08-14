@@ -4,6 +4,7 @@ import { pullCloudDocs, pushCloudDoc, pushCloudDelete } from '../lib/cloudDocsSy
 import { nudgeSync } from '../lib/syncNudge'
 import { recordActionWithToast } from './actionHistory'
 import { useMessagingStore } from './messaging'
+import { crdtEmitDocumentCreate, crdtEmitDocumentDelete, crdtEmitDocumentAttrs } from '../lib/crdtBridge'
 
 // Documents store — the standalone office files (doc / sheet / slides). Holds
 // the list for the hub and the one open document for the editor. Body edits are
@@ -111,6 +112,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
               : 'Untitled map')
     const doc = await window.api.documents.create({ docType, title })
     void pushCloudDoc(doc).catch(() => {})
+    crdtEmitDocumentCreate(doc) // WS01 (flagged): materialise doc metadata on other devices
     await get().refresh()
     nudgeSync()
     return doc
@@ -125,6 +127,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
       body: r.body as FbDocument['body']
     })
     void pushCloudDoc(doc).catch(() => {})
+    crdtEmitDocumentCreate(doc) // WS01 (flagged): materialise doc metadata on other devices
     await get().refresh()
     return { ok: true, id: doc.id }
   },
@@ -141,6 +144,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
       body: r.body as FbDocument['body']
     })
     void pushCloudDoc(doc).catch(() => {})
+    crdtEmitDocumentCreate(doc) // WS01 (flagged): materialise doc metadata on other devices
     await get().refresh()
     return { ok: true, id: doc.id }
   },
@@ -198,6 +202,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
     void pushCloudDoc(next).catch(() => {})
     await get().refresh()
     nudgeSync()
+    crdtEmitDocumentAttrs(a.id, { title }) // WS01 (flagged): title as LWW attr
   },
 
   refreshTrashed: async () => {
@@ -208,6 +213,7 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   remove: async (id) => {
     const meta = get().list.find((d) => d.id === id)
     await window.api.documents.delete(id)
+    crdtEmitDocumentDelete(id) // WS01 (flagged): tombstone so the delete converges
     // No cloud delete here: the document is only in the local Trash. The cloud
     // copy is forgotten when (and only when) the user purges it.
     // Best-effort archive of this doc's chat channel (un-archives if restored+reopened).

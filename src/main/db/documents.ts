@@ -157,7 +157,13 @@ export function getDocument(id: string): FbDocument | null {
 
 export function createDocument(draft: DocumentDraft): FbDocument {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id (create-if-missing by primary key)
+  // so a document create event materialises with the same id on another device.
+  const id = draft.id ?? randomUUID()
+  if (draft.id) {
+    const existing = getDocument(draft.id)
+    if (existing) return existing
+  }
   const now = Date.now()
   const body = draft.body ?? emptyBody(draft.docType)
   db.prepare(
