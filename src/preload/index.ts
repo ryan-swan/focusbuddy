@@ -2138,6 +2138,20 @@ const api = {
       return () => ipcRenderer.removeListener('meet:incoming-room', handler)
     }
   },
+  // External markdown editing (ws-v-3): ops-console artifacts open in
+  // PlexiDocs and save straight back to disk. Same drain + live pattern.
+  mdext: {
+    read: (path: string): Promise<{ ok: boolean; content?: string; error?: string }> =>
+      ipcRenderer.invoke('mdext:read', path),
+    write: (path: string, content: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('mdext:write', path, content),
+    getPending: (): Promise<string | null> => ipcRenderer.invoke('mdext:get-pending'),
+    onIncomingPath: (cb: (path: string) => void): (() => void) => {
+      const handler = (_: unknown, path: string): void => cb(path)
+      ipcRenderer.on('mdext:incoming-path', handler)
+      return () => ipcRenderer.removeListener('mdext:incoming-path', handler)
+    }
+  },
   // File import — opens a native picker scoped to importable extensions,
   // then converts the contents into a widget draft (text / table /
   // page-from-json). The renderer creates the actual widget through the

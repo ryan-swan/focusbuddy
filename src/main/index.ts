@@ -6,6 +6,7 @@ import { config as loadEnv } from 'dotenv'
 import { closeDb, getDb } from './db/database'
 import { autoBackupOnLaunch } from './db/backup'
 import { registerIpcHandlers } from './ipc'
+import { registerMdExternal } from './mdExternal'
 import { decidePopup } from './popupRouter'
 import { cleanWebviewUserAgent } from './userAgent'
 import { getFile } from './db/files'
@@ -481,6 +482,7 @@ app.whenReady().then(() => {
   // Enable getDisplayMedia so PlexiMeet can share a screen or window.
   applyDisplayMediaHandler(session.defaultSession)
   registerIpcHandlers()
+  registerMdExternal()
   // Stream Deck focus handoff — caches the previously-frontmost app so
   // ⌘C / ⌘V / ⌘⇧4 / type-text land in the user's actual workspace
   // rather than in FocusBuddy itself.

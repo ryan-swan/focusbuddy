@@ -332,6 +332,24 @@ export default function App(): JSX.Element {
     }
   }, [])
 
+  // External markdown deep link (haptyx://edit-md?path=...) from the ops
+  // console: open the file as a PlexiDocs surface (ws-v-3).
+  useEffect(() => {
+    let detach: (() => void) | undefined
+    const openPath = (p: string): void => {
+      useViewStore.getState().go({ kind: 'mdext', path: p })
+    }
+    const run = async (): Promise<void> => {
+      const pending = await window.api.mdext.getPending()
+      if (pending) openPath(pending)
+      detach = window.api.mdext.onIncomingPath(openPath)
+    }
+    void run()
+    return () => {
+      detach?.()
+    }
+  }, [])
+
   // First launch after an update → show the "What's new" modal once for this
   // version. The main process says authoritatively whether this boot followed
   // an update; we then advance the run-version marker so the next update is

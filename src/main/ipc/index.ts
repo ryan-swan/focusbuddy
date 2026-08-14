@@ -3,7 +3,7 @@ import { detectPreviewBuild } from '../appMode'
 import { writeFile } from 'node:fs/promises'
 import { join as pathJoin } from 'node:path'
 import { buildMeetingIcs } from '@shared/ics'
-import { consumePendingAuthHandoff, consumePendingShareToken, consumePendingMeetRoom } from '../authProtocol'
+import { consumePendingAuthHandoff, consumePendingShareToken, consumePendingMeetRoom, consumePendingMdEditPath } from '../authProtocol'
 import {
   checkForUpdates,
   getCurrentUpdateState,
@@ -2384,6 +2384,7 @@ export function registerIpcHandlers(): void {
   // Same drain-pending pattern for a share deep link (haptyx://share?token=...).
   ipcMain.handle('share:get-pending', () => consumePendingShareToken())
   ipcMain.handle('meet:get-pending', () => consumePendingMeetRoom())
+  ipcMain.handle('mdext:get-pending', () => consumePendingMdEditPath())
 
   // ── Auto-update ──────────────────────────────────────────────────────────
   // The renderer subscribes via the `update:state` event (broadcast from

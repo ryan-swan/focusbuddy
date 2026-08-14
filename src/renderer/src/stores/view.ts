@@ -59,6 +59,7 @@ export type View =
   | { kind: 'flows' }
   | { kind: 'api' }
   | { kind: 'marketplace' }
+  | { kind: 'mdext'; path: string }
 
 interface ViewStore {
   view: View

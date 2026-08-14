@@ -110,6 +110,46 @@ function parseMeetUrl(url: string): string | null {
   }
 }
 
+// haptyx://edit-md?path=<absolute .md path> — open an external markdown
+// document (an ops-console artifact) in the PlexiDocs editor (ws-v-3). The
+// path is only a REQUEST here; the mdext IPC layer enforces the allowed root.
+let pendingMdEditPath: string | null = null
+
+function parseEditMdUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== `${SCHEME}:` || parsed.host !== 'edit-md') return null
+    return parsed.searchParams.get('path')
+  } catch {
+    return null
+  }
+}
+
+function broadcastMdEdit(path: string) {
+  const wins = BrowserWindow.getAllWindows()
+  if (wins.length === 0) {
+    pendingMdEditPath = path
+    return
+  }
+  for (const win of wins) {
+    if (!win.isDestroyed()) {
+      try {
+        win.webContents.send('mdext:incoming-path', path)
+      } catch {
+        /* renderer still loading; it drains via mdext:get-pending on ready */
+      }
+    }
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  }
+}
+
+export function consumePendingMdEditPath(): string | null {
+  const p = pendingMdEditPath
+  pendingMdEditPath = null
+  return p
+}
+
 function broadcastMeet(roomId: string) {
   const wins = BrowserWindow.getAllWindows()
   if (wins.length === 0) {
@@ -171,7 +211,13 @@ function handleAuthUrl(url: string, origin: AuthHandoff['origin']) {
   }
   // And meeting-join links (haptyx://meet?room=...) from an invite email.
   const meetRoom = parseMeetUrl(url)
-  if (meetRoom) broadcastMeet(meetRoom)
+  if (meetRoom) {
+    broadcastMeet(meetRoom)
+    return
+  }
+  // And external-markdown edit links from the ops console (ws-v-3).
+  const mdPath = parseEditMdUrl(url)
+  if (mdPath) broadcastMdEdit(mdPath)
 }
 
 // Called from main/ipc.ts handler so the renderer can drain anything
