@@ -17,16 +17,14 @@ interface CrashApi {
   crash?: { report?: (p: CrashPayload) => Promise<unknown> }
 }
 
-function crashApi(): CrashApi | undefined {
-  return (window as unknown as { api?: CrashApi }).api
-}
-
 // Send one crash. Never throws; a missing bridge (e.g. very early boot) is a
-// silent no-op rather than an error.
+// silent no-op rather than an error. Accessed as the literal `api.crash` so the
+// SDK-conformance check (every preload namespace has a first-party caller) sees
+// this call site.
 export function reportCrash(payload: CrashPayload): void {
   try {
-    const fn = crashApi()?.crash?.report
-    if (fn) void fn(payload).catch(() => {})
+    const api = (window as unknown as { api?: CrashApi }).api
+    if (api?.crash?.report) void api.crash.report(payload).catch(() => {})
   } catch {
     // reporting must never itself surface an error
   }
