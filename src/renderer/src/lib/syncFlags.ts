@@ -40,6 +40,28 @@ export function crdtTablesEnabled(): boolean {
   }
 }
 
+// Time blocks (calendar). Syncs a block's start / duration / title / status as LWW
+// registers, so moving or retitling a block converges live. Creation/deletion +
+// recurrence series stay on the poll. Default OFF.
+export function crdtTimeBlocksEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.timeblocks') === '1'
+  } catch {
+    return false
+  }
+}
+
+// Files/folders (the Drive manager entries). Syncs an entry's name and parent as
+// LWW registers, so a rename or a move converges live. Ingest/creation/deletion and
+// the file bytes stay on the poll + blob sync. Default OFF.
+export function crdtFilesEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.files') === '1'
+  } catch {
+    return false
+  }
+}
+
 // A stable per-install id, minted once and reused. It is the LWW tiebreak actor, so
 // it MUST be distinct per device: two devices of the same account editing at the
 // same millisecond would otherwise share an actor and could diverge. Combined with
@@ -75,4 +97,14 @@ export function nodePartition(accountId: string): string {
 // The sync partition for an account's table rows.
 export function rowPartition(accountId: string): string {
   return `r:acct:${accountId}`
+}
+
+// The sync partition for an account's time blocks.
+export function timeBlockPartition(accountId: string): string {
+  return `t:acct:${accountId}`
+}
+
+// The sync partition for an account's file/folder entries.
+export function filePartition(accountId: string): string {
+  return `f:acct:${accountId}`
 }

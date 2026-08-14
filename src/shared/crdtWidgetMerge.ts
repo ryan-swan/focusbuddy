@@ -25,9 +25,19 @@ export interface WidgetGeom {
 }
 
 // Fields across all migrated types: widget geometry ('geom') + membership
-// ('members'), node 'title' + 'parent', and row 'cell'. New types add their fields
-// here as they migrate, keeping ChangeEvent one shape on the wire.
-export type CrdtField = 'geom' | 'members' | 'title' | 'parent' | 'cell'
+// ('members'), node 'title' + 'parent', row 'cell', timeblock 'start'/'duration'/
+// 'status' (+ shared 'title'), and file 'name' (+ shared 'parent'). New types add
+// their fields here as they migrate, keeping ChangeEvent one shape on the wire.
+export type CrdtField =
+  | 'geom'
+  | 'members'
+  | 'title'
+  | 'parent'
+  | 'cell'
+  | 'start'
+  | 'duration'
+  | 'status'
+  | 'name'
 // 'register' is the LWW class used for geometry and node scalar fields; 'set' is the
 // OR-Set class used for membership. Both are deterministic — neither ever surfaces a
 // manual conflict.
@@ -37,7 +47,7 @@ export interface ChangeEvent {
   id: string // client-generated UUIDv7, never renumbered (SYN-010)
   ts: string // ISO occurrence time, preserved on ingestion (SYN-011)
   partitionKey: string // the room this object syncs in, e.g. `w:acct:<accountId>`
-  objectType: 'widget' | 'node' | 'row'
+  objectType: 'widget' | 'node' | 'row' | 'timeblock' | 'file'
   objectId: string
   field: CrdtField
   dataClass: CrdtDataClass
@@ -90,9 +100,30 @@ export function isRegisterPayload(p: ChangeEvent['payload']): p is RegisterPaylo
 }
 
 // The LWW register a scalar (node title/parent) event represents.
-export function registerOf(ev: ChangeEvent): import('./crdt').LWWRegister<unknown> {
+export function registerOf(ev: ChangeEvent): LWWRegister<unknown> {
   const p = ev.payload as RegisterPayload
   return { value: p.value, timestamp: p.at, actor: ev.actor }
+}
+
+// Generic fold for a set of scalar LWW-register fields on one object. Returns the
+// converged register per field that has at least one event. Nodes, timeblocks and
+// files are all just named scalar registers, so they share this one fold; each
+// passes the field names it cares about. Pure and order-independent (each field
+// folds by lwwMerge independently).
+export function foldRegisterFields(
+  events: Iterable<ChangeEvent>,
+  fields: ReadonlySet<string>
+): Map<string, LWWRegister<unknown>> {
+  const regs = new Map<string, LWWRegister<unknown>>()
+  for (const ev of events) {
+    if (!fields.has(ev.field)) continue
+    const p = ev.payload as RegisterPayload
+    if (p.at === undefined) continue
+    const reg = registerOf(ev)
+    const prior = regs.get(ev.field) ?? null
+    regs.set(ev.field, prior ? lwwMerge(prior, reg) : reg)
+  }
+  return regs
 }
 
 // The LWW register a single geometry event represents.

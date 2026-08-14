@@ -14,6 +14,9 @@ export interface CrdtEmit {
   nodeTitle: (nodeId: string, title: string) => void
   nodeParent: (nodeId: string, parentId: string | null) => void
   rowCells: (rowId: string, cells: Record<string, unknown>) => void
+  timeBlock: (blockId: string, patch: { startMs?: number; durationMin?: number; title?: string; status?: string }) => void
+  fileName: (entryId: string, name: string) => void
+  fileParent: (entryId: string, parentId: string | null) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -40,4 +43,19 @@ export function crdtEmitNodeParent(nodeId: string, parentId: string | null): voi
 
 export function crdtEmitRowCells(rowId: string, cells: Record<string, unknown>): void {
   impl?.rowCells(rowId, cells)
+}
+
+export function crdtEmitTimeBlock(
+  blockId: string,
+  patch: { startMs?: number; durationMin?: number; title?: string; status?: string }
+): void {
+  impl?.timeBlock(blockId, patch)
+}
+
+export function crdtEmitFileName(entryId: string, name: string): void {
+  impl?.fileName(entryId, name)
+}
+
+export function crdtEmitFileParent(entryId: string, parentId: string | null): void {
+  impl?.fileParent(entryId, parentId)
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { TimeBlock, TimeBlockDraft, TimeBlockPatch } from '@shared/types'
 import { recordAction, recordActionWithToast } from './actionHistory'
+import { crdtEmitTimeBlock } from '../lib/crdtBridge'
 
 // Calendar time blocks for the currently-viewed range. The view sets the range
 // (a week / a day); the store loads the blocks that overlap it and keeps an
@@ -68,6 +69,10 @@ export const useTimeBlockStore = create<TimeBlockStore>((set, get) => ({
     const next = blocks.filter((b) => b.id !== id)
     if (stillInRange) next.push(updated)
     set({ blocks: next.sort((a, b) => a.startMs - b.startMs) })
+    // WS01 sync substrate (flagged, off by default): mirror start/duration/title/
+    // status changes into the CRDT change log as LWW registers. Recurrence/series
+    // edits + creation/deletion stay on the poll. No-op until the engine registers.
+    crdtEmitTimeBlock(id, patch)
   },
   remove: async (id, scope = 'one') => {
     const existing = get().blocks.find((b) => b.id === id)

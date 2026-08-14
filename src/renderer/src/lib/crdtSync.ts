@@ -17,6 +17,8 @@ import { useAccountStore } from '../stores/account'
 import { useWidgetStore } from '../stores/widgets'
 import { useNodeStore } from '../stores/nodes'
 import { useTablesStore } from '../stores/tables'
+import { useTimeBlockStore } from '../stores/timeBlocks'
+import { useFileManagerStore } from '../stores/fileManager'
 import {
   sendSocketMessage,
   setCrdtSocketHandler,
@@ -28,10 +30,14 @@ import {
   crdtWidgetsEnabled,
   crdtNodesEnabled,
   crdtTablesEnabled,
+  crdtTimeBlocksEnabled,
+  crdtFilesEnabled,
   deviceId,
   widgetPartition,
   nodePartition,
-  rowPartition
+  rowPartition,
+  timeBlockPartition,
+  filePartition
 } from './syncFlags'
 import type { Widget } from '@shared/types'
 import type { FbRow } from '@shared/fields'
@@ -51,6 +57,8 @@ import type { FbRow } from '@shared/fields'
 let widgetPart: string | null = null
 let nodePart: string | null = null
 let rowPart: string | null = null
+let tbPart: string | null = null
+let filePart: string | null = null
 let actor = ''
 let started = false
 
@@ -82,13 +90,18 @@ const nodeRegs = new Map<string, LWWRegister<unknown>>()
 // Row in-memory state: one LWW register per (row, column), keyed `${rowId}:${column}`.
 const rowRegs = new Map<string, LWWRegister<unknown>>()
 
+// Timeblock + file in-memory state: one LWW register per (field, id), keyed
+// `${field}:${id}` (ids are UUIDs so there is no cross-type collision).
+const tbRegs = new Map<string, LWWRegister<unknown>>()
+const fileRegs = new Map<string, LWWRegister<unknown>>()
+
 function geomOf(w: Widget): WidgetGeom {
   return { x: w.x, y: w.y, width: w.width, height: w.height }
 }
 
 function mkEvent(
   partitionKey: string,
-  objectType: 'widget' | 'node' | 'row',
+  objectType: 'widget' | 'node' | 'row' | 'timeblock' | 'file',
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
@@ -192,6 +205,40 @@ function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
   }
 }
 
+function emitTimeBlock(
+  blockId: string,
+  patch: { startMs?: number; durationMin?: number; title?: string; status?: string }
+): void {
+  if (!tbPart) return
+  const at = Date.now()
+  const fields: Array<[CrdtField, unknown]> = []
+  if (patch.startMs !== undefined) fields.push(['start', patch.startMs])
+  if (patch.durationMin !== undefined) fields.push(['duration', patch.durationMin])
+  if (patch.title !== undefined) fields.push(['title', patch.title])
+  if (patch.status !== undefined) fields.push(['status', patch.status])
+  for (const [field, value] of fields) {
+    tbRegs.set(`${field}:${blockId}`, { value, timestamp: at, actor })
+    const ev = mkEvent(tbPart, 'timeblock', blockId, field, 'register', { value, at })
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+
+function emitFileRegister(entryId: string, field: 'name' | 'parent', value: unknown): void {
+  if (!filePart) return
+  const at = Date.now()
+  fileRegs.set(`${field}:${entryId}`, { value, timestamp: at, actor })
+  const ev = mkEvent(filePart, 'file', entryId, field, 'register', { value, at })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitFileName(entryId: string, name: string): void {
+  emitFileRegister(entryId, 'name', name)
+}
+function emitFileParent(entryId: string, parentId: string | null): void {
+  emitFileRegister(entryId, 'parent', parentId)
+}
+
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
 // Persist a remotely-won value and reflect it in the store WITHOUT going through
@@ -264,6 +311,32 @@ async function applyCellToRow(rowId: string, column: string, value: unknown): Pr
   if (changed) useTablesStore.setState({ rows: next })
 }
 
+async function applyTimeBlock(id: string, field: CrdtField, value: unknown): Promise<void> {
+  const patch: Record<string, unknown> = {}
+  if (field === 'start') patch.startMs = value
+  else if (field === 'duration') patch.durationMin = value
+  else if (field === 'title') patch.title = value
+  else if (field === 'status') patch.status = value
+  try {
+    await window.api.timeBlocks.update(id, patch)
+  } catch {
+    /* not present locally — the poll reconciles it */
+  }
+  // Reload the visible range so a moved/retitled block reflects; low-frequency
+  // (remote edits only), so a full range reload is fine.
+  void useTimeBlockStore.getState().reload()
+}
+
+async function applyFile(id: string, field: CrdtField, value: unknown): Promise<void> {
+  try {
+    if (field === 'name') await window.api.fileManager.rename(id, value as string)
+    else await window.api.fileManager.move(id, value as string | null)
+  } catch {
+    /* rejected or not present locally — the poll reconciles it */
+  }
+  void useFileManagerStore.getState().refresh()
+}
+
 function applyEvent(ev: ChangeEvent): void {
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
@@ -308,6 +381,29 @@ function applyEvent(ev: ChangeEvent): void {
       rowRegs.set(key, merged)
       if (merged === remote) void applyCellToRow(ev.objectId, p.column, remote.value)
     }
+  } else if (ev.objectType === 'timeblock') {
+    const f = ev.field
+    if (
+      (f === 'start' || f === 'duration' || f === 'title' || f === 'status') &&
+      (ev.payload as RegisterPayload).at !== undefined
+    ) {
+      const remote = registerOf(ev)
+      const key = `${f}:${ev.objectId}`
+      const local = tbRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      tbRegs.set(key, merged)
+      if (merged === remote) void applyTimeBlock(ev.objectId, f, remote.value)
+    }
+  } else if (ev.objectType === 'file') {
+    const f = ev.field
+    if ((f === 'name' || f === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
+      const remote = registerOf(ev)
+      const key = `${f}:${ev.objectId}`
+      const local = fileRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      fileRegs.set(key, merged)
+      if (merged === remote) void applyFile(ev.objectId, f, remote.value)
+    }
   }
 }
 
@@ -330,10 +426,11 @@ function onCrdt(e: CrdtSocketEvent): void {
 function onReauth(): void {
   // Join each enabled partition (the server relays only to joined sockets), then
   // flush the shared offline queue.
-  for (const pk of [widgetPart, nodePart, rowPart]) {
+  const parts = [widgetPart, nodePart, rowPart, tbPart, filePart]
+  for (const pk of parts) {
     if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
   }
-  if (widgetPart || nodePart || rowPart) void flushUnsynced()
+  if (parts.some(Boolean)) void flushUnsynced()
 }
 
 async function flushUnsynced(): Promise<void> {
@@ -345,7 +442,7 @@ async function flushUnsynced(): Promise<void> {
         id: e.id,
         ts: e.ts,
         partitionKey: e.partitionKey,
-        objectType: e.objectType as 'widget' | 'node' | 'row',
+        objectType: e.objectType as 'widget' | 'node' | 'row' | 'timeblock' | 'file',
         objectId: e.objectId,
         field: e.field as CrdtField,
         dataClass: e.dataClass as CrdtDataClass,
@@ -371,7 +468,9 @@ export function initCrdtSync(): void {
   const wEnabled = crdtWidgetsEnabled()
   const nEnabled = crdtNodesEnabled()
   const tEnabled = crdtTablesEnabled()
-  if (!wEnabled && !nEnabled && !tEnabled) {
+  const tbEnabled = crdtTimeBlocksEnabled()
+  const fEnabled = crdtFilesEnabled()
+  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled) {
     stopCrdtSync()
     return
   }
@@ -381,6 +480,8 @@ export function initCrdtSync(): void {
   widgetPart = wEnabled ? widgetPartition(acct.id) : null
   nodePart = nEnabled ? nodePartition(acct.id) : null
   rowPart = tEnabled ? rowPartition(acct.id) : null
+  tbPart = tbEnabled ? timeBlockPartition(acct.id) : null
+  filePart = fEnabled ? filePartition(acct.id) : null
   if (!started) {
     setCrdtSocketHandler(onCrdt)
     setCrdtOpenHandler(onReauth)
@@ -389,7 +490,10 @@ export function initCrdtSync(): void {
       membership: emitMembership,
       nodeTitle: emitNodeTitle,
       nodeParent: emitNodeParent,
-      rowCells: emitRowCells
+      rowCells: emitRowCells,
+      timeBlock: emitTimeBlock,
+      fileName: emitFileName,
+      fileParent: emitFileParent
     })
     started = true
   }
@@ -399,7 +503,7 @@ export function initCrdtSync(): void {
 }
 
 export function stopCrdtSync(): void {
-  for (const pk of [widgetPart, nodePart, rowPart]) {
+  for (const pk of [widgetPart, nodePart, rowPart, tbPart, filePart]) {
     if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   }
   registerCrdtEmit(null)
@@ -409,9 +513,13 @@ export function stopCrdtSync(): void {
   memberStates.clear()
   nodeRegs.clear()
   rowRegs.clear()
+  tbRegs.clear()
+  fileRegs.clear()
   widgetPart = null
   nodePart = null
   rowPart = null
+  tbPart = null
+  filePart = null
   actor = ''
   started = false
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { FileEntry } from '@shared/fields'
 import { nudgeSync } from '../lib/syncNudge'
+import { crdtEmitFileName, crdtEmitFileParent } from '../lib/crdtBridge'
 
 // State for the file/folder manager view. The current folder (cwd, null = root)
 // drives the listing; view mode and sort are persisted so the manager opens the
@@ -260,6 +261,8 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   rename: async (id, name) => {
     const before = get().entries.find((e) => e.id === id)?.name ?? ''
     await window.api.fileManager.rename(id, name)
+    // WS01 sync substrate (flagged): a rename is a 'name' LWW register. No-op off.
+    crdtEmitFileName(id, name)
     record(set, get, {
       label: 'Rename',
       undo: async () => {
@@ -275,6 +278,8 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
     const before = get().entries.find((e) => e.id === id)?.parentId ?? get().cwd
     const ok = await window.api.fileManager.move(id, newParentId)
     if (!ok) return
+    // WS01 sync substrate (flagged): a move is a 'parent' LWW register. No-op off.
+    crdtEmitFileParent(id, newParentId)
     record(set, get, {
       label: 'Move',
       undo: async () => {
