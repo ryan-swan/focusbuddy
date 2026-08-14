@@ -6,7 +6,13 @@ import { sectionCreate, widgetOpen } from '../lib/audioBeep'
 import { notifyWireSource } from '../lib/wireEngine'
 import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
 import { recordSnapshotSoon } from '../lib/timeTravel'
-import { crdtEmitGeom, crdtEmitMembership } from '../lib/crdtBridge'
+import {
+  crdtEmitGeom,
+  crdtEmitMembership,
+  crdtEmitWidgetCreate,
+  crdtEmitWidgetDelete,
+  crdtEmitWidgetFields
+} from '../lib/crdtBridge'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import { focusNavOrder, isFocusable } from '../lib/focusNavOrder'
 import { useAccountStore } from './account'
@@ -370,6 +376,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     // Different chime for sections (the "container" event) vs other widgets
     if (widget.kind === 'section') sectionCreate()
     else widgetOpen()
+    // WS01 sync substrate (flagged): emit the create so the widget materialises on
+    // other devices with the same id. No-op until the engine registers (flag on).
+    crdtEmitWidgetCreate(widget)
     return widget
   },
   update: async (id, patch) => {
@@ -450,6 +459,22 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       }
       if ('parentSectionId' in patch) {
         crdtEmitMembership(id, beforeSection, (patch.parentSectionId as string | null) ?? null)
+      }
+      // The widget's own content fields as LWW registers (content/title/colour/
+      // status), so a concurrent edit to a sticky's text or a card's title
+      // converges instead of the poll's whole-row last-write-wins.
+      if (
+        patch.content !== undefined ||
+        patch.title !== undefined ||
+        patch.color !== undefined ||
+        patch.status !== undefined
+      ) {
+        crdtEmitWidgetFields(id, {
+          content: patch.content,
+          title: patch.title,
+          color: patch.color,
+          status: patch.status as string | null | undefined
+        })
       }
       // Linked-duplicate live sync: mirror the synced fields (content / title /
       // colour) to any OTHER in-store copies that share this widget's syncGroupId,
@@ -537,6 +562,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     await window.api.widgets.delete(id) // soft-delete (trashed, recoverable)
     set({ widgets: get().widgets.filter((w) => w.id !== id) })
     nudgeSync()
+    // WS01 sync substrate (flagged): emit a delete tombstone so the removal
+    // converges on other devices (remove-wins). No-op until the engine registers.
+    crdtEmitWidgetDelete(id)
     // Don't prune links: they survive the soft-delete so they return on restore.
     // The overlay skips links whose endpoint widget isn't present, so a trashed
     // widget's lines simply hide until it's restored.

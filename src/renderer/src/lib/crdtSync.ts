@@ -11,7 +11,9 @@ import {
   type GeomPayload,
   type MembersPayload,
   type RegisterPayload,
-  type CellPayload
+  type CellPayload,
+  type CreatePayload,
+  type DeletePayload
 } from '@shared/crdtWidgetMerge'
 import { useAccountStore } from '../stores/account'
 import { useWidgetStore } from '../stores/widgets'
@@ -90,6 +92,13 @@ const nodeRegs = new Map<string, LWWRegister<unknown>>()
 // Row in-memory state: one LWW register per (row, column), keyed `${rowId}:${column}`.
 const rowRegs = new Map<string, LWWRegister<unknown>>()
 
+// Widget scalar-field registers (content/title/color/status), keyed `${field}:${id}`.
+const widgetFieldRegs = new Map<string, LWWRegister<unknown>>()
+// Lifecycle tombstones: object ids that have seen a delete event. Remove-wins, so a
+// create is never applied for a tombstoned id (no resurrection). Spans all types
+// (ids are globally unique UUIDs).
+const tombstoned = new Set<string>()
+
 // Timeblock + file in-memory state: one LWW register per (field, id), keyed
 // `${field}:${id}` (ids are UUIDs so there is no cross-type collision).
 const tbRegs = new Map<string, LWWRegister<unknown>>()
@@ -105,7 +114,7 @@ function mkEvent(
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
-  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload
+  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload | CreatePayload | DeletePayload
 ): ChangeEvent {
   return {
     id: plexiId(),
@@ -173,6 +182,53 @@ function emitMembership(widgetId: string, from: string | null, to: string | null
     events.push(mkEvent(widgetPart, 'widget', widgetId, 'members', 'set', { op: 'add', section: to, tags: [tag] }))
   }
   for (const ev of events) {
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+
+function emitWidgetCreate(w: Widget): void {
+  if (!widgetPart) return
+  const at = Date.now()
+  const snapshot: Record<string, unknown> = {
+    id: w.id,
+    taskId: w.taskId,
+    kind: w.kind,
+    title: w.title,
+    content: w.content,
+    x: w.x,
+    y: w.y,
+    width: w.width,
+    height: w.height,
+    color: w.color ?? null
+  }
+  const ev = mkEvent(widgetPart, 'widget', w.id, 'create', 'set', { snapshot, at })
+  recordLocal(ev, false)
+  send(ev)
+}
+
+function emitWidgetDelete(widgetId: string): void {
+  if (!widgetPart) return
+  tombstoned.add(widgetId)
+  const ev = mkEvent(widgetPart, 'widget', widgetId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+
+function emitWidgetFields(
+  widgetId: string,
+  patch: { content?: string; title?: string; color?: string | null; status?: string | null }
+): void {
+  if (!widgetPart) return
+  const at = Date.now()
+  const fields: Array<[CrdtField, unknown]> = []
+  if (patch.content !== undefined) fields.push(['content', patch.content])
+  if (patch.title !== undefined) fields.push(['title', patch.title])
+  if (patch.color !== undefined) fields.push(['color', patch.color])
+  if (patch.status !== undefined) fields.push(['status', patch.status])
+  for (const [field, value] of fields) {
+    widgetFieldRegs.set(`${field}:${widgetId}`, { value, timestamp: at, actor })
+    const ev = mkEvent(widgetPart, 'widget', widgetId, field, 'register', { value, at })
     recordLocal(ev, false)
     send(ev)
   }
@@ -253,6 +309,53 @@ async function applyGeomToWidget(id: string, geom: WidgetGeom): Promise<void> {
   }
   useWidgetStore.setState((s) => ({
     widgets: s.widgets.map((w) => (w.id === id ? { ...w, ...geom } : w))
+  }))
+}
+
+async function applyWidgetCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  let created: Widget | null = null
+  try {
+    // create-if-missing by id (main honours the provided id + returns the existing
+    // row if it is already there), so a replayed/echoed create never duplicates.
+    created = await window.api.widgets.create(snapshot as never)
+  } catch {
+    return
+  }
+  if (!created) return
+  // Reflect only if the widget's task is already loaded in the store (its desk is
+  // open); otherwise it materialises when that desk is next opened. The base write
+  // above is what makes it durable regardless.
+  const st = useWidgetStore.getState()
+  if (st.widgets.some((w) => w.taskId === created!.taskId) && !st.widgets.some((w) => w.id === created!.id)) {
+    useWidgetStore.setState({ widgets: [...st.widgets, created] })
+  }
+}
+
+async function applyWidgetDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.widgets.delete(id) // soft-delete (recoverable), matches local remove()
+  } catch {
+    /* not present locally — the tombstone still guards against a later create */
+  }
+  useWidgetStore.setState((s) => ({ widgets: s.widgets.filter((w) => w.id !== id) }))
+}
+
+async function applyWidgetField(id: string, field: CrdtField, value: unknown): Promise<void> {
+  const patch: Record<string, unknown> = {}
+  if (field === 'content') patch.content = value
+  else if (field === 'title') patch.title = value
+  else if (field === 'color') patch.color = value
+  else if (field === 'status') patch.status = value
+  try {
+    await window.api.widgets.update(id, patch)
+  } catch {
+    /* not on this device's open task; base write still lands */
+  }
+  useWidgetStore.setState((s) => ({
+    widgets: s.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w))
   }))
 }
 
@@ -341,7 +444,18 @@ function applyEvent(ev: ChangeEvent): void {
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
   if (ev.objectType === 'widget') {
-    if (ev.field === 'geom' && (ev.payload as GeomPayload).geom !== undefined) {
+    if (ev.field === 'create') {
+      void applyWidgetCreate((ev.payload as CreatePayload).snapshot)
+    } else if (ev.field === 'delete') {
+      void applyWidgetDelete(ev.objectId)
+    } else if (ev.field === 'content' || ev.field === 'title' || ev.field === 'color' || ev.field === 'status') {
+      const remote = registerOf(ev)
+      const key = `${ev.field}:${ev.objectId}`
+      const local = widgetFieldRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      widgetFieldRegs.set(key, merged)
+      if (merged === remote) void applyWidgetField(ev.objectId, ev.field, remote.value)
+    } else if (ev.field === 'geom' && (ev.payload as GeomPayload).geom !== undefined) {
       const remote = geomRegisterOf(ev)
       const local = geomRegs.get(ev.objectId) ?? null
       const merged = local ? lwwMerge(local, remote) : remote
@@ -488,6 +602,9 @@ export function initCrdtSync(): void {
     registerCrdtEmit({
       geom: emitGeom,
       membership: emitMembership,
+      widgetCreate: emitWidgetCreate,
+      widgetDelete: emitWidgetDelete,
+      widgetFields: emitWidgetFields,
       nodeTitle: emitNodeTitle,
       nodeParent: emitNodeParent,
       rowCells: emitRowCells,
@@ -515,6 +632,8 @@ export function stopCrdtSync(): void {
   rowRegs.clear()
   tbRegs.clear()
   fileRegs.clear()
+  widgetFieldRegs.clear()
+  tombstoned.clear()
   widgetPart = null
   nodePart = null
   rowPart = null

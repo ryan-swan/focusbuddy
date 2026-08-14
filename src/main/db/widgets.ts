@@ -111,7 +111,17 @@ function nextZ(taskId: string): number {
 
 export function createWidget(draft: WidgetDraft): Widget {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id so a widget created on one device
+  // materialises with the SAME id when its create event is applied on another
+  // (idempotent by primary key). Locally-originated creates pass no id and get a
+  // fresh one, exactly as before.
+  const id = draft.id ?? randomUUID()
+  // Create-if-missing: applying a create event whose id already exists is a no-op
+  // that returns the existing row, so a replayed/echoed create never duplicates.
+  if (draft.id) {
+    const existing = db.prepare('SELECT * FROM widgets WHERE id = ?').get(draft.id) as WidgetRow | undefined
+    if (existing) return rowToWidget(existing)
+  }
   const now = Date.now()
   // Optional pin at creation — used by the minimap auto-create flow so the
   // widget is docked the moment it spawns instead of "flash on canvas, then

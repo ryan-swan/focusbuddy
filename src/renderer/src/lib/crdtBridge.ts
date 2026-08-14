@@ -11,6 +11,9 @@ import type { Widget } from '@shared/types'
 export interface CrdtEmit {
   geom: (w: Widget) => void
   membership: (widgetId: string, from: string | null, to: string | null) => void
+  widgetCreate: (w: Widget) => void
+  widgetDelete: (widgetId: string) => void
+  widgetFields: (widgetId: string, patch: { content?: string; title?: string; color?: string | null; status?: string | null }) => void
   nodeTitle: (nodeId: string, title: string) => void
   nodeParent: (nodeId: string, parentId: string | null) => void
   rowCells: (rowId: string, cells: Record<string, unknown>) => void
@@ -31,6 +34,19 @@ export function crdtEmitGeom(w: Widget): void {
 
 export function crdtEmitMembership(widgetId: string, from: string | null, to: string | null): void {
   impl?.membership(widgetId, from, to)
+}
+
+export function crdtEmitWidgetCreate(w: Widget): void {
+  impl?.widgetCreate(w)
+}
+export function crdtEmitWidgetDelete(widgetId: string): void {
+  impl?.widgetDelete(widgetId)
+}
+export function crdtEmitWidgetFields(
+  widgetId: string,
+  patch: { content?: string; title?: string; color?: string | null; status?: string | null }
+): void {
+  impl?.widgetFields(widgetId, patch)
 }
 
 export function crdtEmitNodeTitle(nodeId: string, title: string): void {

@@ -38,6 +38,14 @@ export type CrdtField =
   | 'duration'
   | 'status'
   | 'name'
+  | 'content'
+  | 'color'
+  // Object lifecycle: 'create' carries the full initial snapshot so the object can
+  // be materialised on another device; 'delete' is a tombstone. Together they are a
+  // remove-wins existence CRDT (a delete is never undone by a late create — ids are
+  // unique per creation, so create/delete of one id are causally ordered).
+  | 'create'
+  | 'delete'
 // 'register' is the LWW class used for geometry and node scalar fields; 'set' is the
 // OR-Set class used for membership. Both are deterministic — neither ever surfaces a
 // manual conflict.
@@ -52,7 +60,7 @@ export interface ChangeEvent {
   field: CrdtField
   dataClass: CrdtDataClass
   actor: string // device/account id — the LWW tiebreak, deterministic
-  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload
+  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload | CreatePayload | DeletePayload
   // Server-assigned authoritative sequence, present once the event is on the log.
   // Consumers order catch-up by this, never by wall-clock (SYN-011). Absent on a
   // freshly-minted local event before it has been appended.
@@ -73,6 +81,44 @@ export interface CellPayload {
   column: string
   value: unknown
   at: number
+}
+
+// Object lifecycle payloads. `create` carries the full snapshot needed to
+// materialise the object on another device (a draft plus its id); `delete` is a
+// bare tombstone. `at` is the occurrence time.
+export interface CreatePayload {
+  snapshot: Record<string, unknown>
+  at: number
+}
+export interface DeletePayload {
+  at: number
+  // Optional scope for types with a delete scope (e.g. timeblock 'one' | 'series').
+  scope?: string
+}
+
+export interface LifecycleState {
+  // The create snapshot if the object was created and not tombstoned, else null.
+  created: Record<string, unknown> | null
+  // True once any delete event has been seen (remove-wins, permanent tombstone).
+  deleted: boolean
+}
+
+// Fold an object's lifecycle (create + delete) events. Remove-wins: any delete
+// tombstones the object permanently, so a create can never resurrect it. Pure and
+// order-independent — a delete seen before its create still tombstones.
+export function foldLifecycle(events: Iterable<ChangeEvent>): LifecycleState {
+  let created: Record<string, unknown> | null = null
+  let deleted = false
+  for (const ev of events) {
+    if (ev.field === 'create') {
+      const p = ev.payload as CreatePayload
+      if (p.snapshot && created === null) created = p.snapshot
+    } else if (ev.field === 'delete') {
+      deleted = true
+    }
+  }
+  if (deleted) created = null
+  return { created, deleted }
 }
 
 export interface GeomPayload {

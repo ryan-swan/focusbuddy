@@ -351,6 +351,10 @@ export interface Widget {
 }
 
 export interface WidgetDraft {
+  // Optional client-provided id (WS01 sync substrate): when set, the widget
+  // materialises with this exact id, so a create event from another device is
+  // idempotent by primary key. Omitted for ordinary local creates.
+  id?: string
   taskId: string
   kind: WidgetKind
   title?: string
