@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { foldRow, rowValues } from '../../src/shared/crdtRowMerge'
-import type { ChangeEvent } from '../../src/shared/crdtWidgetMerge'
+import { foldLifecycle, foldAttrs, type ChangeEvent } from '../../src/shared/crdtWidgetMerge'
 
 // WS01 sync substrate — convergence for the third migrated type (table rows). A row
 // syncs its cells, each an LWW register keyed by column; foldRow is the pure core
@@ -75,5 +75,61 @@ describe('plx_syn — row CRDT convergence (WS01 third slice)', () => {
     const c1 = cell('row1', 'name', 'a:dev1', 1000, 'One')
     const c2 = cell('row1', 'name', 'b:dev2', 2000, 'Two')
     expect(rowValues(foldRow([c1, c2, c1, c2, c2])).name).toBe('Two')
+  })
+})
+
+describe('plx_syn — row + table lifecycle convergence', () => {
+  const life = (
+    objectType: ChangeEvent['objectType'],
+    id: string,
+    kind: 'create' | 'delete',
+    at: number,
+    snapshot?: Record<string, unknown>
+  ): ChangeEvent => ({
+    id: `l${seq++}`,
+    ts: new Date(at).toISOString(),
+    partitionKey: 'r:acct:a',
+    objectType,
+    objectId: id,
+    field: kind,
+    dataClass: 'set',
+    actor: 'a:dev1',
+    payload: kind === 'create' ? { snapshot: snapshot ?? {}, at } : { at }
+  })
+  const tableAttr = (id: string, attr: string, at: number, value: unknown): ChangeEvent => ({
+    id: `ta${seq++}`,
+    ts: new Date(at).toISOString(),
+    partitionKey: 'r:acct:a',
+    objectType: 'table',
+    objectId: id,
+    field: 'attr',
+    dataClass: 'register',
+    actor: 'a:dev1',
+    payload: { attr, value, at }
+  })
+
+  it('row create + delete is remove-wins in any order', () => {
+    const c = life('row', 'row1', 'create', 1000, { id: 'row1', tableId: 't1', cells: {} })
+    const d = life('row', 'row1', 'delete', 2000)
+    for (const order of permutations([c, d])) {
+      expect(foldLifecycle(order).deleted).toBe(true)
+      expect(foldLifecycle(order).created).toBeNull()
+    }
+  })
+
+  it('table create materialises with its snapshot until deleted', () => {
+    const snap = { id: 't1', taskId: null, title: 'Sheet', schema: { columns: [] } }
+    expect(foldLifecycle([life('table', 't1', 'create', 1000, snap)]).created).toEqual(snap)
+    expect(foldLifecycle([life('table', 't1', 'create', 1000, snap), life('table', 't1', 'delete', 2000)]).deleted).toBe(true)
+  })
+
+  it('table title + schema converge as independent attr registers', () => {
+    const title = tableAttr('t1', 'title', 2000, 'Renamed')
+    const schema = tableAttr('t1', 'schema', 1000, { columns: [{ id: 'c1' }] })
+    for (const order of permutations([title, schema])) {
+      const regs = foldAttrs(order)
+      expect(regs.get('title')?.value).toBe('Renamed')
+      expect(regs.get('schema')?.value).toEqual({ columns: [{ id: 'c1' }] })
+    }
   })
 })

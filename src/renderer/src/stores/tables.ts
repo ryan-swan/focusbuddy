@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { recordAction, recordActionWithToast } from './actionHistory'
-import { crdtEmitRowCells } from '../lib/crdtBridge'
+import {
+  crdtEmitRowCells,
+  crdtEmitRowCreate,
+  crdtEmitRowDelete,
+  crdtEmitTableCreate,
+  crdtEmitTableAttrs
+} from '../lib/crdtBridge'
 import type {
   FbRow,
   FbTable,
@@ -48,12 +54,16 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
       tables: { ...get().tables, [table.id]: table },
       rows: { ...get().rows, [table.id]: [] }
     })
+    // WS01 sync substrate (flagged): materialise the table on other devices.
+    crdtEmitTableCreate(table)
     return table
   },
   updateTable: async (id, patch) => {
     const updated = await window.api.tables.update(id, patch)
     if (!updated) return
     set({ tables: { ...get().tables, [id]: updated } })
+    // Title / schema as LWW attr registers.
+    crdtEmitTableAttrs(id, patch as unknown as Record<string, unknown>)
   },
   setSchema: async (id, schema) => {
     // Optimistic: apply locally so the schema-editing UI doesn't lag, then
@@ -64,11 +74,14 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     }
     const updated = await window.api.tables.update(id, { schema })
     if (updated) set({ tables: { ...get().tables, [id]: updated } })
+    crdtEmitTableAttrs(id, { schema })
   },
   addRow: async (tableId, cells = {}) => {
     const row = await window.api.tables.createRow({ tableId, cells })
     const existing = get().rows[tableId] ?? []
     set({ rows: { ...get().rows, [tableId]: [...existing, row] } })
+    // WS01 sync substrate (flagged): materialise the row on other devices.
+    crdtEmitRowCreate(row)
     // Undo a row add (covers AI add-table-row applies). Redo re-creates it; the
     // id changes, so track the live id for a subsequent undo.
     let rowId = row.id
@@ -142,6 +155,8 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
       rowsCopy[tableId] = list.filter((r) => r.id !== rowId)
     }
     set({ rows: rowsCopy })
+    // WS01 sync substrate (flagged): tombstone the row so the delete converges.
+    crdtEmitRowDelete(rowId)
     if (capturedTableId && capturedCells) {
       const tableId = capturedTableId
       // Rows are soft-deleted now, so undo restores the SAME row (same id and

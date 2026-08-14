@@ -347,6 +347,9 @@ export interface FbTable {
 }
 
 export interface FbTableDraft {
+  // Optional client-provided id (WS01 sync substrate) so a create event is
+  // idempotent by primary key across devices. Omitted for local creates.
+  id?: string
   taskId: string | null
   title?: string
   schema?: TableSchema
@@ -370,6 +373,8 @@ export interface FbRow {
 }
 
 export interface FbRowDraft {
+  // Optional client-provided id (WS01 sync substrate) for idempotent create.
+  id?: string
   tableId: string
   cells?: Record<string, unknown>
 }

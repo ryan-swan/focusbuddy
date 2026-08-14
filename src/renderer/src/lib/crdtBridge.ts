@@ -1,4 +1,5 @@
 import type { Widget, FbNode } from '@shared/types'
+import type { FbRow, FbTable } from '@shared/fields'
 
 // WS01 sync substrate — the seam between the widgets store and the sync engine.
 //
@@ -20,6 +21,11 @@ export interface CrdtEmit {
   nodeDelete: (nodeIds: string[]) => void
   nodeAttrs: (nodeId: string, attrs: Record<string, unknown>) => void
   rowCells: (rowId: string, cells: Record<string, unknown>) => void
+  rowCreate: (row: FbRow) => void
+  rowDelete: (rowId: string) => void
+  tableCreate: (table: FbTable) => void
+  tableDelete: (tableId: string) => void
+  tableAttrs: (tableId: string, attrs: Record<string, unknown>) => void
   timeBlock: (blockId: string, patch: { startMs?: number; durationMin?: number; title?: string; status?: string }) => void
   fileName: (entryId: string, name: string) => void
   fileParent: (entryId: string, parentId: string | null) => void
@@ -73,6 +79,21 @@ export function crdtEmitNodeAttrs(nodeId: string, attrs: Record<string, unknown>
 
 export function crdtEmitRowCells(rowId: string, cells: Record<string, unknown>): void {
   impl?.rowCells(rowId, cells)
+}
+export function crdtEmitRowCreate(row: FbRow): void {
+  impl?.rowCreate(row)
+}
+export function crdtEmitRowDelete(rowId: string): void {
+  impl?.rowDelete(rowId)
+}
+export function crdtEmitTableCreate(table: FbTable): void {
+  impl?.tableCreate(table)
+}
+export function crdtEmitTableDelete(tableId: string): void {
+  impl?.tableDelete(tableId)
+}
+export function crdtEmitTableAttrs(tableId: string, attrs: Record<string, unknown>): void {
+  impl?.tableAttrs(tableId, attrs)
 }
 
 export function crdtEmitTimeBlock(

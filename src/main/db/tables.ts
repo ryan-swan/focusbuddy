@@ -47,7 +47,13 @@ function rowToTable(row: TableRow): FbTable {
 
 export function createTable(draft: FbTableDraft): FbTable {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id (create-if-missing by primary key)
+  // so a create event materialises the table with the same id on another device.
+  const id = draft.id ?? randomUUID()
+  if (draft.id) {
+    const existing = db.prepare('SELECT * FROM fb_tables WHERE id = ?').get(draft.id) as TableRow | undefined
+    if (existing) return rowToTable(existing)
+  }
   const now = Date.now()
   const schema: TableSchema = draft.schema ?? { columns: [] }
   db.prepare(
@@ -173,7 +179,12 @@ export function listRows(tableId: string): FbRow[] {
 
 export function createRow(draft: FbRowDraft): FbRow {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id (create-if-missing by primary key).
+  const id = draft.id ?? randomUUID()
+  if (draft.id) {
+    const existing = db.prepare('SELECT * FROM fb_rows WHERE id = ?').get(draft.id) as RowRow | undefined
+    if (existing) return rowToFbRow(existing)
+  }
   const now = Date.now()
   db.prepare(
     `INSERT INTO fb_rows (id, table_id, cells_json, sort_order, created_at, updated_at)

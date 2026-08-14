@@ -43,7 +43,7 @@ import {
   filePartition
 } from './syncFlags'
 import type { Widget, FbNode } from '@shared/types'
-import type { FbRow } from '@shared/fields'
+import type { FbRow, FbTable } from '@shared/fields'
 
 // The node scalar attributes carried as generic 'attr' registers. title + parent
 // have their own fields/apply (parent uses move()); ordering (sortOrder) and the
@@ -127,7 +127,7 @@ function geomOf(w: Widget): WidgetGeom {
 
 function mkEvent(
   partitionKey: string,
-  objectType: 'widget' | 'node' | 'row' | 'timeblock' | 'file',
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file',
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
@@ -329,6 +329,52 @@ function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
   }
 }
 
+function emitRowCreate(row: FbRow): void {
+  if (!rowPart) return
+  const snapshot: Record<string, unknown> = { id: row.id, tableId: row.tableId, cells: row.cells }
+  const ev = mkEvent(rowPart, 'row', row.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitRowDelete(rowId: string): void {
+  if (!rowPart) return
+  tombstoned.add(rowId)
+  const ev = mkEvent(rowPart, 'row', rowId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitTableCreate(table: FbTable): void {
+  if (!rowPart) return
+  const snapshot: Record<string, unknown> = {
+    id: table.id,
+    taskId: table.taskId,
+    title: table.title,
+    schema: table.schema
+  }
+  const ev = mkEvent(rowPart, 'table', table.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitTableDelete(tableId: string): void {
+  if (!rowPart) return
+  tombstoned.add(tableId)
+  const ev = mkEvent(rowPart, 'table', tableId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitTableAttrs(tableId: string, attrs: Record<string, unknown>): void {
+  if (!rowPart) return
+  const at = Date.now()
+  for (const attr of ['title', 'schema'] as const) {
+    if (!(attr in attrs)) continue
+    const value = attrs[attr]
+    attrRegs.set(`table:${tableId}:${attr}`, { value, timestamp: at, actor })
+    const ev = mkEvent(rowPart, 'table', tableId, 'attr', 'register', { attr, value, at })
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+
 function emitTimeBlock(
   blockId: string,
   patch: { startMs?: number; durationMin?: number; title?: string; status?: string }
@@ -521,6 +567,82 @@ async function applyCellToRow(rowId: string, column: string, value: unknown): Pr
   if (changed) useTablesStore.setState({ rows: next })
 }
 
+async function applyRowCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  const tableId = snapshot.tableId as string
+  if (!id || tombstoned.has(id)) return
+  let created: FbRow | null = null
+  try {
+    created = await window.api.tables.createRow(snapshot as never)
+  } catch {
+    return
+  }
+  if (!created) return
+  // Reflect only if that table's rows are already loaded in the store.
+  const rows = useTablesStore.getState().rows
+  if (rows[tableId] && !rows[tableId].some((r) => r.id === id)) {
+    useTablesStore.setState({ rows: { ...rows, [tableId]: [...rows[tableId], created] } })
+  }
+}
+
+async function applyRowDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.tables.deleteRow(id)
+  } catch {
+    /* not present locally — tombstone still guards a later create */
+  }
+  const rows = useTablesStore.getState().rows
+  const next: Record<string, FbRow[]> = {}
+  let changed = false
+  for (const [tid, list] of Object.entries(rows)) {
+    const filtered = list.filter((r) => r.id !== id)
+    next[tid] = filtered
+    if (filtered.length !== list.length) changed = true
+  }
+  if (changed) useTablesStore.setState({ rows: next })
+}
+
+async function applyTableCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  try {
+    const created = await window.api.tables.create(snapshot as never)
+    if (created) useTablesStore.setState((s) => ({ tables: { ...s.tables, [created.id]: created } }))
+  } catch {
+    /* best effort */
+  }
+}
+
+async function applyTableDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.tables.delete(id)
+  } catch {
+    /* not present locally / no-op */
+  }
+  useTablesStore.setState((s) => {
+    const tables = { ...s.tables }
+    delete tables[id]
+    const rows = { ...s.rows }
+    delete rows[id]
+    return { tables, rows }
+  })
+}
+
+async function applyTableAttr(id: string, attr: string, value: unknown): Promise<void> {
+  try {
+    await window.api.tables.update(id, { [attr]: value } as never)
+  } catch {
+    /* not present locally — the poll reconciles it */
+  }
+  useTablesStore.setState((s) => {
+    const t = s.tables[id]
+    if (!t) return {}
+    return { tables: { ...s.tables, [id]: { ...t, [attr]: value } as typeof t } }
+  })
+}
+
 async function applyTimeBlock(id: string, field: CrdtField, value: unknown): Promise<void> {
   const patch: Record<string, unknown> = {}
   if (field === 'start') patch.startMs = value
@@ -605,14 +727,32 @@ function applyEvent(ev: ChangeEvent): void {
       }
     }
   } else if (ev.objectType === 'row') {
-    const p = ev.payload as CellPayload
-    if (ev.field === 'cell' && typeof p.column === 'string' && p.at !== undefined) {
+    if (ev.field === 'create') {
+      void applyRowCreate((ev.payload as CreatePayload).snapshot)
+    } else if (ev.field === 'delete') {
+      void applyRowDelete(ev.objectId)
+    } else if (ev.field === 'cell' && typeof (ev.payload as CellPayload).column === 'string' && (ev.payload as CellPayload).at !== undefined) {
+      const p = ev.payload as CellPayload
       const remote = registerOf(ev)
       const key = `${ev.objectId}:${p.column}`
       const local = rowRegs.get(key) ?? null
       const merged = local ? lwwMerge(local, remote) : remote
       rowRegs.set(key, merged)
       if (merged === remote) void applyCellToRow(ev.objectId, p.column, remote.value)
+    }
+  } else if (ev.objectType === 'table') {
+    if (ev.field === 'create') {
+      void applyTableCreate((ev.payload as CreatePayload).snapshot)
+    } else if (ev.field === 'delete') {
+      void applyTableDelete(ev.objectId)
+    } else if (ev.field === 'attr' && (ev.payload as AttrPayload).at !== undefined) {
+      const p = ev.payload as AttrPayload
+      const remote = registerOf(ev)
+      const key = `table:${ev.objectId}:${p.attr}`
+      const local = attrRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      attrRegs.set(key, merged)
+      if (merged === remote) void applyTableAttr(ev.objectId, p.attr, remote.value)
     }
   } else if (ev.objectType === 'timeblock') {
     const f = ev.field
@@ -730,6 +870,11 @@ export function initCrdtSync(): void {
       nodeDelete: emitNodeDelete,
       nodeAttrs: emitNodeAttrs,
       rowCells: emitRowCells,
+      rowCreate: emitRowCreate,
+      rowDelete: emitRowDelete,
+      tableCreate: emitTableCreate,
+      tableDelete: emitTableDelete,
+      tableAttrs: emitTableAttrs,
       timeBlock: emitTimeBlock,
       fileName: emitFileName,
       fileParent: emitFileParent
