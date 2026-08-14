@@ -467,13 +467,15 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
         patch.content !== undefined ||
         patch.title !== undefined ||
         patch.color !== undefined ||
-        patch.status !== undefined
+        patch.status !== undefined ||
+        patch.zIndex !== undefined
       ) {
         crdtEmitWidgetFields(id, {
           content: patch.content,
           title: patch.title,
           color: patch.color,
-          status: patch.status as string | null | undefined
+          status: patch.status as string | null | undefined,
+          zIndex: patch.zIndex
         })
       }
       // Linked-duplicate live sync: mirror the synced fields (content / title /
@@ -619,6 +621,8 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     const updated = await window.api.widgets.bringToFront(id)
     if (!updated) return
     set({ widgets: get().widgets.map((w) => (w.id === id ? updated : w)) })
+    // WS01 sync substrate (flagged): stacking order as an LWW register. No-op off.
+    crdtEmitWidgetFields(id, { zIndex: updated.zIndex })
   },
   pinToZone: async (id, zone) => {
     // Zone pins don't need pinnedScreenX/Y — the pinned-layer computes

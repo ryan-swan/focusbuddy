@@ -56,7 +56,12 @@ const NODE_ATTR_KEYS = [
   'importance',
   'dueDate',
   'estimateMinutes',
-  'isPlan'
+  'isPlan',
+  // Ordering as an LWW-per-item register (not a fractional index). A single
+  // reparent/reorder converges on the moved item's rank deterministically; a full
+  // concurrent list reshuffle may interleave before the poll reconciles siblings.
+  'sortOrder',
+  'extensionsMinutes'
 ] as const
 
 // WS01 sync substrate — the client sync engine.
@@ -241,7 +246,7 @@ function emitWidgetDelete(widgetId: string): void {
 
 function emitWidgetFields(
   widgetId: string,
-  patch: { content?: string; title?: string; color?: string | null; status?: string | null }
+  patch: { content?: string; title?: string; color?: string | null; status?: string | null; zIndex?: number }
 ): void {
   if (!widgetPart) return
   const at = Date.now()
@@ -250,6 +255,8 @@ function emitWidgetFields(
   if (patch.title !== undefined) fields.push(['title', patch.title])
   if (patch.color !== undefined) fields.push(['color', patch.color])
   if (patch.status !== undefined) fields.push(['status', patch.status])
+  // zIndex is stacking order — an LWW-per-item register, like sortOrder elsewhere.
+  if (patch.zIndex !== undefined) fields.push(['order', patch.zIndex])
   for (const [field, value] of fields) {
     widgetFieldRegs.set(`${field}:${widgetId}`, { value, timestamp: at, actor })
     const ev = mkEvent(widgetPart, 'widget', widgetId, field, 'register', { value, at })
@@ -327,6 +334,15 @@ function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
     recordLocal(ev, false)
     send(ev)
   }
+}
+
+function emitRowOrder(rowId: string, sortOrder: number): void {
+  if (!rowPart) return
+  const at = Date.now()
+  attrRegs.set(`row:${rowId}:sortOrder`, { value: sortOrder, timestamp: at, actor })
+  const ev = mkEvent(rowPart, 'row', rowId, 'attr', 'register', { attr: 'sortOrder', value: sortOrder, at })
+  recordLocal(ev, false)
+  send(ev)
 }
 
 function emitRowCreate(row: FbRow): void {
@@ -503,6 +519,7 @@ async function applyWidgetField(id: string, field: CrdtField, value: unknown): P
   else if (field === 'title') patch.title = value
   else if (field === 'color') patch.color = value
   else if (field === 'status') patch.status = value
+  else if (field === 'order') patch.zIndex = value
   try {
     await window.api.widgets.update(id, patch)
   } catch {
@@ -623,6 +640,29 @@ async function applyRowCreate(snapshot: Record<string, unknown>): Promise<void> 
   if (rows[tableId] && !rows[tableId].some((r) => r.id === id)) {
     useTablesStore.setState({ rows: { ...rows, [tableId]: [...rows[tableId], created] } })
   }
+}
+
+async function applyRowAttr(id: string, attr: string, value: unknown): Promise<void> {
+  try {
+    await window.api.tables.updateRow(id, { [attr]: value } as never)
+  } catch {
+    /* not present locally — the poll reconciles it */
+  }
+  const rows = useTablesStore.getState().rows
+  const next: Record<string, FbRow[]> = {}
+  let changed = false
+  for (const [tid, list] of Object.entries(rows)) {
+    const idx = list.findIndex((r) => r.id === id)
+    if (idx === -1) {
+      next[tid] = list
+      continue
+    }
+    const copy = [...list]
+    copy[idx] = { ...copy[idx], [attr]: value } as FbRow
+    next[tid] = copy
+    changed = true
+  }
+  if (changed) useTablesStore.setState({ rows: next })
 }
 
 async function applyRowDelete(id: string): Promise<void> {
@@ -761,7 +801,13 @@ function applyEvent(ev: ChangeEvent): void {
       void applyWidgetCreate((ev.payload as CreatePayload).snapshot)
     } else if (ev.field === 'delete') {
       void applyWidgetDelete(ev.objectId)
-    } else if (ev.field === 'content' || ev.field === 'title' || ev.field === 'color' || ev.field === 'status') {
+    } else if (
+      ev.field === 'content' ||
+      ev.field === 'title' ||
+      ev.field === 'color' ||
+      ev.field === 'status' ||
+      ev.field === 'order'
+    ) {
       const remote = registerOf(ev)
       const key = `${ev.field}:${ev.objectId}`
       const local = widgetFieldRegs.get(key) ?? null
@@ -823,6 +869,14 @@ function applyEvent(ev: ChangeEvent): void {
       const merged = local ? lwwMerge(local, remote) : remote
       rowRegs.set(key, merged)
       if (merged === remote) void applyCellToRow(ev.objectId, p.column, remote.value)
+    } else if (ev.field === 'attr' && (ev.payload as AttrPayload).at !== undefined) {
+      const p = ev.payload as AttrPayload
+      const remote = registerOf(ev)
+      const key = `row:${ev.objectId}:${p.attr}`
+      const local = attrRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      attrRegs.set(key, merged)
+      if (merged === remote) void applyRowAttr(ev.objectId, p.attr, remote.value)
     }
   } else if (ev.objectType === 'table') {
     if (ev.field === 'create') {
@@ -962,6 +1016,7 @@ export function initCrdtSync(): void {
       nodeDelete: emitNodeDelete,
       nodeAttrs: emitNodeAttrs,
       rowCells: emitRowCells,
+      rowOrder: emitRowOrder,
       rowCreate: emitRowCreate,
       rowDelete: emitRowDelete,
       tableCreate: emitTableCreate,

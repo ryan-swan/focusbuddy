@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { foldWidget, resolvedSection, type ChangeEvent } from '../../src/shared/crdtWidgetMerge'
+import { foldWidget, resolvedSection, foldRegisterFields, type ChangeEvent } from '../../src/shared/crdtWidgetMerge'
 
 // WS01 sync substrate — the convergence guarantee for the first migrated type.
 //
@@ -120,6 +120,21 @@ describe('plx_syn — widget CRDT convergence (WS01 first slice)', () => {
       const s = foldWidget(order)
       expect(s.sections).toEqual(['B'])
       expect(resolvedSection(s)).toBe('B')
+    }
+  })
+
+  it('ordering (widget zIndex): stacking order is an LWW-per-item register', () => {
+    // Two clients raise the same widget; the later raise wins deterministically.
+    const early: ChangeEvent = {
+      id: 'o1', ts: new Date(1000).toISOString(), partitionKey: 'w:acct:a', objectType: 'widget',
+      objectId: 'w1', field: 'order', dataClass: 'register', actor: 'a:dev1', payload: { value: 5, at: 1000 }
+    }
+    const late: ChangeEvent = {
+      id: 'o2', ts: new Date(2000).toISOString(), partitionKey: 'w:acct:a', objectType: 'widget',
+      objectId: 'w1', field: 'order', dataClass: 'register', actor: 'b:dev2', payload: { value: 9, at: 2000 }
+    }
+    for (const order of permutations([early, late])) {
+      expect(foldRegisterFields(order, new Set(['order'])).get('order')?.value).toBe(9)
     }
   })
 

@@ -40,6 +40,9 @@ export type CrdtField =
   | 'name'
   | 'content'
   | 'color'
+  // Stacking / list order as an LWW-per-item register (widget zIndex). Node/row
+  // ordering rides the generic 'attr' path as attr 'sortOrder'.
+  | 'order'
   // A generic per-attribute LWW register: the attribute name lives in the payload
   // (like a row 'cell' carries its column), so a type's many scalar fields sync
   // without each needing its own field in this union. Used for node/timeblock/etc.

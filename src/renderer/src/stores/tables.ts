@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import {
   crdtEmitRowCells,
+  crdtEmitRowOrder,
   crdtEmitRowCreate,
   crdtEmitRowDelete,
   crdtEmitTableCreate,
@@ -184,6 +185,8 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     const reordered = ids.map((id) => byId.get(id)).filter(Boolean) as FbRow[]
     set({ rows: { ...get().rows, [tableId]: reordered } })
     await window.api.tables.reorderRows(tableId, ids)
+    // WS01 sync substrate (flagged): each row's new rank as an LWW 'sortOrder' attr.
+    ids.forEach((rid, i) => crdtEmitRowOrder(rid, i))
   }
 }))
 

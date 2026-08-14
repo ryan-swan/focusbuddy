@@ -239,10 +239,12 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const fresh = await window.api.nodes.list()
     set({ nodes: fresh })
     nudgeSync()
-    // WS01 sync substrate (flagged): a reparent is a node 'parent' register change.
-    // Sibling ordering (beforeId) is not part of this slice; it reconciles via the
-    // poll. No-op until the engine registers (flag on).
+    // WS01 sync substrate (flagged): a reparent is a node 'parent' register change,
+    // and the moved node's new rank is a 'sortOrder' attr register (LWW per item).
+    // No-op until the engine registers (flag on).
     crdtEmitNodeParent(id, newParentId)
+    const moved = fresh.find((n) => n.id === id)
+    if (moved) crdtEmitNodeAttrs(id, { sortOrder: moved.sortOrder })
     // Auto-expand the destination parent so the moved node is visible after drop
     if (newParentId) set({ expanded: { ...get().expanded, [newParentId]: true } })
     if (prevParentId !== newParentId || prevBeforeId !== beforeId) {

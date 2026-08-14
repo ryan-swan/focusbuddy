@@ -14,13 +14,14 @@ export interface CrdtEmit {
   membership: (widgetId: string, from: string | null, to: string | null) => void
   widgetCreate: (w: Widget) => void
   widgetDelete: (widgetId: string) => void
-  widgetFields: (widgetId: string, patch: { content?: string; title?: string; color?: string | null; status?: string | null }) => void
+  widgetFields: (widgetId: string, patch: { content?: string; title?: string; color?: string | null; status?: string | null; zIndex?: number }) => void
   nodeTitle: (nodeId: string, title: string) => void
   nodeParent: (nodeId: string, parentId: string | null) => void
   nodeCreate: (node: FbNode) => void
   nodeDelete: (nodeIds: string[]) => void
   nodeAttrs: (nodeId: string, attrs: Record<string, unknown>) => void
   rowCells: (rowId: string, cells: Record<string, unknown>) => void
+  rowOrder: (rowId: string, sortOrder: number) => void
   rowCreate: (row: FbRow) => void
   rowDelete: (rowId: string) => void
   tableCreate: (table: FbTable) => void
@@ -57,7 +58,7 @@ export function crdtEmitWidgetDelete(widgetId: string): void {
 }
 export function crdtEmitWidgetFields(
   widgetId: string,
-  patch: { content?: string; title?: string; color?: string | null; status?: string | null }
+  patch: { content?: string; title?: string; color?: string | null; status?: string | null; zIndex?: number }
 ): void {
   impl?.widgetFields(widgetId, patch)
 }
@@ -83,6 +84,9 @@ export function crdtEmitNodeAttrs(nodeId: string, attrs: Record<string, unknown>
 
 export function crdtEmitRowCells(rowId: string, cells: Record<string, unknown>): void {
   impl?.rowCells(rowId, cells)
+}
+export function crdtEmitRowOrder(rowId: string, sortOrder: number): void {
+  impl?.rowOrder(rowId, sortOrder)
 }
 export function crdtEmitRowCreate(row: FbRow): void {
   impl?.rowCreate(row)
