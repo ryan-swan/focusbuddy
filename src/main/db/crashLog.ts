@@ -107,10 +107,13 @@ export function recordCrash(input: CrashInput): CrashEvent | null {
       event.appVersion,
       event.context
     )
-    // Keep only the most recent CAP rows.
+    // Keep only the most recent CAP rows. rowid breaks ts ties so two events in
+    // the same millisecond order by insertion, and it always keeps the newest
+    // (highest rowid) — the trim only ever drops the oldest, so max(rowid) never
+    // shrinks and SQLite never reuses a rowid.
     db.prepare(
-      `DELETE FROM crash_events WHERE id NOT IN
-         (SELECT id FROM crash_events ORDER BY ts DESC LIMIT ?)`
+      `DELETE FROM crash_events WHERE rowid NOT IN
+         (SELECT rowid FROM crash_events ORDER BY ts DESC, rowid DESC LIMIT ?)`
     ).run(CAP)
     return event
   } catch {
@@ -122,7 +125,7 @@ export function recordCrash(input: CrashInput): CrashEvent | null {
 export function listCrashes(limit = 50): CrashEvent[] {
   try {
     const rows = getDb()
-      .prepare('SELECT * FROM crash_events ORDER BY ts DESC LIMIT ?')
+      .prepare('SELECT * FROM crash_events ORDER BY ts DESC, rowid DESC LIMIT ?')
       .all(Math.max(1, Math.min(limit, CAP))) as CrashRow[]
     return rows.map(rowTo)
   } catch {
