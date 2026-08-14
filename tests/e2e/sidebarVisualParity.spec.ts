@@ -51,11 +51,11 @@ test('Desk Sidebar and OfficeSidebar share the same visual system', async () => 
     expect(deskAsideClasses).toContain('rounded-[14px]')
     expect(deskAsideClasses).toContain('border-[var(--edge-soft)]')
 
-    // 2b. Wordmark: 15px, font-bold, tracking-[0.14em]
-    const deskWordmark = deskSidebar.locator('span.text-\\[15px\\].font-bold.tracking-\\[0\\.14em\\]').first()
-    await expect(deskWordmark).toBeVisible({ timeout: 3_000 })
-    const deskWordmarkText = await deskWordmark.textContent()
-    expect(deskWordmarkText?.trim().toUpperCase()).toBe('PLEXIDESK')
+    // 2b. Brand mark in the header. The sidebar redesign replaced the text
+    // wordmark with the PlexiiLogo component (an <img>), so assert the logo
+    // renders in the h-14 header rather than a specific text span.
+    const deskHeaderMark = deskSidebar.locator('div.h-14 img, div.h-14 svg').first()
+    await expect(deskHeaderMark).toBeVisible({ timeout: 3_000 })
 
     // 2c. Header border-b present
     const deskHeader = deskSidebar.locator('div.h-14').first()
@@ -150,10 +150,11 @@ test('Desk Sidebar and OfficeSidebar share the same visual system', async () => 
       }, taskId)
       await window.waitForTimeout(500)
 
-      // The "Add to desk" strip must be visible inside the Desk sidebar
-      const deskSidebarAfterTask = window.locator('aside').first()
-      const addToDesk = deskSidebarAfterTask.locator('[data-testid="sidebar-widgets"]')
-      await expect(addToDesk).toBeVisible({ timeout: 4_000 })
+      // The Desk sidebar still renders (as a task-context surface) with the shared
+      // visual system. The widget-add UI is no longer a sidebar strip — it moved
+      // to the floating WidgetPalette (covered by deskWidgets.spec.ts) — so this
+      // parity check no longer asserts a sidebar widget section.
+      await expect(window.locator('aside').first()).toBeVisible({ timeout: 4_000 })
     }
 
     // ── 6. Confirm nav rows are clickable — click Plans, verify active tint ─

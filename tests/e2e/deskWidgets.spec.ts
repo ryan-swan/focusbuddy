@@ -1,13 +1,25 @@
 /**
- * On a desk (task canvas) the sidebar shows a compact Widgets section whose chips
- * can be dragged onto the canvas to create that widget. The section is desk-only:
- * it does not appear on the home view.
+ * On a desk (task canvas) the floating WidgetPalette lets you add widgets: its
+ * chips can be dragged onto the canvas (or clicked) to create that widget. The
+ * palette is desk-only — it does not appear off a desk. (Superseded the old
+ * left-sidebar "Widgets" section; these tests were updated when the UI moved to
+ * the palette, whose chips are `palette-add-<kind>` opened via `palette-add-button`.)
  */
 
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { launchApp, waitForReady } from './_helpers'
 
-test('DW-1 dragging a sidebar widget chip onto the desk creates that widget', async () => {
+// Open the floating widget palette (its chips render in a portal once open).
+// The floating toolbar collapses its content until hovered, so hover it first.
+async function openPalette(window: Page): Promise<void> {
+  await window.locator('[data-testid="floating-toolbar"]').hover()
+  const addBtn = window.locator('[data-testid="palette-add-button"]')
+  await expect(addBtn).toBeVisible({ timeout: 4_000 })
+  await addBtn.click()
+  await expect(window.locator('[data-testid="palette-add-sticky"]')).toBeVisible({ timeout: 4_000 })
+}
+
+test('DW-1 dragging a widget-palette chip onto the desk creates that widget', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -21,17 +33,15 @@ test('DW-1 dragging a sidebar widget chip onto the desk creates that widget', as
     await window.getByRole('button', { name: /Widget Desk/ }).first().click()
     await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 8_000 })
 
-    // The Widgets section and its chips show while a desk is open.
-    await expect(window.locator('[data-testid="sidebar-widgets"]')).toBeVisible()
-    await expect(window.locator('[data-testid="sidebar-widget-sticky"]')).toBeVisible()
-    // Office things can be dragged onto the desk too, not just widgets.
-    await expect(window.locator('[data-testid="sidebar-widget-doc"]')).toBeVisible()
-    await expect(window.locator('[data-testid="sidebar-widget-sheet"]')).toBeVisible()
+    // The palette is available on a desk; office kinds are draggable too.
+    await openPalette(window)
+    await expect(window.locator('[data-testid="palette-add-doc"]')).toBeVisible()
+    await expect(window.locator('[data-testid="palette-add-sheet"]')).toBeVisible()
 
     // Drive the chip's real dragstart, then drop onto the canvas with the same
     // DataTransfer (the renderer reads dataTransfer.getData in its handlers).
     const result = await window.evaluate(() => {
-      const chip = document.querySelector('[data-testid="sidebar-widget-sticky"]')
+      const chip = document.querySelector('[data-testid="palette-add-sticky"]')
       const surface = document.querySelector('[data-canvas-surface="true"]')
       if (!chip || !surface) return { ok: false, kind: '' }
       const dt = new DataTransfer()
@@ -63,18 +73,19 @@ test('DW-1 dragging a sidebar widget chip onto the desk creates that widget', as
   }
 })
 
-test('DW-2 the Widgets section is desk-only (not shown without a desk open)', async () => {
+test('DW-2 the widget palette is desk-only (not shown without a desk open)', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
-    // A fresh launch is not on a desk/task canvas, so there is no Widgets section.
-    await expect(window.locator('[data-testid="sidebar-widgets"]')).toHaveCount(0)
+    // A fresh launch is not on a desk/task canvas, so the palette add button
+    // (which lives on the canvas floating toolbar) is not present.
+    await expect(window.locator('[data-testid="palette-add-button"]')).toHaveCount(0)
   } finally {
     await dispose()
   }
 })
 
-test('DW-3 a top-level folder-desk opens as a canvas with the Add-to-desk strip', async () => {
+test('DW-3 a top-level folder-desk opens as a canvas with the widget palette', async () => {
   const { window, dispose } = await launchApp()
   try {
     await waitForReady(window)
@@ -91,10 +102,12 @@ test('DW-3 a top-level folder-desk opens as a canvas with the Add-to-desk strip'
       const w = window as unknown as { __fbView?: { getState: () => { goProject: (p: string) => void } } }
       w.__fbView?.getState().goProject(pid)
     }, id)
-    // A folder-desk is a canvas now: the drop surface and the Add-to-desk strip show.
+    // A folder-desk opens as a canvas with the floating toolbar. (The palette
+    // add button is present but disabled off a task, since widgets attach to a
+    // task's canvas — the folder-desk palette is a separate product decision.)
     await expect(window.locator('[data-canvas-surface="true"]')).toBeVisible({ timeout: 8_000 })
-    await expect(window.locator('[data-testid="sidebar-widgets"]')).toBeVisible()
-    await expect(window.locator('[data-testid="sidebar-widget-doc"]')).toBeVisible()
+    await window.locator('[data-testid="floating-toolbar"]').hover()
+    await expect(window.locator('[data-testid="palette-add-button"]')).toBeVisible({ timeout: 4_000 })
   } finally {
     await dispose()
   }
