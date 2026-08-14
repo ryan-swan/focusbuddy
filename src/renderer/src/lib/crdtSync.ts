@@ -61,7 +61,11 @@ const NODE_ATTR_KEYS = [
   // reparent/reorder converges on the moved item's rank deterministically; a full
   // concurrent list reshuffle may interleave before the poll reconciles siblings.
   'sortOrder',
-  'extensionsMinutes'
+  'extensionsMinutes',
+  // Resume/standup markdown is a plain scalar field (LWW is fine; it is not a
+  // collaborative rich-text body — those go through the Yjs text class).
+  'resumeMarkdown',
+  'resumeUpdatedAt'
 ] as const
 
 // WS01 sync substrate — the client sync engine.
@@ -229,7 +233,15 @@ function emitWidgetCreate(w: Widget): void {
     y: w.y,
     width: w.width,
     height: w.height,
-    color: w.color ?? null
+    color: w.color ?? null,
+    // Create-time metadata that must survive materialisation on another device: a
+    // connected-app binding, a duplicate sync-group, launcher/mirror mode, and pin
+    // state. Omitting these made a connected-app or linked widget materialise wrong.
+    sourceAppId: w.sourceAppId ?? null,
+    syncGroupId: w.syncGroupId ?? null,
+    mode: w.mode ?? null,
+    pinned: w.pinned,
+    pinnedZone: w.pinnedZone ?? null
   }
   const ev = mkEvent(widgetPart, 'widget', w.id, 'create', 'set', { snapshot, at })
   recordLocal(ev, false)
