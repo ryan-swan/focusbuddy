@@ -12,6 +12,8 @@ import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
 import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
 import AssistantOverlay from './components/assistant/AssistantOverlay'
+import DemoOverlay from './demo/DemoOverlay'
+import { useDemoStore } from './demo/useDemo'
 import PinTray from './components/pins/PinTray'
 import { useAssistantChrome } from './stores/assistantChrome'
 import TelemetryReporter from './components/TelemetryReporter'
@@ -417,6 +419,23 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Cmd+Shift+D runs the scripted product demo (src/renderer/src/demo). It
+  // drives the real app — real desks, real widgets — and offers to clean up
+  // everything it created on exit. Deliberately a shortcut rather than a menu
+  // item: it exists to be screen-recorded, not discovered by users.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        const demo = useDemoStore.getState()
+        if (demo.active) void demo.exit(false)
+        else void demo.startScenario(1)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // Global undo/redo for structural workspace actions (create/delete/move/rename
   // of tasks, folders, widgets). Yields to text fields and the full editors
   // (docs/sheets/slides/files), which keep their own per-character undo.
@@ -679,6 +698,8 @@ export default function App(): JSX.Element {
       {/* The assistant: a pill on every screen, opening into sidebar /
           floating / fullscreen over one conversation. */}
       <AssistantOverlay />
+      {/* Scripted product demo (Cmd+Shift+D). Renders nothing unless running. */}
+      <DemoOverlay />
       {/* The universal pin layer (spec §7): a persistent tray of globally pinned
           items, reachable on every surface, droppable onto the current desk. */}
       <PinTray />

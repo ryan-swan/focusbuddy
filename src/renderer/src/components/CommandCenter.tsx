@@ -18,6 +18,7 @@ import { useDocumentsStore } from '../stores/documents'
 import { useQuickCreate } from '../stores/quickCreate'
 import { recencyRank } from '../lib/viewRecency'
 import { createShowcaseDesk } from '../lib/createShowcaseDesk'
+import { useDemoStore } from '../demo/useDemo'
 
 interface Props {
   onOpenBodyDouble: () => void
@@ -266,6 +267,18 @@ export default function CommandCenter({
       run: () => {
         closePalette()
         void createShowcaseDesk()
+      }
+    })
+    items.push({
+      id: 'run-demo',
+      label: 'Run product demo',
+      hint: 'One Week, One Desk · ⌘⇧D',
+      icon: 'play_circle',
+      kind: 'action',
+      score: matchScore('run product demo scripted walkthrough record screencast story presentation', q),
+      run: () => {
+        closePalette()
+        void useDemoStore.getState().startScenario(1)
       }
     })
     items.push({
