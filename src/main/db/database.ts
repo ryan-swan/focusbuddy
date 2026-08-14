@@ -673,6 +673,32 @@ export function getDb(): Database.Database {
   `)
   // Migration for DBs created before crash forwarding: add the flag if missing.
   ensureColumn(db, 'crash_events', 'forwarded', 'INTEGER NOT NULL DEFAULT 0')
+
+  // WS01 sync substrate — the local end of the append-only change log. It is both
+  // the offline queue (events emitted while the socket is down, `synced = 0`, are
+  // flushed on reconnect) and the local record of applied events. `id` is the
+  // client-generated UUIDv7 and PRIMARY KEY, so re-recording an event is an
+  // idempotent no-op (SYN-010). `seq` is null until the server acks with its
+  // authoritative sequence. This coexists with the workspace poll and does nothing
+  // until the `fb.sync.crdt.widgets` renderer flag is on.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS change_log (
+      id TEXT PRIMARY KEY,
+      partition_key TEXT NOT NULL,
+      seq INTEGER,
+      occurred_at TEXT NOT NULL,
+      object_type TEXT NOT NULL,
+      object_id TEXT NOT NULL,
+      field TEXT NOT NULL,
+      data_class TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      synced INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_change_log_unsynced ON change_log(synced, created_at);
+    CREATE INDEX IF NOT EXISTS idx_change_log_object ON change_log(object_id, created_at);
+  `)
   // Mark a row dirty on any content update so the sync engine knows to push it.
   // The WHEN guard fires only on a content change (sync columns untouched) of a
   // currently-clean row, so a sync-bookkeeping write (which sets sync_rev /

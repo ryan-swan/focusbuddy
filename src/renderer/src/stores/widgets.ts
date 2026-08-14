@@ -6,6 +6,7 @@ import { sectionCreate, widgetOpen } from '../lib/audioBeep'
 import { notifyWireSource } from '../lib/wireEngine'
 import { notifyAgentInputChanged } from '../lib/deskAgentEngine'
 import { recordSnapshotSoon } from '../lib/timeTravel'
+import { crdtEmitGeom, crdtEmitMembership } from '../lib/crdtBridge'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import { focusNavOrder, isFocusable } from '../lib/focusNavOrder'
 import { useAccountStore } from './account'
@@ -396,6 +397,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
             : 'Move widget'
       return { prevPatch, redoPatch, label }
     })()
+    // Prior section, captured before the optimistic set, so a membership change can
+    // be emitted to the CRDT change log with its from/to (WS01, flagged).
+    const beforeSection = get().widgets.find((w) => w.id === id)?.parentSectionId ?? null
     // Optimistic local update — applies the patch immediately so consumers (Canvas,
     // focus mode, dashboard cards) re-render right away. Critical for the URL persistence
     // case where the user clicks "expand" within IPC roundtrip latency of the last nav.
@@ -437,6 +441,16 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
           w.id === id ? (routeGeom ? { ...server, ...overlayGeom } : server) : w
         )
       })
+      // WS01 sync substrate (flagged, off by default): mirror the base geometry and
+      // any section-membership change into the one CRDT change log. Overlay-routed
+      // geometry (routeGeom) is deliberately per-device and private, so it is never
+      // emitted. Both calls are no-ops until the engine registers (flag on).
+      if (!routeGeom && ['x', 'y', 'width', 'height'].some((k) => k in patch)) {
+        crdtEmitGeom(server)
+      }
+      if ('parentSectionId' in patch) {
+        crdtEmitMembership(id, beforeSection, (patch.parentSectionId as string | null) ?? null)
+      }
       // Linked-duplicate live sync: mirror the synced fields (content / title /
       // colour) to any OTHER in-store copies that share this widget's syncGroupId,
       // so same-task copies update instantly. Cross-task copies are mirrored by the

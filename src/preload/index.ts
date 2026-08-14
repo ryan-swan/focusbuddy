@@ -754,6 +754,62 @@ const api = {
     > => ipcRenderer.invoke('crash:unforwarded', limit),
     markForwarded: (ids: string[]): Promise<void> => ipcRenderer.invoke('crash:markForwarded', ids)
   },
+  // WS01 sync substrate: the renderer's CRDT engine persists every widget event to
+  // the local change log (offline queue + record) and reads back what it hasn't
+  // synced. The wire shape is object-type-agnostic (field + dataClass pick the
+  // merge). Gated by the fb.sync.crdt.widgets flag; a no-op path when off.
+  crdt: {
+    record: (input: {
+      id: string
+      partitionKey: string
+      ts: string
+      objectType: string
+      objectId: string
+      field: string
+      dataClass: string
+      actor: string
+      payload: unknown
+      synced?: boolean
+      seq?: number | null
+    }): Promise<void> => ipcRenderer.invoke('crdt:record', input),
+    unsynced: (
+      limit?: number
+    ): Promise<
+      Array<{
+        id: string
+        partitionKey: string
+        seq: number | null
+        ts: string
+        objectType: string
+        objectId: string
+        field: string
+        dataClass: string
+        actor: string
+        payload: unknown
+        synced: boolean
+      }>
+    > => ipcRenderer.invoke('crdt:unsynced', limit),
+    markSynced: (entries: Array<{ id: string; seq?: number | null }>): Promise<void> =>
+      ipcRenderer.invoke('crdt:markSynced', entries),
+    knownIds: (ids: string[]): Promise<string[]> => ipcRenderer.invoke('crdt:knownIds', ids),
+    eventsForObject: (
+      objectId: string
+    ): Promise<
+      Array<{
+        id: string
+        partitionKey: string
+        seq: number | null
+        ts: string
+        objectType: string
+        objectId: string
+        field: string
+        dataClass: string
+        actor: string
+        payload: unknown
+        synced: boolean
+      }>
+    > => ipcRenderer.invoke('crdt:eventsForObject', objectId)
+  },
   connectedApps: {
     list: (): Promise<ConnectedApp[]> => ipcRenderer.invoke('connectedApps:list'),
     create: (draft: ConnectedAppDraft): Promise<ConnectedApp> =>

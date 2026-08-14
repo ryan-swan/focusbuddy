@@ -171,6 +171,22 @@ export interface DocCommentEvent {
 }
 let onDocCommentCb: ((e: DocCommentEvent) => void) | null = null
 
+// WS01 sync substrate: change-log events (full replay on join + single live events)
+// and a (re)auth hook so the engine re-joins its partition after a reconnect.
+export type CrdtSocketEvent =
+  | { type: 'crdtSync'; payload: { partitionKey: string; events: unknown[] } }
+  | { type: 'crdtEvent'; payload: { event: unknown } }
+let onCrdtCb: ((e: CrdtSocketEvent) => void) | null = null
+let onCrdtOpenCb: (() => void) | null = null
+/** Register a handler for sync-substrate socket events (crdtSync / crdtEvent). */
+export function setCrdtSocketHandler(cb: ((e: CrdtSocketEvent) => void) | null): void {
+  onCrdtCb = cb
+}
+/** Register a handler that fires on every (re)auth so the sync engine re-joins. */
+export function setCrdtOpenHandler(cb: (() => void) | null): void {
+  onCrdtOpenCb = cb
+}
+
 /** Register a handler for live-document socket events. */
 export function setDocSocketHandler(cb: ((e: DocSocketEvent) => void) | null): void {
   onDocEventCb = cb
@@ -339,11 +355,15 @@ function open(): void {
           void store.update(p.targetId, { content: JSON.stringify({ ...cfg, lastPayload: p.payload ?? '' }) })
         }
       }
+    } else if (msg.type === 'crdtSync' || msg.type === 'crdtEvent') {
+      onCrdtCb?.({ type: msg.type, payload: msg.payload } as CrdtSocketEvent)
     } else if (msg.type === 'authenticated') {
       // Socket is live again (initial connect or after a reconnect) — let the
-      // Yjs provider re-join its room and presence re-announce itself.
+      // Yjs provider re-join its room, presence re-announce, and the sync engine
+      // re-join its partition and flush any queued offline events.
       onSocketOpenCb?.()
       onPresenceOpenCb?.()
+      onCrdtOpenCb?.()
     }
   }
 

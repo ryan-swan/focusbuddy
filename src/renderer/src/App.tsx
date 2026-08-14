@@ -61,6 +61,7 @@ import { useAccountStore } from './stores/account'
 import { personDisplayName, personInitials } from './lib/personName'
 import { installInboxPoller } from './lib/inboxPoller'
 import { startWorkspaceSync, stopWorkspaceSync } from './lib/workspaceSync'
+import { initCrdtSync, stopCrdtSync } from './lib/crdtSync'
 import { applyCustomization, applyFont, applyTheme, loadCustomization, loadTheme, useTheme } from './lib/theme'
 import { typingClick } from './lib/audioBeep'
 import { setActiveWidgetForSound } from './lib/soundPrefs'
@@ -232,11 +233,18 @@ export default function App(): JSX.Element {
       // Multi-device sync: keep this account's tasks + canvas widgets in step with
       // its other devices. Default-on; pushes local changes and pulls remote ones.
       startWorkspaceSync()
+      // WS01 sync substrate (flagged, off by default): routes widget edits through
+      // the one CRDT change log alongside the poll. No-op unless fb.sync.crdt.widgets.
+      initCrdtSync()
     } else {
       disconnectMessaging()
       stopWorkspaceSync()
+      stopCrdtSync()
     }
-    return () => stopWorkspaceSync()
+    return () => {
+      stopWorkspaceSync()
+      stopCrdtSync()
+    }
   }, [account, sessionToken, connectMessaging, disconnectMessaging, initDocCollab])
 
   // Mail is local (IMAP straight from the desktop), so it loads independently

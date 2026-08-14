@@ -128,6 +128,14 @@ import {
   updateWidget, createWidgetIfTaskExists } from '../db/widgets'
 import { collectTelemetry, recordAiCall, setOnboardingSummary } from '../db/telemetry'
 import { recordCrash, listCrashes, listUnforwarded, markForwarded } from '../db/crashLog'
+import {
+  recordEvent as recordChangeEvent,
+  unsyncedEvents as unsyncedChangeEvents,
+  markSynced as markChangeSynced,
+  knownIds as knownChangeIds,
+  eventsForObject as changeEventsForObject,
+  type RecordInput as ChangeRecordInput
+} from '../db/changeLog'
 import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
@@ -1449,6 +1457,15 @@ export function registerIpcHandlers(): void {
   // server (it holds the session token), then marks them forwarded.
   ipcMain.handle('crash:unforwarded', (_e, limit?: number) => listUnforwarded(limit))
   ipcMain.handle('crash:markForwarded', (_e, ids: string[]) => markForwarded(ids))
+  // WS01 sync substrate: the renderer's CRDT engine persists every widget event
+  // here (offline queue + local record) and reads back what it hasn't synced.
+  ipcMain.handle('crdt:record', (_e, input: ChangeRecordInput) => recordChangeEvent(input))
+  ipcMain.handle('crdt:unsynced', (_e, limit?: number) => unsyncedChangeEvents(limit))
+  ipcMain.handle('crdt:markSynced', (_e, entries: Array<{ id: string; seq?: number | null }>) =>
+    markChangeSynced(entries)
+  )
+  ipcMain.handle('crdt:knownIds', (_e, ids: string[]) => knownChangeIds(ids))
+  ipcMain.handle('crdt:eventsForObject', (_e, objectId: string) => changeEventsForObject(objectId))
   // Persist onboarding progress locally so it rides the next telemetry snapshot.
   ipcMain.handle(
     'onboarding:record',
