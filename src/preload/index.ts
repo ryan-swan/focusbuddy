@@ -1132,8 +1132,8 @@ const api = {
     get: (id: string): Promise<FileEntry | null> => ipcRenderer.invoke('fileManager:get', id),
     path: (id: string | null): Promise<Array<{ id: string; name: string }>> =>
       ipcRenderer.invoke('fileManager:path', id),
-    createFolder: (parentId: string | null, name: string): Promise<FileEntry> =>
-      ipcRenderer.invoke('fileManager:createFolder', parentId, name),
+    createFolder: (parentId: string | null, name: string, explicitId?: string): Promise<FileEntry> =>
+      ipcRenderer.invoke('fileManager:createFolder', parentId, name, explicitId),
     rename: (id: string, name: string): Promise<FileEntry | null> =>
       ipcRenderer.invoke('fileManager:rename', id, name),
     move: (id: string, newParentId: string | null): Promise<boolean> =>

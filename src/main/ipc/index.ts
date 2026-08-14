@@ -1840,8 +1840,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('fileManager:list', (_e, parentId: string | null) => listFileEntries(parentId))
   ipcMain.handle('fileManager:get', (_e, id: string) => getFileEntry(id))
   ipcMain.handle('fileManager:path', (_e, id: string | null) => fileFolderPath(id))
-  ipcMain.handle('fileManager:createFolder', (_e, parentId: string | null, name: string) =>
-    createFileFolder(parentId, name)
+  ipcMain.handle('fileManager:createFolder', (_e, parentId: string | null, name: string, explicitId?: string) =>
+    createFileFolder(parentId, name, explicitId)
   )
   ipcMain.handle('fileManager:rename', (_e, id: string, name: string) => renameFileEntry(id, name))
   ipcMain.handle('fileManager:move', (_e, id: string, newParentId: string | null) => moveFileEntry(id, newParentId))

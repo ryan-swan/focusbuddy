@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { FileEntry } from '@shared/fields'
 import { nudgeSync } from '../lib/syncNudge'
-import { crdtEmitFileName, crdtEmitFileParent } from '../lib/crdtBridge'
+import { crdtEmitFileName, crdtEmitFileParent, crdtEmitFileCreate, crdtEmitFileDelete } from '../lib/crdtBridge'
 
 // State for the file/folder manager view. The current folder (cwd, null = root)
 // drives the listing; view mode and sort are persisted so the manager opens the
@@ -245,6 +245,8 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
 
   createFolder: async (name) => {
     const folder = await window.api.fileManager.createFolder(get().cwd, name)
+    // WS01 sync substrate (flagged): materialise the folder on other devices.
+    crdtEmitFileCreate(folder)
     record(set, get, {
       label: 'Create folder',
       // A created folder is removed by trashing it (recoverable), and brought
@@ -303,6 +305,9 @@ export const useFileManagerStore = create<FileManagerStore>((set, get) => ({
   remove: async (id) => {
     const ids = await window.api.fileManager.delete(id)
     set({ selectedId: null })
+    // WS01 sync substrate (flagged): tombstone every removed entry (a folder delete
+    // cascades) so the removal converges on other devices.
+    for (const rid of ids) crdtEmitFileDelete(rid)
     if (ids.length) {
       record(set, get, {
         label: 'Delete',

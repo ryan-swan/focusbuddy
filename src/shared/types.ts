@@ -278,6 +278,8 @@ export interface TimeBlock {
 }
 
 export interface TimeBlockDraft {
+  // Optional client-provided id (WS01 sync substrate) for idempotent create.
+  id?: string
   taskId?: string | null
   title?: string
   startMs: number

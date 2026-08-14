@@ -65,7 +65,12 @@ export function listBlocksInRange(fromMs: number, toMs: number): TimeBlock[] {
 
 export function createTimeBlock(draft: TimeBlockDraft): TimeBlock {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id (create-if-missing by primary key).
+  const id = draft.id ?? randomUUID()
+  if (draft.id) {
+    const existing = db.prepare('SELECT * FROM time_blocks WHERE id = ?').get(draft.id) as TimeBlockRow | undefined
+    if (existing) return rowToBlock(existing)
+  }
   const now = Date.now()
   const duration = Math.max(5, Math.round(draft.durationMin))
   db.prepare(

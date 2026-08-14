@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { foldRegisterFields, type ChangeEvent } from '../../src/shared/crdtWidgetMerge'
+import { foldRegisterFields, foldLifecycle, type ChangeEvent } from '../../src/shared/crdtWidgetMerge'
 
 // WS01 sync substrate — convergence for the fourth and fifth migrated types,
 // timeblocks and files. Both are plain named scalar LWW registers, so they share
@@ -93,5 +93,46 @@ describe('plx_syn — file/folder CRDT convergence (WS01 fifth slice)', () => {
     const n1 = reg('file', 'f1', 'name', 'a:dev1', 1000, 'A.txt')
     const n2 = reg('file', 'f1', 'name', 'b:dev2', 2000, 'B.txt')
     expect(foldRegisterFields([n1, n2, n1, n2, n2], FILE_FIELDS).get('name')?.value).toBe('B.txt')
+  })
+})
+
+describe('plx_syn — timeblock + file lifecycle convergence', () => {
+  const life = (
+    objectType: ChangeEvent['objectType'],
+    id: string,
+    kind: 'create' | 'delete',
+    at: number,
+    snapshot?: Record<string, unknown>
+  ): ChangeEvent => ({
+    id: `l${seq++}`,
+    ts: new Date(at).toISOString(),
+    partitionKey: 't:acct:a',
+    objectType,
+    objectId: id,
+    field: kind,
+    dataClass: 'set',
+    actor: 'a:dev1',
+    payload: kind === 'create' ? { snapshot: snapshot ?? {}, at } : { at }
+  })
+
+  it('timeblock create + delete is remove-wins in any order', () => {
+    const snap = { id: 'b1', taskId: null, title: 'Focus', startMs: 1_700_000_000_000, durationMin: 30 }
+    const c = life('timeblock', 'b1', 'create', 1000, snap)
+    const d = life('timeblock', 'b1', 'delete', 2000)
+    expect(foldLifecycle([c]).created).toEqual(snap)
+    for (const order of permutations([c, d])) {
+      expect(foldLifecycle(order).deleted).toBe(true)
+      expect(foldLifecycle(order).created).toBeNull()
+    }
+  })
+
+  it('folder create + delete is remove-wins in any order', () => {
+    const snap = { id: 'f1', parentId: null, name: 'Docs' }
+    const c = life('file', 'f1', 'create', 1000, snap)
+    const d = life('file', 'f1', 'delete', 2000)
+    expect(foldLifecycle([c]).created).toEqual(snap)
+    for (const order of permutations([c, d])) {
+      expect(foldLifecycle(order).deleted).toBe(true)
+    }
   })
 })

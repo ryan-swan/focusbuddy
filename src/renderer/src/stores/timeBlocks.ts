@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { TimeBlock, TimeBlockDraft, TimeBlockPatch } from '@shared/types'
 import { recordAction, recordActionWithToast } from './actionHistory'
-import { crdtEmitTimeBlock } from '../lib/crdtBridge'
+import { crdtEmitTimeBlock, crdtEmitTimeBlockCreate, crdtEmitTimeBlockDelete } from '../lib/crdtBridge'
 
 // Calendar time blocks for the currently-viewed range. The view sets the range
 // (a week / a day); the store loads the blocks that overlap it and keeps an
@@ -45,6 +45,9 @@ export const useTimeBlockStore = create<TimeBlockStore>((set, get) => ({
     if (rangeFrom != null && rangeTo != null && overlaps(created, rangeFrom, rangeTo)) {
       set({ blocks: [...blocks, created].sort((a, b) => a.startMs - b.startMs) })
     }
+    // WS01 sync substrate (flagged): materialise this block on other devices. A
+    // recurring series' extra occurrences still come from the poll/materialiser.
+    crdtEmitTimeBlockCreate(created)
     // Structural undo: creating a block (or a repeating series) reverses by
     // deleting it (scope 'series' also stops the materialiser regrowing it).
     recordAction({
@@ -78,6 +81,9 @@ export const useTimeBlockStore = create<TimeBlockStore>((set, get) => ({
     const existing = get().blocks.find((b) => b.id === id)
     await window.api.timeBlocks.delete(id, scope)
     await get().reload()
+    // WS01 sync substrate (flagged): tombstone this block so the delete converges.
+    // A 'series' delete still relies on the poll to prune the other occurrences.
+    crdtEmitTimeBlockDelete(id)
     if (!existing) return
     // Undo recreates the block from what we knew about it. A series delete
     // reverses into a fresh series with the same pattern (ids change, which

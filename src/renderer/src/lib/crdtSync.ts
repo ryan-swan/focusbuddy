@@ -42,8 +42,8 @@ import {
   timeBlockPartition,
   filePartition
 } from './syncFlags'
-import type { Widget, FbNode } from '@shared/types'
-import type { FbRow, FbTable } from '@shared/fields'
+import type { Widget, FbNode, TimeBlock } from '@shared/types'
+import type { FbRow, FbTable, FileEntry } from '@shared/fields'
 
 // The node scalar attributes carried as generic 'attr' registers. title + parent
 // have their own fields/apply (parent uses move()); ordering (sortOrder) and the
@@ -409,6 +409,46 @@ function emitFileParent(entryId: string, parentId: string | null): void {
   emitFileRegister(entryId, 'parent', parentId)
 }
 
+function emitTimeBlockCreate(block: TimeBlock): void {
+  if (!tbPart) return
+  // A single occurrence; a recurring series' expansion stays on the poll.
+  const snapshot: Record<string, unknown> = {
+    id: block.id,
+    taskId: block.taskId,
+    title: block.title,
+    startMs: block.startMs,
+    durationMin: block.durationMin
+  }
+  const ev = mkEvent(tbPart, 'timeblock', block.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitTimeBlockDelete(blockId: string): void {
+  if (!tbPart) return
+  tombstoned.add(blockId)
+  const ev = mkEvent(tbPart, 'timeblock', blockId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+
+function emitFileCreate(entry: FileEntry): void {
+  if (!filePart) return
+  // Folders are pure metadata; file-blob entries' bytes ride the poll + blob sync,
+  // so only the folder create is emitted here (name/parent still sync for all).
+  if (entry.kind !== 'folder') return
+  const snapshot: Record<string, unknown> = { id: entry.id, parentId: entry.parentId, name: entry.name }
+  const ev = mkEvent(filePart, 'file', entry.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitFileDelete(entryId: string): void {
+  if (!filePart) return
+  tombstoned.add(entryId)
+  const ev = mkEvent(filePart, 'file', entryId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
 // Persist a remotely-won value and reflect it in the store WITHOUT going through
@@ -669,6 +709,50 @@ async function applyFile(id: string, field: CrdtField, value: unknown): Promise<
   void useFileManagerStore.getState().refresh()
 }
 
+async function applyTimeBlockCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  try {
+    await window.api.timeBlocks.create(snapshot as never)
+  } catch {
+    return
+  }
+  void useTimeBlockStore.getState().reload()
+}
+async function applyTimeBlockDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.timeBlocks.delete(id, 'one')
+  } catch {
+    /* not present locally — tombstone still guards a later create */
+  }
+  void useTimeBlockStore.getState().reload()
+}
+
+async function applyFileCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  try {
+    await window.api.fileManager.createFolder(
+      (snapshot.parentId as string | null) ?? null,
+      snapshot.name as string,
+      id
+    )
+  } catch {
+    return
+  }
+  void useFileManagerStore.getState().refresh()
+}
+async function applyFileDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.fileManager.delete(id)
+  } catch {
+    /* not present locally — tombstone still guards a later create */
+  }
+  void useFileManagerStore.getState().refresh()
+}
+
 function applyEvent(ev: ChangeEvent): void {
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
@@ -756,7 +840,11 @@ function applyEvent(ev: ChangeEvent): void {
     }
   } else if (ev.objectType === 'timeblock') {
     const f = ev.field
-    if (
+    if (f === 'create') {
+      void applyTimeBlockCreate((ev.payload as CreatePayload).snapshot)
+    } else if (f === 'delete') {
+      void applyTimeBlockDelete(ev.objectId)
+    } else if (
       (f === 'start' || f === 'duration' || f === 'title' || f === 'status') &&
       (ev.payload as RegisterPayload).at !== undefined
     ) {
@@ -769,7 +857,11 @@ function applyEvent(ev: ChangeEvent): void {
     }
   } else if (ev.objectType === 'file') {
     const f = ev.field
-    if ((f === 'name' || f === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
+    if (f === 'create') {
+      void applyFileCreate((ev.payload as CreatePayload).snapshot)
+    } else if (f === 'delete') {
+      void applyFileDelete(ev.objectId)
+    } else if ((f === 'name' || f === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
       const remote = registerOf(ev)
       const key = `${f}:${ev.objectId}`
       const local = fileRegs.get(key) ?? null
@@ -876,8 +968,12 @@ export function initCrdtSync(): void {
       tableDelete: emitTableDelete,
       tableAttrs: emitTableAttrs,
       timeBlock: emitTimeBlock,
+      timeBlockCreate: emitTimeBlockCreate,
+      timeBlockDelete: emitTimeBlockDelete,
       fileName: emitFileName,
-      fileParent: emitFileParent
+      fileParent: emitFileParent,
+      fileCreate: emitFileCreate,
+      fileDelete: emitFileDelete
     })
     started = true
   }

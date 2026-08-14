@@ -1,5 +1,5 @@
-import type { Widget, FbNode } from '@shared/types'
-import type { FbRow, FbTable } from '@shared/fields'
+import type { Widget, FbNode, TimeBlock } from '@shared/types'
+import type { FbRow, FbTable, FileEntry } from '@shared/fields'
 
 // WS01 sync substrate — the seam between the widgets store and the sync engine.
 //
@@ -27,8 +27,12 @@ export interface CrdtEmit {
   tableDelete: (tableId: string) => void
   tableAttrs: (tableId: string, attrs: Record<string, unknown>) => void
   timeBlock: (blockId: string, patch: { startMs?: number; durationMin?: number; title?: string; status?: string }) => void
+  timeBlockCreate: (block: TimeBlock) => void
+  timeBlockDelete: (blockId: string) => void
   fileName: (entryId: string, name: string) => void
   fileParent: (entryId: string, parentId: string | null) => void
+  fileCreate: (entry: FileEntry) => void
+  fileDelete: (entryId: string) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -109,4 +113,16 @@ export function crdtEmitFileName(entryId: string, name: string): void {
 
 export function crdtEmitFileParent(entryId: string, parentId: string | null): void {
   impl?.fileParent(entryId, parentId)
+}
+export function crdtEmitTimeBlockCreate(block: TimeBlock): void {
+  impl?.timeBlockCreate(block)
+}
+export function crdtEmitTimeBlockDelete(blockId: string): void {
+  impl?.timeBlockDelete(blockId)
+}
+export function crdtEmitFileCreate(entry: FileEntry): void {
+  impl?.fileCreate(entry)
+}
+export function crdtEmitFileDelete(entryId: string): void {
+  impl?.fileDelete(entryId)
 }

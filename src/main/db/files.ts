@@ -420,9 +420,15 @@ export function folderPath(id: string | null): Array<{ id: string; name: string 
   return chain
 }
 
-export function createFolder(parentId: string | null, name: string): FileEntry {
+export function createFolder(parentId: string | null, name: string, explicitId?: string): FileEntry {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id (create-if-missing by primary key)
+  // so a folder create event materialises with the same id on another device.
+  const id = explicitId ?? randomUUID()
+  if (explicitId) {
+    const existing = getEntry(explicitId)
+    if (existing && existing.kind === 'folder') return existing
+  }
   const now = Date.now()
   const folderName = name.trim() || 'New folder'
   db.prepare(
