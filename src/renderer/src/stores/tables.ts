@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { recordAction, recordActionWithToast } from './actionHistory'
+import { crdtEmitRowCells } from '../lib/crdtBridge'
 import type {
   FbRow,
   FbTable,
@@ -101,6 +102,10 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
     }
     if (!foundTableId) return
     set({ rows: rowsCopy })
+    // WS01 sync substrate (flagged, off by default): each changed cell is an LWW
+    // register, so a concurrent edit to a different cell of this row survives. No-op
+    // until the engine registers (fb.sync.crdt.tables on).
+    crdtEmitRowCells(rowId, cells)
     const updated = await window.api.tables.updateRow(rowId, {
       cells: rowsCopy[foundTableId].find((r) => r.id === rowId)?.cells
     })

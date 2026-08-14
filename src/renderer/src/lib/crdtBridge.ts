@@ -13,6 +13,7 @@ export interface CrdtEmit {
   membership: (widgetId: string, from: string | null, to: string | null) => void
   nodeTitle: (nodeId: string, title: string) => void
   nodeParent: (nodeId: string, parentId: string | null) => void
+  rowCells: (rowId: string, cells: Record<string, unknown>) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -35,4 +36,8 @@ export function crdtEmitNodeTitle(nodeId: string, title: string): void {
 
 export function crdtEmitNodeParent(nodeId: string, parentId: string | null): void {
   impl?.nodeParent(nodeId, parentId)
+}
+
+export function crdtEmitRowCells(rowId: string, cells: Record<string, unknown>): void {
+  impl?.rowCells(rowId, cells)
 }

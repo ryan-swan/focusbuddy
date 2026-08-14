@@ -267,6 +267,7 @@ export default function CanvasBreadcrumb({
             {renaming ? (
               <input
                 ref={renameInputRef}
+                data-testid="desk-title-input"
                 type="text"
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
@@ -281,6 +282,7 @@ export default function CanvasBreadcrumb({
               />
             ) : (
               <span
+                data-testid="desk-title"
                 className="truncate cursor-default"
                 onDoubleClick={(e) => {
                   e.stopPropagation()

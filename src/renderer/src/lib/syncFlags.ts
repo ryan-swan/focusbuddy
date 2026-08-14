@@ -28,6 +28,18 @@ export function crdtNodesEnabled(): boolean {
   }
 }
 
+// Table rows. This slice syncs row CELLS, each an LWW register keyed by column, so
+// two people editing different cells of the same row both survive (today the poll's
+// whole-row last-write-wins loses one). Row creation/deletion + schema stay on the
+// poll. Default OFF.
+export function crdtTablesEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.tables') === '1'
+  } catch {
+    return false
+  }
+}
+
 // A stable per-install id, minted once and reused. It is the LWW tiebreak actor, so
 // it MUST be distinct per device: two devices of the same account editing at the
 // same millisecond would otherwise share an actor and could diverge. Combined with
@@ -58,4 +70,9 @@ export function widgetPartition(accountId: string): string {
 // log and catch-up are independent (the server sequences each partition on its own).
 export function nodePartition(accountId: string): string {
   return `n:acct:${accountId}`
+}
+
+// The sync partition for an account's table rows.
+export function rowPartition(accountId: string): string {
+  return `r:acct:${accountId}`
 }

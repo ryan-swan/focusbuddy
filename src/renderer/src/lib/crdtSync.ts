@@ -3,17 +3,20 @@ import { lwwMerge, type LWWRegister } from '@shared/crdt'
 import {
   geomRegisterOf,
   resolvedSection,
+  registerOf,
   type ChangeEvent,
   type CrdtField,
   type CrdtDataClass,
   type WidgetGeom,
   type GeomPayload,
-  type MembersPayload
+  type MembersPayload,
+  type RegisterPayload,
+  type CellPayload
 } from '@shared/crdtWidgetMerge'
-import { registerOf, type RegisterPayload } from '@shared/crdtNodeMerge'
 import { useAccountStore } from '../stores/account'
 import { useWidgetStore } from '../stores/widgets'
 import { useNodeStore } from '../stores/nodes'
+import { useTablesStore } from '../stores/tables'
 import {
   sendSocketMessage,
   setCrdtSocketHandler,
@@ -24,11 +27,14 @@ import { registerCrdtEmit } from './crdtBridge'
 import {
   crdtWidgetsEnabled,
   crdtNodesEnabled,
+  crdtTablesEnabled,
   deviceId,
   widgetPartition,
-  nodePartition
+  nodePartition,
+  rowPartition
 } from './syncFlags'
 import type { Widget } from '@shared/types'
+import type { FbRow } from '@shared/fields'
 
 // WS01 sync substrate — the client sync engine.
 //
@@ -44,6 +50,7 @@ import type { Widget } from '@shared/types'
 
 let widgetPart: string | null = null
 let nodePart: string | null = null
+let rowPart: string | null = null
 let actor = ''
 let started = false
 
@@ -72,17 +79,20 @@ function liveSections(st: MemberState): string[] {
 // Node in-memory state: one LWW register per (field, node), keyed `${field}:${id}`.
 const nodeRegs = new Map<string, LWWRegister<unknown>>()
 
+// Row in-memory state: one LWW register per (row, column), keyed `${rowId}:${column}`.
+const rowRegs = new Map<string, LWWRegister<unknown>>()
+
 function geomOf(w: Widget): WidgetGeom {
   return { x: w.x, y: w.y, width: w.width, height: w.height }
 }
 
 function mkEvent(
   partitionKey: string,
-  objectType: 'widget' | 'node',
+  objectType: 'widget' | 'node' | 'row',
   objectId: string,
-  field: CrdtField | 'title' | 'parent',
+  field: CrdtField,
   dataClass: CrdtDataClass,
-  payload: GeomPayload | MembersPayload | RegisterPayload
+  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload
 ): ChangeEvent {
   return {
     id: plexiId(),
@@ -171,6 +181,17 @@ function emitNodeParent(nodeId: string, parentId: string | null): void {
   emitNodeRegister(nodeId, 'parent', parentId)
 }
 
+function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
+  if (!rowPart) return
+  const at = Date.now()
+  for (const [column, value] of Object.entries(cells)) {
+    rowRegs.set(`${rowId}:${column}`, { value, timestamp: at, actor })
+    const ev = mkEvent(rowPart, 'row', rowId, 'cell', 'register', { column, value, at })
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
 // Persist a remotely-won value and reflect it in the store WITHOUT going through
@@ -219,6 +240,30 @@ async function applyNodeParent(id: string, parentId: string | null): Promise<voi
   useNodeStore.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)) }))
 }
 
+async function applyCellToRow(rowId: string, column: string, value: unknown): Promise<void> {
+  try {
+    await window.api.tables.updateRow(rowId, { cells: { [column]: value } })
+  } catch {
+    /* the row may not exist on this device yet (creation rides the poll) — the base
+       write is skipped and the poll reconciles it; no data is lost */
+  }
+  const rows = useTablesStore.getState().rows
+  let changed = false
+  const next: Record<string, FbRow[]> = {}
+  for (const [tableId, list] of Object.entries(rows)) {
+    const idx = list.findIndex((r) => r.id === rowId)
+    if (idx === -1) {
+      next[tableId] = list
+      continue
+    }
+    const copy = [...list]
+    copy[idx] = { ...copy[idx], cells: { ...copy[idx].cells, [column]: value } }
+    next[tableId] = copy
+    changed = true
+  }
+  if (changed) useTablesStore.setState({ rows: next })
+}
+
 function applyEvent(ev: ChangeEvent): void {
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
@@ -253,6 +298,16 @@ function applyEvent(ev: ChangeEvent): void {
         else void applyNodeParent(ev.objectId, remote.value as string | null)
       }
     }
+  } else if (ev.objectType === 'row') {
+    const p = ev.payload as CellPayload
+    if (ev.field === 'cell' && typeof p.column === 'string' && p.at !== undefined) {
+      const remote = registerOf(ev)
+      const key = `${ev.objectId}:${p.column}`
+      const local = rowRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      rowRegs.set(key, merged)
+      if (merged === remote) void applyCellToRow(ev.objectId, p.column, remote.value)
+    }
   }
 }
 
@@ -275,10 +330,10 @@ function onCrdt(e: CrdtSocketEvent): void {
 function onReauth(): void {
   // Join each enabled partition (the server relays only to joined sockets), then
   // flush the shared offline queue.
-  for (const pk of [widgetPart, nodePart]) {
+  for (const pk of [widgetPart, nodePart, rowPart]) {
     if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
   }
-  if (widgetPart || nodePart) void flushUnsynced()
+  if (widgetPart || nodePart || rowPart) void flushUnsynced()
 }
 
 async function flushUnsynced(): Promise<void> {
@@ -290,12 +345,12 @@ async function flushUnsynced(): Promise<void> {
         id: e.id,
         ts: e.ts,
         partitionKey: e.partitionKey,
-        objectType: e.objectType as 'widget' | 'node',
+        objectType: e.objectType as 'widget' | 'node' | 'row',
         objectId: e.objectId,
         field: e.field as CrdtField,
         dataClass: e.dataClass as CrdtDataClass,
         actor: e.actor,
-        payload: e.payload as GeomPayload | MembersPayload | RegisterPayload,
+        payload: e.payload as GeomPayload | MembersPayload | RegisterPayload | CellPayload,
         seq: e.seq ?? undefined
       } as ChangeEvent)
     }
@@ -315,7 +370,8 @@ async function flushUnsynced(): Promise<void> {
 export function initCrdtSync(): void {
   const wEnabled = crdtWidgetsEnabled()
   const nEnabled = crdtNodesEnabled()
-  if (!wEnabled && !nEnabled) {
+  const tEnabled = crdtTablesEnabled()
+  if (!wEnabled && !nEnabled && !tEnabled) {
     stopCrdtSync()
     return
   }
@@ -324,6 +380,7 @@ export function initCrdtSync(): void {
   actor = `${acct.id}:${deviceId()}`
   widgetPart = wEnabled ? widgetPartition(acct.id) : null
   nodePart = nEnabled ? nodePartition(acct.id) : null
+  rowPart = tEnabled ? rowPartition(acct.id) : null
   if (!started) {
     setCrdtSocketHandler(onCrdt)
     setCrdtOpenHandler(onReauth)
@@ -331,7 +388,8 @@ export function initCrdtSync(): void {
       geom: emitGeom,
       membership: emitMembership,
       nodeTitle: emitNodeTitle,
-      nodeParent: emitNodeParent
+      nodeParent: emitNodeParent,
+      rowCells: emitRowCells
     })
     started = true
   }
@@ -341,7 +399,7 @@ export function initCrdtSync(): void {
 }
 
 export function stopCrdtSync(): void {
-  for (const pk of [widgetPart, nodePart]) {
+  for (const pk of [widgetPart, nodePart, rowPart]) {
     if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   }
   registerCrdtEmit(null)
@@ -350,8 +408,10 @@ export function stopCrdtSync(): void {
   geomRegs.clear()
   memberStates.clear()
   nodeRegs.clear()
+  rowRegs.clear()
   widgetPart = null
   nodePart = null
+  rowPart = null
   actor = ''
   started = false
 }
