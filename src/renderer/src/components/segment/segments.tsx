@@ -6,6 +6,7 @@ import CalendarView from '../views/CalendarView'
 import FilesView from '../views/FilesView'
 import OrgAdminView from '../views/OrgAdminView'
 import PlexiProjectsView from '../views/PlexiProjectsView'
+import AgenticOpsView from '../views/AgenticOpsView'
 import RecentView from '../views/RecentView'
 import KnowledgeView from '../views/KnowledgeView'
 import PlexiSearchView from '../views/PlexiSearchView'
@@ -44,6 +45,7 @@ export function PlexiDeskShell({ initialApp }: { initialApp?: string } = {}): JS
     { key: 'desk', label: 'My Desk', blurb: 'The working canvas you build on', icon: 'space_dashboard', tint: 'bg-sky-500', render: () => <Canvas /> },
     { key: 'workspaces', label: 'Workspaces', blurb: 'Organisations and sub-workspaces', icon: 'apartment', tint: 'bg-teal-500', render: () => <OrgAdminView />, gateKind: 'organization' },
     { key: 'plans', label: 'Plans', blurb: 'Timelines, milestones and Gantt charts', icon: 'account_tree', tint: 'bg-violet-500', render: () => <PlexiProjectsView /> },
+    { key: 'ops', label: 'Agentic Ops', blurb: 'Your agent workforce: triage, proposals and boardrooms', icon: 'smart_toy', tint: 'bg-cyan-600', render: () => <AgenticOpsView /> },
     { key: 'tasks', label: 'Tasks', blurb: 'Everything on your plate, in one list', icon: 'checklist', tint: 'bg-emerald-500', render: () => <AllTasksView /> },
     { key: 'calendar', label: 'Calendar', blurb: 'Your work by date', icon: 'calendar_month', tint: 'bg-amber-500', render: () => <CalendarView />, gateKind: 'calendar' },
     { key: 'files', label: 'Files', blurb: 'Every file in your workspace', icon: 'folder', tint: 'bg-orange-500', render: () => <FilesView />, gateKind: 'files' },
