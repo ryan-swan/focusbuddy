@@ -216,40 +216,27 @@ test('multi-type live convergence: node/widget/document create + field edits con
     console.log(`[CRDT-LIVE] widget content-edit converged A→B in ${widgetContentMs}ms`)
 
     // ── DOCUMENT: create on A, metadata converges on B; rename, title converges ──
-    // CONFIRMED HARNESS GAP (not fixed here, needs a production one-liner): unlike
-    // __fbNodes/__fbWidgets/__fbView, there is no __fbDocuments debug handle
-    // exposed anywhere in src/renderer/src/stores/documents.ts, so `store` below
-    // is always undefined and this always falls to the raw api.documents.create
-    // IPC bridge. Confirmed by direct signal-server request-log inspection during
-    // two prior runs (each waiting up to 45s): that bridge issues ZERO network
-    // requests — window.api.documents.create is 100% local-only. Only the
-    // renderer store's createBlank() additionally calls pushCloudDoc(doc) and
-    // nudgeSync() (see stores/documents.ts createBlank). So this step, as
-    // written, can NEVER converge to B by any mechanism (not CRDT, not the
-    // classic poll) — it is architecturally blocked, not a timing race, and the
-    // 15s budget below is only to demonstrate that without wasting run time.
-    // Recommended fix for the dispatcher: add, in stores/documents.ts, mirroring
-    // the existing convention in stores/nodes.ts / stores/widgets.ts / stores/view.ts —
-    //   if (typeof window !== 'undefined') {
-    //     (window as unknown as { __fbDocuments?: typeof useDocumentsStore }).__fbDocuments = useDocumentsStore
-    //   }
-    // — then this step can switch to the store path and assert convergence under
-    // the same tight CRDT budget as node/widget above.
-    const docId = await A.window.evaluate(async () => {
+    // FIXED: stores/documents.ts now exposes __fbDocuments (same convention as
+    // __fbNodes/__fbWidgets/__fbView), so `store` below resolves and this reaches
+    // the store's createBlank(), which additionally calls pushCloudDoc(doc) +
+    // nudgeSync() and fires the real CRDT emit — verified below via the explicit
+    // viaStore assertion, not just a comment claim.
+    const { docId, viaStore } = await A.window.evaluate(async () => {
       const store = (window as unknown as { __fbDocuments?: { getState: () => { createBlank: (t: string) => Promise<{ id: string }> } } }).__fbDocuments
       const api = (window as unknown as { api: typeof window.api }).api
       // Prefer the store; fall back to the api if the debug handle isn't exposed.
-      if (store) return (await store.getState().createBlank('doc')).id
+      if (store) return { docId: (await store.getState().createBlank('doc')).id, viaStore: true }
       const d = await api.documents.create({ docType: 'doc', title: 'Live Doc A' } as never)
-      return (d as { id: string }).id
+      return { docId: (d as { id: string }).id, viaStore: false }
     })
+    expect(viaStore, '__fbDocuments hook must be present so this exercises the CRDT emit path, not the local-only IPC bridge').toBe(true)
     const docMs = await until(
       B.window,
       async () => (await (window as unknown as { api: typeof window.api }).api.documents.list()) as Array<{ id: string }>,
       (list) => list.some((d) => d.id === docId),
       15_000
     )
-    console.log(`[CRDT-LIVE] document converged via poll-fallback (no __fbDocuments hook) ${docMs}ms`)
+    console.log(`[CRDT-LIVE] document (via __fbDocuments store, CRDT emit) converged A→B in ${docMs}ms`)
     console.log(`[CRDT-LIVE] all types converged A→B: node=${nodeMs}ms rename=${nodeRenameMs}ms widget=${widgetCreateMs}ms content=${widgetContentMs}ms doc=${docMs}ms`)
   } finally {
     await A.dispose()

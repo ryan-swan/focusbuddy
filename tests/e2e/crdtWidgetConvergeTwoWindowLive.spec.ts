@@ -231,9 +231,13 @@ test('two devices of one account drag the same widget across a socket drop and c
     }, widgetId)
 
     // B reconnects (reload re-auths the socket → onReauth joins + flushes the queue).
+    // The reload wipes every page-global (window.__crdtTaskId included), so geomOf's
+    // read of that global would silently resolve against `undefined` unless it is
+    // re-armed here alongside the view navigation.
     await B.window.reload()
     await dismissOnboardingOnly(B.window)
     await B.window.evaluate((tid) => {
+      ;(window as unknown as { __crdtTaskId: string }).__crdtTaskId = tid
       const w = window as unknown as { __fbView?: { getState: () => { goTask: (id: string) => void } } }
       w.__fbView?.getState()?.goTask?.(tid)
     }, taskId)
