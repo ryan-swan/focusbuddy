@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { foldNode } from '../../src/shared/crdtNodeMerge'
-import type { ChangeEvent } from '../../src/shared/crdtWidgetMerge'
+import { foldAttrs, foldLifecycle, type ChangeEvent } from '../../src/shared/crdtWidgetMerge'
 
 // WS01 sync substrate — convergence for the second migrated type (nodes). A node
 // syncs two LWW registers, title and parent; foldNode is the pure core the client
@@ -75,5 +75,63 @@ describe('plx_syn — node CRDT convergence (WS01 second slice)', () => {
     const t1 = reg('n1', 'title', 'a:dev1', 1000, 'One')
     const t2 = reg('n1', 'title', 'b:dev2', 2000, 'Two')
     expect(foldNode([t1, t2, t1, t2, t2]).title?.value).toBe(foldNode([t1, t2]).title?.value)
+  })
+})
+
+// Node scalar attributes (status/priority/dueDate/…) carried as generic 'attr'
+// keyed registers, plus node lifecycle (create/delete). Same convergence guarantee.
+function attr(id: string, name: string, actor: string, at: number, value: unknown): ChangeEvent {
+  return {
+    id: `a${seq++}`,
+    ts: new Date(at).toISOString(),
+    partitionKey: 'n:acct:a',
+    objectType: 'node',
+    objectId: id,
+    field: 'attr',
+    dataClass: 'register',
+    actor,
+    payload: { attr: name, value, at }
+  }
+}
+function lifecycle(id: string, kind: 'create' | 'delete', at: number, snapshot?: Record<string, unknown>): ChangeEvent {
+  return {
+    id: `l${seq++}`,
+    ts: new Date(at).toISOString(),
+    partitionKey: 'n:acct:a',
+    objectType: 'node',
+    objectId: id,
+    field: kind,
+    dataClass: 'set',
+    actor: 'a:dev1',
+    payload: kind === 'create' ? { snapshot: snapshot ?? {}, at } : { at }
+  }
+}
+
+describe('plx_syn — node attrs + lifecycle convergence', () => {
+  it('different attributes edited concurrently both survive (keyed LWW)', () => {
+    const status = attr('n1', 'status', 'a:dev1', 1000, 'done')
+    const priority = attr('n1', 'priority', 'b:dev2', 1001, 5)
+    for (const order of permutations([status, priority])) {
+      const regs = foldAttrs(order)
+      expect(regs.get('status')?.value).toBe('done')
+      expect(regs.get('priority')?.value).toBe(5)
+    }
+  })
+
+  it('same attribute edited concurrently resolves to the later write', () => {
+    const early = attr('n1', 'status', 'a:dev1', 1000, 'open')
+    const late = attr('n1', 'status', 'b:dev2', 2000, 'done')
+    for (const order of permutations([early, late])) {
+      expect(foldAttrs(order).get('status')?.value).toBe('done')
+    }
+  })
+
+  it('node create + delete is remove-wins in any order (a folder subtree delete)', () => {
+    const create = lifecycle('n1', 'create', 1000, { id: 'n1', kind: 'task', title: 'T' })
+    const del = lifecycle('n1', 'delete', 2000)
+    for (const order of permutations([create, del])) {
+      expect(foldLifecycle(order).deleted).toBe(true)
+      expect(foldLifecycle(order).created).toBeNull()
+    }
   })
 })

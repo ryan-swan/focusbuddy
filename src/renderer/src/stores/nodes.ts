@@ -3,7 +3,13 @@ import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 import { recordAction, recordActionWithToast } from './actionHistory'
 import { recordTrail } from '../lib/trail'
 import { nudgeSync } from '../lib/syncNudge'
-import { crdtEmitNodeTitle, crdtEmitNodeParent } from '../lib/crdtBridge'
+import {
+  crdtEmitNodeTitle,
+  crdtEmitNodeParent,
+  crdtEmitNodeCreate,
+  crdtEmitNodeDelete,
+  crdtEmitNodeAttrs
+} from '../lib/crdtBridge'
 import { taskComplete } from '../lib/audioBeep'
 import { hapticSuccess } from '../lib/haptics'
 import { canCreateMore, limitFor } from '../lib/gating'
@@ -103,6 +109,9 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     const node = await window.api.nodes.create(draft)
     set({ nodes: [...get().nodes, node] })
     nudgeSync()
+    // WS01 sync substrate (flagged): emit the create so the node materialises on
+    // other devices with the same id. No-op until the engine registers.
+    crdtEmitNodeCreate(node)
     if (draft.parentId) set({ expanded: { ...get().expanded, [draft.parentId]: true } })
     // Undo a creation by trashing it; redo restores exactly what was trashed
     // (it may have gained children by the time you undo).
@@ -130,6 +139,10 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
     // into the one CRDT change log. No-ops until the engine registers (flag on).
     if (patch.title !== undefined) crdtEmitNodeTitle(id, updated.title)
     if ('parentId' in patch) crdtEmitNodeParent(id, patch.parentId ?? null)
+    // The node's scalar attributes (status/priority/dueDate/etc.) as generic 'attr'
+    // LWW registers. The engine filters to the fields it carries; ordering + resume
+    // text stay on the poll. No-op until the engine registers.
+    crdtEmitNodeAttrs(id, patch as unknown as Record<string, unknown>)
     // Record an undo only for user-meaningful field edits (not programmatic
     // patches like resume autosave or timers), restoring the prior values.
     const UNDOABLE = ['title', 'description', 'status', 'priority', 'interest', 'importance', 'dueDate'] as const
@@ -177,6 +190,9 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
       activeTaskId: ids.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
     })
     nudgeSync()
+    // WS01 sync substrate (flagged): tombstone every removed id (a folder delete
+    // cascades to its descendants) so the removal converges on other devices.
+    crdtEmitNodeDelete(ids)
     // Best-effort: archive the deleted room/desk's chat channel (keeps history,
     // hides it from lists). No-op if the object never had a channel.
     if (target) {

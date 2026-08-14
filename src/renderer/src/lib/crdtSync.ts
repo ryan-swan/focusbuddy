@@ -12,6 +12,7 @@ import {
   type MembersPayload,
   type RegisterPayload,
   type CellPayload,
+  type AttrPayload,
   type CreatePayload,
   type DeletePayload
 } from '@shared/crdtWidgetMerge'
@@ -41,8 +42,22 @@ import {
   timeBlockPartition,
   filePartition
 } from './syncFlags'
-import type { Widget } from '@shared/types'
+import type { Widget, FbNode } from '@shared/types'
 import type { FbRow } from '@shared/fields'
+
+// The node scalar attributes carried as generic 'attr' registers. title + parent
+// have their own fields/apply (parent uses move()); ordering (sortOrder) and the
+// resume text stay on the poll (ordering + text-class are separate design steps).
+const NODE_ATTR_KEYS = [
+  'description',
+  'status',
+  'priority',
+  'interest',
+  'importance',
+  'dueDate',
+  'estimateMinutes',
+  'isPlan'
+] as const
 
 // WS01 sync substrate — the client sync engine.
 //
@@ -88,6 +103,8 @@ function liveSections(st: MemberState): string[] {
 
 // Node in-memory state: one LWW register per (field, node), keyed `${field}:${id}`.
 const nodeRegs = new Map<string, LWWRegister<unknown>>()
+// Generic per-attribute registers, keyed `${objectType}:${id}:${attr}`.
+const attrRegs = new Map<string, LWWRegister<unknown>>()
 
 // Row in-memory state: one LWW register per (row, column), keyed `${rowId}:${column}`.
 const rowRegs = new Map<string, LWWRegister<unknown>>()
@@ -114,7 +131,14 @@ function mkEvent(
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
-  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload | CreatePayload | DeletePayload
+  payload:
+    | GeomPayload
+    | MembersPayload
+    | RegisterPayload
+    | CellPayload
+    | AttrPayload
+    | CreatePayload
+    | DeletePayload
 ): ChangeEvent {
   return {
     id: plexiId(),
@@ -248,6 +272,50 @@ function emitNodeTitle(nodeId: string, title: string): void {
 }
 function emitNodeParent(nodeId: string, parentId: string | null): void {
   emitNodeRegister(nodeId, 'parent', parentId)
+}
+
+function emitNodeCreate(node: FbNode): void {
+  if (!nodePart) return
+  const snapshot: Record<string, unknown> = {
+    id: node.id,
+    parentId: node.parentId,
+    kind: node.kind,
+    title: node.title,
+    description: node.description,
+    priority: node.priority,
+    interest: node.interest,
+    importance: node.importance,
+    estimateMinutes: node.estimateMinutes,
+    dueDate: node.dueDate,
+    isPlan: node.isPlan
+  }
+  const ev = mkEvent(nodePart, 'node', node.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+
+function emitNodeDelete(nodeIds: string[]): void {
+  if (!nodePart) return
+  for (const id of nodeIds) {
+    tombstoned.add(id)
+    const ev = mkEvent(nodePart, 'node', id, 'delete', 'set', { at: Date.now() })
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+
+// Emit the node's scalar attributes present in a patch as generic 'attr' registers.
+function emitNodeAttrs(nodeId: string, patch: Record<string, unknown>): void {
+  if (!nodePart) return
+  const at = Date.now()
+  for (const attr of NODE_ATTR_KEYS) {
+    if (!(attr in patch)) continue
+    const value = patch[attr]
+    attrRegs.set(`node:${nodeId}:${attr}`, { value, timestamp: at, actor })
+    const ev = mkEvent(nodePart, 'node', nodeId, 'attr', 'register', { attr, value, at })
+    recordLocal(ev, false)
+    send(ev)
+  }
 }
 
 function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
@@ -390,6 +458,45 @@ async function applyNodeParent(id: string, parentId: string | null): Promise<voi
   useNodeStore.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)) }))
 }
 
+async function applyNodeCreate(snapshot: Record<string, unknown>): Promise<void> {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  let created: FbNode | null = null
+  try {
+    created = await window.api.nodes.create(snapshot as never)
+  } catch {
+    return
+  }
+  if (!created) return
+  const st = useNodeStore.getState()
+  if (!st.nodes.some((n) => n.id === created!.id)) {
+    useNodeStore.setState({ nodes: [...st.nodes, created] })
+  }
+}
+
+async function applyNodeDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  let removed: string[] = [id]
+  try {
+    removed = (await window.api.nodes.delete(id)) ?? [id]
+  } catch {
+    /* not present locally — tombstone still guards a later create */
+  }
+  for (const r of removed) tombstoned.add(r)
+  useNodeStore.setState((s) => ({ nodes: s.nodes.filter((n) => !removed.includes(n.id)) }))
+}
+
+async function applyNodeAttr(id: string, attr: string, value: unknown): Promise<void> {
+  try {
+    await window.api.nodes.update(id, { [attr]: value } as never)
+  } catch {
+    /* not present locally — the poll reconciles it */
+  }
+  useNodeStore.setState((s) => ({
+    nodes: s.nodes.map((n) => (n.id === id ? ({ ...n, [attr]: value } as typeof n) : n))
+  }))
+}
+
 async function applyCellToRow(rowId: string, column: string, value: unknown): Promise<void> {
   try {
     await window.api.tables.updateRow(rowId, { cells: { [column]: value } })
@@ -474,7 +581,19 @@ function applyEvent(ev: ChangeEvent): void {
       if (next !== cur) void applyMemberToWidget(ev.objectId, next)
     }
   } else if (ev.objectType === 'node') {
-    if ((ev.field === 'title' || ev.field === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
+    if (ev.field === 'create') {
+      void applyNodeCreate((ev.payload as CreatePayload).snapshot)
+    } else if (ev.field === 'delete') {
+      void applyNodeDelete(ev.objectId)
+    } else if (ev.field === 'attr' && (ev.payload as AttrPayload).at !== undefined) {
+      const p = ev.payload as AttrPayload
+      const remote = registerOf(ev)
+      const key = `node:${ev.objectId}:${p.attr}`
+      const local = attrRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      attrRegs.set(key, merged)
+      if (merged === remote) void applyNodeAttr(ev.objectId, p.attr, remote.value)
+    } else if ((ev.field === 'title' || ev.field === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
       const remote = registerOf(ev)
       const key = `${ev.field}:${ev.objectId}`
       const local = nodeRegs.get(key) ?? null
@@ -607,6 +726,9 @@ export function initCrdtSync(): void {
       widgetFields: emitWidgetFields,
       nodeTitle: emitNodeTitle,
       nodeParent: emitNodeParent,
+      nodeCreate: emitNodeCreate,
+      nodeDelete: emitNodeDelete,
+      nodeAttrs: emitNodeAttrs,
       rowCells: emitRowCells,
       timeBlock: emitTimeBlock,
       fileName: emitFileName,
@@ -629,6 +751,7 @@ export function stopCrdtSync(): void {
   geomRegs.clear()
   memberStates.clear()
   nodeRegs.clear()
+  attrRegs.clear()
   rowRegs.clear()
   tbRegs.clear()
   fileRegs.clear()

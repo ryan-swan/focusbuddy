@@ -96,7 +96,14 @@ function nextSortOrder(parentId: string | null): number {
 
 export function createNode(draft: NodeDraft): FbNode {
   const db = getDb()
-  const id = randomUUID()
+  // WS01 lifecycle: honour a client-provided id so a node created on one device
+  // materialises with the SAME id when its create event is applied on another
+  // (create-if-missing by primary key). Local creates pass no id → fresh one.
+  const id = draft.id ?? randomUUID()
+  if (draft.id) {
+    const existing = getNode(draft.id)
+    if (existing) return existing
+  }
   const now = Date.now()
   db.prepare(
     `INSERT INTO nodes (id, parent_id, kind, title, description, status, priority, interest, importance, sort_order, created_at, updated_at, estimate_minutes, extensions_minutes, due_date, is_plan, shared_from_handle, org_id)

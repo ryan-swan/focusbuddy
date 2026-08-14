@@ -1,4 +1,4 @@
-import type { Widget } from '@shared/types'
+import type { Widget, FbNode } from '@shared/types'
 
 // WS01 sync substrate — the seam between the widgets store and the sync engine.
 //
@@ -16,6 +16,9 @@ export interface CrdtEmit {
   widgetFields: (widgetId: string, patch: { content?: string; title?: string; color?: string | null; status?: string | null }) => void
   nodeTitle: (nodeId: string, title: string) => void
   nodeParent: (nodeId: string, parentId: string | null) => void
+  nodeCreate: (node: FbNode) => void
+  nodeDelete: (nodeIds: string[]) => void
+  nodeAttrs: (nodeId: string, attrs: Record<string, unknown>) => void
   rowCells: (rowId: string, cells: Record<string, unknown>) => void
   timeBlock: (blockId: string, patch: { startMs?: number; durationMin?: number; title?: string; status?: string }) => void
   fileName: (entryId: string, name: string) => void
@@ -55,6 +58,17 @@ export function crdtEmitNodeTitle(nodeId: string, title: string): void {
 
 export function crdtEmitNodeParent(nodeId: string, parentId: string | null): void {
   impl?.nodeParent(nodeId, parentId)
+}
+export function crdtEmitNodeCreate(node: FbNode): void {
+  impl?.nodeCreate(node)
+}
+// A node delete can cascade (a folder + its descendants); the store passes every
+// removed id so each is tombstoned on other devices.
+export function crdtEmitNodeDelete(nodeIds: string[]): void {
+  impl?.nodeDelete(nodeIds)
+}
+export function crdtEmitNodeAttrs(nodeId: string, attrs: Record<string, unknown>): void {
+  impl?.nodeAttrs(nodeId, attrs)
 }
 
 export function crdtEmitRowCells(rowId: string, cells: Record<string, unknown>): void {

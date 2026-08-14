@@ -202,6 +202,9 @@ export interface FbNode {
 }
 
 export interface NodeDraft {
+  // Optional client-provided id (WS01 sync substrate): materialise with this exact
+  // id so a create event from another device is idempotent. Omitted for local creates.
+  id?: string
   parentId: string | null
   kind: NodeKind
   title: string

@@ -40,6 +40,11 @@ export type CrdtField =
   | 'name'
   | 'content'
   | 'color'
+  // A generic per-attribute LWW register: the attribute name lives in the payload
+  // (like a row 'cell' carries its column), so a type's many scalar fields sync
+  // without each needing its own field in this union. Used for node/timeblock/etc.
+  // scalar attributes (status, priority, dueDate, …).
+  | 'attr'
   // Object lifecycle: 'create' carries the full initial snapshot so the object can
   // be materialised on another device; 'delete' is a tombstone. Together they are a
   // remove-wins existence CRDT (a delete is never undone by a late create — ids are
@@ -60,7 +65,14 @@ export interface ChangeEvent {
   field: CrdtField
   dataClass: CrdtDataClass
   actor: string // device/account id — the LWW tiebreak, deterministic
-  payload: GeomPayload | MembersPayload | RegisterPayload | CellPayload | CreatePayload | DeletePayload
+  payload:
+    | GeomPayload
+    | MembersPayload
+    | RegisterPayload
+    | CellPayload
+    | AttrPayload
+    | CreatePayload
+    | DeletePayload
   // Server-assigned authoritative sequence, present once the event is on the log.
   // Consumers order catch-up by this, never by wall-clock (SYN-011). Absent on a
   // freshly-minted local event before it has been appended.
@@ -81,6 +93,30 @@ export interface CellPayload {
   column: string
   value: unknown
   at: number
+}
+
+// A generic per-attribute LWW register (an object's scalar field). `attr` is the
+// field name, so one 'attr' field carries any number of a type's scalar attributes.
+export interface AttrPayload {
+  attr: string
+  value: unknown
+  at: number
+}
+
+// Fold an object's 'attr' events into one converged LWW register per attribute.
+// Pure and order-independent; each attribute folds independently, so cross-field
+// edits never contend. Mirrors foldRow for table cells.
+export function foldAttrs(events: Iterable<ChangeEvent>): Map<string, LWWRegister<unknown>> {
+  const attrs = new Map<string, LWWRegister<unknown>>()
+  for (const ev of events) {
+    if (ev.field !== 'attr') continue
+    const p = ev.payload as AttrPayload
+    if (p.at === undefined || typeof p.attr !== 'string') continue
+    const reg = registerOf(ev)
+    const prior = attrs.get(p.attr) ?? null
+    attrs.set(p.attr, prior ? lwwMerge(prior, reg) : reg)
+  }
+  return attrs
 }
 
 // Object lifecycle payloads. `create` carries the full snapshot needed to
