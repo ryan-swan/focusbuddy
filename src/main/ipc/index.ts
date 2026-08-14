@@ -127,6 +127,7 @@ import {
   listWidgetsByKind,
   updateWidget, createWidgetIfTaskExists } from '../db/widgets'
 import { collectTelemetry, recordAiCall, setOnboardingSummary } from '../db/telemetry'
+import { recordCrash, listCrashes } from '../db/crashLog'
 import { getLaunchInfo } from '../launchVersion'
 import {
   createLink,
@@ -1438,6 +1439,12 @@ export function registerIpcHandlers(): void {
   })
   // Telemetry snapshot for the renderer to report to the signal server.
   ipcMain.handle('telemetry:collect', () => collectTelemetry())
+  // Crash telemetry (WS03): the renderer forwards render-side errors here, and
+  // the whole recent crash log is readable back for inspection.
+  ipcMain.handle('crash:report', (_e, input: Parameters<typeof recordCrash>[0]) =>
+    recordCrash({ ...input, source: 'renderer' })
+  )
+  ipcMain.handle('crash:list', (_e, limit?: number) => listCrashes(limit))
   // Persist onboarding progress locally so it rides the next telemetry snapshot.
   ipcMain.handle(
     'onboarding:record',

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import Icon from './Icon'
+import { reportCrash } from '../lib/crashReporter'
 
 interface Props {
   // A human label for the thing that failed, shown in the fallback ("This table
@@ -34,8 +35,15 @@ export default class WidgetErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Local log for diagnostics. A later reliability increment forwards this to
-    // crash telemetry with symbolication; for now it stays in the dev console.
+    // Persist to the crash log (WS03) so a widget failure is seen, not lost, and
+    // keep the local console line for live debugging.
+    reportCrash({
+      kind: 'widget-error',
+      message: error?.message ?? String(error),
+      stack: error?.stack ?? null,
+      componentStack: info?.componentStack ?? null,
+      context: `${this.props.label ?? 'widget'}${this.props.widgetId ? ` (${this.props.widgetId})` : ''}`
+    })
     // eslint-disable-next-line no-console
     console.error('[WidgetErrorBoundary]', this.props.widgetId, this.props.label, error, info)
   }

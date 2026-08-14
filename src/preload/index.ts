@@ -710,6 +710,32 @@ const api = {
     propose: (taskId: string): Promise<SmartStackResponse> =>
       ipcRenderer.invoke('smartStack:propose', taskId)
   },
+  // Crash telemetry (WS03): forward a render-side error, and read the recent crash
+  // log back. Technical data only, never document content.
+  crash: {
+    report: (input: {
+      kind: string
+      message: string
+      stack?: string | null
+      componentStack?: string | null
+      context?: string | null
+    }): Promise<unknown> => ipcRenderer.invoke('crash:report', input),
+    list: (
+      limit?: number
+    ): Promise<
+      Array<{
+        id: string
+        ts: number
+        source: string
+        kind: string
+        message: string
+        stack: string | null
+        componentStack: string | null
+        appVersion: string
+        context: string | null
+      }>
+    > => ipcRenderer.invoke('crash:list', limit)
+  },
   connectedApps: {
     list: (): Promise<ConnectedApp[]> => ipcRenderer.invoke('connectedApps:list'),
     create: (draft: ConnectedAppDraft): Promise<ConnectedApp> =>

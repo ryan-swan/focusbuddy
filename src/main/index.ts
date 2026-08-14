@@ -16,6 +16,13 @@ import { installAutoUpdater, checkForUpdates } from './autoUpdate'
 import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
 import { runDueReports } from './db/reports'
+import { installMainCrashHandlers } from './db/crashLog'
+
+// Capture uncaught errors + unhandled rejections from the main process before
+// anything else runs, so a startup failure is recorded instead of lost. The
+// handlers only touch the DB when a crash actually fires, by which point it is
+// ready, so installing this early is safe.
+installMainCrashHandlers()
 
 // Load .env for dev/prod, but NOT under the Playwright harness (FB_TEST_USER_DATA):
 // the e2e suite strips API keys from the launch env to stay hermetic, and loading a

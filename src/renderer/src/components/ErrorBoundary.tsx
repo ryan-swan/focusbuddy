@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { reportCrash } from '../lib/crashReporter'
 
 interface Props {
   children: ReactNode
@@ -31,6 +32,15 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
+    // Persist the fatal render error to the crash log (WS03) as well as the
+    // console, so the failure that dropped the user onto this recovery surface is
+    // recorded rather than lost.
+    reportCrash({
+      kind: 'render-error',
+      message: error?.message ?? String(error),
+      stack: error?.stack ?? null,
+      componentStack: info?.componentStack ?? null
+    })
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info)
     this.setState({ info })

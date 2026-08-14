@@ -651,6 +651,25 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'widgets', 'needs_sync', 'INTEGER NOT NULL DEFAULT 1')
   // Small key/value store for sync bookkeeping (the pull cursor).
   db.exec('CREATE TABLE IF NOT EXISTS sync_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+  // Crash telemetry (WS03 reliability). Captures uncaught errors + unhandled
+  // rejections from BOTH processes with a stack + app version, so a failure is
+  // seen instead of vanishing into the console. Aggregate/technical data only,
+  // never document content. Pruned to the most recent rows so it can't grow
+  // unbounded.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS crash_events (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      source TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      message TEXT NOT NULL,
+      stack TEXT,
+      component_stack TEXT,
+      app_version TEXT,
+      context TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_crash_events_ts ON crash_events(ts DESC);
+  `)
   // Mark a row dirty on any content update so the sync engine knows to push it.
   // The WHEN guard fires only on a content change (sync columns untouched) of a
   // currently-clean row, so a sync-bookkeeping write (which sets sync_rev /
