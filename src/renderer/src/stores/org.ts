@@ -111,3 +111,12 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
     useViewStore.getState().goHome()
   }
 }))
+
+// Thin handle for debugging + e2e (same convention as __fbNodes / __fbWidgets /
+// __fbView): lets a test read/drive the active org — the two-account org
+// convergence spec asserts activeOrgId adoption on both windows before checking
+// cross-account sync, so a setup failure fails fast instead of looking like a
+// convergence timeout.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbOrg?: typeof useOrgStore }).__fbOrg = useOrgStore
+}

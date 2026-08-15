@@ -118,17 +118,30 @@ async function apiPost(window: Page, base: string, path: string, token: string, 
   )
 }
 
-async function enableAllFlagsSetOrgReload(window: Page, orgId: string): Promise<void> {
-  await window.evaluate(async (id) => {
+// Turn on all CRDT flags and reload so the engine boots with them set. Active org
+// is switched AFTER, at runtime, so the engine's org subscription fires the re-route.
+async function enableAllFlagsReload(window: Page): Promise<void> {
+  await window.evaluate(() => {
     for (const k of ['widgets', 'nodes', 'tables', 'timeblocks', 'files', 'documents']) {
       localStorage.setItem(`fb.sync.crdt.${k}`, '1')
     }
-    // Persist the active org so the org store adopts it on the reload below; the
-    // CRDT engine reads useOrgStore.activeOrgId to route to the org partition.
-    const api = (window as unknown as { api: typeof window.api }).api
-    await api.session.setActiveOrg(id)
-  }, orgId)
+  })
   await window.reload()
+}
+
+// Switch into the org through the org store (the same setActive the org-switcher UI
+// calls), which updates useOrgStore.activeOrgId and fires the CRDT engine's org
+// subscription → re-route to the org partition. load() first so the just-joined org
+// is in the store. Asserts adoption so a setup failure fails fast + clearly.
+async function switchToOrg(window: Page, orgId: string): Promise<void> {
+  const active = await window.evaluate(async (id) => {
+    const store = (window as unknown as { __fbOrg?: { getState: () => { load: () => Promise<void>; setActive: (o: string) => Promise<void>; activeOrgId: string } } }).__fbOrg
+    if (!store) return '(no __fbOrg handle)'
+    await store.getState().load()
+    await store.getState().setActive(id)
+    return store.getState().activeOrgId
+  }, orgId)
+  expect(active, 'both windows must actually adopt the org as active before convergence is meaningful').toBe(orgId)
 }
 
 async function until<T>(window: Page, fn: () => Promise<T>, pred: (v: T) => boolean, ms = 15_000): Promise<number> {
@@ -171,12 +184,14 @@ test('two accounts in one org: A creates/edits, B converges via the org partitio
     })) as { ok?: boolean }
     expect(added.ok, `add member B failed: ${JSON.stringify(added)}`).toBe(true)
 
-    // Both switch into the org (flags on + active org persisted, then reload so the
-    // org store adopts it and the CRDT engine routes to the org partition).
-    await enableAllFlagsSetOrgReload(A.window, orgId)
-    await enableAllFlagsSetOrgReload(B.window, orgId)
+    // Flags on + reload so the engine boots, THEN switch into the org at runtime so
+    // the engine's org subscription re-routes to the org partition on BOTH windows.
+    await enableAllFlagsReload(A.window)
+    await enableAllFlagsReload(B.window)
     await dismissOnboarding(A.window)
     await dismissOnboarding(B.window)
+    await switchToOrg(A.window, orgId)
+    await switchToOrg(B.window, orgId) // asserts both actually adopt the org as active
 
     // A creates a node in the org (via the store, so crdtEmitNodeCreate fires).
     const nodeId = await A.window.evaluate(async () => {
