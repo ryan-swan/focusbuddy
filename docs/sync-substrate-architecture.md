@@ -207,19 +207,27 @@ still ride the poll.
 
 ## What is proven, and what remains
 
-Proven live, across two real windows over the real (proxied) socket: **per-account
-multi-device** convergence for every type, and **cross-account same-org**
-convergence (two different accounts in one org, an edit reaching the other in
-single-digit-to-low-tens of milliseconds via the `:org:` partition). The signal
-server is **deployed** with the change-log handlers and the org/desk partition auth
-live. Everything ships flag-off, so production behaviour is unchanged until the flags
-are turned on — which is now a safe, proven rollout decision.
+Proven live, across two real windows over the real (proxied) socket, for **all three
+partition scopes**: **per-account** multi-device convergence for every type;
+**cross-account same-org** convergence (two different accounts in one org, via the
+`:org:` partition, `orgs.isMember`); and **shared-desk** convergence (two accounts, a
+desk shared by name, via the `:desk:` partition, gated by the desk's resource ACL).
+Every one landed in single-digit-to-low-tens of milliseconds over the socket. The
+signal server is **deployed** with the change-log handlers and all three partition-
+auth scopes live. Everything ships flag-off, so production behaviour is unchanged
+until the flags are turned on — a safe, proven, incremental rollout decision.
 
-What remains is a clear, sequenced tail rather than open questions: the client
-routing for the `:desk:` (shared-desk) scope (the server auth and the scope resolver
-are in and unit-tested; the per-object engine wiring and a two-account shared-desk
-live proof are the next slice), sweeping the last rare poll-only fields, and then
-demoting the poll's cross-account cycles from primary to reconnect-catch-up. Retiring
-the check-out lock comes last and is gated on migrating the live folder and canvas
-surfaces onto the substrate, because those surfaces still rely on the lock for
-single-writer safety today.
+Shared-desk routing is per-object: the four types the share stamp covers — nodes,
+widgets, tables, rows — resolve their shared root (a node directly, a widget from its
+task node, a table from its task node, a row from its table) and route to the
+`:desk:` partition, while grantees join `n:/w:/r:desk:<root>` as the shared desk's
+nodes load. Timeblocks, files, and documents are never part of a shared desk, so they
+correctly stay on their active-scope partition.
+
+What remains is a short, sequenced consolidation rather than open questions: sweeping
+the last rare poll-only fields (e.g. a timeblock's meeting object); demoting the
+poll's cross-account cycles from primary to reconnect-catch-up once every field a
+scope carries is on the substrate; and, last, migrating the live folder and canvas
+surfaces onto the substrate so the check-out lock can be retired — those surfaces
+still rely on the lock for single-writer safety today, so it cannot come off before
+they converge on the substrate.
