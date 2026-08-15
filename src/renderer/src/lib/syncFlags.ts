@@ -134,3 +134,20 @@ export function documentPartition(accountId: string): string {
 export function crdtScopeSuffix(activeOrgId: string | null | undefined, accountId: string): string {
   return activeOrgId && activeOrgId !== 'personal' ? `org:${activeOrgId}` : `acct:${accountId}`
 }
+
+// Per-OBJECT partition scope, with shared-desk taking precedence. An object under a
+// desk shared with named individuals carries a shared_root_id; it must route to that
+// desk's partition so every grantee (across accounts) converges, REGARDLESS of whose
+// account or which org it is being viewed in — otherwise a shared-desk edit would be
+// stranded in the editor's personal/org scope and never reach the other grantees.
+// With no shared root it falls back to the active-workspace scope (org or account).
+// This precedence (desk > org > account) is the contract that keeps a shared object
+// on the shared channel and a private object off it.
+export function crdtObjectScope(
+  sharedRootId: string | null | undefined,
+  activeOrgId: string | null | undefined,
+  accountId: string
+): string {
+  if (sharedRootId) return `desk:${sharedRootId}`
+  return crdtScopeSuffix(activeOrgId, accountId)
+}
