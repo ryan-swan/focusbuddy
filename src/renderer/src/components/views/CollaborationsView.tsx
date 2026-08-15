@@ -3,6 +3,7 @@ import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import { listLiveDocs, type LiveDocListItem } from '../../lib/docCollabClient'
+import { convertLiveCanvasToDesk } from '../../lib/liveCanvasMigrate'
 import Icon from '../Icon'
 import { personDisplayName } from '../../lib/personName'
 
@@ -44,6 +45,7 @@ export default function CollaborationsView(): JSX.Element {
   const goLiveDoc = useViewStore((s) => s.goLiveDoc)
   const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
   const goLiveFolder = useViewStore((s) => s.goLiveFolder)
+  const goTask = useViewStore((s) => s.goTask)
 
   const [items, setItems] = useState<LiveDocListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,9 +67,17 @@ export default function CollaborationsView(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  function open(d: LiveDocListItem): void {
-    if (d.docType === 'canvas') goLiveCanvas(d.id)
-    else if (d.docType === 'folder') goLiveFolder(d.id)
+  async function open(d: LiveDocListItem): Promise<void> {
+    if (d.docType === 'canvas') {
+      // Legacy live canvases convert to a real shared desk on open (the canvas
+      // mechanism is retired in favour of shared desks). Navigate to the desk; fall
+      // back to the legacy view only if the conversion could not run.
+      const deskId = token ? await convertLiveCanvasToDesk(d.id, token, account?.id ?? null) : null
+      if (deskId) goTask(deskId)
+      else goLiveCanvas(d.id)
+      return
+    }
+    if (d.docType === 'folder') goLiveFolder(d.id)
     else goLiveDoc(d.id)
   }
 
@@ -126,7 +136,7 @@ export default function CollaborationsView(): JSX.Element {
               return (
                 <div
                   key={d.id}
-                  onClick={() => open(d)}
+                  onClick={() => void open(d)}
                   data-testid="collaboration-item"
                   className="flex items-center gap-3 rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
                 >
