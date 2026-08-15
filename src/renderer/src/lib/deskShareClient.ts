@@ -1,5 +1,6 @@
 import { signalConfig } from './signalConfig'
 import { useAccountStore } from '../stores/account'
+import { crdtSeedDeskLinks } from './crdtBridge'
 
 // Renderer client for per-desk live sharing (share a desk with named individuals so
 // they get bidirectional near-live updates). It talks to the signal /workspace/desk
@@ -55,6 +56,11 @@ export async function shareDeskLive(
     // Push the freshly-stamped desk to the server now, so grantees can pull it.
     const { syncWorkspaceOnce } = await import('./workspaceSync')
     void syncWorkspaceOnce()
+    // Seed the desk's existing wires onto the substrate. The poll's shared cycle
+    // carries widgets/nodes/tables/rows but not widget_links, so without this a
+    // grantee would see the shared desk's widgets and none of its connectors.
+    // No-op when the substrate is off.
+    crdtSeedDeskLinks(rootId)
     return { ok: true, access: json.access }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Network error.' }

@@ -52,6 +52,11 @@ export interface CrdtEmit {
   linkCreate: (link: WidgetLink) => void
   linkDelete: (linkId: string, taskId: string) => void
   linkAttrs: (linkId: string, taskId: string, patch: { type?: string; verb?: string; enabled?: boolean }) => void
+  // Seed the desk partition with a create for every existing wire on a desk when it
+  // is shared. The poll's shared cycle carries widgets/nodes/tables/rows (they are
+  // stamped with shared_root_id) but NOT widget_links, so without this a grantee
+  // would see a shared desk's widgets but none of its pre-existing connectors.
+  seedDeskLinks: (rootId: string) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -189,4 +194,7 @@ export function crdtEmitLinkAttrs(
   patch: { type?: string; verb?: string; enabled?: boolean }
 ): void {
   impl?.linkAttrs(linkId, taskId, patch)
+}
+export function crdtSeedDeskLinks(rootId: string): void {
+  impl?.seedDeskLinks(rootId)
 }

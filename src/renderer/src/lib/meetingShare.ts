@@ -13,6 +13,8 @@ import {
   removeLiveDocMember
 } from './docCollabClient'
 import { promoteToLiveCanvas } from './liveCanvasMirror'
+import { shareDeskLive, revokeDeskAccess, revokeDeskInvite } from './deskShareClient'
+import { crdtWidgetsEnabled } from './syncFlags'
 import type { MeetingOrigin } from './startMeeting'
 
 // Meeting origins whose artifact is a document: each becomes a live document of
@@ -51,6 +53,15 @@ interface PendingLiveDowngrade {
   after: MeetingAfterAccess
 }
 let pendingLiveDowngrades: PendingLiveDowngrade[] = []
+// Desk-ACL grants (a desk shared as a live canvas via the substrate) waiting for the
+// meeting to end so they can be downgraded to view-only or revoked.
+interface PendingDeskDowngrade {
+  rootId: string
+  accountIds: string[]
+  emails: string[]
+  after: MeetingAfterAccess
+}
+let pendingDeskDowngrades: PendingDeskDowngrade[] = []
 let endWatcherInstalled = false
 
 // Grants a meeting's attendees access to the artifact it was started from. This
@@ -116,14 +127,56 @@ export async function shareArtifactWithAttendees(input: {
   // Collaborate opens ONE shared object everyone edits together in real time —
   // genuine co-editing, not a copy each — consistently across every app: a
   // document / sheet / deck / drawing / design becomes a live document, and a
-  // desk becomes a live canvas. Only if the live object cannot be created do we
-  // fall back to a copy share so attendees still get access rather than nothing.
+  // desk becomes a shared desk on the CRDT substrate. Only if the live object
+  // cannot be created do we fall back to a copy share so attendees still get
+  // access rather than nothing.
+  const after = input.afterAccess ?? 'downgrade-view'
+  // A desk collaborates by SHARING THE REAL DESK on the substrate (lock-free,
+  // per-object, wires included) rather than minting a server-canonical live-canvas
+  // behind the check-out lock. Only when the substrate is off ('0') does it fall
+  // back to the old live-canvas path below.
+  if (input.level === 'collaborate' && input.origin.kind === 'desk' && crdtWidgetsEnabled()) {
+    const desk = await collaborateDeskViaSubstrate(input.origin, emails, after)
+    if (desk) return desk
+  }
   if (input.level === 'collaborate' && COLLAB_LIVE_KINDS.has(input.origin.kind)) {
-    const live = await collaborateLive(input.origin, emails, input.afterAccess ?? 'downgrade-view')
+    const live = await collaborateLive(input.origin, emails, after)
     if (live) return live
   }
 
-  return shareViaCopy(input.origin, emails, input.level, input.afterAccess ?? 'downgrade-view')
+  return shareViaCopy(input.origin, emails, input.level, after)
+}
+
+// Desk collaborate on the substrate: share the real desk with the attendees by ACL
+// (users become grants, non-users pending email invites), so its widgets, nodes,
+// tables, rows and wires converge live across grantees with no check-out lock. The
+// desk's existing wires are seeded onto the substrate by shareDeskLive. Returns null
+// only when the desk node is gone, so a genuine share failure falls through to the
+// copy-share path rather than silently doing nothing.
+async function collaborateDeskViaSubstrate(
+  origin: MeetingOrigin,
+  emails: string[],
+  after: MeetingAfterAccess
+): Promise<MeetingShareResult | null> {
+  if (origin.kind !== 'desk') return null
+  const node = useNodeStore.getState().nodes.find((n) => n.id === origin.nodeId)
+  if (!node) return null
+  const res = await shareDeskLive(
+    node.id,
+    emails.map((email) => ({ email, permission: 'edit' as const })),
+    'edit'
+  )
+  if (!res.ok || !res.access) return null
+  const accountIds = res.access.grants.map((g) => g.accountId)
+  const pendingEmails = res.access.pending.map((p) => p.email)
+  if (after !== 'keep' && (accountIds.length > 0 || pendingEmails.length > 0)) {
+    pendingDeskDowngrades.push({ rootId: node.id, accountIds, emails: pendingEmails, after })
+    installMeetingEndDowngrade()
+  }
+  // Everyone the share resolved to (existing grants + pending invites). Per-email
+  // delivery is not reported by the desk-share route, so emailed stays 0 rather than
+  // asserting a delivery we did not observe.
+  return { shared: accountIds.length + pendingEmails.length, emailed: 0, failed: [] }
 }
 
 // Create the live object for a meeting origin, seeded from its current content:
@@ -260,7 +313,7 @@ async function shareViaCopy(
 // Apply the end-of-meeting behaviour to every pending collaborate grant:
 // downgrade it to read-only, or revoke it. Runs when the meeting ends.
 async function applyMeetingEndDowngrades(): Promise<void> {
-  if (pendingDowngrades.length === 0 && pendingLiveDowngrades.length === 0) return
+  if (pendingDowngrades.length === 0 && pendingLiveDowngrades.length === 0 && pendingDeskDowngrades.length === 0) return
 
   // Share-link grants: revoke, or downgrade the copy to read-only view.
   const shareQueue = pendingDowngrades
@@ -289,6 +342,30 @@ async function applyMeetingEndDowngrades(): Promise<void> {
       } catch {
         /* a failed change leaves the collaborator's access in place — non-destructive */
       }
+    }
+  }
+
+  // Shared-desk grants: revoke each grant + pending invite, or re-grant everyone at
+  // view-only. Same non-destructive stance — a failed change leaves access as it was.
+  const deskQueue = pendingDeskDowngrades
+  pendingDeskDowngrades = []
+  for (const p of deskQueue) {
+    try {
+      if (p.after === 'revoke') {
+        for (const accountId of p.accountIds) await revokeDeskAccess(p.rootId, accountId)
+        for (const email of p.emails) await revokeDeskInvite(p.rootId, email)
+      } else if (p.after === 'downgrade-view') {
+        await shareDeskLive(
+          p.rootId,
+          [
+            ...p.accountIds.map((accountId) => ({ accountId, permission: 'view' as const })),
+            ...p.emails.map((email) => ({ email, permission: 'view' as const }))
+          ],
+          'view'
+        )
+      }
+    } catch {
+      /* non-destructive: a failed downgrade/revoke leaves the desk access in place */
     }
   }
 }

@@ -699,11 +699,8 @@ function emitFolderEntryParent(folderId: string, entryId: string, parentId: stri
 // alongside its widgets. Existence is create/delete; type/verb/enabled are generic
 // LWW attr registers. Run-state (lastRunAt/lastError) is local engine output and
 // never emitted.
-function emitLinkCreate(link: WidgetLink): void {
-  if (!linkPart) return
-  const pk = partitionFor('l', linkSharedRoot(link.taskId))
-  ensureDeskJoined(pk)
-  const snapshot: Record<string, unknown> = {
+function linkSnapshot(link: WidgetLink): Record<string, unknown> {
+  return {
     id: link.id,
     sourceWidgetId: link.sourceWidgetId,
     targetWidgetId: link.targetWidgetId,
@@ -712,9 +709,60 @@ function emitLinkCreate(link: WidgetLink): void {
     verb: link.verb,
     enabled: link.enabled
   }
-  const ev = mkEvent(pk, 'link', link.id, 'create', 'set', { snapshot, at: Date.now() })
+}
+function sendLinkCreate(pk: string, link: WidgetLink): void {
+  ensureDeskJoined(pk)
+  const ev = mkEvent(pk, 'link', link.id, 'create', 'set', { snapshot: linkSnapshot(link), at: Date.now() })
   recordLocal(ev, false)
   send(ev)
+}
+function emitLinkCreate(link: WidgetLink): void {
+  if (!linkPart) return
+  sendLinkCreate(partitionFor('l', linkSharedRoot(link.taskId)), link)
+}
+
+// Seed a newly-shared desk's EXISTING wires onto its desk partition. Routed
+// explicitly to `l:desk:<rootId>` (not via linkSharedRoot, whose shared_root_id may
+// not have propagated to the renderer node store yet at share time), walking the
+// desk's node subtree by parent so it never depends on the stamp having landed.
+// Idempotent: create-if-missing by link id + the server's dedup make a re-share a
+// no-op. No-op when the substrate is off.
+function seedDeskLinks(rootId: string): void {
+  if (!linkPart) return
+  const pk = `l:desk:${rootId}`
+  void (async () => {
+    for (const taskId of subtreeNodeIds(rootId)) {
+      let links: WidgetLink[] = []
+      try {
+        links = await window.api.widgetLinks.listByTask(taskId)
+      } catch {
+        continue
+      }
+      for (const l of links) sendLinkCreate(pk, l)
+    }
+  })()
+}
+// rootId + every descendant node id, resolved from the renderer node store by
+// walking parentId (independent of shared_root_id, so no stamp-timing dependency).
+function subtreeNodeIds(rootId: string): string[] {
+  const nodes = useNodeStore.getState().nodes
+  const byParent = new Map<string, string[]>()
+  for (const n of nodes) {
+    if (!n.parentId) continue
+    const arr = byParent.get(n.parentId) ?? []
+    arr.push(n.id)
+    byParent.set(n.parentId, arr)
+  }
+  const out = [rootId]
+  const stack = [rootId]
+  while (stack.length) {
+    const cur = stack.pop() as string
+    for (const child of byParent.get(cur) ?? []) {
+      out.push(child)
+      stack.push(child)
+    }
+  }
+  return out
 }
 // Called BEFORE the store prunes the link, so its task's shared root is resolvable.
 function emitLinkDelete(linkId: string, taskId: string): void {
@@ -1627,7 +1675,8 @@ export function initCrdtSync(): void {
       folderEntryParent: emitFolderEntryParent,
       linkCreate: emitLinkCreate,
       linkDelete: emitLinkDelete,
-      linkAttrs: emitLinkAttrs
+      linkAttrs: emitLinkAttrs,
+      seedDeskLinks
     })
     started = true
   }
