@@ -151,13 +151,15 @@ export const useTablesStore = create<TablesStore>((set, get) => ({
       }
     }
     await window.api.tables.deleteRow(rowId)
+    // WS01 sync substrate (flagged): tombstone the row so the delete converges. Emit
+    // BEFORE pruning the store so the engine can still resolve the row's table (and
+    // its shared root) to route a shared-desk row's tombstone to the desk partition.
+    crdtEmitRowDelete(rowId)
     const rowsCopy: Record<string, FbRow[]> = {}
     for (const [tableId, list] of Object.entries(get().rows)) {
       rowsCopy[tableId] = list.filter((r) => r.id !== rowId)
     }
     set({ rows: rowsCopy })
-    // WS01 sync substrate (flagged): tombstone the row so the delete converges.
-    crdtEmitRowDelete(rowId)
     if (capturedTableId && capturedCells) {
       const tableId = capturedTableId
       // Rows are soft-deleted now, so undo restores the SAME row (same id and

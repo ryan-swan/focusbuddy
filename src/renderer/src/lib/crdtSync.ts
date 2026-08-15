@@ -199,6 +199,19 @@ function widgetSharedRoot(widgetId: string): string | null {
   const w = useWidgetStore.getState().widgets.find((x) => x.id === widgetId)
   return w ? nodeSharedRoot(w.taskId) : null
 }
+// A table inherits its shared root from the task node it lives on; a row from its
+// table. (These are the other two shared-desk content types alongside node+widget.)
+function tableSharedRoot(tableId: string): string | null {
+  const t = useTablesStore.getState().tables[tableId]
+  return t?.taskId ? nodeSharedRoot(t.taskId) : null
+}
+function rowSharedRoot(rowId: string): string | null {
+  const rows = useTablesStore.getState().rows
+  for (const [tableId, list] of Object.entries(rows)) {
+    if (list.some((r) => r.id === rowId)) return tableSharedRoot(tableId)
+  }
+  return null
+}
 function partitionFor(prefix: string, sharedRootId: string | null): string {
   return `${prefix}:${crdtObjectScope(sharedRootId, useOrgStore.getState().activeOrgId, accountId)}`
 }
@@ -221,6 +234,7 @@ function refreshDeskJoins(): void {
   for (const root of roots) {
     if (widgetPart) ensureDeskJoined(`w:desk:${root}`)
     if (nodePart) ensureDeskJoined(`n:desk:${root}`)
+    if (rowPart) ensureDeskJoined(`r:desk:${root}`) // rows + tables share the r: partition
   }
 }
 
@@ -401,10 +415,12 @@ function emitNodeAttrs(nodeId: string, patch: Record<string, unknown>): void {
 
 function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
   if (!rowPart) return
+  const pk = partitionFor('r', rowSharedRoot(rowId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   for (const [column, value] of Object.entries(cells)) {
     rowRegs.set(`${rowId}:${column}`, { value, timestamp: at, actor })
-    const ev = mkEvent(rowPart, 'row', rowId, 'cell', 'register', { column, value, at })
+    const ev = mkEvent(pk, 'row', rowId, 'cell', 'register', { column, value, at })
     recordLocal(ev, false)
     send(ev)
   }
@@ -412,54 +428,67 @@ function emitRowCells(rowId: string, cells: Record<string, unknown>): void {
 
 function emitRowOrder(rowId: string, sortOrder: number): void {
   if (!rowPart) return
+  const pk = partitionFor('r', rowSharedRoot(rowId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   attrRegs.set(`row:${rowId}:sortOrder`, { value: sortOrder, timestamp: at, actor })
-  const ev = mkEvent(rowPart, 'row', rowId, 'attr', 'register', { attr: 'sortOrder', value: sortOrder, at })
+  const ev = mkEvent(pk, 'row', rowId, 'attr', 'register', { attr: 'sortOrder', value: sortOrder, at })
   recordLocal(ev, false)
   send(ev)
 }
 
 function emitRowCreate(row: FbRow): void {
   if (!rowPart) return
+  const pk = partitionFor('r', tableSharedRoot(row.tableId))
+  ensureDeskJoined(pk)
   const snapshot: Record<string, unknown> = { id: row.id, tableId: row.tableId, cells: row.cells }
-  const ev = mkEvent(rowPart, 'row', row.id, 'create', 'set', { snapshot, at: Date.now() })
+  const ev = mkEvent(pk, 'row', row.id, 'create', 'set', { snapshot, at: Date.now() })
   recordLocal(ev, false)
   send(ev)
 }
+// Called BEFORE the store prunes the row, so its table's shared root is resolvable.
 function emitRowDelete(rowId: string): void {
   if (!rowPart) return
+  const pk = partitionFor('r', rowSharedRoot(rowId))
+  ensureDeskJoined(pk)
   tombstoned.add(rowId)
-  const ev = mkEvent(rowPart, 'row', rowId, 'delete', 'set', { at: Date.now() })
+  const ev = mkEvent(pk, 'row', rowId, 'delete', 'set', { at: Date.now() })
   recordLocal(ev, false)
   send(ev)
 }
 function emitTableCreate(table: FbTable): void {
   if (!rowPart) return
+  const pk = partitionFor('r', table.taskId ? nodeSharedRoot(table.taskId) : null)
+  ensureDeskJoined(pk)
   const snapshot: Record<string, unknown> = {
     id: table.id,
     taskId: table.taskId,
     title: table.title,
     schema: table.schema
   }
-  const ev = mkEvent(rowPart, 'table', table.id, 'create', 'set', { snapshot, at: Date.now() })
+  const ev = mkEvent(pk, 'table', table.id, 'create', 'set', { snapshot, at: Date.now() })
   recordLocal(ev, false)
   send(ev)
 }
 function emitTableDelete(tableId: string): void {
   if (!rowPart) return
+  const pk = partitionFor('r', tableSharedRoot(tableId))
+  ensureDeskJoined(pk)
   tombstoned.add(tableId)
-  const ev = mkEvent(rowPart, 'table', tableId, 'delete', 'set', { at: Date.now() })
+  const ev = mkEvent(pk, 'table', tableId, 'delete', 'set', { at: Date.now() })
   recordLocal(ev, false)
   send(ev)
 }
 function emitTableAttrs(tableId: string, attrs: Record<string, unknown>): void {
   if (!rowPart) return
+  const pk = partitionFor('r', tableSharedRoot(tableId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   for (const attr of ['title', 'schema'] as const) {
     if (!(attr in attrs)) continue
     const value = attrs[attr]
     attrRegs.set(`table:${tableId}:${attr}`, { value, timestamp: at, actor })
-    const ev = mkEvent(rowPart, 'table', tableId, 'attr', 'register', { attr, value, at })
+    const ev = mkEvent(pk, 'table', tableId, 'attr', 'register', { attr, value, at })
     recordLocal(ev, false)
     send(ev)
   }
