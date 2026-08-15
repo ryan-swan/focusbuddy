@@ -12,19 +12,17 @@ import {
   setLiveDocMemberRole,
   removeLiveDocMember
 } from './docCollabClient'
-import { promoteToLiveCanvas } from './liveCanvasMirror'
 import { shareDeskLive, revokeDeskAccess, revokeDeskInvite } from './deskShareClient'
-import { crdtWidgetsEnabled } from './syncFlags'
 import type { MeetingOrigin } from './startMeeting'
 
 // Meeting origins whose artifact is a document: each becomes a live document of
 // its own docType (a drawing is a 'map', a design is a 'design'), co-edited in
 // the matching live editor.
 const DOC_ORIGIN_KINDS = new Set(['doc', 'sheet', 'slides', 'draw', 'design'])
-// Every origin that has a real live (co-editable) form: the document apps plus
-// a desk (which becomes a live canvas). Collaborate on any of these is genuine
-// co-editing; anything else falls back to an editable copy.
-const COLLAB_LIVE_KINDS = new Set([...DOC_ORIGIN_KINDS, 'desk'])
+// Document origins that collaborate as a live document (co-edited via Yjs). A desk
+// is handled separately: it collaborates by sharing the real desk on the CRDT
+// substrate (see collaborateDeskViaSubstrate), not as a live document.
+const COLLAB_LIVE_KINDS = DOC_ORIGIN_KINDS
 
 // What happens to a collaborate grant once the meeting ends. Collaborate access
 // is only meant to last for the meeting by default: attendees work on the
@@ -132,10 +130,9 @@ export async function shareArtifactWithAttendees(input: {
   // access rather than nothing.
   const after = input.afterAccess ?? 'downgrade-view'
   // A desk collaborates by SHARING THE REAL DESK on the substrate (lock-free,
-  // per-object, wires included) rather than minting a server-canonical live-canvas
-  // behind the check-out lock. Only when the substrate is off ('0') does it fall
-  // back to the old live-canvas path below.
-  if (input.level === 'collaborate' && input.origin.kind === 'desk' && crdtWidgetsEnabled()) {
+  // per-object, wires included). If the share fails it falls through to a copy
+  // share below so attendees still get access rather than nothing.
+  if (input.level === 'collaborate' && input.origin.kind === 'desk') {
     const desk = await collaborateDeskViaSubstrate(input.origin, emails, after)
     if (desk) return desk
   }
@@ -181,16 +178,10 @@ async function collaborateDeskViaSubstrate(
 
 // Create the live object for a meeting origin, seeded from its current content:
 // a document-backed app (doc/sheet/slides/draw/design) becomes a live document
-// of the SAME docType, and a desk becomes a live canvas. Returns the live id, or
-// null when the origin has no live form or creation failed.
+// of the SAME docType. Returns the live id, or null when the origin has no live
+// document form or creation failed. A desk does NOT come through here: it shares
+// the real desk on the substrate via collaborateDeskViaSubstrate.
 async function createLiveForOrigin(origin: MeetingOrigin, token: string): Promise<string | null> {
-  if (origin.kind === 'desk') {
-    const node = useNodeStore.getState().nodes.find((n) => n.id === origin.nodeId)
-    if (!node) return null
-    // Reuse the app's own desk->live-canvas promotion so co-editing behaves
-    // exactly like the "Collaborate live" action already does for a desk.
-    return promoteToLiveCanvas(node, token)
-  }
   if (DOC_ORIGIN_KINDS.has(origin.kind) && 'id' in origin) {
     const doc = await window.api.documents.get(origin.id)
     if (!doc) return null

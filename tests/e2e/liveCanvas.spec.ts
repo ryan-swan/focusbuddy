@@ -1,31 +1,23 @@
 /**
- * liveCanvas.spec.ts — E2E coverage for the live canvas collaboration feature.
+ * liveCanvas.spec.ts — coverage for the canvas board round-trip + the "Collaborate
+ * live" entry point, after the live-canvas mechanism was retired (WS01 lock-retire).
  *
- * What is verified here (single-process, hermetic — no signal server needed):
+ * The old server-canonical live canvas (mirror + check-out lock) is gone: a desk now
+ * collaborates by sharing the real desk on the CRDT substrate, and legacy canvases
+ * convert to a real desk on open. What remains valid to test here:
  *
- *   LC-1  applyCanvasBodyToTask round-trip: build a task with two sticky widgets
- *         and a link, serialize into a CanvasBody (via window.api + the JS module),
- *         apply that body into a fresh target task, and assert the widgets + link
- *         were recreated with correct geometry and content.
+ *   LC-1  applyCanvasBodyToTask round-trip (the function is still load-bearing — it
+ *         materialises a legacy canvas body into a real desk during migration). Build
+ *         a CanvasBody with two stickies + a link and rebuild it into a fresh task via
+ *         the IPC contract the function depends on; assert widgets + link (with
+ *         remapped endpoints) come back.
  *
- *   LC-2  Regression: app still boots, existing canvas + home views work with the
- *         new view router entry ('livecanvas' kind) wired in. Navigating goLiveCanvas()
- *         renders a loading/error state (no real server) and does NOT crash; the
- *         livecanvas-surface testid is present once the mirror setup begins.
+ *   LC-3  The sidebar "Collaborate live" context-menu entry is still reachable on a
+ *         task row and does not crash when there is no session (it now shares the desk
+ *         on the substrate rather than minting a live canvas).
  *
- *   LC-3  Sidebar "Collaborate live" context-menu entry is reachable on a task row.
- *         Without a session token it should surface an inline error rather than crash.
- *
- *   LC-4  DocumentsView: a canvas-kind shared live entry routes via goLiveCanvas (not
- *         goLiveDoc). Verified by checking that DocumentsView routes canvas entries
- *         through the correct onClick path — exercised via DOM inspection of the
- *         data-testid="shared-live-list" item handler (integration level only; real
- *         canvas live entries require a signed-in account).
- *
- * What is explicitly NOT tested here (BLOCKED — two-client, needs live server):
- *   - Lock acquisition / takeover across two accounts
- *   - Body diffs propagating from holder to mirror on the other client
- *   - The holder's debounced saveBody round-trip to the signal server
+ * Cross-account convergence for a shared desk (widgets + wires) is proven by the
+ * crdt*Live specs; this file stays hermetic (no signal server needed).
  */
 
 import { test, expect } from '@playwright/test'
@@ -176,79 +168,6 @@ test('LC-1 — applyCanvasBodyToTask contract: rebuild from CanvasBody via windo
   // The link's endpoints must be the NEW widget ids (remapped), not the originals.
   expect(rebuilt.linkSourceIsNew).toBe(true)
   expect(rebuilt.linkEndpointsInNewSet).toBe(true)
-})
-
-// ---------------------------------------------------------------------------
-// LC-2: Regression — app boots, canvas/home still work; goLiveCanvas routes
-//        to LiveCanvasView (loading state, no crash)
-// ---------------------------------------------------------------------------
-test('LC-2 — view router accepts livecanvas kind; LiveCanvasView mounts without crash', async () => {
-  launched = await launchApp()
-  const { window } = launched
-
-  const uncaught: string[] = []
-  window.on('pageerror', (err) => uncaught.push(err.message))
-  window.on('console', (msg) => {
-    if (msg.type() === 'error') uncaught.push(msg.text())
-  })
-
-  await waitForReady(window)
-
-  // Confirm normal canvas view still works (regression on the view router).
-  const taskId = await window.evaluate(async () => {
-    const api = (window as unknown as { api: typeof window.api }).api
-    const task = await api.nodes.create({ parentId: null, kind: 'task', title: 'Regression canvas' })
-    return task.id
-  })
-
-  // Navigate to the task view — the canvas should render.
-  await window.evaluate((id) => {
-    const stores = (window as unknown as { __zustand__?: unknown })
-    // Drive via the view store's goTask (same path the sidebar uses).
-    const { useViewStore } = require('/src/renderer/src/stores/view.ts') as {
-      useViewStore: { getState: () => { goTask: (id: string) => void } }
-    }
-    useViewStore.getState().goTask(id)
-  }, taskId).catch(() => {
-    // If dynamic require isn't available in this build, fall back to clicking
-    // the task row in the sidebar — but for this regression we only need the
-    // view store exercised.
-  })
-
-  // Give the renderer a moment to settle.
-  await window.waitForTimeout(600)
-
-  // Now drive goLiveCanvas with a fake id — this triggers LiveCanvasView mount.
-  // The openLive() call will fail (no server, no token), which should show the
-  // loading spinner/state, not crash.
-  await window.evaluate(() => {
-    try {
-      // Access via the view store directly from the renderer context.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stores = (window as any).__stores__
-      if (stores?.view?.getState) {
-        stores.view.getState().goLiveCanvas('test-fake-canvas-id')
-      }
-    } catch {
-      // store access path failed — try alternative
-    }
-  })
-
-  await window.waitForTimeout(800)
-
-  // No page-level JS exceptions from the route change.
-  const realErrors = uncaught.filter(
-    (e) =>
-      !e.includes('favicon') &&
-      !e.includes('net::ERR_') &&
-      !e.includes('Failed to load resource') &&
-      !e.includes('WebSocket') &&
-      !e.includes('signal') &&
-      !e.includes('localhost:3001') &&
-      !e.includes('focusbuddy-signal') &&
-      !e.includes('test-fake-canvas-id')
-  )
-  expect(realErrors, `Unexpected renderer errors after goLiveCanvas:\n${realErrors.join('\n')}`).toHaveLength(0)
 })
 
 // ---------------------------------------------------------------------------

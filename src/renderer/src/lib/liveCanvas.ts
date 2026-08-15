@@ -10,11 +10,11 @@
 // than a frozen copy. The signal server stores it as opaque JSON, exactly like
 // a doc/sheet/slides body, so no server change is needed to carry a canvas.
 
-import type { FbNode, SectionLayout, WidgetKind, WireType } from '@shared/types'
+import type { SectionLayout, WidgetKind, WireType } from '@shared/types'
 import { defaultConfig, type FieldDefinition, type FieldType } from '@shared/fields'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
-import { buildTaskSnapshot, type SerializedWidget } from './shareSnapshot'
+import type { SerializedWidget } from './shareSnapshot'
 
 export const CANVAS_BODY_VERSION = 1 as const
 
@@ -36,37 +36,6 @@ export interface CanvasBody {
   title: string
   widgets: SerializedWidget[]
   links: SerializedLink[]
-}
-
-// Capture a task's board into a CanvasBody JSON string. Reuses
-// buildTaskSnapshot for the widgets (so table widgets carry their data) and
-// adds the widget links. Links whose endpoints are not both present in the
-// serialized widget set are dropped so a rebuild never produces a dangling
-// wire.
-export async function serializeCanvasBody(task: FbNode): Promise<string> {
-  const snap = await buildTaskSnapshot(task, '')
-  // Drop the minimap — it's a per-desk UI affordance that the Canvas
-  // auto-creates for whatever task is active, so it should never travel as
-  // board content (otherwise every mirror gains a duplicate).
-  const widgets = (snap.task.widgets ?? []).filter((w) => w.kind !== 'minimap')
-  const widgetIds = new Set(widgets.map((w) => w.id))
-  const rawLinks = await window.api.widgetLinks.listByTask(task.id)
-  const links: SerializedLink[] = rawLinks
-    .filter((l) => widgetIds.has(l.sourceWidgetId) && widgetIds.has(l.targetWidgetId))
-    .map((l) => ({
-      sourceWidgetId: l.sourceWidgetId,
-      targetWidgetId: l.targetWidgetId,
-      type: l.type,
-      verb: l.verb,
-      enabled: l.enabled
-    }))
-  const body: CanvasBody = {
-    version: CANVAS_BODY_VERSION,
-    title: task.title || 'Untitled desk',
-    widgets,
-    links
-  }
-  return JSON.stringify(body)
 }
 
 // Coerce an already-parsed value into a CanvasBody, reading defensively. Used
@@ -96,18 +65,6 @@ export function parseCanvasBody(raw: string): CanvasBody | null {
     return null
   }
   return coerceCanvasBody(obj)
-}
-
-// Produce an empty canvas body (e.g. when promoting a brand-new desk). Kept
-// here so the shape lives in one place.
-export function emptyCanvasBody(title: string): string {
-  const body: CanvasBody = {
-    version: CANVAS_BODY_VERSION,
-    title: title || 'Untitled desk',
-    widgets: [],
-    links: []
-  }
-  return JSON.stringify(body)
 }
 
 // Widget kinds whose content is a local id or blob that cannot resolve on

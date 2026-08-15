@@ -1,18 +1,17 @@
-// Unit tests for the live-canvas body parse/build helpers (lib/liveCanvas.ts).
+// Unit tests for the live-canvas migration helpers (lib/liveCanvas.ts).
 //
-// These cover the pure, deterministic half of the canvas collaboration core:
-// turning a stored JSON body back into a usable CanvasBody, reading defensively
-// so a corrupt or foreign body fails to a clean null rather than throwing in
-// the render path, and producing a well-formed empty body. serializeCanvasBody
-// is exercised by the desktop e2e because it depends on window.api.
+// The live-canvas mechanism itself is retired (WS01 lock-retire Stage D1): a desk
+// now collaborates by sharing the real desk on the CRDT substrate, and legacy
+// docType:'canvas' live-docs convert to a real desk on open. What remains is the
+// pure, deterministic parse half — turning a stored (or legacy) JSON body back into
+// a usable CanvasBody, reading defensively so a corrupt or foreign body fails to a
+// clean null rather than throwing in the render path — which the migration path
+// still depends on (applyCanvasBodyToTask, exercised by the desktop e2e because it
+// depends on window.api). serializeCanvasBody and emptyCanvasBody were removed with
+// the mechanism they served and are no longer under test here.
 
 import { describe, it, expect } from 'vitest'
-import {
-  parseCanvasBody,
-  emptyCanvasBody,
-  CANVAS_BODY_VERSION,
-  type CanvasBody
-} from '../../src/renderer/src/lib/liveCanvas'
+import { parseCanvasBody, type CanvasBody } from '../../src/renderer/src/lib/liveCanvas'
 
 describe('parseCanvasBody', () => {
   it('round-trips a well-formed body', () => {
@@ -71,22 +70,5 @@ describe('parseCanvasBody', () => {
     const parsed = parseCanvasBody(JSON.stringify({ widgets: [], links: { bad: true } }))
     expect(parsed).not.toBeNull()
     expect(parsed!.links).toEqual([])
-  })
-})
-
-describe('emptyCanvasBody', () => {
-  it('produces a parseable empty body at the current version', () => {
-    const raw = emptyCanvasBody('My desk')
-    const parsed = parseCanvasBody(raw)
-    expect(parsed).not.toBeNull()
-    expect(parsed!.version).toBe(CANVAS_BODY_VERSION)
-    expect(parsed!.title).toBe('My desk')
-    expect(parsed!.widgets).toEqual([])
-    expect(parsed!.links).toEqual([])
-  })
-
-  it('falls back to a default title when given an empty string', () => {
-    const parsed = parseCanvasBody(emptyCanvasBody(''))
-    expect(parsed!.title).toBe('Untitled desk')
   })
 })

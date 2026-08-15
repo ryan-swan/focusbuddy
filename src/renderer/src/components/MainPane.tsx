@@ -15,7 +15,6 @@ import DocumentsView from './views/DocumentsView'
 import DesignsView from './views/DesignsView'
 import DocumentOpen from './views/DocumentOpen'
 import LiveDocEditorView from './views/LiveDocEditorView'
-import LiveCanvasView from './views/LiveCanvasView'
 import LiveFolderView from './views/LiveFolderView'
 import CollaborationsView from './views/CollaborationsView'
 import InsightsView from './views/InsightsView'
@@ -102,8 +101,6 @@ function MainPaneSurface(): JSX.Element {
       return <DocumentOpen documentId={view.documentId} />
     case 'livedoc':
       return <LiveDocEditorView liveDocId={view.liveDocId} />
-    case 'livecanvas':
-      return <LiveCanvasView liveCanvasId={view.liveCanvasId} />
     case 'livefolder':
       return <LiveFolderView liveFolderId={view.liveFolderId} />
     case 'collaborations':

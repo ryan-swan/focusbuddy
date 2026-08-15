@@ -43,12 +43,12 @@ export default function CollaborationsView(): JSX.Element {
   const account = useAccountStore((s) => s.account)
   const requestSignIn = useSignInPrompt((s) => s.requestOpen)
   const goLiveDoc = useViewStore((s) => s.goLiveDoc)
-  const goLiveCanvas = useViewStore((s) => s.goLiveCanvas)
   const goLiveFolder = useViewStore((s) => s.goLiveFolder)
   const goTask = useViewStore((s) => s.goTask)
 
   const [items, setItems] = useState<LiveDocListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState<string | null>(null)
 
   async function load(): Promise<void> {
     if (!token) {
@@ -70,11 +70,12 @@ export default function CollaborationsView(): JSX.Element {
   async function open(d: LiveDocListItem): Promise<void> {
     if (d.docType === 'canvas') {
       // Legacy live canvases convert to a real shared desk on open (the canvas
-      // mechanism is retired in favour of shared desks). Navigate to the desk; fall
-      // back to the legacy view only if the conversion could not run.
+      // mechanism is retired in favour of shared desks). Navigate to the desk, or
+      // surface an honest error if the conversion could not run.
+      setErr(null)
       const deskId = token ? await convertLiveCanvasToDesk(d.id, token, account?.id ?? null) : null
       if (deskId) goTask(deskId)
-      else goLiveCanvas(d.id)
+      else setErr('Could not open this shared desk. Check your connection and try again.')
       return
     }
     if (d.docType === 'folder') goLiveFolder(d.id)
@@ -117,6 +118,12 @@ export default function CollaborationsView(): JSX.Element {
             <Icon name="refresh" size={16} />
           </button>
         </header>
+
+        {err && (
+          <div className="mb-3 rounded-lg border border-red-300 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-2 text-[12px] text-red-700 dark:text-red-300" data-testid="collaborations-error">
+            {err}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-[13px] text-[var(--ink-40)] px-1 py-8 text-center">Loading…</div>

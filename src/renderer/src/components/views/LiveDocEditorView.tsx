@@ -109,7 +109,11 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   const [collabBody, setCollabBody] = useState<unknown>(null)
 
   useEffect(() => {
-    void openLive(liveDocId)
+    // Live docs co-edit via Yjs (Tiptap for 'doc', the JSON reconcile engine for
+    // sheet/slides/map/design), so the check-out lock is not their write control —
+    // open lock-free so a doc never holds the lock. The lock branches below are
+    // already unreachable (liveCoEdit is always true) and are removed in D2.
+    void openLive(liveDocId, { lockFree: true })
     return () => closeLive()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveDocId])
