@@ -5,7 +5,7 @@
 // member actually opens it (lazy), so structure edits never re-download blobs.
 
 import type { FileEntry } from '@shared/fields'
-import { createLiveDoc, putLiveBody } from './docCollabClient'
+import { createLiveDoc, snapshotLiveBody } from './docCollabClient'
 import { uploadLiveFile, downloadLiveFile } from './liveFolderClient'
 import { emptyFolderBody, type FolderBody, type FolderEntry } from './liveFolder'
 
@@ -94,7 +94,8 @@ export async function promoteFolderToLive(
   }
 
   const body: FolderBody = { version: 1, rootName: rootName || 'Shared folder', entries }
-  await putLiveBody(token, created.id, JSON.stringify(body))
+  // Lock-free body write (the creator just made this doc; there is no lock any more).
+  await snapshotLiveBody(token, created.id, JSON.stringify(body))
   return { liveId: created.id, filesUploaded, filesFailed }
 }
 

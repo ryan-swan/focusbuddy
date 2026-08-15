@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useAccountStore } from '@runtime'
 import { listLiveDocs, type LiveDocListItem } from '../../lib/docCollabClient'
 import Icon from '../Icon'
-import { personDisplayName } from '../../lib/personName'
 
 // The signed-in user's live (collaborative) documents — ones they made
 // collaborative or were invited to. Reuses the same live-docs client PlexiDesk
@@ -63,11 +62,6 @@ export default function OfficeCollaborations({
           >
             <Icon name={docIcon(d.docType)} size={14} className="shrink-0 text-[var(--ink-40)]" />
             <span className="truncate flex-1">{d.title || 'Untitled'}</span>
-            {d.lock && (
-              <span className="shrink-0 text-amber-500" title={`Locked by ${personDisplayName(d.lock, d.lock.handle)}`}>
-                <Icon name="lock" size={12} />
-              </span>
-            )}
           </button>
         ))}
       </div>

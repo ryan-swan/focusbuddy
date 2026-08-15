@@ -51,7 +51,6 @@ import FeatureSpotlightPopup from './components/onboarding/FeatureSpotlightPopup
 import OnboardingHub from './components/onboarding/OnboardingHub'
 import { useOnboarding } from './stores/onboarding'
 import { useMessagingStore } from './stores/messaging'
-import { useDocCollabStore } from './stores/docCollab'
 import { useMailStore } from './stores/mail'
 import { usePeerBodyDoubleStore } from './stores/peerBodyDouble'
 import { useNodeStore } from './stores/nodes'
@@ -212,7 +211,6 @@ export default function App(): JSX.Element {
   // DMs + shared-space chat arrive in real time; tear it down on sign-out.
   const connectMessaging = useMessagingStore((s) => s.connect)
   const disconnectMessaging = useMessagingStore((s) => s.disconnect)
-  const initDocCollab = useDocCollabStore((s) => s.init)
   // Wire the PlexiCam call signaling + PlexiPeople knock handlers once; both ride
   // the same socket.
   useEffect(() => {
@@ -223,9 +221,6 @@ export default function App(): JSX.Element {
   useEffect(() => {
     if (account && sessionToken) {
       void connectMessaging(sessionToken)
-      // Live-document collaboration rides the same socket; register its handler
-      // and pull any pending takeover requests so PlexiInbox is current.
-      initDocCollab()
       // Learn the credit balance + whether the server proxy is live as soon as
       // we're signed in, so the very first AI call routes correctly (credits vs
       // BYOK) instead of bouncing off a dormant proxy.
@@ -245,7 +240,7 @@ export default function App(): JSX.Element {
       stopWorkspaceSync()
       stopCrdtSync()
     }
-  }, [account, sessionToken, connectMessaging, disconnectMessaging, initDocCollab])
+  }, [account, sessionToken, connectMessaging, disconnectMessaging])
 
   // Mail is local (IMAP straight from the desktop), so it loads independently
   // of PlexiDesk sign-in. Doing it once at startup populates the sidebar's

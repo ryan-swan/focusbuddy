@@ -14,39 +14,19 @@ export interface LiveDocMeta {
   createdAt: number
   updatedAt: number
 }
+// A member of a live document/folder (the co-editor list). Historically named for
+// the old lock holder; it is now just the member shape.
 export interface LockHolder {
   accountId: string
   handle: string
   firstName?: string | null
   lastName?: string | null
 }
-export interface LockState {
-  docId: string
-  holder: LockHolder | null
-  expiresAt: number | null
-}
 export interface LiveDocFull extends LiveDocMeta {
   body: string
   members: LockHolder[]
-  lock: LockState
 }
-export interface LiveDocListItem extends LiveDocMeta {
-  lock: LockHolder | null
-  lockExpiresAt: number | null
-}
-export interface Takeover {
-  id: string
-  docId: string
-  requesterAccountId: string
-  holderAccountId: string
-  message: string | null
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
-  responseMessage: string | null
-  createdAt: number
-  resolvedAt: number | null
-  docTitle?: string
-  requesterHandle?: string
-}
+export type LiveDocListItem = LiveDocMeta
 
 function urlFor(path: string): string {
   return signalConfig.httpUrl.replace(/\/+$/, '') + path
@@ -127,33 +107,6 @@ export async function getLiveDoc(token: string, id: string): Promise<LiveDocFull
   return json?.ok ? json.doc ?? null : null
 }
 
-// Acquire/refresh the lock. ok=true with the lock, or ok=false carrying the
-// current holder (someone else is editing).
-export async function lockDoc(
-  token: string,
-  id: string
-): Promise<{ ok: boolean; lock: LockState | null }> {
-  const { ok, json } = await call<{ ok: boolean; lock?: LockState }>('POST', `/livedocs/${id}/lock`, token)
-  return { ok: ok && !!json?.ok, lock: json?.lock ?? null }
-}
-
-export async function releaseDoc(token: string, id: string): Promise<void> {
-  await call('POST', `/livedocs/${id}/release`, token)
-}
-
-export async function putLiveBody(
-  token: string,
-  id: string,
-  body: string
-): Promise<{ ok: boolean; version: number | null; lock: LockState | null }> {
-  const { ok, json } = await call<{ ok: boolean; version?: number; lock?: LockState }>(
-    'PUT',
-    `/livedocs/${id}/body`,
-    token,
-    { body }
-  )
-  return { ok: ok && !!json?.ok, version: json?.version ?? null, lock: json?.lock ?? null }
-}
 
 // Persist a CRDT snapshot of the body (co-editing path). Lock-free; the server
 // stores it without notifying anyone, so the live editors aren't disrupted.
@@ -249,28 +202,5 @@ export async function setLiveDocMemberRole(
 // Remove a member entirely (revoke access).
 export async function removeLiveDocMember(token: string, id: string, accountId: string): Promise<boolean> {
   const { json } = await call<{ ok: boolean }>('DELETE', `/livedocs/${id}/members/${accountId}`, token)
-  return !!json?.ok
-}
-
-export async function requestTakeover(token: string, id: string, message: string): Promise<boolean> {
-  const { json } = await call<{ ok: boolean }>('POST', `/livedocs/${id}/takeover`, token, { message })
-  return !!json?.ok
-}
-
-export async function listTakeovers(token: string): Promise<Takeover[]> {
-  const { json } = await call<{ ok: boolean; requests?: Takeover[] }>('GET', '/livedocs/takeovers', token)
-  return json?.ok ? json.requests ?? [] : []
-}
-
-export async function respondTakeover(
-  token: string,
-  tid: string,
-  accept: boolean,
-  message: string
-): Promise<boolean> {
-  const { json } = await call<{ ok: boolean }>('POST', `/livedocs/takeovers/${tid}/respond`, token, {
-    accept,
-    message
-  })
   return !!json?.ok
 }

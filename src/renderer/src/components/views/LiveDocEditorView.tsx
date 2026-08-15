@@ -23,7 +23,6 @@ import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@
 import Icon from '../Icon'
 import CollaboratorBar from './CollaboratorBar'
 import { collaborators } from '../../lib/presence'
-import { personDisplayName } from '../../lib/personName'
 import * as Y from 'yjs'
 import { getSchema } from '@tiptap/core'
 import { buildDocExtensions } from '../documents/editor/extensions'
@@ -53,32 +52,19 @@ type JsonCoeditType = (typeof JSON_COEDIT_TYPES)[number]
 function isJsonCoedit(t: string | undefined): t is JsonCoeditType {
   return !!t && (JSON_COEDIT_TYPES as readonly string[]).includes(t)
 }
-// Every type that edits live with no check-out lock (doc via Tiptap, the rest via
-// JSON reconcile).
-function isLiveCoEdit(t: string | undefined): boolean {
-  return t === 'doc' || isJsonCoedit(t)
-}
 
 export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Element {
   const meta = useDocCollabStore((s) => s.meta)
   const bodyObj = useDocCollabStore((s) => s.bodyObj)
-  const lock = useDocCollabStore((s) => s.lock)
-  const isHolder = useDocCollabStore((s) => s.isHolder)
   const loading = useDocCollabStore((s) => s.loading)
-  const saving = useDocCollabStore((s) => s.saving)
   const openLive = useDocCollabStore((s) => s.openLive)
   const closeLive = useDocCollabStore((s) => s.closeLive)
-  const acquire = useDocCollabStore((s) => s.acquire)
-  const requestTakeoverForOpen = useDocCollabStore((s) => s.requestTakeoverForOpen)
   const goDocuments = useViewStore((s) => s.goDocuments)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   const back = onBack ?? goDocuments
   const myId = useAccountStore((s) => s.account?.id)
   const token = useAccountStore((s) => s.sessionToken)
 
-  const [requesting, setRequesting] = useState(false)
-  const [requestMsg, setRequestMsg] = useState('')
-  const [requested, setRequested] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [inviteHandle, setInviteHandle] = useState('')
   const [inviteNote, setInviteNote] = useState<string | null>(null)
@@ -110,10 +96,9 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
 
   useEffect(() => {
     // Live docs co-edit via Yjs (Tiptap for 'doc', the JSON reconcile engine for
-    // sheet/slides/map/design), so the check-out lock is not their write control —
-    // open lock-free so a doc never holds the lock. The lock branches below are
-    // already unreachable (liveCoEdit is always true) and are removed in D2.
-    void openLive(liveDocId, { lockFree: true })
+    // sheet/slides/map/design), so there is no check-out lock — openLive just
+    // fetches the doc's meta + baseline body for the Yjs session to seed from.
+    void openLive(liveDocId)
     return () => closeLive()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveDocId])
@@ -248,13 +233,12 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
   // Enforce read-only for non-holders by marking the editor subtree inert (the
   // server also rejects writes without the lock, so this is belt-and-braces).
   useEffect(() => {
+    // Every live editor type co-edits in real time (Tiptap for 'doc', the JSON
+    // reconcile engine for the rest), so the surface is never inert — there is no
+    // check-out lock any more.
     const el = surfaceRef.current
-    // All live editor types are concurrently editable by everyone (CRDT), so
-    // never inert. (There is no non-CRDT type left, but the guard stays so a
-    // future lock-only type still gets the read-only treatment.)
-    const co = isLiveCoEdit(meta?.docType)
-    if (el) (el as unknown as { inert: boolean }).inert = co ? false : !isHolder
-  }, [isHolder, meta, bodyObj])
+    if (el) (el as unknown as { inert: boolean }).inert = false
+  }, [meta, bodyObj])
 
   // Load the owner's teams when the invite panel opens, so they can invite a whole
   // team at once. Above the early return to keep hook order stable.
@@ -291,15 +275,10 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             ? 'brush'
             : 'account_tree'
   const isOwner = meta.ownerAccountId === myId
-  const holderHandle = lock?.holder ? personDisplayName(lock.holder, lock.holder.handle) : null
-  const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
-  // Every editor type co-edits in real time (doc via Tiptap, the rest via the
-  // JSON reconcile engine); nothing uses the check-out lock any more.
-  const liveCoEdit = isLiveCoEdit(meta.docType)
   // Comments are a document-only feature for now.
   const canComment = meta.docType === 'doc'
-  // Awareness: who has access, with the live editor (lock holder) highlighted.
-  const people = collaborators(meta.members ?? [], lock, myId ?? null)
+  // Awareness: who has access. No lock any more, so no holder is highlighted.
+  const people = collaborators(meta.members ?? [], null, myId ?? null)
   // The label + colour shown on my caret to the other editors.
   const me = people.find((p) => p.you)
   const meUser = { name: me?.name ?? 'You', color: me?.color ?? '#888888' }
@@ -449,13 +428,6 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
     if (res.ok) setInviting(false)
   }
 
-  async function sendRequest(): Promise<void> {
-    await requestTakeoverForOpen(requestMsg.trim())
-    setRequesting(false)
-    setRequested(true)
-    setRequestMsg('')
-  }
-
   return (
     <div className="h-full flex flex-col desk-paper no-tod">
       {/* Header */}
@@ -501,12 +473,6 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             </button>
           </>
         )}
-        {isHolder && (
-          <span className="text-[11px] text-[var(--ink-40)] inline-flex items-center gap-1 shrink-0">
-            <Icon name={saving ? 'sync' : 'cloud_done'} size={13} className={saving ? 'animate-spin' : 'text-emerald-500'} />
-            {saving ? 'Saving' : 'Saved'}
-          </span>
-        )}
         <span className="text-[11px] text-[var(--ink-40)] shrink-0">{typeLabel}</span>
         {isOwner && (
           <button onClick={() => setInviting((v) => !v)} className="icon-btn" title="Invite someone" data-testid="livedoc-invite">
@@ -515,72 +481,15 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
         )}
       </div>
 
-      {/* Collaboration status strip */}
+      {/* Collaboration status strip. Every live editor type co-edits in real time
+          (Tiptap / JSON reconcile), so there is no check-out lock. */}
       <div
-        className={`shrink-0 px-4 py-1.5 text-[12px] flex items-center gap-2 border-b ${
-          lockedByOther && !liveCoEdit
-            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200'
-            : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
-        }`}
+        className="shrink-0 px-4 py-1.5 text-[12px] flex items-center gap-2 border-b bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200"
         data-testid="livedoc-status"
       >
-        {liveCoEdit ? (
-          <>
-            <Icon name="bolt" size={14} />
-            <span data-testid="livedoc-live">Live — everyone here can edit together.</span>
-          </>
-        ) : lockedByOther ? (
-          <>
-            <Icon name="lock" size={14} />
-            <span data-testid="livedoc-locked">Editing — locked by {holderHandle}</span>
-            <div className="ml-auto flex items-center gap-2">
-              {requested ? (
-                <span className="text-[11px] opacity-80">Access requested</span>
-              ) : (
-                <button
-                  onClick={() => setRequesting((v) => !v)}
-                  className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-600 text-white hover:brightness-110"
-                  data-testid="livedoc-request"
-                >
-                  Request access
-                </button>
-              )}
-            </div>
-          </>
-        ) : isHolder ? (
-          <>
-            <Icon name="edit" size={14} />
-            <span>You're editing. Others see it locked until you leave.</span>
-          </>
-        ) : (
-          <>
-            <Icon name="lock_open" size={14} />
-            <span>No one is editing.</span>
-            <button
-              onClick={() => void acquire()}
-              className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-600 text-white hover:brightness-110"
-              data-testid="livedoc-checkout"
-            >
-              Check out to edit
-            </button>
-          </>
-        )}
+        <Icon name="bolt" size={14} />
+        <span data-testid="livedoc-live">Live — everyone here can edit together.</span>
       </div>
-
-      {requesting && (
-        <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
-          <input
-            value={requestMsg}
-            onChange={(e) => setRequestMsg(e.target.value)}
-            placeholder={`Message to ${holderHandle ?? 'the editor'} (optional)`}
-            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
-            data-testid="livedoc-request-message"
-          />
-          <button onClick={() => void sendRequest()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livedoc-request-send">
-            Send request
-          </button>
-        </div>
-      )}
 
       {inviting && (
         <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
