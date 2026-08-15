@@ -201,9 +201,12 @@ const api = {
       sourceWidgetId: string,
       targetWidgetId: string,
       taskId: string,
-      type?: WireType
+      type?: WireType,
+      // Optional explicit id — the CRDT substrate materialises a link with the same
+      // id on another device (create-if-missing).
+      id?: string
     ): Promise<WidgetLink | null> =>
-      ipcRenderer.invoke('widgetLinks:create', sourceWidgetId, targetWidgetId, taskId, type),
+      ipcRenderer.invoke('widgetLinks:create', sourceWidgetId, targetWidgetId, taskId, type, id),
     update: (
       id: string,
       patch: {

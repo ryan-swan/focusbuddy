@@ -23,6 +23,7 @@ import { useTablesStore } from '../stores/tables'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useFileManagerStore } from '../stores/fileManager'
 import { useDocumentsStore } from '../stores/documents'
+import { useLinksStore } from '../stores/links'
 import { useOrgStore } from '../stores/org'
 import { useLiveFolderEntriesStore } from '../stores/liveFolderEntries'
 import {
@@ -39,13 +40,14 @@ import {
   crdtTimeBlocksEnabled,
   crdtFilesEnabled,
   crdtDocumentsEnabled,
+  crdtLinksEnabled,
   crdtLiveFoldersEnabled,
   deviceId,
   crdtScopeSuffix,
   crdtObjectScope,
   liveFolderPartition
 } from './syncFlags'
-import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
+import type { Widget, FbNode, TimeBlock, FbDocument, WidgetLink, WireType } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
 import type { FolderEntry } from './liveFolder'
 
@@ -91,6 +93,7 @@ let rowPart: string | null = null
 let tbPart: string | null = null
 let filePart: string | null = null
 let docPart: string | null = null
+let linkPart: string | null = null
 let actor = ''
 let started = false
 
@@ -164,7 +167,7 @@ function geomOf(w: Widget): WidgetGeom {
 
 function mkEvent(
   partitionKey: string,
-  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry',
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry' | 'link',
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
@@ -238,6 +241,12 @@ function rowSharedRoot(rowId: string): string | null {
   }
   return null
 }
+// A widget link inherits its shared root from the task node it lives on (its wires
+// belong to the same desk as its widgets), so a shared desk's wires route to the
+// desk partition alongside the widgets they connect.
+function linkSharedRoot(taskId: string): string | null {
+  return nodeSharedRoot(taskId)
+}
 function partitionFor(prefix: string, sharedRootId: string | null): string {
   return `${prefix}:${crdtObjectScope(sharedRootId, useOrgStore.getState().activeOrgId, accountId)}`
 }
@@ -261,6 +270,7 @@ function refreshDeskJoins(): void {
     if (widgetPart) ensureDeskJoined(`w:desk:${root}`)
     if (nodePart) ensureDeskJoined(`n:desk:${root}`)
     if (rowPart) ensureDeskJoined(`r:desk:${root}`) // rows + tables share the r: partition
+    if (linkPart) ensureDeskJoined(`l:desk:${root}`)
   }
 }
 
@@ -682,6 +692,53 @@ function emitFolderEntryName(folderId: string, entryId: string, name: string): v
 }
 function emitFolderEntryParent(folderId: string, entryId: string, parentId: string | null): void {
   emitFolderEntryRegister(folderId, entryId, 'parent', parentId)
+}
+
+// ── Widget links (wires) ──────────────────────────────────────────────────────
+// A wire routes with its task node's shared root, so a shared desk's wires converge
+// alongside its widgets. Existence is create/delete; type/verb/enabled are generic
+// LWW attr registers. Run-state (lastRunAt/lastError) is local engine output and
+// never emitted.
+function emitLinkCreate(link: WidgetLink): void {
+  if (!linkPart) return
+  const pk = partitionFor('l', linkSharedRoot(link.taskId))
+  ensureDeskJoined(pk)
+  const snapshot: Record<string, unknown> = {
+    id: link.id,
+    sourceWidgetId: link.sourceWidgetId,
+    targetWidgetId: link.targetWidgetId,
+    taskId: link.taskId,
+    type: link.type,
+    verb: link.verb,
+    enabled: link.enabled
+  }
+  const ev = mkEvent(pk, 'link', link.id, 'create', 'set', { snapshot, at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+// Called BEFORE the store prunes the link, so its task's shared root is resolvable.
+function emitLinkDelete(linkId: string, taskId: string): void {
+  if (!linkPart) return
+  const pk = partitionFor('l', linkSharedRoot(taskId))
+  ensureDeskJoined(pk)
+  tombstoned.add(linkId)
+  const ev = mkEvent(pk, 'link', linkId, 'delete', 'set', { at: Date.now() })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitLinkAttrs(linkId: string, taskId: string, patch: { type?: string; verb?: string; enabled?: boolean }): void {
+  if (!linkPart) return
+  const pk = partitionFor('l', linkSharedRoot(taskId))
+  ensureDeskJoined(pk)
+  const at = Date.now()
+  for (const attr of ['type', 'verb', 'enabled'] as const) {
+    const value = patch[attr]
+    if (value === undefined) continue
+    attrRegs.set(`link:${linkId}:${attr}`, { value, timestamp: at, actor })
+    const ev = mkEvent(pk, 'link', linkId, 'attr', 'register', { attr, value, at })
+    recordLocal(ev, false)
+    send(ev)
+  }
 }
 
 // ── Apply (remote events) ─────────────────────────────────────────────────────
@@ -1124,6 +1181,64 @@ async function applyDocumentAttr(id: string, attr: string, value: unknown): Prom
   void useDocumentsStore.getState().refresh()
 }
 
+// Reflect a link change into the open canvas: reload the links store only when the
+// affected task is the one currently on screen (low-frequency remote edits, so a
+// reload is fine); otherwise the base write landed and it shows on next open.
+async function reflectLinks(taskId: string): Promise<void> {
+  if (useNodeStore.getState().activeTaskId === taskId) {
+    await useLinksStore.getState().loadForTask(taskId)
+  }
+}
+function applyLinkCreate(snapshot: Record<string, unknown>): void {
+  const id = snapshot.id as string
+  if (!id || tombstoned.has(id)) return
+  applyCreateGuarded(`link:${id}`, () => tryCreateLink(snapshot))
+}
+async function tryCreateLink(snapshot: Record<string, unknown>): Promise<boolean> {
+  const id = snapshot.id as string
+  if (tombstoned.has(id)) return true
+  try {
+    // create-if-missing by id, so a replayed/echoed create never duplicates.
+    const created = await window.api.widgetLinks.create(
+      snapshot.sourceWidgetId as string,
+      snapshot.targetWidgetId as string,
+      snapshot.taskId as string,
+      (snapshot.type as WireType) || undefined,
+      id
+    )
+    if (!created) return false
+    // Carry non-default behaviour fields from the snapshot (createLink defaults verb
+    // to '' and enabled to true).
+    const verb = snapshot.verb as string | undefined
+    if ((verb && verb !== '') || snapshot.enabled === false) {
+      await window.api.widgetLinks.update(id, { verb, enabled: snapshot.enabled as boolean })
+    }
+  } catch {
+    return false // buffer + retry (e.g. endpoints not present yet)
+  }
+  void reflectLinks(snapshot.taskId as string)
+  return true
+}
+async function applyLinkDelete(id: string): Promise<void> {
+  tombstoned.add(id)
+  try {
+    await window.api.widgetLinks.delete(id)
+  } catch {
+    /* not present locally — tombstone still guards a later create */
+  }
+  useLinksStore.setState((s) => ({ links: s.links.filter((l) => l.id !== id) }))
+}
+async function applyLinkAttr(id: string, attr: string, value: unknown): Promise<void> {
+  try {
+    await window.api.widgetLinks.update(id, { [attr]: value })
+  } catch {
+    /* not present locally — the poll/next open reconciles it */
+  }
+  useLinksStore.setState((s) => ({
+    links: s.links.map((l) => (l.id === id ? ({ ...l, [attr]: value } as typeof l) : l))
+  }))
+}
+
 function applyEvent(ev: ChangeEvent): void {
   // Record it locally (idempotent) so a reload can re-fold and it survives offline.
   recordLocal(ev, true)
@@ -1268,6 +1383,20 @@ function applyEvent(ev: ChangeEvent): void {
       attrRegs.set(key, merged)
       if (merged === remote) void applyDocumentAttr(ev.objectId, p.attr, remote.value)
     }
+  } else if (ev.objectType === 'link') {
+    if (ev.field === 'create') {
+      void applyLinkCreate((ev.payload as CreatePayload).snapshot)
+    } else if (ev.field === 'delete') {
+      void applyLinkDelete(ev.objectId)
+    } else if (ev.field === 'attr' && (ev.payload as AttrPayload).at !== undefined) {
+      const p = ev.payload as AttrPayload
+      const remote = registerOf(ev)
+      const key = `link:${ev.objectId}:${p.attr}`
+      const local = attrRegs.get(key) ?? null
+      const merged = local ? lwwMerge(local, remote) : remote
+      attrRegs.set(key, merged)
+      if (merged === remote) void applyLinkAttr(ev.objectId, p.attr, remote.value)
+    }
   } else if (ev.objectType === 'folderentry') {
     applyFolderEntry(ev)
   }
@@ -1324,7 +1453,7 @@ function onReauth(): void {
   // flush the shared offline queue. Re-joining is idempotent on reconnect; the
   // joinedDeskParts set is cleared here so desk rooms are re-joined after a drop.
   joinedDeskParts.clear()
-  const parts = [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]
+  const parts = [widgetPart, nodePart, rowPart, tbPart, filePart, docPart, linkPart]
   for (const pk of parts) {
     if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
   }
@@ -1346,7 +1475,7 @@ async function flushUnsynced(): Promise<void> {
         id: e.id,
         ts: e.ts,
         partitionKey: e.partitionKey,
-        objectType: e.objectType as 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry',
+        objectType: e.objectType as 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry' | 'link',
         objectId: e.objectId,
         field: e.field as CrdtField,
         dataClass: e.dataClass as CrdtDataClass,
@@ -1387,13 +1516,14 @@ function computePartitions(accountId: string): void {
   tbPart = crdtTimeBlocksEnabled() ? `t:${s}` : null
   filePart = crdtFilesEnabled() ? `f:${s}` : null
   docPart = crdtDocumentsEnabled() ? `d:${s}` : null
+  linkPart = crdtLinksEnabled() ? `l:${s}` : null
   // Live folders have no scoped partition (each is its own room), so this is a plain
   // on/off gate rather than a partition key.
   liveFoldersOn = crdtLiveFoldersEnabled()
 }
 
 function currentParts(): (string | null)[] {
-  return [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]
+  return [widgetPart, nodePart, rowPart, tbPart, filePart, docPart, linkPart]
 }
 
 // Re-scope when the active org changes: leave the old scope's rooms, recompute the
@@ -1434,8 +1564,9 @@ export function initCrdtSync(): void {
   const tbEnabled = crdtTimeBlocksEnabled()
   const fEnabled = crdtFilesEnabled()
   const dEnabled = crdtDocumentsEnabled()
+  const lEnabled = crdtLinksEnabled()
   const lfEnabled = crdtLiveFoldersEnabled()
-  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled && !dEnabled && !lfEnabled) {
+  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled && !dEnabled && !lEnabled && !lfEnabled) {
     stopCrdtSync()
     return
   }
@@ -1493,7 +1624,10 @@ export function initCrdtSync(): void {
       folderEntryCreate: emitFolderEntryCreate,
       folderEntryDelete: emitFolderEntryDelete,
       folderEntryName: emitFolderEntryName,
-      folderEntryParent: emitFolderEntryParent
+      folderEntryParent: emitFolderEntryParent,
+      linkCreate: emitLinkCreate,
+      linkDelete: emitLinkDelete,
+      linkAttrs: emitLinkAttrs
     })
     started = true
   }
@@ -1503,7 +1637,7 @@ export function initCrdtSync(): void {
 }
 
 export function stopCrdtSync(): void {
-  for (const pk of [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]) {
+  for (const pk of [widgetPart, nodePart, rowPart, tbPart, filePart, docPart, linkPart]) {
     if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   }
   for (const pk of joinedDeskParts) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
@@ -1538,6 +1672,7 @@ export function stopCrdtSync(): void {
   tbPart = null
   filePart = null
   docPart = null
+  linkPart = null
   actor = ''
   started = false
 }

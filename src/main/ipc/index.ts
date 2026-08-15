@@ -964,8 +964,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'widgetLinks:create',
-    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType) => {
-      const link = createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context')
+    (_e, sourceWidgetId: string, targetWidgetId: string, taskId: string, type?: WireType, id?: string) => {
+      const link = createLink(sourceWidgetId, targetWidgetId, taskId, type ?? 'context', id)
       // A link the user drew IS a relationship: mirror it into the graph as a
       // confirmed RelatedTo, so the connection feeds context.related, decision-risk
       // propagation and Assemble's related-surfacing (widget-link-owner approved,

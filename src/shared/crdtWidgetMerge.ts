@@ -66,7 +66,10 @@ export interface ChangeEvent {
   // 'folderentry' is a LIVE-folder tree entry (a shared folder/file/doc node),
   // synced in the live folder's own `lfe:folder:<folderId>` room. It reuses the
   // name/parent/create/delete fields exactly like a node, so no new algebra.
-  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry'
+  // 'link' is a widget-to-widget connector (a wire): create carries its endpoints,
+  // delete tombstones it, and type/verb/enabled ride the generic 'attr' register.
+  // It routes with its task node's shared root, so a shared desk's wires converge.
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry' | 'link'
   objectId: string
   field: CrdtField
   dataClass: CrdtDataClass

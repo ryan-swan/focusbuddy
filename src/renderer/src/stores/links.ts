@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { WidgetLink, WireType } from '@shared/types'
 import { recordAction } from './actionHistory'
+import { crdtEmitLinkCreate, crdtEmitLinkDelete, crdtEmitLinkAttrs } from '../lib/crdtBridge'
 
 // Spatial-link store. Mirrors the widgets store's per-task lifecycle:
 // loadForTask wipes + fetches; clear empties on task switch. Optimistic
@@ -59,6 +60,10 @@ export const useLinksStore = create<LinksStore>((set, get) => ({
     if (sourceId === targetId) return null
     const created = await window.api.widgetLinks.create(sourceId, targetId, taskId, type)
     if (!created) return null
+    // WS01 sync substrate (flagged): materialise the wire on the other grantees of a
+    // shared desk. Emit even if we already have it locally (an echo is deduped by id
+    // downstream), so a re-created link still propagates.
+    crdtEmitLinkCreate(created)
     // Skip if we already have this link (e.g. server returned the existing
     // row because of UNIQUE conflict). Compare by id, not by endpoints —
     // the server is the source of truth for the canonical row.
@@ -88,12 +93,24 @@ export const useLinksStore = create<LinksStore>((set, get) => ({
     set({
       links: get().links.map((l) => (l.id === id ? { ...l, ...patch } : l))
     })
+    // WS01 sync substrate (flagged): sync the behaviour fields (type/verb/enabled)
+    // as LWW registers. Run-state (lastRunAt/lastError) is local engine output and
+    // is deliberately NOT synced.
+    const taskId = get().links.find((l) => l.id === id)?.taskId
+    if (taskId && (patch.type !== undefined || patch.verb !== undefined || patch.enabled !== undefined)) {
+      crdtEmitLinkAttrs(id, taskId, { type: patch.type, verb: patch.verb, enabled: patch.enabled })
+    }
     const updated = await window.api.widgetLinks.update(id, patch)
     if (updated) {
       set({ links: get().links.map((l) => (l.id === id ? updated : l)) })
     }
   },
   remove: async (id) => {
+    // WS01 sync substrate (flagged): tombstone the wire on other grantees. Resolve
+    // the task id and emit BEFORE the optimistic prune, so the wire's shared root is
+    // still known and the tombstone routes to the same partition its create did.
+    const taskId = get().links.find((l) => l.id === id)?.taskId
+    if (taskId) crdtEmitLinkDelete(id, taskId)
     // Optimistic — remove locally first so the line disappears immediately.
     set({ links: get().links.filter((l) => l.id !== id) })
     await window.api.widgetLinks.delete(id)
@@ -106,3 +123,10 @@ export const useLinksStore = create<LinksStore>((set, get) => ({
     })
   }
 }))
+
+// Expose the links store on window so e2e specs can drive wire create/update/remove
+// directly (the real store path, which emits the CRDT events). A thin handle to the
+// real store, not a mock.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbLinks?: typeof useLinksStore }).__fbLinks = useLinksStore
+}

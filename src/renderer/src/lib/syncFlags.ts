@@ -73,6 +73,20 @@ export function crdtDocumentsEnabled(): boolean {
   }
 }
 
+// Widget LINKS (the connector wires between widgets on a desk). Syncs a wire's
+// existence (create / delete) and its behaviour fields (type / verb / enabled) as
+// LWW registers, routed with the wire's task node — so a SHARED DESK's wires
+// converge alongside its widgets (previously wires never synced across grantees).
+// Run-state (lastRunAt / lastError) is local engine output and stays off the log.
+// Default OFF. Meaningful together with the widgets flag (wires need their widgets).
+export function crdtLinksEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.links') === '1'
+  } catch {
+    return false
+  }
+}
+
 // LIVE FOLDERS (the shared, collaborative folder tree — LiveFolderView). Each tree
 // entry (folder / file / inlined doc) becomes a CRDT object: create carries the
 // entry snapshot, delete tombstones it, name + parent are LWW registers, so two
@@ -138,6 +152,11 @@ export function filePartition(accountId: string): string {
 // The sync partition for an account's document metadata.
 export function documentPartition(accountId: string): string {
   return `d:acct:${accountId}`
+}
+
+// The sync partition for an account's widget links (wires).
+export function linkPartition(accountId: string): string {
+  return `l:acct:${accountId}`
 }
 
 // The sync partition (room) for a LIVE folder's tree entries. A live folder is its

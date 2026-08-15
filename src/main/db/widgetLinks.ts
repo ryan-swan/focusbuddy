@@ -68,22 +68,31 @@ export function createLink(
   sourceWidgetId: string,
   targetWidgetId: string,
   taskId: string,
-  type: WireType = 'context'
+  type: WireType = 'context',
+  // Optional explicit id. The WS01 sync substrate replays a link's `create` event
+  // on another device and must materialise the SAME link id, so it passes the id
+  // through here as create-if-missing (an already-present id returns unchanged, so
+  // a replayed/echoed create never duplicates or throws).
+  id?: string
 ): WidgetLink | null {
   if (sourceWidgetId === targetWidgetId) return null // no self-loops
   const db = getDb()
+  if (id) {
+    const byId = db.prepare('SELECT * FROM widget_links WHERE id = ?').get(id) as WidgetLinkRow | undefined
+    if (byId) return rowToLink(byId)
+  }
   const existing = db
     .prepare('SELECT * FROM widget_links WHERE source_widget_id = ? AND target_widget_id = ?')
     .get(sourceWidgetId, targetWidgetId) as WidgetLinkRow | undefined
   if (existing) return rowToLink(existing)
-  const id = randomUUID()
+  const linkId = id ?? randomUUID()
   const now = Date.now()
   db.prepare(
     `INSERT INTO widget_links (id, source_widget_id, target_widget_id, task_id, created_at, type, verb, enabled)
      VALUES (?, ?, ?, ?, ?, ?, '', 1)`
-  ).run(id, sourceWidgetId, targetWidgetId, taskId, now, type)
+  ).run(linkId, sourceWidgetId, targetWidgetId, taskId, now, type)
   return {
-    id,
+    id: linkId,
     sourceWidgetId,
     targetWidgetId,
     taskId,

@@ -1,4 +1,4 @@
-import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
+import type { Widget, FbNode, TimeBlock, FbDocument, WidgetLink } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
 import type { FolderEntry } from './liveFolder'
 
@@ -46,6 +46,12 @@ export interface CrdtEmit {
   folderEntryDelete: (folderId: string, entryIds: string[]) => void
   folderEntryName: (folderId: string, entryId: string, name: string) => void
   folderEntryParent: (folderId: string, entryId: string, parentId: string | null) => void
+  // Widget links (wires). create carries the whole link; delete/attrs by id. The
+  // task id is on the link (create) or passed alongside (delete/attrs) so the
+  // engine can resolve the wire's shared root for routing.
+  linkCreate: (link: WidgetLink) => void
+  linkDelete: (linkId: string, taskId: string) => void
+  linkAttrs: (linkId: string, taskId: string, patch: { type?: string; verb?: string; enabled?: boolean }) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -169,4 +175,18 @@ export function crdtEmitFolderEntryName(folderId: string, entryId: string, name:
 }
 export function crdtEmitFolderEntryParent(folderId: string, entryId: string, parentId: string | null): void {
   impl?.folderEntryParent(folderId, entryId, parentId)
+}
+
+export function crdtEmitLinkCreate(link: WidgetLink): void {
+  impl?.linkCreate(link)
+}
+export function crdtEmitLinkDelete(linkId: string, taskId: string): void {
+  impl?.linkDelete(linkId, taskId)
+}
+export function crdtEmitLinkAttrs(
+  linkId: string,
+  taskId: string,
+  patch: { type?: string; verb?: string; enabled?: boolean }
+): void {
+  impl?.linkAttrs(linkId, taskId, patch)
 }
