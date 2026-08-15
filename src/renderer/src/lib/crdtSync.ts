@@ -24,6 +24,7 @@ import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useFileManagerStore } from '../stores/fileManager'
 import { useDocumentsStore } from '../stores/documents'
 import { useOrgStore } from '../stores/org'
+import { useLiveFolderEntriesStore } from '../stores/liveFolderEntries'
 import {
   sendSocketMessage,
   setCrdtSocketHandler,
@@ -38,12 +39,15 @@ import {
   crdtTimeBlocksEnabled,
   crdtFilesEnabled,
   crdtDocumentsEnabled,
+  crdtLiveFoldersEnabled,
   deviceId,
   crdtScopeSuffix,
-  crdtObjectScope
+  crdtObjectScope,
+  liveFolderPartition
 } from './syncFlags'
 import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
+import type { FolderEntry } from './liveFolder'
 
 // The node scalar attributes carried as generic 'attr' registers. title + parent
 // have their own fields/apply (parent uses move()); ordering (sortOrder) and the
@@ -132,13 +136,35 @@ const tombstoned = new Set<string>()
 const tbRegs = new Map<string, LWWRegister<unknown>>()
 const fileRegs = new Map<string, LWWRegister<unknown>>()
 
+// Live-folder in-memory state. Live folders are their OWN rooms (one per folder id),
+// not a single scoped partition, so they are tracked separately: which folders are
+// open (joined), the name/parent LWW registers keyed `${folderId}::${field}::${id}`,
+// and remove-wins tombstones keyed `${folderId}:${id}` (a folder entry id is only
+// unique WITHIN its folder, so its tombstone must be folder-qualified — unlike the
+// globally-unique ids in the `tombstoned` set).
+let liveFoldersOn = false
+const openLiveFolders = new Set<string>()
+const folderRegs = new Map<string, LWWRegister<unknown>>()
+const folderTombstoned = new Set<string>()
+
+// Extract the folder id from a `lfe:folder:<folderId>` partition key, or null.
+function liveFolderIdOf(partitionKey: string): string | null {
+  const prefix = 'lfe:folder:'
+  return partitionKey.startsWith(prefix) ? partitionKey.slice(prefix.length) : null
+}
+function ensureLiveFolderJoined(folderId: string): void {
+  if (openLiveFolders.has(folderId)) return
+  openLiveFolders.add(folderId)
+  sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: liveFolderPartition(folderId) } })
+}
+
 function geomOf(w: Widget): WidgetGeom {
   return { x: w.x, y: w.y, width: w.width, height: w.height }
 }
 
 function mkEvent(
   partitionKey: string,
-  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document',
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry',
   objectId: string,
   field: CrdtField,
   dataClass: CrdtDataClass,
@@ -596,6 +622,66 @@ function emitDocumentAttrs(docId: string, attrs: Record<string, unknown>): void 
     recordLocal(ev, false)
     send(ev)
   }
+}
+
+// ── Live folders (their own per-folder room) ──────────────────────────────────
+
+// Open a live folder: lay the frozen body_json baseline into the store, then join
+// the folder's room so the change log replays the deltas on top. Idempotent.
+function liveFolderOpen(folderId: string, baseline: FolderEntry[]): void {
+  if (!liveFoldersOn) return
+  useLiveFolderEntriesStore.getState().seed(folderId, baseline)
+  ensureLiveFolderJoined(folderId)
+}
+function liveFolderClose(folderId: string): void {
+  if (openLiveFolders.has(folderId)) {
+    openLiveFolders.delete(folderId)
+    sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: liveFolderPartition(folderId) } })
+  }
+  useLiveFolderEntriesStore.getState().clear(folderId)
+  for (const key of [...folderRegs.keys()]) if (key.startsWith(`${folderId}::`)) folderRegs.delete(key)
+}
+
+function emitFolderEntryCreate(folderId: string, entry: FolderEntry): void {
+  if (!liveFoldersOn) return
+  ensureLiveFolderJoined(folderId)
+  const ev = mkEvent(
+    liveFolderPartition(folderId),
+    'folderentry',
+    entry.id,
+    'create',
+    'set',
+    { snapshot: { ...entry } as Record<string, unknown>, at: Date.now() }
+  )
+  recordLocal(ev, false)
+  send(ev)
+}
+// Called with EVERY doomed id (a folder delete cascades to its whole subtree, per
+// removeEntry), so each descendant is tombstoned on other grantees too.
+function emitFolderEntryDelete(folderId: string, entryIds: string[]): void {
+  if (!liveFoldersOn) return
+  ensureLiveFolderJoined(folderId)
+  for (const id of entryIds) {
+    folderTombstoned.add(`${folderId}:${id}`)
+    const ev = mkEvent(liveFolderPartition(folderId), 'folderentry', id, 'delete', 'set', { at: Date.now() })
+    recordLocal(ev, false)
+    send(ev)
+  }
+}
+function emitFolderEntryRegister(folderId: string, entryId: string, field: 'name' | 'parent', value: unknown): void {
+  if (!liveFoldersOn) return
+  ensureLiveFolderJoined(folderId)
+  const at = Date.now()
+  folderRegs.set(`${folderId}::${field}::${entryId}`, { value, timestamp: at, actor })
+  const ev = mkEvent(liveFolderPartition(folderId), 'folderentry', entryId, field, 'register', { value, at })
+  recordLocal(ev, false)
+  send(ev)
+}
+function emitFolderEntryName(folderId: string, entryId: string, name: string): void {
+  emitFolderEntryRegister(folderId, entryId, 'name', name)
+}
+function emitFolderEntryParent(folderId: string, entryId: string, parentId: string | null): void {
+  emitFolderEntryRegister(folderId, entryId, 'parent', parentId)
 }
 
 // ── Apply (remote events) ─────────────────────────────────────────────────────
@@ -1182,6 +1268,37 @@ function applyEvent(ev: ChangeEvent): void {
       attrRegs.set(key, merged)
       if (merged === remote) void applyDocumentAttr(ev.objectId, p.attr, remote.value)
     }
+  } else if (ev.objectType === 'folderentry') {
+    applyFolderEntry(ev)
+  }
+}
+
+// Apply a live-folder tree event into the materialised store. No window.api write:
+// the live folder has no local table, so this renderer store IS its local copy (the
+// change log on the signal server is the durable record). Create is remove-wins
+// against a folder-qualified tombstone; name/parent are LWW registers.
+function applyFolderEntry(ev: ChangeEvent): void {
+  const folderId = liveFolderIdOf(ev.partitionKey)
+  if (!folderId) return
+  const store = useLiveFolderEntriesStore.getState()
+  const tkey = `${folderId}:${ev.objectId}`
+  if (ev.field === 'create') {
+    if (folderTombstoned.has(tkey)) return
+    const snap = (ev.payload as CreatePayload).snapshot as unknown as FolderEntry
+    if (snap && typeof snap.id === 'string') store.applyCreate(folderId, snap)
+  } else if (ev.field === 'delete') {
+    folderTombstoned.add(tkey)
+    store.applyDelete(folderId, ev.objectId)
+  } else if ((ev.field === 'name' || ev.field === 'parent') && (ev.payload as RegisterPayload).at !== undefined) {
+    const remote = registerOf(ev)
+    const key = `${folderId}::${ev.field}::${ev.objectId}`
+    const local = folderRegs.get(key) ?? null
+    const merged = local ? lwwMerge(local, remote) : remote
+    folderRegs.set(key, merged)
+    if (merged === remote) {
+      if (ev.field === 'name') store.applyName(folderId, ev.objectId, remote.value as string)
+      else store.applyParent(folderId, ev.objectId, remote.value as string | null)
+    }
   }
 }
 
@@ -1212,7 +1329,12 @@ function onReauth(): void {
     if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
   }
   refreshDeskJoins()
-  if (parts.some(Boolean)) void flushUnsynced()
+  // Re-join every open live-folder room (they are scope-independent, so they persist
+  // across an org switch; a reconnect must re-join them to resume receiving deltas).
+  for (const folderId of openLiveFolders) {
+    sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: liveFolderPartition(folderId) } })
+  }
+  if (parts.some(Boolean) || liveFoldersOn) void flushUnsynced()
 }
 
 async function flushUnsynced(): Promise<void> {
@@ -1224,7 +1346,7 @@ async function flushUnsynced(): Promise<void> {
         id: e.id,
         ts: e.ts,
         partitionKey: e.partitionKey,
-        objectType: e.objectType as 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document',
+        objectType: e.objectType as 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry',
         objectId: e.objectId,
         field: e.field as CrdtField,
         dataClass: e.dataClass as CrdtDataClass,
@@ -1265,6 +1387,9 @@ function computePartitions(accountId: string): void {
   tbPart = crdtTimeBlocksEnabled() ? `t:${s}` : null
   filePart = crdtFilesEnabled() ? `f:${s}` : null
   docPart = crdtDocumentsEnabled() ? `d:${s}` : null
+  // Live folders have no scoped partition (each is its own room), so this is a plain
+  // on/off gate rather than a partition key.
+  liveFoldersOn = crdtLiveFoldersEnabled()
 }
 
 function currentParts(): (string | null)[] {
@@ -1309,7 +1434,8 @@ export function initCrdtSync(): void {
   const tbEnabled = crdtTimeBlocksEnabled()
   const fEnabled = crdtFilesEnabled()
   const dEnabled = crdtDocumentsEnabled()
-  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled && !dEnabled) {
+  const lfEnabled = crdtLiveFoldersEnabled()
+  if (!wEnabled && !nEnabled && !tEnabled && !tbEnabled && !fEnabled && !dEnabled && !lfEnabled) {
     stopCrdtSync()
     return
   }
@@ -1361,7 +1487,13 @@ export function initCrdtSync(): void {
       fileDelete: emitFileDelete,
       documentCreate: emitDocumentCreate,
       documentDelete: emitDocumentDelete,
-      documentAttrs: emitDocumentAttrs
+      documentAttrs: emitDocumentAttrs,
+      liveFolderOpen,
+      liveFolderClose,
+      folderEntryCreate: emitFolderEntryCreate,
+      folderEntryDelete: emitFolderEntryDelete,
+      folderEntryName: emitFolderEntryName,
+      folderEntryParent: emitFolderEntryParent
     })
     started = true
   }
@@ -1376,6 +1508,13 @@ export function stopCrdtSync(): void {
   }
   for (const pk of joinedDeskParts) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   joinedDeskParts.clear()
+  for (const folderId of openLiveFolders) {
+    sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: liveFolderPartition(folderId) } })
+  }
+  openLiveFolders.clear()
+  folderRegs.clear()
+  folderTombstoned.clear()
+  liveFoldersOn = false
   registerCrdtEmit(null)
   setCrdtSocketHandler(null)
   setCrdtOpenHandler(null)

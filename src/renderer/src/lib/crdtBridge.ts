@@ -1,5 +1,6 @@
 import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
+import type { FolderEntry } from './liveFolder'
 
 // WS01 sync substrate — the seam between the widgets store and the sync engine.
 //
@@ -37,6 +38,14 @@ export interface CrdtEmit {
   documentCreate: (doc: FbDocument) => void
   documentDelete: (docId: string) => void
   documentAttrs: (docId: string, attrs: Record<string, unknown>) => void
+  // Live-folder tree entries. A folder is opened/closed to (un)subscribe its room;
+  // create/delete/rename/move each emit a CRDT event so grantees converge lock-free.
+  liveFolderOpen: (folderId: string, baseline: FolderEntry[]) => void
+  liveFolderClose: (folderId: string) => void
+  folderEntryCreate: (folderId: string, entry: FolderEntry) => void
+  folderEntryDelete: (folderId: string, entryIds: string[]) => void
+  folderEntryName: (folderId: string, entryId: string, name: string) => void
+  folderEntryParent: (folderId: string, entryId: string, parentId: string | null) => void
 }
 
 let impl: CrdtEmit | null = null
@@ -141,4 +150,23 @@ export function crdtEmitDocumentDelete(docId: string): void {
 }
 export function crdtEmitDocumentAttrs(docId: string, attrs: Record<string, unknown>): void {
   impl?.documentAttrs(docId, attrs)
+}
+
+export function crdtLiveFolderOpen(folderId: string, baseline: FolderEntry[]): void {
+  impl?.liveFolderOpen(folderId, baseline)
+}
+export function crdtLiveFolderClose(folderId: string): void {
+  impl?.liveFolderClose(folderId)
+}
+export function crdtEmitFolderEntryCreate(folderId: string, entry: FolderEntry): void {
+  impl?.folderEntryCreate(folderId, entry)
+}
+export function crdtEmitFolderEntryDelete(folderId: string, entryIds: string[]): void {
+  impl?.folderEntryDelete(folderId, entryIds)
+}
+export function crdtEmitFolderEntryName(folderId: string, entryId: string, name: string): void {
+  impl?.folderEntryName(folderId, entryId, name)
+}
+export function crdtEmitFolderEntryParent(folderId: string, entryId: string, parentId: string | null): void {
+  impl?.folderEntryParent(folderId, entryId, parentId)
 }

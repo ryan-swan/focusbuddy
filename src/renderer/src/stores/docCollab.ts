@@ -46,7 +46,11 @@ interface DocCollabStore {
   lastResponse: { docId: string; accepted: boolean; message: string | null } | null
 
   init: () => void
-  openLive: (id: string) => Promise<void>
+  // `lockFree` opens without acquiring the check-out lock — used when the surface
+  // carries its edits on the CRDT substrate instead (a live folder with the
+  // fb.sync.crdt.livefolders flag on), so it never falsely shows "locked by X" and
+  // never blocks a concurrent editor. Default (no opts) is the check-out behaviour.
+  openLive: (id: string, opts?: { lockFree?: boolean }) => Promise<void>
   closeLive: () => void
   saveBody: (body: unknown) => void
   acquire: () => Promise<void>
@@ -79,7 +83,7 @@ export const useDocCollabStore = create<DocCollabStore>((set, get) => ({
     void get().refreshTakeovers()
   },
 
-  openLive: async (id) => {
+  openLive: async (id, opts) => {
     const t = token()
     if (!t) return
     set({ openId: id, loading: true, meta: null, bodyObj: null, lock: null, isHolder: false })
@@ -95,8 +99,9 @@ export const useDocCollabStore = create<DocCollabStore>((set, get) => ({
       bodyObj = null
     }
     set({ meta: full, bodyObj, lock: full.lock, loading: false })
-    // Try to check it out. If someone else holds it, we stay read-only.
-    await get().acquire()
+    // Try to check it out. If someone else holds it, we stay read-only. Skipped when
+    // the substrate carries the surface (lockFree): edits are conflict-free CRDT.
+    if (!opts?.lockFree) await get().acquire()
   },
 
   closeLive: () => {

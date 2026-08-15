@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDocCollabStore } from '../../stores/docCollab'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
-import { inviteToLiveDoc } from '../../lib/docCollabClient'
+import { inviteToLiveDoc, snapshotLiveBody } from '../../lib/docCollabClient'
 import { personDisplayName } from '../../lib/personName'
 import { uploadLiveFile } from '../../lib/liveFolderClient'
 import {
@@ -11,11 +11,29 @@ import {
   addEntry,
   renameEntry,
   removeEntry,
+  descendantIds,
   type FolderBody,
   type FolderEntry
 } from '../../lib/liveFolder'
 import { openSharedFile, recreateSharedDoc } from '../../lib/liveFolderMirror'
+import { crdtLiveFoldersEnabled } from '../../lib/syncFlags'
+import { useLiveFolderEntriesStore } from '../../stores/liveFolderEntries'
+import {
+  crdtLiveFolderOpen,
+  crdtLiveFolderClose,
+  crdtEmitFolderEntryCreate,
+  crdtEmitFolderEntryDelete,
+  crdtEmitFolderEntryName
+} from '../../lib/crdtBridge'
 import Icon from '../Icon'
+
+// WS01 sync substrate: when fb.sync.crdt.livefolders is on, a live folder syncs its
+// tree per-entry through the change log (create / delete / name / parent) instead of
+// under the whole-body check-out lock, so grantees reorganise concurrently and
+// converge. body_json stays the frozen baseline and is snapshotted back (lock-free)
+// so a flag-off client still sees the current structure. Read once per mount; the
+// flag is a stable localStorage value that only changes on reload.
+const LIVE_FOLDERS_CRDT = crdtLiveFoldersEnabled()
 
 // A LIVE (collaborative) folder — a shared file tree under the same check-out
 // model as live documents. The body holds the whole tree; this view renders it
@@ -62,14 +80,58 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
   const [inviteHandle, setInviteHandle] = useState('')
   const [inviteNote, setInviteNote] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const snapshotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The most recent tree awaiting a debounced snapshot-back, so a close mid-debounce
+  // still persists the last edit to body_json (the flag-off baseline) rather than
+  // dropping it. The change log always has it; this keeps body_json honest too.
+  const pendingSnapshot = useRef<FolderBody | null>(null)
+
+  // The CRDT-materialised entries for this folder (undefined until seeded on open).
+  // Only subscribed when the flag is on, so flag-off render is untouched.
+  const storeEntries = useLiveFolderEntriesStore((s) => (LIVE_FOLDERS_CRDT ? s.entries[liveFolderId] : undefined))
 
   useEffect(() => {
-    void openLive(liveFolderId)
-    return () => closeLive()
+    let cancelled = false
+    void (async () => {
+      // Lock-free open when the substrate carries this folder: acquiring the lock
+      // would falsely show the folder "locked" to others and defeat concurrent edit.
+      await openLive(liveFolderId, { lockFree: LIVE_FOLDERS_CRDT })
+      if (cancelled) return
+      if (LIVE_FOLDERS_CRDT) {
+        const baseline = coerceFolderBody(useDocCollabStore.getState().bodyObj)
+        crdtLiveFolderOpen(liveFolderId, baseline?.entries ?? [])
+      }
+    })()
+    return () => {
+      cancelled = true
+      // Flush (not drop) a pending snapshot so the last edit reaches body_json.
+      if (snapshotTimer.current) {
+        clearTimeout(snapshotTimer.current)
+        snapshotTimer.current = null
+        const tok = useAccountStore.getState().sessionToken
+        const pending = pendingSnapshot.current
+        if (tok && pending) void snapshotLiveBody(tok, liveFolderId, JSON.stringify(pending))
+        pendingSnapshot.current = null
+      }
+      if (LIVE_FOLDERS_CRDT) crdtLiveFolderClose(liveFolderId)
+      closeLive()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveFolderId])
 
-  const body: FolderBody | null = useMemo(() => coerceFolderBody(bodyObj), [bodyObj])
+  // Flag on: the tree is the CRDT store (baseline seeded on open + live deltas),
+  // falling back to the baseline body until the store is seeded. Flag off: exactly
+  // the previous behaviour, the fetched body_json.
+  const body: FolderBody | null = useMemo(() => {
+    if (!LIVE_FOLDERS_CRDT) return coerceFolderBody(bodyObj)
+    const baseline = coerceFolderBody(bodyObj)
+    if (!storeEntries) return baseline
+    return {
+      version: baseline?.version ?? 1,
+      rootName: baseline?.rootName ?? meta?.title ?? 'Shared folder',
+      entries: storeEntries
+    }
+  }, [bodyObj, storeEntries, meta?.title])
 
   // Breadcrumb chain from root to cwd.
   const crumbs = useMemo(() => {
@@ -104,10 +166,28 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
   const isOwner = meta.ownerAccountId === myId
   const holderHandle = lock?.holder ? personDisplayName(lock.holder, lock.holder.handle) : null
   const lockedByOther = !!lock?.holder && lock.holder.accountId !== myId
+  // With the substrate carrying this folder there is no single writer, so everyone
+  // may reorganise; otherwise the check-out lock still gates structural edits.
+  const canEdit = LIVE_FOLDERS_CRDT || isHolder
   const entries = childrenOf(body, cwd)
 
+  // Flag-off path: whole-body write under the lock (unchanged).
   function commitBody(next: FolderBody): void {
     saveBody(next)
+  }
+
+  // Flag-on path: keep body_json (the flag-off baseline) current from the converged
+  // tree, debounced + lock-free. This is what honours the dual-write contract — a
+  // client that later turns the flag off still sees the structure edited while on.
+  function snapshotBack(next: FolderBody): void {
+    if (!token) return
+    pendingSnapshot.current = next
+    if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
+    snapshotTimer.current = setTimeout(() => {
+      snapshotTimer.current = null
+      pendingSnapshot.current = null
+      void snapshotLiveBody(token, liveFolderId, JSON.stringify(next))
+    }, 800)
   }
 
   async function onOpen(e: FolderEntry): Promise<void> {
@@ -135,7 +215,14 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
   function newFolder(): void {
     const name = 'New folder'
     const id = `lf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
-    commitBody(addEntry(body!, { id, parentId: cwd, kind: 'folder', name }))
+    const entry: FolderEntry = { id, parentId: cwd, kind: 'folder', name }
+    if (LIVE_FOLDERS_CRDT) {
+      useLiveFolderEntriesStore.getState().applyCreate(liveFolderId, entry)
+      crdtEmitFolderEntryCreate(liveFolderId, entry)
+      snapshotBack(addEntry(body!, entry))
+    } else {
+      commitBody(addEntry(body!, entry))
+    }
     setRenamingId(id)
     setRenameText(name)
   }
@@ -145,13 +232,32 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
     setRenameText(e.name)
   }
   function commitRename(): void {
-    if (renamingId) commitBody(renameEntry(body!, renamingId, renameText))
+    if (renamingId) {
+      if (LIVE_FOLDERS_CRDT) {
+        const name = renameText.trim() || 'Untitled'
+        useLiveFolderEntriesStore.getState().applyName(liveFolderId, renamingId, name)
+        crdtEmitFolderEntryName(liveFolderId, renamingId, name)
+        snapshotBack(renameEntry(body!, renamingId, name))
+      } else {
+        commitBody(renameEntry(body!, renamingId, renameText))
+      }
+    }
     setRenamingId(null)
     setRenameText('')
   }
 
   function remove(e: FolderEntry): void {
-    commitBody(removeEntry(body!, e.id))
+    if (LIVE_FOLDERS_CRDT) {
+      // A folder delete cascades to its whole subtree (removeEntry semantics), so
+      // tombstone every doomed id on all grantees.
+      const doomed = [e.id, ...descendantIds(body!, e.id)]
+      const st = useLiveFolderEntriesStore.getState()
+      for (const id of doomed) st.applyDelete(liveFolderId, id)
+      crdtEmitFolderEntryDelete(liveFolderId, doomed)
+      snapshotBack(removeEntry(body!, e.id))
+    } else {
+      commitBody(removeEntry(body!, e.id))
+    }
   }
 
   async function onAddFiles(files: FileList | null): Promise<void> {
@@ -174,7 +280,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
         failed++
         continue
       }
-      next = addEntry(next, {
+      const entry: FolderEntry = {
         id: `lf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         parentId: cwd,
         kind: 'file',
@@ -183,10 +289,16 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
         mimeType: f.type || 'application/octet-stream',
         ext,
         sizeBytes: f.size
-      })
+      }
+      next = addEntry(next, entry)
+      if (LIVE_FOLDERS_CRDT) {
+        useLiveFolderEntriesStore.getState().applyCreate(liveFolderId, entry)
+        crdtEmitFolderEntryCreate(liveFolderId, entry)
+      }
     }
     setBusyMsg(null)
-    commitBody(next)
+    if (LIVE_FOLDERS_CRDT) snapshotBack(next)
+    else commitBody(next)
     if (failed > 0) setErrMsg(`${failed} file${failed === 1 ? '' : 's'} could not be uploaded.`)
   }
 
@@ -231,52 +343,63 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
         )}
       </div>
 
-      {/* Collaboration status strip */}
-      <div
-        className={`shrink-0 px-4 py-1.5 text-[12px] flex items-center gap-2 border-b ${
-          lockedByOther
-            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200'
-            : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
-        }`}
-        data-testid="livefolder-status"
-      >
-        {lockedByOther ? (
-          <>
-            <Icon name="lock" size={14} />
-            <span data-testid="livefolder-locked">Organising — locked by {holderHandle}. You can still open files.</span>
-            <div className="ml-auto flex items-center gap-2">
-              {requested ? (
-                <span className="text-[11px] opacity-80">Access requested</span>
-              ) : (
-                <button
-                  onClick={() => setRequesting((v) => !v)}
-                  className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-600 text-white hover:brightness-110"
-                  data-testid="livefolder-request"
-                >
-                  Request access
-                </button>
-              )}
-            </div>
-          </>
-        ) : isHolder ? (
-          <>
-            <Icon name="edit" size={14} />
-            <span>You're organising this folder. Others can open files but not rearrange until you leave.</span>
-          </>
-        ) : (
-          <>
-            <Icon name="lock_open" size={14} />
-            <span>No one is organising it. Open files freely, or check out to rearrange.</span>
-            <button
-              onClick={() => void acquire()}
-              className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-600 text-white hover:brightness-110"
-              data-testid="livefolder-checkout"
-            >
-              Check out to organise
-            </button>
-          </>
-        )}
-      </div>
+      {/* Collaboration status strip. Substrate-carried folders have no single writer,
+          so they show a live state; otherwise the check-out lock strip. */}
+      {LIVE_FOLDERS_CRDT ? (
+        <div
+          className="shrink-0 px-4 py-1.5 text-[12px] flex items-center gap-2 border-b bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200"
+          data-testid="livefolder-status"
+        >
+          <Icon name="group" size={14} />
+          <span data-testid="livefolder-live">Live folder. Everyone here can organise it together, changes sync as you go.</span>
+        </div>
+      ) : (
+        <div
+          className={`shrink-0 px-4 py-1.5 text-[12px] flex items-center gap-2 border-b ${
+            lockedByOther
+              ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200'
+              : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
+          }`}
+          data-testid="livefolder-status"
+        >
+          {lockedByOther ? (
+            <>
+              <Icon name="lock" size={14} />
+              <span data-testid="livefolder-locked">Organising — locked by {holderHandle}. You can still open files.</span>
+              <div className="ml-auto flex items-center gap-2">
+                {requested ? (
+                  <span className="text-[11px] opacity-80">Access requested</span>
+                ) : (
+                  <button
+                    onClick={() => setRequesting((v) => !v)}
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-600 text-white hover:brightness-110"
+                    data-testid="livefolder-request"
+                  >
+                    Request access
+                  </button>
+                )}
+              </div>
+            </>
+          ) : isHolder ? (
+            <>
+              <Icon name="edit" size={14} />
+              <span>You're organising this folder. Others can open files but not rearrange until you leave.</span>
+            </>
+          ) : (
+            <>
+              <Icon name="lock_open" size={14} />
+              <span>No one is organising it. Open files freely, or check out to rearrange.</span>
+              <button
+                onClick={() => void acquire()}
+                className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-600 text-white hover:brightness-110"
+                data-testid="livefolder-checkout"
+              >
+                Check out to organise
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {requesting && (
         <div className="shrink-0 px-4 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2">
@@ -324,7 +447,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
             </span>
           ))}
         </div>
-        {isHolder && (
+        {canEdit && (
           <div className="flex items-center gap-1.5 shrink-0">
             <button onClick={newFolder} className="icon-btn" title="New folder" data-testid="livefolder-newfolder">
               <Icon name="create_new_folder" size={16} />
@@ -366,6 +489,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
                 {renamingId === e.id ? (
                   <input
                     autoFocus
+                    data-testid="livefolder-rename-input"
                     value={renameText}
                     onChange={(ev) => setRenameText(ev.target.value)}
                     onBlur={commitRename}
@@ -386,7 +510,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
                     )}
                   </button>
                 )}
-                {isHolder && renamingId !== e.id && (
+                {canEdit && renamingId !== e.id && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition">
                     <button onClick={() => startRename(e)} className="icon-btn" title="Rename" data-testid="livefolder-rename">
                       <Icon name="edit" size={14} />

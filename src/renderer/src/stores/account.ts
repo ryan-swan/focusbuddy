@@ -202,3 +202,10 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     return { ok: true, sessionToken, account }
   }
 }))
+
+// Expose the account store on window so e2e specs can read the session token to
+// drive REST-only flows (e.g. creating + sharing a live folder). A thin handle to
+// the real store, not a mock; it changes nothing about how the app behaves.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbAccount?: typeof useAccountStore }).__fbAccount = useAccountStore
+}

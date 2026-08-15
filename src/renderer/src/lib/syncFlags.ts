@@ -73,6 +73,21 @@ export function crdtDocumentsEnabled(): boolean {
   }
 }
 
+// LIVE FOLDERS (the shared, collaborative folder tree — LiveFolderView). Each tree
+// entry (folder / file / inlined doc) becomes a CRDT object: create carries the
+// entry snapshot, delete tombstones it, name + parent are LWW registers, so two
+// people reorganising the same shared folder converge WITHOUT the check-out lock.
+// The folder's body_json stays the frozen baseline; the change log carries the
+// deltas on top. Default OFF (the lock path is unchanged while this is off). This
+// is the first of the two migrations that let the check-out lock be retired.
+export function crdtLiveFoldersEnabled(): boolean {
+  try {
+    return localStorage.getItem('fb.sync.crdt.livefolders') === '1'
+  } catch {
+    return false
+  }
+}
+
 // A stable per-install id, minted once and reused. It is the LWW tiebreak actor, so
 // it MUST be distinct per device: two devices of the same account editing at the
 // same millisecond would otherwise share an actor and could diverge. Combined with
@@ -123,6 +138,15 @@ export function filePartition(accountId: string): string {
 // The sync partition for an account's document metadata.
 export function documentPartition(accountId: string): string {
   return `d:acct:${accountId}`
+}
+
+// The sync partition (room) for a LIVE folder's tree entries. A live folder is its
+// OWN room keyed by the live-folder id, NOT by the viewer's active scope — every
+// member converges regardless of which org they are in, exactly like the folder's
+// membership-based REST access. The server authorises this `folder:` scope by
+// live-doc membership (liveDocs.isMember), the same rule its REST endpoints use.
+export function liveFolderPartition(folderId: string): string {
+  return `lfe:folder:${folderId}`
 }
 
 // The partition SCOPE suffix for the currently-active workspace. The renderer is

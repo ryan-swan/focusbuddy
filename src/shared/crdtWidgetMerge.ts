@@ -63,7 +63,10 @@ export interface ChangeEvent {
   id: string // client-generated UUIDv7, never renumbered (SYN-010)
   ts: string // ISO occurrence time, preserved on ingestion (SYN-011)
   partitionKey: string // the room this object syncs in, e.g. `w:acct:<accountId>`
-  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document'
+  // 'folderentry' is a LIVE-folder tree entry (a shared folder/file/doc node),
+  // synced in the live folder's own `lfe:folder:<folderId>` room. It reuses the
+  // name/parent/create/delete fields exactly like a node, so no new algebra.
+  objectType: 'widget' | 'node' | 'row' | 'table' | 'timeblock' | 'file' | 'document' | 'folderentry'
   objectId: string
   field: CrdtField
   dataClass: CrdtDataClass
