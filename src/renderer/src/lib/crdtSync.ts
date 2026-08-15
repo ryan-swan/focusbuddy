@@ -39,7 +39,8 @@ import {
   crdtFilesEnabled,
   crdtDocumentsEnabled,
   deviceId,
-  crdtScopeSuffix
+  crdtScopeSuffix,
+  crdtObjectScope
 } from './syncFlags'
 import type { Widget, FbNode, TimeBlock, FbDocument } from '@shared/types'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
@@ -79,6 +80,7 @@ const NODE_ATTR_KEYS = [
 // algebra lives in @shared/crdtWidgetMerge and @shared/crdtNodeMerge and is proven
 // directly by the convergence tests.
 
+let accountId = ''
 let widgetPart: string | null = null
 let nodePart: string | null = null
 let rowPart: string | null = null
@@ -184,20 +186,62 @@ function send(ev: ChangeEvent): void {
   sendSocketMessage({ type: 'crdtEvent', payload: { event: ev } })
 }
 
+// ── Per-object partition routing (shared-desk aware) ──────────────────────────
+// An object under a shared desk (its node carries shared_root_id) must route to the
+// desk partition so grantees converge; everything else routes to the active-scope
+// partition. crdtObjectScope encodes the precedence (desk > org > account); these
+// helpers resolve the shared root per type (nodes carry it directly; widgets and
+// other task-bound objects inherit it from their task node).
+function nodeSharedRoot(nodeId: string): string | null {
+  return useNodeStore.getState().nodes.find((n) => n.id === nodeId)?.sharedRootId ?? null
+}
+function widgetSharedRoot(widgetId: string): string | null {
+  const w = useWidgetStore.getState().widgets.find((x) => x.id === widgetId)
+  return w ? nodeSharedRoot(w.taskId) : null
+}
+function partitionFor(prefix: string, sharedRootId: string | null): string {
+  return `${prefix}:${crdtObjectScope(sharedRootId, useOrgStore.getState().activeOrgId, accountId)}`
+}
+
+// Desk partitions this socket has joined so it RECEIVES shared-desk events. Joining
+// replays the partition's log, so a grantee catches up on backlog when it joins.
+const joinedDeskParts = new Set<string>()
+function ensureDeskJoined(partitionKey: string): void {
+  if (!partitionKey.includes(':desk:') || joinedDeskParts.has(partitionKey)) return
+  joinedDeskParts.add(partitionKey)
+  sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey } })
+}
+// Join the desk partitions for every shared desk among the loaded nodes, for each
+// enabled type, so this device receives edits other grantees make. Called on scope
+// change + whenever the node set changes (a shared desk appearing/loading).
+function refreshDeskJoins(): void {
+  if (!started) return
+  const roots = new Set<string>()
+  for (const n of useNodeStore.getState().nodes) if (n.sharedRootId) roots.add(n.sharedRootId)
+  for (const root of roots) {
+    if (widgetPart) ensureDeskJoined(`w:desk:${root}`)
+    if (nodePart) ensureDeskJoined(`n:desk:${root}`)
+  }
+}
+
 // ── Emit (local edits) ───────────────────────────────────────────────────────
 
 function emitGeom(w: Widget): void {
   if (!widgetPart) return
+  const pk = partitionFor('w', nodeSharedRoot(w.taskId))
+  ensureDeskJoined(pk)
   const geom = geomOf(w)
   const at = Date.now()
   geomRegs.set(w.id, { value: geom, timestamp: at, actor })
-  const ev = mkEvent(widgetPart, 'widget', w.id, 'geom', 'register', { geom, at })
+  const ev = mkEvent(pk, 'widget', w.id, 'geom', 'register', { geom, at })
   recordLocal(ev, false)
   send(ev)
 }
 
 function emitMembership(widgetId: string, from: string | null, to: string | null): void {
   if (!widgetPart) return
+  const pk = partitionFor('w', widgetSharedRoot(widgetId))
+  ensureDeskJoined(pk)
   const st = memberState(widgetId)
   const events: ChangeEvent[] = []
   if (from) {
@@ -207,12 +251,12 @@ function emitMembership(widgetId: string, from: string | null, to: string | null
     // add for that section has also flowed through the log.
     const tags = [...st.adds].filter(([t, s]) => s === from && !st.removes.has(t)).map(([t]) => t)
     for (const t of tags) st.removes.add(t)
-    events.push(mkEvent(widgetPart, 'widget', widgetId, 'members', 'set', { op: 'remove', section: from, tags }))
+    events.push(mkEvent(pk, 'widget', widgetId, 'members', 'set', { op: 'remove', section: from, tags }))
   }
   if (to) {
     const tag = plexiId()
     st.adds.set(tag, to)
-    events.push(mkEvent(widgetPart, 'widget', widgetId, 'members', 'set', { op: 'add', section: to, tags: [tag] }))
+    events.push(mkEvent(pk, 'widget', widgetId, 'members', 'set', { op: 'add', section: to, tags: [tag] }))
   }
   for (const ev of events) {
     recordLocal(ev, false)
@@ -222,6 +266,8 @@ function emitMembership(widgetId: string, from: string | null, to: string | null
 
 function emitWidgetCreate(w: Widget): void {
   if (!widgetPart) return
+  const pk = partitionFor('w', nodeSharedRoot(w.taskId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   const snapshot: Record<string, unknown> = {
     id: w.id,
@@ -243,15 +289,19 @@ function emitWidgetCreate(w: Widget): void {
     pinned: w.pinned,
     pinnedZone: w.pinnedZone ?? null
   }
-  const ev = mkEvent(widgetPart, 'widget', w.id, 'create', 'set', { snapshot, at })
+  const ev = mkEvent(pk, 'widget', w.id, 'create', 'set', { snapshot, at })
   recordLocal(ev, false)
   send(ev)
 }
 
+// Called BEFORE the store removes the widget, so its task's shared root is still
+// resolvable and the tombstone routes to the same partition its edits did.
 function emitWidgetDelete(widgetId: string): void {
   if (!widgetPart) return
+  const pk = partitionFor('w', widgetSharedRoot(widgetId))
+  ensureDeskJoined(pk)
   tombstoned.add(widgetId)
-  const ev = mkEvent(widgetPart, 'widget', widgetId, 'delete', 'set', { at: Date.now() })
+  const ev = mkEvent(pk, 'widget', widgetId, 'delete', 'set', { at: Date.now() })
   recordLocal(ev, false)
   send(ev)
 }
@@ -261,6 +311,8 @@ function emitWidgetFields(
   patch: { content?: string; title?: string; color?: string | null; status?: string | null; zIndex?: number }
 ): void {
   if (!widgetPart) return
+  const pk = partitionFor('w', widgetSharedRoot(widgetId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   const fields: Array<[CrdtField, unknown]> = []
   if (patch.content !== undefined) fields.push(['content', patch.content])
@@ -271,7 +323,7 @@ function emitWidgetFields(
   if (patch.zIndex !== undefined) fields.push(['order', patch.zIndex])
   for (const [field, value] of fields) {
     widgetFieldRegs.set(`${field}:${widgetId}`, { value, timestamp: at, actor })
-    const ev = mkEvent(widgetPart, 'widget', widgetId, field, 'register', { value, at })
+    const ev = mkEvent(pk, 'widget', widgetId, field, 'register', { value, at })
     recordLocal(ev, false)
     send(ev)
   }
@@ -279,9 +331,11 @@ function emitWidgetFields(
 
 function emitNodeRegister(nodeId: string, field: 'title' | 'parent', value: unknown): void {
   if (!nodePart) return
+  const pk = partitionFor('n', nodeSharedRoot(nodeId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   nodeRegs.set(`${field}:${nodeId}`, { value, timestamp: at, actor })
-  const ev = mkEvent(nodePart, 'node', nodeId, field, 'register', { value, at })
+  const ev = mkEvent(pk, 'node', nodeId, field, 'register', { value, at })
   recordLocal(ev, false)
   send(ev)
 }
@@ -295,6 +349,8 @@ function emitNodeParent(nodeId: string, parentId: string | null): void {
 
 function emitNodeCreate(node: FbNode): void {
   if (!nodePart) return
+  const pk = partitionFor('n', node.sharedRootId ?? null)
+  ensureDeskJoined(pk)
   const snapshot: Record<string, unknown> = {
     id: node.id,
     parentId: node.parentId,
@@ -308,16 +364,20 @@ function emitNodeCreate(node: FbNode): void {
     dueDate: node.dueDate,
     isPlan: node.isPlan
   }
-  const ev = mkEvent(nodePart, 'node', node.id, 'create', 'set', { snapshot, at: Date.now() })
+  const ev = mkEvent(pk, 'node', node.id, 'create', 'set', { snapshot, at: Date.now() })
   recordLocal(ev, false)
   send(ev)
 }
 
+// Called BEFORE the store removes the nodes, so each removed node's shared root is
+// still resolvable and its tombstone routes to the same partition its edits did.
 function emitNodeDelete(nodeIds: string[]): void {
   if (!nodePart) return
   for (const id of nodeIds) {
+    const pk = partitionFor('n', nodeSharedRoot(id))
+    ensureDeskJoined(pk)
     tombstoned.add(id)
-    const ev = mkEvent(nodePart, 'node', id, 'delete', 'set', { at: Date.now() })
+    const ev = mkEvent(pk, 'node', id, 'delete', 'set', { at: Date.now() })
     recordLocal(ev, false)
     send(ev)
   }
@@ -326,12 +386,14 @@ function emitNodeDelete(nodeIds: string[]): void {
 // Emit the node's scalar attributes present in a patch as generic 'attr' registers.
 function emitNodeAttrs(nodeId: string, patch: Record<string, unknown>): void {
   if (!nodePart) return
+  const pk = partitionFor('n', nodeSharedRoot(nodeId))
+  ensureDeskJoined(pk)
   const at = Date.now()
   for (const attr of NODE_ATTR_KEYS) {
     if (!(attr in patch)) continue
     const value = patch[attr]
     attrRegs.set(`node:${nodeId}:${attr}`, { value, timestamp: at, actor })
-    const ev = mkEvent(nodePart, 'node', nodeId, 'attr', 'register', { attr, value, at })
+    const ev = mkEvent(pk, 'node', nodeId, 'attr', 'register', { attr, value, at })
     recordLocal(ev, false)
     send(ev)
   }
@@ -1111,12 +1173,16 @@ function onCrdt(e: CrdtSocketEvent): void {
 }
 
 function onReauth(): void {
-  // Join each enabled partition (the server relays only to joined sockets), then
-  // flush the shared offline queue.
+  // Join each enabled active-scope partition (the server relays only to joined
+  // sockets), plus the desk partitions for any shared desks currently loaded, then
+  // flush the shared offline queue. Re-joining is idempotent on reconnect; the
+  // joinedDeskParts set is cleared here so desk rooms are re-joined after a drop.
+  joinedDeskParts.clear()
   const parts = [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]
   for (const pk of parts) {
     if (pk) sendSocketMessage({ type: 'crdtJoin', payload: { partitionKey: pk } })
   }
+  refreshDeskJoins()
   if (parts.some(Boolean)) void flushUnsynced()
 }
 
@@ -1181,11 +1247,15 @@ function currentParts(): (string | null)[] {
 // stop/start so an org switch always re-routes. In-memory registers are cleared
 // because they belong to the previous scope's objects.
 let orgUnsub: (() => void) | null = null
+let nodeUnsub: (() => void) | null = null
 function applyScopeChange(): void {
   if (!started) return
   for (const pk of currentParts()) {
     if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   }
+  // Leave the old scope's desk rooms too; onReauth re-joins the ones still loaded.
+  for (const pk of joinedDeskParts) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
+  joinedDeskParts.clear()
   geomRegs.clear()
   memberStates.clear()
   nodeRegs.clear()
@@ -1216,12 +1286,20 @@ export function initCrdtSync(): void {
   }
   const acct = useAccountStore.getState().account
   if (!acct) return // called again by App once signed in
+  accountId = acct.id
   actor = `${acct.id}:${deviceId()}`
   computePartitions(acct.id)
   // Re-route on org switch (subscribe once; survives stop/start).
   if (!orgUnsub) {
     orgUnsub = useOrgStore.subscribe((st, prev) => {
       if (st.activeOrgId !== prev.activeOrgId) applyScopeChange()
+    })
+  }
+  // Join a shared desk's partitions as soon as its nodes appear locally (via the
+  // poll or CRDT), so a grantee receives edits other grantees make. Subscribe once.
+  if (!nodeUnsub) {
+    nodeUnsub = useNodeStore.subscribe((st, prev) => {
+      if (st.nodes !== prev.nodes) refreshDeskJoins()
     })
   }
   if (!started) {
@@ -1267,6 +1345,8 @@ export function stopCrdtSync(): void {
   for (const pk of [widgetPart, nodePart, rowPart, tbPart, filePart, docPart]) {
     if (pk) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
   }
+  for (const pk of joinedDeskParts) sendSocketMessage({ type: 'crdtLeave', payload: { partitionKey: pk } })
+  joinedDeskParts.clear()
   registerCrdtEmit(null)
   setCrdtSocketHandler(null)
   setCrdtOpenHandler(null)

@@ -562,11 +562,13 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     const widget = get().widgets.find((w) => w.id === id)
     const removedTaskId = widget?.taskId
     await window.api.widgets.delete(id) // soft-delete (trashed, recoverable)
+    // WS01 sync substrate (flagged): emit a delete tombstone so the removal
+    // converges on other devices (remove-wins). Emit BEFORE pruning the store so the
+    // engine can still resolve the widget's task-shared-root (a shared-desk widget's
+    // tombstone must route to the desk partition, not the account).
+    crdtEmitWidgetDelete(id)
     set({ widgets: get().widgets.filter((w) => w.id !== id) })
     nudgeSync()
-    // WS01 sync substrate (flagged): emit a delete tombstone so the removal
-    // converges on other devices (remove-wins). No-op until the engine registers.
-    crdtEmitWidgetDelete(id)
     // Don't prune links: they survive the soft-delete so they return on restore.
     // The overlay skips links whose endpoint widget isn't present, so a trashed
     // widget's lines simply hide until it's restored.

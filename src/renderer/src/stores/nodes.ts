@@ -185,14 +185,16 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
   remove: async (id) => {
     const target = get().nodes.find((n) => n.id === id)
     const ids = await window.api.nodes.delete(id)
+    // WS01 sync substrate (flagged): tombstone every removed id (a folder delete
+    // cascades to its descendants) so the removal converges on other devices. Emit
+    // BEFORE pruning the store so the engine can still resolve each node's shared
+    // root (shared-desk deletes must route to the desk partition, not the account).
+    crdtEmitNodeDelete(ids)
     set({
       nodes: get().nodes.filter((n) => !ids.includes(n.id)),
       activeTaskId: ids.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
     })
     nudgeSync()
-    // WS01 sync substrate (flagged): tombstone every removed id (a folder delete
-    // cascades to its descendants) so the removal converges on other devices.
-    crdtEmitNodeDelete(ids)
     // Best-effort: archive the deleted room/desk's chat channel (keeps history,
     // hides it from lists). No-op if the object never had a channel.
     if (target) {
