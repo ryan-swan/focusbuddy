@@ -2,104 +2,76 @@ import { plexiId } from '@shared/plexiId'
 
 // WS01 sync substrate — per-type migration flags.
 //
-// Each object type moves onto the CRDT change log behind its own flag, with the
-// twenty-second workspace poll kept as the fallback until that type is proven, so a
-// half-migrated type never breaks live use (the design's dual-write rule). Default
-// OFF: with no flag set the app behaves exactly as it does today and the engine
-// registers nothing.
+// Each object type rides the CRDT change log alongside the twenty-second workspace
+// poll (the design's dual-write rule: the poll stays as the backstop, so a dropped
+// frame or a not-yet-migrated field never loses data). Every type is now proven live
+// across all three partition scopes (account, org, shared desk) and the signal is
+// deployed, so as of the lock-retire rollout these DEFAULT ON.
+//
+// Default ON, with an explicit off-switch: `localStorage['fb.sync.crdt.<type>']`
+// unset or '1' is ON; only the literal '0' turns a type off. This is what makes
+// shared-desk canvas collaboration real (it rides widgets + nodes + tables + links),
+// which is the prerequisite for retiring the check-out lock. If localStorage is
+// unreadable we fail safe to OFF (poll-only) rather than starting the engine blind.
+function crdtFlagOn(type: string): boolean {
+  try {
+    return localStorage.getItem(`fb.sync.crdt.${type}`) !== '0'
+  } catch {
+    return false
+  }
+}
 
 export function crdtWidgetsEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.widgets') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('widgets')
 }
 
-// Nodes (tasks / folders / desks). This slice syncs the node's title and its
-// parent as LWW registers; ordering (sortOrder / beforeId) stays on the poll until
-// a fractional-index ordering CRDT lands, so a reparent converges live while
-// sibling order still reconciles via the poll. Default OFF.
+// Nodes (tasks / folders / desks). Syncs the node's title, parent and scalar attrs
+// as LWW registers; sibling ORDER still reconciles via the poll (no fractional-index
+// CRDT yet), so a reparent converges live while order catches up on the poll.
 export function crdtNodesEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.nodes') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('nodes')
 }
 
-// Table rows. This slice syncs row CELLS, each an LWW register keyed by column, so
-// two people editing different cells of the same row both survive (today the poll's
-// whole-row last-write-wins loses one). Row creation/deletion + schema stay on the
-// poll. Default OFF.
+// Table rows. Syncs each row CELL as an LWW register keyed by column, so two people
+// editing different cells of the same row both survive (the poll's whole-row LWW
+// loses one).
 export function crdtTablesEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.tables') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('tables')
 }
 
-// Time blocks (calendar). Syncs a block's start / duration / title / status as LWW
-// registers, so moving or retitling a block converges live. Creation/deletion +
-// recurrence series stay on the poll. Default OFF.
+// Time blocks (calendar). Syncs start / duration / title / status as LWW registers;
+// recurrence-series expansion stays on the poll.
 export function crdtTimeBlocksEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.timeblocks') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('timeblocks')
 }
 
-// Files/folders (the Drive manager entries). Syncs an entry's name and parent as
-// LWW registers, so a rename or a move converges live. Ingest/creation/deletion and
-// the file bytes stay on the poll + blob sync. Default OFF.
+// Files/folders (the Drive manager entries). Syncs name + parent as LWW registers;
+// the file bytes stay on the poll + blob sync.
 export function crdtFilesEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.files') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('files')
 }
 
-// Document METADATA (title / archived / create / delete). The document BODY is not
-// carried here: org-shared bodies live on Yjs, and personal bodies still ride the
-// poll until the Yjs text-class fold moves them. Default OFF.
+// Document METADATA (title / archived / create / delete). The document BODY rides
+// its own channel (org bodies on Yjs, personal on the poll), not this.
 export function crdtDocumentsEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.documents') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('documents')
 }
 
-// Widget LINKS (the connector wires between widgets on a desk). Syncs a wire's
-// existence (create / delete) and its behaviour fields (type / verb / enabled) as
-// LWW registers, routed with the wire's task node — so a SHARED DESK's wires
-// converge alongside its widgets (previously wires never synced across grantees).
-// Run-state (lastRunAt / lastError) is local engine output and stays off the log.
-// Default OFF. Meaningful together with the widgets flag (wires need their widgets).
+// Widget LINKS (the connector wires between widgets on a desk). Existence
+// (create / delete) plus type / verb / enabled as LWW registers, routed with the
+// wire's task node so a SHARED DESK's wires converge alongside its widgets. Run-state
+// (lastRunAt / lastError) is local engine output and stays off the log.
 export function crdtLinksEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.links') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('links')
 }
 
 // LIVE FOLDERS (the shared, collaborative folder tree — LiveFolderView). Each tree
-// entry (folder / file / inlined doc) becomes a CRDT object: create carries the
-// entry snapshot, delete tombstones it, name + parent are LWW registers, so two
-// people reorganising the same shared folder converge WITHOUT the check-out lock.
-// The folder's body_json stays the frozen baseline; the change log carries the
-// deltas on top. Default OFF (the lock path is unchanged while this is off). This
-// is the first of the two migrations that let the check-out lock be retired.
+// entry becomes a CRDT object (create snapshot + delete tombstone + name/parent LWW),
+// so people reorganise a shared folder concurrently and converge WITHOUT the
+// check-out lock. body_json stays the frozen baseline; the change log carries the
+// deltas on top.
 export function crdtLiveFoldersEnabled(): boolean {
-  try {
-    return localStorage.getItem('fb.sync.crdt.livefolders') === '1'
-  } catch {
-    return false
-  }
+  return crdtFlagOn('livefolders')
 }
 
 // A stable per-install id, minted once and reused. It is the LWW tiebreak actor, so
