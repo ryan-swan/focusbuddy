@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.13',
+    date: '2026-08-16T12:00:00Z',
+    title: 'PlexiDesk 4.0.13 — real-time collaboration, no more check-out',
+    tag: 'feature',
+    summary:
+      'Shared desks, folders and canvases are now edited by everyone at once, live. The old check-out lock is gone: you no longer have to wait for a teammate to release a folder or canvas before you can touch it, and there is no more "locked by, request access". Everyone edits together and the changes merge automatically as they happen, the same way live documents already work. Connector wires between widgets now sync on a shared desk too. Under the hood this moves the whole workspace onto one conflict-free sync engine, so edits made offline queue up and reconcile cleanly when you reconnect.',
+    highlights: [
+      'Shared desks, folders and canvases are now fully concurrent — no check-out lock, no "request access", no waiting your turn.',
+      'Changes from teammates appear live rather than on a slow refresh, and edits to different things (or different cells of the same row) all survive.',
+      'Wires between widgets now sync across everyone on a shared desk.',
+      'Edits made while offline queue locally and merge in when you reconnect.'
+    ],
+    links: [{ label: 'Collaborating in real time', href: `${HELP_BASE}/real-time-collaboration` }]
+  },
+  {
     version: '4.0.12',
     date: '2026-08-13T18:00:00Z',
     title: 'PlexiDesk 4.0.12 — one assistant, finished',
