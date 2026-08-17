@@ -38,16 +38,18 @@ describe('isEnabledValue', () => {
 
 describe('isCapabilityEnabled — boolean gates from the matrix', () => {
   it('free user cannot use a Pro-only capability by default', () => {
-    // Uses caps that remain Pro-gated under the land-grab pricing (collaboration
-    // and backup are the wall; widgets and personal features are free).
+    // Uses caps that remain Pro-gated under the land-grab pricing. Real-time
+    // collaboration (chat, meet, calls, presence, sharing) is now free to drive
+    // adoption; the paid wall is heavy-consumption and convenience — cloud vault
+    // backup, the live AI body double, and unlimited workspace history.
     const free = defaultsForTier('free')
-    expect(isCapabilityEnabled(free, 'chat')).toBe(false)
+    expect(isCapabilityEnabled(free, 'vault_backup')).toBe(false)
     expect(isCapabilityEnabled(free, 'body_double')).toBe(false)
     expect(isCapabilityEnabled(free, 'workspace_history')).toBe(false)
   })
   it('pro user can use Pro capabilities', () => {
     const pro = defaultsForTier('pro')
-    expect(isCapabilityEnabled(pro, 'chat')).toBe(true)
+    expect(isCapabilityEnabled(pro, 'vault_backup')).toBe(true)
     expect(isCapabilityEnabled(pro, 'body_double')).toBe(true)
   })
   it('an ADMIN OVERRIDE that enables a cap for free flips the verdict', () => {

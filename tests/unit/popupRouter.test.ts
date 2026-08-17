@@ -176,4 +176,75 @@ describe('decidePopup', () => {
       expect(result.overrideBrowserWindowOptions.width).toBe(520)
     })
   })
+
+  describe('sign-in from any connected app stays a native window', () => {
+    it('GitHub plain login as a foreground-tab opens native (the connect-spins fix)', () => {
+      // A user not yet signed into GitHub in the app hits github.com/login first,
+      // which is not an /oauth path. Host-matching keeps it a real window so the
+      // sign-in completes instead of being forwarded to the canvas as a widget.
+      const result = decidePopup(
+        {
+          url: 'https://github.com/login?return_to=%2Flogin%2Foauth%2Fauthorize',
+          frameName: '',
+          features: '',
+          disposition: 'foreground-tab'
+        },
+        ctx
+      )
+      expect(result.action).toBe('allow')
+    })
+
+    it('GitHub two-factor and device popups open native', () => {
+      for (const url of ['https://github.com/sessions/two-factor', 'https://github.com/login/device']) {
+        const result = decidePopup({ url, frameName: '', features: '', disposition: 'foreground-tab' }, ctx)
+        expect(result.action).toBe('allow')
+      }
+    })
+
+    it('GitLab and Bitbucket hosts open native too', () => {
+      for (const url of ['https://gitlab.com/users/sign_in', 'https://bitbucket.org/account/signin']) {
+        const result = decidePopup({ url, frameName: '', features: '', disposition: 'foreground-tab' }, ctx)
+        expect(result.action).toBe('allow')
+      }
+    })
+
+    it('an unknown provider whose path looks like sign-in opens native', () => {
+      for (const url of ['https://acme.example/login', 'https://acme.example/sso/start', 'https://acme.example/oauth/authorize']) {
+        const result = decidePopup({ url, frameName: '', features: '', disposition: 'foreground-tab' }, ctx)
+        expect(result.action).toBe('allow')
+      }
+    })
+
+    it('does not mistake a content path that merely contains "login" (/login-help) for auth', () => {
+      const result = decidePopup(
+        { url: 'https://docs.example.com/login-help', frameName: '', features: '', disposition: 'foreground-tab' },
+        ctx
+      )
+      expect(result.action).toBe('deny') // ordinary link → desk browser widget
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer?.url).toContain('login-help')
+    })
+  })
+
+  describe('no popup is ever silently dropped', () => {
+    it('an http popup with an odd disposition still shows as a desk browser object', () => {
+      const result = decidePopup(
+        { url: 'https://random.example/thing', frameName: '', features: '', disposition: 'other' },
+        ctx
+      )
+      expect(result.action).toBe('deny')
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer?.url).toBe('https://random.example/thing')
+    })
+
+    it('still refuses non-http schemes outright, with no forward', () => {
+      const result = decidePopup(
+        { url: 'javascript:alert(1)', frameName: '', features: '', disposition: 'other' },
+        ctx
+      )
+      expect(result.action).toBe('deny')
+      if (result.action !== 'deny') return
+      expect(result.forwardToRenderer).toBeUndefined()
+    })
+  })
 })
