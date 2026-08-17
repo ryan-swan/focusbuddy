@@ -149,6 +149,24 @@ async function seed(ownerToken, orgId) {
   }
 }
 
+// A fresh org has no chat channel, so seed a #general and join every member,
+// mirroring the test-org harness, so the chat journey has somewhere to post.
+async function seedChannel(users, orgId) {
+  const owner = users[0]
+  const existing = await api(`/orgs/${orgId}/channels`, { token: owner.token })
+  let channelId = (existing.json?.channels ?? []).find((c) => (c.name || c.title || '').toLowerCase() === 'general')?.id ?? null
+  if (!channelId) {
+    const r = await api(`/orgs/${orgId}/channels`, { method: 'POST', token: owner.token, body: { name: 'general' } })
+    channelId = r.json?.conversationId ?? null
+  }
+  if (!channelId) {
+    console.log('  ! could not seed #general')
+    return
+  }
+  for (const u of users.slice(1)) await api(`/conversations/${channelId}/join`, { method: 'POST', token: u.token })
+  console.log(`  + #general channel ready (${channelId}); members joined`)
+}
+
 async function stop() {
   try {
     const pid = Number(readFileSync(PID_FILE, 'utf8'))
@@ -170,6 +188,7 @@ async function main() {
   await api(`/orgs/${orgId}/members`, { method: 'POST', token: ava.token, body: { email: ben.email, role: 'member' } })
   console.log(`• org "${ORG_NAME}" ready (${orgId}); ava owner, ben member`)
   await seed(ava.token, orgId)
+  await seedChannel([ava, ben], orgId)
   const creds = {
     signalHttp: HTTP,
     signalWs: WS,

@@ -212,9 +212,11 @@ async function main() {
   })
 
   await step(page, 'chat-message', async () => {
-    await agent.aiAction('Open the chat (PlexiChat). Select the #general channel if there is a channel list.')
-    await agent.aiAction('Type "Hello from the AI native E2E run" into the message composer and send it.')
-    await agent.aiAssert('the message "Hello from the AI native E2E run" appears in the channel message list')
+    await agent.aiAction('Open the Chat / PlexiChat area (it may be under a People, Chat, or Messages section in the navigation).')
+    await agent.aiAction('In the channel or conversation list, select the channel named "general" (it may show as #general).')
+    await agent.aiAction('Click the message input box at the bottom of the conversation, type "Hello from the AI native E2E run", and press Enter to send it.')
+    await agent.aiWaitFor('the sent message text is visible in the conversation message list', { timeoutMs: 20_000 })
+    await agent.aiAssert('the message "Hello from the AI native E2E run" appears in the general channel message list')
     return 'chat message sent'
   })
 
