@@ -1,0 +1,19 @@
+{
+  "name": "plexidesk-ai-e2e",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "AI-driven end-user E2E for PlexiDesk. An LLM vision agent drives the real UI (clicks, types, creates), asserts outcomes in natural language, and produces a visual report plus a diagnosis and improvement recommendations. Distinct from the Playwright/vitest tester.",
+  "scripts": {
+    "boot": "node boot-local.mjs",
+    "test": "node run.mjs",
+    "diagnose": "node diagnose.mjs",
+    "test:desktop": "node run-desktop.mjs",
+    "diagnose:desktop": "node diagnose.mjs results-desktop.json",
+    "stop": "node boot-local.mjs stop"
+  },
+  "dependencies": {
+    "@midscene/web": "^0.30.0",
+    "puppeteer": "^24.0.0"
+  }
+}
