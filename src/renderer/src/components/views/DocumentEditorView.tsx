@@ -10,6 +10,7 @@ import { DocEditor, SheetEditor, SlidesEditor, MapEditor, DesignEditor } from '@
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
 import DocFiledInChip from '../DocFiledInChip'
+import ShareDialog from '../ShareDialog'
 
 // Local-document comment row (matches the docComments IPC surface).
 interface LocalComment {
@@ -62,6 +63,8 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
   // the docComments IPC, so the panel works signed out too.
   const [editor, setEditor] = useState<Editor | null>(null)
   const [comments, setComments] = useState<LocalComment[]>([])
+  // Share this office file directly from its editor.
+  const [shareOpen, setShareOpen] = useState(false)
   useEffect(() => {
     setComments([])
     void window.api.documents.listComments(documentId).then(setComments)
@@ -197,6 +200,16 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
         >
           <Icon name="forum" size={15} />
         </button>
+        <button
+          onClick={() => setShareOpen(true)}
+          title="Share this file"
+          aria-label="Share this file"
+          data-testid="doc-share-button"
+          className="shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-[12px] font-medium text-stone-500 dark:text-stone-400 hover:text-accent hover:bg-[var(--surface-sunken)]"
+        >
+          <Icon name="ios_share" size={14} />
+          Share
+        </button>
         {saveError ? (
           <span
             className="text-[11px] text-red-600 dark:text-red-400 inline-flex items-center gap-1 shrink-0"
@@ -247,6 +260,14 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
           <DesignEditor key={active.id} content={active.body} title={active.title} onChange={(b) => saveBody(b)} />
         )}
       </div>
+      {shareOpen && (
+        <ShareDialog
+          kind="document"
+          entityId={active.id}
+          label={active.title || 'Document'}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }
