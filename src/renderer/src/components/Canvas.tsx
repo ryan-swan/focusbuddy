@@ -304,7 +304,6 @@ export default function Canvas(): JSX.Element {
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   const resolveObjectChannel = useMessagingStore((s) => s.resolveObjectChannel)
   const setActiveTask = useNodeStore((s) => s.setActive)
-  const expandFolder = useNodeStore((s) => s.expand)
   // Breadcrumb origin: if this task's canvas was opened by exploring a mind-map
   // node, show a path back to the map. Re-read on task switch + origin changes.
   const [nodeOrigin, setNodeOrigin] = useState<NodeCanvasOrigin | null>(() =>
@@ -2359,7 +2358,6 @@ export default function Canvas(): JSX.Element {
               activeTask={activeTask}
               nodes={nodes}
               onOpenTask={(id) => setActiveTask(id)}
-              onRevealFolder={(id) => expandFolder(id, true)}
               onHome={() => setActiveTask(null)}
               fromMindmap={!!nodeOrigin}
               onRenameTask={(id, title) => void updateNode(id, { title })}

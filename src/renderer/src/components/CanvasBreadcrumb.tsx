@@ -3,12 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { FbNode } from '@shared/types'
 import Icon from './Icon'
 import StageManagerStrip from './StageManagerStrip'
+import { useViewStore } from '../stores/view'
 
 interface Props {
   activeTask: FbNode
   nodes: FbNode[]
   onOpenTask: (id: string) => void
-  onRevealFolder: (id: string) => void
   onHome: () => void
   fromMindmap?: boolean
   onAssignToRoom?: (deskId: string, roomId: string) => void
@@ -34,13 +34,17 @@ export default function CanvasBreadcrumb({
   activeTask,
   nodes,
   onOpenTask,
-  onRevealFolder,
   onHome,
   fromMindmap,
   onAssignToRoom,
   onCreateRoomFromDesk,
   onRenameTask
 }: Props): JSX.Element {
+  // Global back + canonical room open, so a desk can always step back to the
+  // previous screen and open the room it lives in from the breadcrumb.
+  const goBack = useViewStore((s) => s.back)
+  const canBack = useViewStore((s) => s.past.length > 0)
+  const goRoom = useViewStore((s) => s.goRoom)
   // `expanded` drives both pill breadcrumb visibility AND dropdown presence.
   // It is set true on any mouseEnter into the system (pill or dropdown) and
   // scheduled false by a shared timer on any mouseLeave — cancelled if the
@@ -182,6 +186,18 @@ export default function CanvasBreadcrumb({
         onMouseLeave={handleLeave}
         className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] max-w-full overflow-hidden cursor-default select-none"
       >
+        {/* Back — steps to the previous screen; shown only when there is history */}
+        {canBack && (
+          <button
+            onClick={goBack}
+            className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] shrink-0 transition-colors"
+            title="Back"
+            aria-label="Back"
+            data-testid="canvas-back"
+          >
+            <Icon name="arrow_back" size={13} />
+          </button>
+        )}
         {/* Home button — always visible */}
         <button
           onClick={onHome}
@@ -214,9 +230,9 @@ export default function CanvasBreadcrumb({
                   >
                     <Icon name="chevron_right" size={13} className="text-[var(--ink-30)]" />
                     <button
-                      onClick={() => (isFolder ? onRevealFolder(n.id) : onOpenTask(n.id))}
+                      onClick={() => (isFolder ? goRoom(n.id) : onOpenTask(n.id))}
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-100)] max-w-[160px] transition-colors whitespace-nowrap"
-                      title={isFolder ? `Reveal "${n.title}" in sidebar` : `Open "${n.title}"`}
+                      title={isFolder ? `Open room "${n.title}"` : `Open "${n.title}"`}
                     >
                       <Icon
                         name={isFolder ? 'folder' : 'task_alt'}

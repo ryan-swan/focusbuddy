@@ -498,16 +498,6 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           {roomsNavOpen && (
             <div className="ml-4 pl-2 border-l border-[var(--edge-soft)]">
               <NavRow
-                icon="grid_view"
-                label="All rooms"
-                tint="bg-sky-400"
-                active={viewIsActive({ kind: 'rooms' })}
-                onClick={() => {
-                  setActive(null)
-                  goRooms()
-                }}
-              />
-              <NavRow
                 icon="desk"
                 label="All desks"
                 tint="bg-teal-500"

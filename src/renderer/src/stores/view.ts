@@ -62,10 +62,21 @@ export type View =
 
 interface ViewStore {
   view: View
+  // Navigation history. `past` is the stack of views behind the current one,
+  // `future` the stack ahead (populated by back()). Every setter funnels through
+  // commit(), so back/forward work from anywhere, including inside a desk.
+  past: View[]
+  future: View[]
+  back: () => void
+  forward: () => void
   go: (view: View) => void
   goHome: () => void
   goAllTasks: () => void
   goRooms: () => void
+  // Canonical way to open a Room. A room opens as its spatial folder-canvas
+  // (kind 'project-dashboard'); every room opener routes through this so there is
+  // one room destination, not three.
+  goRoom: (roomId: string) => void
   goDesks: (roomId?: string) => void
   goShared: () => void
   goCalendar: () => void
@@ -106,6 +117,7 @@ interface ViewStore {
 }
 
 const STORAGE_KEY = 'fb.view.last'
+const MAX_HISTORY = 50
 
 function readLastView(): View {
   // PlexiSuite is the default landing: anyone without a saved view starts on the
@@ -154,213 +166,88 @@ function persistView(view: View): void {
   }
 }
 
-export const useViewStore = create<ViewStore>((set) => ({
-  view: readLastView(),
-  go: (view) => {
+// Views are small plain objects; a JSON compare is the cheapest way to avoid
+// pushing a duplicate of the current view onto the history stack.
+function isSameView(a: View, b: View): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+export const useViewStore = create<ViewStore>((set, get) => {
+  // Every navigation goes through here: record where we were, clear the forward
+  // stack, persist, and switch. This is what makes Back work from any screen.
+  const commit = (view: View): void => {
+    const cur = get().view
+    if (isSameView(cur, view)) {
+      persistView(view)
+      set({ view })
+      return
+    }
     persistView(view)
-    set({ view })
-  },
-  goHome: () => {
-    const v: View = { kind: 'home' }
-    persistView(v)
-    set({ view: v })
-  },
-  goAllTasks: () => {
-    const v: View = { kind: 'all-tasks' }
-    persistView(v)
-    set({ view: v })
-  },
-  goRooms: () => {
-    const v: View = { kind: 'rooms' }
-    persistView(v)
-    set({ view: v })
-  },
-  goDesks: (roomId?: string) => {
-    const v: View = { kind: 'desks', roomId }
-    persistView(v)
-    set({ view: v })
-  },
-  goShared: () => {
-    const v: View = { kind: 'shared' }
-    persistView(v)
-    set({ view: v })
-  },
-  goCalendar: () => {
-    const v: View = { kind: 'calendar' }
-    persistView(v)
-    set({ view: v })
-  },
-  goProject: (projectId) => {
-    const v: View = { kind: 'project-dashboard', projectId }
-    persistView(v)
-    set({ view: v })
-  },
-  goTask: (taskId) => {
-    const v: View = { kind: 'task', taskId }
-    persistView(v)
-    set({ view: v })
-  },
-  goConnectedApp: (appId) => {
-    const v: View = { kind: 'connected-app', appId }
-    persistView(v)
-    set({ view: v })
-  },
-  goVault: () => {
-    const v: View = { kind: 'vault' }
-    persistView(v)
-    set({ view: v })
-  },
-  goMessages: () => {
-    const v: View = { kind: 'messages' }
-    persistView(v)
-    set({ view: v })
-  },
-  goInbox: () => {
-    const v: View = { kind: 'inbox' }
-    persistView(v)
-    set({ view: v })
-  },
-  goMail: (openUid) => {
-    const v: View = { kind: 'mail', openUid }
-    persistView(v)
-    set({ view: v })
-  },
-  goDocuments: () => {
-    const v: View = { kind: 'documents' }
-    persistView(v)
-    set({ view: v })
-  },
-  goOffice: (app) => {
-    const v: View = { kind: 'office', app }
-    persistView(v)
-    set({ view: v })
-  },
-  goPlexiDesk: (app) => {
-    const v: View = { kind: 'plexidesk', app }
-    persistView(v)
-    set({ view: v })
-  },
-  goPlexiPeople: (app) => {
-    const v: View = { kind: 'plexipeople', app }
-    persistView(v)
-    set({ view: v })
-  },
-  goPlexiBrain: (app) => {
-    const v: View = { kind: 'plexibrain', app }
-    persistView(v)
-    set({ view: v })
-  },
-  goDesign: () => {
-    const v: View = { kind: 'design' }
-    persistView(v)
-    set({ view: v })
-  },
-  goDocument: (documentId) => {
-    const v: View = { kind: 'document', documentId }
-    persistView(v)
-    set({ view: v })
-  },
-  goLiveDoc: (liveDocId) => {
-    const v: View = { kind: 'livedoc', liveDocId }
-    persistView(v)
-    set({ view: v })
-  },
-  goLiveFolder: (liveFolderId) => {
-    const v: View = { kind: 'livefolder', liveFolderId }
-    persistView(v)
-    set({ view: v })
-  },
-  goCollaborations: () => {
-    const v: View = { kind: 'collaborations' }
-    persistView(v)
-    set({ view: v })
-  },
-  goInsights: () => {
-    const v: View = { kind: 'insights' }
-    persistView(v)
-    set({ view: v })
-  },
-  goFiles: () => {
-    const v: View = { kind: 'files' }
-    persistView(v)
-    set({ view: v })
-  },
-  goOrg: () => {
-    const v: View = { kind: 'organization' }
-    persistView(v)
-    set({ view: v })
-  },
-  goPeopleMap: () => {
-    const v: View = { kind: 'people-map' }
-    persistView(v)
-    set({ view: v })
-  },
-  goSuite: () => {
-    const v: View = { kind: 'suite' }
-    persistView(v)
-    set({ view: v })
-  },
-  goProduct: (productKey) => {
-    const v: View = { kind: 'product', productKey }
-    persistView(v)
-    set({ view: v })
-  },
-  goKnowledge: (entryId?: string) => {
-    const v: View = { kind: 'knowledge', entryId }
-    persistView(v)
-    set({ view: v })
-  },
-  goMeetings: () => {
-    const v: View = { kind: 'meetings' }
-    persistView(v)
-    set({ view: v })
-  },
-  goApps: () => {
-    const v: View = { kind: 'apps' }
-    persistView(v)
-    set({ view: v })
-  },
-  goForms: () => {
-    const v: View = { kind: 'forms' }
-    persistView(v)
-    set({ view: v })
-  },
-  goSign: () => {
-    const v: View = { kind: 'sign' }
-    persistView(v)
-    set({ view: v })
-  },
-  goSearch: () => {
-    const v: View = { kind: 'search' }
-    persistView(v)
-    set({ view: v })
-  },
-  goProjects: () => {
-    const v: View = { kind: 'projects' }
-    persistView(v)
-    set({ view: v })
-  },
-  goReports: () => {
-    const v: View = { kind: 'reports' }
-    persistView(v)
-    set({ view: v })
-  },
-  goFlows: () => {
-    const v: View = { kind: 'flows' }
-    persistView(v)
-    set({ view: v })
-  },
-  goApi: () => {
-    const v: View = { kind: 'api' }
-    persistView(v)
-    set({ view: v })
-  },
-  goMarketplace: () => {
-    const v: View = { kind: 'marketplace' }
-    persistView(v)
-    set({ view: v })
+    set({ view, past: [...get().past, cur].slice(-MAX_HISTORY), future: [] })
   }
-}))
+
+  return {
+    view: readLastView(),
+    past: [],
+    future: [],
+    back: () => {
+      const { past, view, future } = get()
+      if (past.length === 0) return
+      const prev = past[past.length - 1]
+      persistView(prev)
+      set({ view: prev, past: past.slice(0, -1), future: [view, ...future].slice(0, MAX_HISTORY) })
+    },
+    forward: () => {
+      const { future, view, past } = get()
+      if (future.length === 0) return
+      const next = future[0]
+      persistView(next)
+      set({ view: next, future: future.slice(1), past: [...past, view].slice(-MAX_HISTORY) })
+    },
+    go: (view) => commit(view),
+    goHome: () => commit({ kind: 'home' }),
+    goAllTasks: () => commit({ kind: 'all-tasks' }),
+    goRooms: () => commit({ kind: 'rooms' }),
+    goRoom: (roomId) => commit({ kind: 'project-dashboard', projectId: roomId }),
+    goDesks: (roomId) => commit({ kind: 'desks', roomId }),
+    goShared: () => commit({ kind: 'shared' }),
+    goCalendar: () => commit({ kind: 'calendar' }),
+    goProject: (projectId) => commit({ kind: 'project-dashboard', projectId }),
+    goTask: (taskId) => commit({ kind: 'task', taskId }),
+    goConnectedApp: (appId) => commit({ kind: 'connected-app', appId }),
+    goVault: () => commit({ kind: 'vault' }),
+    goMessages: () => commit({ kind: 'messages' }),
+    goInbox: () => commit({ kind: 'inbox' }),
+    goMail: (openUid) => commit({ kind: 'mail', openUid }),
+    goDocuments: () => commit({ kind: 'documents' }),
+    goOffice: (app) => commit({ kind: 'office', app }),
+    goPlexiDesk: (app) => commit({ kind: 'plexidesk', app }),
+    goPlexiPeople: (app) => commit({ kind: 'plexipeople', app }),
+    goPlexiBrain: (app) => commit({ kind: 'plexibrain', app }),
+    goDesign: () => commit({ kind: 'design' }),
+    goDocument: (documentId) => commit({ kind: 'document', documentId }),
+    goLiveDoc: (liveDocId) => commit({ kind: 'livedoc', liveDocId }),
+    goLiveFolder: (liveFolderId) => commit({ kind: 'livefolder', liveFolderId }),
+    goCollaborations: () => commit({ kind: 'collaborations' }),
+    goInsights: () => commit({ kind: 'insights' }),
+    goFiles: () => commit({ kind: 'files' }),
+    goOrg: () => commit({ kind: 'organization' }),
+    goPeopleMap: () => commit({ kind: 'people-map' }),
+    goSuite: () => commit({ kind: 'suite' }),
+    goProduct: (productKey) => commit({ kind: 'product', productKey }),
+    goKnowledge: (entryId) => commit({ kind: 'knowledge', entryId }),
+    goMeetings: () => commit({ kind: 'meetings' }),
+    goApps: () => commit({ kind: 'apps' }),
+    goForms: () => commit({ kind: 'forms' }),
+    goSign: () => commit({ kind: 'sign' }),
+    goSearch: () => commit({ kind: 'search' }),
+    goProjects: () => commit({ kind: 'projects' }),
+    goReports: () => commit({ kind: 'reports' }),
+    goFlows: () => commit({ kind: 'flows' }),
+    goApi: () => commit({ kind: 'api' }),
+    goMarketplace: () => commit({ kind: 'marketplace' })
+  }
+})
 
 // Expose the view store on window so debugging sessions and e2e specs can drive
 // navigation directly. This is a thin handle to the real store, not a mock; it

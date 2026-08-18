@@ -37,7 +37,7 @@ export default function RoomsView(): JSX.Element {
   // team org exists.
   const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
   const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
-  const goDesks = useViewStore((s) => s.goDesks)
+  const goRoom = useViewStore((s) => s.goRoom)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   // Public share-link target (a room shared as a 'folder' snapshot with its
   // desks). Opens the universal ShareDialog; null when closed.
@@ -173,13 +173,13 @@ export default function RoomsView(): JSX.Element {
       { key: 'top', label: 'Top level', predicate: (r) => r.parentId == null }
     ],
     timelineDate: (r) => r.createdAt,
-    onOpen: (r) => goDesks(r.id),
+    onOpen: (r) => goRoom(r.id),
     newLabel: 'New room',
     onNew: () => {
       void (async () => {
         try {
           const node = await create({ parentId: null, kind: 'folder', title: 'New room' })
-          goDesks(node.id)
+          goRoom(node.id)
         } catch {
           /* create() surfaces its own limit prompt */
         }
@@ -264,9 +264,9 @@ export default function RoomsView(): JSX.Element {
         <button
           onClick={(e) => {
             e.stopPropagation()
-            goDesks(r.id)
+            goRoom(r.id)
           }}
-          title="Open this room's desks"
+          title="Open room"
           className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
         >
           <Icon name="chevron_right" size={15} />
