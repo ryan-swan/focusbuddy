@@ -22,6 +22,7 @@ import {
 import { buildDocumentSnapshot, buildFolderShareSnapshot } from '../lib/officeShareSnapshot'
 import Icon from './Icon'
 import LiveDeskSharing from './LiveDeskSharing'
+import LiveDocSharing from './LiveDocSharing'
 
 // Universal share dialog — opens from a folder, task, or widget right-click.
 // One flow regardless of the entity kind: pick scope (view-only or
@@ -291,6 +292,10 @@ export default function ShareDialog({
           {(kind === 'folder' || kind === 'task') && (
             <LiveDeskSharing rootId={entityId} roomRootId={roomInfo?.id} roomTitle={roomInfo?.title} />
           )}
+
+          {/* An office file promotes to a live co-edited document and invites the
+              chosen people, via the same shared picker. */}
+          {kind === 'document' && <LiveDocSharing documentId={entityId} onClose={onClose} />}
 
           {/* Guardrail: on a desk/room both paths are offered, so make it
               unmistakable that the link below is a FROZEN snapshot, not live — this
