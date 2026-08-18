@@ -643,15 +643,21 @@ export default function App(): JSX.Element {
       </header>
       <main className="flex-1 min-h-0 relative flex bg-[var(--surface-base)]" style={mainPad}>
         {segmentTakeover ? (
-          currentView.kind === 'office' ? (
-            <PlexiOfficeShell initialApp={currentView.app} />
-          ) : currentView.kind === 'plexidesk' ? (
-            <PlexiDeskShell initialApp={currentView.app} />
-          ) : currentView.kind === 'plexipeople' ? (
-            <PlexiPeopleShell initialApp={currentView.app ?? 'home'} />
-          ) : (
-            <PlexiBrainShell initialApp={currentView.app} />
-          )
+          // Grow the segment shell to fill <main> up to the reserved assistant
+          // strip, the same wrapper the MainPane branch uses. Without this the
+          // shell is a grow-0 flex item that collapses to content width and pins
+          // left, leaving dead whitespace on wide screens.
+          <div className="flex-1 min-w-0 h-full">
+            {currentView.kind === 'office' ? (
+              <PlexiOfficeShell initialApp={currentView.app} />
+            ) : currentView.kind === 'plexidesk' ? (
+              <PlexiDeskShell initialApp={currentView.app} />
+            ) : currentView.kind === 'plexipeople' ? (
+              <PlexiPeopleShell initialApp={currentView.app ?? 'home'} />
+            ) : (
+              <PlexiBrainShell initialApp={currentView.app} />
+            )}
+          </div>
         ) : (
         <>
           {/* The Desk sidebar floats as a rounded card beside the content. The
