@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.16',
+    date: '2026-08-18T22:00:00Z',
+    title: 'PlexiDesk 4.0.16 — share with several people at once',
+    tag: 'feature',
+    summary:
+      'Sharing a desk, room or office file now lets you add several people in one go. The picker browses your whole organisation and narrows as you type by name, handle or email, shows each person with their handle and email so you pick the right one, and stages everyone as chips so you share with them all in a single step. Sharing an office file promotes it to a live document everyone edits together, and people outside your email domain can be added as organisation guests as part of sharing.',
+    highlights: [
+      'Add several people to a share at once, staged as chips.',
+      'Browse the whole organisation and search by name, handle or email.',
+      'Everyone shows with their handle and email so you pick the right person.',
+      'Sharing an office file with people turns it into a live document you edit together.'
+    ],
+    links: [{ label: 'Sharing and collaboration', href: `${HELP_BASE}/real-time-collaboration` }]
+  },
+  {
     version: '4.0.15',
     date: '2026-08-18T18:00:00Z',
     title: 'PlexiDesk 4.0.15 — share from anywhere, full-width office',
