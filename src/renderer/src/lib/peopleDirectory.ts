@@ -22,6 +22,7 @@ export interface DirectoryPerson {
   handle: string
   firstName: string | null
   lastName: string | null
+  email: string | null
   role: string
 }
 
@@ -36,6 +37,7 @@ function toDirectory(members: OrgMember[]): DirectoryPerson[] {
     handle: m.handle,
     firstName: m.firstName ?? null,
     lastName: m.lastName ?? null,
+    email: m.email ?? null,
     role: m.role
   }))
 }

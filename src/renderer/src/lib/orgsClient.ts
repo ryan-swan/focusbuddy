@@ -21,6 +21,7 @@ export interface OrgMember {
   handle: string
   firstName?: string | null
   lastName?: string | null
+  email?: string | null
 }
 export interface OrgInvite {
   id: string
