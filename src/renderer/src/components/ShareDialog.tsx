@@ -51,6 +51,17 @@ export default function ShareDialog({
   const revoke = useSharesStore((s) => s.revoke)
   const remove = useSharesStore((s) => s.remove)
   const refresh = useSharesStore((s) => s.refresh)
+  // When sharing a desk (task) that lives in a room (folder), offer to share the
+  // room too so the recipient can open the desk in its room context.
+  const roomInfo = useMemo(() => {
+    if (kind !== 'task') return null
+    const nodes = useNodeStore.getState().nodes
+    const node = nodes.find((n) => n.id === entityId)
+    if (!node?.parentId) return null
+    const parent = nodes.find((n) => n.id === node.parentId)
+    if (!parent || parent.kind !== 'folder') return null
+    return { id: parent.id, title: parent.title || 'room' }
+  }, [kind, entityId])
   // CRITICAL: subscribe to the FULL outgoing array (stable ref while the
   // array itself is unchanged) and derive the filtered subset with
   // useMemo. The previous code did the .filter INSIDE the selector,
@@ -277,7 +288,9 @@ export default function ShareDialog({
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
           {/* Live sharing (real-time, per-desk ACL) — the primary path for a desk.
               A desk is a folder or task node whose id is the desk root id. */}
-          {(kind === 'folder' || kind === 'task') && <LiveDeskSharing rootId={entityId} />}
+          {(kind === 'folder' || kind === 'task') && (
+            <LiveDeskSharing rootId={entityId} roomRootId={roomInfo?.id} roomTitle={roomInfo?.title} />
+          )}
 
           {/* Guardrail: on a desk/room both paths are offered, so make it
               unmistakable that the link below is a FROZEN snapshot, not live — this

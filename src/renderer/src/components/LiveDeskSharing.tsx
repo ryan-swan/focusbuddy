@@ -21,12 +21,23 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 // mistyped handle that silently never matches), or type an email to invite someone
 // by address, and if their email is on a different domain you can add them to the
 // organisation as a guest at the same time.
-export default function LiveDeskSharing({ rootId }: { rootId: string }): JSX.Element {
+export default function LiveDeskSharing({
+  rootId,
+  roomRootId,
+  roomTitle
+}: {
+  rootId: string
+  // When the desk lives in a room, the room is offered so the sharer can grant
+  // it too, letting the recipient open the desk in its room context.
+  roomRootId?: string
+  roomTitle?: string
+}): JSX.Element {
   const [access, setAccess] = useState<DeskAccess | null>(null)
   const [query, setQuery] = useState('')
   const [perm, setPerm] = useState<'view' | 'edit'>('edit')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [shareRoom, setShareRoom] = useState(false)
 
   const people = usePeopleStore((s) => s.people)
   const loadPeople = usePeopleStore((s) => s.load)
@@ -94,7 +105,11 @@ export default function LiveDeskSharing({ rootId }: { rootId: string }): JSX.Ele
     setBusy(true)
     setMsg(null)
     const r = await shareDeskLive(rootId, [{ ...invite, permission: perm }], perm)
-    finish(r, okMsg)
+    if (r.ok && shareRoom && roomRootId) {
+      // Also grant the room so the recipient can open the desk in its room context.
+      await shareDeskLive(roomRootId, [{ ...invite, permission: perm }], perm)
+    }
+    finish(r, shareRoom && roomRootId ? `${okMsg} Room "${roomTitle}" shared too.` : okMsg)
   }
 
   function addAccount(p: DirectoryPerson): void {
@@ -123,7 +138,13 @@ export default function LiveDeskSharing({ rootId }: { rootId: string }): JSX.Ele
       void loadPeople()
     }
     const r = await shareDeskLive(rootId, [{ email, permission: perm }], perm)
-    finish(r, `${email} added to ${orgName} as a guest and given live access.`)
+    if (r.ok && shareRoom && roomRootId) {
+      await shareDeskLive(roomRootId, [{ email, permission: perm }], perm)
+    }
+    finish(
+      r,
+      `${email} added to ${orgName} as a guest and given live access.${shareRoom && roomRootId ? ` Room "${roomTitle}" shared too.` : ''}`
+    )
   }
 
   const grants = (access?.grants ?? []).filter((g) => g.accountId !== owner)
@@ -141,6 +162,22 @@ export default function LiveDeskSharing({ rootId }: { rootId: string }): JSX.Ele
         Everyone you add here sees each other&apos;s changes to this desk as they happen. Only the people
         listed can open it.
       </p>
+
+      {roomRootId && (
+        <label className="flex items-start gap-2 text-[11px] text-[var(--ink-60)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={shareRoom}
+            onChange={(e) => setShareRoom(e.target.checked)}
+            data-testid="livedesk-share-room"
+            className="mt-0.5 accent-[rgb(var(--accent))]"
+          />
+          <span>
+            Also share the room <span className="font-semibold text-[var(--ink-80)]">{roomTitle}</span> and
+            everything in it, so they can open this desk in its room.
+          </span>
+        </label>
+      )}
 
       <div className="flex items-start gap-1.5">
         <div className="flex-1 min-w-0 relative">
