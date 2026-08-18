@@ -4,6 +4,7 @@ import type { FbNode } from '@shared/types'
 import Icon from './Icon'
 import StageManagerStrip from './StageManagerStrip'
 import { useViewStore } from '../stores/view'
+import ShareDialog from './ShareDialog'
 
 interface Props {
   activeTask: FbNode
@@ -45,6 +46,8 @@ export default function CanvasBreadcrumb({
   const goBack = useViewStore((s) => s.back)
   const canBack = useViewStore((s) => s.past.length > 0)
   const goRoom = useViewStore((s) => s.goRoom)
+  // Share dialog for the current room or desk, opened from the breadcrumb.
+  const [shareOpen, setShareOpen] = useState(false)
   // `expanded` drives both pill breadcrumb visibility AND dropdown presence.
   // It is set true on any mouseEnter into the system (pill or dropdown) and
   // scheduled false by a shared timer on any mouseLeave — cancelled if the
@@ -349,6 +352,23 @@ export default function CanvasBreadcrumb({
             <span className="text-[11px] font-medium">Add to room</span>
           </button>
         )}
+
+        {/* Share — opens the people-picker for the current room or desk */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShareOpen(true)
+          }}
+          onMouseEnter={handleLeave}
+          aria-label={current.kind === 'folder' ? 'Share room' : 'Share desk'}
+          title={current.kind === 'folder' ? 'Share this room' : 'Share this desk'}
+          data-testid="canvas-share"
+          className="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)] transition-colors shrink-0"
+        >
+          <Icon name="ios_share" size={12} />
+          <span className="text-[11px] font-medium">Share</span>
+        </button>
       </div>
 
       {/* Transparent bridge — fills the mt-2 gap between pill and dropdown so
@@ -450,6 +470,15 @@ export default function CanvasBreadcrumb({
           </>
         )}
       </AnimatePresence>
+
+      {shareOpen && (
+        <ShareDialog
+          kind={current.kind === 'folder' ? 'folder' : 'task'}
+          entityId={current.id}
+          label={current.title || 'Untitled'}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }
