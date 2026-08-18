@@ -36,6 +36,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.15',
+    date: '2026-08-18T18:00:00Z',
+    title: 'PlexiDesk 4.0.15 — share from anywhere, full-width office',
+    tag: 'polish',
+    summary:
+      'Sharing is now within reach wherever you are. There is a Share button in the canvas breadcrumb for the room or desk you have open, and one in the office editor toolbar so you can share a document, sheet, slides, drawing or design straight from the file. When you share a desk that sits in a room, you can now also share the room and everything in it in the same step, so people can open the desk in context. The office apps and the other full-screen areas also use the whole width of a large display now, instead of a narrow column with empty space beside it.',
+    highlights: [
+      'Share the current room or desk straight from the canvas breadcrumb.',
+      'Share a document, sheet, slides, drawing or design from inside the office editor.',
+      'Sharing a desk can also share its room and everything in it, in one step.',
+      'Office apps and other full-screen views fill the whole width on large screens.'
+    ],
+    links: [{ label: 'Sharing and collaboration', href: `${HELP_BASE}/real-time-collaboration` }]
+  },
+  {
     version: '4.0.14',
     date: '2026-08-18T12:00:00Z',
     title: 'PlexiDesk 4.0.14 — free collaboration, reliable connect, clearer sharing',
