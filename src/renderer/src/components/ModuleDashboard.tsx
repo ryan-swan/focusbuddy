@@ -190,7 +190,7 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
 
   return (
     <div className="flex-1 min-w-0 overflow-auto" data-testid={`module-dashboard-${moduleKey}`}>
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className="w-full px-8 py-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2.5">
             <Icon name={icon} size={22} className={`mt-0.5 shrink-0 ${accentClass}`} filled />

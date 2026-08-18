@@ -465,7 +465,7 @@ export default function FlowView(): JSX.Element {
 
       {/* The single column */}
       <div className="flex-1 min-w-0 overflow-auto">
-        <div className="max-w-[760px] mx-auto px-5 pb-20">
+        <div className="w-full px-6 pb-20">
           {/* Command / ask bar */}
           <div className="sticky top-0 z-20 pt-4 pb-2 bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] backdrop-blur">
             <div className="flex items-center gap-2">

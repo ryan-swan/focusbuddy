@@ -391,7 +391,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
       )}
 
       <div className="flex-1 min-w-0 overflow-auto">
-        <div className="max-w-[1400px] mx-auto px-6 py-6">
+        <div className="w-full px-8 py-6">
           {/* Header */}
           <div className="flex items-start gap-4 mb-5">
             <div className="min-w-0">

@@ -125,7 +125,7 @@ export default function DocumentsView(): JSX.Element {
 
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         <header className="mb-6">
           <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-100">Documents</h1>
           <p className="text-[13px] text-stone-500 dark:text-stone-400 mt-0.5">

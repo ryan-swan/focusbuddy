@@ -55,7 +55,7 @@ export default function DesignsView(): JSX.Element {
 
   return (
     <div className="h-full overflow-auto desk-paper no-tod">
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className="w-full px-8 py-6">
         <div className="flex items-center gap-2.5 mb-1">
           <Icon name="palette" size={22} className="text-accent" />
           <h1 className="text-[20px] font-semibold text-[var(--ink-100)]">PlexiDesign</h1>
