@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.14',
+    date: '2026-08-18T12:00:00Z',
+    title: 'PlexiDesk 4.0.14 — free collaboration, reliable connect, clearer sharing',
+    tag: 'feature',
+    summary:
+      'Real-time collaboration is now free on every plan, so anyone you work with can co-edit a shared desk, room or document without a paid seat. Connecting outside apps like GitHub is fixed: their sign-in pop-up now opens as a real window instead of being blocked, so the login no longer spins forever. Sharing is clearer too. You pick teammates from your organisation by name, or invite by email, or add someone on a different domain as a guest, which stops the old problem of a share that silently never reached the other person. On big screens Messages, the office home and the list pages now use the full width instead of a narrow centred column, and getting around is simpler with one way to open a room, a Back button, and a clear step back to a room from any desk.',
+    highlights: [
+      'Real-time collaboration is free on every plan.',
+      'Connecting apps that sign in with a pop-up, like GitHub, works reliably again with no more spinning login.',
+      'Share a desk or room by picking a teammate from your organisation, inviting by email, or adding an outside address as a guest.',
+      'Messages, the office home and the list pages fill the whole screen on large displays.',
+      'One clear way to open a room, plus Back and step-back-to-room from inside a desk.'
+    ],
+    links: [{ label: 'Sharing and collaboration', href: `${HELP_BASE}/real-time-collaboration` }]
+  },
+  {
     version: '4.0.13',
     date: '2026-08-16T12:00:00Z',
     title: 'PlexiDesk 4.0.13 — real-time collaboration, no more check-out',
