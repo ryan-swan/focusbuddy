@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { usePresenceStore } from '../stores/presence'
 import { useMessagingStore } from '../stores/messaging'
 import { useAccountStore } from '../stores/account'
+import { useCapabilityEnabled } from '../stores/capabilities'
 import { presenceColor } from '../lib/presence'
 import { personDisplayName, personInitials } from '../lib/personName'
 import Icon from './Icon'
@@ -24,6 +25,9 @@ export default function DeskPresenceBar({ taskId }: { taskId: string }): JSX.Ele
   const peers = usePresenceStore((s) => s.peers)
   const conversations = useMessagingStore((s) => s.conversations)
   const myId = useAccountStore((s) => s.account?.id ?? null)
+  // Live presence is Team-tier only; free/pro never see the desk who-is-here bar
+  // (and the server refuses their presence join).
+  const presenceEnabled = useCapabilityEnabled('presence')
   const [showInvited, setShowInvited] = useState(false)
 
   // Everyone whose live presence location is this desk (self is excluded by the
@@ -45,6 +49,7 @@ export default function DeskPresenceBar({ taskId }: { taskId: string }): JSX.Ele
     )
   }, [deskConv, present, myId])
 
+  if (!presenceEnabled) return null
   if (present.length === 0 && invited.length === 0) return null
 
   const shownPresent = present.slice(0, 5)

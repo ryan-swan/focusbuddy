@@ -4,6 +4,7 @@ import Icon from './Icon'
 import Tooltip from './Tooltip'
 import { usePresenceStore, type PresenceStatus } from '../stores/presence'
 import { useAccountStore } from '../stores/account'
+import { useCapabilityEnabled } from '../stores/capabilities'
 import { personDisplayName, personInitials } from '../lib/personName'
 
 // Header entry point for account-level presence (the "People Map"): who across
@@ -39,7 +40,7 @@ function Avatar({ handle, name }: { handle: string; name?: string }): JSX.Elemen
   )
 }
 
-export default function TeamPresenceButton(): JSX.Element {
+export default function TeamPresenceButton(): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
@@ -49,6 +50,10 @@ export default function TeamPresenceButton(): JSX.Element {
   const myInvisible = usePresenceStore((s) => s.myInvisible)
   const setInvisible = usePresenceStore((s) => s.setInvisible)
   const account = useAccountStore((s) => s.account)
+  // Live presence is a Team-tier capability. Free/Pro never see the who-is-online
+  // header entry (and the server refuses their presence join), so this renders
+  // nothing for them rather than an empty team.
+  const presenceEnabled = useCapabilityEnabled('presence')
 
   const list = Object.values(peers).sort((a, b) => {
     // Online-ish first by status weight, then by handle.
@@ -80,6 +85,8 @@ export default function TeamPresenceButton(): JSX.Element {
   }, [open])
 
   const myHandle = personDisplayName(account, account?.email || 'You')
+
+  if (!presenceEnabled) return null
 
   return (
     <div className="relative">
