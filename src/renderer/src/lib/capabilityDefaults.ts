@@ -128,7 +128,7 @@ export const CAPABILITY_DEFAULTS: Record<string, Record<TierId, CapabilityValue>
   brain_scope: { free: true, pro: true, team: true },
   ai_usage_metering: { free: true, pro: true, team: true },
   people_map: { free: false, pro: false, team: true },
-  presence: { free: true, pro: false, team: true },
+  presence: { free: true, pro: true, team: true },
   org_directory: { free: false, pro: false, team: true },
   multi_org: { free: false, pro: false, team: true },
   chat: { free: true, pro: true, team: true },

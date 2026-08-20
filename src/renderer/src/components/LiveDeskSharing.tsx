@@ -80,14 +80,20 @@ export default function LiveDeskSharing({
       p.accountId ? { accountId: p.accountId, permission: perm } : { email: p.email, permission: perm }
     )
     const r = await shareDeskLive(rootId, invites, perm)
+    let roomShared = false
     if (r.ok && shareRoom && roomRootId) {
-      await shareDeskLive(roomRootId, invites, perm)
+      const roomResult = await shareDeskLive(roomRootId, invites, perm)
+      roomShared = roomResult.ok
     }
     if (r.ok && r.access) {
       setAccess(r.access)
-      setMsg(
-        `Shared with ${picks.length} ${picks.length === 1 ? 'person' : 'people'}.${shareRoom && roomRootId ? ` Room "${roomTitle}" too.` : ''}`
-      )
+      const base = `Shared with ${picks.length} ${picks.length === 1 ? 'person' : 'people'}.`
+      const roomNote = roomShared
+        ? ` Room "${roomTitle}" too.`
+        : shareRoom && roomRootId
+          ? ` The room could not be shared, so only this desk was.`
+          : ''
+      setMsg(base + roomNote)
       setBusy(false)
       return { ok: true }
     }
@@ -157,17 +163,23 @@ export default function LiveDeskSharing({
             <div key={p.email} className="flex items-center justify-between gap-2 text-[11px]">
               <span className="truncate text-[var(--ink-70)]">{p.email}</span>
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[var(--ink-40)] text-[10px] uppercase tracking-wide">invited</span>
+                <span className="text-[var(--ink-40)] text-[10px] uppercase tracking-wide">granted</span>
                 <button
                   onClick={() => void revokeDeskInvite(rootId, p.email).then((a) => a && setAccess(a))}
                   className="icon-btn !h-5 !w-5 hover:!text-red-600"
-                  title="Cancel invite"
+                  title="Revoke access"
                 >
                   <Icon name="close" size={11} />
                 </button>
               </div>
             </div>
           ))}
+          {pending.length > 0 && (
+            <p className="text-[10px] text-[var(--ink-40)] leading-snug pt-0.5">
+              Access is granted for these addresses. They will see it when they sign in with that
+              email. No email is sent from here.
+            </p>
+          )}
         </div>
       )}
     </div>

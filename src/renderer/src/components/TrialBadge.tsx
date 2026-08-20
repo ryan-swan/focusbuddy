@@ -125,16 +125,16 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
         <div className="space-y-2 mb-4">
           <TierRow
             name="Free"
-            blurb="Core canvas + SpeedDeck + 1 device. No AI features."
+            blurb="Core canvas + SpeedDeck + 3 devices. AI on your own key."
           />
           <TierRow
             name="Pro"
-            blurb="AI assistant, body double, 3 devices, table widget, focus mode."
+            blurb="Managed AI, body double, cloud backup, unlimited devices."
             highlight
           />
           <TierRow
             name="Team"
-            blurb="Everything in Pro + per-seat admin, shared decks, audit log."
+            blurb="Everything in Pro + per-seat admin, shared decks, usage analytics."
           />
         </div>
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--edge-soft)]">

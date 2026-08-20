@@ -204,7 +204,7 @@ export default function OrgAdminView(): JSX.Element {
       if (!ok) return
     }
     const res = await inviteMember(token, selId, email, inviteRole)
-    setMsg(res.ok ? (res.added ? 'Added to the organization.' : 'Invite sent — they join when they sign up.') : res.error ?? 'Could not invite.')
+    setMsg(res.ok ? (res.added ? 'Added to the organization.' : 'Access granted. They will join when they sign in with that email. No email is sent from here.') : res.error ?? 'Could not add that person.')
     if (res.ok) {
       setInviteEmail('')
       void refreshDetail()

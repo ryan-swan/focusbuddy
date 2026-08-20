@@ -1,0 +1,38 @@
+name: CI
+
+# Fast feedback lane on every push and pull request: typecheck plus the unit
+# suite. The heavy end-to-end tests (npm run test:e2e, which builds the app and
+# drives Playwright) are deliberately NOT run here, so this stays quick; the
+# merge-check workflow and local hooks own the gating.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# One run per ref; a new push cancels the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-and-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+        env:
+          CI: 'true'

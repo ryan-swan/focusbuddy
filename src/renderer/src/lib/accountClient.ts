@@ -182,16 +182,35 @@ export async function logout(token: string): Promise<void> {
 // Resolve the current session against the server. Used on app boot to
 // confirm the cached session is still valid. Returns null on any failure
 // (network or unauthorized).
-export async function getMe(token: string): Promise<ServerAccount | null> {
+// Result of validating a session token. `unauthenticated` means the server
+// answered and explicitly rejected the token (expired/revoked). `unreachable`
+// means we could not confirm one way or the other (offline, DNS failure, 5xx,
+// unparseable body). Callers MUST treat these differently: only `unauthenticated`
+// justifies destroying a local session. On `unreachable` the safe move is to
+// keep the user signed in and retry.
+export type MeResult =
+  | { status: 'ok'; account: ServerAccount }
+  | { status: 'unauthenticated' }
+  | { status: 'unreachable' }
+
+export async function getMe(token: string): Promise<MeResult> {
   try {
     const { res, json } = await getJson<{ ok: boolean; account?: ServerAccount }>(
       '/accounts/me',
       token
     )
-    if (!res.ok || !json?.ok || !json.account) return null
-    return json.account
+    if (res.status === 401 || res.status === 403) return { status: 'unauthenticated' }
+    // Any other non-2xx (5xx, proxy/gateway error) is inconclusive — the token
+    // may still be valid, we just could not check it. Keep the session.
+    if (!res.ok) return { status: 'unreachable' }
+    if (json?.ok && json.account) return { status: 'ok', account: json.account }
+    // A 200 that explicitly says ok:false is a real rejection; anything else
+    // (missing/unparseable body) is inconclusive and must not sign the user out.
+    if (json && json.ok === false) return { status: 'unauthenticated' }
+    return { status: 'unreachable' }
   } catch {
-    return null
+    // fetch rejected — offline / connection refused / timeout. Not a rejection.
+    return { status: 'unreachable' }
   }
 }
 

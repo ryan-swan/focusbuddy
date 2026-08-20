@@ -246,10 +246,45 @@ export const useDocumentsStore = create<DocumentsStore>((set, get) => ({
   }
 }))
 
+// Flush every document's pending debounced body write immediately. close()
+// already flushes the one document you are leaving, but quitting the app,
+// closing the window, or reloading the renderer never calls close(), so a
+// debounced edit made in the last ~600ms would be lost. This writes every
+// queued body straight to disk. On beforeunload we cannot await, but the IPC
+// message is posted to the main process before the renderer tears down, so the
+// SQLite write still lands.
+export function flushPendingDocumentSaves(): void {
+  for (const [id, timer] of saveTimers) {
+    clearTimeout(timer)
+    saveTimers.delete(id)
+    const body = pendingBodies.get(id)
+    if (body === undefined) continue
+    pendingBodies.delete(id)
+    void window.api.documents.update(id, { body }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('[documents.flush] final flush failed', err)
+    })
+  }
+  // Any bodies queued without a live timer (edge cases) still get written.
+  for (const [id, body] of pendingBodies) {
+    pendingBodies.delete(id)
+    void window.api.documents.update(id, { body }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('[documents.flush] final flush failed', err)
+    })
+  }
+}
+
 // Thin handle for debugging + e2e (same convention as __fbNodes / __fbWidgets /
 // __fbView): the live convergence spec drives document creation through the store
 // action (which fires crdtEmitDocumentCreate) rather than the raw api.documents
 // bridge (which does not). Without this the CRDT emit path is unreachable in tests.
 if (typeof window !== 'undefined') {
   ;(window as unknown as { __fbDocuments?: typeof useDocumentsStore }).__fbDocuments = useDocumentsStore
+  // Quit, window close and reload all fire beforeunload in the renderer;
+  // pagehide is the fallback some platforms fire instead. Flush pending
+  // office-document edits on any of them so no typed content is lost.
+  const flushOnExit = (): void => flushPendingDocumentSaves()
+  window.addEventListener('beforeunload', flushOnExit)
+  window.addEventListener('pagehide', flushOnExit)
 }

@@ -51,10 +51,15 @@ export class ShareService {
   // Owner mints a share. Returns the viewer URL the hosted service confirms
   // — same one the renderer would build from the token, but we trust the
   // server's response so the viewer host can move without a client update.
-  async mint(input: MintShareInput): Promise<{ viewerUrl: string }> {
+  async mint(input: MintShareInput, sessionToken?: string | null): Promise<{ viewerUrl: string }> {
+    // Send the session token when we have one so the server attributes the share
+    // to this account and applies the per-account cap. The server also accepts an
+    // anonymous mint (older clients send no token), so this stays optional.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`
     const res = await fetch(`${this.baseUrl}/share`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(input)
     })
     if (!res.ok) {

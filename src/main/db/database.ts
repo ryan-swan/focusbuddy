@@ -1,8 +1,30 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
+import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 
 let db: Database.Database | null = null
+
+// Bump this whenever a schema migration is added. It gates the pre-upgrade
+// safety backup (see getDb): the snapshot is taken once per version bump, not on
+// every launch. It is NOT used to decide whether the idempotent migrations run —
+// those still run every launch.
+const MIGRATION_VERSION = 1
+
+// Synchronous, transactionally-consistent snapshot of the live database taken
+// BEFORE any migration runs, via SQLite's VACUUM INTO. It produces one
+// self-contained file with no WAL/SHM sidecars and does not modify the source.
+// Throws on failure so the caller can refuse to migrate a database it could not
+// first back up — a migration with no restore point is the exact risk this
+// guards against.
+function backupBeforeMigrating(d: Database.Database): void {
+  const dir = join(app.getPath('userData'), 'backups')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  const ts = new Date().toISOString().replace(/:/g, '-').replace(/\..+$/, '')
+  const dest = join(dir, `pre-migrate-${ts}.fbbackup`)
+  // VACUUM INTO refuses to overwrite; the timestamped name avoids collisions.
+  d.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`)
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS nodes (
@@ -519,6 +541,18 @@ export function getDb(): Database.Database {
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
+  // Pre-upgrade safety backup. Before running any schema migration on an
+  // existing database with real data, snapshot it so a failed migration always
+  // has a restore point. Reading user_version and sqlite_master does not mutate
+  // the database, so this happens strictly before the first migrating statement.
+  // If the snapshot cannot be written we do NOT migrate — we throw and leave the
+  // database untouched rather than migrate without a restore point.
+  const priorMigrationVersion = Number(db.pragma('user_version', { simple: true })) || 0
+  const hasExistingData =
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='nodes'").get() != null
+  if (hasExistingData && priorMigrationVersion < MIGRATION_VERSION) {
+    backupBeforeMigrating(db)
+  }
   db.exec(SCHEMA)
   // Forward-compatible migrations for previously-created DBs
   // File/folder manager: fb_files grows from a flat attachment store into a
@@ -1110,6 +1144,10 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_node_relations_org ON fb_node_relations(org_id);
   `)
   migratePlanFlag(db)
+  // Migrations completed successfully — stamp the version so the next launch
+  // knows this database is already at the current schema and skips the
+  // pre-upgrade snapshot until MIGRATION_VERSION is bumped again.
+  db.pragma(`user_version = ${MIGRATION_VERSION}`)
   return db
 }
 

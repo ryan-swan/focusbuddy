@@ -37,22 +37,28 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
 
         <div className="overflow-y-auto px-5 py-4 space-y-4 text-sm text-[var(--ink-70)] leading-relaxed">
           <section>
-            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">1. Your data is yours</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">1. Local-first, with sync when you sign in</h4>
             <p>
-              PlexiDesk stores everything locally on your machine — tasks, widgets, browsing
-              history, chat messages, preferences. No data is sent to PlexiDesk servers; there are
-              no PlexiDesk servers. Backups, sync, and export are your responsibility.
+              PlexiDesk is local-first. Your tasks, widgets, documents, browsing history and
+              preferences live on your device. If you stay signed out, nothing leaves your machine.
+              When you sign in, the features you choose to use send the data they need to PlexiDesk's
+              servers. Cloud sync keeps your workspace in step across your devices, and sharing,
+              chat, meetings and mail exchange content with the people and services you point them
+              at. You can export your data at any time, and keeping your own backups of work that
+              matters is still wise.
             </p>
           </section>
 
           <section>
-            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">2. AI features use your own API key</h4>
+            <h4 className="text-[var(--ink-100)] font-semibold mb-1.5">2. AI features and where requests go</h4>
             <p>
-              Open <strong>Settings → AI · API keys</strong> to paste your Anthropic API key.
-              It's encrypted with your system keychain and never leaves this Mac except as
-              part of an outbound request to Anthropic — the assistant, AI Setup, and resume
-              features call Anthropic's API directly from the app. You are responsible for any
-              usage charges on that key.
+              AI runs one of two ways. With your own Anthropic key, pasted under{' '}
+              <strong>Settings → AI · API keys</strong>, the assistant, AI Setup and resume features
+              call Anthropic's API directly from the app. The key is encrypted with your system
+              keychain and is sent only as part of those outbound requests. On a managed plan,
+              PlexiBrain requests are relayed through PlexiDesk's server to Anthropic instead. Either
+              way, AI requests include the workspace content needed to answer them, and you are
+              responsible for the usage on your own key.
             </p>
           </section>
 
@@ -94,7 +100,7 @@ export default function TermsModal({ onClose }: Props): JSX.Element {
           </section>
 
           <section className="text-[11px] text-[var(--ink-50)] pt-2 border-t border-[var(--edge-soft)]">
-            Last updated 23 May 2026.
+            Last updated 20 August 2026.
           </section>
         </div>
 

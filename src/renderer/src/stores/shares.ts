@@ -152,15 +152,18 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
     const service = getShareService()
     if (service && snapshot !== undefined) {
       try {
-        await service.mint({
-          token,
-          kind,
-          snapshot,
-          fromHandle: fromHandle ?? 'anonymous',
-          scope,
-          expiresAt: expiresAt ?? null,
-          createdBy: createdBy ?? null
-        })
+        await service.mint(
+          {
+            token,
+            kind,
+            snapshot,
+            fromHandle: fromHandle ?? 'anonymous',
+            scope,
+            expiresAt: expiresAt ?? null,
+            createdBy: createdBy ?? null
+          },
+          useAccountStore.getState().sessionToken
+        )
         // A raw-file share hosts its bytes publicly against the token so the
         // viewer can render/download them. Only after the snapshot mint
         // succeeded (the token now resolves); a failed upload is non-fatal.
@@ -233,14 +236,17 @@ export const useSharesStore = create<SharesStore>((set, get) => ({
     const service = getShareService()
     if (service && remote) {
       try {
-        await service.mint({
-          token: updated.token,
-          kind: updated.kind,
-          snapshot: remote.snapshot,
-          fromHandle: remote.fromHandle,
-          scope,
-          expiresAt: updated.expiresAt
-        })
+        await service.mint(
+          {
+            token: updated.token,
+            kind: updated.kind,
+            snapshot: remote.snapshot,
+            fromHandle: remote.fromHandle,
+            scope,
+            expiresAt: updated.expiresAt
+          },
+          useAccountStore.getState().sessionToken
+        )
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn('[SharesStore] remote scope update failed:', err)

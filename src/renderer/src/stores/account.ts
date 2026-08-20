@@ -87,17 +87,27 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         set({ bootStatus: 'ready' })
         return
       }
-      // Validate against the server. If the server says "not authenticated"
-      // (token expired or revoked), wipe locally so the next boot is clean.
-      const account = await getMe(cached.sessionToken)
-      if (!account) {
+      // Validate against the server. Only wipe the local session when the server
+      // EXPLICITLY rejects the token (expired or revoked). A network failure
+      // must never sign the user out: keep the cached session, let the app run
+      // offline, and retry validation in the background until it succeeds.
+      const me = await getMe(cached.sessionToken)
+      if (me.status === 'unauthenticated') {
         await window.api.account.clearSession()
         set({ sessionToken: null, account: null, bootStatus: 'ready' })
         return
       }
+      if (me.status === 'unreachable') {
+        // Could not reach the server to validate. Stay signed in on the cached
+        // token (cachedEmail already set above covers UI that needs the email),
+        // mark ready so the workspace is usable, and revalidate shortly.
+        set({ sessionToken: cached.sessionToken, bootStatus: 'ready' })
+        void revalidateSessionSoon(cached.sessionToken)
+        return
+      }
       set({
         sessionToken: cached.sessionToken,
-        account,
+        account: me.account,
         bootStatus: 'ready'
       })
     } catch (err) {
@@ -172,14 +182,18 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     // If the token is expired/forged the server returns null and we
     // surface a normal failed-auth result so the caller can show the
     // launch modal.
-    const account = await getMe(sessionToken)
-    if (!account) {
+    const me = await getMe(sessionToken)
+    if (me.status !== 'ok') {
       return {
         ok: false,
-        error: 'Sign-in link expired. Sign in again from the website.',
+        error:
+          me.status === 'unreachable'
+            ? 'Could not reach the server to finish signing in. Check your connection and try again.'
+            : 'Sign-in link expired. Sign in again from the website.',
         code: 'INVALID_CREDENTIALS'
       }
     }
+    const account = me.account
     // Mismatched email-hint is non-fatal — the server's account row is
     // authoritative. We log it once for debug.
     if (email && email.toLowerCase() !== account.email.toLowerCase()) {
@@ -202,6 +216,31 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     return { ok: true, sessionToken, account }
   }
 }))
+
+// Retry session validation after an offline boot. We keep the user signed in on
+// a network failure and quietly re-check until the server is reachable, so a
+// transient outage never logs anyone out. Bounded backoff; stops once the token
+// is confirmed, explicitly rejected, or the user signs out / the token changes.
+async function revalidateSessionSoon(token: string, attempt = 0): Promise<void> {
+  const delayMs = Math.min(30_000, 3_000 * 2 ** attempt) // 3s, 6s, 12s, 24s, 30s…
+  await new Promise((r) => setTimeout(r, delayMs))
+  // Bail if the user signed out or the token changed while we waited.
+  if (useAccountStore.getState().sessionToken !== token) return
+  const me = await getMe(token)
+  if (me.status === 'ok') {
+    useAccountStore.setState({ account: me.account })
+    return
+  }
+  if (me.status === 'unauthenticated') {
+    await window.api.account.clearSession()
+    useAccountStore.setState({ sessionToken: null, account: null })
+    return
+  }
+  // Still unreachable — keep retrying, capped so we never loop forever.
+  if (attempt < 10 && useAccountStore.getState().sessionToken === token) {
+    void revalidateSessionSoon(token, attempt + 1)
+  }
+}
 
 // Expose the account store on window so e2e specs can read the session token to
 // drive REST-only flows (e.g. creating + sharing a live folder). A thin handle to
