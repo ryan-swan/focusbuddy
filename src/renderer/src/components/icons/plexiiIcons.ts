@@ -1,4 +1,4 @@
-// Plexii iconography — original brand icon set (43 marks).
+// Plexii iconography — original brand icon set (44 marks).
 // Source of truth: professional-brain/02-work/plexidesk/brand/01-knowledge/brand-assets/icons/
 // (one SVG per icon; this file mirrors their inner markup verbatim).
 // Drawn on a 24px grid, 1.75 stroke, round caps/joins, fill none, currentColor.
@@ -93,6 +93,8 @@ export const PLEXII_ICONS: Record<string, string> = {
     '<path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4"/><path d="m13.25 5.75-2.5 12.5"/>',
   'ai':
     '<path stroke-width="2.5" d="M9.4 9.2v10M14.6 9.2v10"/><path stroke-width="2.5" d="M9.4 4.9v.01M14.6 4.9v.01"/>',
+  'mic':
+    '<rect x="9.4" y="3.75" width="5.2" height="9.5" rx="2.6"/><path d="M6.25 11.25a5.75 5.75 0 0 0 11.5 0"/><path d="M12 17v3.25"/>',
 }
 
 // Material Symbols names that are unambiguous across the app map straight
@@ -143,4 +145,5 @@ export const PLEXII_BY_MATERIAL: Record<string, string> = {
   apps: 'all-desks',
   auto_awesome: 'ai',
   auto_awesome_motion: 'ai',
+  mic: 'mic',
 }
