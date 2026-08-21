@@ -7,7 +7,7 @@
 // zero and drops out.
 
 import { listDocuments, getDocument } from './db/documents'
-import { extractDocText, type WorkspaceSource } from './workspaceRank'
+import { extractDocText, selectPassages, type WorkspaceSource } from './workspaceRank'
 import { embedTexts, embedQuery } from './ai/embeddings'
 import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
 import { listDocMetadata, getDocMetadata, type DocMetadata } from './db/docMetadata'
@@ -144,7 +144,11 @@ export async function semanticSearchDocuments(query: string, limit = 6): Promise
     title: d.title || 'Untitled',
     docType: d.docType,
     snippet: snippet(d.text, query),
-    text: d.text.slice(0, 6000),
+    // The best-matching passage(s), not the head (M1 defect #2): tasks and
+    // notes already got passage extraction via rankSources; documents — the
+    // richest content — were shipped as their opening 6000 chars, so a match
+    // deep in a long document quoted the cover page.
+    text: selectPassages(query, d.text),
     // Descending by blended rank so the strongest source leads the grounding.
     score: 1 - i * 0.01,
     // Carry AI-enriched metadata through so the grounding header can frame this

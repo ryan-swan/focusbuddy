@@ -1909,7 +1909,7 @@ export function registerIpcHandlers(): void {
       // Retrieve using the recent thread so a bare follow-up ("what about year two?")
       // still pulls the documents the conversation is actually about.
       const query = [...hist.map((h) => h.question), question].join(' ')
-      const sources = await retrieveSources(query, 6)
+      const sources = await retrieveSources(query)
       const buildSourceMeta = (citedIds: Set<string>): Array<{ docId: string; title: string; docType: string; snippet: string; cited: boolean }> =>
         sources.map((s) => ({ docId: s.docId, title: s.title, docType: s.docType, snippet: s.snippet, cited: citedIds.has(s.docId) }))
       // Semantic answer cache: a near-identical question, with the workspace
@@ -1981,7 +1981,7 @@ export function registerIpcHandlers(): void {
       const sources =
         docContext && docContext.text && docContext.text.trim()
           ? [{ docId: 'current-doc', title: docContext.title || 'This document', docType: 'doc', snippet: docContext.text.slice(0, 200), text: docContext.text.slice(0, 12000), score: 1 }]
-          : await retrieveSources([...hist.map((h) => h.question), question].join(' '), 6)
+          : await retrieveSources([...hist.map((h) => h.question), question].join(' '))
       if (sources.length) recordAiCall()
       const channel = `workspace:askStream:${requestId}`
       const res = await askWorkspaceStream(

@@ -28,3 +28,20 @@ export function groundingBlock(s: GroundingSource, i: number): string {
   if (s.summary) lines.push(`Summary: ${s.summary}`)
   return `${lines.join('\n')}\n${s.text}`
 }
+
+// Per-source ceiling for the chat prompt's RETRIEVED MATERIAL block (M1 defect
+// #1). Matches what rankSources/selectPassages pack, so the passage selection
+// upstream is what reaches the model instead of being re-cut. The old cut was
+// 600 characters — the whole workspace grounded an answer on ~3.6 KB while a
+// single open canvas widget could ride at 8000.
+export const SOURCE_PROMPT_CAP = 6000
+
+// One numbered source line of the chat retrieval block. Pure and exported so a
+// unit test can assert what ACTUALLY reaches the prompt — the gate the defect
+// audit demanded after the 600-char cut survived invisible to every spec.
+export function retrievalSourceLine(
+  s: { docType: string; title: string; text: string },
+  i: number
+): string {
+  return `[${i + 1}] (${s.docType}) ${s.title}: ${s.text.replace(/\s+/g, ' ').slice(0, SOURCE_PROMPT_CAP)}`
+}

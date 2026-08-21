@@ -14,9 +14,16 @@ import { collectExtraSources } from './workspaceExtras'
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
 
+// How many sources ground an answer (M1 defect #4). The old 6, round-robined
+// across three pools, meant AT MOST 2 documents could ever reach the assistant
+// no matter how many matched. 10 slots let ~4 documents through while
+// tasks/tables/notes and knowledge keep their fair rounds; the per-source
+// prompt cap (grounding.ts SOURCE_PROMPT_CAP) bounds the total prompt cost.
+export const RETRIEVAL_SOURCE_LIMIT = 10
+
 export async function retrieveSources(
   query: string,
-  limit = 6,
+  limit = RETRIEVAL_SOURCE_LIMIT,
   scopeNodeIds?: string[]
 ): Promise<WorkspaceSource[]> {
   // Knowledge: curated company truth, ranked semantically (or keyword fallback)

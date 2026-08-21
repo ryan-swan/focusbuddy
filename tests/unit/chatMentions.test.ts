@@ -62,6 +62,7 @@ const { personMentionCandidates } = await import(
 const { resolveMentions, mentionedDeskIds, reportResolutions } = await import(
   '../../src/main/ai/mentionResolver'
 )
+const { DOC_TEXT_CAP } = await import('../../src/main/workspaceRank')
 
 function widget(p: Partial<Widget>): Widget {
   return {
@@ -317,10 +318,12 @@ describe('renderMentions — the block claims only what genuinely rendered', () 
   it('never quotes a total it cannot know when an upstream extractor already cut the body', () => {
     // Two caps sit above this block: the resolver's own PER_MENTION, and
     // extractDocText's DOC_TEXT_CAP, which trims every document body before the
-    // resolver ever sees it. For a 30 000-char document the true length is not
-    // knowable here — so the notice must state the cut WITHOUT a denominator
-    // rather than presenting the cap as the whole document.
-    const huge = 'y'.repeat(30000)
+    // resolver ever sees it. For a document larger than DOC_TEXT_CAP the true
+    // length is not knowable here — so the notice must state the cut WITHOUT a
+    // denominator rather than presenting the cap as the whole document. (The
+    // seed tracks the constant so raising the ceiling re-tests, not retires,
+    // this rule — M1 moved it from 12000 to 48000.)
+    const huge = 'y'.repeat(DOC_TEXT_CAP + 5000)
     docs.set('big', { id: 'big', docType: 'doc', title: 'Big', body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: huge }] }] } })
     const resolved = resolveMentions([ref({ id: 'big', title: 'Big' })])
     expect(resolved[0].truncated).toBe(true)
@@ -328,7 +331,7 @@ describe('renderMentions — the block claims only what genuinely rendered', () 
     const { block } = renderMentions(resolved)
     expect(block).toContain('the rest was not read')
     // The exact failure this guards: quoting a cap as if it were the total.
-    expect(block).not.toMatch(/of (8000|12000|12004) characters shown/)
+    expect(block).not.toMatch(new RegExp(`of (8000|${DOC_TEXT_CAP}|${DOC_TEXT_CAP + 4}) characters shown`))
   })
 
   it('DOES quote the real total when it genuinely knows it', () => {

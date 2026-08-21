@@ -36,28 +36,37 @@ export function collectTiptapText(node: unknown): string {
 // additive, no behaviour change — so callers that must be honest about
 // truncation can tell "this document is exactly this long" from "this is merely
 // where the cut fell". @-mention resolution needs that distinction: quoting
-// 12000 as a document's full length when it is only the cap would state a
+// the cap as a document's full length when it is only the cap would state a
 // number that is not true.
-export const DOC_TEXT_CAP = 12000
+// 48000 (M1): the old 12000 meant a passage past ~page 4 of a long document
+// could never be retrieved, mentioned, or embedded, however good the match.
+// Chunk scoring is linear in this cap, so it is a ceiling, not an invitation.
+export const DOC_TEXT_CAP = 48000
+
+// Sheets flatten one row per line. 40 rows silently answered "total this
+// column" questions from the first 40 rows of a 500-row sheet; rows are cheap
+// (~tens of chars each) so the row cap can be generous — DOC_TEXT_CAP still
+// bounds the total.
+export const SHEET_ROW_CAP = 500
 
 export function extractDocText(docType: string, body: unknown): string {
   try {
     const b = (body ?? {}) as Record<string, unknown>
     if (docType === 'doc') {
       const root = (b.doc as unknown) ?? body
-      return collectTiptapText(root).trim().slice(0, 12000)
+      return collectTiptapText(root).trim().slice(0, DOC_TEXT_CAP)
     }
     if (docType === 'sheet') {
       const sheets = (b.sheets as Array<{ columns?: string[]; rows?: string[][] }>) ?? []
       return sheets
         .map((t) => {
           const header = (t.columns ?? []).join(' | ')
-          const rows = (t.rows ?? []).slice(0, 40).map((r) => (r ?? []).join(' | ')).join('\n')
+          const rows = (t.rows ?? []).slice(0, SHEET_ROW_CAP).map((r) => (r ?? []).join(' | ')).join('\n')
           return `${header}\n${rows}`
         })
         .join('\n')
         .trim()
-        .slice(0, 12000)
+        .slice(0, DOC_TEXT_CAP)
     }
     if (docType === 'slides') {
       const slides =
@@ -75,7 +84,7 @@ export function extractDocText(docType: string, body: unknown): string {
         })
         .join('\n')
         .trim()
-        .slice(0, 12000)
+        .slice(0, DOC_TEXT_CAP)
     }
   } catch {
     /* best-effort */
@@ -135,6 +144,31 @@ function scoreHay(hay: string, terms: string[]): number {
   return s
 }
 
+// The query reduced to its signal-bearing terms, shared by every ranking path
+// so "what matches" means one thing everywhere.
+export function queryTerms(query: string): string[] {
+  return [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !STOPWORDS.has(t)))]
+}
+
+// The passage(s) of one text that best answer a query: the top-scoring chunks
+// joined, falling back to the head when nothing matches (title-only or purely
+// semantic matches have no chunk to point at). This is the single
+// passage-selection rule — rankSources applies it to keyword-ranked pools, and
+// the semantic document path applies it so a document chosen by meaning is
+// still QUOTED at its best-matching passage instead of its opening: a 20-page
+// contract matching on page 9 must deliver page 9, not the cover page.
+export function selectPassages(query: string, text: string, maxChars = 6000): string {
+  const terms = queryTerms(query)
+  const chunks = chunkText(text)
+  const top = chunks
+    .map((t) => ({ text: t, score: terms.length ? scoreHay(t.toLowerCase(), terms) : 0 }))
+    .sort((a, b) => b.score - a.score)
+    .filter((c) => c.score > 0)
+    .slice(0, 2)
+  const passages = top.length ? top.map((c) => c.text) : [chunks[0] ?? text.slice(0, 800)]
+  return passages.join('\n…\n').slice(0, maxChars)
+}
+
 // Score each document, title matches weighted higher AND the body scored per
 // chunk so a mid-document match counts. The returned source text is the top
 // matching chunk(s), not the document head, so the model is grounded on the
@@ -144,7 +178,7 @@ export function rankSources(
   docs: Array<{ docId: string; title: string; docType: string; text: string }>,
   limit = 6
 ): WorkspaceSource[] {
-  const terms = [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !STOPWORDS.has(t)))]
+  const terms = queryTerms(query)
   if (!terms.length) return []
   const scored: WorkspaceSource[] = []
   for (const d of docs) {

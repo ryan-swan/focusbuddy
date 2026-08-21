@@ -29,7 +29,11 @@ const OFFICE_KINDS = new Set<WidgetKind>(['doc', 'sheet', 'slides', 'map', 'desi
 // assistant's click-to-pin rule and this gathering agree on what can ride.
 const ATTACH_KINDS = ATTACHABLE_WIDGET_KINDS
 
-const MAX_WIDGETS = 8
+// M1 defect #21: at 8, widget #9 on a busy desk silently never rode as context.
+// The prompt-side budget in chatMentions/renderAttachments (24000 chars total)
+// is what actually bounds the request, so the count cap can be generous — it
+// exists to stop pathological desks, not to ration normal ones.
+const MAX_WIDGETS = 24
 const PER_WIDGET = 8000
 
 // Re-exported so other renderer code keeps a single plaintext implementation.
