@@ -314,9 +314,12 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     void checkApiKey()
   }, [checkApiKey])
 
+  // Follow the conversation as it grows — including the streaming turn, whose
+  // content lengthens without changing messages.length (Plexii P3).
+  const lastMessageLen = messages.length > 0 ? messages[messages.length - 1].content.length : 0
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages.length, sending])
+  }, [messages.length, lastMessageLen, sending])
 
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current

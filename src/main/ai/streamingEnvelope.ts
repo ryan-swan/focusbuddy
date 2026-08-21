@@ -24,6 +24,7 @@ function escapeRegExp(s: string): string {
 export class StreamingEnvelopeScanner {
   private buf = ''
   private replyEnd: number | null = null // index where the reply field's closing " sits
+  private replyStart: number | null = null // index just past the reply field's opening "
   private itemsArrayStart: number | null = null
   // Position the next-extract scan starts at (cursor advances as we emit each
   // completed object).
@@ -47,6 +48,47 @@ export class StreamingEnvelopeScanner {
 
   fullText(): string {
     return this.buf
+  }
+
+  // The reply text as decoded SO FAR — growing while the string is still
+  // streaming, complete once it has closed, null before the field opens.
+  // Non-consuming and safe to call on every push: extractReply() remains the
+  // one-shot "the reply landed" signal; this is the live view that makes
+  // token-by-token prose possible.
+  peekReply(): string | null {
+    if (this.replyStart === null) {
+      const m = this.buf.match(/"reply"\s*:\s*"/)
+      if (!m || m.index === undefined) return null
+      this.replyStart = m.index + m[0].length
+    }
+    const start = this.replyStart
+    // Walk forward respecting escapes, stopping at the closing quote or the
+    // buffer's end. `cut` is the last index that does NOT split an escape
+    // sequence: a chunk boundary can land mid-`\uXXXX`, and decoding a torn
+    // escape would either throw or show the user literal backslash junk.
+    let i = start
+    let cut = start
+    while (i < this.buf.length) {
+      const c = this.buf[i]
+      if (c === '\\') {
+        // \uXXXX is 6 chars, every other escape is 2. Only advance `cut`
+        // past the sequence once the whole thing has arrived.
+        const len = this.buf[i + 1] === 'u' ? 6 : 2
+        if (i + len > this.buf.length) break
+        i += len
+        cut = i
+        continue
+      }
+      if (c === '"') break
+      i += 1
+      cut = i
+    }
+    const slice = this.buf.slice(start, cut)
+    try {
+      return JSON.parse(`"${slice}"`) as string
+    } catch {
+      return slice
+    }
   }
 
   extractReply(): string | null {

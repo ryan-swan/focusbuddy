@@ -1209,6 +1209,9 @@ export interface ChatStreamCallbacks {
   onMentions: (mentions: ChatMentionResolved[]) => void
   onSources: (trace: ChatRetrievalTrace) => void
   onReply: (replyText: string) => void
+  // Cumulative decoded prose while the reply is still streaming (Plexii P3).
+  // Optional so older listeners see exactly the pre-existing sequence.
+  onReplyDelta?: (textSoFar: string) => void
   onTool: (tool: ChatToolTrace) => void
   // Fired when an action STARTS arriving (its `"kind"` just landed) — the
   // in-progress counterpart of onTool, so the UI can narrate "Generating a
@@ -1259,6 +1262,7 @@ export async function sendChatStream(
   // this file's database imports. See chatStreamConsumer.ts.
   const consumer = createChatStreamConsumer({
     onReply: cb.onReply,
+    onReplyDelta: cb.onReplyDelta,
     onTool: cb.onTool,
     onActivity: cb.onActivity,
     onQuestion: cb.onQuestion

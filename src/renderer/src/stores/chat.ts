@@ -516,10 +516,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set({ liveTraceByThread: { ...get().liveTraceByThread, [key]: { ...live, ...patch } } })
     }
 
-    // The prose lands (and is shown) the moment the reply field closes, which is
-    // before the actions have finished streaming. `answerTs` is the message we
-    // appended then, so `complete` updates that same turn in place instead of
-    // appending a second one.
+    // The prose shows as it streams (Plexii P3): the first reply delta creates
+    // the turn and later deltas rewrite it in place, so the text types out
+    // live. `answerTs` is that turn's identity — `reply` lands the final prose
+    // on it and `complete` updates the same turn instead of appending a second
+    // one.
     let answerTs: number | null = null
     const appendAnswer = (text: string): number => {
       const ts = Date.now()
@@ -532,6 +533,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       })
       return ts
+    }
+    // Rewrite the streaming turn's prose in place. No-op until the turn exists
+    // or when the text hasn't changed, so replays and late events cost nothing.
+    const updateAnswer = (text: string): void => {
+      if (answerTs === null) return
+      const thread = get().messagesByTask[key] ?? []
+      const at = thread.findIndex((m) => m.ts === answerTs)
+      if (at < 0 || thread[at].content === text) return
+      const copy = thread.slice()
+      copy[at] = { ...copy[at], content: text }
+      set({ messagesByTask: { ...get().messagesByTask, [key]: copy } })
     }
 
     // Land the finished response and retire the trace onto the answer's turn.
@@ -681,9 +693,27 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             set({ mentionResolution: mergeMentionResolution(get().mentionResolution, m) })
           },
           onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
+          // Token-by-token prose: the first delta creates the turn, later ones
+          // grow it in place. Cumulative text, so each event simply replaces.
+          onReplyDelta: (text) => {
+            if (answerTs === null) {
+              if (!text.trim()) return
+              patchTrace({ repliedAt: Date.now() })
+              appendAnswer(text)
+              return
+            }
+            updateAnswer(text)
+          },
           onReply: (text) => {
             patchTrace({ repliedAt: Date.now() })
-            if (answerTs === null && text.trim()) appendAnswer(text)
+            if (answerTs === null) {
+              if (text.trim()) appendAnswer(text)
+              return
+            }
+            // The field closed: the final decoded prose replaces the
+            // progressively-decoded draft (they can differ at escape
+            // boundaries).
+            updateAnswer(text)
           },
           // What the model is writing RIGHT NOW ("Generating a document…").
           // Kept until superseded by a newer activity; the view ignores it once

@@ -407,6 +407,9 @@ const api = {
         onMentions?: (mentions: ChatMentionResolved[]) => void
         onSources?: (trace: ChatRetrievalTrace) => void
         onReply?: (text: string) => void
+        // Cumulative prose-so-far while the reply is still streaming — the
+        // token-by-token feel. Never fires after onReply.
+        onReplyDelta?: (text: string) => void
         // In-progress counterpart of onTool: fires when an action STARTS
         // arriving, so the UI can say what the assistant is doing right now.
         onActivity?: (activity: ChatToolTrace) => void
@@ -421,6 +424,7 @@ const api = {
         | { type: 'mentions'; payload: ChatMentionResolved[] }
         | { type: 'sources'; payload: ChatRetrievalTrace }
         | { type: 'reply'; payload: string }
+        | { type: 'reply-delta'; payload: string }
         | { type: 'activity'; payload: ChatToolTrace }
         | { type: 'tool'; payload: ChatToolTrace }
         | { type: 'question'; payload: ChatQuestion }
@@ -439,6 +443,9 @@ const api = {
             break
           case 'reply':
             callbacks.onReply?.(ev.payload)
+            break
+          case 'reply-delta':
+            callbacks.onReplyDelta?.(ev.payload)
             break
           case 'activity':
             callbacks.onActivity?.(ev.payload)

@@ -18,10 +18,14 @@ import { validateChatQuestion } from './chatQuestion'
 import type { ChatQuestion, ChatToolTrace } from '@shared/types'
 
 export interface ChatStreamConsumerCallbacks {
-  // Fires exactly once, when the envelope's reply field closes. The prose lands
-  // whole rather than token-by-token: that gives "here comes the output"
-  // without markdown re-layout thrashing on every delta.
+  // Fires exactly once, when the envelope's reply field closes, with the final
+  // decoded prose. The authoritative "the reply landed" signal.
   onReply: (replyText: string) => void
+  // Fires as the reply string GROWS, with the cumulative decoded text so far —
+  // token-by-token prose (Plexii P3). Cumulative rather than incremental so a
+  // listener can just replace what it shows; never fires after onReply, and a
+  // listener that ignores it sees exactly the pre-existing event sequence.
+  onReplyDelta?: (textSoFar: string) => void
   // Fires once per action object as it completes, in arrival order.
   onTool: (tool: ChatToolTrace) => void
   // Fires once per action object as it STARTS arriving — the moment its
@@ -55,6 +59,9 @@ export function createChatStreamConsumer(
   let questionArrived = false
   let toolIndex = 0
   let activityAnnounced = 0
+  // Length of the last cumulative reply text reported via onReplyDelta, so a
+  // push that grew only non-reply parts of the envelope stays silent.
+  let deltaLen = 0
 
   // In-progress peek: count `"kind": "…"` occurrences past the actions-array
   // marker in the accumulated text and announce each new one the moment it
@@ -85,6 +92,15 @@ export function createChatStreamConsumer(
         if (r !== null) {
           replySeen = true
           cb.onReply(r)
+        } else if (cb.onReplyDelta) {
+          // Still streaming: report the prose as far as it has decodably
+          // arrived. Only when it actually grew — chunks that extend other
+          // envelope fields must not re-announce the same text.
+          const partial = scanner.peekReply()
+          if (partial !== null && partial.length > deltaLen) {
+            deltaLen = partial.length
+            cb.onReplyDelta(partial)
+          }
         }
       }
       // The optional question object. The scanner is one-shot per key; the
