@@ -23,6 +23,7 @@ export type HomeWidgetId =
   | 'stalled'
   | 'new-meeting'
   | 'pinned-conversation'
+  | 'transcribe'
 
 // One tile in a Shortcuts box. Every kind carries an optional label snapshot
 // taken when the target was added: live store titles win while the subject
@@ -107,6 +108,7 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   // Communication
   { id: 'new-meeting', name: 'New meeting', blurb: 'Start or schedule a PlexiMeet and invite anyone', icon: 'plexii:meet', tint: 'bg-rose-500/10 text-rose-500', category: 'Communication', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
   { id: 'pinned-conversation', name: 'Pinned conversation', blurb: 'One person or chat, unread count and one click away', icon: 'plexii:chat', tint: 'bg-sky-500/10 text-sky-500', category: 'Communication', multi: true, config: 'conversation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'transcribe', name: 'Transcribe', blurb: 'Record and transcribe, then keep it where it belongs', icon: 'plexii:mic', tint: 'bg-violet-500/10 text-violet-500', category: 'Communication', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
   // Smart
   { id: 'one-thing', name: 'One thing now', blurb: 'The single most pressing task. No list, just the one', icon: 'target', tint: 'bg-amber-500/10 text-amber-600', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
   { id: 'where-was-i', name: 'Where was I', blurb: 'Your last working context, with one button: Resume', icon: 'undo', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },

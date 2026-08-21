@@ -46,6 +46,7 @@ import {
   ShortcutsWidget,
   NewMeetingWidget,
   PinnedConversationWidget,
+  TranscribeWidget,
   conversationName
 } from './homeWidgets'
 import { useMessagingStore } from '../../stores/messaging'
@@ -778,6 +779,8 @@ export default function HomeDashboard(): JSX.Element {
         return <NewMeetingWidget />
       case 'pinned-conversation':
         return <PinnedConversationWidget config={inst.config} size={size} />
+      case 'transcribe':
+        return <TranscribeWidget />
       case 'standup':
         // StandupHome carries its own card chrome + margin one level deeper
         // than the tile wrapper can reach; neutralize both here so the glass

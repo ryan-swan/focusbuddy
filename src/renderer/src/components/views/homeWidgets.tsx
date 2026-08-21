@@ -9,8 +9,11 @@ import { useMessagingStore } from '../../stores/messaging'
 import { useAccountStore } from '../../stores/account'
 import { usePresenceStore } from '../../stores/presence'
 import { useCapabilityEnabled } from '../../stores/capabilities'
+import { useWidgetStore } from '../../stores/widgets'
 import { splitFavourites } from '../../lib/connectedAppSort'
 import { personDisplayName } from '../../lib/personName'
+import { transcribeRecording } from '../../lib/transcribeRecording'
+import { saveTranscriptDoc } from '../../lib/meetingWrapup'
 import { RailCard } from '../plexi'
 import Modal from '../plexi/Modal'
 import Icon from '../Icon'
@@ -970,6 +973,424 @@ export function PinnedConversationWidget({
         </button>
       )}
     </RailCard>
+  )
+}
+
+// Start a transcription from Home. The pipeline is the app's one transcription
+// path end to end: MediaRecorder capture with live caption preview, the
+// recording ingested into Files first (so it survives a failed transcription),
+// then the provider-aware transcribeRecording helper. The wrap-up confirms
+// where it lands: a real voice-recorder widget on a chosen desk (full replay
+// and AI processing there), or a transcript document via the same
+// saveTranscriptDoc the meeting wrap-up uses.
+export function TranscribeWidget(): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <RailCard title="Transcribe" icon="plexii:mic" tone="violet">
+      <div className="flex-1 flex items-center gap-3" data-testid="home-transcribe">
+        <span className="flex-1 text-[12px] text-[var(--ink-70)]">
+          Say it once. Keep it forever.
+        </span>
+        <button
+          onClick={() => setOpen(true)}
+          data-testid="home-transcribe-start"
+          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[12.5px] font-medium bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+        >
+          <Icon name="plexii:mic" size={15} />
+          Record
+        </button>
+      </div>
+      {open && <TranscribeOverlay onClose={() => setOpen(false)} />}
+    </RailCard>
+  )
+}
+
+// Minimal Web Speech live-caption preview (Chromium ships it in Electron).
+// Preview only, never stored; Whisper owns the real transcript.
+interface CaptionRecognition {
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((e: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null
+  start: () => void
+  stop: () => void
+}
+
+type TranscribePhase =
+  | { kind: 'recording' }
+  | { kind: 'transcribing' }
+  | { kind: 'wrapup'; transcript: string; fileId: string; durationSec: number | null; language: string | null }
+  | { kind: 'error'; message: string; canRetry: boolean }
+
+function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
+  const v = useViewStore()
+  const nodes = useNodeStore((s) => s.nodes)
+  const setActiveNode = useNodeStore((s) => s.setActive)
+  const createDeskWidget = useWidgetStore((s) => s.create)
+
+  const [phase, setPhase] = useState<TranscribePhase>({ kind: 'recording' })
+  const [caption, setCaption] = useState('')
+  const [seconds, setSeconds] = useState(0)
+  const [title, setTitle] = useState('Transcription')
+  const [deskQuery, setDeskQuery] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [pickDesk, setPickDesk] = useState(false)
+
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const captionRef = useRef<CaptionRecognition | null>(null)
+  const timerRef = useRef<number | null>(null)
+  const lastBufferRef = useRef<{ buffer: ArrayBuffer; mimeType: string; fileId: string } | null>(null)
+
+  const stopEverything = (): void => {
+    if (timerRef.current !== null) window.clearInterval(timerRef.current)
+    timerRef.current = null
+    try {
+      captionRef.current?.stop()
+    } catch {
+      /* already stopped */
+    }
+    captionRef.current = null
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try {
+        recorderRef.current.stop()
+      } catch {
+        /* already stopped */
+      }
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+  }
+
+  // Recording starts the moment the overlay opens: one click from the widget
+  // to a running recorder, no second confirmation.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        streamRef.current = stream
+        chunksRef.current = []
+        const mr = new MediaRecorder(stream)
+        mr.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data)
+        }
+        mr.onstop = () => {
+          const mimeType = mr.mimeType || 'audio/webm'
+          const blob = new Blob(chunksRef.current, { type: mimeType })
+          chunksRef.current = []
+          streamRef.current?.getTracks().forEach((t) => t.stop())
+          streamRef.current = null
+          void finishRecording(blob, mimeType)
+        }
+        mr.start(250)
+        recorderRef.current = mr
+        timerRef.current = window.setInterval(() => setSeconds((s) => s + 1), 1000)
+        const Ctor =
+          (window as unknown as { webkitSpeechRecognition?: new () => CaptionRecognition }).webkitSpeechRecognition ||
+          (window as unknown as { SpeechRecognition?: new () => CaptionRecognition }).SpeechRecognition
+        if (Ctor) {
+          try {
+            const rec = new Ctor()
+            rec.continuous = true
+            rec.interimResults = true
+            rec.onresult = (e) => {
+              let text = ''
+              for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript
+              setCaption(text.slice(-180))
+            }
+            rec.start()
+            captionRef.current = rec
+          } catch {
+            /* captions are a bonus, never a blocker */
+          }
+        }
+      } catch (err) {
+        if (!cancelled)
+          setPhase({
+            kind: 'error',
+            message: `Microphone access denied or unavailable: ${err instanceof Error ? err.message : String(err)}. On macOS: System Settings, Privacy & Security, Microphone, allow PlexiDesk.`,
+            canRetry: false
+          })
+      }
+    })()
+    return () => {
+      cancelled = true
+      stopEverything()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function finishRecording(blob: Blob, mimeType: string): Promise<void> {
+    setPhase({ kind: 'transcribing' })
+    const buffer = await blob.arrayBuffer()
+    // Files first: the recording survives even if transcription fails.
+    let fileId: string
+    try {
+      const file = await window.api.files.ingestBuffer({
+        buffer,
+        originalName: `transcription-${Date.now()}.webm`,
+        mimeType
+      })
+      fileId = file.id
+    } catch (err) {
+      setPhase({
+        kind: 'error',
+        message: `Could not save the recording: ${err instanceof Error ? err.message : String(err)}`,
+        canRetry: false
+      })
+      return
+    }
+    lastBufferRef.current = { buffer, mimeType, fileId }
+    await runTranscription(buffer, mimeType, fileId)
+  }
+
+  async function runTranscription(buffer: ArrayBuffer, mimeType: string, fileId: string): Promise<void> {
+    setPhase({ kind: 'transcribing' })
+    try {
+      const r = await transcribeRecording(buffer, mimeType)
+      if (!r.ok) {
+        setPhase({
+          kind: 'error',
+          message: `The recording is safe in Files, but transcription failed: ${r.error}`,
+          canRetry: true
+        })
+        return
+      }
+      setPhase({
+        kind: 'wrapup',
+        transcript: r.transcript,
+        fileId,
+        durationSec: r.durationSec,
+        language: r.language
+      })
+    } catch (err) {
+      setPhase({
+        kind: 'error',
+        message: `The recording is safe in Files, but transcription failed: ${err instanceof Error ? err.message : String(err)}`,
+        canRetry: true
+      })
+    }
+  }
+
+  async function landOnDesk(deskId: string): Promise<void> {
+    if (phase.kind !== 'wrapup' || saving) return
+    setSaving(true)
+    try {
+      await createDeskWidget({
+        taskId: deskId,
+        kind: 'voice-recorder',
+        title: title.trim() || 'Transcription',
+        content: JSON.stringify({
+          fileId: phase.fileId,
+          captureMode: 'audio',
+          transcript: phase.transcript,
+          language: phase.language,
+          durationSec: phase.durationSec,
+          mode: 'summary',
+          processedText: '',
+          proposals: []
+        })
+      })
+      onClose()
+      setActiveNode(deskId)
+      v.goTask(deskId)
+    } catch (err) {
+      setSaving(false)
+      setPhase({
+        kind: 'error',
+        message: `Could not place the widget on that desk: ${err instanceof Error ? err.message : String(err)}`,
+        canRetry: false
+      })
+    }
+  }
+
+  async function landInDocuments(): Promise<void> {
+    if (phase.kind !== 'wrapup' || saving) return
+    setSaving(true)
+    const docId = await saveTranscriptDoc(title.trim() || 'Transcription', phase.transcript, null)
+    if (docId) {
+      onClose()
+      v.goDocument(docId)
+    } else {
+      setSaving(false)
+      setPhase({
+        kind: 'error',
+        message: 'Could not create the transcript document. The recording is safe in Files.',
+        canRetry: false
+      })
+    }
+  }
+
+  const desks = nodes
+    .filter((n) => n.kind === 'task' && !n.archived)
+    .filter((n) => !deskQuery.trim() || (n.title || '').toLowerCase().includes(deskQuery.trim().toLowerCase()))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 12)
+
+  const mm = Math.floor(seconds / 60)
+  const ss = seconds % 60
+
+  return (
+    <Modal
+      onClose={onClose}
+      label="Transcribe"
+      z={260}
+      className="fb-glass-pillow rounded-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[76vh] outline-none"
+      testId="home-transcribe-overlay"
+    >
+      <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2.5">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500 shrink-0">
+          <Icon name="plexii:mic" size={15} />
+        </span>
+        <span className="flex-1 text-[13.5px] font-semibold text-[var(--ink-100)]">Transcribe</span>
+        {phase.kind === 'recording' && (
+          <span className="inline-flex items-center gap-1.5 text-[12px] text-rose-500 fb-tabular" data-testid="home-transcribe-timer">
+            <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+            {mm}:{String(ss).padStart(2, '0')}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {phase.kind === 'recording' && (
+          <div className="flex flex-col gap-3" data-testid="home-transcribe-recording">
+            <p className="text-[12.5px] text-[var(--ink-70)]">
+              Recording. Speak naturally; the transcript comes when you stop.
+            </p>
+            <p className="min-h-[3.5rem] rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-[12px] leading-relaxed text-[var(--ink-60)] italic">
+              {caption || 'Live preview appears here as you speak…'}
+            </p>
+            <button
+              onClick={() => {
+                if (timerRef.current !== null) window.clearInterval(timerRef.current)
+                timerRef.current = null
+                try {
+                  captionRef.current?.stop()
+                } catch {
+                  /* stopped */
+                }
+                recorderRef.current?.stop()
+              }}
+              data-testid="home-transcribe-stop"
+              className="self-center inline-flex items-center gap-1.5 h-10 px-5 rounded-lg text-[13px] font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors"
+            >
+              <Icon name="stop_circle" size={16} />
+              Stop
+            </button>
+          </div>
+        )}
+
+        {phase.kind === 'transcribing' && (
+          <div className="py-8 flex flex-col items-center gap-2" data-testid="home-transcribe-busy">
+            <Icon name="progress_activity" size={20} className="animate-spin text-violet-500" />
+            <p className="text-[12.5px] text-[var(--ink-60)]">Transcribing…</p>
+          </div>
+        )}
+
+        {phase.kind === 'wrapup' && (
+          <div className="flex flex-col gap-3" data-testid="home-transcribe-wrapup">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              aria-label="Transcription name"
+              data-testid="home-transcribe-title"
+              className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 text-[13px] font-medium text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent))]"
+            />
+            <div className="max-h-40 overflow-y-auto rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-[12px] leading-relaxed text-[var(--ink-80)] whitespace-pre-wrap">
+              {phase.transcript || 'Silence. Nothing was heard.'}
+            </div>
+            {!pickDesk ? (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-[var(--ink-40)]">Keep it where?</p>
+                <button
+                  onClick={() => setPickDesk(true)}
+                  disabled={saving}
+                  data-testid="home-transcribe-to-desk"
+                  className="flex items-center gap-2.5 fb-tile fb-press px-3 py-2.5 text-left"
+                >
+                  <Icon name="desk" size={17} className="text-violet-500 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block fb-t-body font-medium text-[var(--ink-100)]">On a desk</span>
+                    <span className="block fb-t-caption">A voice widget there: replay, clean up, pull out tasks</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => void landInDocuments()}
+                  disabled={saving}
+                  data-testid="home-transcribe-to-documents"
+                  className="flex items-center gap-2.5 fb-tile fb-press px-3 py-2.5 text-left"
+                >
+                  <Icon name="description" size={17} className="text-sky-500 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block fb-t-body font-medium text-[var(--ink-100)]">In Documents</span>
+                    <span className="block fb-t-caption">A transcript document; the recording stays in Files</span>
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5" data-testid="home-transcribe-desk-picker">
+                <input
+                  autoFocus
+                  value={deskQuery}
+                  onChange={(e) => setDeskQuery(e.target.value)}
+                  placeholder="Search desks…"
+                  className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+                />
+                {desks.length === 0 ? (
+                  <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">No desks match.</p>
+                ) : (
+                  <div className="space-y-0.5 max-h-44 overflow-y-auto">
+                    {desks.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => void landOnDesk(n.id)}
+                        disabled={saving}
+                        data-testid={`home-transcribe-desk-${n.id}`}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                      >
+                        <Icon name="desk" size={15} className="text-[var(--ink-50)] shrink-0" />
+                        <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                          {n.title || 'Untitled desk'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setPickDesk(false)} className="self-start btn-ghost text-[12px]">
+                  Back
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase.kind === 'error' && (
+          <div className="flex flex-col gap-3" data-testid="home-transcribe-error">
+            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-[12px] leading-relaxed text-amber-700 dark:text-amber-300">
+              {phase.message}
+            </p>
+            {phase.canRetry && lastBufferRef.current && (
+              <button
+                onClick={() => {
+                  const last = lastBufferRef.current
+                  if (last) void runTranscription(last.buffer, last.mimeType, last.fileId)
+                }}
+                data-testid="home-transcribe-retry"
+                className="self-start inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[12.5px] font-medium bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))] transition-colors"
+              >
+                <Icon name="refresh" size={15} />
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
 
