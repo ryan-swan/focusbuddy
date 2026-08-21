@@ -759,9 +759,13 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             card provides the width. Always the same wrapper node — classes
             only — so switching modes mid-conversation re-lays-out without
             remounting the panel. */}
+        {/* Turn rhythm (P2): large gaps BETWEEN turns, tight spacing within
+            one — the premium-chat convention. The fullscreen column narrows to
+            a ~68-character reading measure; the card modes keep a smaller gap
+            so short panels don't feel sparse. */}
         <div
           className={
-            isFullscreen && !fullscreenHome ? 'max-w-[820px] mx-auto w-full space-y-3' : 'space-y-3'
+            isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full space-y-6' : 'space-y-4'
           }
         >
         {fullscreenHome && (
@@ -834,7 +838,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <div
                 key={i}
                 data-testid="user-turn"
-                className="ml-auto max-w-[88%] rounded-[var(--radius-row)] rounded-br-[3px] px-3 py-2 fb-t-body leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.18)] text-[var(--ink-100)]"
+                className="ml-auto w-fit max-w-[70%] rounded-[var(--radius-card)] px-3.5 py-2.5 fb-t-body leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
               >
                 {segments.length <= 1
                   ? m.content
@@ -888,17 +892,12 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           const finishedTrace = traceByMessage[String(m.ts)]
           return (
             <div key={i} className="group/turn flex flex-col gap-1.5" data-testid="assistant-turn">
-              {/* Identity row. With the prose unbubbled, this is what marks the
-                  speaker — the research is explicit that sender must not be
-                  carried by colour alone. */}
-              <div className="flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded-[5px] grid place-items-center bg-accent/15 text-accent shrink-0">
-                  <Icon name="auto_awesome" size={10} filled />
-                </span>
-                <span className="fb-t-caption font-mono uppercase tracking-[0.09em] text-[var(--ink-50)]">
-                  Plexii
-                </span>
-              </div>
+              {/* No identity row (P2). The premium-chat convention is
+                  unanimous: the asymmetry itself marks the speaker — user
+                  turns sit right-anchored in a quiet tint, assistant turns are
+                  flat full-width prose on the page. A repeated logo eyebrow
+                  reads as messenger chrome, and the trace's summary line
+                  already heads the answers that did retrieval work. */}
               {/* What produced this answer, above it — collapsed to a single
                   summary line once it has been read, absent entirely when
                   retrieval found nothing and no action was prepared. */}
@@ -927,12 +926,18 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   }}
                 />
               ))}
-              {/* Per-turn actions. Always present — they were hover-only, which
-                  meant you had to already know they were there and land the
-                  pointer on the prose to find them. They sit at low contrast and
-                  come up to full on hover, so the thread stays calm without the
-                  controls being a secret. */}
-              <div className="flex items-center gap-0.5 opacity-55 group-hover/turn:opacity-100 focus-within:opacity-100 transition-opacity">
+              {/* Per-turn actions (P2): completion is a state change. Nothing
+                  but the answer exists while it streams; the actions
+                  materialize when the turn is done and reveal on hover/focus —
+                  present for the pointer that goes looking, invisible to the
+                  reading eye. Keyboard users get them via focus-within. */}
+              <div
+                className={`flex items-center gap-0.5 transition-opacity ${
+                  sending && i === messages.length - 1
+                    ? 'hidden'
+                    : 'opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100'
+                }`}
+              >
                 <button
                   onClick={() => void copyTurn(m.content)}
                   title="Copy this reply"
