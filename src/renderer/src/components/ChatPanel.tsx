@@ -123,6 +123,12 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const linkedDesks = useMemo(() => activeMeta?.linkedDesks ?? [], [activeMeta])
   const primaryDeskId = linkedDesks[0] ?? null
   const linkConversationDesk = useChatStore((s) => s.linkDesk)
+  // Discovery mode (Plexii P6): per-conversation, switchable at any time.
+  // Subscribed through the fields it derives from so the badge re-renders.
+  const pendingMode = useChatStore((s) => s.pendingMode)
+  const setChatMode = useChatStore((s) => s.setMode)
+  const mode = activeConversationId ? (activeMeta?.mode ?? 'chat') : pendingMode
+  const discovering = mode === 'discovery'
   const thread = {
     key: conversationKey,
     label: startedIn?.label ?? ctx.label,
@@ -536,6 +542,18 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[var(--ink-100)]">
               Plexii
             </h2>
+            {/* The mode badge (Plexii P6) — visible whenever discovery is on,
+                so the different posture is never a mystery. */}
+            {discovering && (
+              <span
+                data-testid="chat-mode-badge"
+                title="Discovery mode — Plexii is leading with questions toward a desk"
+                className="inline-flex items-center gap-1 rounded-[8px] bg-accent/10 px-1.5 py-px fb-t-caption font-medium text-[rgb(var(--accent))]"
+              >
+                <Icon name="plexii:discover" size={11} />
+                Discovery
+              </span>
+            )}
           </div>
           <p
             className="text-[10.5px] text-[var(--ink-50)] truncate"
@@ -582,6 +600,20 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           )}
         </div>
         <div className="flex items-center gap-1">
+          {/* Enter or leave discovery at any point in any conversation. */}
+          <button
+            onClick={() => setChatMode(discovering ? 'chat' : 'discovery')}
+            className={`icon-btn ${discovering ? '!text-accent' : ''}`}
+            data-testid="chat-mode-toggle"
+            aria-pressed={discovering}
+            title={
+              discovering
+                ? 'Discovery mode is ON — Plexii leads with questions toward a desk. Click to return to normal chat.'
+                : 'Discovery mode — let Plexii lead: guided questions and options that build toward a desk'
+            }
+          >
+            <Icon name="plexii:discover" size={16} filled={discovering} />
+          </button>
           <button
             onClick={() => {
               newConversation()
@@ -738,12 +770,28 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           // inside the form below.
           <div data-testid="assistant-home" className="text-center">
             <h3 className="text-[26px] font-semibold tracking-[-0.02em] text-[var(--ink-100)] mb-2">
-              How can I help you today?
+              {discovering ? "What are we building?" : 'How can I help you today?'}
             </h3>
-            <p className="text-[13px] text-[var(--ink-60)] leading-relaxed">{ctx.intro}</p>
+            <p className="text-[13px] text-[var(--ink-60)] leading-relaxed">
+              {discovering
+                ? 'Start anywhere — a question, an idea, a list, a business. I will ask my way through it with you, and we finish with a desk that brings it to life.'
+                : ctx.intro}
+            </p>
           </div>
         )}
-        {messages.length === 0 && !fullscreenHome && (
+        {messages.length === 0 && !fullscreenHome && discovering && (
+          // Discovery in the narrow modes: its own invitation, no starter rows.
+          <div className="mt-2 px-1" data-testid="assistant-empty-state">
+            <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-100)] mb-1">
+              What are we building?
+            </h3>
+            <p className="text-[11.5px] text-[var(--ink-60)] leading-relaxed">
+              Start anywhere — a question, an idea, a list, a business. I will ask my way through it
+              with you, and we finish with a desk that brings it to life.
+            </p>
+          </div>
+        )}
+        {messages.length === 0 && !fullscreenHome && !discovering && (
           // Notion-mirror empty state: avatar, "How can I help you today?",
           // the per-screen intro, then iconed suggestion ROWS — the reference
           // layout. (The earlier wrap-chips predate the mirror direction.)
@@ -1097,7 +1145,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             </button>
           </div>
         </div>
-        {fullscreenHome && (
+        {/* Discovery supplies its own invitation ("start anywhere"), so the
+            normal-chat starters are suppressed there: "Draft an email" and
+            "What should I work on next?" are the wrong offer for someone who
+            came to explore an idea. */}
+        {fullscreenHome && !discovering && (
           <>
             {/* What the assistant can genuinely act on today (P8), and a real
                 entry point for each (3b — operator's call): clicking a chip

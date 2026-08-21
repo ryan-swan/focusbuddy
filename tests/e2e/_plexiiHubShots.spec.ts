@@ -114,13 +114,31 @@ test('plexii hub visual shots', async () => {
   }
   await window.screenshot({ path: `${OUT}/p5-linked-desk.png` })
 
-  // Back home: sidebar sublist with the recent conversation.
+  // Back home: sidebar sublist with the recent conversation. Place the
+  // Discover icon while we are here so the icon block is in the shot.
   await window.evaluate(() => {
     const w = window as unknown as { __fbView?: { getState: () => { goHome: () => void } } }
     w.__fbView?.getState().goHome()
   })
   await window.waitForTimeout(500)
+  await window.locator('[data-testid="home-customize-toggle"]').click()
+  await window.locator('[data-testid="home-add-widget"]').click()
+  await window.locator('[data-testid="home-gallery-discover"]').click()
+  await window.locator('[data-testid="home-picker-add"]').click()
+  await window.locator('[data-testid="home-customize-toggle"]').click()
+  await window.waitForTimeout(600)
   await window.screenshot({ path: `${OUT}/p1-home-with-recents.png` })
+
+  // The Discover app icon itself, framed with its icon-tier neighbours.
+  const iconTile = window.locator('[data-testid="home-discover"]')
+  await iconTile.scrollIntoViewIfNeeded()
+  await window.waitForTimeout(400)
+  await window.screenshot({ path: `${OUT}/p6-discover-icon.png` })
+
+  // Discovery mode (P6): one tap from the Home icon.
+  await window.locator('[data-testid="home-discover-start"]').click()
+  await window.waitForTimeout(700)
+  await window.screenshot({ path: `${OUT}/p6-discovery.png` })
 
   await launched.dispose()
 })

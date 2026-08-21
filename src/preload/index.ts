@@ -1975,8 +1975,14 @@ const api = {
       taskId: string | null
       title?: string
       context?: import('@shared/types').AiChatConversationContext | null
+      mode?: import('@shared/types').AiChatMode
     }): Promise<import('@shared/types').AiChatConversationMeta> =>
       ipcRenderer.invoke('aiChat:createConversation', input),
+    // Plexii P6: switch a conversation between normal chat and guided discovery.
+    setConversationMode: (
+      id: string,
+      mode: import('@shared/types').AiChatMode
+    ): Promise<void> => ipcRenderer.invoke('aiChat:setConversationMode', id, mode),
     appendMessage: (
       conversationId: string,
       message: {

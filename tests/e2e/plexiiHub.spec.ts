@@ -219,6 +219,45 @@ test.describe('Plexii hub (Phase 1)', () => {
     })
   })
 
+  // ── Phase 6: discovery mode + the Home icon verb ─────────────────────────
+
+  test('the Discover icon starts a guided discovery in the hub', async () => {
+    const { window } = launched
+    await gotoHome()
+    // Place the Discover icon widget from the gallery.
+    await window.locator('[data-testid="home-customize-toggle"]').click()
+    await window.locator('[data-testid="home-add-widget"]').click()
+    // A gallery tile opens its detail pane; Add places it, then leave customize.
+    await window.locator('[data-testid="home-gallery-discover"]').click()
+    await window.locator('[data-testid="home-picker-add"]').click()
+    await window.locator('[data-testid="home-customize-toggle"]').click()
+
+    const discover = window.locator('[data-testid="home-discover-start"]')
+    await expect(discover).toBeVisible({ timeout: 8_000 })
+    await discover.click()
+
+    // Lands on the hub, in discovery, with the mode's own opening.
+    await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
+    await expect(window.locator('[data-testid="chat-mode-badge"]')).toBeVisible()
+    await expect(window.locator('[data-testid="assistant-home"]')).toContainText(
+      'What are we building?'
+    )
+  })
+
+  test('discovery is a mode you can enter and leave in any conversation', async () => {
+    const { window } = launched
+    await window.locator('[data-testid="sidebar-plexii"]').click()
+    await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
+    // A normal chat carries no badge.
+    await expect(window.locator('[data-testid="chat-mode-badge"]')).toHaveCount(0)
+    const toggle = window.locator('[data-testid="chat-mode-toggle"]')
+    await toggle.click()
+    await expect(window.locator('[data-testid="chat-mode-badge"]')).toBeVisible()
+    // And out again — the mode is never a one-way door.
+    await toggle.click()
+    await expect(window.locator('[data-testid="chat-mode-badge"]')).toHaveCount(0)
+  })
+
   // ── Phase 2: consolidation + the Plexii name ─────────────────────────────
 
   test('cmd-shift-K toggles the hub and the header Build button is gone', async () => {

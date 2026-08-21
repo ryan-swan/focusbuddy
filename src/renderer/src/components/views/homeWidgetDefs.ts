@@ -25,6 +25,7 @@ export type HomeWidgetId =
   | 'pinned-conversation'
   | 'transcribe'
   | 'new-desk'
+  | 'discover'
 
 // One tile in a Shortcuts box. Every kind carries an optional label snapshot
 // taken when the target was added: live store titles win while the subject
@@ -124,6 +125,7 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   { id: 'create', name: 'Create new', blurb: 'Start a document, spreadsheet, deck, or desk in one tap', icon: 'add_circle', tint: 'bg-accent/10 text-accent', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'focus-timer', name: 'Focus timer', blurb: 'Start and stop the five minute promise from home', icon: 'timer', tint: 'bg-violet-500/10 text-violet-500', category: 'Actions', defaultCol: 'rail', sizes: ['icon', 'sm'], defaultSize: 'sm' },
   { id: 'new-desk', name: 'New desk', blurb: 'A fresh desk, one tap, straight in', icon: 'desk', tint: 'bg-teal-500/10 text-teal-500', category: 'Actions', defaultCol: 'rail', sizes: ['icon'], defaultSize: 'icon' },
+  { id: 'discover', name: 'Discover', blurb: 'Start from any idea and let Plexii guide it into a desk', icon: 'plexii:discover', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Actions', defaultCol: 'rail', sizes: ['icon'], defaultSize: 'icon' },
   // Communication
   { id: 'new-meeting', name: 'New meeting', blurb: 'Start or schedule a PlexiMeet and invite anyone', icon: 'plexii:meet', tint: 'bg-rose-500/10 text-rose-500', category: 'Communication', defaultCol: 'rail', sizes: ['icon', 'md'], defaultSize: 'icon' },
   { id: 'pinned-conversation', name: 'Pinned conversation', blurb: 'One person or chat, unread count and one click away', icon: 'plexii:chat', tint: 'bg-sky-500/10 text-sky-500', category: 'Communication', multi: true, config: 'conversation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },

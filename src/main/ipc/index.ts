@@ -465,7 +465,8 @@ import {
   setMessageApplied as setAiChatMessageApplied,
   renameConversation as renameAiChatConversation,
   deleteConversation as deleteAiChatConversation,
-  linkDesk as linkAiChatDesk
+  linkDesk as linkAiChatDesk,
+  setConversationMode as setAiChatConversationMode
 } from '../db/aiChat'
 import { getRecentActivity, recordActivity } from '../db/activity'
 import {
@@ -1274,26 +1275,24 @@ export function registerIpcHandlers(): void {
         if (sender.isDestroyed()) return
         sender.send(channel, { type, payload })
       }
-      await sendChatStream(
-        {
-          taskId: input.taskId,
-          messages: input.messages,
-          attachments: input.attachments,
-          supportsQuestions: input.supportsQuestions,
-          pinnedWidgetId: input.pinnedWidgetId
-        },
-        {
-          onMentions: (m) => send('mentions', m),
-          onSources: (t) => send('sources', t),
-          onReply: (text) => send('reply', text),
-          onReplyDelta: (text) => send('reply-delta', text),
-          onActivity: (a) => send('activity', a),
-          onTool: (tool) => send('tool', tool),
-          onQuestion: (q) => send('question', q),
-          onError: (err) => send('error', err),
-          onComplete: (resp) => send('complete', resp)
-        }
-      )
+      // Forward the WHOLE request rather than re-listing its fields. The old
+      // hand-built object silently dropped `mentions` and `includeMemory` —
+      // every @-reference and the memory block were lost on the streaming
+      // path (the normal one), while the non-streaming fallback passed them
+      // through, so the two paths disagreed. Spreading also means the next
+      // field added to ChatRequest cannot go missing here again.
+      const { requestId: _requestId, ...chatReq } = input
+      await sendChatStream(chatReq, {
+        onMentions: (m) => send('mentions', m),
+        onSources: (t) => send('sources', t),
+        onReply: (text) => send('reply', text),
+        onReplyDelta: (text) => send('reply-delta', text),
+        onActivity: (a) => send('activity', a),
+        onTool: (tool) => send('tool', tool),
+        onQuestion: (q) => send('question', q),
+        onError: (err) => send('error', err),
+        onComplete: (resp) => send('complete', resp)
+      })
       return { ok: true }
     }
   )
@@ -2703,8 +2702,17 @@ export function registerIpcHandlers(): void {
     'aiChat:createConversation',
     (
       _e,
-      input: { taskId: string | null; title?: string; context?: AiChatConversationContext | null }
+      input: {
+        taskId: string | null
+        title?: string
+        context?: AiChatConversationContext | null
+        mode?: import('@shared/types').AiChatMode
+      }
     ) => createAiChatConversation(input)
+  )
+  ipcMain.handle(
+    'aiChat:setConversationMode',
+    (_e, id: string, mode: import('@shared/types').AiChatMode) => setAiChatConversationMode(id, mode)
   )
   ipcMain.handle(
     'aiChat:appendMessage',

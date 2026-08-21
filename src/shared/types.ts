@@ -501,6 +501,10 @@ export interface ChatRequest {
   // affordance never set it. The prompt claims a pin only when the id resolves
   // to an attachment that genuinely rendered (see chatAttachments).
   pinnedWidgetId?: string
+  // The conversation's mode (Plexii P6). Absent means the normal assistant;
+  // 'discovery' adds the guided-discovery prompt layer on top of everything
+  // else. Optional so every non-conversational caller is untouched.
+  mode?: AiChatMode
 }
 
 // A retrieved workspace document the assistant was grounded on. Slimmed from
@@ -2363,7 +2367,15 @@ export interface AiChatConversationMeta {
   // element 0 is the PRIMARY: the pinned chip in the header and the default
   // push target. Grows as the chat creates desks; never limits how many.
   linkedDesks: string[]
+  // How this conversation talks (Plexii P6). 'chat' is the normal assistant;
+  // 'discovery' is the guided mode that drives with questions and blocks
+  // toward a desk. Per-conversation and switchable at any time.
+  mode: AiChatMode
 }
+
+// The conversation modes (Plexii P6). Persisted per conversation so reopening
+// a discovery thread keeps discovering.
+export type AiChatMode = 'chat' | 'discovery'
 // A persisted message: the ChatMessage plus its proposals + applied-state, so an
 // assistant turn restores with its green "done" cards intact.
 export interface AiChatStoredMessage {

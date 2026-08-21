@@ -1001,6 +1001,9 @@ export function getDb(): Database.Database {
   // Plexii P5 — desks a conversation produced/adopted (element 0 = primary).
   // NULL/absent means none yet; pre-P5 conversations honestly link nothing.
   ensureColumn(db, 'ai_chat_conversations', 'linked_desks_json', 'TEXT')
+  // Plexii P6 — how a conversation talks ('chat' | 'discovery'). Every existing
+  // row is a normal chat, which the DEFAULT states rather than infers.
+  ensureColumn(db, 'ai_chat_conversations', 'mode', "TEXT NOT NULL DEFAULT 'chat'")
   // What screen a conversation was started from, so it can say so later. The
   // assistant used to re-thread per screen; after unification a conversation
   // REMEMBERS its context instead of being replaced by it (plan D4).

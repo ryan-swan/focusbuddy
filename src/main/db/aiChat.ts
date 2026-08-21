@@ -13,6 +13,7 @@ import type {
   ChatRole,
   ChatSource,
   ChatUiBlock,
+  AiChatMode,
   StoredTrace
 } from '@shared/types'
 
@@ -35,6 +36,9 @@ interface ConversationRow {
   context_json: string | null
   // Plexii P5: desks this conversation produced/adopted, element 0 = primary.
   linked_desks_json: string | null
+  // Plexii P6: 'chat' | 'discovery'. Defaulted at the column, so a legacy row
+  // reads as the normal assistant rather than as an unknown.
+  mode: string | null
 }
 
 interface MessageRow {
@@ -69,8 +73,15 @@ function rowToMeta(
     context: safeParse<AiChatConversationContext | null>(row.context_json, null),
     messageCount: extras?.messageCount,
     preview: extras?.preview,
-    linkedDesks: safeParse<string[]>(row.linked_desks_json, [])
+    linkedDesks: safeParse<string[]>(row.linked_desks_json, []),
+    mode: toChatMode(row.mode)
   }
+}
+
+// Coerce a stored mode string; anything unexpected reads as the normal
+// assistant rather than silently enabling a mode the user never chose.
+export function toChatMode(raw: string | null): AiChatMode {
+  return raw === 'discovery' ? 'discovery' : 'chat'
 }
 
 // Exported for unit testing — robust JSON parse that never throws on a corrupt
@@ -124,7 +135,8 @@ export function listConversations(): AiChatConversationMeta[] {
   const org = getActiveOrgId()
   const rows = db
     .prepare(
-      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json, linked_desks_json
+      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json,
+              linked_desks_json, mode
        FROM ai_chat_conversations WHERE org_id = ? ORDER BY updated_at DESC`
     )
     .all(org) as ConversationRow[]
@@ -148,7 +160,8 @@ export function getConversation(id: string): AiChatConversation | null {
   const org = getActiveOrgId()
   const row = db
     .prepare(
-      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json, linked_desks_json
+      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json,
+              linked_desks_json, mode
        FROM ai_chat_conversations WHERE id = ? AND org_id = ?`
     )
     .get(id, org) as ConversationRow | undefined
@@ -171,14 +184,17 @@ export function createConversation(input: {
   // not know (a fresh chat opened from nowhere) record nothing rather than a
   // placeholder.
   context?: AiChatConversationContext | null
+  // Plexii P6: the mode this conversation starts in. Omitted means normal chat.
+  mode?: AiChatMode
 }): AiChatConversationMeta {
   const db = getDb()
   const id = randomUUID()
   const now = Date.now()
+  const mode = toChatMode(input.mode ?? null)
   db.prepare(
     `INSERT INTO ai_chat_conversations
-      (id, org_id, task_id, title, created_at, updated_at, context_json)
-     VALUES (@id, @org_id, @task_id, @title, @created_at, @updated_at, @context_json)`
+      (id, org_id, task_id, title, created_at, updated_at, context_json, mode)
+     VALUES (@id, @org_id, @task_id, @title, @created_at, @updated_at, @context_json, @mode)`
   ).run({
     id,
     org_id: getActiveOrgId(),
@@ -186,7 +202,8 @@ export function createConversation(input: {
     title: input.title?.trim() || '',
     created_at: now,
     updated_at: now,
-    context_json: input.context ? JSON.stringify(input.context) : null
+    context_json: input.context ? JSON.stringify(input.context) : null,
+    mode
   })
   return {
     id,
@@ -196,8 +213,20 @@ export function createConversation(input: {
     updatedAt: now,
     context: input.context ?? null,
     messageCount: 0,
-    linkedDesks: []
+    linkedDesks: [],
+    mode
   }
+}
+
+/** Switch a conversation's mode (Plexii P6). Org-scoped like every write. */
+export function setConversationMode(id: string, mode: AiChatMode): void {
+  const db = getDb()
+  if (!conversationOwnedByActiveOrg(id)) return
+  db.prepare(`UPDATE ai_chat_conversations SET mode = ?, updated_at = ? WHERE id = ?`).run(
+    toChatMode(mode),
+    Date.now(),
+    id
+  )
 }
 
 /**

@@ -24,6 +24,7 @@ import { relatedScopeIds } from '../db/nodeRelations'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
 import { uiBlocksSection, validateChatUiBlocks } from './chatUiBlocks'
+import { discoverySection } from './discoveryMode'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
 import { renderMentions } from './chatMentions'
@@ -49,6 +50,7 @@ import type {
   AiBuildSuggestion,
   BodyDoubleResponse,
   ChatMentionResolved,
+  AiChatMode,
   ChatQuestion,
   ChatUiBlock,
   ChatRequest,
@@ -352,7 +354,14 @@ const ACTION_KINDS_CATALOG =
   '  { "kind": "post-chat", "conversationId": "<from chat conversations>", "conversationLabel": "#launch", "body": "Draft update: ...", "reason": "..." }\n' +
   '\n'
 
-function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean, includeMemory?: boolean): string {
+function buildSystemPrompt(
+  taskId: string | null,
+  supportsQuestions?: boolean,
+  includeMemory?: boolean,
+  // Plexii P6: 'discovery' appends the guided-discovery posture on top of
+  // everything else. The envelope and every protocol above are unchanged.
+  mode?: AiChatMode
+): string {
   const base =
     'You are PlexiDesk, the in-app pair-worker for an ADHD-friendly task-execution desktop app. ' +
     'You help the user think, plan, research, and complete the task they are currently focused on. ' +
@@ -408,7 +417,10 @@ function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean, i
     questionProtocolSection(supportsQuestions) +
     // The visual-block contract (Plexii P4) — universal across chat surfaces;
     // the renderer that cannot show a block simply ignores the array.
-    uiBlocksSection()
+    uiBlocksSection() +
+    // Guided discovery (Plexii P6) — posture only, appended last so it colours
+    // how the protocols above are used rather than replacing any of them.
+    discoverySection(mode === 'discovery')
   // Memory only for conversational surfaces that opt in (assistant panel / focus
   // chat), never the field editor / command bar / one-off completions — a
   // "what I know about you" block is noise + cost there.
@@ -1064,7 +1076,7 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
     // (mentions, retrieval, attachments) as an uncached suffix so they don't
     // change the cached hash.
     system: cachedSystem(
-      buildSystemPrompt(req.taskId, req.supportsQuestions, req.includeMemory),
+      buildSystemPrompt(req.taskId, req.supportsQuestions, req.includeMemory, req.mode),
       // What the user named by hand leads what the system went looking for.
       renderedMentions.block + retrieval + renderAttachments(req.attachments, req.pinnedWidgetId)
     ),

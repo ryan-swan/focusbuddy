@@ -10,6 +10,7 @@ import { useAccountStore } from '../../stores/account'
 import { usePresenceStore } from '../../stores/presence'
 import { useCapabilityEnabled } from '../../stores/capabilities'
 import { useWidgetStore } from '../../stores/widgets'
+import { useChatStore } from '../../stores/chat'
 import { splitFavourites } from '../../lib/connectedAppSort'
 import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
@@ -1217,6 +1218,39 @@ export function NewDeskWidget(): JSX.Element {
       testId="home-new-desk"
       buttonTestId="home-new-desk-create"
       onPress={() => void make()}
+    />
+  )
+}
+
+// One tap into a fresh guided discovery (Plexii P6): a new conversation in
+// discovery mode, opened on the Plexii hub. A distinct VERB — it starts the
+// guided experience, not a second general door to the assistant — which is why
+// it earns an icon under the no-duplicate-chrome ruling.
+export function DiscoverWidget(): JSX.Element {
+  const v = useViewStore()
+  const setActive = useNodeStore((s) => s.setActive)
+  const start = (): void => {
+    const chat = useChatStore.getState()
+    chat.newConversation()
+    chat.setMode('discovery')
+    chat.setPendingContext({
+      kind: 'workspace',
+      label: 'a new idea',
+      title: '',
+      icon: 'plexii:discover'
+    })
+    // The hub is no desk — same rule every other hub door follows.
+    setActive(null)
+    v.goPlexii()
+  }
+  return (
+    <AppIconWidget
+      name="Discover"
+      icon="plexii:discover"
+      surface="bg-gradient-to-b from-indigo-500 to-indigo-600"
+      testId="home-discover"
+      buttonTestId="home-discover-start"
+      onPress={start}
     />
   )
 }

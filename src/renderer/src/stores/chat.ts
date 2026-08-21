@@ -9,6 +9,7 @@ import type {
   ChatResponse,
   ChatSource,
   ChatUiBlock,
+  AiChatMode,
   StoredTrace
 } from '@shared/types'
 import { recordTrail } from '../lib/trail'
@@ -147,6 +148,15 @@ interface ChatStore {
   // one records nothing rather than a placeholder.
   pendingContext: AiChatConversationContext | null
   setPendingContext: (ctx: AiChatConversationContext | null) => void
+  // The mode a NOT-YET-SAVED chat will be created in (Plexii P6). A saved
+  // conversation's mode lives on its meta; this covers the window before the
+  // first message, so opening discovery from Home is discovery from turn one.
+  pendingMode: AiChatMode
+  // Switch the active conversation's mode. Works before the conversation
+  // exists (sets pendingMode) and after (persists on the row).
+  setMode: (mode: AiChatMode) => void
+  // The mode in force right now: the active conversation's, or the pending one.
+  activeMode: () => AiChatMode
   sending: boolean
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
@@ -267,6 +277,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   messageIdByTs: {},
   pendingContext: null,
   setPendingContext: (ctx) => set({ pendingContext: ctx }),
+  pendingMode: 'chat',
+  activeMode: () => {
+    const id = get().activeConversationId
+    if (!id) return get().pendingMode
+    return get().conversations.find((c) => c.id === id)?.mode ?? 'chat'
+  },
+  setMode: (mode) => {
+    const id = get().activeConversationId
+    if (!id) {
+      set({ pendingMode: mode })
+      return
+    }
+    // Optimistic on the meta so the badge flips instantly; persisted after.
+    set({
+      conversations: get().conversations.map((c) => (c.id === id ? { ...c, mode } : c))
+    })
+    if (typeof window.api?.aiChat?.setConversationMode === 'function') {
+      void window.api.aiChat.setConversationMode(id, mode).catch(() => {})
+    }
+  },
   conversationKey: () => get().activeConversationId ?? NEW_CHAT_KEY,
   refreshConversations: async () => {
     const list = await window.api.aiChat.listConversations().catch(() => null)
@@ -287,7 +317,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       liveTraceByThread: nextLive,
       messageIdByTs: {},
       mentions: clearConversationMentions(get().mentions, key),
-      pendingContext: null
+      pendingContext: null,
+      // A fresh chat starts as a normal chat unless the caller (the Discover
+      // widget) asks for discovery straight after.
+      pendingMode: 'chat'
     })
   },
   openConversation: async (id) => {
@@ -481,7 +514,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const meta = await window.api.aiChat.createConversation({
           taskId,
           title: content.slice(0, 60),
-          context: get().pendingContext
+          context: get().pendingContext,
+          // The mode chosen before the first word carries into the row.
+          mode: get().pendingMode
         })
         convId = meta.id
         const carried = get().messagesByTask[NEW_CHAT_KEY] ?? []
@@ -490,6 +525,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         nextMessages[meta.id] = carried
         set({
           activeConversationId: meta.id,
+          // The new row is not in the list until the next refresh, so seed it
+          // now — otherwise activeMode() would read 'chat' for a conversation
+          // that was just created in discovery.
+          conversations: [meta, ...get().conversations.filter((c) => c.id !== meta.id)],
           messagesByTask: nextMessages,
           // References picked before the first send belong to this conversation.
           mentions: get().mentions.map((m) =>
@@ -505,6 +544,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         set({ creatingConversation: false })
       }
     }
+    // Read AFTER any lazy conversation-create above, so a discovery chat is
+    // discovery from its very first request.
+    const mode = get().activeMode()
     const current = get().messagesByTask[key] ?? []
     const userMsg: ChatMessage = { role: 'user', content, ts: Date.now() }
     const next = [...current, userMsg]
@@ -710,7 +752,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         // Conversational surface: inject the "what I know about you" memory block.
         includeMemory: true,
         pinnedWidgetId,
-        mentions: wireMentions
+        mentions: wireMentions,
+        mode
       })
       settle(resp)
       return
@@ -734,7 +777,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           supportsQuestions: true,
           includeMemory: true,
           pinnedWidgetId,
-          mentions: wireMentions
+          mentions: wireMentions,
+          mode
         },
         {
           onMentions: (m) => {
