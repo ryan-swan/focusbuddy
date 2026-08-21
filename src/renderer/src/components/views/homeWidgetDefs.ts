@@ -28,22 +28,29 @@ export type HomeWidgetId =
 // One tile in a Shortcuts box. Every kind carries an optional label snapshot
 // taken when the target was added: live store titles win while the subject
 // exists (renames stay fresh), the snapshot keeps a dead target legible
-// ("Payroll desk" instead of an anonymous missing tile).
+// ("Payroll desk" instead of an anonymous missing tile). `detail` is an
+// optional where-it-lives snapshot (a document's Drive folder, for example)
+// captured when the target is added, so tiles can say WHAT a thing is, not
+// just its name.
+interface ShortcutTargetBase {
+  label?: string
+  detail?: string
+}
 export type ShortcutTarget =
-  | { kind: 'url'; url: string; label?: string }
-  | { kind: 'section'; id: string; label?: string }
-  | { kind: 'desk'; nodeId: string; label?: string }
-  | { kind: 'room'; roomId: string; label?: string }
-  | { kind: 'document'; documentId: string; label?: string }
-  | { kind: 'connected-app'; appId: string; label?: string }
+  | (ShortcutTargetBase & { kind: 'url'; url: string })
+  | (ShortcutTargetBase & { kind: 'section'; id: string })
+  | (ShortcutTargetBase & { kind: 'desk'; nodeId: string })
+  | (ShortcutTargetBase & { kind: 'room'; roomId: string })
+  | (ShortcutTargetBase & { kind: 'document'; documentId: string })
+  | (ShortcutTargetBase & { kind: 'connected-app'; appId: string })
   // A tile that DOES something instead of going somewhere: starts a meeting
   // or a transcription right from the box.
-  | { kind: 'action'; action: 'new-meeting' | 'transcribe'; label?: string }
+  | (ShortcutTargetBase & { kind: 'action'; action: 'new-meeting' | 'transcribe' })
   // Message a person: opens their DM (starting it for real if none exists).
-  | { kind: 'person'; accountId: string; handle?: string; label?: string }
+  | (ShortcutTargetBase & { kind: 'person'; accountId: string; handle?: string })
   // A specific widget on a desk: lands on the desk with the camera centred on
   // that widget (the desk alone if the widget has since been removed).
-  | { kind: 'desk-widget'; nodeId: string; widgetId: string; label?: string }
+  | (ShortcutTargetBase & { kind: 'desk-widget'; nodeId: string; widgetId: string })
 
 export interface HomeWidgetConfig {
   deskId?: string

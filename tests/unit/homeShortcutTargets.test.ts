@@ -23,11 +23,13 @@ const WORLD: ShortcutLookups = {
   node: (id) =>
     id === 'desk1'
       ? { title: 'Payroll desk', archived: false }
-      : id === 'deadDesk'
-        ? { title: 'Old desk', archived: true }
-        : id === 'room1'
-          ? { title: 'Loop room', archived: false }
-          : null,
+      : id === 'deskInRoom'
+        ? { title: 'Clock-in desk', archived: false, parentTitle: 'Loop' }
+        : id === 'deadDesk'
+          ? { title: 'Old desk', archived: true }
+          : id === 'room1'
+            ? { title: 'Loop room', archived: false }
+            : null,
   document: (id) =>
     id === 'doc1'
       ? { title: 'Q3 numbers', docType: 'sheet', archived: false }
@@ -125,6 +127,13 @@ describe('describeShortcutTarget', () => {
   it('labels URLs from the label, else the hostname', () => {
     expect(describeShortcutTarget({ kind: 'url', url: 'https://x.netsuite.com/a', label: 'NetSuite' }, EMPTY).label).toBe('NetSuite')
     expect(describeShortcutTarget({ kind: 'url', url: 'https://x.netsuite.com/a' }, EMPTY).label).toBe('x.netsuite.com')
+  })
+  it('keeps the domain visible on renamed links and captions context', () => {
+    expect(describeShortcutTarget({ kind: 'url', url: 'https://x.netsuite.com/a', label: 'NetSuite' }, EMPTY).caption).toBe('x.netsuite.com')
+    expect(describeShortcutTarget({ kind: 'url', url: 'https://x.netsuite.com/a' }, EMPTY).caption).toBe('Website')
+    expect(describeShortcutTarget({ kind: 'desk', nodeId: 'deskInRoom' }, WORLD).caption).toBe('Desk · Loop')
+    expect(describeShortcutTarget({ kind: 'document', documentId: 'doc1', detail: 'Flamelit' }, WORLD).caption).toBe('Spreadsheet · Flamelit')
+    expect(describeShortcutTarget({ kind: 'document', documentId: 'doc1' }, WORLD).caption).toBe('Spreadsheet')
   })
   it('resolves live desks, rooms, documents, and apps from the stores', () => {
     const desk = describeShortcutTarget({ kind: 'desk', nodeId: 'desk1' }, WORLD)

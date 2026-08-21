@@ -243,6 +243,20 @@ export function AppLauncherWidget(): JSX.Element {
 
 type ConnectedApp = ReturnType<typeof useConnectedAppsStore.getState>['apps'][number]
 
+// Tinted chip wash per target tone, so every tile carries a colored identity
+// block instead of a bare glyph floating on glass.
+const TONE_CHIP: Record<string, string> = {
+  'text-indigo-500': 'bg-indigo-500/12',
+  'text-sky-500': 'bg-sky-500/12',
+  'text-violet-500': 'bg-violet-500/12',
+  'text-teal-500': 'bg-teal-500/12',
+  'text-emerald-500': 'bg-emerald-500/12',
+  'text-rose-500': 'bg-rose-500/12',
+  'text-orange-500': 'bg-orange-500/12',
+  'text-amber-500': 'bg-amber-500/12',
+  'text-fuchsia-500': 'bg-fuchsia-500/12'
+}
+
 // The visual for one shortcut: favicon for websites (globe fallback), the real
 // app logo for connected apps, a toned Plexii icon for everything else.
 function ShortcutGlyph({
@@ -290,6 +304,33 @@ function ShortcutGlyph({
   return <Icon name={icon} size={size} className={`${tone} shrink-0`} />
 }
 
+// The glyph in its tinted chip: the standard identity block for shortcut
+// tiles and composer rows.
+function ShortcutChip({
+  target,
+  icon,
+  tone,
+  apps,
+  chip,
+  glyph
+}: {
+  target: ShortcutTarget
+  icon: string
+  tone: string
+  apps: ConnectedApp[]
+  chip: number
+  glyph: number
+}): JSX.Element {
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-[10px] shrink-0 ${TONE_CHIP[tone] ?? 'bg-[var(--surface-sunken)]'}`}
+      style={{ width: chip, height: chip }}
+    >
+      <ShortcutGlyph target={target} icon={icon} tone={tone} apps={apps} size={glyph} />
+    </span>
+  )
+}
+
 export function ShortcutsWidget({
   config,
   size,
@@ -317,7 +358,9 @@ export function ShortcutsWidget({
     () => ({
       node: (id) => {
         const n = nodes.find((x) => x.id === id)
-        return n ? { title: n.title || '', archived: !!n.archived } : null
+        if (!n) return null
+        const parent = n.parentId ? nodes.find((x) => x.id === n.parentId) : null
+        return { title: n.title || '', archived: !!n.archived, parentTitle: parent?.title || null }
       },
       document: (id) => {
         const d = docs.find((x) => x.id === id)
@@ -471,12 +514,15 @@ export function ShortcutsWidget({
               <button
                 key={targetKey(t)}
                 onClick={() => invoke(t)}
-                title={view.alive ? view.label : `${view.label} (gone)`}
+                title={view.alive ? `${view.label} · ${view.caption}` : `${view.label} (gone)`}
                 aria-label={view.label}
                 data-testid={`home-shortcut-${i}`}
-                className={`h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press ${view.alive ? '' : 'opacity-40'}`}
+                className={`h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-1 fb-tile fb-press px-1 ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={22} />
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={30} glyph={17} />
+                <span className="max-w-full truncate text-[9px] font-medium leading-none text-[var(--ink-70)]">
+                  {view.label}
+                </span>
               </button>
             )
           })}
@@ -491,12 +537,17 @@ export function ShortcutsWidget({
               <button
                 key={targetKey(t)}
                 onClick={() => invoke(t)}
-                title={view.alive ? view.label : `${view.label} (gone)`}
+                title={view.alive ? undefined : `${view.label} (gone)`}
                 data-testid={`home-shortcut-${i}`}
-                className={`flex items-center gap-2 fb-tile fb-press px-2.5 py-2 text-left ${view.alive ? '' : 'opacity-40'}`}
+                className={`flex items-center gap-2.5 fb-tile fb-press px-2.5 py-2 text-left ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={17} />
-                <span className="text-[12px] font-medium text-[var(--ink-90)] truncate">{view.label}</span>
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={32} glyph={17} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] font-medium text-[var(--ink-100)]">{view.label}</span>
+                  <span className="block truncate text-[10px] text-[var(--ink-50)]">
+                    {view.alive ? view.caption : 'Gone. Click to fix.'}
+                  </span>
+                </span>
               </button>
             )
           })}
@@ -517,7 +568,7 @@ export function ShortcutsWidget({
                 data-testid={`home-shortcut-${i}`}
                 className={`flex items-center gap-2.5 fb-tile fb-press px-2.5 py-1.5 text-left min-h-0 ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={17} />
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={32} glyph={17} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-medium text-[var(--ink-100)]">{view.label}</span>
                   <span className="block truncate text-[10.5px] text-[var(--ink-50)]">
@@ -565,12 +616,18 @@ function ShortcutComposer({
 
   const targets = useMemo(() => config?.targets ?? [], [config])
   const taken = useMemo(() => new Set(targets.map(targetKey)), [targets])
+  // Latest config for async enrichment callbacks (Drive lookups resolve after
+  // the commit that added the target).
+  const configRef = useRef(config)
+  configRef.current = config
 
   const lookups = useMemo<ShortcutLookups>(
     () => ({
       node: (id) => {
         const n = nodes.find((x) => x.id === id)
-        return n ? { title: n.title || '', archived: !!n.archived } : null
+        if (!n) return null
+        const parent = n.parentId ? nodes.find((x) => x.id === n.parentId) : null
+        return { title: n.title || '', archived: !!n.archived, parentTitle: parent?.title || null }
       },
       document: (id) => {
         const d = docs.find((x) => x.id === id)
@@ -596,8 +653,29 @@ function ShortcutComposer({
 
   const toggle = (t: ShortcutTarget): void => {
     const key = targetKey(t)
-    if (taken.has(key)) commit({ targets: targets.filter((x) => targetKey(x) !== key) })
-    else commit({ targets: [...targets, t] })
+    if (taken.has(key)) {
+      commit({ targets: targets.filter((x) => targetKey(x) !== key) })
+    } else {
+      commit({ targets: [...targets, t] })
+      // Documents get their Drive location stamped in after the fact, so the
+      // tile can say "Spreadsheet · Flamelit" instead of a bare doc icon.
+      if (t.kind === 'document') {
+        void window.api.fileManager
+          .locateDocument(t.documentId)
+          .then((loc) => {
+            const detail = loc?.path?.length ? loc.path[loc.path.length - 1]?.name : null
+            if (!detail) return
+            const cfg = configRef.current
+            const cur = cfg?.targets ?? []
+            if (!cur.some((x) => targetKey(x) === key)) return
+            onUpdate({
+              ...cfg,
+              targets: cur.map((x) => (targetKey(x) === key ? { ...x, detail } : x))
+            })
+          })
+          .catch(() => {})
+      }
+    }
     setQuery('')
     inputRef.current?.focus()
   }
@@ -675,10 +753,20 @@ function ShortcutComposer({
             tone: 'text-sky-500'
           }))
       : []
+    const appItems = apps
+      .filter((a) => !q || a.title.toLowerCase().includes(q))
+      .slice(0, 6)
+      .map((a) => ({
+        target: { kind: 'connected-app' as const, appId: a.id, label: a.title },
+        label: a.title,
+        icon: 'apps',
+        tone: 'text-emerald-500'
+      }))
     if (!q) {
       // No query yet: the finite catalogs are browsable immediately;
       // everything else needs a few letters.
       if (actionItems.length) out.push({ name: 'Actions', items: actionItems })
+      if (appItems.length) out.push({ name: 'Connected apps', items: appItems })
       if (sectionItems.length) out.push({ name: 'PlexiDesk sections', items: sectionItems })
       if (peopleItems.length) out.push({ name: 'People online', items: peopleItems })
       return out
@@ -744,16 +832,7 @@ function ShortcutComposer({
       .slice(0, 5)
     if (widgetItems.length) out.push({ name: 'Desk widgets', items: widgetItems })
 
-    const appItems = apps
-      .filter((a) => a.title.toLowerCase().includes(q))
-      .slice(0, 5)
-      .map((a) => ({
-        target: { kind: 'connected-app' as const, appId: a.id, label: a.title },
-        label: a.title,
-        icon: 'apps',
-        tone: 'text-emerald-500'
-      }))
-    if (appItems.length) out.push({ name: 'Apps', items: appItems })
+    if (appItems.length) out.push({ name: 'Connected apps', items: appItems })
     return out
   }, [query, url, nodes, docs, apps, deepHits, lookups, presencePeers, presenceEnabled])
 
@@ -819,13 +898,19 @@ function ShortcutComposer({
             className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
           />
 
+          {!query.trim() && (
+            <p className="mt-1.5 px-1 text-[11px] leading-relaxed text-[var(--ink-40)]">
+              Paste any web link (netsuite.com, a Google Doc URL, anything) and it becomes a tile with its own icon.
+            </p>
+          )}
+
           {url && (
             <button
               onClick={() => toggle({ kind: 'url', url, label: urlLabel(url) })}
               data-testid="home-shortcut-composer-add-url"
               className="mt-2 flex w-full items-center gap-2.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-2 text-left hover:border-[rgb(var(--accent)/0.5)] hover:bg-[var(--surface-sunken)] transition-colors"
             >
-              <ShortcutGlyph target={{ kind: 'url', url }} icon="language" tone="text-indigo-500" apps={apps} size={16} />
+              <ShortcutChip target={{ kind: 'url', url }} icon="language" tone="text-indigo-500" apps={apps} chip={28} glyph={15} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12.5px] font-medium text-[var(--ink-100)]">{urlLabel(url)}</span>
                 <span className="block truncate text-[10.5px] text-[var(--ink-50)]">{url}</span>
@@ -844,15 +929,19 @@ function ShortcutComposer({
               <div className="space-y-0.5">
                 {g.items.map((c, i) => {
                   const isTaken = taken.has(targetKey(c.target))
+                  const caption = describeShortcutTarget(c.target, lookups).caption
                   return (
                     <button
                       key={targetKey(c.target)}
                       onClick={() => toggle(c.target)}
                       data-testid={`home-shortcut-composer-result-${g.name.toLowerCase().replace(/\s+/g, '-')}-${i}`}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
                     >
-                      <ShortcutGlyph target={c.target} icon={c.icon} tone={c.tone} apps={apps} size={16} />
-                      <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">{c.label}</span>
+                      <ShortcutChip target={c.target} icon={c.icon} tone={c.tone} apps={apps} chip={28} glyph={15} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate fb-t-body text-[var(--ink-100)]">{c.label}</span>
+                        <span className="block truncate text-[10px] text-[var(--ink-50)]">{caption}</span>
+                      </span>
                       {isTaken && <Icon name="check" size={13} className="text-accent shrink-0" />}
                     </button>
                   )
@@ -883,7 +972,7 @@ function ShortcutComposer({
                     data-testid={`home-shortcut-composer-row-${i}`}
                   >
                     <Icon name="drag_indicator" size={15} className="text-[var(--ink-30)] shrink-0 cursor-grab" />
-                    <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={16} />
+                    <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={28} glyph={15} />
                     {renamingKey === key ? (
                       <input
                         autoFocus
@@ -949,17 +1038,23 @@ export function NewMeetingWidget(): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <RailCard title="New meeting" icon="plexii:meet" tone="rose">
-      <div className="flex-1 flex items-center gap-3" data-testid="home-new-meeting">
-        <span className="flex-1 text-[12px] text-[var(--ink-70)]">
-          Face to face beats forty messages.
-        </span>
+      <div className="flex-1 flex flex-col" data-testid="home-new-meeting">
         <button
           onClick={() => setOpen(true)}
           data-testid="home-new-meeting-start"
-          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[12.5px] font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors"
+          className="flex-1 flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
         >
-          <Icon name="plexii:meet" size={15} />
-          Start
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500/12 text-rose-500 shrink-0">
+            <Icon name="plexii:meet" size={21} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block fb-t-body font-semibold text-[var(--ink-100)]">Start a meeting</span>
+            <span className="block fb-t-caption truncate">Face to face beats forty messages</span>
+          </span>
+          <span className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-rose-500">
+            Start
+            <Icon name="chevron_right" size={15} />
+          </span>
         </button>
       </div>
       {open && <NewMeetingDialog onClose={() => setOpen(false)} />}
@@ -1100,17 +1195,23 @@ export function TranscribeWidget(): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <RailCard title="Transcribe" icon="plexii:mic" tone="violet">
-      <div className="flex-1 flex items-center gap-3" data-testid="home-transcribe">
-        <span className="flex-1 text-[12px] text-[var(--ink-70)]">
-          Say it once. Keep it forever.
-        </span>
+      <div className="flex-1 flex flex-col" data-testid="home-transcribe">
         <button
           onClick={() => setOpen(true)}
           data-testid="home-transcribe-start"
-          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[12.5px] font-medium bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+          className="flex-1 flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
         >
-          <Icon name="plexii:mic" size={15} />
-          Record
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/12 text-violet-500 shrink-0">
+            <Icon name="plexii:mic" size={21} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block fb-t-body font-semibold text-[var(--ink-100)]">Record and transcribe</span>
+            <span className="block fb-t-caption truncate">Say it once. Keep it forever</span>
+          </span>
+          <span className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-violet-500">
+            Record
+            <Icon name="chevron_right" size={15} />
+          </span>
         </button>
       </div>
       {open && <TranscribeOverlay onClose={() => setOpen(false)} />}

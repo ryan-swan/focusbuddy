@@ -8,7 +8,9 @@ import type { HomeWidgetConfig, HomeWidgetId, ShortcutTarget, WidgetSize } from 
 // What the widget needs to know about the world to describe a target. The
 // component builds these from its stores; tests build them from fixtures.
 export interface ShortcutLookups {
-  node: (id: string) => { title: string; archived: boolean } | null
+  // parentTitle: the containing room's name for a desk, when it has one — it
+  // feeds the "Desk · Loop" context caption.
+  node: (id: string) => { title: string; archived: boolean; parentTitle?: string | null } | null
   document: (id: string) => { title: string; docType: string; archived: boolean } | null
   app: (id: string) => { title: string } | null
 }
@@ -136,14 +138,19 @@ const DOC_VISUALS: Record<string, { icon: string; tone: string; caption: string 
 
 export function describeShortcutTarget(t: ShortcutTarget, lookups: ShortcutLookups): ShortcutView {
   switch (t.kind) {
-    case 'url':
+    case 'url': {
+      // A renamed link keeps its domain visible ("NetSuite" · netsuite.com);
+      // an unnamed one already shows the domain as its label.
+      const host = urlLabel(t.url)
+      const label = t.label || host
       return {
-        label: t.label || urlLabel(t.url),
-        caption: 'Website',
+        label,
+        caption: label === host ? 'Website' : host,
         icon: 'language',
         tone: 'text-indigo-500',
         alive: true
       }
+    }
     case 'section': {
       const route = QUICK_LINK_ROUTES.find((r) => r.id === t.id)
       return route
@@ -154,7 +161,7 @@ export function describeShortcutTarget(t: ShortcutTarget, lookups: ShortcutLooku
       const node = lookups.node(t.nodeId)
       return {
         label: node?.title || t.label || 'Missing desk',
-        caption: 'Desk',
+        caption: node?.parentTitle ? `Desk · ${node.parentTitle}` : 'Desk',
         icon: 'desk',
         tone: 'text-violet-500',
         alive: !!node && !node.archived
@@ -175,7 +182,9 @@ export function describeShortcutTarget(t: ShortcutTarget, lookups: ShortcutLooku
       const visuals = DOC_VISUALS[doc?.docType ?? 'doc'] ?? DOC_VISUALS.doc
       return {
         label: doc?.title || t.label || 'Missing document',
-        caption: visuals.caption,
+        // detail = the Drive folder it lives in, snapshotted when it was
+        // added: "Spreadsheet · Flamelit" instead of an anonymous doc icon.
+        caption: t.detail ? `${visuals.caption} · ${t.detail}` : visuals.caption,
         icon: visuals.icon,
         tone: visuals.tone,
         alive: !!doc && !doc.archived
