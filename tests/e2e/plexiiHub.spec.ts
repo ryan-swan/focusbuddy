@@ -100,6 +100,30 @@ test.describe('Plexii hub (Phase 1)', () => {
     )
   })
 
+  // ── Phase 2: consolidation + the Plexii name ─────────────────────────────
+
+  test('cmd-shift-K toggles the hub and the header Build button is gone', async () => {
+    const { window } = launched
+    await gotoHome()
+    // The retired one-shot command bar's header trigger must not exist.
+    await expect(window.getByRole('button', { name: 'Build with AI' })).toHaveCount(0)
+    // The shortcut opens the hub...
+    await window.keyboard.press('Meta+Shift+K')
+    await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
+    // ...and pressed again steps back out.
+    await window.keyboard.press('Meta+Shift+K')
+    await expect(window.locator('[data-testid="plexii-hub"]')).toHaveCount(0)
+  })
+
+  test('the assistant surfaces carry the Plexii name', async () => {
+    const { window } = launched
+    await window.locator('[data-testid="sidebar-plexii"]').click()
+    await expect(window.getByRole('heading', { name: 'Plexii', exact: true })).toBeVisible()
+    // The retired names are gone from the chrome.
+    await expect(window.getByRole('heading', { name: 'Assistant', exact: true })).toHaveCount(0)
+    await expect(window.getByText('Ask PlexiBrain')).toHaveCount(0)
+  })
+
   test('home Ask button opens the hub, and leaving restores the pill', async () => {
     const { window } = launched
     await gotoHome()

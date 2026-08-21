@@ -3,7 +3,6 @@ import { effectiveShortcutToKind } from '../lib/keymap'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useMessagingStore } from '../stores/messaging'
-import { useAiCommandBar } from '../stores/aiCommandBar'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
 import WidgetErrorBoundary from './WidgetErrorBoundary'
@@ -443,14 +442,6 @@ export default function Canvas(): JSX.Element {
   // AI Setup (which is task-context-driven and uses the older suggestion
   // format).
   const [showAiBuilder, setShowAiBuilder] = useState(false)
-  // When the Ask AI command bar prepares object suggestions it stashes them in
-  // the store; we open the builder preview here, preloaded, so the user goes
-  // straight to picking and placing (no second prompt, no dead-end alert).
-  const aiBuildHandoff = useAiCommandBar((s) => s.handoff)
-  const clearAiBuildHandoff = useAiCommandBar((s) => s.setHandoff)
-  useEffect(() => {
-    if (aiBuildHandoff && aiBuildHandoff.suggestions.length > 0) setShowAiBuilder(true)
-  }, [aiBuildHandoff])
   const welcomedTasksRef = useRef<Set<string>>(new Set())
   const [ctxMenu, setCtxMenu] = useState<{
     screenX: number
@@ -2805,12 +2796,7 @@ export default function Canvas(): JSX.Element {
       {showAiBuilder && (
         <AiBuilderDialog
           taskId={activeTaskId ?? null}
-          initialSuggestions={aiBuildHandoff?.suggestions}
-          initialIntent={aiBuildHandoff?.intent}
-          onClose={() => {
-            setShowAiBuilder(false)
-            clearAiBuildHandoff(null)
-          }}
+          onClose={() => setShowAiBuilder(false)}
           onAccept={handleAiBuilderAccept}
         />
       )}

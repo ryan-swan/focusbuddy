@@ -496,12 +496,12 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           <div className="flex items-center gap-1.5">
             <Icon name={thread.icon} size={15} className="text-[var(--ink-70)]" />
             <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[var(--ink-100)]">
-              Assistant
+              Plexii
             </h2>
           </div>
           <p
             className="text-[10.5px] text-[var(--ink-50)] truncate"
-            title={`Assistant is focused on ${thread.label}${thread.title ? ` — ${thread.title}` : ''}`}
+            title={`Plexii is focused on ${thread.label}${thread.title ? ` — ${thread.title}` : ''}`}
           >
             {thread.title ? `${thread.title} · ` : ''}
             {thread.label}
@@ -769,7 +769,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   <Icon name="auto_awesome" size={10} filled />
                 </span>
                 <span className="text-[10px] font-mono uppercase tracking-[0.09em] text-[var(--ink-50)]">
-                  Plexi
+                  Plexii
                 </span>
               </div>
               {/* What produced this answer, above it — collapsed to a single

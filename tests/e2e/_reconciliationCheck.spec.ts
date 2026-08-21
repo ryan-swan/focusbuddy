@@ -100,7 +100,7 @@ test('Plexi3.0 reconciliation: single AI panel, pill+resume, Ryan chrome intact,
   const nextBestActionsCount = await window.getByText(/NEXT BEST ACTIONS/i).count()
   const asideCount = await window.locator('aside').count()
   const assistantHeadingCount = await window
-    .getByRole('heading', { name: 'Assistant', exact: true })
+    .getByRole('heading', { name: 'Plexii', exact: true })
     .count()
   const legacyRailCount = await window
     .locator('[data-testid="canvas-ai-assistant-rail"]')
@@ -117,7 +117,7 @@ test('Plexi3.0 reconciliation: single AI panel, pill+resume, Ryan chrome intact,
   // ── CHECK 2 — assistant is contextual: desk vs document ────────────────────
   const asideDesk = window
     .locator('aside')
-    .filter({ has: window.getByRole('heading', { name: 'Assistant', exact: true }) })
+    .filter({ has: window.getByRole('heading', { name: 'Plexii', exact: true }) })
   const desktSubtitle = ((await asideDesk.locator('p').first().textContent()) ?? '').trim()
   const deskChip = window.locator('[data-testid="chat-suggestion"]').first()
   const deskHasChip = await deskChip.isVisible({ timeout: 2_000 }).catch(() => false)
@@ -143,7 +143,7 @@ test('Plexi3.0 reconciliation: single AI panel, pill+resume, Ryan chrome intact,
   await window.waitForTimeout(1000)
   const asideDoc = window
     .locator('aside')
-    .filter({ has: window.getByRole('heading', { name: 'Assistant', exact: true }) })
+    .filter({ has: window.getByRole('heading', { name: 'Plexii', exact: true }) })
   const docSubtitle = ((await asideDoc.locator('p').first().textContent()) ?? '').trim()
   const docChip = window.locator('[data-testid="chat-suggestion"]').first()
   const docHasChip = await docChip.isVisible({ timeout: 2_000 }).catch(() => false)

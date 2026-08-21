@@ -165,8 +165,8 @@ export default function AssistantOverlay(): JSX.Element {
       <button
         type="button"
         onClick={openPanel}
-        title="Assistant — ask, plan, act (opens in your last view)"
-        aria-label="Open the assistant"
+        title="Plexii — ask, plan, act (opens in your last view)"
+        aria-label="Open Plexii"
         data-testid="assistant-pill"
         className="fb-floating-chrome fixed right-[14px] bottom-[42px] z-[120] h-10 w-10 rounded-full grid place-items-center border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-accent hover:border-[rgb(var(--accent)/0.5)] transition-colors"
         style={FLOATING_MENU_STYLE}
@@ -219,8 +219,8 @@ export default function AssistantOverlay(): JSX.Element {
           }}
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize the assistant"
-          title="Drag to resize the assistant"
+          aria-label="Resize Plexii"
+          title="Drag to resize Plexii"
           tabIndex={0}
           data-testid="assistant-resize"
           className="group absolute top-0 left-0 h-full w-2.5 -translate-x-1 z-10 flex items-center justify-center cursor-col-resize outline-none touch-none"
@@ -256,7 +256,7 @@ export default function AssistantOverlay(): JSX.Element {
       >
         <div
           role="tablist"
-          aria-label="Assistant sections"
+          aria-label="Plexii sections"
           data-testid="assistant-tabs"
           className="shrink-0 flex items-center gap-0.5 px-1.5 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-raised)]"
         >

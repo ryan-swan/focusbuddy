@@ -1479,7 +1479,7 @@ export default function HomeDashboard(): JSX.Element {
               className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
             >
               <Icon name="auto_awesome" size={16} className="text-accent" />
-              Ask PlexiBrain
+              Ask Plexii
             </button>
             <button
               onClick={() => void toggleFocus()}

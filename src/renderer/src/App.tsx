@@ -18,7 +18,6 @@ import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
 import Tooltip from './components/Tooltip'
 import { getPendingReleaseEntry, advanceRunVersion, type ChangelogEntry } from './lib/changelog'
-import { useAiCommandBar } from './stores/aiCommandBar'
 import Icon from './components/Icon'
 import SettingsPanel from './components/SettingsPanel'
 import RelatedDesksModal from './components/RelatedDesksModal'
@@ -40,7 +39,6 @@ import SmartStackModal from './components/SmartStackModal'
 import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
 import CommandCenter from './components/CommandCenter'
-import AICommandBar from './components/AICommandBar'
 import MetricsOverlay from './components/MetricsOverlay'
 import UnifiedBottomBar from './components/UnifiedBottomBar'
 import LaunchSignInModal from './components/LaunchSignInModal'
@@ -155,22 +153,8 @@ export default function App(): JSX.Element {
   // after an update. Resolved on mount; a fresh install sets the baseline
   // silently so it never appears retroactively.
   const [releaseEntry, setReleaseEntry] = useState<ChangelogEntry | null>(null)
-  // AI Command Bar — the "AI is the OS" entry point. Opened from the
-  // header button or Cmd+Shift+K. Owned at App level so any future hook
-  // can summon it (a stuck-detector nudge, a contextual "did you mean…"
-  // suggestion, etc.) without prop-drilling.
-  // Command bar open state lives in a store so any surface (header, Cmd+Shift+K,
-  // the canvas toolbar) can summon the one "Ask AI".
-  const aiBarOpen = useAiCommandBar((s) => s.open)
-  const setAiBarOpen = useAiCommandBar((s) => s.setOpen)
-  const toggleAiBar = useAiCommandBar((s) => s.toggle)
-  // Surfaces like the PlexiOffice AI bar open the global AI command bar via a
-  // window event, so they don't need to thread the setter down.
-  useEffect(() => {
-    const open = (): void => setAiBarOpen(true)
-    window.addEventListener('fb:open-ai-bar', open)
-    return () => window.removeEventListener('fb:open-ai-bar', open)
-  }, [setAiBarOpen])
+  // The one-shot AI command bar retired in the Plexii consolidation: ⌘⇧K and
+  // every former summoner open the Plexii hub (view.kind 'plexii') instead.
   // Peer body double — controlled HERE rather than inside its own
   // component so the dialog can be summoned from anywhere (button in
   // chrome, future keyboard shortcut, future "you've been stuck for 20
@@ -410,14 +394,18 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // Cmd+Shift+K toggles the AI command bar — distinct from Cmd+K (the
-  // search palette). Two shortcuts for two purposes: search what exists,
-  // vs. ask AI to make something new.
+  // Cmd+Shift+K toggles the Plexii hub — distinct from Cmd+K (the search
+  // palette). Two shortcuts for two purposes: search what exists, vs. talk to
+  // Plexii. Pressed on the hub it steps back out, so the key genuinely
+  // toggles. (The one-shot AI command bar this used to open retired in the
+  // Plexii consolidation — the conversation proposes builds now.)
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        toggleAiBar()
+        const v = useViewStore.getState()
+        if (v.view.kind === 'plexii') v.back()
+        else v.goPlexii()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -542,28 +530,10 @@ export default function App(): JSX.Element {
           </span>
         </h1>
         <div className="titlebar-nodrag flex items-center gap-1">
-          {/* AI command bar trigger — the "AI as the operating system"
-              entry point. Sits prominently in the header so it's the
-              first affordance the eye lands on. Cmd+Shift+K opens it
-              from anywhere. */}
-          <Tooltip
-            content="Build with AI — describe what you want and it builds the tools and widgets on your desk. For help thinking through a task, open the Assistant from the pill at the bottom right. (⌘⇧K)"
-            placement="bottom"
-          >
-            <button
-              onClick={() => setAiBarOpen(true)}
-              className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] border border-transparent hover:border-stone-200 dark:hover:border-white/[0.06] transition-colors"
-              aria-label="Build with AI"
-            >
-              <Icon name="auto_awesome" size={12} className="text-accent" />
-              <span>Build</span>
-              {/* PLX-A11Y-001: opacity-60 dimming a dark-ink kbd hint fell below
-                  4.5:1; --ink-70 is the token other kbd hints in the app use
-                  (CommandCenter, ShortcutsOverlay, WidgetFocusMode) so this one
-                  reads at the same weight instead of a one-off opacity trick. */}
-              <kbd className="text-[9px] font-mono text-[var(--ink-70)] ml-0.5">⌘⇧K</kbd>
-            </button>
-          </Tooltip>
+          {/* The header Build button retired in the Plexii consolidation
+              (Caleb's ruling, 2026-08-21): with the sidebar tab, the pill, the
+              Home input and ⌘⇧K all opening the one conversational engine, a
+              fifth door duplicated chrome. */}
           <Tooltip
             placement="bottom"
             content={
@@ -709,7 +679,6 @@ export default function App(): JSX.Element {
       {/* The universal pin layer (spec §7): a persistent tray of globally pinned
           items, reachable on every surface, droppable onto the current desk. */}
       <PinTray />
-      <AICommandBar open={aiBarOpen} onClose={() => setAiBarOpen(false)} />
       {/* Hover mic bar — collapses to accent strip, expands to voice FAB */}
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-auto">
         <UnifiedBottomBar />

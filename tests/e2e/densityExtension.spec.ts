@@ -172,7 +172,7 @@ test('compact density extension: fb-sidebar-fixed, fb-floating-inset, fb-nav-ite
   expect(comfortableSidebar.width).toBeLessThanOrEqual(265)
 
   const assistantHeadingCountComfortable = await window
-    .getByRole('heading', { name: 'Assistant', exact: true })
+    .getByRole('heading', { name: 'Plexii', exact: true })
     .count()
   console.log('Comfortable Assistant heading count (want 1):', assistantHeadingCountComfortable)
   expect(assistantHeadingCountComfortable).toBe(1)
@@ -272,7 +272,7 @@ test('compact density extension: fb-sidebar-fixed, fb-floating-inset, fb-nav-ite
 
   // Chrome intact in compact: FloatingPill + single Assistant heading still there.
   const assistantHeadingCountCompact = await window
-    .getByRole('heading', { name: 'Assistant', exact: true })
+    .getByRole('heading', { name: 'Plexii', exact: true })
     .count()
   console.log('Compact Assistant heading count (want 1):', assistantHeadingCountCompact)
   expect(assistantHeadingCountCompact).toBe(1)

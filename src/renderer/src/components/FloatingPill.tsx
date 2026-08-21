@@ -271,7 +271,7 @@ export default function FloatingPill({
             <MotionLabel hovered={hovered}>Tidy</MotionLabel>
           </button>
 
-          <button onClick={onBuild} className="inline-flex items-center h-6 px-1.5 rounded-lg text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)] transition-colors" title="Build with AI (⌘⇧K)" data-testid="pill-build">
+          <button onClick={onBuild} className="inline-flex items-center h-6 px-1.5 rounded-lg text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)] transition-colors" title="Build with AI" data-testid="pill-build">
             <Icon name="auto_awesome" size={12} />
             <MotionLabel hovered={hovered}>Build</MotionLabel>
           </button>
@@ -377,7 +377,7 @@ export default function FloatingPill({
           <MotionLabel hovered={hovered}>Tidy</MotionLabel>
         </button>
 
-        <button onClick={onBuild} className="inline-flex items-center h-6 px-1.5 rounded-full text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)] transition-colors" title="Build with AI (⌘⇧K)" data-testid="pill-build">
+        <button onClick={onBuild} className="inline-flex items-center h-6 px-1.5 rounded-full text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)] transition-colors" title="Build with AI" data-testid="pill-build">
           <Icon name="auto_awesome" size={12} />
           <MotionLabel hovered={hovered}>Build</MotionLabel>
         </button>

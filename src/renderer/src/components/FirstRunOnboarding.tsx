@@ -86,14 +86,14 @@ export default function FirstRunOnboarding(): JSX.Element | null {
       await window.api.nodes.create({
         parentId: folder.id,
         kind: 'task',
-        title: 'Try Build with AI — describe a workspace and let it build'
+        title: 'Try Plexii — describe a workspace and let it build'
       })
       await window.api.widgets.create({
         taskId: firstTask.id,
         kind: 'sticky',
         title: '',
         content:
-          'Welcome.\n\nThis is your desk. Add tools with + Widget, or press Build (⌘⇧K) and describe what you want — it builds the widgets for you. For help thinking through a task, use the Assistant panel on the right.\n\nPress the play button on a task to start a 5-minute focus session.',
+          'Welcome.\n\nThis is your desk. Add tools with + Widget, or ask Plexii (⌘⇧K) — describe what you want and it builds the widgets for you. Plexii is also the pill at the bottom right whenever you need help thinking through a task.\n\nPress the play button on a task to start a 5-minute focus session.',
         x: 160,
         y: 160,
         width: 280,

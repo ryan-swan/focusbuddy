@@ -225,7 +225,7 @@ test('regression: FloatingPill (fb-pill) still resolves and Resume opens the Res
 
   // CHECK 4 — single "Assistant" heading, no duplicate rail.
   const assistantHeadingCount = await window
-    .getByRole('heading', { name: 'Assistant', exact: true })
+    .getByRole('heading', { name: 'Plexii', exact: true })
     .count()
   console.log('Assistant heading count (want 1):', assistantHeadingCount)
   expect(assistantHeadingCount).toBe(1)

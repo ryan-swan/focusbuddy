@@ -77,7 +77,7 @@ async function openDesk(window: LaunchedApp['window'], title: string): Promise<v
 async function readAssistantPanel(
   window: LaunchedApp['window']
 ): Promise<{ subtitle: string; firstSuggestion: string | null }> {
-  const aside = window.locator('aside').filter({ has: window.getByRole('heading', { name: 'Assistant', exact: true }) })
+  const aside = window.locator('aside').filter({ has: window.getByRole('heading', { name: 'Plexii', exact: true }) })
   await expect(aside).toBeVisible({ timeout: 5_000 })
   // Subtitle is the small text under the "ASSISTANT" heading.
   const subtitleLoc = aside.locator('p').first()
@@ -123,7 +123,7 @@ test('single AI assistant + context-aware subtitle/suggestions + overlap fixes (
   console.log('"NEXT BEST ACTIONS" element count (should be 0):', nextBestActionsCount)
 
   const asideCount = await window.locator('aside').count()
-  const assistantHeadings = window.getByRole('heading', { name: 'Assistant', exact: true })
+  const assistantHeadings = window.getByRole('heading', { name: 'Plexii', exact: true })
   const assistantHeadingCount = await assistantHeadings.count()
   console.log('<aside> element count on desk:', asideCount)
   console.log('"ASSISTANT" heading count (should be exactly 1):', assistantHeadingCount)
