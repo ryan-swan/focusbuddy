@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, animate, motion, useMotionValue } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
@@ -379,6 +379,8 @@ export default function HomeDashboard(): JSX.Element {
   // never re-render.
   const [drag, setDrag] = useState<{ key: string; settling: boolean } | null>(null)
   const [customize, setCustomize] = useState(false)
+  // The center-screen widget picker, over a blurred home page.
+  const [gallery, setGallery] = useState(false)
   // Stage Manager pill — the same desk-miniature strip the desk breadcrumb
   // opens, surfaced on Home so any desk is one click away.
   const [deskStripOpen, setDeskStripOpen] = useState(false)
@@ -612,19 +614,20 @@ export default function HomeDashboard(): JSX.Element {
   const findInstance = (key: string): SizedInstance | null =>
     flat.find((it) => it.key === key) ?? null
 
-  // Place a new widget from the gallery at the end of the board, running its
-  // config picker first when it needs one. Singletons already placed are a
-  // no-op. The size comes from the picker when given, else the def's default.
-  const placeWidget = (id: HomeWidgetId, size?: WidgetSize): void => {
+  // Place a new widget at the end of the board. The picker overlay passes
+  // size and (for configurable widgets) config it already collected; without
+  // a config the widget's own picker runs first. Singletons already placed
+  // are a no-op.
+  const placeWidget = (id: HomeWidgetId, size?: WidgetSize, config?: HomeWidgetConfig): void => {
     const def = widgetDef(id)
     if (!def.multi && isPlaced(id)) return
     const finalSize = clampSize(def, size ?? def.defaultSize)
-    const finish = (config?: HomeWidgetConfig): void =>
-      commitFlat([...flatRef.current, { key: newInstanceKey(id), widget: id, config, size: finalSize }])
-    if (def.config) {
-      setPicker({ widget: id, kind: def.config, apply: (config) => finish(config) })
+    const finish = (cfg?: HomeWidgetConfig): void =>
+      commitFlat([...flatRef.current, { key: newInstanceKey(id), widget: id, config: cfg, size: finalSize }])
+    if (config !== undefined || !def.config) {
+      finish(config)
     } else {
-      finish()
+      setPicker({ widget: id, kind: def.config, apply: (cfg) => finish(cfg) })
     }
   }
 
@@ -676,18 +679,20 @@ export default function HomeDashboard(): JSX.Element {
   }
 
   // Escape backs out of customize mode one layer at a time: a drag in flight
-  // first (restoring the pre-drag order), then swap selection, then the mode.
+  // first (restoring the pre-drag order), then the picker overlay, then swap
+  // selection, then the mode.
   useEffect(() => {
     if (!customize) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       if (dragInfoRef.current) cancelDragRef.current()
+      else if (gallery) setGallery(false)
       else if (swapKey) setSwapKey(null)
       else setCustomize(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [customize, swapKey])
+  }, [customize, swapKey, gallery])
 
   // One widget = one tile. The renderer owns the chrome; content adapts to the
   // instance's size (row caps, column counts) so every size is designed, not
@@ -1214,7 +1219,10 @@ export default function HomeDashboard(): JSX.Element {
                               movedRef.current = false
                               return
                             }
+                            // Selecting a widget to swap opens the picker on
+                            // its replacement candidates.
                             setSwapKey(selected ? null : inst.key)
+                            if (!selected) setGallery(true)
                           }
                         : undefined
                     }
@@ -1372,11 +1380,28 @@ export default function HomeDashboard(): JSX.Element {
                 Reset layout
               </button>
             )}
-            <div className="relative">
+            {customize && (
+              <button
+                onClick={() => setGallery(true)}
+                data-testid="home-add-widget"
+                className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
+              >
+                <Icon name="add" size={16} />
+                Add widget
+              </button>
+            )}
             <button
               onClick={() => {
-                setCustomize((c) => !c)
-                setSwapKey(null)
+                if (customize) {
+                  setCustomize(false)
+                  setSwapKey(null)
+                  setGallery(false)
+                } else {
+                  // Entering customize goes straight to the picker, Apple's
+                  // "edit home screen" rhythm: choose, then place.
+                  setCustomize(true)
+                  setGallery(true)
+                }
               }}
               data-testid="home-customize-toggle"
               className={`inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-press ${
@@ -1388,26 +1413,6 @@ export default function HomeDashboard(): JSX.Element {
               <Icon name={customize ? 'check' : 'dashboard_customize'} size={16} />
               {customize ? 'Done' : 'Customize'}
             </button>
-                  <AnimatePresence>
-      {customize && (
-        <WidgetGalleryDrawer
-          isPlaced={isPlaced}
-          swapTarget={swapKey ? findInstance(swapKey) : null}
-          onPick={(id) => {
-            if (swapKey) swapWidget(swapKey, id)
-            else placeWidget(id)
-          }}
-          onDragStartWidget={() => {}}
-          onDragEndWidget={() => {}}
-          onClearSwap={() => setSwapKey(null)}
-          onClose={() => {
-            setCustomize(false)
-            setSwapKey(null)
-          }}
-        />
-      )}
-      </AnimatePresence>
-            </div>
             <button
               onClick={() => openAiBar(true)}
               data-testid="home-ask-brain"
@@ -1468,6 +1473,39 @@ export default function HomeDashboard(): JSX.Element {
         )
       )}
 
+      {/* The center-screen picker: home blurred behind, live per-size
+          previews of the real widgets inside. */}
+      <AnimatePresence>
+        {gallery && (
+          <WidgetPickerOverlay
+            isPlaced={isPlaced}
+            swapTarget={swapKey ? findInstance(swapKey) : null}
+            cellW={gridMetrics()?.cellW ?? 264}
+            cellH={GRID.cellH}
+            gap={GRID.gap}
+            renderPreview={renderWidget}
+            requestConfig={(id, apply) => {
+              const def = widgetDef(id)
+              if (!def.config) {
+                apply(undefined)
+                return
+              }
+              setPicker({ widget: id, kind: def.config, apply })
+            }}
+            onAdd={(id, size, config) => {
+              placeWidget(id, size, config)
+              setGallery(false)
+            }}
+            onSwap={(id) => {
+              if (swapKey) swapWidget(swapKey, id)
+              setGallery(false)
+            }}
+            onClearSwap={() => setSwapKey(null)}
+            onClose={() => setGallery(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {picker && (
         <WidgetConfigPicker
           widget={picker.widget}
@@ -1485,30 +1523,52 @@ export default function HomeDashboard(): JSX.Element {
   )
 }
 
-// ── Customize mode: the gallery drawer ───────────────────────────────────────
-// Slides up from the bottom while customizing. Browse by category or search,
-// drag a card up onto a glowing slot, or click to place it at the end of its
-// stock column. With a placed widget selected, clicking a card swaps it in.
-function WidgetGalleryDrawer({
+// ── The widget picker ────────────────────────────────────────────────────────
+// Apple's widget-editing rhythm: a centered glass panel over the blurred home
+// page. Browse by category or search; choosing a widget slides to its detail
+// page, where every size it supports renders as a LIVE preview of the real
+// widget (config collected first so previews show real content); Add drops
+// back into placement mode. With a placed widget selected, the picker offers
+// replacements instead.
+
+const SIZE_LABEL: Record<WidgetSize, string> = {
+  sm: 'Small',
+  md: 'Medium',
+  lg: 'Large',
+  stack: 'Stack'
+}
+
+function WidgetPickerOverlay({
   isPlaced,
   swapTarget,
-  onPick,
-  onDragStartWidget,
-  onDragEndWidget,
+  cellW,
+  cellH,
+  gap,
+  renderPreview,
+  requestConfig,
+  onAdd,
+  onSwap,
   onClearSwap,
   onClose
 }: {
   isPlaced: (id: HomeWidgetId) => boolean
-  swapTarget: HomeWidgetInstance | null
-  onPick: (id: HomeWidgetId) => void
-  onDragStartWidget: (id: HomeWidgetId) => void
-  onDragEndWidget: () => void
+  swapTarget: SizedInstance | null
+  cellW: number
+  cellH: number
+  gap: number
+  renderPreview: (inst: SizedInstance) => JSX.Element | null
+  requestConfig: (id: HomeWidgetId, apply: (config?: HomeWidgetConfig) => void) => void
+  onAdd: (id: HomeWidgetId, size: WidgetSize, config?: HomeWidgetConfig) => void
+  onSwap: (id: HomeWidgetId) => void
   onClearSwap: () => void
   onClose: () => void
 }): JSX.Element {
   const CATEGORIES = ['All', 'Navigation', 'Live', 'Smart', 'Actions'] as const
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('All')
   const [search, setSearch] = useState('')
+  // The detail page: one widget, its config already collected, a size chosen.
+  const [detail, setDetail] = useState<{ id: HomeWidgetId; config?: HomeWidgetConfig } | null>(null)
+  const [sizeIx, setSizeIx] = useState(0)
 
   const q = search.trim().toLowerCase()
   const visible = HOME_WIDGET_DEFS.filter((d) => {
@@ -1517,125 +1577,268 @@ function WidgetGalleryDrawer({
     return true
   })
 
+  const openDetail = (id: HomeWidgetId, config?: HomeWidgetConfig): void => {
+    setDetail({ id, config })
+    const def = widgetDef(id)
+    setSizeIx(Math.max(0, def.sizes.indexOf(def.defaultSize)))
+  }
+
+  const pick = (id: HomeWidgetId): void => {
+    if (swapTarget) {
+      onSwap(id)
+      return
+    }
+    const def = widgetDef(id)
+    if (def.config) requestConfig(id, (config) => openDetail(id, config))
+    else openDetail(id)
+  }
+
+  const def = detail ? widgetDef(detail.id) : null
+  const size = def ? def.sizes[Math.min(sizeIx, def.sizes.length - 1)] : 'sm'
+
   return (
-    // Anchored dropdown — drops directly under the Customize button with the
-    // same spring and panel treatment as the Stage Manager strip. It floats
-    // over the page; customize never reflows the layout.
     <motion.div
-      initial={{ opacity: 0, y: -8, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }}
-      className="absolute right-0 top-full mt-2 z-[70] w-[380px] max-h-[min(560px,calc(100vh-220px))] flex flex-col rounded-2xl fb-glass-panel ring-1 ring-black/[0.10] dark:ring-white/[0.10] overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.15 } }}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-[80] flex items-center justify-center p-6"
       data-testid="home-widget-gallery"
     >
-      {/* Panel header */}
-      <div className="px-4 pt-4 pb-3 border-b border-[var(--edge-soft)] shrink-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[13.5px] font-semibold text-[var(--ink-100)] flex-1 truncate">
-            {swapTarget ? `Swap ${widgetDef(swapTarget.widget).name}` : 'Widget gallery'}
-          </span>
-          <button
-            onClick={onClose}
-            data-testid="home-widget-gallery-done"
-            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))]"
-          >
-            <Icon name="check" size={14} />
-            Done
-          </button>
-        </div>
-        {swapTarget ? (
-          <div className="fb-t-caption">
-            Pick its replacement below, or{' '}
-            <button
-              onClick={onClearSwap}
-              className="text-[rgb(var(--accent))] underline-offset-2 hover:underline"
-            >
-              cancel the swap
-            </button>
-            .
-          </div>
-        ) : (
-          <div className="fb-t-caption">
-            Drag a card onto the canvas, or click to add. Click a placed widget to swap it.
-          </div>
-        )}
-        <div className="relative mt-2.5">
-          <Icon
-            name="search"
-            size={13}
-            className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-40)]"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search widgets"
-            className="h-8 w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-7 pr-2 text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
-          />
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-2.5 py-1 rounded-full text-[11px] transition-colors ${
-                category === c
-                  ? 'bg-[rgb(var(--accent))] text-white'
-                  : 'bg-[var(--surface-sunken)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Scrim: home stays visible but recedes behind the blur. */}
+      <div
+        className="absolute inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-md"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 14, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.97, transition: { duration: 0.15 } }}
+        transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }}
+        className="relative w-[720px] max-w-[94vw] max-h-[min(660px,88vh)] flex flex-col rounded-2xl fb-glass-panel ring-1 ring-black/[0.10] dark:ring-white/[0.10] overflow-hidden"
+      >
+        {def && detail ? (
+          /* ── Detail: live previews at every size ── */
+          <>
+            <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-[var(--edge-soft)] shrink-0">
+              <button
+                onClick={() => setDetail(null)}
+                data-testid="home-picker-back"
+                title="Back to all widgets"
+                className="h-8 w-8 rounded-lg inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors shrink-0"
+              >
+                <Icon name="arrow_back" size={17} />
+              </button>
+              <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${def.tint}`}>
+                <Icon name={def.icon} size={17} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13.5px] font-semibold text-[var(--ink-100)] truncate">{def.name}</div>
+                <div className="fb-t-caption truncate">{def.blurb}</div>
+              </div>
+              <button
+                onClick={onClose}
+                title="Close"
+                className="h-8 w-8 rounded-lg inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors shrink-0"
+              >
+                <Icon name="close" size={17} />
+              </button>
+            </div>
 
-      {/* Vertical card list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
-        {visible.map((d) => {
-          const placed = !d.multi && isPlaced(d.id)
-          const blocked = placed && !swapTarget
-          return (
-            <button
-              key={d.id}
-              draggable={!blocked}
-              onDragStart={(e) => {
-                if (blocked) return
-                e.dataTransfer.effectAllowed = 'copy'
-                e.dataTransfer.setData('text/plain', d.id)
-                onDragStartWidget(d.id)
-              }}
-              onDragEnd={onDragEndWidget}
-              onClick={() => !blocked && onPick(d.id)}
-              disabled={blocked}
-              data-testid={`home-gallery-${d.id}`}
-              title={d.blurb}
-              className={`w-full rounded-xl border p-3 text-left transition-colors ${
-                blocked
-                  ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 cursor-default'
-                  : 'border-transparent fb-tile fb-press cursor-grab active:cursor-grabbing'
-              }`}
-            >
+            <div className="flex-1 overflow-y-auto px-5 py-6 flex flex-col items-center justify-center gap-5">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setSizeIx((i) => Math.max(0, i - 1))}
+                  disabled={sizeIx === 0}
+                  aria-label="Previous size"
+                  className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors disabled:opacity-30 disabled:pointer-events-none shrink-0"
+                >
+                  <Icon name="chevron_left" size={20} />
+                </button>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={size}
+                    initial={{ opacity: 0, x: 26, scale: 0.98 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -26, scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }}
+                    className="[filter:drop-shadow(0_16px_32px_rgba(0,0,0,0.18))]"
+                  >
+                    <SizePreview size={size} cellW={cellW} cellH={cellH} gap={gap}>
+                      {renderPreview({ key: `preview:${detail.id}`, widget: detail.id, config: detail.config, size })}
+                    </SizePreview>
+                  </motion.div>
+                </AnimatePresence>
+                <button
+                  onClick={() => setSizeIx((i) => Math.min(def.sizes.length - 1, i + 1))}
+                  disabled={sizeIx >= def.sizes.length - 1}
+                  aria-label="Next size"
+                  className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors disabled:opacity-30 disabled:pointer-events-none shrink-0"
+                >
+                  <Icon name="chevron_right" size={20} />
+                </button>
+              </div>
+
+              {/* Size dots + label, Apple's pager */}
+              {def.sizes.length > 1 && (
+                <div className="flex items-center gap-2">
+                  {def.sizes.map((s, i) => (
+                    <button
+                      key={s}
+                      onClick={() => setSizeIx(i)}
+                      aria-label={`${SIZE_LABEL[s]} size`}
+                      data-testid={`home-picker-size-${s}`}
+                      className={`h-2 w-2 rounded-full transition-colors ${
+                        i === sizeIx ? 'bg-[rgb(var(--accent))]' : 'bg-[var(--ink-30)] hover:bg-[var(--ink-50)]'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="fb-t-caption fb-tabular">{SIZE_LABEL[size]}</div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-[var(--edge-soft)] flex justify-center shrink-0">
+              <button
+                onClick={() => onAdd(detail.id, size, detail.config)}
+                data-testid="home-picker-add"
+                className="inline-flex items-center justify-center gap-2 h-10 w-[240px] rounded-[10px] bg-[rgb(var(--accent))] text-white text-[13px] font-medium fb-press shadow-[0_1px_2px_rgb(var(--accent)/0.25),0_4px_12px_-2px_rgb(var(--accent)/0.30)] hover:bg-[rgb(var(--accent-hover))]"
+              >
+                <Icon name="add" size={16} />
+                Add widget
+              </button>
+            </div>
+          </>
+        ) : (
+          /* ── Browse: search, categories, the catalog ── */
+          <>
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--edge-soft)] shrink-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg shrink-0 ${d.tint}`}>
-                  <Icon name={d.icon} size={15} />
+                <span className="text-[15px] font-semibold text-[var(--ink-100)] flex-1 truncate">
+                  {swapTarget ? `Replace ${widgetDef(swapTarget.widget).name}` : 'Widgets'}
                 </span>
-                <span className="fb-t-label font-semibold text-[var(--ink-100)] truncate">{d.name}</span>
-                {placed && (
-                  <Icon name="check_circle" size={13} filled className="ml-auto text-emerald-600 dark:text-emerald-500 shrink-0" />
-                )}
+                <button
+                  onClick={onClose}
+                  data-testid="home-widget-gallery-done"
+                  className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-[12px] font-medium bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))]"
+                >
+                  <Icon name="check" size={14} />
+                  Done
+                </button>
               </div>
-              <div className="fb-t-caption leading-snug">
-                {placed && !swapTarget ? 'Already on your home' : d.blurb}
+              {swapTarget ? (
+                <div className="fb-t-caption">
+                  Pick its replacement below, or{' '}
+                  <button onClick={onClearSwap} className="text-[rgb(var(--accent))] underline-offset-2 hover:underline">
+                    cancel the swap
+                  </button>
+                  .
+                </div>
+              ) : (
+                <div className="fb-t-caption">Pick a widget, choose its size, then drag it into place.</div>
+              )}
+              <div className="mt-3 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Icon name="search" size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-40)]" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search widgets"
+                    className="h-8 w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-8 pr-2 text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+                  />
+                </div>
+                <div className="flex gap-1">
+                  {CATEGORIES.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setCategory(c)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] transition-colors ${
+                        category === c
+                          ? 'bg-[rgb(var(--accent))] text-white'
+                          : 'bg-[var(--surface-sunken)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </button>
-          )
-        })}
-        {visible.length === 0 && (
-          <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">No widgets match.</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {visible.map((d) => {
+                  const placed = !d.multi && isPlaced(d.id)
+                  const blocked = placed && !swapTarget
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => !blocked && pick(d.id)}
+                      disabled={blocked}
+                      data-testid={`home-gallery-${d.id}`}
+                      title={d.blurb}
+                      className={`rounded-xl border p-3 text-left transition-colors ${
+                        blocked
+                          ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 cursor-default'
+                          : 'border-transparent fb-tile fb-press'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg shrink-0 ${d.tint}`}>
+                          <Icon name={d.icon} size={15} />
+                        </span>
+                        <span className="fb-t-label font-semibold text-[var(--ink-100)] truncate">{d.name}</span>
+                        {placed && (
+                          <Icon name="check_circle" size={13} filled className="ml-auto text-emerald-600 dark:text-emerald-500 shrink-0" />
+                        )}
+                      </div>
+                      <div className="fb-t-caption leading-snug line-clamp-2">
+                        {placed && !swapTarget ? 'Already on your home' : d.blurb}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              {visible.length === 0 && (
+                <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">No widgets match.</p>
+              )}
+            </div>
+          </>
         )}
-      </div>
+      </motion.div>
     </motion.div>
+  )
+}
+
+// A live widget preview at its true grid footprint, scaled to fit the picker.
+// The real component renders at real cell dimensions inside a scale transform,
+// so the preview is exactly what lands on the board.
+function SizePreview({
+  size,
+  cellW,
+  cellH,
+  gap,
+  children
+}: {
+  size: WidgetSize
+  cellW: number
+  cellH: number
+  gap: number
+  children: ReactNode
+}): JSX.Element {
+  const span = SIZE_SPAN[size]
+  const w = span.w * cellW + (span.w - 1) * gap
+  const h = span.h * cellH + (span.h - 1) * gap
+  const s = Math.min(1, 430 / w, 290 / h)
+  return (
+    <div style={{ width: w * s, height: h * s }} className="relative">
+      <div
+        style={{ width: w, height: h, transform: `scale(${s})`, transformOrigin: 'top left' }}
+        className="absolute left-0 top-0 pointer-events-none select-none overflow-hidden rounded-2xl [&>*]:h-full"
+      >
+        {children}
+      </div>
+    </div>
   )
 }
 
