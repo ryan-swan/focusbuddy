@@ -13,6 +13,7 @@ import { usePeopleStore } from '../lib/peopleDirectory'
 import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
+import StreamingProse from './assistant/StreamingProse'
 import QuestionCard from './assistant/QuestionCard'
 import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
@@ -355,11 +356,46 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     void checkApiKey()
   }, [checkApiKey])
 
-  // Follow the conversation as it grows — including the streaming turn, whose
-  // content lengthens without changing messages.length (Plexii P3).
+  // Scroll discipline (P3): follow the conversation only while the reader is
+  // already at the bottom (within ~100px). Scrolling up locks the position —
+  // an answer must never yank the page out from under a reading eye — and a
+  // "Jump to latest" pill offers the way back. A ResizeObserver on the column
+  // follows the smoothed reveal, whose height grows between store updates.
+  const stickRef = useRef(true)
+  const columnRef = useRef<HTMLDivElement | null>(null)
+  const [showJump, setShowJump] = useState(false)
+  const syncStick = useCallback((): void => {
+    const el = scrollRef.current
+    if (!el) return
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+    const stick = dist < 100
+    stickRef.current = stick
+    setShowJump(!stick)
+  }, [])
+  const jumpToLatest = useCallback((): void => {
+    const el = scrollRef.current
+    if (!el) return
+    stickRef.current = true
+    setShowJump(false)
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [])
+  useEffect(() => {
+    const el = scrollRef.current
+    const col = columnRef.current
+    if (!el || !col) return
+    const ro = new ResizeObserver(() => {
+      if (stickRef.current) el.scrollTop = el.scrollHeight
+      else syncStick()
+    })
+    ro.observe(col)
+    return () => ro.disconnect()
+  }, [syncStick])
+  // A new message (the user's own send, or a turn appearing) re-follows when
+  // stuck; the length hook keeps the non-streamed reply path followed too.
   const lastMessageLen = messages.length > 0 ? messages[messages.length - 1].content.length : 0
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (stickRef.current && scrollRef.current)
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length, lastMessageLen, sending])
 
   const submitComposer = useCallback(async (): Promise<void> => {
@@ -749,6 +785,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       <div
         ref={scrollRef}
         onContextMenu={handleMessagesContextMenu}
+        onScroll={syncStick}
         className={
           fullscreenHome
             ? 'shrink-0 mt-auto w-full max-w-[640px] mx-auto px-6 pb-5'
@@ -764,6 +801,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             a ~68-character reading measure; the card modes keep a smaller gap
             so short panels don't feel sparse. */}
         <div
+          ref={columnRef}
           className={
             isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full space-y-6' : 'space-y-4'
           }
@@ -858,6 +896,22 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                         </span>
                       )
                     )}
+              </div>
+            )
+          }
+          // The actively-streaming turn takes the living-text path (P3): the
+          // reveal is paced and word-faded by StreamingProse, and the live
+          // trace heads it. Proposals, sources and interactive blocks only
+          // exist once the envelope completes, so nothing is lost by skipping
+          // the block pipeline here; on completion this same turn re-renders
+          // through it, which is also what keeps scroll-back unanimated.
+          if (sending && i === messages.length - 1) {
+            return (
+              <div key={i} className="flex flex-col gap-1.5" data-testid="assistant-turn">
+                {liveTrace && (
+                  <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
+                )}
+                <StreamingProse markdown={m.content} active />
               </div>
             )
           }
@@ -971,13 +1025,18 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           )
         })}
         {/* While a send is in flight the trace IS the pending indicator: it says
-            what is actually happening instead of a generic "Working…". The dots
-            remain for the non-streaming path, which reports nothing until it
-            returns and so has nothing truer to show. */}
-        {sending && liveTrace && (
-          <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
-        )}
-        {sending && !liveTrace && (
+            what is actually happening instead of a generic "Working…". Once the
+            first delta creates the streaming turn, the trace renders INSIDE
+            that turn (above its text) — this standalone instance covers only
+            the retrieval window before any text exists. The dots remain for
+            the non-streaming path, which reports nothing until it returns and
+            so has nothing truer to show. */}
+        {sending &&
+          liveTrace &&
+          !(messages.length > 0 && messages[messages.length - 1].role === 'assistant') && (
+            <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
+          )}
+        {sending && !liveTrace && !(messages.length > 0 && messages[messages.length - 1].role === 'assistant') && (
           <div className="flex items-center gap-1.5 text-[var(--ink-50)]" data-testid="chat-pending">
             <span className="flex gap-[3px]" aria-hidden="true">
               <span className="w-1 h-1 rounded-full bg-current fb-dot" />
@@ -988,6 +1047,23 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           </div>
         )}
         </div>
+        {/* The way back down while the position is locked. Floating chrome, so
+            it takes the glass tier; sticky inside the scroll area, zero height
+            in flow so it never pushes content. */}
+        {!fullscreenHome && (
+          <div className="sticky bottom-1 h-0 flex justify-center pointer-events-none">
+            {showJump && (
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                data-testid="jump-to-latest"
+                className="pointer-events-auto -translate-y-9 fb-glass-panel fb-press rounded-full h-7 px-3 flex items-center gap-1.5 fb-t-caption font-medium text-[var(--ink-90)] shadow-[var(--shadow-cast)]"
+              >
+                <span aria-hidden="true">↓</span> Jump to latest
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* The composer is one container that holds the field AND its actions,

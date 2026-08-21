@@ -2423,6 +2423,41 @@ body {
    block fades out once the answer is done, and the in-flight phase carries a
    blinking square. Kept as plain CSS beside fb-dot rather than as Tailwind
    keyframes: that's how every other animation in this app is declared. */
+/* Streaming text (Plexii P3). Each newly revealed word fades in over ~140ms —
+   the one continuous animation in the product while an answer writes itself.
+   Opacity only (compositor-thread rule); no movement, no layout. The caret is
+   a soft pulsing dot pinned after the last block of the streaming turn. */
+@keyframes fb-word-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fb-word-in {
+  animation: fb-word-in 140ms ease-out both;
+}
+.fb-stream-caret {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 9999px;
+  background: rgb(var(--accent) / 0.8);
+  animation: fb-dot-pulse 1.2s ease-in-out infinite;
+  vertical-align: baseline;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-word-in {
+    animation: none;
+  }
+  .fb-stream-caret {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
 @keyframes fb-trace-in {
   from {
     opacity: 0;
