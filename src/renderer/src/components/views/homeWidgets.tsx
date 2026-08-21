@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Reorder } from 'framer-motion'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useDocumentsStore } from '../../stores/documents'
@@ -6,10 +7,20 @@ import { useConnectedAppsStore } from '../../stores/connectedApps'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { splitFavourites } from '../../lib/connectedAppSort'
 import { RailCard } from '../plexi'
+import Modal from '../plexi/Modal'
 import Icon from '../Icon'
 import AppLogo from '../AppLogo'
 import AddConnectedAppDialog from '../AddConnectedAppDialog'
-import type { ActivityEvent, FbNode } from '@shared/types'
+import type { ActivityEvent, FbNode, SearchHit } from '@shared/types'
+import {
+  describeShortcutTarget,
+  faviconUrl,
+  normalizeUrl,
+  targetKey,
+  urlLabel,
+  visibleShortcuts
+} from './homeShortcutTargets'
+import type { ShortcutLookups } from './homeShortcutTargets'
 
 // The home widget catalog — registry metadata for the gallery, plus the widget
 // components that are not part of the original dashboard set. Every widget
@@ -24,7 +35,7 @@ import type { ActivityEvent, FbNode } from '@shared/types'
 export type { HomeWidgetId, HomeWidgetConfig, HomeWidgetInstance, WidgetSize, HomeWidgetDef, QuickLinkRoute } from './homeWidgetDefs'
 export { HOME_WIDGET_DEFS, widgetDef, QUICK_LINK_ROUTES } from './homeWidgetDefs'
 import { QUICK_LINK_ROUTES } from './homeWidgetDefs'
-import type { QuickLinkRoute, WidgetSize } from './homeWidgetDefs'
+import type { HomeWidgetConfig, QuickLinkRoute, ShortcutTarget, WidgetSize } from './homeWidgetDefs'
 
 function relTime(ms: number): string {
   const diff = Date.now() - ms
@@ -155,22 +166,27 @@ export function RoomPortalWidget({ roomId, size = 'lg' }: { roomId?: string; siz
   )
 }
 
+// One navigation map for PlexiDesk section shortcuts, shared by Quick Links
+// and the Shortcuts widget's section targets so both always land identically.
+type ViewStore = ReturnType<typeof useViewStore.getState>
+function goSection(v: ViewStore, id: string): void {
+  switch (id) {
+    case 'rooms': v.goRooms(); break
+    case 'desks': v.goDesks(); break
+    case 'shared': v.goShared(); break
+    case 'plans': v.goProjects(); break
+    case 'tasks': v.goAllTasks(); break
+    case 'calendar': v.goCalendar(); break
+    case 'documents': v.goDocuments(); break
+    case 'files': v.goFiles(); break
+    case 'vault': v.goVault(); break
+  }
+}
+
 export function QuickLinksWidget({ routes }: { routes?: string[] }): JSX.Element {
   const v = useViewStore()
   const picked = (routes ?? []).map((id) => QUICK_LINK_ROUTES.find((r) => r.id === id)).filter(Boolean) as QuickLinkRoute[]
-  const go = (id: string): void => {
-    switch (id) {
-      case 'rooms': v.goRooms(); break
-      case 'desks': v.goDesks(); break
-      case 'shared': v.goShared(); break
-      case 'plans': v.goProjects(); break
-      case 'tasks': v.goAllTasks(); break
-      case 'calendar': v.goCalendar(); break
-      case 'documents': v.goDocuments(); break
-      case 'files': v.goFiles(); break
-      case 'vault': v.goVault(); break
-    }
-  }
+  const go = (id: string): void => goSection(v, id)
   return (
     <RailCard title="Quick links" icon="link" tone="accent">
       {picked.length === 0 ? (
@@ -235,6 +251,596 @@ export function AppLauncherWidget(): JSX.Element {
         <AddConnectedAppDialog onClose={() => setAddOpen(false)} onAdded={(id) => v.goConnectedApp(id)} />
       )}
     </RailCard>
+  )
+}
+
+// ── Shortcuts ────────────────────────────────────────────────────────────────
+// A fully custom box of tiles that go anywhere: PlexiDesk sections, desks,
+// rooms, documents, connected apps, and outside websites. Multi-instance with
+// a name per box; the composer overlay adds, renames, reorders, and removes.
+
+type ConnectedApp = ReturnType<typeof useConnectedAppsStore.getState>['apps'][number]
+
+// The visual for one shortcut: favicon for websites (globe fallback), the real
+// app logo for connected apps, a toned Plexii icon for everything else.
+function ShortcutGlyph({
+  target,
+  icon,
+  tone,
+  apps,
+  size
+}: {
+  target: ShortcutTarget
+  icon: string
+  tone: string
+  apps: ConnectedApp[]
+  size: number
+}): JSX.Element {
+  const [imgReady, setImgReady] = useState(false)
+  if (target.kind === 'url') {
+    // The globe shows immediately; the favicon replaces it only once it has
+    // actually loaded, so the tile is never blank while the network thinks.
+    const src = faviconUrl(target.url)
+    return (
+      <span
+        className="relative inline-flex items-center justify-center shrink-0"
+        style={{ width: size, height: size }}
+      >
+        {!imgReady && <Icon name="language" size={size} className="text-indigo-500" />}
+        {src && (
+          <img
+            src={src}
+            alt=""
+            width={size}
+            height={size}
+            className={`absolute inset-0 rounded ${imgReady ? '' : 'opacity-0'}`}
+            onLoad={() => setImgReady(true)}
+            onError={() => setImgReady(false)}
+          />
+        )}
+      </span>
+    )
+  }
+  if (target.kind === 'connected-app') {
+    const app = apps.find((a) => a.id === target.appId)
+    if (app) return <AppLogo app={app} size={size + 8} glyphSize={size - 2} />
+  }
+  return <Icon name={icon} size={size} className={`${tone} shrink-0`} />
+}
+
+export function ShortcutsWidget({
+  config,
+  size,
+  onUpdate
+}: {
+  config?: HomeWidgetConfig
+  size: WidgetSize
+  onUpdate: (config: HomeWidgetConfig) => void
+}): JSX.Element {
+  const v = useViewStore()
+  const nodes = useNodeStore((s) => s.nodes)
+  const setActive = useNodeStore((s) => s.setActive)
+  const docs = useDocumentsStore((s) => s.list)
+  const apps = useConnectedAppsStore((s) => s.apps)
+  const launchLocal = useConnectedAppsStore((s) => s.launchLocal)
+  const [composerOpen, setComposerOpen] = useState(false)
+
+  const targets = config?.targets ?? []
+  const lookups = useMemo<ShortcutLookups>(
+    () => ({
+      node: (id) => {
+        const n = nodes.find((x) => x.id === id)
+        return n ? { title: n.title || '', archived: !!n.archived } : null
+      },
+      document: (id) => {
+        const d = docs.find((x) => x.id === id)
+        return d ? { title: d.title, docType: d.docType, archived: d.archived } : null
+      },
+      app: (id) => {
+        const a = apps.find((x) => x.id === id)
+        return a ? { title: a.title } : null
+      }
+    }),
+    [nodes, docs, apps]
+  )
+
+  const invoke = (t: ShortcutTarget): void => {
+    if (!describeShortcutTarget(t, lookups).alive) {
+      // A dead tile stops navigating; clicking it opens the composer so the
+      // broken entry can be removed or replaced on the spot.
+      setComposerOpen(true)
+      return
+    }
+    switch (t.kind) {
+      case 'url':
+        void window.api.files.openExternal(t.url).catch(() => {})
+        break
+      case 'section':
+        goSection(v, t.id)
+        break
+      case 'desk':
+        setActive(t.nodeId)
+        v.goTask(t.nodeId)
+        break
+      case 'room':
+        v.goRoom(t.roomId)
+        break
+      case 'document':
+        v.goDocument(t.documentId)
+        break
+      case 'connected-app': {
+        const app = apps.find((a) => a.id === t.appId)
+        if (app?.kind === 'local') void launchLocal(app.id)
+        else v.goConnectedApp(t.appId)
+        break
+      }
+    }
+  }
+
+  const { shown, overflow } = visibleShortcuts(targets.length, size)
+  const visible = targets.slice(0, shown)
+  const title = config?.title?.trim() || 'Shortcuts'
+  const openComposer = (): void => setComposerOpen(true)
+
+  const addGhost = (compact: boolean): JSX.Element =>
+    compact ? (
+      <button
+        onClick={openComposer}
+        title="Add shortcut"
+        aria-label="Add shortcut"
+        data-testid="home-shortcuts-add"
+        className="h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+      >
+        <Icon name="add" size={18} />
+        <span className="text-[9px] font-medium">Add</span>
+      </button>
+    ) : (
+      <button
+        onClick={openComposer}
+        data-testid="home-shortcuts-add"
+        className="flex items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] px-2.5 py-2 text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+      >
+        <Icon name="add" size={15} />
+        <span className="text-[11.5px] font-medium">Add shortcut</span>
+      </button>
+    )
+
+  const moreTile = (compact: boolean): JSX.Element => (
+    <button
+      onClick={openComposer}
+      title={`${overflow} more`}
+      data-testid="home-shortcuts-more"
+      className={
+        compact
+          ? 'h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press text-[12px] font-semibold text-[var(--ink-60)]'
+          : 'flex items-center justify-center fb-tile fb-press px-2.5 py-2 text-[11.5px] font-semibold text-[var(--ink-60)]'
+      }
+    >
+      +{overflow}
+    </button>
+  )
+
+  return (
+    <RailCard title={title} icon="link" tone="accent">
+      {targets.length === 0 ? (
+        <div className="my-auto flex flex-col items-center gap-2 py-2" data-testid="home-shortcuts-empty">
+          {addGhost(true)}
+          <p className="text-[12px] text-[var(--ink-50)] text-center">
+            Take yourself anywhere: desks, documents, websites, apps.
+          </p>
+        </div>
+      ) : size === 'sm' ? (
+        <div className="flex flex-wrap content-start gap-2" data-testid="home-shortcuts">
+          {visible.map((t, i) => {
+            const view = describeShortcutTarget(t, lookups)
+            return (
+              <button
+                key={targetKey(t)}
+                onClick={() => invoke(t)}
+                title={view.alive ? view.label : `${view.label} (gone)`}
+                aria-label={view.label}
+                data-testid={`home-shortcut-${i}`}
+                className={`h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press ${view.alive ? '' : 'opacity-40'}`}
+              >
+                <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={22} />
+              </button>
+            )
+          })}
+          {overflow > 0 && moreTile(true)}
+          {addGhost(true)}
+        </div>
+      ) : size === 'md' ? (
+        <div className="grid grid-cols-3 auto-rows-fr flex-1 min-h-0 gap-2" data-testid="home-shortcuts">
+          {visible.map((t, i) => {
+            const view = describeShortcutTarget(t, lookups)
+            return (
+              <button
+                key={targetKey(t)}
+                onClick={() => invoke(t)}
+                title={view.alive ? view.label : `${view.label} (gone)`}
+                data-testid={`home-shortcut-${i}`}
+                className={`flex items-center gap-2 fb-tile fb-press px-2.5 py-2 text-left ${view.alive ? '' : 'opacity-40'}`}
+              >
+                <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={17} />
+                <span className="text-[12px] font-medium text-[var(--ink-90)] truncate">{view.label}</span>
+              </button>
+            )
+          })}
+          {overflow > 0 && moreTile(false)}
+          {addGhost(false)}
+        </div>
+      ) : (
+        <div
+          className={`grid ${size === 'lg' ? 'grid-cols-2' : 'grid-cols-1'} auto-rows-fr flex-1 min-h-0 gap-1.5`}
+          data-testid="home-shortcuts"
+        >
+          {visible.map((t, i) => {
+            const view = describeShortcutTarget(t, lookups)
+            return (
+              <button
+                key={targetKey(t)}
+                onClick={() => invoke(t)}
+                data-testid={`home-shortcut-${i}`}
+                className={`flex items-center gap-2.5 fb-tile fb-press px-2.5 py-1.5 text-left min-h-0 ${view.alive ? '' : 'opacity-40'}`}
+              >
+                <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={17} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] font-medium text-[var(--ink-100)]">{view.label}</span>
+                  <span className="block truncate text-[10.5px] text-[var(--ink-50)]">
+                    {view.alive ? view.caption : 'Gone. Click to fix.'}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+          {overflow > 0 && moreTile(false)}
+          {addGhost(false)}
+        </div>
+      )}
+      {composerOpen && (
+        <ShortcutComposer config={config} onUpdate={onUpdate} onClose={() => setComposerOpen(false)} />
+      )}
+    </RailCard>
+  )
+}
+
+// The floating composer: name the box, paste a link or search everything,
+// reorder and prune what is already inside. Every change commits live.
+function ShortcutComposer({
+  config,
+  onUpdate,
+  onClose
+}: {
+  config?: HomeWidgetConfig
+  onUpdate: (config: HomeWidgetConfig) => void
+  onClose: () => void
+}): JSX.Element {
+  const nodes = useNodeStore((s) => s.nodes)
+  const docs = useDocumentsStore((s) => s.list)
+  const apps = useConnectedAppsStore((s) => s.apps)
+  const [query, setQuery] = useState('')
+  const [deepHits, setDeepHits] = useState<SearchHit[]>([])
+  const [renamingKey, setRenamingKey] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [boxName, setBoxName] = useState(config?.title ?? '')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  const targets = useMemo(() => config?.targets ?? [], [config])
+  const taken = useMemo(() => new Set(targets.map(targetKey)), [targets])
+
+  const lookups = useMemo<ShortcutLookups>(
+    () => ({
+      node: (id) => {
+        const n = nodes.find((x) => x.id === id)
+        return n ? { title: n.title || '', archived: !!n.archived } : null
+      },
+      document: (id) => {
+        const d = docs.find((x) => x.id === id)
+        return d ? { title: d.title, docType: d.docType, archived: d.archived } : null
+      },
+      app: (id) => {
+        const a = apps.find((x) => x.id === id)
+        return a ? { title: a.title } : null
+      }
+    }),
+    [nodes, docs, apps]
+  )
+
+  const commit = (next: Partial<HomeWidgetConfig>): void => onUpdate({ ...config, ...next })
+  const commitTitle = (): void => {
+    const t = boxName.trim()
+    if (t !== (config?.title ?? '')) commit({ title: t || undefined })
+  }
+  const close = (): void => {
+    commitTitle()
+    onClose()
+  }
+
+  const toggle = (t: ShortcutTarget): void => {
+    const key = targetKey(t)
+    if (taken.has(key)) commit({ targets: targets.filter((x) => targetKey(x) !== key) })
+    else commit({ targets: [...targets, t] })
+    setQuery('')
+    inputRef.current?.focus()
+  }
+
+  // Deep content search from the main process: finds desks, rooms, and
+  // documents whose bodies match, not just their titles. Debounced; skipped
+  // when the query is a pasted link.
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2 || normalizeUrl(q)) {
+      setDeepHits([])
+      return
+    }
+    const timer = window.setTimeout(() => {
+      void window.api.search
+        .query(q)
+        .then((hits) =>
+          setDeepHits(hits.filter((h) => h.type === 'task' || h.type === 'folder' || h.type === 'document'))
+        )
+        .catch(() => setDeepHits([]))
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  const url = normalizeUrl(query)
+
+  interface Candidate {
+    target: ShortcutTarget
+    label: string
+    icon: string
+    tone: string
+  }
+  const groups = useMemo<{ name: string; items: Candidate[] }[]>(() => {
+    const q = query.trim().toLowerCase()
+    if (url) return []
+    const out: { name: string; items: Candidate[] }[] = []
+    const sectionItems = QUICK_LINK_ROUTES.filter((r) => !q || r.label.toLowerCase().includes(q)).map((r) => ({
+      target: { kind: 'section' as const, id: r.id, label: r.label },
+      label: r.label,
+      icon: r.icon,
+      tone: r.tone
+    }))
+    if (!q) {
+      // No query yet: the finite section catalog is browsable immediately;
+      // everything else needs a few letters.
+      if (sectionItems.length) out.push({ name: 'PlexiDesk sections', items: sectionItems })
+      return out
+    }
+    if (sectionItems.length) out.push({ name: 'PlexiDesk sections', items: sectionItems.slice(0, 4) })
+
+    const nodeGroup = (kind: 'task' | 'folder', name: string): void => {
+      const byTitle = nodes
+        .filter((n) => n.kind === kind && !n.archived && (n.title || '').toLowerCase().includes(q))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+      const hitType = kind === 'task' ? 'task' : 'folder'
+      const fromDeep = deepHits
+        .filter((h) => h.type === hitType && !byTitle.some((n) => n.id === h.id))
+        .map((h) => nodes.find((n) => n.id === h.id && !n.archived))
+        .filter(Boolean) as FbNode[]
+      const items = [...byTitle, ...fromDeep].slice(0, 5).map((n) => ({
+        target:
+          kind === 'task'
+            ? { kind: 'desk' as const, nodeId: n.id, label: n.title || '' }
+            : { kind: 'room' as const, roomId: n.id, label: n.title || '' },
+        label: n.title || (kind === 'task' ? 'Untitled desk' : 'Untitled room'),
+        icon: kind === 'task' ? 'desk' : 'meeting_room',
+        tone: kind === 'task' ? 'text-violet-500' : 'text-sky-500'
+      }))
+      if (items.length) out.push({ name, items })
+    }
+    nodeGroup('task', 'Desks')
+    nodeGroup('folder', 'Rooms')
+
+    const docByTitle = docs.filter((d) => !d.archived && d.title.toLowerCase().includes(q))
+    const docFromDeep = deepHits
+      .filter((h) => h.type === 'document' && !docByTitle.some((d) => d.id === h.id))
+      .map((h) => docs.find((d) => d.id === h.id && !d.archived))
+      .filter(Boolean) as typeof docs
+    const docItems = [...docByTitle, ...docFromDeep].slice(0, 5).map((d) => {
+      const view = describeShortcutTarget({ kind: 'document', documentId: d.id }, lookups)
+      return {
+        target: { kind: 'document' as const, documentId: d.id, label: d.title },
+        label: d.title || 'Untitled document',
+        icon: view.icon,
+        tone: view.tone
+      }
+    })
+    if (docItems.length) out.push({ name: 'Documents', items: docItems })
+
+    const appItems = apps
+      .filter((a) => a.title.toLowerCase().includes(q))
+      .slice(0, 5)
+      .map((a) => ({
+        target: { kind: 'connected-app' as const, appId: a.id, label: a.title },
+        label: a.title,
+        icon: 'apps',
+        tone: 'text-emerald-500'
+      }))
+    if (appItems.length) out.push({ name: 'Apps', items: appItems })
+    return out
+  }, [query, url, nodes, docs, apps, deepHits, lookups])
+
+  const keys = targets.map(targetKey)
+  const reorder = (nextKeys: string[]): void => {
+    const byKey = new Map(targets.map((t) => [targetKey(t), t]))
+    commit({ targets: nextKeys.map((k) => byKey.get(k)).filter(Boolean) as ShortcutTarget[] })
+  }
+  const rename = (key: string): void => {
+    const label = renameDraft.trim()
+    commit({
+      targets: targets.map((t) => (targetKey(t) === key ? { ...t, label: label || undefined } : t))
+    })
+    setRenamingKey(null)
+  }
+
+  return (
+    <Modal
+      onClose={close}
+      label="Edit shortcuts"
+      z={260}
+      className="fb-glass-pillow rounded-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[76vh] outline-none"
+      testId="home-shortcut-composer"
+    >
+      <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2.5">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500 shrink-0">
+          <Icon name="link" size={15} />
+        </span>
+        <input
+          value={boxName}
+          onChange={(e) => setBoxName(e.target.value)}
+          onBlur={commitTitle}
+          placeholder="Shortcuts"
+          aria-label="Box name"
+          data-testid="home-shortcut-composer-title"
+          className="flex-1 min-w-0 bg-transparent text-[13.5px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+        />
+        <button
+          onClick={close}
+          title="Done"
+          data-testid="home-shortcut-composer-done"
+          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))] transition-colors"
+        >
+          <Icon name="check" size={14} />
+          Done
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+        <div>
+          <input
+            ref={inputRef}
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && url) {
+                toggle({ kind: 'url', url, label: urlLabel(url) })
+              }
+            }}
+            placeholder="Paste a link, or search desks, rooms, documents, apps"
+            data-testid="home-shortcut-composer-input"
+            className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+          />
+
+          {url && (
+            <button
+              onClick={() => toggle({ kind: 'url', url, label: urlLabel(url) })}
+              data-testid="home-shortcut-composer-add-url"
+              className="mt-2 flex w-full items-center gap-2.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-2 text-left hover:border-[rgb(var(--accent)/0.5)] hover:bg-[var(--surface-sunken)] transition-colors"
+            >
+              <ShortcutGlyph target={{ kind: 'url', url }} icon="language" tone="text-indigo-500" apps={apps} size={16} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12.5px] font-medium text-[var(--ink-100)]">{urlLabel(url)}</span>
+                <span className="block truncate text-[10.5px] text-[var(--ink-50)]">{url}</span>
+              </span>
+              <span className="shrink-0 text-[11px] font-medium text-accent">
+                {taken.has(targetKey({ kind: 'url', url })) ? 'Added' : 'Add link'}
+              </span>
+            </button>
+          )}
+
+          {groups.map((g) => (
+            <div key={g.name} className="mt-2.5">
+              <p className="px-1 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--ink-40)]">
+                {g.name}
+              </p>
+              <div className="space-y-0.5">
+                {g.items.map((c, i) => {
+                  const isTaken = taken.has(targetKey(c.target))
+                  return (
+                    <button
+                      key={targetKey(c.target)}
+                      onClick={() => toggle(c.target)}
+                      data-testid={`home-shortcut-composer-result-${g.name.toLowerCase().replace(/\s+/g, '-')}-${i}`}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                    >
+                      <ShortcutGlyph target={c.target} icon={c.icon} tone={c.tone} apps={apps} size={16} />
+                      <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">{c.label}</span>
+                      {isTaken && <Icon name="check" size={13} className="text-accent shrink-0" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          {query.trim() && !url && groups.length === 0 && (
+            <p className="mt-3 py-3 text-center text-[12px] text-[var(--ink-50)]">Nothing matches.</p>
+          )}
+        </div>
+
+        {targets.length > 0 && (
+          <div>
+            <p className="px-1 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--ink-40)]">
+              In this box
+            </p>
+            <Reorder.Group axis="y" values={keys} onReorder={reorder} className="space-y-0.5">
+              {targets.map((t, i) => {
+                const key = targetKey(t)
+                const view = describeShortcutTarget(t, lookups)
+                return (
+                  <Reorder.Item
+                    key={key}
+                    value={key}
+                    className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 bg-transparent hover:bg-[var(--surface-sunken)] transition-colors"
+                    data-testid={`home-shortcut-composer-row-${i}`}
+                  >
+                    <Icon name="drag_indicator" size={15} className="text-[var(--ink-30)] shrink-0 cursor-grab" />
+                    <ShortcutGlyph target={t} icon={view.icon} tone={view.tone} apps={apps} size={16} />
+                    {renamingKey === key ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onBlur={() => rename(key)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') rename(key)
+                          if (e.key === 'Escape') setRenamingKey(null)
+                        }}
+                        data-testid="home-shortcut-composer-rename"
+                        className="flex-1 min-w-0 rounded border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent))]"
+                      />
+                    ) : (
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-[12.5px] ${view.alive ? 'text-[var(--ink-100)]' : 'text-[var(--ink-50)] line-through'}`}>
+                          {view.label}
+                        </span>
+                        <span className="block truncate text-[10.5px] text-[var(--ink-50)]">
+                          {view.alive ? view.caption : 'Gone'}
+                        </span>
+                      </span>
+                    )}
+                    {t.kind === 'url' && renamingKey !== key && (
+                      <button
+                        onClick={() => {
+                          setRenamingKey(key)
+                          setRenameDraft(t.label ?? '')
+                        }}
+                        title="Rename"
+                        data-testid={`home-shortcut-composer-rename-${i}`}
+                        className="shrink-0 h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
+                      >
+                        <Icon name="edit" size={13} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => commit({ targets: targets.filter((x) => targetKey(x) !== key) })}
+                      title="Remove"
+                      data-testid={`home-shortcut-composer-remove-${i}`}
+                      className="shrink-0 h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:text-rose-500 hover:bg-[var(--surface-sunken)] transition-colors"
+                    >
+                      <Icon name="close" size={13} />
+                    </button>
+                  </Reorder.Item>
+                )
+              })}
+            </Reorder.Group>
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
 

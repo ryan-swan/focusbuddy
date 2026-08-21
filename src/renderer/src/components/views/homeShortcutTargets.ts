@@ -1,0 +1,173 @@
+// Pure helpers for the Shortcuts widget: URL normalization, target identity,
+// display resolution, and per-size slot budgets. No JSX, no store imports —
+// unit tests, the widget, and the composer share one source of truth.
+
+import { QUICK_LINK_ROUTES } from './homeWidgetDefs'
+import type { ShortcutTarget, WidgetSize } from './homeWidgetDefs'
+
+// What the widget needs to know about the world to describe a target. The
+// component builds these from its stores; tests build them from fixtures.
+export interface ShortcutLookups {
+  node: (id: string) => { title: string; archived: boolean } | null
+  document: (id: string) => { title: string; docType: string; archived: boolean } | null
+  app: (id: string) => { title: string } | null
+}
+
+export interface ShortcutView {
+  label: string
+  // Kind caption shown on the larger sizes ('Desk', 'Spreadsheet', 'Website').
+  caption: string
+  icon: string
+  tone: string
+  // false: the subject is gone or archived. The tile dims and stops navigating;
+  // clicking it opens the composer so the dead entry can be removed.
+  alive: boolean
+}
+
+// Slot budget per widget size, the add tile included. Derived from the real
+// cell geometry (GRID cellH 200, RailCard header ~40px): sm fits two rows of
+// four icon tiles; md fits two rows of three labeled tiles; stack fits eight
+// list rows; lg fits two columns of seven rows.
+export const SHORTCUT_SLOTS: Record<WidgetSize, number> = { sm: 8, md: 6, stack: 8, lg: 14 }
+
+// How many targets render at a size. The add tile always takes one slot; when
+// targets overflow the rest, the final visible slot becomes a "+N" spillover
+// that opens the composer, so nothing is ever silently hidden.
+export function visibleShortcuts(total: number, size: WidgetSize): { shown: number; overflow: number } {
+  const room = SHORTCUT_SLOTS[size] - 1
+  if (total <= room) return { shown: total, overflow: 0 }
+  const shown = Math.max(0, room - 1)
+  return { shown, overflow: total - shown }
+}
+
+// Accepts what a person actually pastes or types: full URLs, scheme-less
+// domains ("netsuite.com/login"), localhost with a port. Returns a canonical
+// URL string, or null when the text is clearly not a link.
+export function normalizeUrl(raw: string): string | null {
+  const s = raw.trim()
+  if (!s || /\s/.test(s)) return null
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(s)
+    ? s
+    : /^localhost(:\d+)?([/?#]|$)/i.test(s)
+      ? `http://${s}`
+      : `https://${s}`
+  let url: URL
+  try {
+    url = new URL(withScheme)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  const host = url.hostname
+  // A bare word ("payroll") is a search query, not a link. Real hosts have a
+  // dot; localhost and IPs pass on their own shape.
+  if (!host.includes('.') && host !== 'localhost') return null
+  if (/\.$/.test(host) || /^\./.test(host)) return null
+  return url.href
+}
+
+// The human name for a URL when no label was given: hostname minus www.
+export function urlLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+// Favicon for a website tile. Google's s2 service resolves icons reliably
+// across hosts that bury theirs; the tile falls back to a globe glyph when
+// the image fails to load.
+export function faviconUrl(url: string): string | null {
+  try {
+    const host = new URL(url).hostname
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
+  } catch {
+    return null
+  }
+}
+
+// Stable identity for dedupe and list keys. Two targets are the same shortcut
+// when they lead to the same place, regardless of label.
+export function targetKey(t: ShortcutTarget): string {
+  switch (t.kind) {
+    case 'url':
+      return `url:${t.url}`
+    case 'section':
+      return `section:${t.id}`
+    case 'desk':
+      return `desk:${t.nodeId}`
+    case 'room':
+      return `room:${t.roomId}`
+    case 'document':
+      return `document:${t.documentId}`
+    case 'connected-app':
+      return `app:${t.appId}`
+  }
+}
+
+const DOC_VISUALS: Record<string, { icon: string; tone: string; caption: string }> = {
+  doc: { icon: 'description', tone: 'text-sky-500', caption: 'Document' },
+  sheet: { icon: 'table_chart', tone: 'text-emerald-500', caption: 'Spreadsheet' },
+  slides: { icon: 'slideshow', tone: 'text-orange-500', caption: 'Deck' }
+}
+
+export function describeShortcutTarget(t: ShortcutTarget, lookups: ShortcutLookups): ShortcutView {
+  switch (t.kind) {
+    case 'url':
+      return {
+        label: t.label || urlLabel(t.url),
+        caption: 'Website',
+        icon: 'language',
+        tone: 'text-indigo-500',
+        alive: true
+      }
+    case 'section': {
+      const route = QUICK_LINK_ROUTES.find((r) => r.id === t.id)
+      return route
+        ? { label: route.label, caption: 'PlexiDesk', icon: route.icon, tone: route.tone, alive: true }
+        : { label: t.label || 'Missing section', caption: 'PlexiDesk', icon: 'link', tone: 'text-[var(--ink-40)]', alive: false }
+    }
+    case 'desk': {
+      const node = lookups.node(t.nodeId)
+      return {
+        label: node?.title || t.label || 'Missing desk',
+        caption: 'Desk',
+        icon: 'desk',
+        tone: 'text-violet-500',
+        alive: !!node && !node.archived
+      }
+    }
+    case 'room': {
+      const node = lookups.node(t.roomId)
+      return {
+        label: node?.title || t.label || 'Missing room',
+        caption: 'Room',
+        icon: 'meeting_room',
+        tone: 'text-sky-500',
+        alive: !!node && !node.archived
+      }
+    }
+    case 'document': {
+      const doc = lookups.document(t.documentId)
+      const visuals = DOC_VISUALS[doc?.docType ?? 'doc'] ?? DOC_VISUALS.doc
+      return {
+        label: doc?.title || t.label || 'Missing document',
+        caption: visuals.caption,
+        icon: visuals.icon,
+        tone: visuals.tone,
+        alive: !!doc && !doc.archived
+      }
+    }
+    case 'connected-app': {
+      const app = lookups.app(t.appId)
+      return {
+        label: app?.title || t.label || 'Missing app',
+        caption: 'App',
+        icon: 'apps',
+        tone: 'text-emerald-500',
+        alive: !!app
+      }
+    }
+  }
+}

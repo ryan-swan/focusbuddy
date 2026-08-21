@@ -13,6 +13,7 @@ export type HomeWidgetId =
   | 'pinned-desk'
   | 'room-portal'
   | 'quick-links'
+  | 'shortcuts'
   | 'app-launcher'
   | 'create'
   | 'overdue'
@@ -21,10 +22,25 @@ export type HomeWidgetId =
   | 'where-was-i'
   | 'stalled'
 
+// One tile in a Shortcuts box. Every kind carries an optional label snapshot
+// taken when the target was added: live store titles win while the subject
+// exists (renames stay fresh), the snapshot keeps a dead target legible
+// ("Payroll desk" instead of an anonymous missing tile).
+export type ShortcutTarget =
+  | { kind: 'url'; url: string; label?: string }
+  | { kind: 'section'; id: string; label?: string }
+  | { kind: 'desk'; nodeId: string; label?: string }
+  | { kind: 'room'; roomId: string; label?: string }
+  | { kind: 'document'; documentId: string; label?: string }
+  | { kind: 'connected-app'; appId: string; label?: string }
+
 export interface HomeWidgetConfig {
   deskId?: string
   roomId?: string
   routes?: string[]
+  // Shortcuts: the box name and its tiles.
+  title?: string
+  targets?: ShortcutTarget[]
 }
 
 export interface HomeWidgetInstance {
@@ -68,6 +84,7 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   { id: 'pinned-desk', name: 'Pinned desk', blurb: 'One desk you care about, one click away', icon: 'push_pin', tint: 'bg-violet-500/10 text-violet-500', category: 'Navigation', multi: true, config: 'desk', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'room-portal', name: 'Room portal', blurb: 'A single room and the desks inside it', icon: 'door_open', tint: 'bg-teal-500/10 text-teal-500', category: 'Navigation', multi: true, config: 'room', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'lg' },
   { id: 'quick-links', name: 'Quick links', blurb: 'Your own row of shortcuts to the places you use most', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', config: 'links', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'shortcuts', name: 'Shortcuts', blurb: 'Your own tiles to anywhere: desks, documents, websites, apps', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', multi: true, defaultCol: 'rail', sizes: ['sm', 'md', 'lg', 'stack'], defaultSize: 'sm' },
   { id: 'app-launcher', name: 'App launcher', blurb: 'Your favourite connected apps with their real logos', icon: 'apps', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Navigation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   // Actions
   { id: 'quick', name: 'Quick actions', blurb: 'Create, plan, collaborate, automate', icon: 'bolt', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },

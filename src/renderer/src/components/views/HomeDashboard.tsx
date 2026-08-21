@@ -43,7 +43,8 @@ import {
   OverdueRadarWidget,
   OneThingNowWidget,
   WhereWasIWidget,
-  StalledDeskWidget
+  StalledDeskWidget,
+  ShortcutsWidget
 } from './homeWidgets'
 import type { ActivityEvent, ActivityKind, DocumentMeta, FbNode, TimeBlock } from '@shared/types'
 
@@ -738,6 +739,20 @@ export default function HomeDashboard(): JSX.Element {
         return <RoomPortalWidget roomId={inst.config?.roomId} size={size} />
       case 'quick-links':
         return <QuickLinksWidget routes={inst.config?.routes} />
+      case 'shortcuts':
+        // The composer commits config live. Previews render synthetic
+        // instances whose keys are not in the layout; the guard keeps their
+        // edits from touching the real board.
+        return (
+          <ShortcutsWidget
+            config={inst.config}
+            size={size}
+            onUpdate={(config) => {
+              if (!flatRef.current.some((it) => it.key === inst.key)) return
+              commitFlat(flatRef.current.map((it) => (it.key === inst.key ? { ...it, config } : it)))
+            }}
+          />
+        )
       case 'app-launcher':
         return <AppLauncherWidget />
       case 'create':
