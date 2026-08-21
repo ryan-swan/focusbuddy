@@ -381,6 +381,17 @@ export default function HomeDashboard(): JSX.Element {
   const [customize, setCustomize] = useState(false)
   // The center-screen widget picker, over a blurred home page.
   const [gallery, setGallery] = useState(false)
+  // The instance just added from the picker: enters with a spring and a
+  // short-lived glow so the eye lands where the widget did.
+  const [justPlaced, setJustPlaced] = useState<string | null>(null)
+  useEffect(() => {
+    if (!justPlaced) return
+    document
+      .querySelector(`[data-widget-key="${justPlaced}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    const t = window.setTimeout(() => setJustPlaced(null), 1800)
+    return () => window.clearTimeout(t)
+  }, [justPlaced])
   // Stage Manager pill — the same desk-miniature strip the desk breadcrumb
   // opens, surfaced on Home so any desk is one click away.
   const [deskStripOpen, setDeskStripOpen] = useState(false)
@@ -622,8 +633,11 @@ export default function HomeDashboard(): JSX.Element {
     const def = widgetDef(id)
     if (!def.multi && isPlaced(id)) return
     const finalSize = clampSize(def, size ?? def.defaultSize)
-    const finish = (cfg?: HomeWidgetConfig): void =>
-      commitFlat([...flatRef.current, { key: newInstanceKey(id), widget: id, config: cfg, size: finalSize }])
+    const finish = (cfg?: HomeWidgetConfig): void => {
+      const key = newInstanceKey(id)
+      commitFlat([...flatRef.current, { key, widget: id, config: cfg, size: finalSize }])
+      setJustPlaced(key)
+    }
     if (config !== undefined || !def.config) {
       finish(config)
     } else {
@@ -1186,17 +1200,19 @@ export default function HomeDashboard(): JSX.Element {
           const span = SIZE_SPAN[inst.size]
           const pos = positions.get(inst.key)
           const lifted = drag?.key === inst.key
+          const isNew = justPlaced === inst.key
           const mountDelay = firstPaintRef.current ? i * 0.045 : 0
           return (
             <motion.div
               key={inst.key}
               layout
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={isNew ? { opacity: 0, scale: 0.72 } : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
               transition={{
                 layout: GRID.reflowSpring,
                 opacity: { duration: 0.25, delay: mountDelay },
+                scale: { type: 'spring', stiffness: 340, damping: 26 },
                 y: { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
               }}
               style={{
@@ -1204,6 +1220,7 @@ export default function HomeDashboard(): JSX.Element {
                 gridRow: `${(pos?.row ?? 0) + 1} / span ${span.h}`
               }}
               className="relative group/slot min-w-0"
+              data-widget-key={inst.key}
               onPointerDown={(e) => beginCardDrag(e, inst)}
             >
               {lifted ? (
@@ -1227,11 +1244,15 @@ export default function HomeDashboard(): JSX.Element {
                         : undefined
                     }
                     className={`h-full transition-all rounded-2xl ${
+                      isNew ? 'ring-2 ring-[rgb(var(--accent))] shadow-[0_0_36px_rgb(var(--accent)/0.45)]' : ''
+                    } ${
                       customize || dragging
                         ? `${customize ? 'cursor-pointer' : ''} scale-[0.985] ${
                             selected
                               ? 'ring-2 ring-[rgb(var(--accent))] shadow-[0_0_24px_rgb(var(--accent)/0.35)]'
-                              : 'ring-2 ring-[rgb(var(--accent)/0.35)] shadow-[0_0_16px_rgb(var(--accent)/0.15)]'
+                              : isNew
+                                ? ''
+                                : 'ring-2 ring-[rgb(var(--accent)/0.35)] shadow-[0_0_16px_rgb(var(--accent)/0.15)]'
                           }`
                         : ''
                     }`}
@@ -1308,7 +1329,12 @@ export default function HomeDashboard(): JSX.Element {
       {/* Home pill — the same glass pill, in the same top-left spot as the
           desk breadcrumb, so Home and desks share one navigation language.
           The Desks segment drops the Stage Manager strip directly beneath. */}
-      <div className="absolute top-4 left-4 z-[45]" data-floating-menu>
+      <motion.div
+        animate={customize ? { opacity: 0.4, filter: 'blur(2px)' } : { opacity: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 0.25 }}
+        className={`absolute top-4 left-4 z-[45] ${customize ? 'pointer-events-none select-none' : ''}`}
+        data-floating-menu
+      >
         <div className="relative">
           <div className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] select-none">
             <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)]">
@@ -1350,15 +1376,21 @@ export default function HomeDashboard(): JSX.Element {
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       <div className="h-full w-full overflow-auto paper-texture">
       {/* The gallery floats as a dropdown now — customize never squeezes the
           page, and pt-16 keeps the greeting clear of the Home pill above. */}
       <div className="max-w-6xl mx-auto px-6 pb-7 pt-16">
-        {/* Greeting + focus-mode toggle */}
+        {/* Greeting + focus-mode toggle. In customize (placement) mode the
+            greeting and the non-editing controls recede behind a soft blur:
+            the board is live, everything else steps back. */}
         <header className="flex items-start justify-between gap-4 flex-wrap mb-6">
-          <div className="min-w-0">
+          <motion.div
+            animate={customize ? { opacity: 0.4, filter: 'blur(2px)' } : { opacity: 1, filter: 'blur(0px)' }}
+            transition={{ duration: 0.25 }}
+            className={`min-w-0 ${customize ? 'pointer-events-none select-none' : ''}`}
+          >
             <h1
               className="fb-display-hero text-[24px] leading-tight text-[var(--ink-100)]"
               data-testid="home-greeting"
@@ -1368,7 +1400,7 @@ export default function HomeDashboard(): JSX.Element {
             <p className="mt-1 text-[13px] text-[var(--ink-50)]">
               Here is your workspace and what is happening across it.
             </p>
-          </div>
+          </motion.div>
           <div className="flex items-center gap-2">
             {customize && !flatIsStock(flat) && (
               <button
@@ -1413,6 +1445,11 @@ export default function HomeDashboard(): JSX.Element {
               <Icon name={customize ? 'check' : 'dashboard_customize'} size={16} />
               {customize ? 'Done' : 'Customize'}
             </button>
+            <motion.div
+              animate={customize ? { opacity: 0.4, filter: 'blur(2px)' } : { opacity: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 0.25 }}
+              className={`flex items-center gap-2 ${customize ? 'pointer-events-none select-none' : ''}`}
+            >
             <button
               onClick={() => openAiBar(true)}
               data-testid="home-ask-brain"
@@ -1437,13 +1474,21 @@ export default function HomeDashboard(): JSX.Element {
               <Icon name={focusActive ? 'stop_circle' : 'bolt'} size={16} />
               {focusActive ? 'End focus mode' : 'Focus mode'}
             </button>
+            </motion.div>
           </div>
         </header>
 
         {/* Hero — describe a goal, get a real desk with AI-proposed widgets and
             the assistant beside it (spec §4.1). Fixed position: this is the one
-            piece of home that is not a re-slottable widget. */}
-        <StartOrAskPlexi />
+            piece of home that is not a re-slottable widget. Recedes with the
+            rest of the page chrome in placement mode. */}
+        <motion.div
+          animate={customize ? { opacity: 0.4, filter: 'blur(2px)' } : { opacity: 1, filter: 'blur(0px)' }}
+          transition={{ duration: 0.25 }}
+          className={customize ? 'pointer-events-none select-none' : ''}
+        >
+          <StartOrAskPlexi />
+        </motion.div>
 
         {/* The widget board. In customize mode, press and move any card to
             lift it; the board reflows live underneath. */}
