@@ -73,11 +73,25 @@ describe('packGrid', () => {
     const items = [inst('s', 'sm'), inst('i1', 'icon'), inst('i2', 'icon'), inst('i3', 'icon'), inst('i4', 'icon')]
     const pos = packGrid(items, COLS)
     assertValid(items, pos)
-    // The four icons tile the 2x2 block beside the small widget.
+    // Column-first: the four icons tile one flush 2x2 block beside the small
+    // widget instead of a half-height strip.
     expect(pos.get('i1')).toEqual({ col: 2, row: 0 })
-    expect(pos.get('i2')).toEqual({ col: 3, row: 0 })
-    expect(pos.get('i3')).toEqual({ col: 4, row: 0 })
-    expect(pos.get('i4')).toEqual({ col: 5, row: 0 })
+    expect(pos.get('i2')).toEqual({ col: 2, row: 1 })
+    expect(pos.get('i3')).toEqual({ col: 3, row: 0 })
+    expect(pos.get('i4')).toEqual({ col: 3, row: 1 })
+    expect(packedRows(items, pos)).toBe(2)
+  })
+
+  it('stacks an icon pair into a flush full-height column (no half gap)', () => {
+    // Caleb's board: launcher (sm), two action icons, then another sm. The
+    // icons must form one column as tall as their neighbors so the widget
+    // after them packs flush against it.
+    const items = [inst('launcher', 'sm'), inst('i1', 'icon'), inst('i2', 'icon'), inst('next', 'sm')]
+    const pos = packGrid(items, COLS)
+    assertValid(items, pos)
+    expect(pos.get('i1')).toEqual({ col: 2, row: 0 })
+    expect(pos.get('i2')).toEqual({ col: 2, row: 1 })
+    expect(pos.get('next')).toEqual({ col: 3, row: 0 })
     expect(packedRows(items, pos)).toBe(2)
   })
 

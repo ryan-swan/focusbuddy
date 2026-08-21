@@ -91,6 +91,27 @@ export function packGrid(
   for (const item of items) {
     const span = SIZE_SPAN[item.size]
     const w = Math.min(span.w, cols)
+    if (item.size === 'icon') {
+      // Icons fill COLUMN-first within each cell-height band: the first icon
+      // takes a top subrow, the next completes the column beneath it, so two
+      // icons make a flush full-height column and four make a full cell.
+      // Row-major would strand a half-height strip under every icon row that
+      // nothing else can fill (only icons are one subunit tall) — the "weird
+      // middle area" Apple's boards never show.
+      placed: for (let band = 0; ; band++) {
+        for (let col = 0; col < cols; col++) {
+          for (let dr = 0; dr < SUBDIV; dr++) {
+            const row = band * SUBDIV + dr
+            if (fits(col, row, 1, 1)) {
+              claim(col, row, 1, 1)
+              out.set(item.key, { col, row })
+              break placed
+            }
+          }
+        }
+      }
+      continue
+    }
     placed: for (let row = 0; ; row++) {
       for (let col = 0; col <= cols - w; col++) {
         if (fits(col, row, w, span.h)) {
