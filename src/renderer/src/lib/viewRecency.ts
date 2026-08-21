@@ -33,7 +33,8 @@ const MODULE_KINDS = new Set<string>([
   'reports',
   'flows',
   'api',
-  'marketplace'
+  'marketplace',
+  'plexii'
 ])
 
 export function recordViewVisit(kind: string): void {

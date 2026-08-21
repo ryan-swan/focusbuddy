@@ -35,6 +35,7 @@ import PlexiFlowView from './views/PlexiFlowView'
 import PlexiApiView from './views/PlexiApiView'
 import PlexiMarketplaceView from './views/PlexiMarketplaceView'
 import ExternalMdEditorView from './views/ExternalMdEditorView'
+import PlexiiHubView from './views/PlexiiHubView'
 import CapabilityGate from './CapabilityGate'
 import { VIEW_CAPABILITY } from '../lib/viewCapability'
 
@@ -141,6 +142,8 @@ function MainPaneSurface(): JSX.Element {
       return <PlexiMarketplaceView />
     case 'mdext':
       return <ExternalMdEditorView path={view.path} />
+    case 'plexii':
+      return <PlexiiHubView />
     default:
       return <HomeDashboard />
   }

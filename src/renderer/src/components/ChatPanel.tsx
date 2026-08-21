@@ -42,9 +42,14 @@ const EMPTY_MESSAGES: ChatMessage[] = []
 
 interface Props {
   onCollapse?: () => void
+  // The Plexii hub renders this same panel as a real page in the main pane
+  // (view.kind 'plexii'). Page mode forces the fullscreen layout regardless of
+  // the overlay's chrome mode and drops the display-mode menu — a page is a
+  // place you navigated to, not a dressing you switch.
+  page?: boolean
 }
 
-export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
+export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const send = useChatStore((s) => s.send)
   const sending = useChatStore((s) => s.sending)
@@ -211,7 +216,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
   // greeting and composer centered as a group, capability row and suggestion
   // cards under the input. Same panel, same nodes — only layout classes
   // change, so the draft and every store subscription survive the swap.
-  const isFullscreen = chromeMode === 'fullscreen'
+  const isFullscreen = page || chromeMode === 'fullscreen'
   const fullscreenHome = isFullscreen && messages.length === 0
 
   async function handleWhatWasIDoing(): Promise<void> {
@@ -570,7 +575,8 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
           )}
           {/* Display mode — Notion's ⌄ menu: Sidebar / Floating / Full screen,
               check on the active one. Chrome only; the conversation persists
-              across switches. */}
+              across switches. Absent in page mode: the hub is not re-dressable. */}
+          {!page && (
           <div className="relative" ref={modeMenuRef}>
             <button
               onClick={() => setModeMenuOpen((v) => !v)}
@@ -608,6 +614,7 @@ export default function ChatPanel({ onCollapse }: Props = {}): JSX.Element {
               </div>
             )}
           </div>
+          )}
           {onCollapse && (
             <button
               onClick={onCollapse}

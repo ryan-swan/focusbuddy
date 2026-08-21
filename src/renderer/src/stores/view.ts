@@ -36,6 +36,9 @@ export type View =
   | { kind: 'plexidesk'; app?: string }
   | { kind: 'plexipeople'; app?: string }
   | { kind: 'plexibrain'; app?: string }
+  // The Plexii hub — the AI's own page. One conversational engine, many doors
+  // (sidebar tab, pill, Home input, ⌘⇧K); this view is the full-screen door.
+  | { kind: 'plexii' }
   | { kind: 'design' }
   | { kind: 'document'; documentId: string }
   | { kind: 'livedoc'; liveDocId: string }
@@ -92,6 +95,7 @@ interface ViewStore {
   goPlexiDesk: (app?: string) => void
   goPlexiPeople: (app?: string) => void
   goPlexiBrain: (app?: string) => void
+  goPlexii: () => void
   goDesign: () => void
   goDocument: (documentId: string) => void
   goLiveDoc: (liveDocId: string) => void
@@ -224,6 +228,7 @@ export const useViewStore = create<ViewStore>((set, get) => {
     goPlexiDesk: (app) => commit({ kind: 'plexidesk', app }),
     goPlexiPeople: (app) => commit({ kind: 'plexipeople', app }),
     goPlexiBrain: (app) => commit({ kind: 'plexibrain', app }),
+    goPlexii: () => commit({ kind: 'plexii' }),
     goDesign: () => commit({ kind: 'design' }),
     goDocument: (documentId) => commit({ kind: 'document', documentId }),
     goLiveDoc: (liveDocId) => commit({ kind: 'livedoc', liveDocId }),

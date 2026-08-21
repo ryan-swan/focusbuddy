@@ -19,7 +19,6 @@ import { useAccountStore } from '../../stores/account'
 import { personFirstName } from '../../lib/personName'
 import { useDocumentsStore } from '../../stores/documents'
 import { useNodeStore } from '../../stores/nodes'
-import { useAiCommandBar } from '../../stores/aiCommandBar'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { usePinLayer } from '../../stores/pinLayer'
 import { useFocusSessionStore } from '../../stores/focusSession'
@@ -374,7 +373,6 @@ export default function HomeDashboard(): JSX.Element {
   const createNode = useNodeStore((s) => s.create)
   const setActive = useNodeStore((s) => s.setActive)
 
-  const openAiBar = useAiCommandBar((s) => s.setOpen)
   const pin = usePinLayer((s) => s.pin)
 
   const focusActive = useFocusSessionStore((s) => s.active)
@@ -1470,17 +1468,18 @@ export default function HomeDashboard(): JSX.Element {
               transition={{ duration: 0.25 }}
               className={`flex items-center gap-2 ${customize ? 'pointer-events-none select-none' : ''}`}
             >
+            {/* A door into the Plexii hub (consolidation ruling, 2026-08-21).
+                The ⌘⇧K chip left with the command bar hand-off: until Phase 2
+                repoints the shortcut, showing it here would promise the wrong
+                destination. */}
             <button
-              onClick={() => openAiBar(true)}
+              onClick={() => v.goPlexii()}
               data-testid="home-ask-brain"
-              title="Ask PlexiBrain or type a command"
+              title="Ask Plexii — opens the AI hub"
               className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
             >
               <Icon name="auto_awesome" size={16} className="text-accent" />
               Ask PlexiBrain
-              <span className="fb-t-caption text-[var(--ink-40)] bg-[var(--surface-sunken)] rounded-[6px] px-1.5 py-px fb-tabular">
-                ⌘⇧K
-              </span>
             </button>
             <button
               onClick={() => void toggleFocus()}

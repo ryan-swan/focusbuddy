@@ -189,6 +189,24 @@ export function useAssistantContext(): AssistantContext {
         ],
         placeholder: 'Ask about this design…'
       }
+    case 'plexii':
+      // The hub is the AI's own page: workspace scope, never a lingering desk —
+      // being "on" the hub means being on no desk at all.
+      return {
+        key: '__global__',
+        serverTaskId: null,
+        kind: 'workspace',
+        label: 'your workspace',
+        title: '',
+        icon: 'auto_awesome',
+        intro: 'Ask anything. I can research, plan, draft, and act across your workspace.',
+        suggestions: [
+          { icon: 'travel_explore', text: 'What should I work on next?' },
+          { icon: 'add_task', text: 'Plan out…' },
+          { icon: 'search', text: 'Find…' }
+        ],
+        placeholder: 'Ask Plexii anything…'
+      }
     default:
       return {
         key: '__global__',

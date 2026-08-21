@@ -94,6 +94,11 @@ export default function AssistantOverlay(): JSX.Element {
   const focusedWidgetId = useWidgetStore((s) => s.focusedWidgetId)
   const focusModeShowing =
     (view.kind === 'task' || view.kind === 'project-dashboard') && focusedWidgetId !== null
+  // Plexii-hub suppression: while the hub page is showing, the page IS the
+  // assistant (same rule as focus mode). Pill and panel both disappear so the
+  // ONE-ChatPanel invariant holds; chrome state is untouched, so leaving the
+  // hub restores the overlay exactly as it was.
+  const hubShowing = view.kind === 'plexii'
   // Fullscreen-as-a-page geometry (3a.4): the same four takeover kinds App
   // uses. The dock inset is measured live so sidebar resizes and the minimised
   // 58px strip track truthfully.
@@ -153,7 +158,7 @@ export default function AssistantOverlay(): JSX.Element {
     }
   }, [resizing, setWidth, persistWidth])
 
-  if (focusModeShowing) return <></>
+  if (focusModeShowing || hubShowing) return <></>
 
   if (!open) {
     return (
