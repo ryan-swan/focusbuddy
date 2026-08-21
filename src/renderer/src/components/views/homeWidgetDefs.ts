@@ -41,6 +41,9 @@ export type ShortcutTarget =
   | { kind: 'action'; action: 'new-meeting' | 'transcribe'; label?: string }
   // Message a person: opens their DM (starting it for real if none exists).
   | { kind: 'person'; accountId: string; handle?: string; label?: string }
+  // A specific widget on a desk: lands on the desk with the camera centred on
+  // that widget (the desk alone if the widget has since been removed).
+  | { kind: 'desk-widget'; nodeId: string; widgetId: string; label?: string }
 
 export interface HomeWidgetConfig {
   deskId?: string

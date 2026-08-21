@@ -107,6 +107,8 @@ export function targetKey(t: ShortcutTarget): string {
       return `action:${t.action}`
     case 'person':
       return `person:${t.accountId}`
+    case 'desk-widget':
+      return `deskwidget:${t.nodeId}:${t.widgetId}`
   }
 }
 
@@ -203,5 +205,17 @@ export function describeShortcutTarget(t: ShortcutTarget, lookups: ShortcutLooku
         tone: 'text-sky-500',
         alive: true
       }
+    case 'desk-widget': {
+      // Liveness follows the DESK: Home cannot see another desk's widget list,
+      // and landing on the desk is still correct if the widget was removed.
+      const node = lookups.node(t.nodeId)
+      return {
+        label: t.label || 'Desk widget',
+        caption: node?.title ? `On ${node.title}` : 'Desk widget',
+        icon: 'dashboard_customize',
+        tone: 'text-teal-500',
+        alive: !!node && !node.archived
+      }
+    }
   }
 }

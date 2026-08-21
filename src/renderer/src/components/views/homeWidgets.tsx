@@ -361,6 +361,29 @@ export function ShortcutsWidget({
         else v.goConnectedApp(t.appId)
         break
       }
+      case 'desk-widget': {
+        setActive(t.nodeId)
+        v.goTask(t.nodeId)
+        // The desk's widgets load after navigation; focusOn is the store's
+        // surface-an-offscreen-widget primitive (BringMeBack uses it too).
+        // Gate on layoutHydratedFor === this desk: Canvas restores the desk's
+        // persisted camera on mount, and a focusOn fired before that hydration
+        // would be clobbered a frame later by the restored pan/zoom. Widget
+        // presence alone is not proof hydration ran; they are separate loads.
+        // If the widget never appears (deleted), landing on the desk alone is
+        // the honest outcome, so the poll just gives up quietly.
+        const startedAt = Date.now()
+        const tick = window.setInterval(() => {
+          const st = useWidgetStore.getState()
+          if (st.layoutHydratedFor === t.nodeId && st.widgets.some((w) => w.id === t.widgetId)) {
+            window.clearInterval(tick)
+            st.focusOn(t.widgetId)
+          } else if (Date.now() - startedAt > 5000) {
+            window.clearInterval(tick)
+          }
+        }, 150)
+        break
+      }
       case 'action':
         setOpenAction(t.action)
         break
@@ -592,7 +615,11 @@ function ShortcutComposer({
       void window.api.search
         .query(q)
         .then((hits) =>
-          setDeepHits(hits.filter((h) => h.type === 'task' || h.type === 'folder' || h.type === 'document'))
+          setDeepHits(
+            hits.filter(
+              (h) => h.type === 'task' || h.type === 'folder' || h.type === 'document' || h.type === 'widget'
+            )
+          )
         )
         .catch(() => setDeepHits([]))
     }, 200)
@@ -698,6 +725,24 @@ function ShortcutComposer({
       }
     })
     if (docItems.length) out.push({ name: 'Documents', items: docItems })
+
+    // Widgets on desks, via deep search (its 'widget' hits carry the desk id).
+    // Only widgets whose desk still exists are offered.
+    const widgetItems = deepHits
+      .filter((h) => h.type === 'widget' && h.taskId)
+      .map((h) => {
+        const desk = nodes.find((n) => n.id === h.taskId && n.kind === 'task' && !n.archived)
+        if (!desk) return null
+        return {
+          target: { kind: 'desk-widget' as const, nodeId: desk.id, widgetId: h.id, label: h.title },
+          label: h.title || 'Untitled widget',
+          icon: 'dashboard_customize',
+          tone: 'text-teal-500'
+        }
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .slice(0, 5)
+    if (widgetItems.length) out.push({ name: 'Desk widgets', items: widgetItems })
 
     const appItems = apps
       .filter((a) => a.title.toLowerCase().includes(q))

@@ -93,9 +93,10 @@ describe('targetKey', () => {
       targetKey({ kind: 'section', id: 'a' }),
       targetKey({ kind: 'url', url: 'a' }),
       targetKey({ kind: 'person', accountId: 'a' }),
-      targetKey({ kind: 'action', action: 'new-meeting' })
+      targetKey({ kind: 'action', action: 'new-meeting' }),
+      targetKey({ kind: 'desk-widget', nodeId: 'a', widgetId: 'b' })
     ])
-    expect(keys.size).toBe(8)
+    expect(keys.size).toBe(9)
   })
 })
 
@@ -163,6 +164,12 @@ describe('describeShortcutTarget', () => {
       alive: true
     })
     expect(describeShortcutTarget({ kind: 'person', accountId: 'x', handle: 'sam' }, EMPTY).label).toBe('sam')
+  })
+  it('describes desk-widget targets with liveness following the desk', () => {
+    const live = describeShortcutTarget({ kind: 'desk-widget', nodeId: 'desk1', widgetId: 'w1', label: 'Notes' }, WORLD)
+    expect(live).toMatchObject({ label: 'Notes', caption: 'On Payroll desk', alive: true })
+    expect(describeShortcutTarget({ kind: 'desk-widget', nodeId: 'deadDesk', widgetId: 'w1' }, WORLD).alive).toBe(false)
+    expect(describeShortcutTarget({ kind: 'desk-widget', nodeId: 'nope', widgetId: 'w1' }, WORLD).alive).toBe(false)
   })
   it('resolves known sections and flags unknown ids', () => {
     expect(describeShortcutTarget({ kind: 'section', id: 'vault' }, EMPTY)).toMatchObject({ label: 'Vault', alive: true })
