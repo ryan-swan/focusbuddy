@@ -1,0 +1,105 @@
+// The home widget registry — pure data, no JSX, no store imports. Lives apart
+// from homeWidgets.tsx so grid geometry (homeGridLayout.ts) and unit tests can
+// read the catalog without dragging component code in.
+
+export type HomeWidgetId =
+  | 'standup'
+  | 'navigator'
+  | 'continue'
+  | 'agenda'
+  | 'pulse'
+  | 'quick'
+  | 'activity'
+  | 'pinned-desk'
+  | 'room-portal'
+  | 'quick-links'
+  | 'app-launcher'
+  | 'create'
+  | 'overdue'
+  | 'focus-timer'
+  | 'one-thing'
+  | 'where-was-i'
+  | 'stalled'
+
+export interface HomeWidgetConfig {
+  deskId?: string
+  roomId?: string
+  routes?: string[]
+}
+
+export interface HomeWidgetInstance {
+  key: string
+  widget: HomeWidgetId
+  config?: HomeWidgetConfig
+}
+
+// Apple-style widget sizes, in grid cells: sm 1x1, md 2x1, lg 2x2,
+// stack 1x2 tall. Every def declares only the sizes its content genuinely
+// supports, plus the size it arrives at.
+export type WidgetSize = 'sm' | 'md' | 'lg' | 'stack'
+
+export interface HomeWidgetDef {
+  id: HomeWidgetId
+  name: string
+  blurb: string
+  icon: string
+  tint: string
+  category: 'Navigation' | 'Live' | 'Actions' | 'Smart'
+  // Multi-instance widgets (a pinned desk per desk, a portal per room). All
+  // others are singletons: the gallery shows them as Added once placed.
+  multi?: boolean
+  // Which picker must run before this widget can be placed.
+  config?: 'desk' | 'room' | 'links'
+  defaultCol: 'main' | 'rail'
+  sizes: WidgetSize[]
+  defaultSize: WidgetSize
+}
+
+export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
+  // Live
+  { id: 'standup', name: 'Standup', blurb: 'Your look-back and look-forward narrative for the day', icon: 'auto_awesome', tint: 'bg-accent/10 text-accent', category: 'Live', defaultCol: 'main', sizes: ['lg'], defaultSize: 'lg' },
+  { id: 'agenda', name: "Today's agenda", blurb: 'The time blocks on your calendar today', icon: 'calendar_today', tint: 'bg-sky-500/10 text-sky-500', category: 'Live', defaultCol: 'rail', sizes: ['sm', 'md', 'stack'], defaultSize: 'sm' },
+  { id: 'pulse', name: 'Pulse', blurb: 'Open, due, and overdue counts at a glance', icon: 'monitoring', tint: 'bg-violet-500/10 text-violet-500', category: 'Live', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'continue', name: 'Continue', blurb: 'The documents you touched most recently', icon: 'history', tint: 'bg-accent/10 text-accent', category: 'Live', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'lg' },
+  { id: 'activity', name: 'Recent activity', blurb: 'The workspace activity trail from the last week', icon: 'bolt', tint: 'bg-accent/10 text-accent', category: 'Live', defaultCol: 'rail', sizes: ['sm', 'md', 'stack'], defaultSize: 'sm' },
+  { id: 'overdue', name: 'Overdue radar', blurb: 'Only the tasks past their due date. Empty is the goal', icon: 'priority_high', tint: 'bg-rose-500/10 text-rose-500', category: 'Live', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  // Navigation
+  { id: 'navigator', name: 'Rooms and desks', blurb: 'Browse rooms on the left, their desks open to the right', icon: 'meeting_room', tint: 'bg-sky-500/10 text-sky-500', category: 'Navigation', defaultCol: 'main', sizes: ['lg'], defaultSize: 'lg' },
+  { id: 'pinned-desk', name: 'Pinned desk', blurb: 'One desk you care about, one click away', icon: 'push_pin', tint: 'bg-violet-500/10 text-violet-500', category: 'Navigation', multi: true, config: 'desk', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'room-portal', name: 'Room portal', blurb: 'A single room and the desks inside it', icon: 'door_open', tint: 'bg-teal-500/10 text-teal-500', category: 'Navigation', multi: true, config: 'room', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'lg' },
+  { id: 'quick-links', name: 'Quick links', blurb: 'Your own row of shortcuts to the places you use most', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', config: 'links', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'app-launcher', name: 'App launcher', blurb: 'Your favourite connected apps with their real logos', icon: 'apps', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Navigation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  // Actions
+  { id: 'quick', name: 'Quick actions', blurb: 'Create, plan, collaborate, automate', icon: 'bolt', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'create', name: 'Create new', blurb: 'Start a document, spreadsheet, deck, or desk in one tap', icon: 'add_circle', tint: 'bg-accent/10 text-accent', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'focus-timer', name: 'Focus timer', blurb: 'Start and stop the five minute promise from home', icon: 'timer', tint: 'bg-violet-500/10 text-violet-500', category: 'Actions', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
+  // Smart
+  { id: 'one-thing', name: 'One thing now', blurb: 'The single most pressing task. No list, just the one', icon: 'target', tint: 'bg-amber-500/10 text-amber-600', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
+  { id: 'where-was-i', name: 'Where was I', blurb: 'Your last working context, with one button: Resume', icon: 'undo', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
+  { id: 'stalled', name: 'Stalled desk', blurb: 'The in-progress desk that has waited longest for you', icon: 'hourglass_bottom', tint: 'bg-orange-500/10 text-orange-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' }
+]
+
+export function widgetDef(id: HomeWidgetId): HomeWidgetDef {
+  return HOME_WIDGET_DEFS.find((d) => d.id === id) ?? HOME_WIDGET_DEFS[0]
+}
+
+// The route catalog Quick Links composes from. Each id is stable and stored in
+// the widget's config; icons and tones mirror the sidebar so the shortcuts
+// read as the same destinations.
+export interface QuickLinkRoute {
+  id: string
+  label: string
+  icon: string
+  tone: string
+}
+export const QUICK_LINK_ROUTES: QuickLinkRoute[] = [
+  { id: 'rooms', label: 'Rooms', icon: 'meeting_room', tone: 'text-sky-500' },
+  { id: 'desks', label: 'Desks', icon: 'desk', tone: 'text-teal-500' },
+  { id: 'shared', label: 'Shared', icon: 'folder_shared', tone: 'text-fuchsia-500' },
+  { id: 'plans', label: 'Plans', icon: 'account_tree', tone: 'text-violet-500' },
+  { id: 'tasks', label: 'Tasks', icon: 'checklist', tone: 'text-emerald-500' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar_month', tone: 'text-amber-500' },
+  { id: 'documents', label: 'Documents', icon: 'description', tone: 'text-sky-500' },
+  { id: 'files', label: 'Files', icon: 'folder', tone: 'text-orange-500' },
+  { id: 'vault', label: 'Vault', icon: 'plexii:vault', tone: 'text-rose-500' }
+]

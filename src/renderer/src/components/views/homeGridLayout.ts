@@ -6,12 +6,28 @@
 // mid-animation (framer's transforms would feed the springs back into the
 // math and jitter).
 
-import type { HomeWidgetInstance } from './homeWidgets'
+import { widgetDef, type HomeWidgetDef, type HomeWidgetInstance, type WidgetSize } from './homeWidgetDefs'
 
-export type WidgetSize = 'sm' | 'md' | 'lg' | 'stack'
+export type { WidgetSize }
 
 export interface SizedInstance extends HomeWidgetInstance {
   size: WidgetSize
+}
+
+// A widget only renders at sizes its def declares; anything else falls back
+// to the def's default. Guards migration and swap-in-place.
+export function clampSize(def: HomeWidgetDef, desired: WidgetSize): WidgetSize {
+  return def.sizes.includes(desired) ? desired : def.defaultSize
+}
+
+// Migrate the v2 two-column layout: main-column widgets arrive large, rail
+// widgets small, order main-then-rail, every size clamped to what the def
+// actually supports.
+export function sizedFromColumns(main: HomeWidgetInstance[], rail: HomeWidgetInstance[]): SizedInstance[] {
+  return [
+    ...main.map((it): SizedInstance => ({ ...it, size: clampSize(widgetDef(it.widget), 'lg') })),
+    ...rail.map((it): SizedInstance => ({ ...it, size: clampSize(widgetDef(it.widget), 'sm') }))
+  ]
 }
 
 // Grid footprint per size, in cells.

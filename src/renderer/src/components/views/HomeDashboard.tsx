@@ -5,8 +5,10 @@ import {
   SIZE_SPAN,
   bestInsertionIndex,
   cellRect,
+  clampSize,
   packGrid,
   pointerCell,
+  sizedFromColumns,
   type GridMetrics,
   type SizedInstance,
   type WidgetSize
@@ -253,19 +255,10 @@ function loadLayout(): HomeLayout {
   }
 }
 
-function saveLayout(l: HomeLayout): void {
-  try {
-    localStorage.setItem(LAYOUT_KEY, JSON.stringify(l))
-  } catch {
-    /* ignore quota */
-  }
-}
-
-// ── Phase 1 grid (Apple widget-picker mission) ──────────────────────────────
-// One flat, ordered, sized list renders as a packed 4-column grid. Sizes are
-// derived in memory from the v2 two-column layout (main = lg, rail = sm) and
-// persistence stays v2-shaped (saving splits the list back by size), so
-// rolling back to the column UI loses nothing. Every feel knob lives here.
+// ── The widget grid (Apple widget-picker mission) ───────────────────────────
+// One flat, ordered, sized list renders as a packed 4-column grid; per-widget
+// sizes come from each def's `sizes`/`defaultSize` and persist as v3 (the v2
+// key stays untouched for rollback). Every feel knob lives here.
 
 const GRID = {
   cols: 4,
@@ -280,22 +273,49 @@ const GRID = {
   dragActivationPx: 6
 }
 
-function deriveFlat(l: HomeLayout): SizedInstance[] {
-  return [
-    ...l.main.map((it): SizedInstance => ({ ...it, size: 'lg' })),
-    ...l.rail.map((it): SizedInstance => ({ ...it, size: 'sm' }))
-  ]
-}
+// v3 persistence: the flat sized list, stored whole. v2 (and v1 through the
+// v2 reader) migrate on first load — main-column widgets arrive large, rail
+// widgets small — and the v2 key is never deleted, so rolling back to a
+// pre-grid build finds the user's old layout intact.
+const FLAT_KEY = 'home.layout.v3'
+const SIZE_VALUES: readonly string[] = ['sm', 'md', 'lg', 'stack']
 
-function flatToLayout(flat: SizedInstance[]): HomeLayout {
-  const strip = ({ size: _size, ...inst }: SizedInstance): HomeWidgetInstance => inst
-  return {
-    main: flat.filter((it) => it.size !== 'sm').map(strip),
-    rail: flat.filter((it) => it.size === 'sm').map(strip)
+const STOCK_FLAT: SizedInstance[] = sizedFromColumns(STOCK_LAYOUT.main, STOCK_LAYOUT.rail)
+
+function loadFlat(): SizedInstance[] {
+  try {
+    const raw = localStorage.getItem(FLAT_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { widgets?: unknown }
+      const seen = new Set<string>()
+      const clean = (Array.isArray(parsed.widgets) ? parsed.widgets : []).filter(
+        (it): it is SizedInstance =>
+          !!it &&
+          typeof it === 'object' &&
+          typeof (it as SizedInstance).key === 'string' &&
+          KNOWN_IDS.has((it as SizedInstance).widget) &&
+          SIZE_VALUES.includes((it as SizedInstance).size) &&
+          !seen.has((it as SizedInstance).key) &&
+          !!seen.add((it as SizedInstance).key)
+      )
+      if (clean.length > 0)
+        return clean.map((it) => ({ ...it, size: clampSize(widgetDef(it.widget), it.size) }))
+    }
+    const legacy = loadLayout()
+    const migrated = sizedFromColumns(legacy.main, legacy.rail)
+    return migrated.length > 0 ? migrated : STOCK_FLAT
+  } catch {
+    return STOCK_FLAT
   }
 }
 
-const STOCK_FLAT = deriveFlat(STOCK_LAYOUT)
+function saveFlat(flat: SizedInstance[]): void {
+  try {
+    localStorage.setItem(FLAT_KEY, JSON.stringify({ widgets: flat }))
+  } catch {
+    /* ignore quota */
+  }
+}
 
 function flatIsStock(flat: SizedInstance[]): boolean {
   return (
@@ -353,7 +373,7 @@ export default function HomeDashboard(): JSX.Element {
   const [now, setNow] = useState(() => Date.now())
 
   // The sized widget list, rendered as one packed grid. Order IS the layout.
-  const [flat, setFlat] = useState<SizedInstance[]>(() => deriveFlat(loadLayout()))
+  const [flat, setFlat] = useState<SizedInstance[]>(() => loadFlat())
   // A pointer drag in flight. React state carries only identity and the
   // settling flag; per-frame position rides motion values so pointer moves
   // never re-render.
@@ -499,7 +519,7 @@ export default function HomeDashboard(): JSX.Element {
   }, [nodes, agenda, now])
 
   const recentActivity = useMemo(
-    () => (activity ?? []).filter((e) => !dismissed.has(e.id)).slice(0, 6),
+    () => (activity ?? []).filter((e) => !dismissed.has(e.id)).slice(0, 12),
     [activity, dismissed]
   )
 
@@ -586,7 +606,7 @@ export default function HomeDashboard(): JSX.Element {
   const commitFlat = (next: SizedInstance[]): void => {
     flatRef.current = next
     setFlat(next)
-    saveLayout(flatToLayout(next))
+    saveFlat(next)
   }
 
   const findInstance = (key: string): SizedInstance | null =>
@@ -594,14 +614,13 @@ export default function HomeDashboard(): JSX.Element {
 
   // Place a new widget from the gallery at the end of the board, running its
   // config picker first when it needs one. Singletons already placed are a
-  // no-op. defaultCol maps to the interim size story: main-column widgets
-  // arrive large, rail widgets small (real per-widget sizes land in Phase 2).
-  const placeWidget = (id: HomeWidgetId): void => {
+  // no-op. The size comes from the picker when given, else the def's default.
+  const placeWidget = (id: HomeWidgetId, size?: WidgetSize): void => {
     const def = widgetDef(id)
     if (!def.multi && isPlaced(id)) return
-    const size: WidgetSize = def.defaultCol === 'main' ? 'lg' : 'sm'
+    const finalSize = clampSize(def, size ?? def.defaultSize)
     const finish = (config?: HomeWidgetConfig): void =>
-      commitFlat([...flatRef.current, { key: newInstanceKey(id), widget: id, config, size }])
+      commitFlat([...flatRef.current, { key: newInstanceKey(id), widget: id, config, size: finalSize }])
     if (def.config) {
       setPicker({ widget: id, kind: def.config, apply: (config) => finish(config) })
     } else {
@@ -609,14 +628,15 @@ export default function HomeDashboard(): JSX.Element {
     }
   }
 
-  // Swap a placed instance for a different widget, keeping its slot and size.
+  // Swap a placed instance for a different widget, keeping its slot and, as
+  // far as the new widget supports it, its size.
   const swapWidget = (key: string, id: HomeWidgetId): void => {
     const def = widgetDef(id)
     if (!def.multi && isPlaced(id)) return
     const replaceWith = (config?: HomeWidgetConfig): void => {
       commitFlat(
         flatRef.current.map((it) =>
-          it.key === key ? { key: newInstanceKey(id), widget: id, config, size: it.size } : it
+          it.key === key ? { key: newInstanceKey(id), widget: id, config, size: clampSize(def, it.size) } : it
         )
       )
       setSwapKey(null)
@@ -669,16 +689,18 @@ export default function HomeDashboard(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [customize, swapKey])
 
-  // One widget = one pinned card. The renderer owns the chrome (and the corner
-  // grip); the original dashboard widgets render inline because they share this
-  // component's imperatively-loaded data, the catalog widgets come from
+  // One widget = one tile. The renderer owns the chrome; content adapts to the
+  // instance's size (row caps, column counts) so every size is designed, not
+  // squeezed. The original dashboard widgets render inline because they share
+  // this component's imperatively-loaded data, the catalog widgets come from
   // homeWidgets.tsx and read their stores directly.
-  const renderWidget = (inst: HomeWidgetInstance): JSX.Element | null => {
+  const renderWidget = (inst: SizedInstance): JSX.Element | null => {
+    const size = inst.size
     switch (inst.widget) {
       case 'pinned-desk':
         return <PinnedDeskWidget deskId={inst.config?.deskId} />
       case 'room-portal':
-        return <RoomPortalWidget roomId={inst.config?.roomId} />
+        return <RoomPortalWidget roomId={inst.config?.roomId} size={size} />
       case 'quick-links':
         return <QuickLinksWidget routes={inst.config?.routes} />
       case 'app-launcher':
@@ -688,7 +710,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'focus-timer':
         return <FocusTimerWidget />
       case 'overdue':
-        return <OverdueRadarWidget />
+        return <OverdueRadarWidget size={size} />
       case 'one-thing':
         return <OneThingNowWidget />
       case 'where-was-i':
@@ -813,7 +835,7 @@ export default function HomeDashboard(): JSX.Element {
               <EmptyState text="Nothing to pick up yet. Create a document and it will wait for you here." />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="home-continue">
-                {recentDocs.map((d) => {
+                {recentDocs.slice(0, size === 'md' ? 2 : 4).map((d) => {
                   const ti = DOC_TYPE_ICON[d.docType] ?? {
                     icon: 'draft',
                     tint: 'text-[var(--ink-40)]',
@@ -859,7 +881,7 @@ export default function HomeDashboard(): JSX.Element {
               </p>
             ) : (
               <ul className="space-y-1.5" data-testid="home-agenda">
-                {todayEvents.map((b) => (
+                {todayEvents.slice(0, size === 'stack' ? 8 : 3).map((b) => (
                   <li key={b.id} className="flex items-center gap-2.5 px-1 py-1" data-testid={`home-agenda-item-${b.id}`}>
                     <span className="shrink-0 fb-t-caption fb-tabular w-14">
                       {clockTime(b.startMs)}
@@ -878,7 +900,7 @@ export default function HomeDashboard(): JSX.Element {
         return (
           <RailCard title="Pulse" icon="monitoring" tone="violet">
             <div
-              className="grid grid-cols-2 gap-2"
+              className={`grid gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}
               data-testid="home-insights"
               title="Counts come straight from your tasks and calendar. Productivity and focus-time scores are not tracked yet, so they are not shown."
             >
@@ -917,7 +939,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'quick':
         return (
           <RailCard title="Quick actions" icon="bolt" tone="emerald">
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}>
               <QuickAction testid="home-quick-create" icon="add" tone="accent" title="Create" blurb="New document" onClick={() => void onCreate()} />
               <QuickAction testid="home-quick-plan" icon="checklist" tone="sky" title="Plan" blurb="Plans and tasks" onClick={() => v.goPlexiDesk('plans')} />
               <QuickAction testid="home-quick-collaborate" icon="group" tone="emerald" title="Collaborate" blurb="Shared work" onClick={() => v.goCollaborations()} />
@@ -937,7 +959,7 @@ export default function HomeDashboard(): JSX.Element {
               </p>
             ) : (
               <ul className="space-y-0.5" data-testid="home-activity">
-                {recentActivity.map((e) => (
+                {recentActivity.slice(0, size === 'stack' ? 9 : 4).map((e) => (
                   <li
                     key={e.id}
                     className="group flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-[var(--surface-sunken)]"
@@ -1215,9 +1237,25 @@ export default function HomeDashboard(): JSX.Element {
                       {renderWidget(inst)}
                     </div>
                   </div>
-                  {/* Customize chrome: remove, and edit for configurable widgets. */}
+                  {/* Customize chrome: size cycle, edit for configurable
+                      widgets, remove. */}
                   {customize && (
                     <div className="absolute -top-2 -right-2 flex items-center gap-1">
+                      {def.sizes.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const next = def.sizes[(def.sizes.indexOf(inst.size) + 1) % def.sizes.length]
+                            commitFlat(flatRef.current.map((it) => (it.key === inst.key ? { ...it, size: next } : it)))
+                          }}
+                          title={`Size: ${inst.size}. Click for the next size`}
+                          data-testid={`home-slot-size-${inst.key}`}
+                          className="h-6 px-1.5 rounded-full inline-flex items-center gap-0.5 bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
+                        >
+                          <Icon name="open_in_full" size={11} />
+                          <span className="text-[9.5px] font-semibold uppercase tracking-wide">{inst.size}</span>
+                        </button>
+                      )}
                       {def.config && (
                         <button
                           onClick={(e) => {

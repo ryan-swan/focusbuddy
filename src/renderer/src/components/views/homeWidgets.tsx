@@ -17,100 +17,13 @@ import type { ActivityEvent, FbNode } from '@shared/types'
 // agenda, pulse, quick, activity) render inside HomeDashboard, which owns
 // their imperatively-loaded data.
 
-export type HomeWidgetId =
-  | 'standup'
-  | 'navigator'
-  | 'continue'
-  | 'agenda'
-  | 'pulse'
-  | 'quick'
-  | 'activity'
-  | 'pinned-desk'
-  | 'room-portal'
-  | 'quick-links'
-  | 'app-launcher'
-  | 'create'
-  | 'overdue'
-  | 'focus-timer'
-  | 'one-thing'
-  | 'where-was-i'
-  | 'stalled'
-
-export interface HomeWidgetConfig {
-  deskId?: string
-  roomId?: string
-  routes?: string[]
-}
-
-export interface HomeWidgetInstance {
-  key: string
-  widget: HomeWidgetId
-  config?: HomeWidgetConfig
-}
-
-export interface HomeWidgetDef {
-  id: HomeWidgetId
-  name: string
-  blurb: string
-  icon: string
-  tint: string
-  category: 'Navigation' | 'Live' | 'Actions' | 'Smart'
-  // Multi-instance widgets (a pinned desk per desk, a portal per room). All
-  // others are singletons: the gallery shows them as Added once placed.
-  multi?: boolean
-  // Which picker must run before this widget can be placed.
-  config?: 'desk' | 'room' | 'links'
-  defaultCol: 'main' | 'rail'
-}
-
-export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
-  // Live
-  { id: 'standup', name: 'Standup', blurb: 'Your look-back and look-forward narrative for the day', icon: 'auto_awesome', tint: 'bg-accent/10 text-accent', category: 'Live', defaultCol: 'main' },
-  { id: 'agenda', name: "Today's agenda", blurb: 'The time blocks on your calendar today', icon: 'calendar_today', tint: 'bg-sky-500/10 text-sky-500', category: 'Live', defaultCol: 'rail' },
-  { id: 'pulse', name: 'Pulse', blurb: 'Open, due, and overdue counts at a glance', icon: 'monitoring', tint: 'bg-violet-500/10 text-violet-500', category: 'Live', defaultCol: 'rail' },
-  { id: 'continue', name: 'Continue', blurb: 'The documents you touched most recently', icon: 'history', tint: 'bg-accent/10 text-accent', category: 'Live', defaultCol: 'main' },
-  { id: 'activity', name: 'Recent activity', blurb: 'The workspace activity trail from the last week', icon: 'bolt', tint: 'bg-accent/10 text-accent', category: 'Live', defaultCol: 'rail' },
-  { id: 'overdue', name: 'Overdue radar', blurb: 'Only the tasks past their due date. Empty is the goal', icon: 'priority_high', tint: 'bg-rose-500/10 text-rose-500', category: 'Live', defaultCol: 'rail' },
-  // Navigation
-  { id: 'navigator', name: 'Rooms and desks', blurb: 'Browse rooms on the left, their desks open to the right', icon: 'meeting_room', tint: 'bg-sky-500/10 text-sky-500', category: 'Navigation', defaultCol: 'main' },
-  { id: 'pinned-desk', name: 'Pinned desk', blurb: 'One desk you care about, one click away', icon: 'push_pin', tint: 'bg-violet-500/10 text-violet-500', category: 'Navigation', multi: true, config: 'desk', defaultCol: 'rail' },
-  { id: 'room-portal', name: 'Room portal', blurb: 'A single room and the desks inside it', icon: 'door_open', tint: 'bg-teal-500/10 text-teal-500', category: 'Navigation', multi: true, config: 'room', defaultCol: 'main' },
-  { id: 'quick-links', name: 'Quick links', blurb: 'Your own row of shortcuts to the places you use most', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', config: 'links', defaultCol: 'rail' },
-  { id: 'app-launcher', name: 'App launcher', blurb: 'Your favourite connected apps with their real logos', icon: 'apps', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Navigation', defaultCol: 'rail' },
-  // Actions
-  { id: 'quick', name: 'Quick actions', blurb: 'Create, plan, collaborate, automate', icon: 'bolt', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Actions', defaultCol: 'rail' },
-  { id: 'create', name: 'Create new', blurb: 'Start a document, spreadsheet, deck, or desk in one tap', icon: 'add_circle', tint: 'bg-accent/10 text-accent', category: 'Actions', defaultCol: 'rail' },
-  { id: 'focus-timer', name: 'Focus timer', blurb: 'Start and stop the five minute promise from home', icon: 'timer', tint: 'bg-violet-500/10 text-violet-500', category: 'Actions', defaultCol: 'rail' },
-  // Smart
-  { id: 'one-thing', name: 'One thing now', blurb: 'The single most pressing task. No list, just the one', icon: 'target', tint: 'bg-amber-500/10 text-amber-600', category: 'Smart', defaultCol: 'main' },
-  { id: 'where-was-i', name: 'Where was I', blurb: 'Your last working context, with one button: Resume', icon: 'undo', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'main' },
-  { id: 'stalled', name: 'Stalled desk', blurb: 'The in-progress desk that has waited longest for you', icon: 'hourglass_bottom', tint: 'bg-orange-500/10 text-orange-500', category: 'Smart', defaultCol: 'rail' }
-]
-
-export function widgetDef(id: HomeWidgetId): HomeWidgetDef {
-  return HOME_WIDGET_DEFS.find((d) => d.id === id) ?? HOME_WIDGET_DEFS[0]
-}
-
-// The route catalog Quick Links composes from. Each id is stable and stored in
-// the widget's config; icons and tones mirror the sidebar so the shortcuts
-// read as the same destinations.
-export interface QuickLinkRoute {
-  id: string
-  label: string
-  icon: string
-  tone: string
-}
-export const QUICK_LINK_ROUTES: QuickLinkRoute[] = [
-  { id: 'rooms', label: 'Rooms', icon: 'meeting_room', tone: 'text-sky-500' },
-  { id: 'desks', label: 'Desks', icon: 'desk', tone: 'text-teal-500' },
-  { id: 'shared', label: 'Shared', icon: 'folder_shared', tone: 'text-fuchsia-500' },
-  { id: 'plans', label: 'Plans', icon: 'account_tree', tone: 'text-violet-500' },
-  { id: 'tasks', label: 'Tasks', icon: 'checklist', tone: 'text-emerald-500' },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar_month', tone: 'text-amber-500' },
-  { id: 'documents', label: 'Documents', icon: 'description', tone: 'text-sky-500' },
-  { id: 'files', label: 'Files', icon: 'folder', tone: 'text-orange-500' },
-  { id: 'vault', label: 'Vault', icon: 'plexii:vault', tone: 'text-rose-500' }
-]
+// Registry data (ids, defs, sizes, quick-link routes) lives in
+// homeWidgetDefs.ts — pure data with no JSX — and is re-exported here so
+// existing imports keep working.
+export type { HomeWidgetId, HomeWidgetConfig, HomeWidgetInstance, WidgetSize, HomeWidgetDef, QuickLinkRoute } from './homeWidgetDefs'
+export { HOME_WIDGET_DEFS, widgetDef, QUICK_LINK_ROUTES } from './homeWidgetDefs'
+import { QUICK_LINK_ROUTES } from './homeWidgetDefs'
+import type { QuickLinkRoute, WidgetSize } from './homeWidgetDefs'
 
 function relTime(ms: number): string {
   const diff = Date.now() - ms
@@ -173,17 +86,19 @@ export function PinnedDeskWidget({ deskId }: { deskId?: string }): JSX.Element {
   )
 }
 
-export function RoomPortalWidget({ roomId }: { roomId?: string }): JSX.Element {
+export function RoomPortalWidget({ roomId, size = 'lg' }: { roomId?: string; size?: WidgetSize }): JSX.Element {
   const room = useNodeStore((s) => s.nodes.find((n) => n.id === roomId) ?? null)
   const nodes = useNodeStore((s) => s.nodes)
   const openDesk = useOpenDesk()
+  // md is one row of tiles, lg is a 2x2 board.
+  const cap = size === 'md' ? 2 : 6
   const desks = useMemo(
     () =>
       nodes
         .filter((n) => n.kind === 'task' && !n.archived && n.parentId === roomId)
         .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, 6),
-    [nodes, roomId]
+        .slice(0, cap),
+    [nodes, roomId, cap]
   )
   return (
     <RailCard
@@ -380,9 +295,10 @@ export function FocusTimerWidget(): JSX.Element {
 
 // ── Smart ────────────────────────────────────────────────────────────────────
 
-export function OverdueRadarWidget(): JSX.Element {
+export function OverdueRadarWidget({ size = 'sm' }: { size?: WidgetSize } = {}): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const openDesk = useOpenDesk()
+  const cap = size === 'md' ? 5 : 3
   const overdue = useMemo(() => {
     const dayStart = new Date()
     dayStart.setHours(0, 0, 0, 0)
@@ -391,8 +307,8 @@ export function OverdueRadarWidget(): JSX.Element {
         (n) => n.kind === 'task' && n.status !== 'done' && !n.archived && n.dueDate != null && n.dueDate < dayStart.getTime()
       )
       .sort((a, b) => (a.dueDate ?? 0) - (b.dueDate ?? 0))
-      .slice(0, 5)
-  }, [nodes])
+      .slice(0, cap)
+  }, [nodes, cap])
   return (
     <RailCard title="Overdue radar" icon="priority_high" tone="rose">
       {overdue.length === 0 ? (

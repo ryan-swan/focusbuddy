@@ -3,13 +3,16 @@ import {
   SIZE_SPAN,
   bestInsertionIndex,
   cellRect,
+  clampSize,
   packGrid,
   packedRows,
   pointerCell,
+  sizedFromColumns,
   type GridMetrics,
   type SizedInstance,
   type WidgetSize
 } from '../../src/renderer/src/components/views/homeGridLayout'
+import { widgetDef } from '../../src/renderer/src/components/views/homeWidgetDefs'
 
 const COLS = 4
 
@@ -142,5 +145,53 @@ describe('bestInsertionIndex', () => {
     const first = bestInsertionIndex(board, dragged, p.x, p.y, METRICS)
     expect(bestInsertionIndex(board, dragged, p.x, p.y, METRICS)).toBe(first)
     expect(first).toBe(0)
+  })
+})
+
+describe('clampSize', () => {
+  it('keeps a declared size and falls back to the default otherwise', () => {
+    const agenda = widgetDef('agenda')
+    expect(clampSize(agenda, 'md')).toBe('md')
+    expect(clampSize(agenda, 'lg')).toBe(agenda.defaultSize)
+    const navigator = widgetDef('navigator')
+    expect(clampSize(navigator, 'sm')).toBe('lg')
+  })
+
+  it('every def declares its own default among its sizes', () => {
+    // Guards the def table itself: a default outside sizes would make
+    // clampSize recurse into nonsense.
+    const ids = ['standup', 'agenda', 'pulse', 'continue', 'activity', 'overdue', 'navigator', 'pinned-desk', 'room-portal', 'quick-links', 'app-launcher', 'quick', 'create', 'focus-timer', 'one-thing', 'where-was-i', 'stalled'] as const
+    for (const id of ids) {
+      const def = widgetDef(id)
+      expect(def.sizes.length).toBeGreaterThan(0)
+      expect(def.sizes).toContain(def.defaultSize)
+    }
+  })
+})
+
+describe('sizedFromColumns (v2 migration)', () => {
+  it('maps main to large and rail to small, preserving order', () => {
+    const out = sizedFromColumns(
+      [
+        { key: 'a', widget: 'standup' },
+        { key: 'b', widget: 'continue' }
+      ],
+      [
+        { key: 'c', widget: 'agenda' },
+        { key: 'd', widget: 'pulse' }
+      ]
+    )
+    expect(out.map((it) => it.key)).toEqual(['a', 'b', 'c', 'd'])
+    expect(out[0].size).toBe('lg')
+    expect(out[1].size).toBe('lg')
+    expect(out[2].size).toBe('sm')
+    expect(out[3].size).toBe('sm')
+  })
+
+  it('clamps sizes a widget does not support', () => {
+    // one-thing sat in main (would be lg) but only supports md/lg; focus-timer
+    // in main clamps all the way to its only size, sm.
+    const out = sizedFromColumns([{ key: 'f', widget: 'focus-timer' }], [])
+    expect(out[0].size).toBe('sm')
   })
 })
