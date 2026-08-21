@@ -117,6 +117,38 @@ body {
     transition-duration: var(--dur-instant);
   }
 
+  /* Floating surfaces (menus, popovers) arrive, they don't appear. */
+  @keyframes fb-pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97) translateY(-2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .fb-pop-in {
+    animation: fb-pop-in 140ms var(--ease-spring-snap) both;
+  }
+
+  /* Skeleton — loading states never say "Loading". A soft pulsing bar in the
+     shape of the content, so arrival feels like focus resolving. */
+  .fb-skeleton {
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--surface-sunken) 88%, var(--ink-50) 12%);
+    animation: fb-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes fb-skeleton-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+
   /* ── Type ramp (Apple pass) ──────────────────────────────────────────────
      Five sizes, period. Tracking widens as type shrinks (SF-style optical
      compensation). Hierarchy comes from weight and spacing, not new sizes. */
@@ -298,6 +330,35 @@ body {
   html[data-desk-pattern='none'] .desk-pattern-layer,
   html[data-desk-bg] .desk-pattern-layer {
     display: none;
+  }
+  /* ── Paper texture for non-desk pages (Home) ───────────────────────────
+     The dashboard wants the same dot/grid paper as desks WITHOUT desk-paper's
+     baggage: no time-of-day overlay, no custom desk background override (that
+     pair caused the mid-screen seam and the light-in-dark bug). Sits on the
+     themed surface, follows the Theme studio pattern choice, and
+     background-attachment: local makes the texture scroll with the content. */
+  .paper-texture {
+    background-color: var(--surface-base);
+    background-image: radial-gradient(rgba(120, 100, 80, 0.18) 1.3px, transparent 1.3px);
+    background-size: 28px 28px;
+    background-attachment: local;
+  }
+  html.dark .paper-texture {
+    background-image: radial-gradient(rgba(168, 162, 158, 0.16) 1.3px, transparent 1.3px);
+  }
+  html[data-desk-pattern='grid'] .paper-texture {
+    background-image:
+      linear-gradient(to right, rgba(120, 100, 80, 0.13) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120, 100, 80, 0.13) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  html.dark[data-desk-pattern='grid'] .paper-texture {
+    background-image:
+      linear-gradient(to right, rgba(168, 162, 158, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(168, 162, 158, 0.12) 1px, transparent 1px);
+  }
+  html[data-desk-pattern='none'] .paper-texture {
+    background-image: none;
   }
   /* `.no-tod` modifier — suppresses ambient overlays (time-of-day ::before AND the
      Futuristic flowing accent-beam ::after) on surfaces where they bleed through
@@ -1817,6 +1878,14 @@ body {
 
 .react-resizable-handle {
   z-index: 10;
+}
+
+/* Keyboard focus (Apple pass): mouse clicks never paint a ring, tab
+   navigation always gets a clear accent halo that follows the element's own
+   corner radius. */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.65);
+  outline-offset: 2px;
 }
 
 ::-webkit-scrollbar {
