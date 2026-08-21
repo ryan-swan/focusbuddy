@@ -162,9 +162,13 @@ export function isValidHex(hex: string): boolean {
 // default values it's a no-op, so an uncustomised UI is byte-for-byte the
 // stock look.
 export type DeskBgMode = 'default' | 'solid' | 'gradient'
+// The texture drawn on the desk paper: the stock dot grid, a composition-paper
+// line grid, or nothing. Independent of the background colour above.
+export type DeskPattern = 'dots' | 'grid' | 'none'
 
 export interface ThemeCustomization {
   deskBgMode: DeskBgMode
+  deskPattern: DeskPattern
   deskColor: string
   gradFrom: string
   gradTo: string
@@ -178,6 +182,7 @@ export interface ThemeCustomization {
 
 export const DEFAULT_CUSTOMIZATION: ThemeCustomization = {
   deskBgMode: 'default',
+  deskPattern: 'dots',
   deskColor: '#fbf7ee',
   gradFrom: '#7c3aed',
   gradTo: '#0ea5e9',
@@ -210,6 +215,16 @@ export function applyCustomization(c: ThemeCustomization): void {
       `linear-gradient(${c.gradAngle}deg, ${c.gradFrom}, ${c.gradTo})`
     )
     root.style.setProperty('--fb-desk-bg-color', 'transparent')
+  }
+
+  // Canvas pattern. 'dots' is the stock look baked into the base .desk-paper
+  // rules, so it clears the attribute; 'grid' and 'none' set it and the
+  // pattern rules in globals.css take over. A custom background (data-desk-bg)
+  // wins over patterns by design.
+  if (c.deskPattern && c.deskPattern !== 'dots') {
+    root.setAttribute('data-desk-pattern', c.deskPattern)
+  } else {
+    root.removeAttribute('data-desk-pattern')
   }
 
   // Glass — translucency + blur scale across all three tiers at once.

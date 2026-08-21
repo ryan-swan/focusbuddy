@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useViewStore } from '../../stores/view'
 import SegmentSwitcher from './SegmentSwitcher'
 import OrgSwitcher from '../OrgSwitcher'
-import { promptUpgrade } from '../../stores/upgradePrompt'
 import Icon from '../Icon'
+import UpgradeCard from '../UpgradeCard'
 import {
   FLOATING_MENU_ASIDE_SCROLL,
   FLOATING_MENU_INSET,
@@ -26,6 +26,8 @@ export interface SegmentApp {
   icon: string
   // Tailwind background classes for the colored icon tile.
   tint: string
+  // Tailwind text-* class colouring the bare icon in the side menu (no tile).
+  tone: string
   render: () => JSX.Element
 }
 
@@ -85,8 +87,8 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
               active === null ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 bg-indigo-500">
-              <Icon name="home" size={14} />
+            <span className="inline-flex items-center justify-center w-6 h-6 shrink-0 text-indigo-500">
+              <Icon name="home" size={17} />
             </span>
             <span>Home</span>
           </button>
@@ -103,8 +105,8 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
                 activeKey === a.key ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
               }`}
             >
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
-                <Icon name={a.icon} size={14} />
+              <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 ${a.tone}`}>
+                <Icon name={a.icon} size={16} />
               </span>
               <span>{a.label}</span>
             </button>
@@ -112,15 +114,7 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
         </div>
 
         <div className="mt-auto p-3">
-          <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-              <span className="text-[12px] font-semibold">{def.proLabel ?? `${def.title} Pro`}</span>
-            </div>
-            <button onClick={() => promptUpgrade(def.proLabel ?? `${def.title} Pro`)} className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium">
-              Upgrade Now
-            </button>
-          </div>
+          <UpgradeCard label={def.proLabel ?? `${def.title} Pro`} />
         </div>
       </aside>
       </div>
@@ -146,7 +140,7 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
                     data-testid={`segment-tile-${a.key}`}
                     className="flex flex-col items-start gap-2.5 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4 text-left hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
                   >
-                    <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl text-white ${a.tint}`}>
+                    <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${a.tone}`} style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                       <Icon name={a.icon} size={22} />
                     </span>
                     <span className="text-[14px] font-semibold">{a.label}</span>

@@ -7,7 +7,6 @@ import { useMessagingStore } from '../../stores/messaging'
 import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
-import Icon from '../Icon'
 import SharedBadge from '../SharedBadge'
 import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
@@ -193,86 +192,77 @@ export default function RoomsView(): JSX.Element {
         }
       })()
     },
-    actions: (r) => (
-      <div className="flex items-center gap-1">
-        {canShare ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              void shareToOrgOrGroup({
-                name: r.title || 'this room',
-                kindLabel: 'room and its desks',
-                sharedOrgs,
-                move: (org, team) => moveToOrg(r.id, org, team)
-              })
-            }}
-            title="Share with your team or a group"
-            className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-          >
-            <Icon name="group_add" size={14} />
-          </button>
-        ) : null}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            setLinkTarget({ id: r.id, title: r.title || 'this room' })
-          }}
-          title="Create a public link — anyone with it can view this room"
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name="link" size={14} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            void openObjectChannel('room', r.id, r.title || 'Room')
-          }}
-          title="Chat about this room"
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name="forum" size={14} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            void (async () => {
-              const next = await promptText({
-                title: 'Rename room',
-                label: 'Room name',
-                initial: r.title || '',
-                confirmLabel: 'Rename'
-              })
-              const trimmed = next?.trim()
-              if (trimmed && trimmed !== (r.title || '')) await update(r.id, { title: trimmed })
-            })()
-          }}
-          title="Rename room"
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name="edit" size={14} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            void update(r.id, { isPlan: !r.isPlan })
-          }}
-          title={r.isPlan ? 'Make this a plain room (removes it from Plans)' : 'Make this a plan (adds it to the Plans timeline)'}
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name={r.isPlan ? 'layers_clear' : 'account_tree'} size={14} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            goRoom(r.id)
-          }}
-          title="Open room"
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name="chevron_right" size={15} />
-        </button>
-      </div>
-    )
+    // One declarative list drives both the hover icon strip and the right-click
+    // context menu — the menu is where the icons become discoverable.
+    itemActions: (r) => [
+      ...(canShare
+        ? [
+            {
+              key: 'share',
+              icon: 'group_add',
+              label: 'Share with team or group',
+              title: 'Share with your team or a group',
+              onClick: () => {
+                void shareToOrgOrGroup({
+                  name: r.title || 'this room',
+                  kindLabel: 'room and its desks',
+                  sharedOrgs,
+                  move: (org, team) => moveToOrg(r.id, org, team)
+                })
+              }
+            }
+          ]
+        : []),
+      {
+        key: 'link',
+        icon: 'link',
+        label: 'Create public link',
+        title: 'Create a public link — anyone with it can view this room',
+        onClick: () => setLinkTarget({ id: r.id, title: r.title || 'this room' })
+      },
+      {
+        key: 'chat',
+        icon: 'forum',
+        label: 'Chat about this room',
+        onClick: () => {
+          void openObjectChannel('room', r.id, r.title || 'Room')
+        }
+      },
+      {
+        key: 'rename',
+        icon: 'edit',
+        label: 'Rename room',
+        onClick: () => {
+          void (async () => {
+            const next = await promptText({
+              title: 'Rename room',
+              label: 'Room name',
+              initial: r.title || '',
+              confirmLabel: 'Rename'
+            })
+            const trimmed = next?.trim()
+            if (trimmed && trimmed !== (r.title || '')) await update(r.id, { title: trimmed })
+          })()
+        }
+      },
+      {
+        key: 'plan',
+        icon: r.isPlan ? 'layers_clear' : 'account_tree',
+        label: r.isPlan ? 'Remove from Plans' : 'Make this a plan',
+        title: r.isPlan
+          ? 'Make this a plain room (removes it from Plans)'
+          : 'Make this a plan (adds it to the Plans timeline)',
+        onClick: () => {
+          void update(r.id, { isPlan: !r.isPlan })
+        }
+      },
+      {
+        key: 'open',
+        icon: 'chevron_right',
+        label: 'Open room',
+        onClick: () => goRoom(r.id)
+      }
+    ]
   }
 
   return (

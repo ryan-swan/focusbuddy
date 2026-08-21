@@ -30,7 +30,7 @@ const TYPE_ICON: Record<DocType, string> = {
   sheet: 'table_chart',
   slides: 'slideshow',
   map: 'account_tree',
-  design: 'palette'
+  design: 'plexii:design'
 }
 const TYPE_LABEL: Record<DocType, string> = {
   doc: 'Docs',

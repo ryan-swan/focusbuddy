@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
 import type { AxisValue, BrowsingHistoryEntry, FbNode, NodeKind, Template } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useCapabilityEnabled } from '../stores/capabilities'
@@ -37,6 +39,20 @@ function fromDateInputValue(s: string): number | null {
   if (!y || !m || !d) return null
   return new Date(y, m - 1, d, 23, 59, 59).getTime()
 }
+
+// Quiet hue rotation for template cards — colour lives in the icon stroke,
+// the chip behind stays neutral, selection stays accent. Literal classes so
+// Tailwind generates them.
+const TEMPLATE_TONES = [
+  'text-sky-500',
+  'text-emerald-500',
+  'text-amber-500',
+  'text-violet-500',
+  'text-rose-500',
+  'text-teal-500',
+  'text-orange-500',
+  'text-fuchsia-500'
+]
 
 export default function NewNodeDialog({
   parentId: parentIdProp,
@@ -238,18 +254,35 @@ export default function NewNodeDialog({
     }
   }
 
-  const dialogTitle = `${isEdit ? 'Edit' : 'New'} ${effectiveKind === 'folder' ? 'Room' : 'Desk'}${
-    isEdit || parentId ? '' : ' (top level)'
-  }`
-  const submitLabel = isEdit ? 'Save changes' : 'Create'
+  const nounLabel = effectiveKind === 'folder' ? 'Room' : 'Desk'
+  const dialogTitle = `${isEdit ? 'Edit' : 'New'} ${nounLabel}`
+  const dialogSubtitle =
+    effectiveKind === 'folder'
+      ? 'A Room holds the desks that belong together.'
+      : isEdit
+        ? 'Adjust the details of this workspace.'
+        : 'Set up a focused workspace for one piece of work.'
+  const submitLabel = isEdit ? 'Save changes' : `Create ${nounLabel}`
   const submitIcon = isEdit ? 'save' : 'check'
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[color-mix(in_oklab,var(--ink-100)_40%,transparent)] backdrop-blur-sm"
+  const composer = effectiveKind === 'task' && !isEdit
+
+  // Portaled to <body>: this dialog is mounted from inside the sidebar, whose
+  // glass chrome (transform/backdrop-filter) turns it into a containing block
+  // for position:fixed — without the portal the "fullscreen" overlay is trapped
+  // inside the sidebar's box and renders as a cramped side column.
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 dark:bg-black/55 backdrop-blur-[2px]"
       onClick={onClose}
     >
-      <form
+      <motion.form
+        initial={{ opacity: 0, scale: 0.985, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         role="dialog"
         aria-modal="true"
         aria-label={dialogTitle}
@@ -261,41 +294,56 @@ export default function NewNodeDialog({
             onClose()
           }
         }}
-        className="fb-glass-pillow rounded-xl w-full max-w-xl mx-4 overflow-hidden max-h-[90vh] flex flex-col"
+        className={`bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-2xl w-full ${
+          composer ? 'max-w-[880px]' : 'max-w-lg'
+        } overflow-hidden max-h-[86vh] flex flex-col shadow-[0_32px_80px_-16px_rgba(0,0,0,0.5)]`}
       >
-        <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center gap-2 shrink-0">
-          <Icon
-            name={
-              isEdit
-                ? 'edit'
-                : effectiveKind === 'folder'
-                  ? 'create_new_folder'
-                  : 'add_task'
-            }
-            size={20}
-            className="text-[var(--ink-70)]"
-          />
-          <h3 className="text-base font-semibold text-[var(--ink-100)]">
-            {dialogTitle}
-          </h3>
-        </div>
-
-        <div className="px-5 py-4 space-y-4 overflow-y-auto">
-          {!isEdit && effectiveKind === 'task' && existingTasks.length > 0 && (
-            <div ref={jumpRef}>
-              <FieldLabel className="flex items-center gap-1.5">
-                <Icon name="bolt" size={12} />
-                Jump to an existing Desk
-                <span className="normal-case text-[var(--ink-40)]">or fill in a new one below</span>
-              </FieldLabel>
-              <input
-                value={jumpQuery}
-                onChange={(e) => setJumpQuery(e.target.value)}
-                placeholder="Search your Desks…"
-                className={fieldInputClass()}
+        {/* Header: identity row, then the name as the hero. Creating a desk should
+            feel like titling a fresh page, not filling in a boxed form. */}
+        <div className="px-6 pt-5 pb-4 border-b border-[var(--edge-soft)] shrink-0">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="h-8 w-8 rounded-xl bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] inline-flex items-center justify-center shrink-0">
+              <Icon
+                name={isEdit ? 'edit' : effectiveKind === 'folder' ? 'plexii:rooms' : 'plexii:desks'}
+                size={17}
               />
+            </span>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-[13px] font-semibold text-[var(--ink-100)] leading-tight">
+                {dialogTitle}
+              </h3>
+              <p className="text-[11px] text-[var(--ink-50)] leading-tight mt-0.5">{dialogSubtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              title="Close"
+              className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors shrink-0"
+            >
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+          <input
+            autoFocus
+            data-testid="newnode-name"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={effectiveKind === 'folder' ? 'Name this Room…' : 'What needs to happen?'}
+            className="w-full bg-transparent border-0 p-0 text-[20px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-30)] placeholder:font-medium focus:outline-none focus:ring-0"
+          />
+          {!isEdit && effectiveKind === 'task' && existingTasks.length > 0 && (
+            <div ref={jumpRef} className="relative mt-3">
+              <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-2.5 focus-within:ring-1 focus-within:ring-[rgb(var(--accent)/0.4)]">
+                <Icon name="search" size={14} className="text-[var(--ink-40)] shrink-0" />
+                <input
+                  value={jumpQuery}
+                  onChange={(e) => setJumpQuery(e.target.value)}
+                  placeholder="Or jump to an existing Desk…"
+                  className="w-full bg-transparent border-0 py-2 text-[12.5px] text-[var(--ink-90)] placeholder:text-[var(--ink-40)] focus:outline-none focus:ring-0"
+                />
+              </div>
               {jumpQuery.trim() && (
-                <div className="mt-1 max-h-44 overflow-auto rounded-md border border-[var(--edge-soft)]">
+                <div className="absolute left-0 right-0 top-full mt-1 z-10 max-h-44 overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-[0_12px_32px_rgba(0,0,0,0.25)]">
                   {existingTasks
                     .filter((t) =>
                       (t.title || '').toLowerCase().includes(jumpQuery.trim().toLowerCase())
@@ -311,7 +359,7 @@ export default function NewNodeDialog({
                             setActive(t.id)
                             onClose()
                           }}
-                          className="w-full text-left px-3 py-1.5 text-sm flex items-center justify-between gap-2 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                          className="w-full text-left px-3 py-2 text-[12.5px] flex items-center justify-between gap-2 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                         >
                           <span className="truncate">{t.title || '(untitled Desk)'}</span>
                           {folder && (
@@ -325,216 +373,58 @@ export default function NewNodeDialog({
                   {existingTasks.filter((t) =>
                     (t.title || '').toLowerCase().includes(jumpQuery.trim().toLowerCase())
                   ).length === 0 && (
-                    <div className="px-3 py-1.5 text-[11px] text-[var(--ink-50)]">No Desks match.</div>
+                    <div className="px-3 py-2 text-[11px] text-[var(--ink-50)]">No Desks match.</div>
                   )}
                 </div>
               )}
             </div>
           )}
-          <FormField label={effectiveKind === 'folder' ? 'Room name' : 'Desk title'}>
-            <input
-              autoFocus
-              data-testid="newnode-name"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={
-                effectiveKind === 'folder'
-                  ? 'e.g. Client X, Marketing, Q3 plans…'
-                  : 'What needs to happen?'
-              }
-              className={fieldInputClass()}
-            />
-          </FormField>
+        </div>
 
-          <FormField label="Notes" hint="(optional)">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Anything to remember about this…"
-              className={`${fieldInputClass()} resize-none`}
-            />
-          </FormField>
-
-          {effectiveKind === 'task' && !isEdit && (
-            <div>
-              <FieldLabel>Room</FieldLabel>
-              {!folderPickerOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setFolderPickerOpen(true)}
-                  className={`${fieldInputClass()} flex items-center justify-between gap-2 text-left hover:border-[var(--edge-firm)]`}
-                >
-                  <span className="truncate flex items-center gap-1.5">
-                    <Icon name="folder" size={14} className="text-[var(--ink-50)]" />
-                    {destParent === NEW_FOLDER
-                      ? newFolderName.trim() || 'New Room…'
-                      : destParent
-                        ? folders.find((f) => f.id === destParent)?.title || '(Room)'
-                        : 'Top level (no Room)'}
-                  </span>
-                  <span className="text-[11px] text-[var(--ink-50)] shrink-0">Change</span>
-                </button>
-              ) : (
-                <div className="rounded-md border border-[var(--edge-soft)] overflow-hidden">
-                  <input
-                    autoFocus
-                    value={folderQuery}
-                    onChange={(e) => setFolderQuery(e.target.value)}
-                    placeholder="Search Rooms…"
-                    className="w-full bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)] px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
-                  />
-                  <div className="max-h-40 overflow-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDestParent(null)
-                        setFolderPickerOpen(false)
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-sm text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
-                    >
-                      Top level (no Room)
-                    </button>
-                    {folders
-                      .filter((f) =>
-                        (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
-                      )
-                      .map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => {
-                            setDestParent(f.id)
-                            setFolderPickerOpen(false)
-                          }}
-                          className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-sunken)] ${
-                            destParent === f.id
-                              ? 'text-accent bg-accent/[0.06]'
-                              : 'text-[var(--ink-90)]'
-                          }`}
-                        >
-                          {f.title || '(untitled Room)'}
-                        </button>
-                      ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDestParent(NEW_FOLDER)
-                        if (folderQuery.trim()) setNewFolderName(folderQuery.trim())
-                        setFolderPickerOpen(false)
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-sm text-accent border-t border-[var(--edge-soft)] hover:bg-accent/5"
-                    >
-                      + Create new Room{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {destParent === NEW_FOLDER && !folderPickerOpen && (
-                <input
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="New Room name"
-                  className={`${fieldInputClass()} mt-1.5`}
-                />
-              )}
-            </div>
-          )}
-
-          {effectiveKind === 'task' && (
-            <>
-              {/* Two-axis model: Interest dropped from UI (see POSITIONING.md §11.5).
-                  The state + DB field stay defaulted to 3 so existing tasks aren't disrupted. */}
-              <div className="grid grid-cols-2 gap-4">
-                <AxisPicker label="Urgency" hint="whenever → urgent" value={priority} onChange={setPriority} />
-                <AxisPicker label="Importance" hint="low → high stakes" value={importance} onChange={setImportance} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Duration" hint="(minutes)">
-                  <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={estimateMinutes}
-                    onChange={(e) => setEstimateMinutes(e.target.value)}
-                    placeholder="e.g. 30"
-                    className={fieldInputClass()}
+        <div className="overflow-y-auto">
+          {composer ? (
+            /* Composer: the work on the left, the details in a quiet rail on the
+               right — the same split every mature creation surface uses, so the
+               eye lands on "what am I making" before "how is it filed". */
+            <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="px-6 py-5 space-y-5 min-w-0">
+                <FormField label="Notes" hint="(optional)">
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={2}
+                    placeholder="Anything to remember about this…"
+                    className={`${fieldInputClass()} resize-none`}
                   />
                 </FormField>
-                <FormField label="Due date" hint="(optional)">
-                  <div className="flex gap-1.5">
-                    <input
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      className={`${fieldInputClass()} flex-1 [color-scheme:light] dark:[color-scheme:dark]`}
-                    />
-                    {dueDate && (
-                      <button
-                        type="button"
-                        onClick={() => setDueDate('')}
-                        className="icon-btn"
-                        title="Clear due date"
-                      >
-                        <Icon name="close" size={14} />
-                      </button>
-                    )}
-                  </div>
-                </FormField>
-              </div>
 
-              {velocity && (
-                <div className="px-2.5 py-1.5 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-[var(--ink-90)] flex items-start gap-1.5">
-                  <Icon name="insights" size={13} className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
-                  <div>
-                    <div>
-                      <strong>Your history:</strong>{' '}
-                      {Math.round(velocity.ratio * 100)}% of estimates
-                      <span className="text-[var(--ink-50)]"> (n={velocity.sampleCount})</span>
-                    </div>
-                    {estimateMinutes.trim() !== '' &&
-                      parseInt(estimateMinutes, 10) > 0 && (
-                        <div className="mt-0.5">
-                          Predicted real time:{' '}
-                          <strong>
-                            {predictForEstimate(velocity, parseInt(estimateMinutes, 10))} min
-                          </strong>
-                        </div>
-                      )}
-                    {estimateMinutes.trim() === '' && (
-                      <div className="mt-0.5">
-                        Median Desk takes{' '}
-                        <strong>{Math.round(velocity.medianActualMin)} min</strong>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {!isEdit && (
                 <div>
                   <FieldLabel>
                     Start from a template <span className="normal-case text-[var(--ink-40)]">(optional)</span>
                   </FieldLabel>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setSelectedTemplate(null)}
-                      className={`chip-btn ${
+                      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                         !selectedTemplate
-                          ? 'border-[var(--ink-100)] bg-[var(--ink-100)] text-[var(--surface-raised)]'
-                          : 'chip-active'
+                          ? 'border-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.08)]'
+                          : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]'
                       }`}
                     >
-                      <Icon name="add" size={14} />
-                      <span>Empty</span>
+                      <span className={`h-8 w-8 rounded-lg inline-flex items-center justify-center shrink-0 ${!selectedTemplate ? 'text-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.12)]' : 'text-[var(--ink-50)] bg-[var(--surface-sunken)]'}`}>
+                        <Icon name="add" size={16} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[12.5px] font-medium text-[var(--ink-100)] truncate">Empty</span>
+                        <span className="block text-[10.5px] text-[var(--ink-40)] truncate">Blank canvas</span>
+                      </span>
                     </button>
-                    {/* Built-in starters first (always available), then the
-                        user's own saved templates. Picking one pre-fills the
-                        title if it's still blank. */}
-                    {[...STARTER_TEMPLATES, ...templates].map((t) => {
+                    {/* Built-in starters first (always available), then the user's
+                        own saved templates. Picking one pre-fills a blank title. */}
+                    {[...STARTER_TEMPLATES, ...templates].map((t, ti) => {
                       const isStarter = t.id.startsWith('starter-')
+                      const isSel = selectedTemplate?.id === t.id
                       return (
                         <button
                           key={t.id}
@@ -543,160 +433,415 @@ export default function NewNodeDialog({
                             setSelectedTemplate(t)
                             if (!title.trim()) setTitle(t.name)
                           }}
-                          title={t.description || `${t.widgets.length} widget(s)`}
-                          className={`chip-btn ${
-                            selectedTemplate?.id === t.id
-                              ? 'border-[var(--ink-100)] bg-[var(--ink-100)] text-[var(--surface-raised)]'
-                              : 'chip-active'
+                          title={t.description || t.name}
+                          className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                            isSel
+                              ? 'border-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.08)]'
+                              : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]'
                           }`}
                         >
-                          <Icon name={isStarter ? 'dashboard' : 'layers'} size={14} />
-                          <span>{t.name}</span>
+                          <span className={`h-8 w-8 rounded-lg inline-flex items-center justify-center shrink-0 ${isSel ? 'text-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.12)]' : `${TEMPLATE_TONES[ti % TEMPLATE_TONES.length]} bg-[var(--surface-sunken)]`}`}>
+                            <Icon name={isStarter ? 'plexii:templates' : 'plexii:assemble'} size={16} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[12.5px] font-medium text-[var(--ink-100)] truncate">{t.name}</span>
+                            <span className="block text-[10.5px] text-[var(--ink-40)] truncate">
+                              {isStarter ? 'Starter' : `${t.widgets.length} widget${t.widgets.length === 1 ? '' : 's'}`}
+                            </span>
+                          </span>
                         </button>
                       )
                     })}
                   </div>
                   {selectedTemplate && (
-                    <div className="mt-1.5 text-[11px] text-[var(--ink-50)]">
+                    <div className="mt-2 text-[11px] text-[var(--ink-50)]">
                       {selectedTemplate.description || `${selectedTemplate.widgets.length} widgets`}
                     </div>
                   )}
                 </div>
-              )}
 
-              {!isEdit && !selectedTemplate && recentPages.length > 0 && (
+                {!selectedTemplate && recentPages.length > 0 && (
+                  <div>
+                    <FieldLabel className="flex items-center gap-1.5">
+                      <Icon name="history" size={12} className="text-sky-500" />
+                      Recent pages
+                      <span className="normal-case text-[var(--ink-40)]">click to add</span>
+                    </FieldLabel>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recentPages.map((entry) => {
+                        const added = addedUrls.has(entry.url)
+                        const label = entry.title || entry.host || entry.url
+                        return (
+                          <button
+                            key={entry.url}
+                            type="button"
+                            onClick={() => appendRecentPage(entry)}
+                            disabled={added}
+                            title={`${entry.url}\n${entry.visitCount} visit${entry.visitCount === 1 ? '' : 's'}`}
+                            className={`chip-btn max-w-[220px] ${
+                              added
+                                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 cursor-default'
+                                : 'chip-active'
+                            }`}
+                          >
+                            <Icon name={added ? 'check' : 'public'} size={12} className={added ? '' : 'text-sky-500'} />
+                            <span className="truncate">{label}</span>
+                            {!added && entry.visitCount > 1 && (
+                              <span className="text-[9px] text-[var(--ink-40)] font-mono shrink-0">
+                                {entry.visitCount}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!selectedTemplate && (
+                  <FormField
+                    label="Tools & tabs"
+                    hint="(one per line — URLs open as browsers, text becomes stickies)"
+                  >
+                    <textarea
+                      value={toolsInput}
+                      onChange={(e) => setToolsInput(e.target.value)}
+                      rows={3}
+                      placeholder={'https://docs.google.com/...\nhttps://github.com/...\nRemember: due Friday'}
+                      className={`${fieldInputClass()} !text-xs font-mono resize-none`}
+                    />
+                  </FormField>
+                )}
+              </div>
+
+              <aside className="px-5 py-5 space-y-5 border-t sm:border-t-0 sm:border-l border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
                 <div>
-                  <FieldLabel className="flex items-center gap-1.5">
-                    <Icon name="history" size={12} />
-                    Recent pages
-                    <span className="normal-case text-[var(--ink-40)]">click to add</span>
-                  </FieldLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {recentPages.map((entry) => {
-                      const added = addedUrls.has(entry.url)
-                      const label = entry.title || entry.host || entry.url
-                      return (
+                  <FieldLabel>Room</FieldLabel>
+                  {!folderPickerOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setFolderPickerOpen(true)}
+                      className={`${fieldInputClass()} flex items-center justify-between gap-2 text-left bg-[var(--surface-raised)] hover:border-[var(--edge-firm)]`}
+                    >
+                      <span className="truncate flex items-center gap-1.5">
+                        <Icon name="meeting_room" size={14} className="text-sky-500" />
+                        {destParent === NEW_FOLDER
+                          ? newFolderName.trim() || 'New Room…'
+                          : destParent
+                            ? folders.find((f) => f.id === destParent)?.title || '(Room)'
+                            : 'Top level (no Room)'}
+                      </span>
+                      <span className="text-[11px] text-[var(--ink-50)] shrink-0">Change</span>
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden">
+                      <input
+                        autoFocus
+                        value={folderQuery}
+                        onChange={(e) => setFolderQuery(e.target.value)}
+                        placeholder="Search Rooms…"
+                        className="w-full bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)] px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+                      />
+                      <div className="max-h-40 overflow-auto">
                         <button
-                          key={entry.url}
                           type="button"
-                          onClick={() => appendRecentPage(entry)}
-                          disabled={added}
-                          title={`${entry.url}\n${entry.visitCount} visit${entry.visitCount === 1 ? '' : 's'}`}
-                          className={`chip-btn max-w-[220px] ${
-                            added
-                              ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 cursor-default'
-                              : 'chip-active'
-                          }`}
+                          onClick={() => {
+                            setDestParent(null)
+                            setFolderPickerOpen(false)
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                         >
-                          <Icon name={added ? 'check' : 'public'} size={12} />
-                          <span className="truncate">{label}</span>
-                          {!added && entry.visitCount > 1 && (
-                            <span className="text-[9px] text-[var(--ink-40)] font-mono shrink-0">
-                              {entry.visitCount}
-                            </span>
-                          )}
+                          Top level (no Room)
                         </button>
-                      )
-                    })}
-                  </div>
+                        {folders
+                          .filter((f) =>
+                            (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())
+                          )
+                          .map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => {
+                                setDestParent(f.id)
+                                setFolderPickerOpen(false)
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-sunken)] ${
+                                destParent === f.id
+                                  ? 'text-accent bg-accent/[0.06]'
+                                  : 'text-[var(--ink-90)]'
+                              }`}
+                            >
+                              {f.title || '(untitled Room)'}
+                            </button>
+                          ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDestParent(NEW_FOLDER)
+                            if (folderQuery.trim()) setNewFolderName(folderQuery.trim())
+                            setFolderPickerOpen(false)
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-accent border-t border-[var(--edge-soft)] hover:bg-accent/5"
+                        >
+                          + Create new Room{folderQuery.trim() ? ` "${folderQuery.trim()}"` : '…'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {destParent === NEW_FOLDER && !folderPickerOpen && (
+                    <input
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      placeholder="New Room name"
+                      className={`${fieldInputClass()} mt-1.5 bg-[var(--surface-raised)]`}
+                    />
+                  )}
                 </div>
-              )}
 
-              {!isEdit && !selectedTemplate && (
-                <FormField
-                  label="Tools & tabs"
-                  hint="(one per line, URLs become browser windows, plain text becomes stickies)"
-                >
-                  {/* The important text-xs keeps this textarea at its original
-                      mono 12px; fieldInputClass carries text-sm by default. */}
-                  <textarea
-                    value={toolsInput}
-                    onChange={(e) => setToolsInput(e.target.value)}
-                    rows={3}
-                    placeholder={'https://docs.google.com/...\nhttps://github.com/...\nRemember: due Friday'}
-                    className={`${fieldInputClass()} !text-xs font-mono resize-none`}
-                  />
-                </FormField>
-              )}
+                {/* Two-axis model: Interest dropped from UI (see POSITIONING.md §11.5).
+                    The state + DB field stay defaulted to 3 so existing tasks aren't disrupted. */}
+                <AxisPicker label="Urgency" hint="whenever → urgent" value={priority} onChange={setPriority} />
+                <AxisPicker label="Importance" hint="low → high stakes" value={importance} onChange={setImportance} />
 
-              {/* AI Setup integration — gated by the ai_task_setup capability.
-                  On Free it renders locked + opens the upgrade prompt. */}
-              {onRequestAISetup && !aiSetupEnabled && (
-                <button
-                  type="button"
-                  onClick={() => promptUpgrade('AI task setup is a Pro feature.')}
-                  className="w-full rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left"
-                  data-testid="ai-setup-locked"
-                >
-                  <div className="text-xs font-medium text-[var(--ink-70)] flex items-center gap-1.5">
-                    <Icon name="lock" size={13} className="text-accent" />
-                    Have AI suggest the setup
-                    <span className="ml-auto text-[9px] uppercase tracking-wider text-accent">Pro</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Duration" hint="(min)">
+                    <input
+                      type="number"
+                      min={1}
+                      max={1440}
+                      value={estimateMinutes}
+                      onChange={(e) => setEstimateMinutes(e.target.value)}
+                      placeholder="e.g. 30"
+                      className={`${fieldInputClass()} bg-[var(--surface-raised)]`}
+                    />
+                  </FormField>
+                  <FormField label="Due" hint="(optional)">
+                    <div className="flex gap-1.5">
+                      <input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className={`${fieldInputClass()} flex-1 min-w-0 bg-[var(--surface-raised)] [color-scheme:light] dark:[color-scheme:dark]`}
+                      />
+                      {dueDate && (
+                        <button
+                          type="button"
+                          onClick={() => setDueDate('')}
+                          className="icon-btn"
+                          title="Clear due date"
+                        >
+                          <Icon name="close" size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </FormField>
+                </div>
+
+                {velocity && (
+                  <div className="px-3 py-2 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-90)] flex items-start gap-2">
+                    <Icon name="insights" size={13} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <div>
+                      <div>
+                        <strong>Your history:</strong> {Math.round(velocity.ratio * 100)}% of estimates
+                        <span className="text-[var(--ink-50)]"> (n={velocity.sampleCount})</span>
+                      </div>
+                      {estimateMinutes.trim() !== '' && parseInt(estimateMinutes, 10) > 0 && (
+                        <div className="mt-0.5">
+                          Predicted real time:{' '}
+                          <strong>{predictForEstimate(velocity, parseInt(estimateMinutes, 10))} min</strong>
+                        </div>
+                      )}
+                      {estimateMinutes.trim() === '' && (
+                        <div className="mt-0.5">
+                          Median Desk takes <strong>{Math.round(velocity.medianActualMin)} min</strong>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
-                    Upgrade to let the assistant propose widgets, browsers and notes for this Desk.
-                  </div>
-                </button>
-              )}
-              {onRequestAISetup && aiSetupEnabled && (
-                <div className="rounded-md border border-violet-500/20 bg-violet-500/10 px-3 py-2.5">
-                  {!isEdit ? (
+                )}
+
+                {/* AI Setup integration — gated by the ai_task_setup capability.
+                    On Free it renders locked + opens the upgrade prompt. */}
+                {onRequestAISetup && !aiSetupEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => promptUpgrade('AI task setup is a Pro feature.')}
+                    className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5 text-left"
+                    data-testid="ai-setup-locked"
+                  >
+                    <div className="text-xs font-medium text-[var(--ink-70)] flex items-center gap-1.5">
+                      <Icon name="lock" size={13} className="text-accent" />
+                      Have AI suggest the setup
+                      <span className="ml-auto text-[9px] uppercase tracking-wider text-accent">Pro</span>
+                    </div>
+                    <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
+                      Upgrade to let the assistant propose widgets, browsers and notes for this Desk.
+                    </div>
+                  </button>
+                )}
+                {onRequestAISetup && aiSetupEnabled && (
+                  <div className="rounded-lg border border-[rgb(var(--accent)/0.25)] bg-[rgb(var(--accent)/0.08)] px-3 py-2.5">
                     <label className="flex items-start gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={autoSuggestAI}
                         onChange={(e) => setAutoSuggestAI(e.target.checked)}
-                        className="mt-0.5 h-3.5 w-3.5 accent-violet-600 cursor-pointer"
+                        className="mt-0.5 h-3.5 w-3.5 accent-[rgb(var(--accent))] cursor-pointer"
                       />
                       <div className="flex-1">
                         <div className="text-xs font-medium text-[var(--ink-100)] flex items-center gap-1.5">
-                          <Icon name="auto_awesome" size={14} className="text-violet-600 dark:text-violet-400" />
+                          <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
                           Have AI suggest the setup
                         </div>
                         <div className="text-[11px] text-[var(--ink-70)] mt-0.5">
-                          After creating, the assistant will propose widgets, browsers and notes that fit this Desk.
+                          After creating, the assistant proposes widgets, browsers and notes that fit this Desk.
                         </div>
                       </div>
                     </label>
-                  ) : (
+                  </div>
+                )}
+              </aside>
+            </div>
+          ) : (
+            /* Edit mode and Rooms: a single calm column — fewer fields, same law. */
+            <div className="px-6 py-5 space-y-5">
+              <FormField label="Notes" hint="(optional)">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Anything to remember about this…"
+                  className={`${fieldInputClass()} resize-none`}
+                />
+              </FormField>
+
+              {effectiveKind === 'task' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <AxisPicker label="Urgency" hint="whenever → urgent" value={priority} onChange={setPriority} />
+                    <AxisPicker label="Importance" hint="low → high stakes" value={importance} onChange={setImportance} />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField label="Duration" hint="(minutes)">
+                      <input
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={estimateMinutes}
+                        onChange={(e) => setEstimateMinutes(e.target.value)}
+                        placeholder="e.g. 30"
+                        className={fieldInputClass()}
+                      />
+                    </FormField>
+                    <FormField label="Due date" hint="(optional)">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="date"
+                          value={dueDate}
+                          onChange={(e) => setDueDate(e.target.value)}
+                          className={`${fieldInputClass()} flex-1 [color-scheme:light] dark:[color-scheme:dark]`}
+                        />
+                        {dueDate && (
+                          <button
+                            type="button"
+                            onClick={() => setDueDate('')}
+                            className="icon-btn"
+                            title="Clear due date"
+                          >
+                            <Icon name="close" size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </FormField>
+                  </div>
+
+                  {velocity && (
+                    <div className="px-3 py-2 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-90)] flex items-start gap-2">
+                      <Icon name="insights" size={13} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      <div>
+                        <div>
+                          <strong>Your history:</strong> {Math.round(velocity.ratio * 100)}% of estimates
+                          <span className="text-[var(--ink-50)]"> (n={velocity.sampleCount})</span>
+                        </div>
+                        {estimateMinutes.trim() !== '' && parseInt(estimateMinutes, 10) > 0 && (
+                          <div className="mt-0.5">
+                            Predicted real time:{' '}
+                            <strong>{predictForEstimate(velocity, parseInt(estimateMinutes, 10))} min</strong>
+                          </div>
+                        )}
+                        {estimateMinutes.trim() === '' && (
+                          <div className="mt-0.5">
+                            Median Desk takes <strong>{Math.round(velocity.medianActualMin)} min</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {onRequestAISetup && !aiSetupEnabled && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!node) return
-                        onClose()
-                        onRequestAISetup(node)
-                      }}
-                      className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors rounded py-1.5"
+                      onClick={() => promptUpgrade('AI task setup is a Pro feature.')}
+                      className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left"
+                      data-testid="ai-setup-locked"
                     >
-                      <Icon name="auto_awesome" size={14} />
-                      <span>Suggest more setup with AI</span>
+                      <div className="text-xs font-medium text-[var(--ink-70)] flex items-center gap-1.5">
+                        <Icon name="lock" size={13} className="text-accent" />
+                        Have AI suggest the setup
+                        <span className="ml-auto text-[9px] uppercase tracking-wider text-accent">Pro</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
+                        Upgrade to let the assistant propose widgets, browsers and notes for this Desk.
+                      </div>
                     </button>
                   )}
-                </div>
+                  {onRequestAISetup && aiSetupEnabled && isEdit && node && (
+                    <div className="rounded-lg border border-[rgb(var(--accent)/0.25)] bg-[rgb(var(--accent)/0.08)] px-3 py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose()
+                          onRequestAISetup(node)
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-[rgb(var(--accent))] hover:bg-[rgb(var(--accent)/0.08)] transition-colors rounded py-1.5"
+                      >
+                        <Icon name="auto_awesome" size={14} />
+                        <span>Suggest more setup with AI</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
-            </>
+            </div>
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex justify-end gap-2 shrink-0">
-          <button type="button" onClick={onClose} className="btn-ghost">
-            Cancel
-          </button>
-          <button type="submit" disabled={!title.trim() || busy} className="btn-primary">
-            {busy ? (
-              <>
-                <Icon name="hourglass_top" size={14} />
-                <span>{isEdit ? 'Saving…' : 'Creating…'}</span>
-              </>
-            ) : (
-              <>
-                <Icon name={submitIcon} size={14} />
-                <span>{submitLabel}</span>
-              </>
-            )}
-          </button>
+        <div className="px-6 py-3.5 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2 shrink-0">
+          <span className="text-[11px] text-[var(--ink-40)] hidden sm:block">
+            {composer ? 'Your new Desk opens as soon as it is created.' : ''}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <button type="button" onClick={onClose} className="btn-ghost">
+              Cancel
+            </button>
+            <button type="submit" disabled={!title.trim() || busy} className="btn-primary">
+              {busy ? (
+                <>
+                  <Icon name="hourglass_top" size={14} />
+                  <span>{isEdit ? 'Saving…' : 'Creating…'}</span>
+                </>
+              ) : (
+                <>
+                  <Icon name={submitIcon} size={14} />
+                  <span>{submitLabel}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
-      </form>
-    </div>
+      </motion.form>
+    </motion.div>,
+    document.body
   )
 }

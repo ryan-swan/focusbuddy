@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { PLEXII_ICONS, PLEXII_BY_MATERIAL } from './icons/plexiiIcons'
 
 interface Props {
   name: string
@@ -22,6 +23,31 @@ export default function Icon({
   // default to the originals (500 / filled). Icons that DO pass a value —
   // usually to signal an active or semantic state — keep their explicit
   // setting, so customisation never changes meaning.
+  // Plexii brand icons take over where a replacement exists: 'plexii:<name>'
+  // opts in explicitly, and PLEXII_BY_MATERIAL swaps unambiguous Material names
+  // app-wide. They are line icons on currentColor, so weight/filled do not
+  // apply — state is carried by color at the call site, per the brand system.
+  const plexiiName = name.startsWith('plexii:') ? name.slice(7) : PLEXII_BY_MATERIAL[name]
+  const plexii = plexiiName ? PLEXII_ICONS[plexiiName] : undefined
+  if (plexii) {
+    return (
+      <svg
+        className={className}
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ flexShrink: 0, ...style }}
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: plexii }}
+      />
+    )
+  }
+
   const wght = weight === undefined ? 'var(--fb-icon-wght, 500)' : weight
   const fill = filled === undefined ? 'var(--fb-icon-fill, 1)' : filled ? 1 : 0
   return (

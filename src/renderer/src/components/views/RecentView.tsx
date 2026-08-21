@@ -15,7 +15,7 @@ const TYPE_ICON: Record<string, { icon: string; tint: string; label: string }> =
   sheet: { icon: 'table_chart', tint: 'text-emerald-500', label: 'Spreadsheet' },
   slides: { icon: 'slideshow', tint: 'text-orange-500', label: 'Presentation' },
   map: { icon: 'gesture', tint: 'text-violet-500', label: 'Drawing' },
-  design: { icon: 'palette', tint: 'text-fuchsia-500', label: 'Design' }
+  design: { icon: 'plexii:design', tint: 'text-fuchsia-500', label: 'Design' }
 }
 
 function relTime(ms: number): string {

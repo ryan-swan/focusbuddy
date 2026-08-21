@@ -697,7 +697,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
           <Icon name="redo" size={15} />
         </button>
         <span className="w-px h-5 bg-[var(--edge-soft)] mx-1" />
-        <ToolBtn icon="dashboard" label="Templates" active={panel === 'templates'} onClick={() => setPanel((p) => (p === 'templates' ? 'none' : 'templates'))} testid="design-templates-btn" />
+        <ToolBtn icon="plexii:templates" label="Templates" active={panel === 'templates'} onClick={() => setPanel((p) => (p === 'templates' ? 'none' : 'templates'))} testid="design-templates-btn" />
         <ToolBtn icon="aspect_ratio" label={size.label} active={panel === 'size'} onClick={() => setPanel((p) => (p === 'size' ? 'none' : 'size'))} testid="design-size-btn" />
         <span className="w-px h-5 bg-[var(--edge-soft)] mx-1" />
         <ToolBtn icon="title" label="Text" onClick={addText} testid="design-add-text" />

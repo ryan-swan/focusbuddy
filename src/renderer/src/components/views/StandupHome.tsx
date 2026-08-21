@@ -140,13 +140,13 @@ export default function StandupHome(): JSX.Element | null {
   return (
     <section
       data-testid="standup-home"
-      className="mb-6 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-5"
+      className="mb-6 fb-card p-5"
     >
       <div className="flex items-center gap-2 mb-2">
         <span className="h-7 w-7 rounded-full bg-accent/10 inline-flex items-center justify-center">
           <Icon name="auto_awesome" size={15} className="text-accent" />
         </span>
-        <span className="text-[13px] font-semibold text-[var(--ink-90)]">Your standup</span>
+        <span className="fb-t-title text-[var(--ink-90)]">Your standup</span>
         {inSharedOrg && (
           <div className="ml-2 inline-flex rounded-lg border border-[var(--edge-soft)] overflow-hidden text-[11px]">
             {(['personal', 'team'] as const).map((s) => (

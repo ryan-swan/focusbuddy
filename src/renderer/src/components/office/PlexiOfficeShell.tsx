@@ -5,6 +5,7 @@ import { useAccountStore } from '../../stores/account'
 import { personDisplayName } from '../../lib/personName'
 import SegmentSwitcher from '../segment/SegmentSwitcher'
 import OrgSwitcher from '../OrgSwitcher'
+import UpgradeCard from '../UpgradeCard'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
 import { useMessagingStore } from '../../stores/messaging'
 import { useCapabilityStore } from '../../stores/capabilities'
@@ -52,16 +53,18 @@ interface OfficeApp {
   icon: string
   // Tailwind classes for the colored icon tile.
   tint: string
+  // Tailwind text-* class colouring the bare icon in the side menu (no tile).
+  tone: string
   // Document type to create inline, or null when the app routes elsewhere.
   docType: DocType | null
 }
 
 const APPS: OfficeApp[] = [
-  { key: 'docs', label: 'PlexiDocs', blurb: 'Create documents', icon: 'description', tint: 'bg-sky-500', docType: 'doc' },
-  { key: 'sheets', label: 'PlexiSheets', blurb: 'Create spreadsheets', icon: 'table_chart', tint: 'bg-emerald-500', docType: 'sheet' },
-  { key: 'slides', label: 'PlexiSlides', blurb: 'Create presentations', icon: 'slideshow', tint: 'bg-orange-500', docType: 'slides' },
-  { key: 'draw', label: 'PlexiDraw', blurb: 'Create drawings', icon: 'gesture', tint: 'bg-violet-500', docType: 'map' },
-  { key: 'design', label: 'PlexiDesign', blurb: 'Designs, any size', icon: 'palette', tint: 'bg-fuchsia-500', docType: 'design' }
+  { key: 'docs', label: 'PlexiDocs', blurb: 'Create documents', icon: 'description', tint: 'bg-sky-500', tone: 'text-sky-500', docType: 'doc' },
+  { key: 'sheets', label: 'PlexiSheets', blurb: 'Create spreadsheets', icon: 'table_chart', tint: 'bg-emerald-500', tone: 'text-emerald-500', docType: 'sheet' },
+  { key: 'slides', label: 'PlexiSlides', blurb: 'Create presentations', icon: 'slideshow', tint: 'bg-orange-500', tone: 'text-orange-500', docType: 'slides' },
+  { key: 'draw', label: 'PlexiDraw', blurb: 'Create drawings', icon: 'gesture', tint: 'bg-violet-500', tone: 'text-violet-500', docType: 'map' },
+  { key: 'design', label: 'PlexiDesign', blurb: 'Designs, any size', icon: 'plexii:design', tint: 'bg-fuchsia-500', tone: 'text-fuchsia-500', docType: 'design' }
 ]
 
 // The communication apps that now live inside PlexiOffice. Each renders its
@@ -74,14 +77,15 @@ interface CommsApp {
   blurb: string
   icon: string
   tint: string
+  tone: string
   render: () => JSX.Element
 }
 const COMMS_APPS: CommsApp[] = [
-  { key: 'mail', label: 'Mail', blurb: 'Your email inbox', icon: 'mail', tint: 'bg-rose-500', render: () => <MailView /> },
-  { key: 'inbox', label: 'Inbox', blurb: 'Notifications and share invites', icon: 'inbox', tint: 'bg-amber-500', render: () => <InboxView /> },
-  { key: 'chat', label: 'Chat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', render: () => <MessagesView /> },
-  { key: 'meet', label: 'Meet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-violet-500', render: () => <PlexiMeetView /> },
-  { key: 'sign', label: 'Sign', blurb: 'Send and sign documents', icon: 'draw', tint: 'bg-teal-500', render: () => <PlexiSignView /> }
+  { key: 'mail', label: 'Mail', blurb: 'Your email inbox', icon: 'mail', tint: 'bg-rose-500', tone: 'text-rose-500', render: () => <MailView /> },
+  { key: 'inbox', label: 'Inbox', blurb: 'Notifications and share invites', icon: 'inbox', tint: 'bg-amber-500', tone: 'text-amber-500', render: () => <InboxView /> },
+  { key: 'chat', label: 'Chat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', tone: 'text-sky-500', render: () => <MessagesView /> },
+  { key: 'meet', label: 'Meet', blurb: 'Video calls and meetings', icon: 'video_call', tint: 'bg-violet-500', tone: 'text-violet-500', render: () => <PlexiMeetView /> },
+  { key: 'sign', label: 'Sign', blurb: 'Send and sign documents', icon: 'plexii:sign', tint: 'bg-teal-500', tone: 'text-teal-500', render: () => <PlexiSignView /> }
 ]
 
 // Which OS view kind each comms app stands in for, so we gate its menu entry and
@@ -106,7 +110,7 @@ const TYPE_ICON: Record<string, { icon: string; tint: string }> = {
   sheet: { icon: 'table_chart', tint: 'text-emerald-500' },
   slides: { icon: 'slideshow', tint: 'text-orange-500' },
   map: { icon: 'gesture', tint: 'text-violet-500' },
-  design: { icon: 'palette', tint: 'text-fuchsia-500' }
+  design: { icon: 'plexii:design', tint: 'text-fuchsia-500' }
 }
 
 const PRO_FEATURES = ['Advanced collaboration', 'Premium templates', 'AI productivity tools', 'Priority support']
@@ -426,7 +430,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                     title={ent.reason}
                     className="relative flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 opacity-50 cursor-not-allowed"
                   >
-                    <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl text-white ${a.tint}`}>
+                    <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${a.tone}`} style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                       <Icon name={a.icon} size={22} />
                     </span>
                     <span className="text-[12.5px] font-medium">{a.label}</span>
@@ -442,7 +446,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                   data-testid={`office-app-${a.key}`}
                   className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
                 >
-                  <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl text-white ${a.tint}`}>
+                  <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${a.tone}`} style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                     <Icon name={a.icon} size={22} />
                   </span>
                   <span className="text-[12.5px] font-medium">{a.label}</span>
@@ -456,7 +460,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                 data-testid="office-app-meet"
                 className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
               >
-                <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-white bg-violet-500">
+                <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-violet-500" style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                   <Icon name="video_call" size={22} />
                 </span>
                 <span className="text-[12.5px] font-medium">PlexiMeet</span>
@@ -840,13 +844,13 @@ function OfficeSidebar({
     const vk = COMMS_VIEW_KIND[a.key]
     return !vk || viewEnabled(vk)
   })
-  const NAV: { id: OfficePage; label: string; icon: string; tint: string }[] = [
-    { id: 'home', label: 'Home', icon: 'home', tint: 'bg-indigo-500' },
-    { id: 'recent', label: 'Recent', icon: 'schedule', tint: 'bg-rose-500' },
-    { id: 'starred', label: 'Starred', icon: 'star', tint: 'bg-amber-500' },
-    { id: 'shared', label: 'Shared with me', icon: 'group', tint: 'bg-teal-500' },
-    { id: 'templates', label: 'Templates', icon: 'dashboard', tint: 'bg-sky-500' },
-    { id: 'trash', label: 'Trash', icon: 'delete', tint: 'bg-slate-500' }
+  const NAV: { id: OfficePage; label: string; icon: string; tone: string }[] = [
+    { id: 'home', label: 'Home', icon: 'home', tone: 'text-indigo-500' },
+    { id: 'recent', label: 'Recent', icon: 'schedule', tone: 'text-rose-500' },
+    { id: 'starred', label: 'Starred', icon: 'star', tone: 'text-amber-500' },
+    { id: 'shared', label: 'Shared with me', icon: 'group', tone: 'text-teal-500' },
+    { id: 'templates', label: 'Templates', icon: 'plexii:templates', tone: 'text-sky-500' },
+    { id: 'trash', label: 'Trash', icon: 'delete', tone: 'text-slate-500' }
   ]
   return (
     <div
@@ -878,8 +882,8 @@ function OfficeSidebar({
               page === n.id ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 ${n.tint}`}>
-              <Icon name={n.icon} size={14} />
+            <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 ${n.tone}`}>
+              <Icon name={n.icon} size={17} />
             </span>
             <span>{n.label}</span>
             {n.id === 'starred' && starredCount > 0 && <span className="ml-auto text-[10px] text-[var(--ink-50)] fb-tabular">{starredCount}</span>}
@@ -906,8 +910,8 @@ function OfficeSidebar({
                 locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[var(--surface-sunken)]'
               }`}
             >
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
-                <Icon name={a.icon} size={14} />
+              <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 ${a.tone}`}>
+                <Icon name={a.icon} size={16} />
               </span>
               <span>{a.label}</span>
               {locked && <Icon name="lock" size={11} className="ml-auto text-[var(--ink-40)]" />}
@@ -927,8 +931,8 @@ function OfficeSidebar({
               activeComms === a.key ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium' : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
             }`}
           >
-            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white ${a.tint}`}>
-              <Icon name={a.icon} size={14} />
+            <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 ${a.tone}`}>
+              <Icon name={a.icon} size={16} />
             </span>
             <span>{a.label}</span>
           </button>
@@ -944,15 +948,7 @@ function OfficeSidebar({
       </div>
 
       <div className="mt-auto p-3">
-        <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-            <span className="text-[12px] font-semibold">PlexiOffice Pro</span>
-          </div>
-          <button onClick={() => promptUpgrade('PlexiOffice Pro')} className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium">
-            Upgrade Now
-          </button>
-        </div>
+        <UpgradeCard label="PlexiOffice Pro" />
       </div>
     </aside>
     </div>

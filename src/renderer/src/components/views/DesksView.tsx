@@ -201,56 +201,63 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
         }
       })()
     },
-    actions: (d) => (
-      <>
-        {canShare ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              void shareToOrgOrGroup({
-                name: d.title || 'this desk',
-                kindLabel: 'desk and its widgets',
-                sharedOrgs,
-                move: (org, team) => moveToOrg(d.id, org, team)
-              })
-            }}
-            title="Share with your team or a group"
-            className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-          >
-            <Icon name="group_add" size={14} />
-          </button>
-        ) : null}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            setLinkTarget({ id: d.id, title: d.title || 'this desk' })
-          }}
-          title="Create a public link — anyone with it can view this desk"
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name="link" size={14} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            void (async () => {
-              const next = await promptText({
-                title: 'Rename desk',
-                label: 'Desk name',
-                initial: d.title || '',
-                confirmLabel: 'Rename'
-              })
-              const trimmed = next?.trim()
-              if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
-            })()
-          }}
-          title="Rename desk"
-          className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)]"
-        >
-          <Icon name="edit" size={14} />
-        </button>
-      </>
-    ),
+    // One declarative list drives both the hover icon strip and the right-click
+    // context menu. "Open desk" is menu-only (inStrip: false) — clicking the
+    // card already opens it, so the strip stays as it was.
+    itemActions: (d) => [
+      ...(canShare
+        ? [
+            {
+              key: 'share',
+              icon: 'group_add',
+              label: 'Share with team or group',
+              title: 'Share with your team or a group',
+              onClick: () => {
+                void shareToOrgOrGroup({
+                  name: d.title || 'this desk',
+                  kindLabel: 'desk and its widgets',
+                  sharedOrgs,
+                  move: (org, team) => moveToOrg(d.id, org, team)
+                })
+              }
+            }
+          ]
+        : []),
+      {
+        key: 'link',
+        icon: 'link',
+        label: 'Create public link',
+        title: 'Create a public link — anyone with it can view this desk',
+        onClick: () => setLinkTarget({ id: d.id, title: d.title || 'this desk' })
+      },
+      {
+        key: 'rename',
+        icon: 'edit',
+        label: 'Rename desk',
+        onClick: () => {
+          void (async () => {
+            const next = await promptText({
+              title: 'Rename desk',
+              label: 'Desk name',
+              initial: d.title || '',
+              confirmLabel: 'Rename'
+            })
+            const trimmed = next?.trim()
+            if (trimmed && trimmed !== (d.title || '')) await update(d.id, { title: trimmed })
+          })()
+        }
+      },
+      {
+        key: 'open',
+        icon: 'chevron_right',
+        label: 'Open desk',
+        inStrip: false,
+        onClick: () => {
+          setActive(d.id)
+          goTask(d.id)
+        }
+      }
+    ],
     headerActions: roomId ? (
       <button
         onClick={() => goRooms()}

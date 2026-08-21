@@ -133,7 +133,7 @@ export default function SyncIndicator(): JSX.Element {
 
   return (
     <div
-      className="mx-2 mb-2 px-2.5 py-2 rounded-md bg-[var(--surface-sunken)]/60 border border-[var(--edge-soft)] flex items-center gap-2"
+      className="mx-2 mb-2 px-2.5 py-2 rounded-[10px] bg-[var(--surface-sunken)]/60 shadow-[0_0_0_1px_var(--edge-hairline)] flex items-center gap-2"
       title={containerTitle}
       data-testid="sync-indicator"
       data-sync-state={syncState}
@@ -148,6 +148,10 @@ export default function SyncIndicator(): JSX.Element {
         <div className="text-[10px] font-medium text-[var(--ink-70)] leading-tight">{label}</div>
         <div className="text-[9px] text-[var(--ink-50)] leading-tight font-mono truncate">{sub}</div>
       </div>
+      {/* The activity sparkline earns its pixels only when there is activity —
+          an all-zero window rendered as ghost stubs reads as a broken dashed
+          placeholder, not a chart. */}
+      {totalRecent > 0 && (
       <svg
         width={48}
         height={20}
@@ -170,6 +174,7 @@ export default function SyncIndicator(): JSX.Element {
           )
         })}
       </svg>
+      )}
     </div>
   )
 }

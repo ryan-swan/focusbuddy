@@ -7,13 +7,15 @@ interface Props {
   onChange: (v: AxisValue) => void
 }
 
+// Label above, dots in the middle, hint below — stacked so nothing collides at
+// narrow widths, and painted with the token ramps (the old text-desk-* classes
+// predated tokens.css and broke on dark surfaces).
 export default function AxisPicker({ label, hint, value, onChange }: Props): JSX.Element {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-desk-800">{label}</span>
-        <span className="text-xs text-desk-600">{hint}</span>
-      </div>
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-[11px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+        {label}
+      </span>
       <div className="flex items-center gap-1.5">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
@@ -25,6 +27,7 @@ export default function AxisPicker({ label, hint, value, onChange }: Props): JSX
           />
         ))}
       </div>
+      <span className="text-[10.5px] text-[var(--ink-40)] truncate">{hint}</span>
     </div>
   )
 }

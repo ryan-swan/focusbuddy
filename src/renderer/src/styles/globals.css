@@ -62,6 +62,95 @@ body {
 }
 
 @layer components {
+  /* ── Apple-pass primitives ──────────────────────────────────────────────
+     The material vocabulary every surface composes from. Depth comes from
+     light (shadow + inset highlight + hairline), never from 1px outlines.
+     fb-card  — an outer material card (radius-card)
+     fb-tile  — an interactive row/tile INSIDE a card (radius-row)
+     fb-btn-surface — a raised chrome button on the canvas (radius-field)
+     fb-press — universal press response: everything a user can push, dips */
+  .fb-card {
+    background: var(--surface-raised);
+    border-radius: var(--radius-card);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      var(--shadow-soft),
+      var(--shadow-inset-highlight);
+  }
+  .fb-tile {
+    background: var(--surface-sunken);
+    border-radius: var(--radius-row);
+    box-shadow: 0 0 0 1px var(--edge-hairline);
+    transition:
+      transform var(--dur-quick) var(--ease-spring-crisp),
+      box-shadow var(--dur-quick) var(--ease-spring-crisp),
+      background-color var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .fb-tile:hover {
+    background: color-mix(in oklab, var(--surface-sunken) 55%, var(--surface-raised));
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      var(--shadow-soft);
+  }
+  .fb-btn-surface {
+    background: var(--surface-raised);
+    border-radius: var(--radius-field);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      var(--shadow-soft),
+      var(--shadow-inset-highlight);
+    transition:
+      transform var(--dur-quick) var(--ease-spring-crisp),
+      box-shadow var(--dur-quick) var(--ease-spring-crisp),
+      background-color var(--dur-quick) var(--ease-spring-crisp);
+  }
+  .fb-btn-surface:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      var(--shadow-cast),
+      var(--shadow-inset-highlight);
+  }
+  .fb-press:active {
+    transform: scale(0.97);
+    transition-duration: var(--dur-instant);
+  }
+
+  /* ── Type ramp (Apple pass) ──────────────────────────────────────────────
+     Five sizes, period. Tracking widens as type shrinks (SF-style optical
+     compensation). Hierarchy comes from weight and spacing, not new sizes. */
+  .fb-t-hero {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+  .fb-t-title {
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .fb-t-body {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 450;
+  }
+  .fb-t-label {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .fb-t-caption {
+    font-size: 11px;
+    line-height: 15px;
+    font-weight: 450;
+    letter-spacing: 0.015em;
+    color: var(--ink-50);
+  }
+
   .sticky-note {
     @apply relative rounded-sm p-4 shadow-md;
     box-shadow:
@@ -85,11 +174,15 @@ body {
     background-image:
       radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.05) 0%, transparent 60%),
       radial-gradient(circle at 80% 80%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
-      radial-gradient(rgba(120, 100, 80, 0.08) 1px, transparent 1px);
+      radial-gradient(rgba(120, 100, 80, 0.18) 1.7px, transparent 1.7px);
     background-size:
       auto,
       auto,
-      18px 18px;
+      calc(42px * var(--fb-desk-zoom, 1)) calc(42px * var(--fb-desk-zoom, 1));
+    background-position:
+      0 0,
+      0 0,
+      var(--fb-desk-pan, 0 0);
   }
   /* Theme studio custom canvas background. When the user picks one, the root
      gets data-desk-bg and --fb-desk-bg / --fb-desk-bg-color carry a solid
@@ -102,6 +195,109 @@ body {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+  }
+  /* Canvas pattern — user-selectable in the Theme studio (data-desk-pattern).
+     'dots' is the stock look baked into the base rules; 'grid' swaps the dot
+     layer for composition-paper hairlines (24px minor, 96px major); 'none'
+     drops the pattern and keeps only the ambient washes. A custom background
+     (data-desk-bg) wins over patterns, so these rules exclude it. */
+  html[data-desk-pattern='none']:not([data-desk-bg]) .desk-paper {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.05) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(184, 137, 63, 0.04) 0%, transparent 60%);
+    background-size: auto, auto;
+  }
+  html[data-desk-pattern='grid']:not([data-desk-bg]) .desk-paper {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.05) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
+      linear-gradient(to right, rgba(120, 100, 80, 0.13) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120, 100, 80, 0.13) 1px, transparent 1px);
+    background-size:
+      auto,
+      auto,
+      calc(56px * var(--fb-desk-zoom, 1)) calc(56px * var(--fb-desk-zoom, 1)),
+      calc(56px * var(--fb-desk-zoom, 1)) calc(56px * var(--fb-desk-zoom, 1));
+    background-position:
+      0 0,
+      0 0,
+      var(--fb-desk-pan, 0 0),
+      var(--fb-desk-pan, 0 0);
+  }
+  html.dark[data-desk-pattern='none']:not([data-desk-bg]) .desk-paper {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 60%);
+    background-size: auto, auto;
+  }
+  html.dark[data-desk-pattern='grid']:not([data-desk-bg]) .desk-paper {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 60%),
+      linear-gradient(to right, rgba(168, 162, 158, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(168, 162, 158, 0.12) 1px, transparent 1px);
+    background-size:
+      auto,
+      auto,
+      calc(56px * var(--fb-desk-zoom, 1)) calc(56px * var(--fb-desk-zoom, 1)),
+      calc(56px * var(--fb-desk-zoom, 1)) calc(56px * var(--fb-desk-zoom, 1));
+    background-position:
+      0 0,
+      0 0,
+      var(--fb-desk-pan, 0 0),
+      var(--fb-desk-pan, 0 0);
+  }
+  /* ── Live canvas pattern layer ─────────────────────────────────────────
+     The Canvas suppresses the static pattern on its own surface and renders a
+     dedicated .desk-pattern-layer child instead. Panning translates this layer
+     on the compositor (will-change: transform) so the paper never repaints
+     mid-pan; only a zoom change re-rasterises it at the new cell size. */
+  .desk-paper.no-static-pattern {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.05) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(184, 137, 63, 0.04) 0%, transparent 60%) !important;
+    background-size: auto, auto !important;
+    background-position: 0 0, 0 0 !important;
+  }
+  html.dark .desk-paper.no-static-pattern {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 60%) !important;
+  }
+  .desk-pattern-layer {
+    position: absolute;
+    top: calc(-1 * var(--fb-desk-tile, 200px));
+    left: calc(-1 * var(--fb-desk-tile, 200px));
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    will-change: transform;
+    background-image: radial-gradient(
+      rgba(120, 100, 80, 0.18) calc(1.7px * var(--fb-desk-zoom, 1)),
+      transparent calc(1.7px * var(--fb-desk-zoom, 1))
+    );
+    background-size: calc(42px * var(--fb-desk-zoom, 1)) calc(42px * var(--fb-desk-zoom, 1));
+  }
+  html.dark .desk-pattern-layer {
+    background-image: radial-gradient(
+      rgba(168, 162, 158, 0.16) calc(1.7px * var(--fb-desk-zoom, 1)),
+      transparent calc(1.7px * var(--fb-desk-zoom, 1))
+    );
+  }
+  html[data-desk-pattern='grid'] .desk-pattern-layer {
+    background-image:
+      linear-gradient(to right, rgba(120, 100, 80, 0.13) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120, 100, 80, 0.13) 1px, transparent 1px);
+    background-size: calc(56px * var(--fb-desk-zoom, 1)) calc(56px * var(--fb-desk-zoom, 1));
+  }
+  html.dark[data-desk-pattern='grid'] .desk-pattern-layer {
+    background-image:
+      linear-gradient(to right, rgba(168, 162, 158, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(168, 162, 158, 0.12) 1px, transparent 1px);
+  }
+  html[data-desk-pattern='none'] .desk-pattern-layer,
+  html[data-desk-bg] .desk-pattern-layer {
+    display: none;
   }
   /* `.no-tod` modifier — suppresses ambient overlays (time-of-day ::before AND the
      Futuristic flowing accent-beam ::after) on surfaces where they bleed through
@@ -137,15 +333,19 @@ body {
     transition: background 120s linear;
   }
   .dark .desk-paper {
-    background-color: #0c0a09;
+    background-color: #17181d; /* lifted from #0c0a09 — dull slate, matches the raised dark surface tokens */
     background-image:
       radial-gradient(circle at 20% 20%, rgba(184, 137, 63, 0.04) 0%, transparent 60%),
       radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 60%),
-      radial-gradient(rgba(168, 162, 158, 0.06) 1px, transparent 1px);
+      radial-gradient(rgba(168, 162, 158, 0.16) 1.7px, transparent 1.7px);
     background-size:
       auto,
       auto,
-      18px 18px;
+      calc(42px * var(--fb-desk-zoom, 1)) calc(42px * var(--fb-desk-zoom, 1));
+    background-position:
+      0 0,
+      0 0,
+      var(--fb-desk-pan, 0 0);
     filter: none;
   }
   .dark .desk-paper::before {

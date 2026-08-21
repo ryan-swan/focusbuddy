@@ -7,6 +7,7 @@ import { autofillWebview } from '../../lib/vaultAutofill'
 import PlaceholderView from './PlaceholderView'
 import VaultBindPopover from './VaultBindPopover'
 import Icon from '../Icon'
+import AppLogo from '../AppLogo'
 
 interface Props {
   appId: string
@@ -154,16 +155,7 @@ export default function ConnectedAppView({ appId }: Props): JSX.Element {
     <div className="h-full flex flex-col bg-[var(--surface-raised)]">
       {/* Toolbar */}
       <div className="px-3 py-2 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-1 shrink-0">
-        <span
-          className="h-7 w-7 rounded-md inline-flex items-center justify-center shrink-0 mr-1"
-          style={
-            app.color
-              ? { backgroundColor: `${app.color}1a`, color: app.color }
-              : { backgroundColor: 'rgb(var(--accent) / 0.12)', color: 'rgb(var(--accent))' }
-          }
-        >
-          <Icon name={app.icon || 'apps'} size={14} />
-        </span>
+        <AppLogo app={app} size={28} glyphSize={14} className="rounded-md mr-1" />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-[var(--ink-100)] truncate">
             {app.title}

@@ -336,6 +336,8 @@ export default function Canvas(): JSX.Element {
   const focusOn = useWidgetStore((s) => s.focusOn)
   const centerToken = useWidgetStore((s) => s.centerToken)
   const zoom = useWidgetStore((s) => s.zoom)
+  // Quantised zoom for the paper pattern only — see the desk-paper style vars.
+  const patternZoom = Math.max(0.05, Math.round(zoom * 20) / 20)
   const panX = useWidgetStore((s) => s.panX)
   const panY = useWidgetStore((s) => s.panY)
   const setZoom = useWidgetStore((s) => s.setZoom)
@@ -2345,12 +2347,42 @@ export default function Canvas(): JSX.Element {
           onPointerMove={handleCanvasPointerMove}
           onPointerUp={handleCanvasPointerUp}
           onPointerCancel={handleCanvasPointerUp}
-          className="flex-1 relative overflow-hidden desk-paper"
-          style={{
-            overscrollBehavior: 'none',
-            cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined
-          }}
+          className="flex-1 relative overflow-hidden desk-paper no-static-pattern"
+          style={
+            {
+              overscrollBehavior: 'none',
+              cursor: grabbing ? 'grabbing' : spaceReady ? 'grab' : undefined,
+              // Cell size + coverage inset for the .desk-pattern-layer child.
+              // 168 is the LCM of the 42px dot and 56px grid cells, so a
+              // translation wrapped to one 168px super-tile is invisible for
+              // both patterns. The pattern tracks zoom in 5% steps
+              // (patternZoom) so a zoom gesture repaints the paper a handful
+              // of times instead of every frame — the ≤5% scale lag during
+              // the gesture is imperceptible, and the final settle is exact.
+              '--fb-desk-zoom': patternZoom,
+              '--fb-desk-tile': `${168 * patternZoom}px`
+            } as React.CSSProperties
+          }
         >
+          {/* Paper pattern on its own compositor layer. Panning only moves
+              this div's transform (composited, no repaint); a zoom change is
+              the only thing that re-rasterises the pattern at a new cell
+              size. The offset wraps modulo one super-tile so it stays small.
+              The container's own static pattern is suppressed via
+              .no-static-pattern — static desk-paper surfaces (gallery,
+              dialogs) keep their built-in pattern. */}
+          <div
+            aria-hidden
+            className="desk-pattern-layer"
+            style={{
+              transform: (() => {
+                const tile = 168 * patternZoom
+                const wrap = (v: number): number => ((v % tile) + tile) % tile
+                return `translate(${wrap(panX)}px, ${wrap(panY)}px)`
+              })()
+            }}
+          />
+
           {/* Breadcrumb — floated top-left of the canvas surface so it
               sits on the desk itself rather than in a header bar above it. */}
           <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45] flex items-center gap-2">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 // Shared modal wrapper — the accessibility shell every hand-rolled overlay
 // should adopt. It renders the backdrop, gives the panel proper dialog
@@ -88,7 +89,12 @@ export default function Modal({
     }
   }
 
-  return (
+  // Portaled to <body>: modals get mounted from arbitrary components, and any
+  // transformed/filtered ancestor (the sidebar's glass chrome, a scaled canvas
+  // widget) becomes the containing block for position:fixed — trapping the
+  // "fullscreen" overlay inside that ancestor's box. The portal makes the
+  // viewport the containing block no matter where the modal is mounted.
+  return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
       style={{ zIndex: z }}
@@ -108,6 +114,7 @@ export default function Modal({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -380,7 +380,7 @@ export default function CommandCenter({
       { id: 'go-plexipeople', label: 'PlexiPeople', hint: 'Team status, directory, organisation map', icon: 'groups', words: 'plexipeople people team directory members organisation organization org map presence', viewKind: 'plexipeople', go: goPlexiPeople },
       { id: 'go-plexibrain', label: 'PlexiBrain', hint: 'Knowledge, search, flows, insights', icon: 'neurology', words: 'plexibrain brain knowledge search map flows agents connect api insights automation', viewKind: 'plexibrain', go: goPlexiBrain },
       { id: 'go-documents', label: 'Documents', hint: 'Docs, sheets, slides', icon: 'article', words: 'documents docs sheets slides', viewKind: 'office', go: goOffice },
-      { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'palette', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
+      { id: 'go-design', label: 'PlexiDesign', hint: 'Designs — social, posters, logos', icon: 'plexii:design', words: 'design plexidesign canva graphic poster social logo flyer banner', viewKind: 'design', go: goDesign },
       { id: 'go-files', label: 'Files', hint: 'File manager', icon: 'folder', words: 'files folders manager', viewKind: 'files', go: goFiles },
       { id: 'go-mail', label: 'Mail', hint: 'Email inbox', icon: 'mail', words: 'mail email inbox', viewKind: 'office', go: () => goOffice('mail') },
       { id: 'go-inbox', label: 'PlexiInbox', hint: 'Notifications, share invites', icon: 'inbox', words: 'inbox notifications invites plexi', viewKind: 'office', go: () => goOffice('inbox') },
@@ -418,7 +418,7 @@ export default function CommandCenter({
       id: 'new-design',
       label: 'New design',
       hint: 'PlexiDesign — social, poster, logo, any size',
-      icon: 'palette',
+      icon: 'plexii:design',
       kind: 'action',
       score: q === '' ? 56 : matchScore('new design plexidesign canva poster social logo flyer graphic create', q),
       run: () => {

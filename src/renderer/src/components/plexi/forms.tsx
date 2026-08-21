@@ -7,7 +7,9 @@ import type { ReactNode } from 'react'
 
 /** The canonical token-driven field skin for inputs, textareas and selects. */
 export function fieldInputClass(): string {
-  return 'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))] focus:ring-2 focus:ring-[rgb(var(--accent)/0.15)] transition-colors'
+  // Apple-style field: filled surface with a hairline, no hard outline until
+  // focus paints the accent ring. Radius matches --radius-field.
+  return 'w-full bg-[var(--surface-sunken)] border border-transparent shadow-[0_0_0_1px_var(--edge-hairline)] rounded-[10px] px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))] focus:shadow-none focus:ring-2 focus:ring-[rgb(var(--accent)/0.15)] transition-colors'
 }
 
 /** The 11px uppercase field label used above every form control. */

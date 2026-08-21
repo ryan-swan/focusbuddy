@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Icon from '../Icon'
 import { DashboardHeader, PLEXI_CARD } from '../plexi'
 
@@ -31,6 +31,22 @@ export interface FilterOption<T> {
   predicate: (item: T) => boolean
 }
 
+// One item action, declared once and rendered two ways: as an icon button in the
+// hover strip (tooltip = title ?? label) and as an icon + label row in the
+// right-click context menu. The strip teaches by hover; the menu teaches by
+// reading — same list, so they can never drift apart.
+export interface IndexAction {
+  key: string
+  icon: string
+  label: string
+  // Longer tooltip for the hover strip; the menu always shows `label`.
+  title?: string
+  // Set false for actions that should only live in the context menu (e.g. Open,
+  // which clicking the card already does) so the strip stays uncluttered.
+  inStrip?: boolean
+  onClick: () => void
+}
+
 export interface IndexConfig<T> {
   storageKey: string
   title: string
@@ -49,7 +65,7 @@ export interface IndexConfig<T> {
   onOpen: (item: T) => void
   onNew?: () => void
   newLabel?: string
-  actions?: (item: T) => ReactNode
+  itemActions?: (item: T) => IndexAction[]
   // Persist a manual order. Given the ids in their new order; the page writes it
   // through to the node sortOrder. Absent = reorder disabled.
   onReorder?: (orderedIds: string[]) => void
@@ -105,7 +121,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
     onOpen,
     onNew,
     newLabel,
-    actions,
+    itemActions,
     onReorder,
     headerActions,
     badge
@@ -122,6 +138,23 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
   const [filterKey, setFilterKey] = usePersistedString(`${storageKey}.filter`, 'all')
   const [search, setSearch] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  // Right-click context menu: same actions as the hover strip, but with labels
+  // so the icons are discoverable. Available in every view mode.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; actions: IndexAction[] } | null>(
+    null
+  )
+
+  function openCtxMenu(e: React.MouseEvent, it: T): void {
+    if (!itemActions) return
+    const acts = itemActions(it)
+    if (acts.length === 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    setCtxMenu({ x: e.clientX, y: e.clientY, actions: acts })
+  }
+
+  const stripOf = (it: T): ReactNode =>
+    itemActions ? <ActionStrip actions={itemActions(it)} /> : null
 
   const activeFilter = filters.find((f) => f.key === filterKey) ?? null
   const activeGroup = groups.find((g) => g.key === groupKey) ?? null
@@ -163,7 +196,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
   }, [visible, activeGroup])
 
   const controlCls =
-    'h-8 rounded-lg border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[12.5px] text-[var(--ink-90)] px-2'
+    'h-8 rounded-[10px] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)] text-[12.5px] text-[var(--ink-90)] px-2'
 
   return (
     <div
@@ -192,7 +225,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
 
         {/* Toolbar: mode switch on the left, then search / group / filter. */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="inline-flex rounded-lg border border-[var(--edge-firm)] overflow-hidden">
+          <div className="inline-flex rounded-[10px] overflow-hidden bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)]">
             {MODES.map((m) => (
               <button
                 key={m.key}
@@ -283,7 +316,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             thumb={thumb}
             metaLine={metaLine}
             onOpen={onOpen}
-            actions={actions}
+            onItemContextMenu={openCtxMenu}
           />
         ) : mode === 'table' ? (
           <TableView
@@ -293,7 +326,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             titleOf={titleOf}
             smallIcon={smallIcon}
             onOpen={onOpen}
-            actions={actions}
+            onItemContextMenu={openCtxMenu}
             storageKey={storageKey}
           />
         ) : mode === 'timeline' ? (
@@ -305,6 +338,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             metaLine={metaLine}
             timelineDate={timelineDate}
             onOpen={onOpen}
+            onItemContextMenu={openCtxMenu}
           />
         ) : (
           // gallery + list both group and both support reorder
@@ -332,8 +366,9 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                         badge={badge?.(it)}
                         thumb={thumb(it)}
                         meta={metaLine(it)}
-                        actions={actions?.(it)}
+                        actions={stripOf(it)}
                         onOpen={() => onOpen(it)}
+                        onContextMenu={(e) => openCtxMenu(e, it)}
                         canReorder={canReorder}
                         onDragStart={() => setDragId(idOf(it))}
                         onDrop={() => handleDrop(idOf(it))}
@@ -342,7 +377,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-[var(--edge-soft)] overflow-hidden divide-y divide-[var(--edge-soft)]">
+                  <div className="fb-card overflow-hidden divide-y divide-[var(--edge-soft)]">
                     {bucket.items.map((it) => (
                       <ListRow
                         key={idOf(it)}
@@ -351,8 +386,9 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                         badge={badge?.(it)}
                         icon={smallIcon(it)}
                         meta={metaLine(it)}
-                        actions={actions?.(it)}
+                        actions={stripOf(it)}
                         onOpen={() => onOpen(it)}
+                        onContextMenu={(e) => openCtxMenu(e, it)}
                         canReorder={canReorder}
                         onDragStart={() => setDragId(idOf(it))}
                         onDrop={() => handleDrop(idOf(it))}
@@ -365,6 +401,96 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             ))}
           </div>
         )}
+      </div>
+      {ctxMenu && <IndexContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />}
+    </div>
+  )
+}
+
+// The hover icon strip, rendered from the same IndexAction list as the context
+// menu. Visuals match the previous hand-rolled buttons exactly.
+function ActionStrip({ actions }: { actions: IndexAction[] }): JSX.Element | null {
+  const strip = actions.filter((a) => a.inStrip !== false)
+  if (strip.length === 0) return null
+  return (
+    <div className="flex items-center gap-1">
+      {strip.map((a) => (
+        <button
+          key={a.key}
+          onClick={(e) => {
+            e.stopPropagation()
+            a.onClick()
+          }}
+          title={a.title ?? a.label}
+          className="inline-flex items-center justify-center h-6 w-6 rounded-[8px] bg-[var(--surface-raised)]/95 shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-soft)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press"
+        >
+          <Icon name={a.icon} size={14} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function IndexContextMenu({
+  menu,
+  onClose
+}: {
+  menu: { x: number; y: number; actions: IndexAction[] }
+  onClose: () => void
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ left: menu.x, top: menu.y })
+
+  // Clamp to the viewport once the menu has a measured size, so a right-click
+  // near the bottom or right edge never spawns a half-offscreen menu.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setPos({
+      left: Math.max(8, Math.min(menu.x, window.innerWidth - r.width - 8)),
+      top: Math.max(8, Math.min(menu.y, window.innerHeight - r.height - 8))
+    })
+  }, [menu])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[80]"
+      onMouseDown={onClose}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onClose()
+      }}
+    >
+      <div
+        ref={ref}
+        style={{ left: pos.left, top: pos.top }}
+        onMouseDown={(e) => e.stopPropagation()}
+        data-testid="index-context-menu"
+        className="absolute min-w-[200px] rounded-[12px] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-deep)] py-1"
+      >
+        {menu.actions.map((a) => (
+          <button
+            key={a.key}
+            onClick={() => {
+              onClose()
+              a.onClick()
+            }}
+            data-testid={`index-context-menu-${a.key}`}
+            className="w-full flex items-center gap-2.5 px-3 h-8 text-left text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+          >
+            <Icon name={a.icon} size={15} className="text-[var(--ink-60)] shrink-0" />
+            <span className="truncate">{a.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -396,6 +522,7 @@ function GalleryCard(props: {
   meta: ReactNode
   actions?: ReactNode
   onOpen: () => void
+  onContextMenu: (e: React.MouseEvent) => void
   canReorder: boolean
   onDragStart: () => void
   onDrop: () => void
@@ -407,7 +534,8 @@ function GalleryCard(props: {
       onDragStart={props.onDragStart}
       onDragOver={(e) => props.canReorder && e.preventDefault()}
       onDrop={props.onDrop}
-      className={`group relative ${PLEXI_CARD} overflow-hidden fb-lift hover:border-[rgb(var(--accent)/0.5)] ${
+      onContextMenu={props.onContextMenu}
+      className={`group relative ${PLEXI_CARD} overflow-hidden fb-lift ${
         props.dragging ? 'opacity-40' : ''
       }`}
       data-testid={`index-card-${props.id}`}
@@ -441,6 +569,7 @@ function ListRow(props: {
   meta: ReactNode
   actions?: ReactNode
   onOpen: () => void
+  onContextMenu: (e: React.MouseEvent) => void
   canReorder: boolean
   onDragStart: () => void
   onDrop: () => void
@@ -452,6 +581,7 @@ function ListRow(props: {
       onDragStart={props.onDragStart}
       onDragOver={(e) => props.canReorder && e.preventDefault()}
       onDrop={props.onDrop}
+      onContextMenu={props.onContextMenu}
       className={`group flex items-center gap-3 px-3 h-12 bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] ${
         props.dragging ? 'opacity-40' : ''
       }`}
@@ -489,7 +619,7 @@ function KanbanBoard<T>(props: {
   thumb: (t: T) => ReactNode
   metaLine: (t: T) => ReactNode
   onOpen: (t: T) => void
-  actions?: (t: T) => ReactNode
+  onItemContextMenu: (e: React.MouseEvent, t: T) => void
 }): JSX.Element {
   return (
     <div className="flex gap-3 overflow-x-auto pb-3">
@@ -506,6 +636,7 @@ function KanbanBoard<T>(props: {
               <button
                 key={props.idOf(it)}
                 onClick={() => props.onOpen(it)}
+                onContextMenu={(e) => props.onItemContextMenu(e, it)}
                 data-testid={`kanban-card-${props.idOf(it)}`}
                 className={`block w-full text-left ${PLEXI_CARD} overflow-hidden fb-lift`}
               >
@@ -536,11 +667,11 @@ function TableView<T>(props: {
   titleOf: (t: T) => string
   smallIcon: (t: T) => ReactNode
   onOpen: (t: T) => void
-  actions?: (t: T) => ReactNode
+  onItemContextMenu: (e: React.MouseEvent, t: T) => void
   storageKey: string
 }): JSX.Element {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[var(--edge-soft)]">
+    <div className="overflow-x-auto fb-card">
       <table className="w-full text-[12.5px]" data-testid={`${props.storageKey}-table`}>
         <thead>
           <tr className="bg-[var(--surface-sunken)] text-[var(--ink-55)] text-[11px] uppercase tracking-[0.06em]">
@@ -572,6 +703,7 @@ function TableGroup<T>(props: {
   titleOf: (t: T) => string
   smallIcon: (t: T) => ReactNode
   onOpen: (t: T) => void
+  onItemContextMenu: (e: React.MouseEvent, t: T) => void
 }): JSX.Element {
   return (
     <>
@@ -589,6 +721,7 @@ function TableGroup<T>(props: {
         <tr
           key={props.idOf(it)}
           onClick={() => props.onOpen(it)}
+          onContextMenu={(e) => props.onItemContextMenu(e, it)}
           data-testid={`table-row-${props.idOf(it)}`}
           className="hover:bg-[var(--surface-hover)] cursor-pointer"
         >
@@ -622,6 +755,7 @@ function TimelineView<T>(props: {
   metaLine: (t: T) => ReactNode
   timelineDate: (t: T) => number | null
   onOpen: (t: T) => void
+  onItemContextMenu: (e: React.MouseEvent, t: T) => void
 }): JSX.Element {
   // Group by month of the item's date, newest month first, so the timeline reads
   // as a real chronology rather than an undated list.
@@ -661,8 +795,9 @@ function TimelineView<T>(props: {
                 <button
                   key={props.idOf(it)}
                   onClick={() => props.onOpen(it)}
+                  onContextMenu={(e) => props.onItemContextMenu(e, it)}
                   data-testid={`timeline-row-${props.idOf(it)}`}
-                  className="flex items-center gap-2.5 w-full text-left rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 hover:border-[rgb(var(--accent)/0.5)]"
+                  className="flex items-center gap-2.5 w-full text-left fb-tile fb-press px-3 py-2"
                 >
                   <span className="w-7 h-7 rounded-md overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
                     {props.smallIcon(it)}

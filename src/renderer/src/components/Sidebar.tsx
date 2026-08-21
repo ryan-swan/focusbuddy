@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import PlexiiLogo from './PlexiiLogo'
-import { promptUpgrade } from '../stores/upgradePrompt'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import SyncIndicator from './SyncIndicator'
+import UpgradeCard from './UpgradeCard'
 import { useViewStore, type View } from '../stores/view'
 import { catalogFor } from '../lib/widgetCatalog'
 import SegmentSwitcher from './segment/SegmentSwitcher'
@@ -19,6 +19,7 @@ import AISetupDialog from './AISetupDialog'
 import AddConnectedAppDialog from './AddConnectedAppDialog'
 import { useSharesStore } from '../stores/shares'
 import Icon from './Icon'
+import AppLogo from './AppLogo'
 import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE, MenuMinimizeButton } from './chrome/floatingMenu'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
@@ -67,29 +68,7 @@ function renderConnectedAppRow(
           active ? '' : 'hover:bg-[var(--surface-sunken)]'
         }`}
       >
-        {app.iconPngBase64 ? (
-          // Real macOS app icon (or favicon-like for web). Pre-cached as base64
-          // PNG at create-time so renders are cheap and don't IPC per-paint.
-          <img
-            src={`data:image/png;base64,${app.iconPngBase64}`}
-            alt=""
-            className="h-5 w-5 rounded shrink-0"
-          />
-        ) : (
-          <span
-            className="h-5 w-5 rounded inline-flex items-center justify-center shrink-0"
-            style={
-              app.color
-                ? { backgroundColor: `${app.color}1a`, color: app.color }
-                : {
-                    backgroundColor: 'rgb(var(--accent) / 0.12)',
-                    color: 'rgb(var(--accent))'
-                  }
-            }
-          >
-            <Icon name={app.icon || 'apps'} size={12} />
-          </span>
-        )}
+        <AppLogo app={app} size={20} glyphSize={12} />
         <span
           className={`text-[13px] flex-1 min-w-0 break-words line-clamp-2 leading-tight ${
             active
@@ -296,8 +275,9 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <div className="w-6 h-px bg-[var(--edge-soft)] shrink-0 my-1" />
               {showOffice && (
                 <CollapsedNavIcon
-                  icon="grid_view"
+                  icon="plexii:office"
                   label="Office"
+                  tone="text-purple-500"
                   active={view.kind === 'office'}
                   onClick={() => goOffice()}
                 />
@@ -306,6 +286,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
                 <CollapsedNavIcon
                   icon="diversity_3"
                   label="People"
+                  tone="text-pink-500"
                   active={view.kind === 'plexipeople'}
                   onClick={() => goPlexiPeople()}
                 />
@@ -314,6 +295,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
                 <CollapsedNavIcon
                   icon="neurology"
                   label="Brain"
+                  tone="text-cyan-500"
                   active={view.kind === 'plexibrain'}
                   onClick={() => goPlexiBrain()}
                 />
@@ -324,20 +306,20 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           {/* ── Desk navigation ── */}
           <div className="w-6 h-px bg-[var(--edge-soft)] shrink-0 my-1" />
 
-          <CollapsedNavIcon icon="dashboard"     label="Home"         active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
-          <CollapsedNavIcon icon="meeting_room"  label="Rooms"        active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
-          <CollapsedNavIcon icon="desk"          label="Desks"        active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
-          <CollapsedNavIcon icon="folder_shared" label="Shared Desks" active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
-          <CollapsedNavIcon icon="account_tree"  label="Plans"        active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
-          <CollapsedNavIcon icon="checklist"     label="Tasks"        active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
+          <CollapsedNavIcon icon="plexii:home"  label="Home"         tone="text-indigo-500"  active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
+          <CollapsedNavIcon icon="meeting_room"  label="Rooms"        tone="text-sky-500"     active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
+          <CollapsedNavIcon icon="desk"          label="Desks"        tone="text-teal-500"    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
+          <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone="text-fuchsia-500" active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
+          <CollapsedNavIcon icon="account_tree"  label="Plans"        tone="text-violet-500"  active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
+          <CollapsedNavIcon icon="checklist"     label="Tasks"        tone="text-emerald-500" active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
           {viewEnabled('calendar') && (
-            <CollapsedNavIcon icon="calendar_month" label="Calendar" active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
+            <CollapsedNavIcon icon="calendar_month" label="Calendar" tone="text-amber-500" active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
           )}
           {viewEnabled('files') && (
-            <CollapsedNavIcon icon="folder" label="Files" active={viewIsActive({ kind: 'files' })} onClick={() => { setActive(null); goFiles() }} />
+            <CollapsedNavIcon icon="folder" label="Files" tone="text-orange-500" active={viewIsActive({ kind: 'files' })} onClick={() => { setActive(null); goFiles() }} />
           )}
           {viewEnabled('vault') && (
-            <CollapsedNavIcon icon="lock" label="Vault" active={viewIsActive({ kind: 'vault' })} onClick={() => { setActive(null); goVault() }} />
+            <CollapsedNavIcon icon="plexii:vault" label="Vault" tone="text-rose-500" active={viewIsActive({ kind: 'vault' })} onClick={() => { setActive(null); goVault() }} />
           )}
 
           {/* ── Connected Apps ── */}
@@ -385,24 +367,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
                           : 'hover:bg-[var(--surface-sunken)]'
                       }`}
                     >
-                      {app.iconPngBase64 ? (
-                        <img
-                          src={`data:image/png;base64,${app.iconPngBase64}`}
-                          alt={app.title}
-                          className="h-5 w-5 rounded shrink-0"
-                        />
-                      ) : (
-                        <span
-                          className="h-5 w-5 rounded inline-flex items-center justify-center shrink-0"
-                          style={
-                            app.color
-                              ? { backgroundColor: `${app.color}1a`, color: app.color }
-                              : { backgroundColor: 'rgb(var(--accent) / 0.12)', color: 'rgb(var(--accent))' }
-                          }
-                        >
-                          <Icon name={app.icon || 'apps'} size={12} />
-                        </span>
-                      )}
+                      <AppLogo app={app} size={20} glyphSize={12} />
                     </button>
                   </div>
                 ))
@@ -463,9 +428,9 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             People / Brain menus, not a stack of labelled sections. */}
         <div className="px-2 pt-1 pb-2">
           <NavRow
-            icon="dashboard"
+            icon="plexii:home"
             label="Home"
-            tint="bg-indigo-500"
+            tone="text-indigo-500"
             active={viewIsActive({ kind: 'home' })}
             onClick={() => {
               setActive(null)
@@ -479,7 +444,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <NavRow
                 icon="meeting_room"
                 label="Rooms"
-                tint="bg-sky-500"
+                tone="text-sky-500"
                 active={viewIsActive({ kind: 'rooms' }) || viewIsActive({ kind: 'desks' })}
                 onClick={() => {
                   setActive(null)
@@ -500,7 +465,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <NavRow
                 icon="desk"
                 label="All desks"
-                tint="bg-teal-500"
+                tone="text-teal-500"
                 active={viewIsActive({ kind: 'desks' })}
                 onClick={() => {
                   setActive(null)
@@ -510,7 +475,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <NavRow
                 icon="folder_shared"
                 label="Shared"
-                tint="bg-fuchsia-500"
+                tone="text-fuchsia-500"
                 active={viewIsActive({ kind: 'shared' })}
                 badge={sharedInbox.length ? String(sharedInbox.length) : undefined}
                 onClick={() => {
@@ -523,7 +488,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           <NavRow
             icon="account_tree"
             label="Plans"
-            tint="bg-violet-500"
+            tone="text-violet-500"
             active={viewIsActive({ kind: 'projects' })}
             onClick={() => {
               setActive(null)
@@ -533,7 +498,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           <NavRow
             icon="checklist"
             label="Tasks"
-            tint="bg-emerald-500"
+            tone="text-emerald-500"
             active={viewIsActive({ kind: 'all-tasks' })}
             onClick={() => {
               setActive(null)
@@ -544,7 +509,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             <NavRow
               icon="calendar_month"
               label="Calendar"
-              tint="bg-amber-500"
+              tone="text-amber-500"
               active={viewIsActive({ kind: 'calendar' })}
               onClick={() => {
                 setActive(null)
@@ -556,7 +521,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             <NavRow
               icon="folder"
               label="Files"
-              tint="bg-orange-500"
+              tone="text-orange-500"
               active={viewIsActive({ kind: 'files' })}
               onClick={() => {
                 setActive(null)
@@ -566,9 +531,9 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           )}
           {viewEnabled('vault') && (
             <NavRow
-              icon="lock"
+              icon="plexii:vault"
               label="Vault"
-              tint="bg-rose-500"
+              tone="text-rose-500"
               active={viewIsActive({ kind: 'vault' })}
               onClick={() => {
                 setActive(null)
@@ -668,18 +633,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
       {/* Pro card — the same upgrade block that sits at the foot of the
           PlexiOffice menu, so every area's menu ends the same way. */}
       <div className="px-3 pt-2">
-        <div className="rounded-xl border border-[rgb(var(--accent)/0.3)] bg-[rgb(var(--accent)/0.06)] p-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-            <span className="text-[12px] font-semibold">PlexiDesk Pro</span>
-          </div>
-          <button
-            onClick={() => promptUpgrade('PlexiDesk Pro')}
-            className="w-full h-7 rounded-lg bg-[rgb(var(--accent))] text-white text-[11.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
-          >
-            Upgrade Now
-          </button>
-        </div>
+        <UpgradeCard label="PlexiDesk Pro" />
       </div>
 
       {/* Footer — sync indicator. Stays pinned to the bottom of the
@@ -745,19 +699,23 @@ function SectionHeader({ label, open, onToggle, action }: SectionHeaderProps): J
 interface CollapsedNavIconProps {
   icon: string
   label: string
+  // Same per-destination stroke colour as the expanded NavRow, so the collapsed
+  // rail reads at a glance instead of as a column of grey glyphs. The active
+  // state still wins with the accent pill.
+  tone?: string
   active: boolean
   onClick: () => void
 }
 
-function CollapsedNavIcon({ icon, label, active, onClick }: CollapsedNavIconProps): JSX.Element {
+function CollapsedNavIcon({ icon, label, tone, active, onClick }: CollapsedNavIconProps): JSX.Element {
   return (
     <button
       onClick={onClick}
       title={label}
-      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
+      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 fb-press ${
         active
           ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]'
-          : 'text-[var(--ink-50)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+          : `${tone ?? 'text-[var(--ink-50)]'} hover:bg-[var(--surface-sunken)]`
       }`}
     >
       <Icon name={icon} size={16} />
@@ -768,28 +726,30 @@ function CollapsedNavIcon({ icon, label, active, onClick }: CollapsedNavIconProp
 interface NavRowProps {
   icon: string
   label: string
-  tint: string
+  // Tailwind text-* class colouring the bare icon (no tile behind it).
+  tone: string
   active: boolean
   onClick: () => void
   badge?: string
   testid?: string
 }
 
-function NavRow({ icon, label, tint, active, onClick, badge, testid }: NavRowProps): JSX.Element {
-  // Same row as the PlexiOffice menu's app rows: a coloured rounded square with a
-  // white icon, then the label, and a soft accent fill when the row is active.
+function NavRow({ icon, label, tone, active, onClick, badge, testid }: NavRowProps): JSX.Element {
+  // Brand treatment: line icons coloured in the stroke itself — one hue per
+  // destination, no tile behind them. The active row still reads through the
+  // soft accent pill and label weight.
   return (
     <button
       onClick={onClick}
       data-testid={testid}
-      className={`fb-nav-item flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 text-left transition-colors ${
+      className={`fb-nav-item group flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] mb-0.5 text-left transition-colors fb-press ${
         active
-          ? 'bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] font-medium'
+          ? 'bg-[rgb(var(--accent)/0.10)] text-[rgb(var(--accent))] font-medium'
           : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'
       }`}
     >
-      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 ${tint}`}>
-        <Icon name={icon} size={14} />
+      <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 ${tone}`}>
+        <Icon name={icon} size={17} />
       </span>
       <span className="flex-1 min-w-0 break-words leading-tight">{label}</span>
       {badge && (

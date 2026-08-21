@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import {
   STANDARD_APPS,
@@ -6,6 +7,7 @@ import {
   type StandardApp
 } from '../lib/standardApps'
 import Icon from './Icon'
+import { logoForStandardId } from '../lib/appLogos'
 
 interface Props {
   onClose: () => void
@@ -149,7 +151,9 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
       )
     : STANDARD_APPS
 
-  return (
+  // Portaled to <body> so a transformed ancestor (sidebar glass chrome) can't
+  // trap the fixed overlay inside its own box — see plexi/Modal.tsx.
+  return createPortal(
     <div
       className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
       onClick={onClose}
@@ -388,7 +392,8 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -438,18 +443,27 @@ function PresetGrid({
             key={p.id}
             onClick={() => !already && onAdd(p)}
             disabled={already || busy}
-            className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-colors ${
+            className={`flex items-center gap-2 p-2.5 text-left ${
               already
-                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 cursor-default'
-                : 'border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5'
+                ? 'rounded-[10px] border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 cursor-default'
+                : 'fb-tile fb-press'
             }`}
           >
-            <span
-              className="h-8 w-8 rounded-md inline-flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${p.color}1a`, color: p.color }}
-            >
-              <Icon name={p.icon} size={16} />
-            </span>
+            {logoForStandardId(p.id) ? (
+              <img
+                src={logoForStandardId(p.id)!}
+                alt=""
+                className="h-8 w-8 rounded-md shrink-0 object-contain"
+                draggable={false}
+              />
+            ) : (
+              <span
+                className="h-8 w-8 rounded-md inline-flex items-center justify-center shrink-0"
+                style={{ backgroundColor: `${p.color}1a`, color: p.color }}
+              >
+                <Icon name={p.icon} size={16} />
+              </span>
+            )}
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-[var(--ink-100)] truncate">
                 {p.title}

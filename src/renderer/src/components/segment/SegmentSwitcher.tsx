@@ -14,8 +14,8 @@ import Icon from '../Icon'
 // rather than an admin restriction, offers an upgrade. Desk is the floor and is
 // always available.
 const AREAS = [
-  { kind: 'plexidesk', label: 'Desk', icon: 'desktop_windows', cap: 'product_desk' },
-  { kind: 'office', label: 'Office', icon: 'grid_view', cap: 'product_office' },
+  { kind: 'plexidesk', label: 'Desk', icon: 'plexii:desks', cap: 'product_desk' },
+  { kind: 'office', label: 'Office', icon: 'plexii:office', cap: 'product_office' },
   { kind: 'plexipeople', label: 'People', icon: 'diversity_3', cap: 'product_people' },
   { kind: 'plexibrain', label: 'Brain', icon: 'neurology', cap: 'product_brain' }
 ] as const

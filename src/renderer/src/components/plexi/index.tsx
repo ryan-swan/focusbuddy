@@ -12,8 +12,10 @@ import Icon from '../Icon'
 // Card idiom (matches the 2.0-era cards): rounded-xl, hairline border, glassy
 // fill, soft inset highlight via fb-glass-soft.
 
-export const PLEXI_CARD =
-  'rounded-xl border border-stone-200/80 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur-sm fb-glass-soft'
+// Material card (Apple pass): depth from shadow + inset light + hairline,
+// no 1px outline. Radius and shadows come from the token layer so every
+// theme repaints it correctly.
+export const PLEXI_CARD = 'fb-card'
 
 export type Tone = 'accent' | 'emerald' | 'amber' | 'rose' | 'violet' | 'sky' | 'stone'
 
@@ -140,19 +142,19 @@ export function RailCard({
   return (
     <section className={`${PLEXI_CARD} ${className}`}>
       {title && (
-        <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2">
-          <h3 className="text-[13px] font-semibold text-[var(--ink-90)] flex items-center gap-1.5">
-            {icon && <Icon name={icon} size={15} className={TONE_TEXT[tone]} />}
+        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
+          <h3 className="fb-t-title text-[var(--ink-90)] flex items-center gap-2">
+            {icon && <Icon name={icon} size={16} className={TONE_TEXT[tone]} />}
             {title}
           </h3>
           {action && (
-            <button onClick={action.onClick} className="text-[11.5px] font-medium text-accent hover:underline">
+            <button onClick={action.onClick} className="fb-t-label text-accent hover:underline underline-offset-2">
               {action.label}
             </button>
           )}
         </div>
       )}
-      <div className={title ? 'px-4 pb-3.5' : 'p-4'}>{children}</div>
+      <div className={title ? 'px-4 pb-4' : 'p-4'}>{children}</div>
     </section>
   )
 }

@@ -6,6 +6,7 @@ import {
   isValidHex,
   type AccentColor,
   type DeskBgMode,
+  type DeskPattern,
   type FontChoice,
   type ThemeCustomization,
   type ThemeMode
@@ -475,6 +476,45 @@ export default function ThemeBuilder({
                   onChange={(v) => onCustomizationChange({ gradAngle: v })}
                   testid="themestudio-grad-angle"
                 />
+              </div>
+            )}
+          </section>
+
+          {/* Canvas pattern */}
+          <section>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-2">
+              Canvas pattern
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  { value: 'dots' as DeskPattern, label: 'Dots', icon: 'blur_on' },
+                  { value: 'grid' as DeskPattern, label: 'Grid', icon: 'grid_4x4' },
+                  { value: 'none' as DeskPattern, label: 'None', icon: 'texture' }
+                ]
+              ).map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => onCustomizationChange({ deskPattern: o.value })}
+                  className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
+                    c.deskPattern === o.value
+                      ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                      : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                  }`}
+                  data-testid={`themestudio-pattern-${o.value}`}
+                >
+                  <Icon
+                    name={o.icon}
+                    size={16}
+                    className={c.deskPattern === o.value ? 'text-accent' : 'text-[var(--ink-50)]'}
+                  />
+                  <span>{o.label}</span>
+                </button>
+              ))}
+            </div>
+            {c.deskBgMode !== 'default' && (
+              <div className="mt-1.5 text-[10.5px] text-[var(--ink-40)]">
+                A custom background replaces the pattern; switch the background to Default to see it.
               </div>
             )}
           </section>

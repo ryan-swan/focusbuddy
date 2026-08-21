@@ -3,6 +3,7 @@ import { useConnectedAppsStore } from '../../stores/connectedApps'
 import { useViewStore } from '../../stores/view'
 import { DashboardHeader } from '../plexi'
 import Icon from '../Icon'
+import AppLogo from '../AppLogo'
 
 // Connect — the hub of apps you have connected (Gmail, Slack, Spotify, ChatGPT,
 // and local apps). Built only from real connected-app records; an empty list
@@ -39,22 +40,9 @@ export default function ConnectedAppsHubView(): JSX.Element {
                 key={app.id}
                 onClick={() => (app.kind === 'local' ? void launchLocal(app.id) : goConnectedApp(app.id))}
                 data-testid={`connect-app-${app.id}`}
-                className="flex flex-col items-start gap-2.5 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4 text-left hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+                className="flex flex-col items-start gap-2.5 fb-card fb-lift p-4 text-left"
               >
-                {app.iconPngBase64 ? (
-                  <img src={`data:image/png;base64,${app.iconPngBase64}`} alt="" className="h-10 w-10 rounded-lg" />
-                ) : (
-                  <span
-                    className="inline-flex items-center justify-center h-10 w-10 rounded-lg"
-                    style={
-                      app.color
-                        ? { backgroundColor: `${app.color}1a`, color: app.color }
-                        : { backgroundColor: 'rgb(var(--accent) / 0.12)', color: 'rgb(var(--accent))' }
-                    }
-                  >
-                    <Icon name={app.icon || 'apps'} size={20} />
-                  </span>
-                )}
+                <AppLogo app={app} size={40} glyphSize={20} className="rounded-lg" />
                 <span className="text-[13.5px] font-semibold truncate w-full">{app.title}</span>
                 <span className="text-[11px] text-[var(--ink-50)]">{app.kind === 'local' ? 'Local app' : 'Web app'}</span>
               </button>
