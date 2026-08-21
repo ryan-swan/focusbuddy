@@ -2388,6 +2388,7 @@ export default function Canvas(): JSX.Element {
           <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45] flex items-center gap-2">
             <CanvasBreadcrumb
               activeTask={activeTask}
+              trailing={activeTaskId && isCanvasMode ? <ViewSelector taskId={activeTaskId} /> : undefined}
               nodes={nodes}
               onOpenTask={(id) => setActiveTask(id)}
               onHome={() => setActiveTask(null)}
@@ -2399,7 +2400,7 @@ export default function Canvas(): JSX.Element {
             {/* The breadcrumb selector shows only in canvas mode; every overlay
                 view (columns + data views) carries its own in-view selector, so
                 exactly one is present at a time (no duplicate testid). */}
-            {activeTaskId && isCanvasMode && <ViewSelector taskId={activeTaskId} />}
+
           </div>
           {/* Context Health (plexi-4.0): floats just under the breadcrumb, showing
               what changed since last visit and related desks needing attention.

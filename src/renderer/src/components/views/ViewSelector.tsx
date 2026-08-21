@@ -155,11 +155,11 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
         title="Change how this desk is shown"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="fb-glass-chrome inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shadow-[0_2px_10px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.06] dark:ring-white/[0.06]"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)] transition-colors shrink-0 whitespace-nowrap"
       >
-        <Icon name={current.icon} size={14} />
-        {current.label}
-        <Icon name="expand_more" size={14} className="text-[var(--ink-40)]" />
+        <Icon name={current.icon} size={12} />
+        <span className="text-[11px] font-medium">{current.label}</span>
+        <Icon name="expand_more" size={12} className="text-[var(--ink-40)]" />
       </button>
 
       {open && pos && createPortal(

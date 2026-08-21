@@ -15,6 +15,9 @@ interface Props {
   onAssignToRoom?: (deskId: string, roomId: string) => void
   onCreateRoomFromDesk?: (deskId: string) => void
   onRenameTask?: (id: string, title: string) => void
+  // Rendered inside the pill after a divider — the view-mode switcher lives
+  // here so "Free canvas" reads as part of the breadcrumb, not a stray button.
+  trailing?: React.ReactNode
 }
 
 // Hover-expand glossy pill breadcrumb with Stage Manager dropdowns.
@@ -39,7 +42,8 @@ export default function CanvasBreadcrumb({
   fromMindmap,
   onAssignToRoom,
   onCreateRoomFromDesk,
-  onRenameTask
+  onRenameTask,
+  trailing
 }: Props): JSX.Element {
   // Global back + canonical room open, so a desk can always step back to the
   // previous screen and open the room it lives in from the breadcrumb.
@@ -369,6 +373,13 @@ export default function CanvasBreadcrumb({
           <Icon name="ios_share" size={12} />
           <span className="text-[11px] font-medium">Share</span>
         </button>
+
+        {trailing && (
+          <>
+            <span aria-hidden className="w-px h-4 bg-[var(--edge-soft)] mx-1 shrink-0" />
+            {trailing}
+          </>
+        )}
       </div>
 
       {/* Transparent bridge — fills the mt-2 gap between pill and dropdown so
