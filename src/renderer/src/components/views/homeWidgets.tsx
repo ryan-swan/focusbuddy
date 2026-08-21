@@ -35,7 +35,7 @@ import type { ShortcutLookups } from './homeShortcutTargets'
 export type { HomeWidgetId, HomeWidgetConfig, HomeWidgetInstance, WidgetSize, HomeWidgetDef, QuickLinkRoute } from './homeWidgetDefs'
 export { HOME_WIDGET_DEFS, widgetDef, QUICK_LINK_ROUTES } from './homeWidgetDefs'
 import { QUICK_LINK_ROUTES } from './homeWidgetDefs'
-import type { HomeWidgetConfig, QuickLinkRoute, ShortcutTarget, WidgetSize } from './homeWidgetDefs'
+import type { HomeWidgetConfig, ShortcutTarget, WidgetSize } from './homeWidgetDefs'
 
 function relTime(ms: number): string {
   const diff = Date.now() - ms
@@ -181,33 +181,6 @@ function goSection(v: ViewStore, id: string): void {
     case 'files': v.goFiles(); break
     case 'vault': v.goVault(); break
   }
-}
-
-export function QuickLinksWidget({ routes }: { routes?: string[] }): JSX.Element {
-  const v = useViewStore()
-  const picked = (routes ?? []).map((id) => QUICK_LINK_ROUTES.find((r) => r.id === id)).filter(Boolean) as QuickLinkRoute[]
-  const go = (id: string): void => goSection(v, id)
-  return (
-    <RailCard title="Quick links" icon="link" tone="accent">
-      {picked.length === 0 ? (
-        <EmptyState text="No links picked yet. Edit this widget in Customize." />
-      ) : (
-        <div className="grid grid-cols-3 auto-rows-fr flex-1 min-h-0 gap-2" data-testid="home-quick-links">
-          {picked.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => go(r.id)}
-              data-testid={`home-quick-link-${r.id}`}
-              className="flex flex-col items-center gap-1.5 fb-tile fb-press px-2 py-2.5"
-            >
-              <Icon name={r.icon} size={18} className={r.tone} />
-              <span className="text-[10.5px] text-[var(--ink-80)] truncate max-w-full">{r.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </RailCard>
-  )
 }
 
 export function AppLauncherWidget(): JSX.Element {

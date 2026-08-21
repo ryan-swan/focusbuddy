@@ -65,7 +65,10 @@ export interface HomeWidgetDef {
   // others are singletons: the gallery shows them as Added once placed.
   multi?: boolean
   // Which picker must run before this widget can be placed.
-  config?: 'desk' | 'room' | 'links'
+  config?: 'desk' | 'room'
+  // Retired widgets stay in the id union and this registry so stored layouts
+  // keep loading (and migrating) sanely, but the gallery never offers them.
+  retired?: boolean
   defaultCol: 'main' | 'rail'
   sizes: WidgetSize[]
   defaultSize: WidgetSize
@@ -83,7 +86,9 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   { id: 'navigator', name: 'Rooms and desks', blurb: 'Browse rooms on the left, their desks open to the right', icon: 'meeting_room', tint: 'bg-sky-500/10 text-sky-500', category: 'Navigation', defaultCol: 'main', sizes: ['lg'], defaultSize: 'lg' },
   { id: 'pinned-desk', name: 'Pinned desk', blurb: 'One desk you care about, one click away', icon: 'push_pin', tint: 'bg-violet-500/10 text-violet-500', category: 'Navigation', multi: true, config: 'desk', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'room-portal', name: 'Room portal', blurb: 'A single room and the desks inside it', icon: 'door_open', tint: 'bg-teal-500/10 text-teal-500', category: 'Navigation', multi: true, config: 'room', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'lg' },
-  { id: 'quick-links', name: 'Quick links', blurb: 'Your own row of shortcuts to the places you use most', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', config: 'links', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  // Absorbed by Shortcuts (2026-08-21): stored quick-links instances migrate
+  // to a Shortcuts box with section targets at load.
+  { id: 'quick-links', name: 'Quick links', blurb: 'Your own row of shortcuts to the places you use most', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', retired: true, defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'shortcuts', name: 'Shortcuts', blurb: 'Your own tiles to anywhere: desks, documents, websites, apps', icon: 'link', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Navigation', multi: true, defaultCol: 'rail', sizes: ['sm', 'md', 'lg', 'stack'], defaultSize: 'sm' },
   { id: 'app-launcher', name: 'App launcher', blurb: 'Your favourite connected apps with their real logos', icon: 'apps', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Navigation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   // Actions

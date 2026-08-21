@@ -3,7 +3,7 @@
 // unit tests, the widget, and the composer share one source of truth.
 
 import { QUICK_LINK_ROUTES } from './homeWidgetDefs'
-import type { ShortcutTarget, WidgetSize } from './homeWidgetDefs'
+import type { HomeWidgetConfig, HomeWidgetId, ShortcutTarget, WidgetSize } from './homeWidgetDefs'
 
 // What the widget needs to know about the world to describe a target. The
 // component builds these from its stores; tests build them from fixtures.
@@ -104,6 +104,22 @@ export function targetKey(t: ShortcutTarget): string {
     case 'connected-app':
       return `app:${t.appId}`
   }
+}
+
+// Quick Links absorption (2026-08-21): a stored quick-links instance becomes a
+// Shortcuts box whose targets are its picked sections, keeping its key, size,
+// and position. Runs at layout load. Idempotent: the result is 'shortcuts' and
+// never matches again. The box keeps the old widget's name so the board reads
+// unchanged after migration.
+export function migrateQuickLinks<T extends { widget: HomeWidgetId; config?: HomeWidgetConfig }>(inst: T): T {
+  if (inst.widget !== 'quick-links') return inst
+  const targets: ShortcutTarget[] = (inst.config?.routes ?? [])
+    .map((id): ShortcutTarget | null => {
+      const route = QUICK_LINK_ROUTES.find((r) => r.id === id)
+      return route ? { kind: 'section', id, label: route.label } : null
+    })
+    .filter((t): t is ShortcutTarget => t !== null)
+  return { ...inst, widget: 'shortcuts' as HomeWidgetId, config: { title: 'Quick links', targets } }
 }
 
 const DOC_VISUALS: Record<string, { icon: string; tone: string; caption: string }> = {

@@ -3,6 +3,7 @@ import {
   SHORTCUT_SLOTS,
   describeShortcutTarget,
   faviconUrl,
+  migrateQuickLinks,
   normalizeUrl,
   targetKey,
   urlLabel,
@@ -148,7 +149,45 @@ describe('describeShortcutTarget', () => {
   })
 })
 
+describe('migrateQuickLinks', () => {
+  it('converts a quick-links instance into a Shortcuts box with section targets', () => {
+    const out = migrateQuickLinks({
+      key: 'quick-links:abc',
+      widget: 'quick-links' as const,
+      config: { routes: ['calendar', 'vault'] },
+      size: 'sm' as const
+    })
+    expect(out.widget).toBe('shortcuts')
+    expect(out.key).toBe('quick-links:abc')
+    expect(out.size).toBe('sm')
+    expect(out.config).toEqual({
+      title: 'Quick links',
+      targets: [
+        { kind: 'section', id: 'calendar', label: 'Calendar' },
+        { kind: 'section', id: 'vault', label: 'Vault' }
+      ]
+    })
+  })
+  it('drops unknown route ids and tolerates missing config', () => {
+    const out = migrateQuickLinks({ widget: 'quick-links' as const, config: { routes: ['vault', 'bogus'] } })
+    expect(out.config?.targets).toHaveLength(1)
+    const bare = migrateQuickLinks({ widget: 'quick-links' as const })
+    expect(bare.config).toEqual({ title: 'Quick links', targets: [] })
+  })
+  it('is idempotent and leaves every other widget untouched', () => {
+    const once = migrateQuickLinks({ widget: 'quick-links' as const, config: { routes: ['tasks'] } })
+    expect(migrateQuickLinks(once)).toEqual(once)
+    const other = { widget: 'agenda' as const, config: { deskId: 'x' } }
+    expect(migrateQuickLinks(other)).toBe(other)
+  })
+})
+
 describe('registry', () => {
+  it('retires quick-links from the gallery but keeps it loadable', () => {
+    const def = HOME_WIDGET_DEFS.find((d) => d.id === 'quick-links')
+    expect(def?.retired).toBe(true)
+  })
+
   it('declares the shortcuts widget as multi-instance at every size', () => {
     const def = HOME_WIDGET_DEFS.find((d) => d.id === 'shortcuts')
     expect(def).toBeTruthy()

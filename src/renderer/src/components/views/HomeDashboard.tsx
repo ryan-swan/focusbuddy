@@ -27,16 +27,15 @@ import Modal from '../plexi/Modal'
 import StandupHome from './StandupHome'
 import StartOrAskPlexi from './StartOrAskPlexi'
 import Icon from '../Icon'
+import { migrateQuickLinks } from './homeShortcutTargets'
 import {
   HOME_WIDGET_DEFS,
-  QUICK_LINK_ROUTES,
   widgetDef,
   type HomeWidgetConfig,
   type HomeWidgetId,
   type HomeWidgetInstance,
   PinnedDeskWidget,
   RoomPortalWidget,
-  QuickLinksWidget,
   AppLauncherWidget,
   CreateWidget,
   FocusTimerWidget,
@@ -299,10 +298,13 @@ function loadFlat(): SizedInstance[] {
           !!seen.add((it as SizedInstance).key)
       )
       if (clean.length > 0)
-        return clean.map((it) => ({ ...it, size: clampSize(widgetDef(it.widget), it.size) }))
+        return clean
+          .map(migrateQuickLinks)
+          .map((it) => ({ ...it, size: clampSize(widgetDef(it.widget), it.size) }))
     }
     const legacy = loadLayout()
-    const migrated = sizedFromColumns(legacy.main, legacy.rail)
+    // Absorb quick-links before sizing so the columns carry Shortcuts defs.
+    const migrated = sizedFromColumns(legacy.main.map(migrateQuickLinks), legacy.rail.map(migrateQuickLinks))
     return migrated.length > 0 ? migrated : STOCK_FLAT
   } catch {
     return STOCK_FLAT
@@ -398,7 +400,7 @@ export default function HomeDashboard(): JSX.Element {
   // with the result — place at a position, swap an instance, or edit in place.
   const [picker, setPicker] = useState<{
     widget: HomeWidgetId
-    kind: 'desk' | 'room' | 'links'
+    kind: 'desk' | 'room'
     initial?: HomeWidgetConfig
     apply: (config: HomeWidgetConfig) => void
   } | null>(null)
@@ -737,8 +739,6 @@ export default function HomeDashboard(): JSX.Element {
         return <PinnedDeskWidget deskId={inst.config?.deskId} onAddAnother={() => placeWidget('pinned-desk')} />
       case 'room-portal':
         return <RoomPortalWidget roomId={inst.config?.roomId} size={size} />
-      case 'quick-links':
-        return <QuickLinksWidget routes={inst.config?.routes} />
       case 'shortcuts':
         // The composer commits config live. Previews render synthetic
         // instances whose keys are not in the layout; the guard keeps their
@@ -1613,6 +1613,7 @@ function WidgetPickerOverlay({
 
   const q = search.trim().toLowerCase()
   const visible = HOME_WIDGET_DEFS.filter((d) => {
+    if (d.retired) return false
     if (category !== 'All' && d.category !== category) return false
     if (q && !`${d.name} ${d.blurb}`.toLowerCase().includes(q)) return false
     return true
@@ -1897,36 +1898,30 @@ function SkeletonLines({ rows }: { rows: number }): JSX.Element {
 
 // ── Customize mode: config pickers ───────────────────────────────────────────
 // Small choosers for the widgets that need a subject: which desk to pin, which
-// room to open, which links to show.
+// room to open. (The links chooser retired with Quick links; Shortcuts carries
+// its own composer.)
 function WidgetConfigPicker({
   widget,
   kind,
-  initial,
   onCancel,
   onConfirm
 }: {
   widget: HomeWidgetId
-  kind: 'desk' | 'room' | 'links'
+  kind: 'desk' | 'room'
   initial?: HomeWidgetConfig
   onCancel: () => void
   onConfirm: (config: HomeWidgetConfig) => void
 }): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const [query, setQuery] = useState('')
-  const [routes, setRoutes] = useState<Set<string>>(
-    () => new Set(initial?.routes ?? ['calendar', 'documents', 'vault'])
-  )
 
   const def = widgetDef(widget)
   const q = query.trim().toLowerCase()
-  const candidates =
-    kind === 'links'
-      ? []
-      : nodes
-          .filter((n) => !n.archived && (kind === 'desk' ? n.kind === 'task' : n.kind === 'folder'))
-          .filter((n) => !q || (n.title || '').toLowerCase().includes(q))
-          .sort((a, b) => b.updatedAt - a.updatedAt)
-          .slice(0, 30)
+  const candidates = nodes
+    .filter((n) => !n.archived && (kind === 'desk' ? n.kind === 'task' : n.kind === 'folder'))
+    .filter((n) => !q || (n.title || '').toLowerCase().includes(q))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 30)
 
   return (
     <Modal
@@ -1941,74 +1936,42 @@ function WidgetConfigPicker({
           <Icon name={def.icon} size={15} />
         </span>
         <span className="text-[13.5px] font-semibold text-[var(--ink-100)]">
-          {kind === 'desk' ? 'Pin which desk?' : kind === 'room' ? 'Open which room?' : 'Pick your links'}
+          {kind === 'desk' ? 'Pin which desk?' : 'Open which room?'}
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
-        {kind === 'links' ? (
-          <div className="grid grid-cols-2 gap-1.5">
-            {QUICK_LINK_ROUTES.map((r) => {
-              const on = routes.has(r.id)
-              return (
-                <button
-                  key={r.id}
-                  onClick={() =>
-                    setRoutes((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(r.id)) next.delete(r.id)
-                      else next.add(r.id)
-                      return next
-                    })
-                  }
-                  className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
-                    on
-                      ? 'border-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.06)]'
-                      : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)]'
-                  }`}
-                >
-                  <Icon name={r.icon} size={15} className={r.tone} />
-                  <span className="flex-1 text-[12.5px] text-[var(--ink-90)]">{r.label}</span>
-                  {on && <Icon name="check" size={13} className="text-accent" />}
-                </button>
-              )
-            })}
-          </div>
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={kind === 'desk' ? 'Search desks…' : 'Search rooms…'}
+          className="w-full mb-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+        />
+        {candidates.length === 0 ? (
+          <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">
+            {kind === 'desk' ? 'No desks match.' : 'No rooms match.'}
+          </p>
         ) : (
-          <>
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={kind === 'desk' ? 'Search desks…' : 'Search rooms…'}
-              className="w-full mb-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
-            />
-            {candidates.length === 0 ? (
-              <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">
-                {kind === 'desk' ? 'No desks match.' : 'No rooms match.'}
-              </p>
-            ) : (
-              <div className="space-y-0.5">
-                {candidates.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => onConfirm(kind === 'desk' ? { deskId: n.id } : { roomId: n.id })}
-                    data-testid={`home-widget-config-item-${n.id}`}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
-                  >
-                    <Icon
-                      name={kind === 'desk' ? 'desk' : 'folder'}
-                      size={15}
-                      className="text-[var(--ink-50)] shrink-0"
-                    />
-                    <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
-                      {n.title || (kind === 'desk' ? 'Untitled desk' : 'Untitled room')}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
+          <div className="space-y-0.5">
+            {candidates.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => onConfirm(kind === 'desk' ? { deskId: n.id } : { roomId: n.id })}
+                data-testid={`home-widget-config-item-${n.id}`}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+              >
+                <Icon
+                  name={kind === 'desk' ? 'desk' : 'folder'}
+                  size={15}
+                  className="text-[var(--ink-50)] shrink-0"
+                />
+                <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                  {n.title || (kind === 'desk' ? 'Untitled desk' : 'Untitled room')}
+                </span>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -2016,17 +1979,6 @@ function WidgetConfigPicker({
         <button onClick={onCancel} className="btn-ghost">
           Cancel
         </button>
-        {kind === 'links' && (
-          <button
-            onClick={() => onConfirm({ routes: QUICK_LINK_ROUTES.filter((r) => routes.has(r.id)).map((r) => r.id) })}
-            disabled={routes.size === 0}
-            className="btn-primary"
-            data-testid="home-widget-config-save"
-          >
-            <Icon name="check" size={14} />
-            <span>Save links</span>
-          </button>
-        )}
       </div>
     </Modal>
   )
