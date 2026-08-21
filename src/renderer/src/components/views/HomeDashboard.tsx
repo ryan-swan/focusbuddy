@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { personFirstName } from '../../lib/personName'
@@ -8,10 +9,10 @@ import { useAiCommandBar } from '../../stores/aiCommandBar'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { usePinLayer } from '../../stores/pinLayer'
 import { useFocusSessionStore } from '../../stores/focusSession'
-import { createPortal } from 'react-dom'
 import { RailCard } from '../plexi'
 import Modal from '../plexi/Modal'
 import StandupHome from './StandupHome'
+import StageManagerStrip from '../StageManagerStrip'
 import StartOrAskPlexi from './StartOrAskPlexi'
 import Icon from '../Icon'
 import {
@@ -313,6 +314,9 @@ export default function HomeDashboard(): JSX.Element {
   const [galleryDrag, setGalleryDrag] = useState<HomeWidgetId | null>(null)
   const [dropHint, setDropHint] = useState<{ col: 'main' | 'rail'; index: number } | null>(null)
   const [customize, setCustomize] = useState(false)
+  // Stage Manager pill — the same desk-miniature strip the desk breadcrumb
+  // opens, surfaced on Home so any desk is one click away.
+  const [deskStripOpen, setDeskStripOpen] = useState(false)
   // A placed widget selected for swapping (click it, then click a gallery card).
   const [swapKey, setSwapKey] = useState<string | null>(null)
   // A config picker in flight: the widget def needing config, plus what happens
@@ -806,7 +810,7 @@ export default function HomeDashboard(): JSX.Element {
             action={{ label: 'Calendar', onClick: () => v.goCalendar() }}
           >
             {agenda === null ? (
-              <EmptyState text="Loading your day…" />
+              <SkeletonLines rows={3} />
             ) : todayEvents.length === 0 ? (
               <p className="py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-agenda-empty">
                 Nothing scheduled today.
@@ -884,7 +888,7 @@ export default function HomeDashboard(): JSX.Element {
         return (
           <RailCard title="Recent activity" icon="bolt" tone="accent">
             {activity === null ? (
-              <EmptyState text="Loading recent activity…" />
+              <SkeletonLines rows={4} />
             ) : recentActivity.length === 0 ? (
               <p className="py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-activity-empty">
                 No recent activity yet. As you open desks and run sessions, it shows up here.
@@ -957,14 +961,32 @@ export default function HomeDashboard(): JSX.Element {
 
   const dragging = dragKey !== null || galleryDrag !== null
 
+  // Stagger only the very first paint: widgets cascade in once, then all
+  // later layout changes are pure springs with no artificial delay.
+  const firstPaintRef = useRef(true)
+  useEffect(() => {
+    firstPaintRef.current = false
+  }, [])
+
   const renderColumn = (col: 'main' | 'rail'): JSX.Element => (
     <div className="space-y-5 min-w-0">
+      <AnimatePresence>
       {layout[col].map((inst, i) => {
         const def = widgetDef(inst.widget)
         const selected = swapKey === inst.key
+        const mountDelay = firstPaintRef.current ? i * 0.045 : 0
         return (
-          <div
+          <motion.div
             key={inst.key}
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+            transition={{
+              layout: { type: 'spring', stiffness: 550, damping: 40 },
+              opacity: { duration: 0.25, delay: mountDelay },
+              y: { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
+            }}
             className="relative group/slot"
             onDragOver={(e) => {
               if (!dragging || dragKey === inst.key) return
@@ -1045,12 +1067,15 @@ export default function HomeDashboard(): JSX.Element {
             >
               <Icon name="drag_indicator" size={14} />
             </span>
-          </div>
+          </motion.div>
         )
       })}
+      </AnimatePresence>
       {/* Column tail — a live drop zone while dragging, and a visible invitation
           in customize mode. */}
-      <div
+      <motion.div
+        layout
+        transition={{ layout: { type: 'spring', stiffness: 550, damping: 40 } }}
         className={`rounded-xl border border-dashed transition-all flex items-center justify-center ${
           dragging
             ? dropHint?.col === col && dropHint.index === layout[col].length
@@ -1075,20 +1100,67 @@ export default function HomeDashboard(): JSX.Element {
             {dragging ? 'Drop here' : 'Free slot, drag a widget in'}
           </span>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 
   return (
-    // Plain themed surface, deliberately NOT desk-paper: the dashboard is
-    // product chrome, not a desk canvas. desk-paper here inherited the user's
-    // custom desk background (light even in dark mode) and the time-of-day
-    // gradient, which pinned to the scroll container and drew a seam.
-    <div
-      className="h-full w-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]"
-      data-testid="home-dashboard"
-    >
-      <div className={`max-w-6xl mx-auto px-6 py-7 transition-[padding] ${customize ? 'lg:pr-[340px]' : ''}`}>
+    // paper-texture, deliberately NOT desk-paper: the dashboard gets the same
+    // dot/grid paper as desks but skips desk-paper's custom-background
+    // override and time-of-day overlay, which caused the mid-screen seam and
+    // the light-background-in-dark-mode bug.
+    <div className="relative h-full w-full text-[var(--ink-100)]" data-testid="home-dashboard">
+      {/* Home pill — the same glass pill, in the same top-left spot as the
+          desk breadcrumb, so Home and desks share one navigation language.
+          The Desks segment drops the Stage Manager strip directly beneath. */}
+      <div className="absolute top-4 left-4 z-[45]" data-floating-menu>
+        <div className="relative">
+          <div className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] select-none">
+            <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)]">
+              <Icon name="plexii:home" size={13} className="text-[rgb(var(--accent))]" />
+              Home
+            </span>
+            <span aria-hidden className="w-px h-4 bg-[var(--edge-soft)] mx-1 shrink-0" />
+            <button
+              onClick={() => setDeskStripOpen((v) => !v)}
+              data-testid="home-desk-strip-toggle"
+              title="Jump to a desk"
+              aria-expanded={deskStripOpen}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full transition-colors shrink-0 ${
+                deskStripOpen
+                  ? 'text-[rgb(var(--accent))] bg-[var(--surface-sunken)]'
+                  : 'text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)]'
+              }`}
+            >
+              <Icon name="apps" size={12} />
+              <span className="text-[11px] font-medium">Desks</span>
+              <Icon name="expand_more" size={12} className="text-[var(--ink-40)]" />
+            </button>
+          </div>
+          <AnimatePresence>
+            {deskStripOpen && (
+              <>
+                <div className="fixed inset-0 z-[59]" onClick={() => setDeskStripOpen(false)} />
+                <motion.div
+                  key="home-stage-strip"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.14, ease: 'easeOut' }}
+                  className="absolute left-0 top-full mt-2 w-[188px] max-h-[min(420px,60vh)] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
+                >
+                  <StageManagerStrip roomId={null} activeId="" />
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      <div className="h-full w-full overflow-auto paper-texture">
+      {/* The gallery floats as a dropdown now — customize never squeezes the
+          page, and pt-16 keeps the greeting clear of the Home pill above. */}
+      <div className="max-w-6xl mx-auto px-6 pb-7 pt-16">
         {/* Greeting + focus-mode toggle */}
         <header className="flex items-start justify-between gap-4 flex-wrap mb-6">
           <div className="min-w-0">
@@ -1113,6 +1185,7 @@ export default function HomeDashboard(): JSX.Element {
                 Reset layout
               </button>
             )}
+            <div className="relative">
             <button
               onClick={() => {
                 setCustomize((c) => !c)
@@ -1128,6 +1201,29 @@ export default function HomeDashboard(): JSX.Element {
               <Icon name={customize ? 'check' : 'dashboard_customize'} size={16} />
               {customize ? 'Done' : 'Customize'}
             </button>
+                  <AnimatePresence>
+      {customize && (
+        <WidgetGalleryDrawer
+          isPlaced={isPlaced}
+          swapTarget={swapKey ? findInstance(swapKey) : null}
+          onPick={(id) => {
+            if (swapKey) swapWidget(swapKey, id)
+            else placeWidget(id)
+          }}
+          onDragStartWidget={(id) => setGalleryDrag(id)}
+          onDragEndWidget={() => {
+            setGalleryDrag(null)
+            setDropHint(null)
+          }}
+          onClearSwap={() => setSwapKey(null)}
+          onClose={() => {
+            setCustomize(false)
+            setSwapKey(null)
+          }}
+        />
+      )}
+      </AnimatePresence>
+            </div>
             <button
               onClick={() => openAiBar(true)}
               data-testid="home-ask-brain"
@@ -1168,26 +1264,6 @@ export default function HomeDashboard(): JSX.Element {
         </div>
       </div>
 
-      {customize && (
-        <WidgetGalleryDrawer
-          isPlaced={isPlaced}
-          swapTarget={swapKey ? findInstance(swapKey) : null}
-          onPick={(id) => {
-            if (swapKey) swapWidget(swapKey, id)
-            else placeWidget(id)
-          }}
-          onDragStartWidget={(id) => setGalleryDrag(id)}
-          onDragEndWidget={() => {
-            setGalleryDrag(null)
-            setDropHint(null)
-          }}
-          onClearSwap={() => setSwapKey(null)}
-          onClose={() => {
-            setCustomize(false)
-            setSwapKey(null)
-          }}
-        />
-      )}
 
       {picker && (
         <WidgetConfigPicker
@@ -1201,6 +1277,7 @@ export default function HomeDashboard(): JSX.Element {
           }}
         />
       )}
+      </div>
     </div>
   )
 }
@@ -1237,9 +1314,16 @@ function WidgetGalleryDrawer({
     return true
   })
 
-  return createPortal(
-    <div
-      className="fixed right-0 top-0 bottom-0 z-[60] w-[328px] flex flex-col border-l border-[var(--edge-firm)] bg-[var(--surface-raised)] shadow-[-12px_0_40px_rgba(0,0,0,0.22)]"
+  return (
+    // Anchored dropdown — drops directly under the Customize button with the
+    // same spring and panel treatment as the Stage Manager strip. It floats
+    // over the page; customize never reflows the layout.
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }}
+      className="absolute right-0 top-full mt-2 z-[70] w-[380px] max-h-[min(560px,calc(100vh-220px))] flex flex-col rounded-2xl fb-glass-panel ring-1 ring-black/[0.10] dark:ring-white/[0.10] overflow-hidden"
       data-testid="home-widget-gallery"
     >
       {/* Panel header */}
@@ -1348,8 +1432,19 @@ function WidgetGalleryDrawer({
           <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">No widgets match.</p>
         )}
       </div>
-    </div>,
-    document.body
+    </motion.div>
+  )
+}
+
+// Skeleton loading — placeholder bars in the shape of the content, so a
+// widget's data arriving feels like focus resolving, never like a fetch.
+function SkeletonLines({ rows }: { rows: number }): JSX.Element {
+  return (
+    <div className="space-y-2.5 py-1.5" aria-hidden="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="fb-skeleton h-3.5" style={{ width: `${88 - i * 13}%` }} />
+      ))}
+    </div>
   )
 }
 

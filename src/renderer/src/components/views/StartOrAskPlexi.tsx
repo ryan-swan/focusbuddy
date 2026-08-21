@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import Icon from '../Icon'
-import { PLEXI_CARD } from '../plexi'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import { useAiCommandBar } from '../../stores/aiCommandBar'
@@ -61,7 +60,9 @@ export default function StartOrAskPlexi(): JSX.Element {
 
   return (
     <div className="mb-6" data-testid="start-or-ask">
-      <div className={`${PLEXI_CARD} p-3`}>
+      {/* Glass chrome: the hero input floats above the desk-paper like a
+          control, not a content card — the one Liquid Glass surface on Home. */}
+      <div className="fb-glass-pillow rounded-[16px] p-3">
         <div className="flex items-center gap-2.5">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent shrink-0">
             <Icon name={busy ? 'auto_awesome' : 'add_circle'} size={17} className={busy ? 'animate-pulse' : ''} />
