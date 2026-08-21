@@ -354,6 +354,42 @@ export function ShortcutsWidget({
   const [openAction, setOpenAction] = useState<'new-meeting' | 'transcribe' | null>(null)
 
   const targets = config?.targets ?? []
+
+  // Backfill: document targets added before context captions existed carry no
+  // Drive-location detail. Resolve them once per mount so old tiles say what
+  // they are without being re-added. One guarded pass; commits only if a
+  // location was actually found.
+  const backfilledRef = useRef(false)
+  const configForBackfill = useRef(config)
+  configForBackfill.current = config
+  useEffect(() => {
+    if (backfilledRef.current) return
+    const missing = (config?.targets ?? []).filter(
+      (t): t is Extract<ShortcutTarget, { kind: 'document' }> => t.kind === 'document' && !t.detail
+    )
+    if (missing.length === 0) return
+    backfilledRef.current = true
+    void (async () => {
+      const found = new Map<string, string>()
+      for (const t of missing) {
+        const loc = await window.api.fileManager.locateDocument(t.documentId).catch(() => null)
+        const name = loc?.path?.length ? loc.path[loc.path.length - 1]?.name : null
+        if (name) found.set(targetKey(t), name)
+      }
+      if (found.size === 0) return
+      const cfg = configForBackfill.current
+      const cur = cfg?.targets ?? []
+      onUpdate({
+        ...cfg,
+        targets: cur.map((x) => {
+          const detail = found.get(targetKey(x))
+          return detail && !x.detail ? { ...x, detail } : x
+        })
+      })
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.targets])
+
   const lookups = useMemo<ShortcutLookups>(
     () => ({
       node: (id) => {
