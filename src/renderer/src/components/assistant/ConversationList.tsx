@@ -43,7 +43,7 @@ export default function ConversationList({
       className={
         isRail
           ? 'w-[220px] shrink-0 h-full flex flex-col border-r border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40'
-          : 'absolute inset-x-2 top-11 z-30 max-h-[60%] flex flex-col rounded-xl border border-[var(--edge-firm)] bg-[var(--surface-raised)] shadow-xl overflow-hidden'
+          : 'absolute inset-x-2 top-11 z-30 max-h-[60%] flex flex-col rounded-[var(--radius-card)] border border-[var(--edge-firm)] bg-[var(--surface-raised)] shadow-[var(--shadow-cast)] overflow-hidden'
       }
     >
       <div className="shrink-0 p-2">
@@ -52,7 +52,7 @@ export default function ConversationList({
           onClick={onNew}
           data-testid="conversation-new"
           title="New chat (⌘O)"
-          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] transition-colors text-[12px] text-[var(--ink-80)]"
+          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] transition-colors fb-t-label text-[var(--ink-80)]"
         >
           <Icon name="add" size={14} className="text-accent shrink-0" />
           <span>New chat</span>
@@ -71,7 +71,7 @@ export default function ConversationList({
               data-testid="conversation-row"
               data-conversation-id={c.id}
               data-active={c.id === activeId ? 'true' : 'false'}
-              className={`group/conv flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+              className={`group/conv flex items-center gap-1 rounded-[var(--radius-row)] px-2 py-1.5 transition-colors ${
                 c.id === activeId
                   ? 'bg-[rgb(var(--accent)/0.12)] border border-[rgb(var(--accent)/0.30)]'
                   : 'border border-transparent hover:bg-[var(--surface-sunken)]'

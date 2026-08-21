@@ -38,7 +38,7 @@ export default function QuestionCard({
   return (
     <div
       data-testid="assistant-question-card"
-      className="mb-2 rounded-[13px] border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.06)] px-3 pt-2.5 pb-2 flex flex-col gap-2"
+      className="mb-2 rounded-[var(--radius-card)] border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.06)] px-3 pt-2.5 pb-2 flex flex-col gap-2"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-[12.5px] font-semibold leading-snug text-[var(--ink-100)]">
@@ -60,7 +60,7 @@ export default function QuestionCard({
         {question.options.map((opt, i) => (
           <label
             key={i}
-            className={`flex items-center gap-2 rounded-lg px-1.5 py-1 cursor-pointer transition-colors text-[12px] leading-snug ${
+            className={`flex items-center gap-2 rounded-[var(--radius-row)] px-1.5 py-1 cursor-pointer transition-colors fb-t-label leading-snug ${
               selected === i
                 ? 'bg-[rgb(var(--accent)/0.12)] text-[var(--ink-100)]'
                 : 'text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]'

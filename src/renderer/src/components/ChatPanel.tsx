@@ -539,7 +539,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               label read as a system banner rather than a product surface. */}
           <div className="flex items-center gap-1.5">
             <Icon name={thread.icon} size={15} className="text-[var(--ink-70)]" />
-            <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-[var(--ink-100)]">
+            <h2 className="fb-t-title text-[var(--ink-100)]">
               Plexii
             </h2>
             {/* The mode badge (Plexii P6) — visible whenever discovery is on,
@@ -548,7 +548,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <span
                 data-testid="chat-mode-badge"
                 title="Discovery mode — Plexii is leading with questions toward a desk"
-                className="inline-flex items-center gap-1 rounded-[8px] bg-accent/10 px-1.5 py-px fb-t-caption font-medium text-[rgb(var(--accent))]"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-chip)] bg-accent/10 px-1.5 py-px fb-t-caption font-medium text-[rgb(var(--accent))]"
               >
                 <Icon name="plexii:discover" size={11} />
                 Discovery
@@ -556,7 +556,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             )}
           </div>
           <p
-            className="text-[10.5px] text-[var(--ink-50)] truncate"
+            className="fb-t-caption text-[var(--ink-50)] truncate"
             title={`Plexii is focused on ${thread.label}${thread.title ? ` — ${thread.title}` : ''}`}
           >
             {thread.title ? `${thread.title} · ` : ''}
@@ -577,7 +577,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                     ? `Open the linked desk — ${primaryDeskNode.title}`
                     : 'The linked desk was deleted'
                 }
-                className={`fb-press inline-flex max-w-full items-center gap-1 rounded-[8px] px-1.5 py-0.5 fb-t-caption transition-colors ${
+                className={`fb-press inline-flex max-w-full items-center gap-1 rounded-[var(--radius-chip)] px-1.5 py-0.5 fb-t-caption transition-colors ${
                   primaryDeskNode
                     ? 'bg-accent/10 text-[rgb(var(--accent))] hover:bg-accent/20'
                     : 'bg-[var(--surface-sunken)] text-[var(--ink-40)] cursor-default'
@@ -697,7 +697,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             {modeMenuOpen && (
               <div
                 data-testid="assistant-mode-menu"
-                className="absolute right-0 top-full mt-1.5 z-30 min-w-[172px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+                className="absolute right-0 top-full mt-1.5 z-30 min-w-[172px] rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
                 style={{ boxShadow: 'var(--shadow-cast)' }}
               >
                 {MODE_OPTIONS.map((opt) => (
@@ -708,7 +708,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                       setModeMenuOpen(false)
                     }}
                     data-testid={`assistant-mode-${opt.mode}`}
-                    className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
+                    className="w-full flex items-center gap-2 rounded-[var(--radius-chip)] px-2 py-1.5 fb-t-label text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
                   >
                     <Icon name={opt.icon} size={15} className="text-[var(--ink-60)]" />
                     <span className="flex-1 text-left">{opt.label}</span>
@@ -736,7 +736,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       </div>
 
       {hasApiKey === false && (
-        <div className="m-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-xs text-[var(--ink-90)] leading-relaxed flex gap-2">
+        <div className="m-3 p-3 rounded-[var(--radius-card)] bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 fb-t-label text-[var(--ink-90)] leading-relaxed flex gap-2">
           <Icon name="key" size={16} className="text-amber-700 dark:text-amber-400 mt-0.5" />
           <div>
             <strong className="text-[var(--ink-100)]">No API key yet.</strong> Open{' '}
@@ -769,10 +769,10 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           // suggestion cards and capability row render under the composer,
           // inside the form below.
           <div data-testid="assistant-home" className="text-center">
-            <h3 className="text-[26px] font-semibold tracking-[-0.02em] text-[var(--ink-100)] mb-2">
+            <h3 className="fb-t-hero fb-display text-[var(--ink-100)] mb-2">
               {discovering ? "What are we building?" : 'How can I help you today?'}
             </h3>
-            <p className="text-[13px] text-[var(--ink-60)] leading-relaxed">
+            <p className="fb-t-body text-[var(--ink-60)] leading-relaxed">
               {discovering
                 ? 'Start anywhere — a question, an idea, a list, a business. I will ask my way through it with you, and we finish with a desk that brings it to life.'
                 : ctx.intro}
@@ -782,10 +782,10 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         {messages.length === 0 && !fullscreenHome && discovering && (
           // Discovery in the narrow modes: its own invitation, no starter rows.
           <div className="mt-2 px-1" data-testid="assistant-empty-state">
-            <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-100)] mb-1">
+            <h3 className="fb-t-title text-[var(--ink-100)] mb-1">
               What are we building?
             </h3>
-            <p className="text-[11.5px] text-[var(--ink-60)] leading-relaxed">
+            <p className="fb-t-caption text-[var(--ink-60)] leading-relaxed">
               Start anywhere — a question, an idea, a list, a business. I will ask my way through it
               with you, and we finish with a desk that brings it to life.
             </p>
@@ -798,17 +798,17 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           // Content still comes from ctx per screen — no curated static list,
           // no invented "New" badges (plan D4).
           <div className="mt-2 px-1 flex flex-col" data-testid="assistant-empty-state">
-            <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-100)] mb-1">
+            <h3 className="fb-t-title text-[var(--ink-100)] mb-1">
               How can I help you today?
             </h3>
-            <p className="text-[11.5px] text-[var(--ink-60)] leading-relaxed mb-4">{ctx.intro}</p>
+            <p className="fb-t-caption text-[var(--ink-60)] leading-relaxed mb-4">{ctx.intro}</p>
             <div className="flex flex-col -mx-1">
               {ctx.suggestions.map((s) => (
                 <button
                   key={s.text}
                   onClick={() => fillComposer(s.text)}
                   data-testid="chat-suggestion"
-                  className="flex items-center gap-2.5 text-left text-[12.5px] px-2 py-2 rounded-lg text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors"
+                  className="flex items-center gap-2.5 text-left fb-t-label px-2 py-2 rounded-[var(--radius-row)] text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors"
                 >
                   <Icon name={s.icon} size={15} className="text-accent shrink-0" />
                   <span className="truncate">{s.text}</span>
@@ -834,7 +834,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <div
                 key={i}
                 data-testid="user-turn"
-                className="ml-auto max-w-[88%] rounded-xl rounded-br-[3px] px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.18)] text-[var(--ink-100)]"
+                className="ml-auto max-w-[88%] rounded-[var(--radius-row)] rounded-br-[3px] px-3 py-2 fb-t-body leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.18)] text-[var(--ink-100)]"
               >
                 {segments.length <= 1
                   ? m.content
@@ -847,7 +847,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                           data-testid="turn-mention-chip"
                           data-mention-id={seg.ref.id}
                           title={`${seg.ref.title} — referenced in this message`}
-                          className="inline-flex items-center gap-1 rounded-md border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.14)] px-1.5 py-[1px] mx-[1px] align-baseline"
+                          className="inline-flex items-center gap-1 rounded-[var(--radius-chip)] border border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.14)] px-1.5 py-[1px] mx-[1px] align-baseline"
                         >
                           <Icon name={seg.ref.icon} size={11} className="shrink-0 text-accent" />
                           <span className="truncate max-w-[160px]">{seg.ref.title}</span>
@@ -895,7 +895,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                 <span className="w-4 h-4 rounded-[5px] grid place-items-center bg-accent/15 text-accent shrink-0">
                   <Icon name="auto_awesome" size={10} filled />
                 </span>
-                <span className="text-[10px] font-mono uppercase tracking-[0.09em] text-[var(--ink-50)]">
+                <span className="fb-t-caption font-mono uppercase tracking-[0.09em] text-[var(--ink-50)]">
                   Plexii
                 </span>
               </div>
@@ -979,7 +979,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <span className="w-1 h-1 rounded-full bg-current fb-dot" style={{ animationDelay: '150ms' }} />
               <span className="w-1 h-1 rounded-full bg-current fb-dot" style={{ animationDelay: '300ms' }} />
             </span>
-            <span className="text-[11.5px]">Working…</span>
+            <span className="fb-t-caption">Working…</span>
           </div>
         )}
         </div>
@@ -1014,7 +1014,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             }}
           />
         )}
-        <div className="rounded-[13px] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+        <div className="rounded-[var(--radius-card)] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
           {/* What this conversation is working from, restated at the point of
               typing. Either the objects it references (typed with "@" or
               clicked on the canvas — one layer, plan D7/D8) or, when it
@@ -1036,7 +1036,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             ) : (
               <span
                 data-testid="composer-context-chip"
-                className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] text-[var(--ink-60)]"
+                className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-0.5 fb-t-caption text-[var(--ink-60)]"
                 title={`This conversation is scoped to ${thread.title || thread.label}`}
               >
                 <Icon name={thread.icon} size={11} className="shrink-0" />
@@ -1100,7 +1100,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                     {deskMenuOpen && (
                       <div
                         data-testid="chat-desk-menu"
-                        className="fb-pop-in absolute bottom-full left-0 mb-1.5 z-30 min-w-[190px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+                        className="fb-pop-in absolute bottom-full left-0 mb-1.5 z-30 min-w-[190px] rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
                         style={{ boxShadow: 'var(--shadow-cast)' }}
                       >
                         {linkedDesks.map((id) => {
@@ -1115,7 +1115,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                                 }
                                 setDeskMenuOpen(false)
                               }}
-                              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
+                              className="w-full flex items-center gap-2 rounded-[var(--radius-chip)] px-2 py-1.5 fb-t-label text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
                             >
                               <Icon name="desk" size={13} className="text-[var(--ink-60)] shrink-0" />
                               <span className="flex-1 min-w-0 truncate text-left">
@@ -1173,7 +1173,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                     void send(thread.serverTaskId, c.starter, thread.key)
                   }}
                   title={`Start now — sends “${c.starter}”; I'll ask for any details I need`}
-                  className="inline-flex items-center gap-1 text-[10.5px] text-[var(--ink-60)] hover:text-accent underline decoration-transparent hover:decoration-current underline-offset-2 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 fb-t-caption text-[var(--ink-60)] hover:text-accent underline decoration-transparent hover:decoration-current underline-offset-2 transition-colors disabled:opacity-50"
                 >
                   <Icon name={c.icon} size={12} className="shrink-0" />
                   {c.label}
@@ -1190,17 +1190,17 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   type="button"
                   data-testid="home-suggestion-card"
                   onClick={() => fillComposer(s.text)}
-                  className="text-left px-3 py-2.5 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2.5"
+                  className="text-left px-3 py-2.5 rounded-[var(--radius-card)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2.5"
                 >
                   <Icon name={s.icon} size={15} className="text-accent shrink-0" />
-                  <span className="text-[12.5px] text-[var(--ink-80)] truncate">{s.text}</span>
+                  <span className="fb-t-label text-[var(--ink-80)] truncate">{s.text}</span>
                 </button>
               ))}
             </div>
           </>
         )}
         <div className="flex justify-end mt-1.5">
-          <span className="text-[9.5px] font-mono text-[var(--ink-40)]">
+          <span className="fb-t-caption font-mono text-[var(--ink-40)]">
             ↵ send · ⇧↵ newline
           </span>
         </div>

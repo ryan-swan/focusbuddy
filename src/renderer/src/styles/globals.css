@@ -1625,9 +1625,13 @@ body {
   margin-top: 1em;
   margin-bottom: 0.3em;
 }
+/* Colours are tokens only (M1 UI phase 1): the old stone-palette literals with
+   hand-written .dark overrides meant chat prose, widget previews and the doc
+   editor ignored the futuristic/atelier themes entirely. Tokens repaint in all
+   four themes with no per-theme rules. Geometry is unchanged. */
 .md-rendered h1 {
   font-size: 1.55em;
-  border-bottom: 1px solid rgba(120, 113, 108, 0.25);
+  border-bottom: 1px solid var(--edge-soft);
   padding-bottom: 0.2em;
 }
 .md-rendered h2 {
@@ -1640,10 +1644,7 @@ body {
   font-size: 1em;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: rgb(120 113 108);
-}
-.dark .md-rendered h4 {
-  color: rgb(168 162 158);
+  color: var(--ink-50);
 }
 .md-rendered p {
   margin: 0.4em 0;
@@ -1684,38 +1685,27 @@ body {
 .md-rendered blockquote {
   border-left: 3px solid rgb(var(--accent) / 0.5);
   padding: 0.1em 0.9em;
-  color: rgb(87 83 78);
-  background: rgb(245 245 244 / 0.6);
+  color: var(--ink-90);
+  background: var(--surface-sunken);
   border-radius: 4px;
   font-style: italic;
 }
-.dark .md-rendered blockquote {
-  color: rgb(214 211 209);
-  background: rgb(28 25 23 / 0.5);
-}
 .md-rendered pre {
-  background: rgb(245 245 244);
-  border: 1px solid rgb(231 229 228);
+  background: var(--surface-sunken);
+  border: 1px solid var(--edge-soft);
   padding: 0.6em 0.85em;
   border-radius: 6px;
   overflow-x: auto;
   font-size: 12px;
   line-height: 1.5;
 }
-.dark .md-rendered pre {
-  background: rgb(28 25 23);
-  border-color: rgb(68 64 60);
-}
 .md-rendered pre code {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 .md-rendered hr {
   border: none;
-  border-top: 1px solid rgb(231 229 228);
+  border-top: 1px solid var(--edge-soft);
   margin: 1em 0;
-}
-.dark .md-rendered hr {
-  border-top-color: rgb(68 64 60);
 }
 .md-rendered table {
   width: 100%;
@@ -1725,21 +1715,14 @@ body {
 }
 .md-rendered th,
 .md-rendered td {
-  border: 1px solid rgb(231 229 228);
+  border: 1px solid var(--edge-soft);
   padding: 0.35em 0.55em;
   text-align: left;
   vertical-align: top;
 }
-.dark .md-rendered th,
-.dark .md-rendered td {
-  border-color: rgb(68 64 60);
-}
 .md-rendered th {
-  background: rgb(250 250 249);
+  background: var(--surface-sunken);
   font-weight: 600;
-}
-.dark .md-rendered th {
-  background: rgb(41 37 36);
 }
 .md-rendered img {
   max-width: 100%;
@@ -1754,13 +1737,10 @@ body {
 .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: rgb(168 162 158);
+  color: var(--ink-40);
   font-style: italic;
   pointer-events: none;
   height: 0;
-}
-.dark .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
-  color: rgb(120 113 108);
 }
 .tiptap-editor .ProseMirror > *:first-child {
   margin-top: 0;
@@ -1817,10 +1797,7 @@ body {
 }
 .tiptap-editor .ProseMirror ul[data-type='taskList'] li[data-checked='true'] > div {
   text-decoration: line-through;
-  color: rgb(168 162 158);
-}
-.dark .tiptap-editor .ProseMirror ul[data-type='taskList'] li[data-checked='true'] > div {
-  color: rgb(120 113 108);
+  color: var(--ink-50);
 }
 
 /* Focus Session (5-Minute Promise) — dims the shell so the canvas feels held in spotlight.

@@ -40,7 +40,7 @@ export default function ModelPickerChip(): JSX.Element {
       {open && (
         <div
           data-testid="composer-model-menu"
-          className="absolute left-0 bottom-full mb-1.5 z-30 w-[300px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+          className="absolute left-0 bottom-full mb-1.5 z-30 w-[300px] rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
           style={{ boxShadow: 'var(--shadow-cast)' }}
         >
           {MODEL_OPTIONS.map((opt) => (
@@ -52,7 +52,7 @@ export default function ModelPickerChip(): JSX.Element {
                 setModelMode(opt.value)
                 setOpen(false)
               }}
-              className="w-full flex items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+              className="w-full flex items-start gap-2 rounded-[var(--radius-chip)] px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
             >
               <span className="w-8 shrink-0 pt-0.5 text-[10px] font-mono text-[var(--ink-40)]">
                 {opt.costTier}
