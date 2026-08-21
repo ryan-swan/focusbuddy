@@ -1989,6 +1989,7 @@ const api = {
         question?: import('@shared/types').ChatQuestion | null
         trace?: import('@shared/types').StoredTrace | null
         mentions?: import('@shared/types').ChatMentionRef[]
+        blocks?: import('@shared/types').ChatUiBlock[]
       }
     ): Promise<import('@shared/types').AiChatStoredMessage> =>
       ipcRenderer.invoke('aiChat:appendMessage', conversationId, message),

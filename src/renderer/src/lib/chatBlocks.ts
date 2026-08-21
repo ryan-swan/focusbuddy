@@ -14,7 +14,7 @@
 // registry; a later session teaches the model to emit them and fills their
 // renderers. This function is where that emission will be parsed in.
 
-import type { ActionProposal, ChatBlock, ChatMessage, ChatSource } from '@shared/types'
+import type { ActionProposal, ChatBlock, ChatMessage, ChatSource, ChatUiBlock } from '@shared/types'
 import { citedNumbers } from './remarkCitations'
 
 // Connector-shaped action kinds. When an action is one of these we surface it as
@@ -58,7 +58,10 @@ export function connectorMeta(connector: string): { icon: string; label: string 
 export function deriveAssistantBlocks(
   message: ChatMessage,
   proposals: ActionProposal[],
-  sources: ChatSource[] = []
+  sources: ChatSource[] = [],
+  // Model-emitted interactive UI blocks for this turn (Plexii P4) — the
+  // emission this function's header note always anticipated, parsed in.
+  uiBlocks: ChatUiBlock[] = []
 ): ChatBlock[] {
   const blocks: ChatBlock[] = []
 
@@ -82,7 +85,11 @@ export function deriveAssistantBlocks(
     if (grounded.length > 0) blocks.push({ kind: 'sources', sources: grounded })
   }
 
-  // 3) Each proposal becomes an action block — or a connector-action block when
+  // 3) The turn's interactive UI blocks, between the prose they illustrate and
+  //    the action cards that commit work.
+  for (const b of uiBlocks) blocks.push({ kind: 'ui', block: b })
+
+  // 4) Each proposal becomes an action block — or a connector-action block when
   //    it maps to a known connector, so email/calendar/chat read as first-class
   //    connector affordances instead of generic actions.
   for (const p of proposals) {

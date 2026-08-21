@@ -23,6 +23,7 @@ import { retrieveSources } from '../workspaceSearch'
 import { relatedScopeIds } from '../db/nodeRelations'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
+import { uiBlocksSection, validateChatUiBlocks } from './chatUiBlocks'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
 import { renderMentions } from './chatMentions'
@@ -49,6 +50,7 @@ import type {
   BodyDoubleResponse,
   ChatMentionResolved,
   ChatQuestion,
+  ChatUiBlock,
   ChatRequest,
   ChatResponse,
   ChatRetrievalTrace,
@@ -403,7 +405,10 @@ function buildSystemPrompt(taskId: string | null, supportsQuestions?: boolean, i
     'INCORRECT (NEVER do this): A reply that says "Here are the widgets I\'ve added: 📝 **Launch checklist** with these items..." while actions is empty. The widgets do not exist if they are not in the actions array.' +
     // Taught ONLY to surfaces that render the question card (the assistant
     // panel). Everything else keeps the exact two-field envelope above.
-    questionProtocolSection(supportsQuestions)
+    questionProtocolSection(supportsQuestions) +
+    // The visual-block contract (Plexii P4) — universal across chat surfaces;
+    // the renderer that cannot show a block simply ignores the array.
+    uiBlocksSection()
   // Memory only for conversational surfaces that opt in (assistant panel / focus
   // chat), never the field editor / command bar / one-off completions — a
   // "what I know about you" block is noise + cost there.
@@ -532,13 +537,25 @@ export function parseChatJson(raw: string): {
   // when absent and when what the model wrote fails validation — a question
   // that can't be rendered honestly is treated as never asked.
   question?: ChatQuestion
+  // Validated interactive UI blocks (Plexii P4), when the model emitted any.
+  blocks?: ChatUiBlock[]
 } | null {
-  let parsed: { reply?: unknown; question?: unknown; actions?: unknown } | null = null
+  let parsed: {
+    reply?: unknown
+    question?: unknown
+    blocks?: unknown
+    actions?: unknown
+  } | null = null
   let truncated = false
   const jsonStr = extractJson(raw)
   if (jsonStr) {
     try {
-      parsed = JSON.parse(jsonStr) as { reply?: unknown; question?: unknown; actions?: unknown }
+      parsed = JSON.parse(jsonStr) as {
+        reply?: unknown
+        question?: unknown
+        blocks?: unknown
+        actions?: unknown
+      }
     } catch {
       parsed = null
     }
@@ -548,7 +565,7 @@ export function parseChatJson(raw: string): {
     // model hit its output token limit mid-JSON. The actions that finished
     // before the cutoff are still complete objects, so salvage those rather
     // than dropping the entire response (which used to dump raw JSON into the
-    // chat as prose).
+    // chat as prose). Blocks are not salvaged: a torn block is dropped whole.
     const salv = salvageEnvelope(raw)
     if (!salv) return null
     parsed = salv
@@ -556,6 +573,7 @@ export function parseChatJson(raw: string): {
   }
   const reply = typeof parsed.reply === 'string' ? parsed.reply : ''
   const question = validateChatQuestion(parsed.question) ?? undefined
+  const blocks = validateChatUiBlocks(parsed.blocks)
   const actionsRaw = Array.isArray(parsed.actions) ? parsed.actions : []
   const proposals: ActionProposal[] = []
   let i = 0
@@ -936,7 +954,7 @@ export function parseChatJson(raw: string): {
       }
     }
   }
-  return { reply, proposals, truncated, question }
+  return { reply, proposals, truncated, question, blocks: blocks.length > 0 ? blocks : undefined }
 }
 
 // Everything a chat call needs before it can be made: the assembled system
@@ -1088,7 +1106,8 @@ function buildChatResponse(
     proposals: parsed.proposals.length > 0 ? parsed.proposals : undefined,
     sources: sources.length > 0 ? sources : undefined,
     question: parsed.question,
-    mentions: mentions.length > 0 ? mentions : undefined
+    mentions: mentions.length > 0 ? mentions : undefined,
+    blocks: parsed.blocks
   }
 }
 

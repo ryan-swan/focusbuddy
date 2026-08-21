@@ -8,6 +8,7 @@ import type {
   ChatQuestion,
   ChatResponse,
   ChatSource,
+  ChatUiBlock,
   StoredTrace
 } from '@shared/types'
 import { recordTrail } from '../lib/trail'
@@ -65,6 +66,10 @@ interface ChatStore {
   // the reply. Retrieval already ran server-side to build the prompt — this is
   // the same set, surfaced rather than discarded.
   sourcesByMessage: Record<string, ChatSource[]>
+  // Interactive UI blocks each assistant turn carried (Plexii P4), keyed by the
+  // message timestamp. Rendered inside the turn; a tap sends the selection back
+  // as the user's next message.
+  blocksByMessage: Record<string, ChatUiBlock[]>
   // The trace for the send currently in flight, keyed by thread. Lives here
   // rather than under a message id because it starts before there IS a message —
   // the first thing it shows is retrieval, which happens before a word is
@@ -223,6 +228,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   proposalsByMessage: {},
   appliedProposals: {},
   sourcesByMessage: {},
+  blocksByMessage: {},
   liveTraceByThread: {},
   traceByMessage: {},
   traceDisclosureByMessage: {},
@@ -291,6 +297,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const proposalsByMessage: Record<string, ActionProposal[]> = {}
     const appliedProposals: Record<string, AppliedProposal> = { ...get().appliedProposals }
     const sourcesByMessage: Record<string, ChatSource[]> = { ...get().sourcesByMessage }
+    const blocksByMessage: Record<string, ChatUiBlock[]> = { ...get().blocksByMessage }
     const questionByMessage: Record<string, ChatQuestion> = { ...get().questionByMessage }
     const traceByMessage: Record<string, AssistantTrace> = { ...get().traceByMessage }
     const mentionsByMessage: Record<string, MentionRef[]> = { ...get().mentionsByMessage }
@@ -303,6 +310,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         appliedProposals[appliedKey(m.ts, proposalId)] = applied
       }
       if (m.sources.length) sourcesByMessage[k] = m.sources
+      if (m.blocks.length) blocksByMessage[k] = m.blocks
       if (m.question) questionByMessage[k] = m.question
       const restored = fromStoredTrace(m.trace)
       if (restored) traceByMessage[k] = restored
@@ -322,6 +330,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       proposalsByMessage: { ...get().proposalsByMessage, ...proposalsByMessage },
       appliedProposals,
       sourcesByMessage,
+      blocksByMessage,
       questionByMessage,
       traceByMessage,
       mentionsByMessage,
@@ -388,6 +397,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextProposals = { ...get().proposalsByMessage }
     const nextApplied = { ...get().appliedProposals }
     const nextSources = { ...get().sourcesByMessage }
+    const nextBlocks = { ...get().blocksByMessage }
     const nextTraces = { ...get().traceByMessage }
     const nextDisclosure = { ...get().traceDisclosureByMessage }
     const nextQuestions = { ...get().questionByMessage }
@@ -398,6 +408,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
       delete nextProposals[String(m.ts)]
       delete nextSources[String(m.ts)]
+      delete nextBlocks[String(m.ts)]
       delete nextTraces[String(m.ts)]
       delete nextDisclosure[String(m.ts)]
       delete nextQuestions[String(m.ts)]
@@ -415,6 +426,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       proposalsByMessage: nextProposals,
       appliedProposals: nextApplied,
       sourcesByMessage: nextSources,
+      blocksByMessage: nextBlocks,
       traceByMessage: nextTraces,
       traceDisclosureByMessage: nextDisclosure,
       questionByMessage: nextQuestions,
@@ -578,6 +590,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (resp.ok && resp.sources && resp.sources.length > 0) {
         updates.sourcesByMessage = { ...get().sourcesByMessage, [tsKey]: resp.sources }
       }
+      // Interactive blocks land with the completed envelope (Plexii P4).
+      if (resp.ok && resp.blocks && resp.blocks.length > 0) {
+        updates.blocksByMessage = { ...get().blocksByMessage, [tsKey]: resp.blocks }
+      }
       // The durable response is the sole source of truth for a question — the
       // renderer must never show one the completed envelope does not carry.
       if (resp.ok && resp.question) {
@@ -619,7 +635,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             proposals: resp.ok ? resp.proposals : undefined,
             sources: resp.ok ? resp.sources : undefined,
             question: resp.ok ? (resp.question ?? null) : null,
-            trace: storedTrace
+            trace: storedTrace,
+            blocks: resp.ok ? resp.blocks : undefined
           })
           .then((saved) => {
             if (saved) {
@@ -774,6 +791,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const nextProposals = { ...get().proposalsByMessage }
     const nextApplied = { ...get().appliedProposals }
     const nextSources = { ...get().sourcesByMessage }
+    const nextBlocks = { ...get().blocksByMessage }
     const nextTraces = { ...get().traceByMessage }
     const nextDisclosure = { ...get().traceDisclosureByMessage }
     const nextQuestions = { ...get().questionByMessage }
@@ -784,6 +802,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
       delete nextProposals[String(m.ts)]
       delete nextSources[String(m.ts)]
+      delete nextBlocks[String(m.ts)]
       delete nextTraces[String(m.ts)]
       delete nextDisclosure[String(m.ts)]
       delete nextQuestions[String(m.ts)]
@@ -796,6 +815,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       proposalsByMessage: nextProposals,
       appliedProposals: nextApplied,
       sourcesByMessage: nextSources,
+      blocksByMessage: nextBlocks,
       traceByMessage: nextTraces,
       traceDisclosureByMessage: nextDisclosure,
       questionByMessage: nextQuestions,

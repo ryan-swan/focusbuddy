@@ -6,6 +6,7 @@ import remarkCitations from '../../lib/remarkCitations'
 import { connectorMeta } from '../../lib/chatBlocks'
 import { isOpenable } from '../../lib/sourceTarget'
 import Icon from '../Icon'
+import ChatUiBlockView from '../assistant/ChatUiBlockView'
 
 // The block-renderer registry for the agentic chat's typed-block thread.
 //
@@ -37,6 +38,11 @@ interface Props {
   onOpenSource?: (source: ChatSource) => void
   // The sources this turn cites, so an inline [n] can resolve its own target.
   citedSources?: ChatSource[]
+  // Interactive UI blocks (Plexii P4): whether this turn's blocks may answer
+  // for the user right now (latest turn, nothing in flight), and where a tap's
+  // text goes. A host that passes neither renders blocks as an inert record.
+  uiEnabled?: boolean
+  onUiSubmit?: (text: string) => void
 }
 
 export default function ChatBlockView({
@@ -47,7 +53,9 @@ export default function ChatBlockView({
   onConsumeProposal,
   onOpenWidget,
   onOpenSource,
-  citedSources
+  citedSources,
+  uiEnabled,
+  onUiSubmit
 }: Props): JSX.Element | null {
   // A citation is clickable only when we both know where it goes and have a way
   // to get there. Anything else stays plain text rather than offering a click
@@ -199,6 +207,11 @@ export default function ChatBlockView({
         </div>
       )
     }
+
+    case 'ui':
+      // Model-emitted interactive blocks (Plexii P4) — chips, scales, icon
+      // rows, cards. A tap sends the selection as the user's next message.
+      return <ChatUiBlockView block={block.block} enabled={!!uiEnabled} onSubmit={onUiSubmit} />
 
     // ── Declared-but-not-yet-emitted blocks: tasteful placeholders ────────────
     // These render so the frame is visibly complete; a later session teaches the

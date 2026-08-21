@@ -12,6 +12,7 @@ import type {
   ChatQuestion,
   ChatRole,
   ChatSource,
+  ChatUiBlock,
   StoredTrace
 } from '@shared/types'
 
@@ -48,6 +49,8 @@ interface MessageRow {
   question_json: string | null
   trace_json: string | null
   mentions_json: string | null
+  // Plexii P4 — interactive UI blocks the turn carried. NULL means none.
+  blocks_json: string | null
   created_at: number
 }
 
@@ -107,7 +110,8 @@ function rowToMessage(row: MessageRow): AiChatStoredMessage {
     sources: safeParse<ChatSource[]>(row.sources_json, []),
     question: safeParse<ChatQuestion | null>(row.question_json, null),
     trace: safeParse<StoredTrace | null>(row.trace_json, null),
-    mentions: safeParse<ChatMentionRef[]>(row.mentions_json, [])
+    mentions: safeParse<ChatMentionRef[]>(row.mentions_json, []),
+    blocks: safeParse<ChatUiBlock[]>(row.blocks_json, [])
   }
 }
 
@@ -149,7 +153,7 @@ export function getConversation(id: string): AiChatConversation | null {
   const msgRows = db
     .prepare(
       `SELECT id, conversation_id, role, content, ts, proposals_json, applied_json,
-              sources_json, question_json, trace_json, mentions_json, created_at
+              sources_json, question_json, trace_json, mentions_json, blocks_json, created_at
        FROM ai_chat_messages WHERE conversation_id = ? ORDER BY ts ASC`
     )
     .all(id) as MessageRow[]
@@ -205,6 +209,7 @@ export function appendMessage(
     question?: ChatQuestion | null
     trace?: StoredTrace | null
     mentions?: ChatMentionRef[]
+    blocks?: ChatUiBlock[]
   }
 ): AiChatStoredMessage {
   const db = getDb()
@@ -217,9 +222,9 @@ export function appendMessage(
   db.prepare(
     `INSERT INTO ai_chat_messages
       (id, conversation_id, role, content, ts, proposals_json, applied_json,
-       sources_json, question_json, trace_json, mentions_json, created_at)
+       sources_json, question_json, trace_json, mentions_json, blocks_json, created_at)
      VALUES (@id, @conversation_id, @role, @content, @ts, @proposals_json, @applied_json,
-             @sources_json, @question_json, @trace_json, @mentions_json, @created_at)`
+             @sources_json, @question_json, @trace_json, @mentions_json, @blocks_json, @created_at)`
   ).run({
     id,
     conversation_id: conversationId,
@@ -237,6 +242,7 @@ export function appendMessage(
     trace_json: message.trace ? JSON.stringify(message.trace) : null,
     mentions_json:
       message.mentions && message.mentions.length ? JSON.stringify(message.mentions) : null,
+    blocks_json: message.blocks && message.blocks.length ? JSON.stringify(message.blocks) : null,
     created_at: now
   })
   db.prepare(`UPDATE ai_chat_conversations SET updated_at = ? WHERE id = ?`).run(now, conversationId)
@@ -250,7 +256,8 @@ export function appendMessage(
     sources: message.sources ?? [],
     question: message.question ?? null,
     trace: message.trace ?? null,
-    mentions: message.mentions ?? []
+    mentions: message.mentions ?? [],
+    blocks: message.blocks ?? []
   }
 }
 

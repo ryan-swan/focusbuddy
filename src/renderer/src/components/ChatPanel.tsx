@@ -59,6 +59,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
   const appliedProposals = useChatStore((s) => s.appliedProposals)
   const sourcesByMessage = useChatStore((s) => s.sourcesByMessage)
+  const blocksByMessage = useChatStore((s) => s.blocksByMessage)
   const liveTraceByThread = useChatStore((s) => s.liveTraceByThread)
   const traceByMessage = useChatStore((s) => s.traceByMessage)
   const traceDisclosureByMessage = useChatStore((s) => s.traceDisclosureByMessage)
@@ -746,7 +747,12 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           // untouched. Same path the Focus chat already uses.
           const proposals = proposalsByMessage[String(m.ts)] ?? []
           const sources = sourcesByMessage[String(m.ts)] ?? []
-          const blocks = deriveAssistantBlocks(m, proposals, sources)
+          const uiBlocks = blocksByMessage[String(m.ts)] ?? []
+          const blocks = deriveAssistantBlocks(m, proposals, sources, uiBlocks)
+          // Interactive blocks answer for the user only on the latest turn and
+          // only while nothing is in flight — older blocks stay visible as a
+          // record of what was offered, but no longer speak.
+          const uiEnabled = i === messages.length - 1 && !sending
           // The sources this turn actually cites, read back off the derived
           // blocks rather than recomputed — so an inline [n] resolves to exactly
           // the chip below it, and the two can't disagree about what was cited.
@@ -796,6 +802,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   onConsumeProposal={(id) => consumeProposal(m.ts, id)}
                   onOpenSource={(s) => void openSource(s)}
                   citedSources={citedSources}
+                  uiEnabled={uiEnabled}
+                  onUiSubmit={(text) => {
+                    if (useChatStore.getState().sending) return
+                    void send(thread.serverTaskId, text, thread.key)
+                  }}
                 />
               ))}
               {/* Per-turn actions. Always present — they were hover-only, which

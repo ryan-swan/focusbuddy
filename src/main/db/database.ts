@@ -995,6 +995,9 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'ai_chat_messages', 'question_json', 'TEXT')
   ensureColumn(db, 'ai_chat_messages', 'trace_json', 'TEXT')
   ensureColumn(db, 'ai_chat_messages', 'mentions_json', 'TEXT')
+  // Plexii P4 — interactive UI blocks an assistant turn carried. Additive,
+  // NULL means the turn had none (every pre-blocks row, honestly).
+  ensureColumn(db, 'ai_chat_messages', 'blocks_json', 'TEXT')
   // What screen a conversation was started from, so it can say so later. The
   // assistant used to re-thread per screen; after unification a conversation
   // REMEMBERS its context instead of being replaced by it (plan D4).

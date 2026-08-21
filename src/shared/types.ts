@@ -574,7 +574,41 @@ export interface ChatResponse {
   // for the trace's "Mentioned" lane and for marking a chip broken — the
   // renderer may not assume a reference resolved just because it was sent.
   mentions?: ChatMentionResolved[]
+  // Interactive UI blocks the model emitted in this turn (Plexii P4): choice
+  // chips, scales, icon rows, cards. Present only when the model emitted valid
+  // ones — the renderer never invents interactivity the turn did not carry.
+  blocks?: ChatUiBlock[]
 }
+
+// ── Interactive UI blocks (Plexii P4) ────────────────────────────────────────
+// The envelope's optional "blocks" array: visual, tappable elements the model
+// emits INSIDE an answer so replies read as UI, not walls of text. Tapping an
+// option sends the user's selection back as their next chat message — blocks
+// carry interaction, never state of their own. Sanitised in main
+// (ai/chatUiBlocks.ts) before anything renders.
+export type ChatUiBlock =
+  | {
+      type: 'choices'
+      id: string
+      // Optional one-line lead-in above the options.
+      prompt?: string
+      // Multi-select renders toggles + a confirm; single-select sends on tap.
+      multi?: boolean
+      options: Array<{ id: string; label: string; icon?: string; description?: string }>
+    }
+  | {
+      type: 'scale'
+      id: string
+      label: string
+      min: number
+      max: number
+      minLabel?: string
+      maxLabel?: string
+    }
+  // Presentational: a row of real icons with labels (apps, tools, steps).
+  | { type: 'icon-row'; items: Array<{ icon: string; label: string }> }
+  // Presentational: small tinted info cards (icon, title, one-line body).
+  | { type: 'cards'; items: Array<{ icon?: string; title: string; body?: string }> }
 
 // ── Agentic loop (multi-round: propose → apply → observe → re-plan) ──────────
 // One step of the agent loop returns the same ActionProposal[] the chat uses,
@@ -2347,6 +2381,9 @@ export interface AiChatStoredMessage {
   // The references the USER's turn was sent with, so the transcript can redraw
   // its chips exactly where they were typed.
   mentions: ChatMentionRef[]
+  // Interactive UI blocks this assistant turn carried (Plexii P4). Empty for
+  // user turns and turns written before blocks existed.
+  blocks: ChatUiBlock[]
 }
 export interface AiChatConversation {
   meta: AiChatConversationMeta
@@ -2444,3 +2481,5 @@ export type ChatBlock =
   // the reply, matching the [n] markers inside it.
   | { kind: 'mentions'; mentions: ChatMentionResolved[] }
   | { kind: 'sources'; sources: ChatSource[] }
+  // A model-emitted interactive block (Plexii P4) riding the derived thread.
+  | { kind: 'ui'; block: ChatUiBlock }

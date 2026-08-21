@@ -100,6 +100,56 @@ test.describe('Plexii hub (Phase 1)', () => {
     )
   })
 
+  // ── Phase 4: interactive blocks ──────────────────────────────────────────
+
+  test('interactive choice blocks render and a tap sends the selection', async () => {
+    const { window } = launched
+    await window.locator('[data-testid="sidebar-plexii"]').click()
+    await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
+
+    // Seed an assistant turn carrying a choices block straight into the store
+    // (the same __fbChat handle the harness exposes for e2e), so the render +
+    // interaction path is exercised without a live model call.
+    await window.evaluate(() => {
+      const w = window as unknown as {
+        __fbChat?: {
+          setState: (s: Record<string, unknown>) => void
+        }
+      }
+      const ts = Date.now()
+      w.__fbChat?.setState({
+        activeConversationId: null,
+        messagesByTask: {
+          __new__: [{ role: 'assistant', content: 'Which direction should we take?', ts }]
+        },
+        blocksByMessage: {
+          [String(ts)]: [
+            {
+              type: 'choices',
+              id: 'c1',
+              prompt: 'Pick a direction',
+              options: [
+                { id: 'a', label: 'Podcast studio', icon: 'mic' },
+                { id: 'b', label: 'Newsletter', icon: 'edit_note' }
+              ]
+            },
+            { type: 'cards', items: [{ icon: 'rocket_launch', title: 'Launch week', body: 'Plan the drop' }] }
+          ]
+        }
+      })
+    })
+
+    await expect(window.locator('[data-testid="ui-block-choices"]')).toBeVisible()
+    await expect(window.locator('[data-testid="ui-block-cards"]')).toBeVisible()
+    const options = window.locator('[data-testid="ui-choice-option"]')
+    await expect(options).toHaveCount(2)
+    // Tapping an option sends it as the user's next message.
+    await options.filter({ hasText: 'Podcast studio' }).click()
+    await expect(
+      window.locator('[data-testid="user-turn"]').filter({ hasText: 'Podcast studio' })
+    ).toBeVisible({ timeout: 8_000 })
+  })
+
   // ── Phase 2: consolidation + the Plexii name ─────────────────────────────
 
   test('cmd-shift-K toggles the hub and the header Build button is gone', async () => {
