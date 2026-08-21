@@ -262,8 +262,8 @@ function loadLayout(): HomeLayout {
 
 const GRID = {
   cols: 4,
-  cellH: 184,
-  gap: 16,
+  cellH: 200,
+  gap: 18,
   // Displaced widgets sliding aside, and the placeholder gap moving.
   reflowSpring: { type: 'spring' as const, stiffness: 550, damping: 40 },
   // The lifted card settling into its slot on release.
@@ -418,7 +418,7 @@ export default function HomeDashboard(): JSX.Element {
   useEffect(() => {
     const el = gridRef.current
     if (!el) return
-    const pick = (w: number): number => (w >= 760 ? 4 : w >= 380 ? 2 : 1)
+    const pick = (w: number): number => (w >= 1000 ? 4 : w >= 520 ? 2 : 1)
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? el.clientWidth
       setCols((c) => (pick(w) === c ? c : pick(w)))
@@ -741,7 +741,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'quick-links':
         return <QuickLinksWidget routes={inst.config?.routes} />
       case 'app-launcher':
-        return <AppLauncherWidget />
+        return <AppLauncherWidget size={size} />
       case 'create':
         return <CreateWidget />
       case 'focus-timer':
@@ -1258,10 +1258,11 @@ export default function HomeDashboard(): JSX.Element {
                               movedRef.current = false
                               return
                             }
-                            // Selecting a widget to swap opens the picker on
-                            // its replacement candidates.
+                            // Selecting a widget arms the swap; the picker
+                            // honours it (Replace X) when opened via Add
+                            // widget. It never opens itself: rearranging
+                            // stays unblocked.
                             setSwapKey(selected ? null : inst.key)
-                            if (!selected) setGallery(true)
                           }
                         : undefined
                     }
@@ -1406,7 +1407,9 @@ export default function HomeDashboard(): JSX.Element {
       <div className="h-full w-full overflow-auto paper-texture">
       {/* The gallery floats as a dropdown now — customize never squeezes the
           page, and pt-16 keeps the greeting clear of the Home pill above. */}
-      <div className="max-w-6xl mx-auto px-6 pb-7 pt-16">
+      {/* Wide board: the page uses the room it has instead of pooling empty
+          margin left and right (Caleb's spacing ruling, 2026-08-21). */}
+      <div className="max-w-[1440px] mx-auto px-8 pb-8 pt-16">
         {/* Greeting + focus-mode toggle. In customize (placement) mode the
             greeting and the non-editing controls recede behind a soft blur:
             the board is live, everything else steps back. */}
@@ -1454,10 +1457,10 @@ export default function HomeDashboard(): JSX.Element {
                   setSwapKey(null)
                   setGallery(false)
                 } else {
-                  // Entering customize goes straight to the picker, Apple's
-                  // "edit home screen" rhythm: choose, then place.
+                  // Customize lands in edit mode: outlines, drag, size,
+                  // remove. Adding is a deliberate second step via the Add
+                  // widget button (Caleb's ruling, 2026-08-21).
                   setCustomize(true)
-                  setGallery(true)
                 }
               }}
               data-testid="home-customize-toggle"

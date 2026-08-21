@@ -172,7 +172,7 @@ export function QuickLinksWidget({ routes }: { routes?: string[] }): JSX.Element
   )
 }
 
-export function AppLauncherWidget(): JSX.Element {
+export function AppLauncherWidget({ size = 'sm' }: { size?: WidgetSize } = {}): JSX.Element {
   const apps = useConnectedAppsStore((s) => s.apps)
   const launchLocal = useConnectedAppsStore((s) => s.launchLocal)
   const v = useViewStore()
@@ -183,17 +183,22 @@ export function AppLauncherWidget(): JSX.Element {
       {shown.length === 0 ? (
         <EmptyState text="No connected apps yet. Add some from the sidebar." />
       ) : (
-        <div className="grid grid-cols-4 gap-2" data-testid="home-app-launcher">
+        // Icon-only, logos large enough to own their tile — the name rides
+        // the tooltip (Caleb's ruling, 2026-08-21: "just the icons, larger").
+        <div
+          className={`grid gap-2 ${size === 'md' ? 'grid-cols-8' : 'grid-cols-4'}`}
+          data-testid="home-app-launcher"
+        >
           {shown.map((a) => (
             <button
               key={a.id}
               onClick={() => (a.kind === 'local' ? void launchLocal(a.id) : v.goConnectedApp(a.id))}
               title={a.title}
+              aria-label={a.title}
               data-testid={`home-app-launch-${a.id}`}
-              className="flex flex-col items-center gap-1.5 fb-tile fb-press px-1.5 py-2.5"
+              className="flex items-center justify-center fb-tile fb-press aspect-square p-2"
             >
-              <AppLogo app={a} size={24} glyphSize={14} />
-              <span className="text-[10px] text-[var(--ink-70)] truncate max-w-full">{a.title}</span>
+              <AppLogo app={a} size={38} glyphSize={22} />
             </button>
           ))}
         </div>
