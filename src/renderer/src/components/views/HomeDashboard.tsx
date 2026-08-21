@@ -755,9 +755,14 @@ export default function HomeDashboard(): JSX.Element {
       case 'stalled':
         return <StalledDeskWidget />
       case 'standup':
-        // StandupHome carries its own card chrome + margin; neutralize the margin
-        // so the slot gap is the single source of vertical rhythm.
-        return <div className="[&>*]:!mb-0">{<StandupHome />}</div>
+        // StandupHome carries its own card chrome + margin one level deeper
+        // than the tile wrapper can reach; neutralize both here so the glass
+        // tile is the only surface.
+        return (
+          <div className="[&>*]:!mb-0 [&>*]:h-full [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!border-0">
+            <StandupHome />
+          </div>
+        )
 
       case 'navigator':
         return (
@@ -1281,11 +1286,13 @@ export default function HomeDashboard(): JSX.Element {
                     }`}
                   >
                     {/* In customize mode the widget is a target, not a control.
-                        [&>*]:h-full is the Apple tile rule: the widget's card
-                        chrome always fills its cell exactly, whatever the
-                        content height, so the board reads uniform outside
-                        customize mode too. */}
-                    <div className={`h-full overflow-hidden rounded-2xl [&>*]:h-full ${customize ? 'pointer-events-none select-none' : ''}`}>
+                        The tile owns the material: fb-widget-tile is the glass
+                        + depth surface, [&>*]:h-full makes the widget fill its
+                        cell, and the !bg/!shadow/!border overrides strip each
+                        widget's own card chrome so nothing double-stacks. */}
+                    <div
+                      className={`h-full overflow-hidden rounded-2xl fb-widget-tile [&>*]:h-full [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!border-0 ${customize ? 'pointer-events-none select-none' : ''}`}
+                    >
                       {renderWidget(inst)}
                     </div>
                   </div>
@@ -1538,7 +1545,7 @@ export default function HomeDashboard(): JSX.Element {
             className="fixed left-0 top-0 z-[100] pointer-events-none"
             data-testid="home-drag-lift"
           >
-            <div className="h-full overflow-hidden rounded-2xl [&>*]:h-full shadow-[0_24px_60px_rgba(0,0,0,0.30)] ring-1 ring-black/[0.08] dark:ring-white/[0.08] bg-[var(--surface-base)]">
+            <div className="h-full overflow-hidden rounded-2xl fb-widget-tile [&>*]:h-full [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!border-0 !shadow-[0_24px_60px_rgba(0,0,0,0.30),0_0_0_1px_rgba(0,0,0,0.06)]">
               {renderWidget(liftedInst)}
             </div>
           </motion.div>,
@@ -1907,7 +1914,7 @@ function SizePreview({
     <div style={{ width: w * s, height: h * s }} className="relative">
       <div
         style={{ width: w, height: h, transform: `scale(${s})`, transformOrigin: 'top left' }}
-        className="absolute left-0 top-0 pointer-events-none select-none overflow-hidden rounded-2xl [&>*]:h-full"
+        className="absolute left-0 top-0 pointer-events-none select-none overflow-hidden rounded-2xl fb-widget-tile [&>*]:h-full [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!border-0"
       >
         {children}
       </div>
