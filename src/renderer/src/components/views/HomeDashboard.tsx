@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, animate, motion, useMotionValue } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import {
+  SIZE_SPAN,
+  bestInsertionIndex,
+  cellRect,
+  packGrid,
+  pointerCell,
+  type GridMetrics,
+  type SizedInstance,
+  type WidgetSize
+} from './homeGridLayout'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { personFirstName } from '../../lib/personName'
@@ -250,12 +261,46 @@ function saveLayout(l: HomeLayout): void {
   }
 }
 
-function layoutIsStock(l: HomeLayout): boolean {
+// ── Phase 1 grid (Apple widget-picker mission) ──────────────────────────────
+// One flat, ordered, sized list renders as a packed 4-column grid. Sizes are
+// derived in memory from the v2 two-column layout (main = lg, rail = sm) and
+// persistence stays v2-shaped (saving splits the list back by size), so
+// rolling back to the column UI loses nothing. Every feel knob lives here.
+
+const GRID = {
+  cols: 4,
+  cellH: 184,
+  gap: 16,
+  // Displaced widgets sliding aside, and the placeholder gap moving.
+  reflowSpring: { type: 'spring' as const, stiffness: 550, damping: 40 },
+  // The lifted card settling into its slot on release.
+  settleSpring: { type: 'spring' as const, stiffness: 520, damping: 42 },
+  liftScale: 1.04,
+  // Pointer travel before a press becomes a drag (below it, it's a click).
+  dragActivationPx: 6
+}
+
+function deriveFlat(l: HomeLayout): SizedInstance[] {
+  return [
+    ...l.main.map((it): SizedInstance => ({ ...it, size: 'lg' })),
+    ...l.rail.map((it): SizedInstance => ({ ...it, size: 'sm' }))
+  ]
+}
+
+function flatToLayout(flat: SizedInstance[]): HomeLayout {
+  const strip = ({ size: _size, ...inst }: SizedInstance): HomeWidgetInstance => inst
+  return {
+    main: flat.filter((it) => it.size !== 'sm').map(strip),
+    rail: flat.filter((it) => it.size === 'sm').map(strip)
+  }
+}
+
+const STOCK_FLAT = deriveFlat(STOCK_LAYOUT)
+
+function flatIsStock(flat: SizedInstance[]): boolean {
   return (
-    l.main.length === STOCK_LAYOUT.main.length &&
-    l.rail.length === STOCK_LAYOUT.rail.length &&
-    l.main.every((it, i) => it.widget === STOCK_LAYOUT.main[i].widget) &&
-    l.rail.every((it, i) => it.widget === STOCK_LAYOUT.rail[i].widget)
+    flat.length === STOCK_FLAT.length &&
+    flat.every((it, i) => it.widget === STOCK_FLAT[i].widget && it.size === STOCK_FLAT[i].size)
   )
 }
 
@@ -307,12 +352,12 @@ export default function HomeDashboard(): JSX.Element {
   // A clock that ticks each minute so the greeting + relative times stay current.
   const [now, setNow] = useState(() => Date.now())
 
-  // Slot arrangement + customize/drag state. dragKey moves a placed instance;
-  // galleryDrag carries a new widget being dragged out of the gallery drawer.
-  const [layout, setLayout] = useState<HomeLayout>(() => loadLayout())
-  const [dragKey, setDragKey] = useState<string | null>(null)
-  const [galleryDrag, setGalleryDrag] = useState<HomeWidgetId | null>(null)
-  const [dropHint, setDropHint] = useState<{ col: 'main' | 'rail'; index: number } | null>(null)
+  // The sized widget list, rendered as one packed grid. Order IS the layout.
+  const [flat, setFlat] = useState<SizedInstance[]>(() => deriveFlat(loadLayout()))
+  // A pointer drag in flight. React state carries only identity and the
+  // settling flag; per-frame position rides motion values so pointer moves
+  // never re-render.
+  const [drag, setDrag] = useState<{ key: string; settling: boolean } | null>(null)
   const [customize, setCustomize] = useState(false)
   // Stage Manager pill — the same desk-miniature strip the desk breadcrumb
   // opens, surfaced on Home so any desk is one click away.
@@ -327,6 +372,28 @@ export default function HomeDashboard(): JSX.Element {
     initial?: HomeWidgetConfig
     apply: (config: HomeWidgetConfig) => void
   } | null>(null)
+
+  // Imperative drag machinery. flatRef mirrors `flat` for the window-level
+  // pointer handlers; dragInfoRef carries one drag's constants; the motion
+  // values position the lifted card without React in the loop.
+  const flatRef = useRef<SizedInstance[]>([])
+  const gridRef = useRef<HTMLDivElement>(null)
+  const dragInfoRef = useRef<{
+    key: string
+    size: WidgetSize
+    grabDX: number
+    grabDY: number
+    width: number
+    height: number
+    orig: SizedInstance[]
+    lastCell: { col: number; row: number } | null
+  } | null>(null)
+  const movedRef = useRef(false)
+  const cancelDragRef = useRef<() => void>(() => {})
+  const dragX = useMotionValue(0)
+  const dragY = useMotionValue(0)
+  const dragScale = useMotionValue(1)
+  flatRef.current = flat
 
   // Which room the navigator has open. TOP_LEVEL is the pseudo-room holding
   // standalone desks that live outside any room.
@@ -515,45 +582,26 @@ export default function HomeDashboard(): JSX.Element {
     }
   }
 
-  // ── Slot editing: move, place, swap, remove, reset ─────────────────────────
-  const commitLayout = (next: HomeLayout): void => {
-    setLayout(next)
-    saveLayout(next)
+  // ── Slot editing on the flat sized list ────────────────────────────────────
+  const commitFlat = (next: SizedInstance[]): void => {
+    flatRef.current = next
+    setFlat(next)
+    saveLayout(flatToLayout(next))
   }
 
-  const insertInstance = (inst: HomeWidgetInstance, col: 'main' | 'rail', index: number): void => {
-    const next: HomeLayout = {
-      main: layout.main.filter((it) => it.key !== inst.key),
-      rail: layout.rail.filter((it) => it.key !== inst.key)
-    }
-    const list = next[col]
-    list.splice(Math.min(index, list.length), 0, inst)
-    commitLayout(next)
-  }
+  const findInstance = (key: string): SizedInstance | null =>
+    flat.find((it) => it.key === key) ?? null
 
-  const findInstance = (key: string): HomeWidgetInstance | null =>
-    layout.main.find((it) => it.key === key) ?? layout.rail.find((it) => it.key === key) ?? null
-
-  const applyDrop = (): void => {
-    if (dropHint && dragKey) {
-      const inst = findInstance(dragKey)
-      if (inst) insertInstance(inst, dropHint.col, dropHint.index)
-    } else if (dropHint && galleryDrag) {
-      placeWidget(galleryDrag, dropHint)
-    }
-    setDragKey(null)
-    setGalleryDrag(null)
-    setDropHint(null)
-  }
-
-  // Place a new widget from the gallery, running its config picker first when
-  // it needs one. Singletons that are already placed are a no-op.
-  const placeWidget = (id: HomeWidgetId, at?: { col: 'main' | 'rail'; index: number }): void => {
+  // Place a new widget from the gallery at the end of the board, running its
+  // config picker first when it needs one. Singletons already placed are a
+  // no-op. defaultCol maps to the interim size story: main-column widgets
+  // arrive large, rail widgets small (real per-widget sizes land in Phase 2).
+  const placeWidget = (id: HomeWidgetId): void => {
     const def = widgetDef(id)
     if (!def.multi && isPlaced(id)) return
-    const target = at ?? { col: def.defaultCol, index: layout[def.defaultCol].length }
+    const size: WidgetSize = def.defaultCol === 'main' ? 'lg' : 'sm'
     const finish = (config?: HomeWidgetConfig): void =>
-      insertInstance({ key: newInstanceKey(id), widget: id, config }, target.col, target.index)
+      commitFlat([...flatRef.current, { key: newInstanceKey(id), widget: id, config, size }])
     if (def.config) {
       setPicker({ widget: id, kind: def.config, apply: (config) => finish(config) })
     } else {
@@ -561,16 +609,16 @@ export default function HomeDashboard(): JSX.Element {
     }
   }
 
-  // Swap a placed instance for a different widget, keeping its slot.
+  // Swap a placed instance for a different widget, keeping its slot and size.
   const swapWidget = (key: string, id: HomeWidgetId): void => {
     const def = widgetDef(id)
     if (!def.multi && isPlaced(id)) return
     const replaceWith = (config?: HomeWidgetConfig): void => {
-      const next: HomeLayout = {
-        main: layout.main.map((it) => (it.key === key ? { key: newInstanceKey(id), widget: id, config } : it)),
-        rail: layout.rail.map((it) => (it.key === key ? { key: newInstanceKey(id), widget: id, config } : it))
-      }
-      commitLayout(next)
+      commitFlat(
+        flatRef.current.map((it) =>
+          it.key === key ? { key: newInstanceKey(id), widget: id, config, size: it.size } : it
+        )
+      )
       setSwapKey(null)
     }
     if (def.config) {
@@ -581,10 +629,7 @@ export default function HomeDashboard(): JSX.Element {
   }
 
   const removeInstance = (key: string): void => {
-    commitLayout({
-      main: layout.main.filter((it) => it.key !== key),
-      rail: layout.rail.filter((it) => it.key !== key)
-    })
+    commitFlat(flat.filter((it) => it.key !== key))
     if (swapKey === key) setSwapKey(null)
   }
 
@@ -598,29 +643,26 @@ export default function HomeDashboard(): JSX.Element {
       kind: def.config,
       initial: inst.config,
       apply: (config) => {
-        commitLayout({
-          main: layout.main.map((it) => (it.key === key ? { ...it, config } : it)),
-          rail: layout.rail.map((it) => (it.key === key ? { ...it, config } : it))
-        })
+        commitFlat(flatRef.current.map((it) => (it.key === key ? { ...it, config } : it)))
       }
     })
   }
 
-  const isPlaced = (id: HomeWidgetId): boolean =>
-    layout.main.some((it) => it.widget === id) || layout.rail.some((it) => it.widget === id)
+  const isPlaced = (id: HomeWidgetId): boolean => flat.some((it) => it.widget === id)
 
   const resetLayout = (): void => {
-    commitLayout(STOCK_LAYOUT)
+    commitFlat(STOCK_FLAT)
     setSwapKey(null)
   }
 
-  // Escape backs out of customize mode one layer at a time: swap selection
-  // first, then the mode itself.
+  // Escape backs out of customize mode one layer at a time: a drag in flight
+  // first (restoring the pre-drag order), then swap selection, then the mode.
   useEffect(() => {
     if (!customize) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
-      if (swapKey) setSwapKey(null)
+      if (dragInfoRef.current) cancelDragRef.current()
+      else if (swapKey) setSwapKey(null)
       else setCustomize(false)
     }
     window.addEventListener('keydown', onKey)
@@ -959,7 +1001,7 @@ export default function HomeDashboard(): JSX.Element {
     }
   }
 
-  const dragging = dragKey !== null || galleryDrag !== null
+  const dragging = drag !== null
 
   // Stagger only the very first paint: widgets cascade in once, then all
   // later layout changes are pure springs with no artificial delay.
@@ -968,139 +1010,242 @@ export default function HomeDashboard(): JSX.Element {
     firstPaintRef.current = false
   }, [])
 
-  const renderColumn = (col: 'main' | 'rail'): JSX.Element => (
-    <div className="space-y-5 min-w-0">
+  // Live grid metrics from the container. The container itself never animates,
+  // so this is safe to read mid-drag; cell geometry comes from packGrid, never
+  // from measuring (possibly mid-spring) widget DOM.
+  const gridMetrics = (): GridMetrics | null => {
+    const el = gridRef.current
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    return {
+      originX: r.left,
+      originY: r.top,
+      cellW: (r.width - GRID.gap * (GRID.cols - 1)) / GRID.cols,
+      cellH: GRID.cellH,
+      gap: GRID.gap,
+      cols: GRID.cols
+    }
+  }
+
+  // End a drag: spring the lifted card into its slot (commit) or back into
+  // the pre-drag order (cancel), then put the real widget back and persist.
+  const settleDrag = (commit: boolean): void => {
+    const info = dragInfoRef.current
+    if (!info) return
+    dragInfoRef.current = null
+    const list = commit ? flatRef.current : info.orig
+    if (!commit) {
+      flatRef.current = info.orig
+      setFlat(info.orig)
+    }
+    const finish = (): void => {
+      setDrag(null)
+      if (commit) commitFlat(list)
+    }
+    const m = gridMetrics()
+    const pos = m ? packGrid(list, m.cols).get(info.key) : undefined
+    if (!m || !pos) {
+      finish()
+      return
+    }
+    setDrag({ key: info.key, settling: true })
+    const r = cellRect(pos, info.size, m)
+    void Promise.all([
+      animate(dragX, r.left, GRID.settleSpring),
+      animate(dragY, r.top, GRID.settleSpring),
+      animate(dragScale, 1, GRID.settleSpring)
+    ]).then(finish)
+  }
+  cancelDragRef.current = () => settleDrag(false)
+
+  // Press on a card in customize mode. Below the activation distance it is a
+  // click (swap selection, via onClick); beyond it the card lifts and follows
+  // the pointer while the board reflows live underneath.
+  const beginCardDrag = (e: React.PointerEvent<HTMLDivElement>, inst: SizedInstance): void => {
+    if (!customize || drag || e.button !== 0) return
+    if ((e.target as HTMLElement).closest('button')) return
+    const card = e.currentTarget
+    const startX = e.clientX
+    const startY = e.clientY
+    movedRef.current = false
+
+    const onMove = (ev: PointerEvent): void => {
+      let info = dragInfoRef.current
+      if (!info) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < GRID.dragActivationPx) return
+        // Lift: freeze the card's rect, remember where inside it we grabbed.
+        const r = card.getBoundingClientRect()
+        movedRef.current = true
+        info = {
+          key: inst.key,
+          size: inst.size,
+          grabDX: startX - r.left,
+          grabDY: startY - r.top,
+          width: r.width,
+          height: r.height,
+          orig: flatRef.current,
+          lastCell: null
+        }
+        dragInfoRef.current = info
+        dragX.set(r.left)
+        dragY.set(r.top)
+        dragScale.set(1)
+        void animate(dragScale, GRID.liftScale, GRID.settleSpring)
+        setSwapKey(null)
+        setDrag({ key: inst.key, settling: false })
+      }
+      dragX.set(ev.clientX - info.grabDX)
+      dragY.set(ev.clientY - info.grabDY)
+      const m = gridMetrics()
+      if (!m) return
+      // Retarget only when the pointer crosses into a new cell — the
+      // hysteresis that keeps cell boundaries from jittering.
+      const cell = pointerCell(ev.clientX, ev.clientY, m)
+      if (info.lastCell && info.lastCell.col === cell.col && info.lastCell.row === cell.row) return
+      info.lastCell = cell
+      const cur = flatRef.current
+      const draggedInst = cur.find((it) => it.key === info.key)
+      if (!draggedInst) return
+      const others = cur.filter((it) => it.key !== info.key)
+      const idx = bestInsertionIndex(others, draggedInst, ev.clientX, ev.clientY, m)
+      if (idx === cur.indexOf(draggedInst)) return
+      const next = [...others.slice(0, idx), draggedInst, ...others.slice(idx)]
+      flatRef.current = next
+      setFlat(next)
+    }
+    const cleanup = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+    const onUp = (): void => {
+      cleanup()
+      if (dragInfoRef.current) settleDrag(true)
+    }
+    const onCancel = (): void => {
+      cleanup()
+      if (dragInfoRef.current) settleDrag(false)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+  }
+
+  const positions = useMemo(() => packGrid(flat, GRID.cols), [flat])
+  const liftedInst = drag
+    ? (flat.find((it) => it.key === drag.key) ??
+      dragInfoRef.current?.orig.find((it) => it.key === drag.key) ??
+      null)
+    : null
+
+  // The widget board: one packed grid. Cells take explicit positions from
+  // packGrid, so the springs animate between spots the drag math already
+  // agreed on.
+  const renderGrid = (): JSX.Element => (
+    <div
+      ref={gridRef}
+      className="grid"
+      style={{
+        gridTemplateColumns: `repeat(${GRID.cols}, minmax(0, 1fr))`,
+        gridAutoRows: `${GRID.cellH}px`,
+        gap: GRID.gap
+      }}
+      data-testid="home-widget-grid"
+    >
       <AnimatePresence>
-      {layout[col].map((inst, i) => {
-        const def = widgetDef(inst.widget)
-        const selected = swapKey === inst.key
-        const mountDelay = firstPaintRef.current ? i * 0.045 : 0
-        return (
-          <motion.div
-            key={inst.key}
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
-            transition={{
-              layout: { type: 'spring', stiffness: 550, damping: 40 },
-              opacity: { duration: 0.25, delay: mountDelay },
-              y: { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
-            }}
-            className="relative group/slot"
-            onDragOver={(e) => {
-              if (!dragging || dragKey === inst.key) return
-              e.preventDefault()
-              setDropHint({ col, index: i })
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              applyDrop()
-            }}
-          >
-            {/* Insertion hint while a widget is dragged over this slot */}
-            {dragging && dropHint?.col === col && dropHint.index === i && dragKey !== inst.key && (
-              <div className="absolute -top-3 left-2 right-2 h-[3px] rounded-full bg-[rgb(var(--accent))]" />
-            )}
-            <div
-              onClick={customize ? () => setSwapKey(selected ? null : inst.key) : undefined}
-              className={`transition-all rounded-2xl ${dragKey === inst.key ? 'opacity-40' : ''} ${
-                customize || dragging
-                  ? `${customize ? 'cursor-pointer' : ''} scale-[0.985] ${
-                      selected
-                        ? 'ring-2 ring-[rgb(var(--accent))] shadow-[0_0_24px_rgb(var(--accent)/0.35)]'
-                        : 'ring-2 ring-[rgb(var(--accent)/0.35)] shadow-[0_0_16px_rgb(var(--accent)/0.15)]'
-                    }`
-                  : ''
-              }`}
+        {flat.map((inst, i) => {
+          const def = widgetDef(inst.widget)
+          const selected = swapKey === inst.key
+          const span = SIZE_SPAN[inst.size]
+          const pos = positions.get(inst.key)
+          const lifted = drag?.key === inst.key
+          const mountDelay = firstPaintRef.current ? i * 0.045 : 0
+          return (
+            <motion.div
+              key={inst.key}
+              layout
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+              transition={{
+                layout: GRID.reflowSpring,
+                opacity: { duration: 0.25, delay: mountDelay },
+                y: { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
+              }}
+              style={{
+                gridColumn: `${(pos?.col ?? 0) + 1} / span ${span.w}`,
+                gridRow: `${(pos?.row ?? 0) + 1} / span ${span.h}`
+              }}
+              className="relative group/slot min-w-0"
+              onPointerDown={(e) => beginCardDrag(e, inst)}
             >
-              {/* In customize mode the widget is a target, not a control. */}
-              <div className={customize ? 'pointer-events-none' : ''}>{renderWidget(inst)}</div>
-            </div>
-            {/* Customize chrome: remove, and edit for configurable widgets. */}
-            {customize && (
-              <div className="absolute -top-2 -right-2 flex items-center gap-1">
-                {def.config && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      editInstance(inst.key)
-                    }}
-                    title={`Edit ${def.name}`}
-                    data-testid={`home-slot-edit-${inst.key}`}
-                    className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
+              {lifted ? (
+                /* The gap: a soft slot marking exactly where the widget lands. */
+                <div className="h-full rounded-2xl bg-[var(--surface-sunken)] ring-1 ring-inset ring-[var(--edge-soft)] opacity-70" />
+              ) : (
+                <>
+                  <div
+                    onClick={
+                      customize
+                        ? () => {
+                            if (movedRef.current) {
+                              movedRef.current = false
+                              return
+                            }
+                            setSwapKey(selected ? null : inst.key)
+                          }
+                        : undefined
+                    }
+                    className={`h-full transition-all rounded-2xl ${
+                      customize || dragging
+                        ? `${customize ? 'cursor-pointer' : ''} scale-[0.985] ${
+                            selected
+                              ? 'ring-2 ring-[rgb(var(--accent))] shadow-[0_0_24px_rgb(var(--accent)/0.35)]'
+                              : 'ring-2 ring-[rgb(var(--accent)/0.35)] shadow-[0_0_16px_rgb(var(--accent)/0.15)]'
+                          }`
+                        : ''
+                    }`}
                   >
-                    <Icon name="edit" size={12} />
-                  </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeInstance(inst.key)
-                  }}
-                  title={`Remove ${def.name}`}
-                  data-testid={`home-slot-remove-${inst.key}`}
-                  className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-rose-500 shadow"
-                >
-                  <Icon name="close" size={12} />
-                </button>
-              </div>
-            )}
-            {/* Corner grip — grab it to lift the widget into another slot. */}
-            <span
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = 'move'
-                // A drag payload keeps WebKit happy; the state carries the key.
-                e.dataTransfer.setData('text/plain', inst.key)
-                setDragKey(inst.key)
-              }}
-              onDragEnd={() => {
-                setDragKey(null)
-                setDropHint(null)
-              }}
-              title="Drag to rearrange your home"
-              className={`absolute bottom-1.5 right-1.5 h-6 w-6 rounded-md inline-flex items-center justify-center cursor-grab active:cursor-grabbing text-[var(--ink-30)] hover:text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-opacity ${
-                customize ? 'opacity-100' : 'opacity-0 group-hover/slot:opacity-100'
-              }`}
-              data-testid={`home-slot-grip-${inst.key}`}
-            >
-              <Icon name="drag_indicator" size={14} />
-            </span>
-          </motion.div>
-        )
-      })}
+                    {/* In customize mode the widget is a target, not a control. */}
+                    <div className={`h-full overflow-hidden rounded-2xl ${customize ? 'pointer-events-none select-none' : ''}`}>
+                      {renderWidget(inst)}
+                    </div>
+                  </div>
+                  {/* Customize chrome: remove, and edit for configurable widgets. */}
+                  {customize && (
+                    <div className="absolute -top-2 -right-2 flex items-center gap-1">
+                      {def.config && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            editInstance(inst.key)
+                          }}
+                          title={`Edit ${def.name}`}
+                          data-testid={`home-slot-edit-${inst.key}`}
+                          className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
+                        >
+                          <Icon name="edit" size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeInstance(inst.key)
+                        }}
+                        title={`Remove ${def.name}`}
+                        data-testid={`home-slot-remove-${inst.key}`}
+                        className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-rose-500 shadow"
+                      >
+                        <Icon name="close" size={12} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
+          )
+        })}
       </AnimatePresence>
-      {/* Column tail — a live drop zone while dragging, and a visible invitation
-          in customize mode. */}
-      <motion.div
-        layout
-        transition={{ layout: { type: 'spring', stiffness: 550, damping: 40 } }}
-        className={`rounded-xl border border-dashed transition-all flex items-center justify-center ${
-          dragging
-            ? dropHint?.col === col && dropHint.index === layout[col].length
-              ? 'h-14 border-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.06)]'
-              : 'h-14 border-[var(--edge-firm)]'
-            : customize
-              ? 'h-14 border-[rgb(var(--accent)/0.35)] bg-[rgb(var(--accent)/0.03)]'
-              : 'h-10 border-transparent'
-        }`}
-        onDragOver={(e) => {
-          if (!dragging) return
-          e.preventDefault()
-          setDropHint({ col, index: layout[col].length })
-        }}
-        onDrop={(e) => {
-          e.preventDefault()
-          applyDrop()
-        }}
-      >
-        {(customize || dragging) && (
-          <span className="text-[11px] text-[var(--ink-40)] pointer-events-none">
-            {dragging ? 'Drop here' : 'Free slot, drag a widget in'}
-          </span>
-        )}
-      </motion.div>
     </div>
   )
 
@@ -1175,7 +1320,7 @@ export default function HomeDashboard(): JSX.Element {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {customize && !layoutIsStock(layout) && (
+            {customize && !flatIsStock(flat) && (
               <button
                 onClick={resetLayout}
                 data-testid="home-layout-reset"
@@ -1210,11 +1355,8 @@ export default function HomeDashboard(): JSX.Element {
             if (swapKey) swapWidget(swapKey, id)
             else placeWidget(id)
           }}
-          onDragStartWidget={(id) => setGalleryDrag(id)}
-          onDragEndWidget={() => {
-            setGalleryDrag(null)
-            setDropHint(null)
-          }}
+          onDragStartWidget={() => {}}
+          onDragEndWidget={() => {}}
           onClearSwap={() => setSwapKey(null)}
           onClose={() => {
             setCustomize(false)
@@ -1256,14 +1398,33 @@ export default function HomeDashboard(): JSX.Element {
             piece of home that is not a re-slottable widget. */}
         <StartOrAskPlexi />
 
-        {/* The pinned-widget canvas: wide main track + narrow rail. Each widget
-            can be lifted by its corner grip and dropped into another slot. */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
-          {renderColumn('main')}
-          {renderColumn('rail')}
-        </div>
+        {/* The widget board. In customize mode, press and move any card to
+            lift it; the board reflows live underneath. */}
+        {renderGrid()}
       </div>
 
+      {/* The lifted card: rides the pointer via motion values in a body
+          portal, springs into its slot on release. */}
+      {drag && liftedInst && dragInfoRef.current !== null && (
+        createPortal(
+          <motion.div
+            style={{
+              x: dragX,
+              y: dragY,
+              scale: dragScale,
+              width: dragInfoRef.current.width,
+              height: dragInfoRef.current.height
+            }}
+            className="fixed left-0 top-0 z-[100] pointer-events-none"
+            data-testid="home-drag-lift"
+          >
+            <div className="h-full overflow-hidden rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.30)] ring-1 ring-black/[0.08] dark:ring-white/[0.08] bg-[var(--surface-base)]">
+              {renderWidget(liftedInst)}
+            </div>
+          </motion.div>,
+          document.body
+        )
+      )}
 
       {picker && (
         <WidgetConfigPicker
