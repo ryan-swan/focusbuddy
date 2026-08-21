@@ -20,15 +20,14 @@ test.afterEach(async () => {
 // the sidebar icon which is small and may overlap other elements).
 async function goSuite(window: LaunchedApp['window']): Promise<void> {
   await window.evaluate(() => {
-    const store = (window as unknown as { useViewStore?: { getState: () => { goSuite: () => void } } }).useViewStore
-    if (store) {
-      store.getState().goSuite()
-    } else {
-      // Fallback: click any sidebar button whose text includes "Suite"
-      const btn = Array.from(document.querySelectorAll('button, [role="button"]'))
-        .find((el) => (el as HTMLElement).innerText?.includes('Suite'))
-      ;(btn as HTMLElement | undefined)?.click()
-    }
+    // The view store is exposed as __fbView (the convention every other spec
+    // uses). This helper reached for a `useViewStore` global that has never
+    // existed, so it silently fell through to a "Suite" text search that finds
+    // nothing under the four-segment switcher — and every case using it timed
+    // out on a suite home it never navigated to.
+    const store = (window as unknown as { __fbView?: { getState: () => { goSuite: () => void } } })
+      .__fbView
+    store?.getState().goSuite()
   })
   await expect(window.locator('[data-testid="plexisuite-home"]')).toBeVisible({ timeout: 5000 })
 }

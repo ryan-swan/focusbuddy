@@ -77,6 +77,11 @@ const panel = (window: Page) => window.locator('[data-testid="assistant-panel"]'
 
 async function openAssistant(window: Page): Promise<void> {
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  // The assistant is a TABBED shell and reopens on whichever tab was last used
+  // (default: Today), where ChatPanel stays mounted but display:none. This spec
+  // drives the conversation, so select the Chat tab before waiting on the panel
+  // — without it the panel resolves as hidden and every case times out.
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
   await panel(window).waitFor({ state: 'visible', timeout: 8000 })
 }
 
@@ -247,7 +252,12 @@ test('AF-5 — fullscreen is flat and full-bleed; floating keeps the card chrome
   const overlayBox = (await overlay(window).boundingBox())!
   const panelBox = (await panel(window).boundingBox())!
   expect(Math.abs(panelBox.width - overlayBox.width)).toBeLessThanOrEqual(2)
-  expect(Math.abs(panelBox.height - overlayBox.height)).toBeLessThanOrEqual(2)
+  // Full-bleed now means "fills everything below the tab strip": the tabbed
+  // shell puts a tab bar above the panel, so the panel is legitimately shorter
+  // than the overlay by exactly that strip. Measured rather than hardcoded, so
+  // the assertion still fails if the panel ever grows its own gutter.
+  const tabsBox = (await window.locator('[data-testid="assistant-tabs"]').boundingBox())!
+  expect(Math.abs(panelBox.height + tabsBox.height - overlayBox.height)).toBeLessThanOrEqual(2)
 })
 
 test('AF-6 — a capability chip click sends the real starter request it declares', async () => {

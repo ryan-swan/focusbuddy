@@ -194,6 +194,11 @@ async function openDesk(window: Page): Promise<void> {
 
 async function openAssistant(window: Page): Promise<void> {
   await window.evaluate(() => window.dispatchEvent(new CustomEvent('fb:open-assistant')))
+  // The assistant is a TABBED shell and reopens on whichever tab was last used
+  // (default: Today), where ChatPanel stays mounted but display:none. This spec
+  // drives the conversation, so select the Chat tab before waiting on the panel
+  // — without it the panel resolves as hidden and every case times out.
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
   await window
     .locator('[data-testid="assistant-panel"]')
     .waitFor({ state: 'visible', timeout: 8000 })
