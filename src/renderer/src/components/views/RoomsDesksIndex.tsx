@@ -475,7 +475,7 @@ function IndexContextMenu({
         style={{ left: pos.left, top: pos.top }}
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="index-context-menu"
-        className="absolute min-w-[200px] rounded-[12px] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-deep)] py-1"
+        className="absolute min-w-[200px] rounded-[12px] fb-glass-panel fb-pop-in py-1"
       >
         {menu.actions.map((a) => (
           <button

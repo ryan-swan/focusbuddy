@@ -400,7 +400,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           left, then the desk's own actions (New desk, hide) on the right. */}
       <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">
         <PlexiiLogo height={22} />
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center">
           <button
             onClick={requestCreateDesk}
             title="New room"
@@ -409,8 +409,13 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             <Icon name="add" size={14} />
             <span>New</span>
           </button>
+          {/* The minimise control is window chrome, not a desk action — a
+              hairline and real spacing keep it from reading as part of New. */}
           {onToggle && (
-            <MenuMinimizeButton onClick={onToggle} title="Minimise the menu to free the desk" />
+            <>
+              <span aria-hidden className="w-px h-4 bg-[var(--edge-soft)] ml-2.5 mr-1.5" />
+              <MenuMinimizeButton onClick={onToggle} title="Minimise the menu to free the desk" />
+            </>
           )}
         </div>
       </div>

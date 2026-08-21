@@ -225,9 +225,9 @@ export function MenuMinimizeButton({
       title={title}
       aria-label={title}
       data-testid="menu-minimize"
-      className="text-[var(--ink-50)] hover:text-[var(--ink-90)] transition-colors"
+      className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-[var(--ink-40)] hover:text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
     >
-      <Icon name="left_panel_close" size={18} />
+      <Icon name="left_panel_close" size={16} />
     </button>
   )
 }
