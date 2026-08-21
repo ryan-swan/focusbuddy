@@ -25,7 +25,6 @@ import { useFocusSessionStore } from '../../stores/focusSession'
 import { RailCard } from '../plexi'
 import Modal from '../plexi/Modal'
 import StandupHome from './StandupHome'
-import StageManagerStrip from '../StageManagerStrip'
 import StartOrAskPlexi from './StartOrAskPlexi'
 import Icon from '../Icon'
 import {
@@ -392,9 +391,6 @@ export default function HomeDashboard(): JSX.Element {
     const t = window.setTimeout(() => setJustPlaced(null), 1800)
     return () => window.clearTimeout(t)
   }, [justPlaced])
-  // Stage Manager pill — the same desk-miniature strip the desk breadcrumb
-  // opens, surfaced on Home so any desk is one click away.
-  const [deskStripOpen, setDeskStripOpen] = useState(false)
   // A placed widget selected for swapping (click it, then click a gallery card).
   const [swapKey, setSwapKey] = useState<string | null>(null)
   // A config picker in flight: the widget def needing config, plus what happens
@@ -1361,64 +1357,12 @@ export default function HomeDashboard(): JSX.Element {
     // override and time-of-day overlay, which caused the mid-screen seam and
     // the light-background-in-dark-mode bug.
     <div className="relative h-full w-full text-[var(--ink-100)]" data-testid="home-dashboard">
-      {/* Home pill — the same glass pill, in the same top-left spot as the
-          desk breadcrumb, so Home and desks share one navigation language.
-          The Desks segment drops the Stage Manager strip directly beneath. */}
-      <motion.div
-        animate={customize ? { opacity: 0.4, filter: 'blur(2px)' } : { opacity: 1, filter: 'blur(0px)' }}
-        transition={{ duration: 0.25 }}
-        className={`absolute top-4 left-4 z-[45] ${customize ? 'pointer-events-none select-none' : ''}`}
-        data-floating-menu
-      >
-        <div className="relative">
-          <div className="inline-flex items-center gap-0.5 px-3 py-1.5 rounded-full fb-glass-chrome ring-1 ring-black/[0.07] dark:ring-white/[0.07] shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-[12px] select-none">
-            <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 font-semibold text-[var(--ink-100)]">
-              <Icon name="plexii:home" size={13} className="text-[rgb(var(--accent))]" />
-              Home
-            </span>
-            <span aria-hidden className="w-px h-4 bg-[var(--edge-soft)] mx-1 shrink-0" />
-            <button
-              onClick={() => setDeskStripOpen((v) => !v)}
-              data-testid="home-desk-strip-toggle"
-              title="Jump to a desk"
-              aria-expanded={deskStripOpen}
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full transition-colors shrink-0 ${
-                deskStripOpen
-                  ? 'text-[rgb(var(--accent))] bg-[var(--surface-sunken)]'
-                  : 'text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[var(--surface-sunken)]'
-              }`}
-            >
-              <Icon name="apps" size={12} />
-              <span className="text-[11px] font-medium">Desks</span>
-              <Icon name="expand_more" size={12} className="text-[var(--ink-40)]" />
-            </button>
-          </div>
-          <AnimatePresence>
-            {deskStripOpen && (
-              <>
-                <div className="fixed inset-0 z-[59]" onClick={() => setDeskStripOpen(false)} />
-                <motion.div
-                  key="home-stage-strip"
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.14, ease: 'easeOut' }}
-                  className="absolute left-0 top-full mt-2 w-[188px] max-h-[min(420px,60vh)] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
-                >
-                  <StageManagerStrip roomId={null} activeId="" />
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.div>
-
+      {/* No floating chrome on Home — Caleb removed the Home/Desks pill
+          (2026-08-21); the sidebar carries navigation. */}
       <div className="h-full w-full overflow-auto paper-texture">
-      {/* The gallery floats as a dropdown now — customize never squeezes the
-          page, and pt-16 keeps the greeting clear of the Home pill above. */}
       {/* Wide board: the page uses the room it has instead of pooling empty
           margin left and right (Caleb's spacing ruling, 2026-08-21). */}
-      <div className="max-w-[1440px] mx-auto px-8 pb-8 pt-16">
+      <div className="max-w-[1440px] mx-auto px-8 pb-8 pt-8">
         {/* Greeting + focus-mode toggle. In customize (placement) mode the
             greeting and the non-editing controls recede behind a soft blur:
             the board is live, everything else steps back. */}
