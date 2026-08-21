@@ -1110,8 +1110,76 @@ export function AppIconWidget({
   )
 }
 
-export function NewMeetingWidget(): JSX.Element {
+// The card form of an action widget, for the md size: icon block, title,
+// blurb, one action. The icon size stays the pure app icon.
+function ActionHeroCard({
+  title,
+  blurb,
+  icon,
+  chipClass,
+  actionLabel,
+  actionTone,
+  testId,
+  buttonTestId,
+  onPress,
+  children
+}: {
+  title: string
+  blurb: string
+  icon: string
+  chipClass: string
+  actionLabel: string
+  actionTone: string
+  testId: string
+  buttonTestId: string
+  onPress: () => void
+  children?: ReactNode
+}): JSX.Element {
+  return (
+    <RailCard title={title} icon={icon} tone="accent">
+      <div className="flex-1 flex flex-col" data-testid={testId}>
+        <button
+          onClick={onPress}
+          data-testid={buttonTestId}
+          className="flex-1 flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+        >
+          <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0 ${chipClass}`}>
+            <Icon name={icon} size={21} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block fb-t-body font-semibold text-[var(--ink-100)]">{title}</span>
+            <span className="block fb-t-caption truncate">{blurb}</span>
+          </span>
+          <span className={`shrink-0 inline-flex items-center gap-1 text-[12px] font-medium ${actionTone}`}>
+            {actionLabel}
+            <Icon name="chevron_right" size={15} />
+          </span>
+        </button>
+      </div>
+      {children}
+    </RailCard>
+  )
+}
+
+export function NewMeetingWidget({ size = 'icon' }: { size?: WidgetSize } = {}): JSX.Element {
   const [open, setOpen] = useState(false)
+  const dialog = open && <NewMeetingDialog onClose={() => setOpen(false)} />
+  if (size === 'md')
+    return (
+      <ActionHeroCard
+        title="New meeting"
+        blurb="Face to face beats forty messages"
+        icon="plexii:meet"
+        chipClass="bg-rose-500/12 text-rose-500"
+        actionLabel="Start"
+        actionTone="text-rose-500"
+        testId="home-new-meeting"
+        buttonTestId="home-new-meeting-start"
+        onPress={() => setOpen(true)}
+      >
+        {dialog}
+      </ActionHeroCard>
+    )
   return (
     <AppIconWidget
       name="New meeting"
@@ -1121,8 +1189,35 @@ export function NewMeetingWidget(): JSX.Element {
       buttonTestId="home-new-meeting-start"
       onPress={() => setOpen(true)}
     >
-      {open && <NewMeetingDialog onClose={() => setOpen(false)} />}
+      {dialog}
     </AppIconWidget>
+  )
+}
+
+// One tap, one fresh desk, straight in. Reuses the exact create path the
+// Create new widget uses; the desk-limit prompt speaks for itself on failure.
+export function NewDeskWidget(): JSX.Element {
+  const v = useViewStore()
+  const createNode = useNodeStore((s) => s.create)
+  const setActive = useNodeStore((s) => s.setActive)
+  const make = async (): Promise<void> => {
+    try {
+      const node = await createNode({ parentId: null, kind: 'task', title: 'New desk' })
+      setActive(node.id)
+      v.goTask(node.id)
+    } catch {
+      /* the desk-limit prompt already told the user what happened */
+    }
+  }
+  return (
+    <AppIconWidget
+      name="New desk"
+      icon="desk"
+      surface="bg-gradient-to-b from-teal-500 to-teal-600"
+      testId="home-new-desk"
+      buttonTestId="home-new-desk-create"
+      onPress={() => void make()}
+    />
   )
 }
 
@@ -1255,8 +1350,25 @@ export function PinnedConversationWidget({
 // where it lands: a real voice-recorder widget on a chosen desk (full replay
 // and AI processing there), or a transcript document via the same
 // saveTranscriptDoc the meeting wrap-up uses.
-export function TranscribeWidget(): JSX.Element {
+export function TranscribeWidget({ size = 'icon' }: { size?: WidgetSize } = {}): JSX.Element {
   const [open, setOpen] = useState(false)
+  const overlay = open && <TranscribeOverlay onClose={() => setOpen(false)} />
+  if (size === 'md')
+    return (
+      <ActionHeroCard
+        title="Transcribe"
+        blurb="Say it once. Keep it forever"
+        icon="plexii:mic"
+        chipClass="bg-violet-500/12 text-violet-500"
+        actionLabel="Record"
+        actionTone="text-violet-500"
+        testId="home-transcribe"
+        buttonTestId="home-transcribe-start"
+        onPress={() => setOpen(true)}
+      >
+        {overlay}
+      </ActionHeroCard>
+    )
   return (
     <AppIconWidget
       name="Transcribe"
@@ -1266,7 +1378,7 @@ export function TranscribeWidget(): JSX.Element {
       buttonTestId="home-transcribe-start"
       onPress={() => setOpen(true)}
     >
-      {open && <TranscribeOverlay onClose={() => setOpen(false)} />}
+      {overlay}
     </AppIconWidget>
   )
 }
@@ -1706,13 +1818,43 @@ export function CreateWidget(): JSX.Element {
   )
 }
 
-export function FocusTimerWidget(): JSX.Element {
+export function FocusTimerWidget({ size = 'sm' }: { size?: WidgetSize } = {}): JSX.Element {
   const active = useFocusSessionStore((s) => s.active)
   const remainingSec = useFocusSessionStore((s) => s.remainingSec)
   const start = useFocusSessionStore((s) => s.start)
   const finish = useFocusSessionStore((s) => s.finish)
   const mm = Math.max(0, Math.floor(remainingSec / 60))
   const ss = Math.max(0, remainingSec % 60)
+  // Icon size: the app-icon form of the five minute promise. Idle taps start
+  // it; while a session runs the icon shows the live countdown and a tap
+  // finishes the session.
+  if (size === 'icon') {
+    return (
+      <div className="relative h-full w-full" data-testid="home-focus-timer">
+        <button
+          onClick={() => (active ? void finish('done') : void start(null, 5 * 60, '5min'))}
+          data-testid={active ? 'home-focus-timer-stop' : 'home-focus-timer-start'}
+          aria-label={active ? 'End focus session' : 'Start 5 minute focus'}
+          title={active ? 'End focus session' : 'Start 5 minute focus'}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-2xl fb-press text-white bg-gradient-to-b from-emerald-500 to-emerald-600"
+        >
+          {active ? (
+            <>
+              <span className="fb-display fb-tabular text-[20px] leading-none">
+                {mm}:{String(ss).padStart(2, '0')}
+              </span>
+              <span className="max-w-full truncate px-2 text-[10.5px] font-semibold">Focusing</span>
+            </>
+          ) : (
+            <>
+              <Icon name="timer" size={26} />
+              <span className="max-w-full truncate px-2 text-[10.5px] font-semibold">Focus</span>
+            </>
+          )}
+        </button>
+      </div>
+    )
+  }
   return (
     <RailCard title="Focus timer" icon="timer" tone="violet">
       <div className="flex-1 flex items-center gap-3" data-testid="home-focus-timer">

@@ -187,7 +187,7 @@ describe('clampSize', () => {
   it('every def declares its own default among its sizes', () => {
     // Guards the def table itself: a default outside sizes would make
     // clampSize recurse into nonsense.
-    const ids = ['standup', 'agenda', 'pulse', 'continue', 'activity', 'overdue', 'navigator', 'pinned-desk', 'room-portal', 'quick-links', 'shortcuts', 'app-launcher', 'quick', 'create', 'focus-timer', 'one-thing', 'where-was-i', 'stalled', 'new-meeting', 'pinned-conversation', 'transcribe'] as const
+    const ids = ['standup', 'agenda', 'pulse', 'continue', 'activity', 'overdue', 'navigator', 'pinned-desk', 'room-portal', 'quick-links', 'shortcuts', 'app-launcher', 'quick', 'create', 'focus-timer', 'one-thing', 'where-was-i', 'stalled', 'new-meeting', 'pinned-conversation', 'transcribe', 'new-desk'] as const
     for (const id of ids) {
       const def = widgetDef(id)
       expect(def.sizes.length).toBeGreaterThan(0)

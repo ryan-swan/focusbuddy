@@ -48,6 +48,7 @@ import {
   NewMeetingWidget,
   PinnedConversationWidget,
   TranscribeWidget,
+  NewDeskWidget,
   conversationName
 } from './homeWidgets'
 import { useMessagingStore } from '../../stores/messaging'
@@ -772,7 +773,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'create':
         return <CreateWidget />
       case 'focus-timer':
-        return <FocusTimerWidget />
+        return <FocusTimerWidget size={size} />
       case 'overdue':
         return <OverdueRadarWidget size={size} />
       case 'one-thing':
@@ -782,11 +783,13 @@ export default function HomeDashboard(): JSX.Element {
       case 'stalled':
         return <StalledDeskWidget />
       case 'new-meeting':
-        return <NewMeetingWidget />
+        return <NewMeetingWidget size={size} />
       case 'pinned-conversation':
         return <PinnedConversationWidget config={inst.config} size={size} />
       case 'transcribe':
-        return <TranscribeWidget />
+        return <TranscribeWidget size={size} />
+      case 'new-desk':
+        return <NewDeskWidget />
       case 'standup':
         // StandupHome carries its own card chrome + margin one level deeper
         // than the tile wrapper can reach; neutralize both here so the glass
