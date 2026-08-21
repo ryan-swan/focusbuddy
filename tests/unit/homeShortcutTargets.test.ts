@@ -91,9 +91,11 @@ describe('targetKey', () => {
       targetKey({ kind: 'document', documentId: 'a' }),
       targetKey({ kind: 'connected-app', appId: 'a' }),
       targetKey({ kind: 'section', id: 'a' }),
-      targetKey({ kind: 'url', url: 'a' })
+      targetKey({ kind: 'url', url: 'a' }),
+      targetKey({ kind: 'person', accountId: 'a' }),
+      targetKey({ kind: 'action', action: 'new-meeting' })
     ])
-    expect(keys.size).toBe(6)
+    expect(keys.size).toBe(8)
   })
 })
 
@@ -142,6 +144,25 @@ describe('describeShortcutTarget', () => {
       alive: false
     })
     expect(describeShortcutTarget({ kind: 'desk', nodeId: 'nope' }, WORLD).label).toBe('Missing desk')
+  })
+  it('describes action and person targets as always alive', () => {
+    expect(describeShortcutTarget({ kind: 'action', action: 'new-meeting' }, EMPTY)).toMatchObject({
+      label: 'New meeting',
+      caption: 'Action',
+      icon: 'plexii:meet',
+      alive: true
+    })
+    expect(describeShortcutTarget({ kind: 'action', action: 'transcribe' }, EMPTY)).toMatchObject({
+      label: 'Transcribe',
+      icon: 'plexii:mic',
+      alive: true
+    })
+    expect(describeShortcutTarget({ kind: 'person', accountId: 'x', handle: 'sam', label: 'Sam R' }, EMPTY)).toMatchObject({
+      label: 'Sam R',
+      caption: 'Message',
+      alive: true
+    })
+    expect(describeShortcutTarget({ kind: 'person', accountId: 'x', handle: 'sam' }, EMPTY).label).toBe('sam')
   })
   it('resolves known sections and flags unknown ids', () => {
     expect(describeShortcutTarget({ kind: 'section', id: 'vault' }, EMPTY)).toMatchObject({ label: 'Vault', alive: true })

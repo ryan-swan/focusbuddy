@@ -36,6 +36,11 @@ export type ShortcutTarget =
   | { kind: 'room'; roomId: string; label?: string }
   | { kind: 'document'; documentId: string; label?: string }
   | { kind: 'connected-app'; appId: string; label?: string }
+  // A tile that DOES something instead of going somewhere: starts a meeting
+  // or a transcription right from the box.
+  | { kind: 'action'; action: 'new-meeting' | 'transcribe'; label?: string }
+  // Message a person: opens their DM (starting it for real if none exists).
+  | { kind: 'person'; accountId: string; handle?: string; label?: string }
 
 export interface HomeWidgetConfig {
   deskId?: string

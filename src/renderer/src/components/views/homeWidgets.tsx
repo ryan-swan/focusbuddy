@@ -305,7 +305,12 @@ export function ShortcutsWidget({
   const docs = useDocumentsStore((s) => s.list)
   const apps = useConnectedAppsStore((s) => s.apps)
   const launchLocal = useConnectedAppsStore((s) => s.launchLocal)
+  const conversations = useMessagingStore((s) => s.conversations)
+  const setActiveConversation = useMessagingStore((s) => s.setActive)
+  const startDm = useMessagingStore((s) => s.startDm)
   const [composerOpen, setComposerOpen] = useState(false)
+  // An action tile in flight: its overlay renders from this widget.
+  const [openAction, setOpenAction] = useState<'new-meeting' | 'transcribe' | null>(null)
 
   const targets = config?.targets ?? []
   const lookups = useMemo<ShortcutLookups>(
@@ -356,6 +361,30 @@ export function ShortcutsWidget({
         else v.goConnectedApp(t.appId)
         break
       }
+      case 'action':
+        setOpenAction(t.action)
+        break
+      case 'person':
+        void (async () => {
+          const dm = conversations.find(
+            (c) => c.kind === 'dm' && c.members.some((m) => m.accountId === t.accountId)
+          )
+          if (dm) {
+            await setActiveConversation(dm.id)
+            v.goMessages()
+            return
+          }
+          if (t.handle) {
+            const r = await startDm(t.handle)
+            if (r.ok) {
+              await setActiveConversation(r.id)
+              v.goMessages()
+              return
+            }
+          }
+          v.goMessages()
+        })()
+        break
     }
   }
 
@@ -482,6 +511,8 @@ export function ShortcutsWidget({
       {composerOpen && (
         <ShortcutComposer config={config} onUpdate={onUpdate} onClose={() => setComposerOpen(false)} />
       )}
+      {openAction === 'new-meeting' && <NewMeetingDialog onClose={() => setOpenAction(null)} />}
+      {openAction === 'transcribe' && <TranscribeOverlay onClose={() => setOpenAction(null)} />}
     </RailCard>
   )
 }
@@ -500,6 +531,8 @@ function ShortcutComposer({
   const nodes = useNodeStore((s) => s.nodes)
   const docs = useDocumentsStore((s) => s.list)
   const apps = useConnectedAppsStore((s) => s.apps)
+  const presencePeers = usePresenceStore((s) => s.peers)
+  const presenceEnabled = useCapabilityEnabled('presence')
   const [query, setQuery] = useState('')
   const [deepHits, setDeepHits] = useState<SearchHit[]>([])
   const [renamingKey, setRenamingKey] = useState<string | null>(null)
@@ -584,13 +617,48 @@ function ShortcutComposer({
       icon: r.icon,
       tone: r.tone
     }))
+    // Action tiles: a shortcut can DO something, not just go somewhere.
+    const actionItems = (
+      [
+        { action: 'new-meeting' as const, label: 'New meeting', icon: 'plexii:meet', tone: 'text-rose-500' },
+        { action: 'transcribe' as const, label: 'Transcribe', icon: 'plexii:mic', tone: 'text-violet-500' }
+      ] as const
+    )
+      .filter((a) => !q || a.label.toLowerCase().includes(q))
+      .map((a) => ({
+        target: { kind: 'action' as const, action: a.action, label: a.label },
+        label: a.label,
+        icon: a.icon,
+        tone: a.tone
+      }))
+    // People online now (presence is Team-tier; hidden when not entitled).
+    const peopleItems = presenceEnabled
+      ? Object.values(presencePeers)
+          .filter((p) => !q || personDisplayName(p, p.handle).toLowerCase().includes(q))
+          .slice(0, 5)
+          .map((p) => ({
+            target: {
+              kind: 'person' as const,
+              accountId: p.accountId,
+              handle: p.handle,
+              label: personDisplayName(p, p.handle)
+            },
+            label: personDisplayName(p, p.handle),
+            icon: 'account_circle',
+            tone: 'text-sky-500'
+          }))
+      : []
     if (!q) {
-      // No query yet: the finite section catalog is browsable immediately;
+      // No query yet: the finite catalogs are browsable immediately;
       // everything else needs a few letters.
+      if (actionItems.length) out.push({ name: 'Actions', items: actionItems })
       if (sectionItems.length) out.push({ name: 'PlexiDesk sections', items: sectionItems })
+      if (peopleItems.length) out.push({ name: 'People online', items: peopleItems })
       return out
     }
+    if (actionItems.length) out.push({ name: 'Actions', items: actionItems })
     if (sectionItems.length) out.push({ name: 'PlexiDesk sections', items: sectionItems.slice(0, 4) })
+    if (peopleItems.length) out.push({ name: 'People online', items: peopleItems })
 
     const nodeGroup = (kind: 'task' | 'folder', name: string): void => {
       const byTitle = nodes
@@ -642,7 +710,7 @@ function ShortcutComposer({
       }))
     if (appItems.length) out.push({ name: 'Apps', items: appItems })
     return out
-  }, [query, url, nodes, docs, apps, deepHits, lookups])
+  }, [query, url, nodes, docs, apps, deepHits, lookups, presencePeers, presenceEnabled])
 
   const keys = targets.map(targetKey)
   const reorder = (nextKeys: string[]): void => {

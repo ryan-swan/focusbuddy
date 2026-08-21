@@ -103,6 +103,10 @@ export function targetKey(t: ShortcutTarget): string {
       return `document:${t.documentId}`
     case 'connected-app':
       return `app:${t.appId}`
+    case 'action':
+      return `action:${t.action}`
+    case 'person':
+      return `person:${t.accountId}`
   }
 }
 
@@ -185,5 +189,19 @@ export function describeShortcutTarget(t: ShortcutTarget, lookups: ShortcutLooku
         alive: !!app
       }
     }
+    case 'action':
+      return t.action === 'new-meeting'
+        ? { label: t.label || 'New meeting', caption: 'Action', icon: 'plexii:meet', tone: 'text-rose-500', alive: true }
+        : { label: t.label || 'Transcribe', caption: 'Action', icon: 'plexii:mic', tone: 'text-violet-500', alive: true }
+    case 'person':
+      // People are never stale: the DM starts for real on first click, and the
+      // name was snapshotted at add time.
+      return {
+        label: t.label || t.handle || 'Someone',
+        caption: 'Message',
+        icon: 'account_circle',
+        tone: 'text-sky-500',
+        alive: true
+      }
   }
 }
