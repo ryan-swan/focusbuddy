@@ -735,7 +735,9 @@ export default function HomeDashboard(): JSX.Element {
     const size = inst.size
     switch (inst.widget) {
       case 'pinned-desk':
-        return <PinnedDeskWidget deskId={inst.config?.deskId} />
+        // Add desk pins another desk: it places a fresh pinned-desk widget,
+        // running the desk picker first.
+        return <PinnedDeskWidget deskId={inst.config?.deskId} onAddAnother={() => placeWidget('pinned-desk')} />
       case 'room-portal':
         return <RoomPortalWidget roomId={inst.config?.roomId} size={size} />
       case 'quick-links':

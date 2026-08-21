@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useDocumentsStore } from '../../stores/documents'
@@ -8,6 +8,7 @@ import { splitFavourites } from '../../lib/connectedAppSort'
 import { RailCard } from '../plexi'
 import Icon from '../Icon'
 import AppLogo from '../AppLogo'
+import AddConnectedAppDialog from '../AddConnectedAppDialog'
 import type { ActivityEvent, FbNode } from '@shared/types'
 
 // The home widget catalog — registry metadata for the gallery, plus the widget
@@ -59,7 +60,13 @@ function useOpenDesk(): (n: FbNode) => void {
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 
-export function PinnedDeskWidget({ deskId }: { deskId?: string }): JSX.Element {
+export function PinnedDeskWidget({
+  deskId,
+  onAddAnother
+}: {
+  deskId?: string
+  onAddAnother?: () => void
+}): JSX.Element {
   const node = useNodeStore((s) => s.nodes.find((n) => n.id === deskId) ?? null)
   const openDesk = useOpenDesk()
   return (
@@ -82,6 +89,19 @@ export function PinnedDeskWidget({ deskId }: { deskId?: string }): JSX.Element {
             <span className="block fb-t-caption">Edited {relTime(node.updatedAt)}</span>
           </span>
           <Icon name="chevron_right" size={16} className="text-[var(--ink-40)] shrink-0" />
+        </button>
+      )}
+      {/* Ghost row: pinning one more desk is always visibly one click away. */}
+      {onAddAnother && (
+        <button
+          onClick={onAddAnother}
+          data-testid="home-pinned-desk-add"
+          className="mt-2 flex w-full items-center gap-3 rounded-[10px] border border-dashed border-[var(--edge-firm)] px-3 py-2.5 text-left text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+        >
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-[var(--edge-soft)] shrink-0">
+            <Icon name="add" size={16} />
+          </span>
+          <span className="fb-t-body">Add desk</span>
         </button>
       )}
     </RailCard>
@@ -178,31 +198,41 @@ export function AppLauncherWidget(): JSX.Element {
   const apps = useConnectedAppsStore((s) => s.apps)
   const launchLocal = useConnectedAppsStore((s) => s.launchLocal)
   const v = useViewStore()
+  const [addOpen, setAddOpen] = useState(false)
   const { favourites } = useMemo(() => splitFavourites(apps), [apps])
   const shown = favourites.length > 0 ? favourites.slice(0, 8) : apps.slice(0, 8)
   return (
     <RailCard title="App launcher" icon="apps" tone="emerald">
-      {shown.length === 0 ? (
-        <EmptyState text="No connected apps yet. Add some from the sidebar." />
-      ) : (
-        // Icon-only, fixed square tiles in a centered wrap — the tile shape
-        // never depends on how many apps there are or how wide the widget is
-        // (Caleb's ruling, 2026-08-21: stretched slabs at md looked wrong).
-        // Names ride the tooltip.
-        <div className="my-auto flex flex-wrap content-center gap-2" data-testid="home-app-launcher">
-          {shown.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => (a.kind === 'local' ? void launchLocal(a.id) : v.goConnectedApp(a.id))}
-              title={a.title}
-              aria-label={a.title}
-              data-testid={`home-app-launch-${a.id}`}
-              className="h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press"
-            >
-              <AppLogo app={a} size={38} glyphSize={22} />
-            </button>
-          ))}
-        </div>
+      {/* Icon-only, fixed square tiles, top-aligned wrap — the tile shape
+          never depends on how many apps there are or how wide the widget is.
+          Names ride the tooltip. The trailing dashed tile keeps the widget
+          subtly proactive: adding is always one click away. */}
+      <div className="flex flex-wrap content-start gap-2" data-testid="home-app-launcher">
+        {shown.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => (a.kind === 'local' ? void launchLocal(a.id) : v.goConnectedApp(a.id))}
+            title={a.title}
+            aria-label={a.title}
+            data-testid={`home-app-launch-${a.id}`}
+            className="h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press"
+          >
+            <AppLogo app={a} size={38} glyphSize={22} />
+          </button>
+        ))}
+        <button
+          onClick={() => setAddOpen(true)}
+          title="Add app"
+          aria-label="Add app"
+          data-testid="home-app-launcher-add"
+          className="h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+        >
+          <Icon name="add" size={18} />
+          <span className="text-[9px] font-medium">Add app</span>
+        </button>
+      </div>
+      {addOpen && (
+        <AddConnectedAppDialog onClose={() => setAddOpen(false)} onAdded={(id) => v.goConnectedApp(id)} />
       )}
     </RailCard>
   )
