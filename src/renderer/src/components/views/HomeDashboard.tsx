@@ -43,8 +43,15 @@ import {
   OneThingNowWidget,
   WhereWasIWidget,
   StalledDeskWidget,
-  ShortcutsWidget
+  ShortcutsWidget,
+  NewMeetingWidget,
+  PinnedConversationWidget,
+  conversationName
 } from './homeWidgets'
+import { useMessagingStore } from '../../stores/messaging'
+import { usePresenceStore } from '../../stores/presence'
+import { useCapabilityEnabled } from '../../stores/capabilities'
+import { personDisplayName } from '../../lib/personName'
 import type { ActivityEvent, ActivityKind, DocumentMeta, FbNode, TimeBlock } from '@shared/types'
 
 // Home — the landing dashboard, laid out as a desk the app sets for you.
@@ -400,7 +407,7 @@ export default function HomeDashboard(): JSX.Element {
   // with the result — place at a position, swap an instance, or edit in place.
   const [picker, setPicker] = useState<{
     widget: HomeWidgetId
-    kind: 'desk' | 'room'
+    kind: 'desk' | 'room' | 'conversation'
     initial?: HomeWidgetConfig
     apply: (config: HomeWidgetConfig) => void
   } | null>(null)
@@ -767,6 +774,10 @@ export default function HomeDashboard(): JSX.Element {
         return <WhereWasIWidget activity={activity} />
       case 'stalled':
         return <StalledDeskWidget />
+      case 'new-meeting':
+        return <NewMeetingWidget />
+      case 'pinned-conversation':
+        return <PinnedConversationWidget config={inst.config} size={size} />
       case 'standup':
         // StandupHome carries its own card chrome + margin one level deeper
         // than the tile wrapper can reach; neutralize both here so the glass
@@ -1604,7 +1615,7 @@ function WidgetPickerOverlay({
   onClearSwap: () => void
   onClose: () => void
 }): JSX.Element {
-  const CATEGORIES = ['All', 'Navigation', 'Live', 'Smart', 'Actions'] as const
+  const CATEGORIES = ['All', 'Navigation', 'Live', 'Smart', 'Actions', 'Communication'] as const
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('All')
   const [search, setSearch] = useState('')
   // The detail page: one widget, its config already collected, a size chosen.
@@ -1898,8 +1909,8 @@ function SkeletonLines({ rows }: { rows: number }): JSX.Element {
 
 // ── Customize mode: config pickers ───────────────────────────────────────────
 // Small choosers for the widgets that need a subject: which desk to pin, which
-// room to open. (The links chooser retired with Quick links; Shortcuts carries
-// its own composer.)
+// room to open, which person or conversation to pin. (The links chooser retired
+// with Quick links; Shortcuts carries its own composer.)
 function WidgetConfigPicker({
   widget,
   kind,
@@ -1907,21 +1918,43 @@ function WidgetConfigPicker({
   onConfirm
 }: {
   widget: HomeWidgetId
-  kind: 'desk' | 'room'
+  kind: 'desk' | 'room' | 'conversation'
   initial?: HomeWidgetConfig
   onCancel: () => void
   onConfirm: (config: HomeWidgetConfig) => void
 }): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
+  const conversations = useMessagingStore((s) => s.conversations)
+  const selfId = useAccountStore((s) => s.account?.id ?? null)
+  const presencePeers = usePresenceStore((s) => s.peers)
+  const presenceEnabled = useCapabilityEnabled('presence')
   const [query, setQuery] = useState('')
 
   const def = widgetDef(widget)
   const q = query.trim().toLowerCase()
-  const candidates = nodes
-    .filter((n) => !n.archived && (kind === 'desk' ? n.kind === 'task' : n.kind === 'folder'))
-    .filter((n) => !q || (n.title || '').toLowerCase().includes(q))
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 30)
+  const candidates =
+    kind === 'conversation'
+      ? []
+      : nodes
+          .filter((n) => !n.archived && (kind === 'desk' ? n.kind === 'task' : n.kind === 'folder'))
+          .filter((n) => !q || (n.title || '').toLowerCase().includes(q))
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 30)
+
+  // Conversation mode: people online now (presence-gated), then conversations.
+  const people =
+    kind === 'conversation' && presenceEnabled
+      ? Object.values(presencePeers)
+          .filter((p) => !q || personDisplayName(p, p.handle).toLowerCase().includes(q))
+          .slice(0, 10)
+      : []
+  const convs =
+    kind === 'conversation'
+      ? conversations
+          .filter((c) => !q || conversationName(c, selfId).toLowerCase().includes(q))
+          .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
+          .slice(0, 20)
+      : []
 
   return (
     <Modal
@@ -1936,7 +1969,7 @@ function WidgetConfigPicker({
           <Icon name={def.icon} size={15} />
         </span>
         <span className="text-[13.5px] font-semibold text-[var(--ink-100)]">
-          {kind === 'desk' ? 'Pin which desk?' : 'Open which room?'}
+          {kind === 'desk' ? 'Pin which desk?' : kind === 'room' ? 'Open which room?' : 'Pin who, or which chat?'}
         </span>
       </div>
 
@@ -1945,10 +1978,79 @@ function WidgetConfigPicker({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={kind === 'desk' ? 'Search desks…' : 'Search rooms…'}
+          placeholder={
+            kind === 'desk' ? 'Search desks…' : kind === 'room' ? 'Search rooms…' : 'Search people and conversations…'
+          }
           className="w-full mb-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
         />
-        {candidates.length === 0 ? (
+        {kind === 'conversation' ? (
+          people.length === 0 && convs.length === 0 ? (
+            <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">
+              {conversations.length === 0
+                ? 'No conversations yet. Start one in Messages and pin it here.'
+                : 'Nothing matches.'}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {people.length > 0 && (
+                <div>
+                  <p className="px-1 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--ink-40)]">
+                    Online now
+                  </p>
+                  <div className="space-y-0.5">
+                    {people.map((p) => (
+                      <button
+                        key={p.accountId}
+                        onClick={() =>
+                          onConfirm({
+                            personId: p.accountId,
+                            personHandle: p.handle,
+                            personName: personDisplayName(p, p.handle)
+                          })
+                        }
+                        data-testid={`home-widget-config-person-${p.accountId}`}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                      >
+                        <Icon name="account_circle" size={15} className="text-[var(--ink-50)] shrink-0" />
+                        <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                          {personDisplayName(p, p.handle)}
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {convs.length > 0 && (
+                <div>
+                  <p className="px-1 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--ink-40)]">
+                    Conversations
+                  </p>
+                  <div className="space-y-0.5">
+                    {convs.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => onConfirm({ conversationId: c.id })}
+                        data-testid={`home-widget-config-conv-${c.id}`}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                      >
+                        <Icon name="plexii:chat" size={15} className="text-[var(--ink-50)] shrink-0" />
+                        <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                          {conversationName(c, selfId)}
+                        </span>
+                        {c.unreadCount > 0 && (
+                          <span className="shrink-0 text-[10.5px] font-semibold text-accent fb-tabular">
+                            {c.unreadCount}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        ) : candidates.length === 0 ? (
           <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">
             {kind === 'desk' ? 'No desks match.' : 'No rooms match.'}
           </p>

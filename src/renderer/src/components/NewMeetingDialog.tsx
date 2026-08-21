@@ -5,6 +5,8 @@ import Modal from './plexi/Modal'
 import { useMeetingRoomStore } from '../stores/meetingRoom'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useAccountStore } from '../stores/account'
+import { usePresenceStore } from '../stores/presence'
+import { useCapabilityEnabled } from '../stores/capabilities'
 import { newMeetingRoomId } from '../lib/startMeeting'
 import { sendMeetingInvites } from '../lib/meetingInvite'
 import { personDisplayName } from '../lib/personName'
@@ -39,8 +41,15 @@ function defaultDateTime(): { date: string; time: string } {
 
 export default function NewMeetingDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const startRoom = useMeetingRoomStore((s) => s.start)
+  const inviteToRoom = useMeetingRoomStore((s) => s.invite)
   const createBlock = useTimeBlockStore((s) => s.create)
   const account = useAccountStore((s) => s.account)
+  // Live presence is a Team-tier capability (base commit 126b2b3 hides all
+  // who-is-online UI for free/pro), so the tap-to-invite teammates section
+  // renders only when the capability allows. The email bar is for everyone.
+  const presenceEnabled = useCapabilityEnabled('presence')
+  const presencePeers = usePresenceStore((s) => s.peers)
+  const [selectedPeers, setSelectedPeers] = useState<Set<string>>(() => new Set())
   // Starting a meeting needs 'meet'; scheduling one also needs 'meet_schedule'.
   // A blocked action reports the reason rather than starting or scheduling.
   const meetEnt = useEntitlement('meet', 'Meetings')
@@ -94,6 +103,11 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
       if (!roomId) {
         setError('Could not start the meeting. Check your microphone and camera permissions.')
         return
+      }
+      // Selected online teammates get a realtime invite into the live room; it
+      // arrives as their in-app meeting-invite notification.
+      for (const p of Object.values(presencePeers)) {
+        if (selectedPeers.has(p.accountId)) inviteToRoom({ accountId: p.accountId, handle: p.handle })
       }
       // Email the join link for the room we just opened, so invited guests land
       // in the same room. The host is already in it; delivery runs in the
@@ -154,6 +168,8 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
   }
 
   const emailCount = parseEmails().length
+  // Start-now invites both selected teammates and emailed guests.
+  const nowInviteCount = emailCount + selectedPeers.size
 
   return createPortal(
     <Modal
@@ -238,6 +254,48 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
         </select>
       </label>
 
+      {/* Tap-to-invite for teammates online right now. Start-now only: a live
+          room invite has nowhere to land for a scheduled meeting, and email
+          covers that path. Hidden entirely when presence is not entitled. */}
+      {mode === 'now' && presenceEnabled && Object.values(presencePeers).length > 0 && (
+        <div className="block" data-testid="new-meeting-peers">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+            Invite teammates online now
+          </span>
+          <div className="mt-1 space-y-1 max-h-36 overflow-y-auto">
+            {Object.values(presencePeers).map((p) => {
+              const on = selectedPeers.has(p.accountId)
+              return (
+                <button
+                  key={p.accountId}
+                  onClick={() =>
+                    setSelectedPeers((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(p.accountId)) next.delete(p.accountId)
+                      else next.add(p.accountId)
+                      return next
+                    })
+                  }
+                  data-testid={`new-meeting-peer-${p.accountId}`}
+                  className={`flex w-full items-center gap-2 fb-tile fb-press px-2 py-1.5 text-left ${
+                    on ? 'ring-1 ring-[rgb(var(--accent))]' : ''
+                  }`}
+                >
+                  <Icon name="account_circle" size={16} className="text-[var(--ink-50)] shrink-0" />
+                  <span className="flex-1 truncate fb-t-body text-[var(--ink-90)]">
+                    {personDisplayName(p, p.handle)}
+                  </span>
+                  {(p.status === 'away' || p.status === 'busy' || p.status === 'focus') && (
+                    <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-400">{p.status}</span>
+                  )}
+                  {on && <Icon name="check" size={13} className="text-accent shrink-0" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <label className="block">
         <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
           Invite by email (optional)
@@ -273,7 +331,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
         {mode === 'now' ? (
           <button onClick={() => void startNow()} disabled={busy} className="btn-primary" data-testid="new-meeting-start">
             <Icon name="videocam" size={14} />
-            <span>{emailCount > 0 ? `Start & invite ${emailCount}` : 'Start now'}</span>
+            <span>{nowInviteCount > 0 ? `Start & invite ${nowInviteCount}` : 'Start now'}</span>
           </button>
         ) : (
           <button onClick={() => void schedule()} disabled={busy} className="btn-primary" data-testid="new-meeting-schedule">

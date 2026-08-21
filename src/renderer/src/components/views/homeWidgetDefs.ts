@@ -21,6 +21,8 @@ export type HomeWidgetId =
   | 'one-thing'
   | 'where-was-i'
   | 'stalled'
+  | 'new-meeting'
+  | 'pinned-conversation'
 
 // One tile in a Shortcuts box. Every kind carries an optional label snapshot
 // taken when the target was added: live store titles win while the subject
@@ -41,6 +43,13 @@ export interface HomeWidgetConfig {
   // Shortcuts: the box name and its tiles.
   title?: string
   targets?: ShortcutTarget[]
+  // Pinned conversation: either a conversation, or a person (name and handle
+  // snapshotted at pin time — presence only lists people currently online, so
+  // the tile must stay legible when they are not).
+  conversationId?: string
+  personId?: string
+  personHandle?: string
+  personName?: string
 }
 
 export interface HomeWidgetInstance {
@@ -60,12 +69,12 @@ export interface HomeWidgetDef {
   blurb: string
   icon: string
   tint: string
-  category: 'Navigation' | 'Live' | 'Actions' | 'Smart'
+  category: 'Navigation' | 'Live' | 'Actions' | 'Smart' | 'Communication'
   // Multi-instance widgets (a pinned desk per desk, a portal per room). All
   // others are singletons: the gallery shows them as Added once placed.
   multi?: boolean
   // Which picker must run before this widget can be placed.
-  config?: 'desk' | 'room'
+  config?: 'desk' | 'room' | 'conversation'
   // Retired widgets stay in the id union and this registry so stored layouts
   // keep loading (and migrating) sanely, but the gallery never offers them.
   retired?: boolean
@@ -95,6 +104,9 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   { id: 'quick', name: 'Quick actions', blurb: 'Create, plan, collaborate, automate', icon: 'bolt', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'create', name: 'Create new', blurb: 'Start a document, spreadsheet, deck, or desk in one tap', icon: 'add_circle', tint: 'bg-accent/10 text-accent', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'focus-timer', name: 'Focus timer', blurb: 'Start and stop the five minute promise from home', icon: 'timer', tint: 'bg-violet-500/10 text-violet-500', category: 'Actions', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
+  // Communication
+  { id: 'new-meeting', name: 'New meeting', blurb: 'Start or schedule a PlexiMeet and invite anyone', icon: 'plexii:meet', tint: 'bg-rose-500/10 text-rose-500', category: 'Communication', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
+  { id: 'pinned-conversation', name: 'Pinned conversation', blurb: 'One person or chat, unread count and one click away', icon: 'plexii:chat', tint: 'bg-sky-500/10 text-sky-500', category: 'Communication', multi: true, config: 'conversation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   // Smart
   { id: 'one-thing', name: 'One thing now', blurb: 'The single most pressing task. No list, just the one', icon: 'target', tint: 'bg-amber-500/10 text-amber-600', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
   { id: 'where-was-i', name: 'Where was I', blurb: 'Your last working context, with one button: Resume', icon: 'undo', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },

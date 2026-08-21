@@ -5,12 +5,18 @@ import { useNodeStore } from '../../stores/nodes'
 import { useDocumentsStore } from '../../stores/documents'
 import { useConnectedAppsStore } from '../../stores/connectedApps'
 import { useFocusSessionStore } from '../../stores/focusSession'
+import { useMessagingStore } from '../../stores/messaging'
+import { useAccountStore } from '../../stores/account'
+import { usePresenceStore } from '../../stores/presence'
+import { useCapabilityEnabled } from '../../stores/capabilities'
 import { splitFavourites } from '../../lib/connectedAppSort'
+import { personDisplayName } from '../../lib/personName'
 import { RailCard } from '../plexi'
 import Modal from '../plexi/Modal'
 import Icon from '../Icon'
 import AppLogo from '../AppLogo'
 import AddConnectedAppDialog from '../AddConnectedAppDialog'
+import NewMeetingDialog from '../NewMeetingDialog'
 import type { ActivityEvent, FbNode, SearchHit } from '@shared/types'
 import {
   describeShortcutTarget,
@@ -814,6 +820,156 @@ function ShortcutComposer({
         )}
       </div>
     </Modal>
+  )
+}
+
+// ── Communication ────────────────────────────────────────────────────────────
+
+// Start or schedule a PlexiMeet from Home. All the real mechanics live in
+// NewMeetingDialog (entitlement gating, teammate invites, email invites,
+// scheduling); this widget is just its Home doorway. The meeting itself runs
+// in the global MeetingOverlay, so starting from Home works in place.
+export function NewMeetingWidget(): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <RailCard title="New meeting" icon="plexii:meet" tone="rose">
+      <div className="flex-1 flex items-center gap-3" data-testid="home-new-meeting">
+        <span className="flex-1 text-[12px] text-[var(--ink-70)]">
+          Face to face beats forty messages.
+        </span>
+        <button
+          onClick={() => setOpen(true)}
+          data-testid="home-new-meeting-start"
+          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[12.5px] font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors"
+        >
+          <Icon name="plexii:meet" size={15} />
+          Start
+        </button>
+      </div>
+      {open && <NewMeetingDialog onClose={() => setOpen(false)} />}
+    </RailCard>
+  )
+}
+
+// Initials for the pinned-conversation avatar; no invented images, just the
+// name the store actually has.
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+// A conversation's display name: its title, else the other members' names.
+// Exported for the conversation config picker in HomeDashboard.
+export function conversationName(
+  conv: { title: string; members: Array<{ accountId: string; handle: string | null; firstName?: string | null; lastName?: string | null }> },
+  selfId: string | null
+): string {
+  if (conv.title.trim()) return conv.title
+  const others = conv.members.filter((m) => m.accountId !== selfId)
+  const names = others.map((m) => personDisplayName(m, m.handle ?? 'Someone'))
+  return names.join(', ') || 'Conversation'
+}
+
+export function PinnedConversationWidget({
+  config,
+  size
+}: {
+  config?: HomeWidgetConfig
+  size: WidgetSize
+}): JSX.Element {
+  const v = useViewStore()
+  const conversations = useMessagingStore((s) => s.conversations)
+  const setActive = useMessagingStore((s) => s.setActive)
+  const startDm = useMessagingStore((s) => s.startDm)
+  const selfId = useAccountStore((s) => s.account?.id ?? null)
+  const presencePeers = usePresenceStore((s) => s.peers)
+  const presenceEnabled = useCapabilityEnabled('presence')
+
+  // Resolve the pin to a conversation: directly by id, or the DM whose other
+  // member is the pinned person.
+  const conv = useMemo(() => {
+    if (config?.conversationId) return conversations.find((c) => c.id === config.conversationId) ?? null
+    if (config?.personId)
+      return (
+        conversations.find((c) => c.kind === 'dm' && c.members.some((m) => m.accountId === config.personId)) ?? null
+      )
+    return null
+  }, [conversations, config])
+
+  const name = conv
+    ? conversationName(conv, selfId)
+    : config?.personName || config?.personHandle || 'Conversation'
+  const online = presenceEnabled && !!config?.personId && !!presencePeers[config.personId]
+
+  const open = async (): Promise<void> => {
+    if (conv) {
+      await setActive(conv.id)
+      v.goMessages()
+      return
+    }
+    if (config?.personHandle) {
+      // No DM with them yet: start one for real, then land in it.
+      const r = await startDm(config.personHandle)
+      if (r.ok) {
+        await setActive(r.id)
+        v.goMessages()
+        return
+      }
+    }
+    v.goMessages()
+  }
+
+  // A person pin is never stale (the DM starts on first click); a conversation
+  // pin dies only if the conversation no longer exists for this account.
+  const dead = !!config?.conversationId && !conv
+
+  return (
+    <RailCard title="Pinned conversation" icon="plexii:chat" tone="sky">
+      {dead ? (
+        <EmptyState text="This conversation is gone. Remove the widget or pin another." />
+      ) : (
+        <button
+          onClick={() => void open()}
+          data-testid="home-pinned-conversation"
+          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+        >
+          <span className="relative shrink-0">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 text-[12px] font-semibold">
+              {initials(name)}
+            </span>
+            {online && (
+              <span
+                className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[var(--surface-raised)]"
+                data-testid="home-pinned-conversation-online"
+              />
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate fb-t-body font-medium text-[var(--ink-100)]">{name}</span>
+            <span className="block fb-t-caption truncate">
+              {size === 'md' && conv?.lastMessage?.body
+                ? conv.lastMessage.body
+                : conv
+                  ? conv.unreadCount > 0
+                    ? `${conv.unreadCount} unread`
+                    : 'All caught up'
+                  : 'Say hello'}
+            </span>
+          </span>
+          {conv && conv.unreadCount > 0 && (
+            <span
+              className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[rgb(var(--accent))] text-white text-[10.5px] font-semibold fb-tabular"
+              data-testid="home-pinned-conversation-unread"
+            >
+              {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
+            </span>
+          )}
+          <Icon name="chevron_right" size={16} className="text-[var(--ink-40)] shrink-0" />
+        </button>
+      )}
+    </RailCard>
   )
 }
 
