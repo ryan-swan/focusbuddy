@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AnimatePresence, animate, motion, useMotionValue } from 'framer-motion'
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
   SIZE_SPAN,
@@ -411,6 +411,24 @@ export default function HomeDashboard(): JSX.Element {
   // values position the lifted card without React in the loop.
   const flatRef = useRef<SizedInstance[]>([])
   const gridRef = useRef<HTMLDivElement>(null)
+  // Column count follows the container: the 4-column board collapses to 2
+  // and then 1 as the window narrows. packGrid clamps spans, so lg/md become
+  // full-width rather than overflowing.
+  const [cols, setCols] = useState(GRID.cols)
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    const pick = (w: number): number => (w >= 760 ? 4 : w >= 380 ? 2 : 1)
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? el.clientWidth
+      setCols((c) => (pick(w) === c ? c : pick(w)))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  // Honour the OS reduced-motion setting: reflow and settle become quick
+  // fades instead of springs.
+  const reducedMotion = useReducedMotion()
   const dragInfoRef = useRef<{
     key: string
     size: WidgetSize
@@ -1061,15 +1079,16 @@ export default function HomeDashboard(): JSX.Element {
     return {
       originX: r.left,
       originY: r.top,
-      cellW: (r.width - GRID.gap * (GRID.cols - 1)) / GRID.cols,
+      cellW: (r.width - GRID.gap * (cols - 1)) / cols,
       cellH: GRID.cellH,
       gap: GRID.gap,
-      cols: GRID.cols
+      cols
     }
   }
 
   // End a drag: spring the lifted card into its slot (commit) or back into
   // the pre-drag order (cancel), then put the real widget back and persist.
+  const settleSpring = reducedMotion ? { duration: 0.12 } : GRID.settleSpring
   const settleDrag = (commit: boolean): void => {
     const info = dragInfoRef.current
     if (!info) return
@@ -1092,9 +1111,9 @@ export default function HomeDashboard(): JSX.Element {
     setDrag({ key: info.key, settling: true })
     const r = cellRect(pos, info.size, m)
     void Promise.all([
-      animate(dragX, r.left, GRID.settleSpring),
-      animate(dragY, r.top, GRID.settleSpring),
-      animate(dragScale, 1, GRID.settleSpring)
+      animate(dragX, r.left, settleSpring),
+      animate(dragY, r.top, settleSpring),
+      animate(dragScale, 1, settleSpring)
     ]).then(finish)
   }
   cancelDragRef.current = () => settleDrag(false)
@@ -1131,7 +1150,7 @@ export default function HomeDashboard(): JSX.Element {
         dragX.set(r.left)
         dragY.set(r.top)
         dragScale.set(1)
-        void animate(dragScale, GRID.liftScale, GRID.settleSpring)
+        void animate(dragScale, GRID.liftScale, settleSpring)
         setSwapKey(null)
         setDrag({ key: inst.key, settling: false })
       }
@@ -1172,7 +1191,7 @@ export default function HomeDashboard(): JSX.Element {
     window.addEventListener('pointercancel', onCancel)
   }
 
-  const positions = useMemo(() => packGrid(flat, GRID.cols), [flat])
+  const positions = useMemo(() => packGrid(flat, cols), [flat, cols])
   const liftedInst = drag
     ? (flat.find((it) => it.key === drag.key) ??
       dragInfoRef.current?.orig.find((it) => it.key === drag.key) ??
@@ -1187,10 +1206,11 @@ export default function HomeDashboard(): JSX.Element {
       ref={gridRef}
       className="grid"
       style={{
-        gridTemplateColumns: `repeat(${GRID.cols}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
         gridAutoRows: `${GRID.cellH}px`,
         gap: GRID.gap
       }}
+      aria-label="Home widgets"
       data-testid="home-widget-grid"
     >
       <AnimatePresence>
@@ -1210,13 +1230,15 @@ export default function HomeDashboard(): JSX.Element {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
               transition={{
-                layout: GRID.reflowSpring,
-                opacity: { duration: 0.25, delay: mountDelay },
-                scale: { type: 'spring', stiffness: 340, damping: 26 },
-                y: { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
+                layout: reducedMotion ? { duration: 0.12 } : GRID.reflowSpring,
+                opacity: { duration: 0.25, delay: reducedMotion ? 0 : mountDelay },
+                scale: reducedMotion ? { duration: 0.12 } : { type: 'spring', stiffness: 340, damping: 26 },
+                y: reducedMotion
+                  ? { duration: 0.12 }
+                  : { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
               }}
               style={{
-                gridColumn: `${(pos?.col ?? 0) + 1} / span ${span.w}`,
+                gridColumn: `${(pos?.col ?? 0) + 1} / span ${Math.min(span.w, cols)}`,
                 gridRow: `${(pos?.row ?? 0) + 1} / span ${span.h}`
               }}
               className="relative group/slot min-w-0"
@@ -1278,6 +1300,7 @@ export default function HomeDashboard(): JSX.Element {
                             commitFlat(flatRef.current.map((it) => (it.key === inst.key ? { ...it, size: next } : it)))
                           }}
                           title={`Size: ${inst.size}. Click for the next size`}
+                          aria-label={`Change size of ${def.name}, currently ${inst.size}`}
                           data-testid={`home-slot-size-${inst.key}`}
                           className="h-6 px-1.5 rounded-full inline-flex items-center gap-0.5 bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
                         >
@@ -1292,6 +1315,7 @@ export default function HomeDashboard(): JSX.Element {
                             editInstance(inst.key)
                           }}
                           title={`Edit ${def.name}`}
+                          aria-label={`Edit ${def.name}`}
                           data-testid={`home-slot-edit-${inst.key}`}
                           className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
                         >
@@ -1304,6 +1328,7 @@ export default function HomeDashboard(): JSX.Element {
                           removeInstance(inst.key)
                         }}
                         title={`Remove ${def.name}`}
+                        aria-label={`Remove ${def.name}`}
                         data-testid={`home-slot-remove-${inst.key}`}
                         className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-rose-500 shadow"
                       >
