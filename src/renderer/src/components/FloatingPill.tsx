@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { collectMenuRects, resolvePosition, resolveCenteredTop } from '../lib/floatingChrome'
+import { useEffect, useRef, useState } from 'react'
+import { collectMenuRects, resolveCenteredTop } from '../lib/floatingChrome'
 import { motion } from 'framer-motion'
 import Icon from './Icon'
 import LoadMeter from './LoadMeter'
@@ -53,7 +53,10 @@ export default function FloatingPill({
   onChat, onMeeting, timerText, timerOverdue
 }: Props): JSX.Element {
   const pillRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  // The pill is ALWAYS horizontally centered (product decision 2026-08-21):
+  // dragging adjusts only its vertical position, so it can never end up
+  // parked off-center. posY null = sit at defaultY.
+  const [posY, setPosY] = useState<number | null>(null)
   const [defaultY, setDefaultY] = useState(60)
   // Vertical-only dodge applied while the pill is in its default centered mode
   // (pos === null). Kept separate from pos so dodging never costs the pill its
@@ -70,10 +73,7 @@ export default function FloatingPill({
 
   const onMove = useRef((e: MouseEvent): void => {
     if (!dragData.current) return
-    setPos({
-      x: dragData.current.startPX + (e.clientX - dragData.current.startMX),
-      y: dragData.current.startPY + (e.clientY - dragData.current.startMY)
-    })
+    setPosY(dragData.current.startPY + (e.clientY - dragData.current.startMY))
   })
 
   const onUp = useRef((): void => {
@@ -152,19 +152,13 @@ export default function FloatingPill({
       if (hovered || dragData.current) return
       const r = el.getBoundingClientRect()
       const obstacles = collectMenuRects(el)
-      if (pos === null) {
-        const top = resolveCenteredTop(defaultY, r.width, r.height, obstacles)
-        setDodgeY((cur) => {
-          const effective = cur ?? defaultY
-          if (Math.round(top) === Math.round(effective)) return cur
-          return Math.round(top) === Math.round(defaultY) ? null : top
-        })
-        return
-      }
-      const next = resolvePosition(r.left, r.top, r.width, r.height, obstacles)
-      if (Math.round(next.left) !== Math.round(r.left) || Math.round(next.top) !== Math.round(r.top)) {
-        setPos({ x: next.left, y: next.top })
-      }
+      const base = posY ?? defaultY
+      const top = resolveCenteredTop(base, r.width, r.height, obstacles)
+      setDodgeY((cur) => {
+        const effective = cur ?? base
+        if (Math.round(top) === Math.round(effective)) return cur
+        return Math.round(top) === Math.round(base) ? null : top
+      })
     }
     resolve()
     const t = setTimeout(resolve, 350)
@@ -173,17 +167,15 @@ export default function FloatingPill({
       clearTimeout(t)
       window.removeEventListener('resize', resolve)
     }
-  }, [hovered, pos, defaultY])
+  }, [hovered, posY, defaultY])
 
-  // Generous zones — vertical when within 200px of either side edge.
-  const orient: 'h' | 'v' = useMemo(() => {
-    if (!pos) return 'h'
-    return (pos.x < 200 || pos.x > window.innerWidth - 200) ? 'v' : 'h'
-  }, [pos])
+  // Always horizontal — the pill never leaves the centered column, so the
+  // side-edge vertical orientation can no longer be reached.
+  // Cast keeps the union type so the (now unreachable) vertical render path
+  // still typechecks without dead-code warnings.
+  const orient = 'h' as 'h' | 'v'
 
-  const posStyle = pos
-    ? { left: pos.x, top: pos.y }
-    : { left: '50%', transform: 'translateX(-50%)', top: dodgeY ?? defaultY }
+  const posStyle = { left: '50%', transform: 'translateX(-50%)', top: dodgeY ?? posY ?? defaultY }
 
   const ringStyle = {
     boxShadow: `0 0 0 2px ${tier.ringColor}, 0 6px 24px ${tier.shadowColor}`,
@@ -197,10 +189,10 @@ export default function FloatingPill({
     onMouseDown: handleMouseDown,
     onDoubleClick: (e: React.MouseEvent) => {
       if ((e.target as HTMLElement).closest('button')) return
-      setPos(null)
+      setPosY(null)
       setDodgeY(null)
     },
-    title: 'Drag to reposition · Double-click to re-center',
+    title: 'Drag up or down to reposition · Double-click to reset',
     'data-testid': 'floating-pill',
     'data-floating-menu': true,
     style: { ...posStyle, ...ringStyle }
