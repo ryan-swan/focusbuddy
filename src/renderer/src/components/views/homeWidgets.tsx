@@ -37,8 +37,10 @@ function relTime(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// my-auto: inside a home tile the content region is a flex column, so the
+// empty state centers vertically instead of hugging the header.
 function EmptyState({ text }: { text: string }): JSX.Element {
-  return <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">{text}</p>
+  return <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]">{text}</p>
 }
 
 function useOpenDesk(): (n: FbNode) => void {
@@ -68,7 +70,7 @@ export function PinnedDeskWidget({ deskId }: { deskId?: string }): JSX.Element {
         <button
           onClick={() => openDesk(node)}
           data-testid={`home-pinned-desk-${node.id}`}
-          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="my-auto flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500 shrink-0">
             <Icon name={node.kind === 'folder' ? 'folder' : 'desk'} size={18} />
@@ -111,7 +113,7 @@ export function RoomPortalWidget({ roomId, size = 'lg' }: { roomId?: string; siz
       ) : desks.length === 0 ? (
         <EmptyState text="No desks in this room yet." />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid={`home-room-portal-${room.id}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 auto-rows-fr flex-1 min-h-0 gap-2" data-testid={`home-room-portal-${room.id}`}>
           {desks.map((n) => (
             <button
               key={n.id}
@@ -154,7 +156,7 @@ export function QuickLinksWidget({ routes }: { routes?: string[] }): JSX.Element
       {picked.length === 0 ? (
         <EmptyState text="No links picked yet. Edit this widget in Customize." />
       ) : (
-        <div className="grid grid-cols-3 gap-2" data-testid="home-quick-links">
+        <div className="grid grid-cols-3 auto-rows-fr flex-1 min-h-0 gap-2" data-testid="home-quick-links">
           {picked.map((r) => (
             <button
               key={r.id}
@@ -186,7 +188,7 @@ export function AppLauncherWidget({ size = 'sm' }: { size?: WidgetSize } = {}): 
         // Icon-only, logos large enough to own their tile — the name rides
         // the tooltip (Caleb's ruling, 2026-08-21: "just the icons, larger").
         <div
-          className={`grid gap-2 ${size === 'md' ? 'grid-cols-8' : 'grid-cols-4'}`}
+          className={`grid gap-2 auto-rows-fr flex-1 min-h-0 ${size === 'md' ? 'grid-cols-8' : 'grid-cols-4'}`}
           data-testid="home-app-launcher"
         >
           {shown.map((a) => (
@@ -196,7 +198,7 @@ export function AppLauncherWidget({ size = 'sm' }: { size?: WidgetSize } = {}): 
               title={a.title}
               aria-label={a.title}
               data-testid={`home-app-launch-${a.id}`}
-              className="flex items-center justify-center fb-tile fb-press aspect-square p-2"
+              className="flex items-center justify-center fb-tile fb-press p-2"
             >
               <AppLogo app={a} size={38} glyphSize={22} />
             </button>
@@ -236,7 +238,7 @@ export function CreateWidget(): JSX.Element {
   ]
   return (
     <RailCard title="Create new" icon="add_circle" tone="accent">
-      <div className="grid grid-cols-2 gap-2" data-testid="home-create">
+      <div className="grid grid-cols-2 auto-rows-fr flex-1 min-h-0 gap-2" data-testid="home-create">
         {items.map((it) => (
           <button
             key={it.id}
@@ -262,7 +264,7 @@ export function FocusTimerWidget(): JSX.Element {
   const ss = Math.max(0, remainingSec % 60)
   return (
     <RailCard title="Focus timer" icon="timer" tone="violet">
-      <div className="flex items-center gap-3" data-testid="home-focus-timer">
+      <div className="flex-1 flex items-center gap-3" data-testid="home-focus-timer">
         {active ? (
           <>
             <span className="fb-display fb-tabular text-[26px] leading-none text-violet-500">
@@ -317,11 +319,11 @@ export function OverdueRadarWidget({ size = 'sm' }: { size?: WidgetSize } = {}):
   return (
     <RailCard title="Overdue radar" icon="priority_high" tone="rose">
       {overdue.length === 0 ? (
-        <p className="py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-overdue-empty">
+        <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-overdue-empty">
           Nothing overdue. Clear skies.
         </p>
       ) : (
-        <ul className="space-y-1" data-testid="home-overdue">
+        <ul className="flex-1 min-h-0 flex flex-col justify-evenly" data-testid="home-overdue">
           {overdue.map((n) => (
             <li key={n.id}>
               <button
@@ -366,7 +368,7 @@ export function OneThingNowWidget(): JSX.Element {
       {!pick ? (
         <EmptyState text="No open tasks. Enjoy it." />
       ) : (
-        <div className="flex items-center gap-3" data-testid="home-one-thing">
+        <div className="flex-1 flex items-center gap-3" data-testid="home-one-thing">
           <div className="min-w-0 flex-1">
             <div className="fb-t-title text-[var(--ink-100)] truncate">{pick.title || 'Untitled task'}</div>
             <div className="mt-0.5 fb-t-caption truncate">
@@ -411,7 +413,7 @@ export function WhereWasIWidget({ activity }: { activity: ActivityEvent[] | null
       {!last ? (
         <EmptyState text="No trail yet. Work a little and this widget will remember for you." />
       ) : (
-        <div className="flex items-center gap-3" data-testid="home-where-was-i">
+        <div className="flex-1 flex items-center gap-3" data-testid="home-where-was-i">
           <div className="min-w-0 flex-1">
             <div className="fb-t-body font-medium text-[var(--ink-100)] truncate">
               {last.node.title || 'Untitled desk'}
@@ -452,14 +454,14 @@ export function StalledDeskWidget(): JSX.Element {
   return (
     <RailCard title="Stalled desk" icon="hourglass_bottom" tone="amber">
       {!stalled ? (
-        <p className="py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-stalled-empty">
+        <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-stalled-empty">
           Nothing stalled. Everything in progress has been touched this week.
         </p>
       ) : (
         <button
           onClick={() => openDesk(stalled)}
           data-testid="home-stalled-open"
-          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="my-auto flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500 shrink-0">
             <Icon name="hourglass_bottom" size={17} />

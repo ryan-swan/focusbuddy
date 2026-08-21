@@ -772,7 +772,7 @@ export default function HomeDashboard(): JSX.Element {
             tone="sky"
             action={{ label: 'All rooms', onClick: () => v.goRooms() }}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-[minmax(150px,200px)_1fr] gap-3" data-testid="home-navigator">
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(150px,200px)_1fr] flex-1 min-h-0 gap-3" data-testid="home-navigator">
               {/* Rooms column */}
               <div className="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible sm:border-r sm:border-[var(--edge-soft)] sm:pr-3">
                 <button
@@ -876,7 +876,7 @@ export default function HomeDashboard(): JSX.Element {
             {recentDocs.length === 0 ? (
               <EmptyState text="Nothing to pick up yet. Create a document and it will wait for you here." />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="home-continue">
+              <div className="grid grid-cols-1 sm:grid-cols-2 auto-rows-fr flex-1 min-h-0 gap-3" data-testid="home-continue">
                 {recentDocs.slice(0, size === 'md' ? 2 : 4).map((d) => {
                   const ti = DOC_TYPE_ICON[d.docType] ?? {
                     icon: 'draft',
@@ -918,11 +918,11 @@ export default function HomeDashboard(): JSX.Element {
             {agenda === null ? (
               <SkeletonLines rows={3} />
             ) : todayEvents.length === 0 ? (
-              <p className="py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-agenda-empty">
+              <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-agenda-empty">
                 Nothing scheduled today.
               </p>
             ) : (
-              <ul className="space-y-1.5" data-testid="home-agenda">
+              <ul className="flex-1 min-h-0 flex flex-col justify-evenly" data-testid="home-agenda">
                 {todayEvents.slice(0, size === 'stack' ? 8 : 3).map((b) => (
                   <li key={b.id} className="flex items-center gap-2.5 px-1 py-1" data-testid={`home-agenda-item-${b.id}`}>
                     <span className="shrink-0 fb-t-caption fb-tabular w-14">
@@ -942,7 +942,7 @@ export default function HomeDashboard(): JSX.Element {
         return (
           <RailCard title="Pulse" icon="monitoring" tone="violet">
             <div
-              className={`grid gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}
+              className={`grid auto-rows-fr flex-1 min-h-0 gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}
               data-testid="home-insights"
               title="Counts come straight from your tasks and calendar. Productivity and focus-time scores are not tracked yet, so they are not shown."
             >
@@ -981,7 +981,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'quick':
         return (
           <RailCard title="Quick actions" icon="bolt" tone="emerald">
-            <div className={`grid gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}>
+            <div className={`grid auto-rows-fr flex-1 min-h-0 gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}>
               <QuickAction testid="home-quick-create" icon="add" tone="accent" title="Create" blurb="New document" onClick={() => void onCreate()} />
               <QuickAction testid="home-quick-plan" icon="checklist" tone="sky" title="Plan" blurb="Plans and tasks" onClick={() => v.goPlexiDesk('plans')} />
               <QuickAction testid="home-quick-collaborate" icon="group" tone="emerald" title="Collaborate" blurb="Shared work" onClick={() => v.goCollaborations()} />
@@ -996,11 +996,11 @@ export default function HomeDashboard(): JSX.Element {
             {activity === null ? (
               <SkeletonLines rows={4} />
             ) : recentActivity.length === 0 ? (
-              <p className="py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-activity-empty">
+              <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-activity-empty">
                 No recent activity yet. As you open desks and run sessions, it shows up here.
               </p>
             ) : (
-              <ul className="space-y-0.5" data-testid="home-activity">
+              <ul className="flex-1 min-h-0 flex flex-col justify-evenly" data-testid="home-activity">
                 {recentActivity.slice(0, size === 'stack' ? 9 : 4).map((e) => (
                   <li
                     key={e.id}
@@ -1926,7 +1926,7 @@ function SizePreview({
 // widget's data arriving feels like focus resolving, never like a fetch.
 function SkeletonLines({ rows }: { rows: number }): JSX.Element {
   return (
-    <div className="space-y-2.5 py-1.5" aria-hidden="true">
+    <div className="my-auto space-y-2.5 py-1.5" aria-hidden="true">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="fb-skeleton h-3.5" style={{ width: `${88 - i * 13}%` }} />
       ))}
@@ -2072,7 +2072,7 @@ function WidgetConfigPicker({
 }
 
 function EmptyState({ text }: { text: string }): JSX.Element {
-  return <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">{text}</p>
+  return <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]">{text}</p>
 }
 
 function QuickAction({

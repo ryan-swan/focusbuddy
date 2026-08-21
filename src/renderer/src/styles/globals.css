@@ -384,6 +384,19 @@ body {
       0 18px 44px -14px oklch(0% 0 0 / 0.55),
       var(--shadow-inset-highlight);
   }
+  /* Inside a tile, the widget root is a flex column and its content region
+     (the card's last child) grows — so interiors distribute rows, stretch
+     grids, or center singles instead of pooling dead space at the bottom. */
+  .fb-widget-tile > * {
+    display: flex;
+    flex-direction: column;
+  }
+  .fb-widget-tile > * > :last-child {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
   /* `.no-tod` modifier — suppresses ambient overlays (time-of-day ::before AND the
      Futuristic flowing accent-beam ::after) on surfaces where they bleed through
      semi-transparent cards. Only the Canvas keeps these ambient effects. */
