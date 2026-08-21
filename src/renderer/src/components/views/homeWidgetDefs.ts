@@ -74,10 +74,12 @@ export interface HomeWidgetInstance {
   config?: HomeWidgetConfig
 }
 
-// Apple-style widget sizes, in grid cells: sm 1x1, md 2x1, lg 2x2,
-// stack 1x2 tall. Every def declares only the sizes its content genuinely
-// supports, plus the size it arrives at.
-export type WidgetSize = 'sm' | 'md' | 'lg' | 'stack'
+// Apple-style widget sizes. The grid packs in half-cell subunits (see
+// homeGridLayout.ts): icon is one subunit — a true app-icon square, four of
+// them in a small widget's footprint, exactly Apple's ratio — then sm 1x1
+// cell, md 2x1, lg 2x2, stack 1x2 tall. Every def declares only the sizes
+// its content genuinely supports, plus the size it arrives at.
+export type WidgetSize = 'icon' | 'sm' | 'md' | 'lg' | 'stack'
 
 export interface HomeWidgetDef {
   id: HomeWidgetId
@@ -121,9 +123,9 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   { id: 'create', name: 'Create new', blurb: 'Start a document, spreadsheet, deck, or desk in one tap', icon: 'add_circle', tint: 'bg-accent/10 text-accent', category: 'Actions', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
   { id: 'focus-timer', name: 'Focus timer', blurb: 'Start and stop the five minute promise from home', icon: 'timer', tint: 'bg-violet-500/10 text-violet-500', category: 'Actions', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
   // Communication
-  { id: 'new-meeting', name: 'New meeting', blurb: 'Start or schedule a PlexiMeet and invite anyone', icon: 'plexii:meet', tint: 'bg-rose-500/10 text-rose-500', category: 'Communication', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
+  { id: 'new-meeting', name: 'New meeting', blurb: 'Start or schedule a PlexiMeet and invite anyone', icon: 'plexii:meet', tint: 'bg-rose-500/10 text-rose-500', category: 'Communication', defaultCol: 'rail', sizes: ['icon'], defaultSize: 'icon' },
   { id: 'pinned-conversation', name: 'Pinned conversation', blurb: 'One person or chat, unread count and one click away', icon: 'plexii:chat', tint: 'bg-sky-500/10 text-sky-500', category: 'Communication', multi: true, config: 'conversation', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
-  { id: 'transcribe', name: 'Transcribe', blurb: 'Record and transcribe, then keep it where it belongs', icon: 'plexii:mic', tint: 'bg-violet-500/10 text-violet-500', category: 'Communication', defaultCol: 'rail', sizes: ['sm'], defaultSize: 'sm' },
+  { id: 'transcribe', name: 'Transcribe', blurb: 'Record and transcribe, then keep it where it belongs', icon: 'plexii:mic', tint: 'bg-violet-500/10 text-violet-500', category: 'Communication', defaultCol: 'rail', sizes: ['icon'], defaultSize: 'icon' },
   // Smart
   { id: 'one-thing', name: 'One thing now', blurb: 'The single most pressing task. No list, just the one', icon: 'target', tint: 'bg-amber-500/10 text-amber-600', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
   { id: 'where-was-i', name: 'Where was I', blurb: 'Your last working context, with one button: Resume', icon: 'undo', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },

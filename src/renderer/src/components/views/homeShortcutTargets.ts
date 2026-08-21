@@ -30,7 +30,8 @@ export interface ShortcutView {
 // cell geometry (GRID cellH 200, RailCard header ~40px): sm fits two rows of
 // four icon tiles; md fits two rows of three labeled tiles; stack fits eight
 // list rows; lg fits two columns of seven rows.
-export const SHORTCUT_SLOTS: Record<WidgetSize, number> = { sm: 8, md: 6, stack: 8, lg: 14 }
+// (icon is never a Shortcuts size; the entry only satisfies the Record.)
+export const SHORTCUT_SLOTS: Record<WidgetSize, number> = { icon: 2, sm: 8, md: 6, stack: 8, lg: 14 }
 
 // How many targets render at a size. The add tile always takes one slot; when
 // targets overflow the rest, the final visible slot becomes a "+N" spillover

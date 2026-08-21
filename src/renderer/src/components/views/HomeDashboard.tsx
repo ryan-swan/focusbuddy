@@ -3,6 +3,7 @@ import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } fr
 import { createPortal } from 'react-dom'
 import {
   SIZE_SPAN,
+  SUBDIV,
   bestInsertionIndex,
   cellRect,
   clampSize,
@@ -285,7 +286,12 @@ const GRID = {
 // widgets small — and the v2 key is never deleted, so rolling back to a
 // pre-grid build finds the user's old layout intact.
 const FLAT_KEY = 'home.layout.v3'
-const SIZE_VALUES: readonly string[] = ['sm', 'md', 'lg', 'stack']
+const SIZE_VALUES: readonly string[] = ['icon', 'sm', 'md', 'lg', 'stack']
+
+// The packing runs in half-cell subunits (see homeGridLayout.ts): same gap,
+// same visual geometry for every existing size, plus the icon tier. These
+// derive the subunit metrics from the visual feel knobs above.
+const SUBROW_H = (GRID.cellH - GRID.gap) / 2
 
 const STOCK_FLAT: SizedInstance[] = sizedFromColumns(STOCK_LAYOUT.main, STOCK_LAYOUT.rail)
 
@@ -1108,13 +1114,14 @@ export default function HomeDashboard(): JSX.Element {
     const el = gridRef.current
     if (!el) return null
     const r = el.getBoundingClientRect()
+    const subCols = cols * SUBDIV
     return {
       originX: r.left,
       originY: r.top,
-      cellW: (r.width - GRID.gap * (cols - 1)) / cols,
-      cellH: GRID.cellH,
+      cellW: (r.width - GRID.gap * (subCols - 1)) / subCols,
+      cellH: SUBROW_H,
       gap: GRID.gap,
-      cols
+      cols: subCols
     }
   }
 
@@ -1223,7 +1230,7 @@ export default function HomeDashboard(): JSX.Element {
     window.addEventListener('pointercancel', onCancel)
   }
 
-  const positions = useMemo(() => packGrid(flat, cols), [flat, cols])
+  const positions = useMemo(() => packGrid(flat, cols * SUBDIV), [flat, cols])
   const liftedInst = drag
     ? (flat.find((it) => it.key === drag.key) ??
       dragInfoRef.current?.orig.find((it) => it.key === drag.key) ??
@@ -1238,8 +1245,8 @@ export default function HomeDashboard(): JSX.Element {
       ref={gridRef}
       className="grid"
       style={{
-        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-        gridAutoRows: `${GRID.cellH}px`,
+        gridTemplateColumns: `repeat(${cols * SUBDIV}, minmax(0, 1fr))`,
+        gridAutoRows: `${SUBROW_H}px`,
         gap: GRID.gap
       }}
       aria-label="Home widgets"
@@ -1270,7 +1277,7 @@ export default function HomeDashboard(): JSX.Element {
                   : { type: 'spring', stiffness: 420, damping: 34, delay: mountDelay }
               }}
               style={{
-                gridColumn: `${(pos?.col ?? 0) + 1} / span ${Math.min(span.w, cols)}`,
+                gridColumn: `${(pos?.col ?? 0) + 1} / span ${Math.min(span.w, cols * SUBDIV)}`,
                 gridRow: `${(pos?.row ?? 0) + 1} / span ${span.h}`
               }}
               className="relative group/slot min-w-0"
@@ -1535,8 +1542,8 @@ export default function HomeDashboard(): JSX.Element {
           <WidgetPickerOverlay
             isPlaced={isPlaced}
             swapTarget={swapKey ? findInstance(swapKey) : null}
-            cellW={gridMetrics()?.cellW ?? 264}
-            cellH={GRID.cellH}
+            cellW={gridMetrics()?.cellW ?? 132}
+            cellH={SUBROW_H}
             gap={GRID.gap}
             renderPreview={renderWidget}
             requestConfig={(id, apply) => {
@@ -1587,6 +1594,7 @@ export default function HomeDashboard(): JSX.Element {
 // replacements instead.
 
 const SIZE_LABEL: Record<WidgetSize, string> = {
+  icon: 'Icon',
   sm: 'Small',
   md: 'Medium',
   lg: 'Large',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Reorder } from 'framer-motion'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
@@ -1070,31 +1070,59 @@ function ShortcutComposer({
 // NewMeetingDialog (entitlement gating, teammate invites, email invites,
 // scheduling); this widget is just its Home doorway. The meeting itself runs
 // in the global MeetingOverlay, so starting from Home works in place.
+//
+// Rendered at the ICON size tier (Caleb's ruling): a true app icon, not a
+// card. No header, no chrome — the whole tile IS the colored surface, glyph
+// and name inside, exactly how an icon sits on an Apple home screen. Four of
+// these occupy a small widget's footprint.
+export function AppIconWidget({
+  name,
+  icon,
+  surface,
+  testId,
+  buttonTestId,
+  onPress,
+  children
+}: {
+  name: string
+  icon: string
+  // Tailwind classes for the colored icon surface (gradient).
+  surface: string
+  testId: string
+  buttonTestId: string
+  onPress: () => void
+  children?: ReactNode
+}): JSX.Element {
+  return (
+    <div className="relative h-full w-full" data-testid={testId}>
+      <button
+        onClick={onPress}
+        data-testid={buttonTestId}
+        aria-label={name}
+        title={name}
+        className={`absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-2xl fb-press text-white ${surface}`}
+      >
+        <Icon name={icon} size={26} />
+        <span className="max-w-full truncate px-2 text-[10.5px] font-semibold">{name}</span>
+      </button>
+      {children}
+    </div>
+  )
+}
+
 export function NewMeetingWidget(): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
-    <RailCard title="New meeting" icon="plexii:meet" tone="rose">
-      <div className="flex-1 flex flex-col" data-testid="home-new-meeting">
-        <button
-          onClick={() => setOpen(true)}
-          data-testid="home-new-meeting-start"
-          className="flex-1 flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
-        >
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500/12 text-rose-500 shrink-0">
-            <Icon name="plexii:meet" size={21} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block fb-t-body font-semibold text-[var(--ink-100)]">Start a meeting</span>
-            <span className="block fb-t-caption truncate">Face to face beats forty messages</span>
-          </span>
-          <span className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-rose-500">
-            Start
-            <Icon name="chevron_right" size={15} />
-          </span>
-        </button>
-      </div>
+    <AppIconWidget
+      name="New meeting"
+      icon="plexii:meet"
+      surface="bg-gradient-to-b from-rose-500 to-rose-600"
+      testId="home-new-meeting"
+      buttonTestId="home-new-meeting-start"
+      onPress={() => setOpen(true)}
+    >
       {open && <NewMeetingDialog onClose={() => setOpen(false)} />}
-    </RailCard>
+    </AppIconWidget>
   )
 }
 
@@ -1230,28 +1258,16 @@ export function PinnedConversationWidget({
 export function TranscribeWidget(): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
-    <RailCard title="Transcribe" icon="plexii:mic" tone="violet">
-      <div className="flex-1 flex flex-col" data-testid="home-transcribe">
-        <button
-          onClick={() => setOpen(true)}
-          data-testid="home-transcribe-start"
-          className="flex-1 flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
-        >
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/12 text-violet-500 shrink-0">
-            <Icon name="plexii:mic" size={21} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block fb-t-body font-semibold text-[var(--ink-100)]">Record and transcribe</span>
-            <span className="block fb-t-caption truncate">Say it once. Keep it forever</span>
-          </span>
-          <span className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-violet-500">
-            Record
-            <Icon name="chevron_right" size={15} />
-          </span>
-        </button>
-      </div>
+    <AppIconWidget
+      name="Transcribe"
+      icon="plexii:mic"
+      surface="bg-gradient-to-b from-violet-500 to-violet-600"
+      testId="home-transcribe"
+      buttonTestId="home-transcribe-start"
+      onPress={() => setOpen(true)}
+    >
       {open && <TranscribeOverlay onClose={() => setOpen(false)} />}
-    </RailCard>
+    </AppIconWidget>
   )
 }
 

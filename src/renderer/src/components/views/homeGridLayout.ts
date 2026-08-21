@@ -30,12 +30,19 @@ export function sizedFromColumns(main: HomeWidgetInstance[], rail: HomeWidgetIns
   ]
 }
 
-// Grid footprint per size, in cells.
+// Grid footprint per size, in SUBUNITS: every visual cell is a 2x2 block of
+// subunits sharing the same gap, which reproduces the original cell geometry
+// exactly ((W - 7g)/8 == ((W - 3g)/4 - g)/2) while opening a true app-icon
+// tier: icon is one subunit, four of them in a small widget's footprint.
+// Callers pass subunit columns (visual columns x SUBDIV) and subunit row
+// height ((cell height - gap) / SUBDIV) in their metrics.
+export const SUBDIV = 2
 export const SIZE_SPAN: Record<WidgetSize, { w: number; h: number }> = {
-  sm: { w: 1, h: 1 },
-  md: { w: 2, h: 1 },
-  lg: { w: 2, h: 2 },
-  stack: { w: 1, h: 2 }
+  icon: { w: 1, h: 1 },
+  sm: { w: 2, h: 2 },
+  md: { w: 4, h: 2 },
+  lg: { w: 4, h: 4 },
+  stack: { w: 2, h: 4 }
 }
 
 export interface GridPos {

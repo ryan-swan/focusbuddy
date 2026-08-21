@@ -14,7 +14,8 @@ import {
 } from '../../src/renderer/src/components/views/homeGridLayout'
 import { widgetDef } from '../../src/renderer/src/components/views/homeWidgetDefs'
 
-const COLS = 4
+// Subunit columns: 4 visual columns x the 2x2 subdivision (SUBDIV).
+const COLS = 8
 
 function inst(key: string, size: WidgetSize): SizedInstance {
   return { key, widget: 'standup', size }
@@ -52,26 +53,38 @@ describe('packGrid', () => {
     const pos = packGrid(items, COLS)
     assertValid(items, pos)
     expect(pos.get('a')).toEqual({ col: 0, row: 0 })
-    expect(pos.get('b')).toEqual({ col: 2, row: 0 })
-    expect(pos.get('c')).toEqual({ col: 0, row: 2 })
+    expect(pos.get('b')).toEqual({ col: 4, row: 0 })
+    expect(pos.get('c')).toEqual({ col: 0, row: 4 })
     // The four small widgets fill the gap beside the third large one.
-    expect(packedRows(items, pos)).toBe(4)
+    expect(packedRows(items, pos)).toBe(8)
   })
 
   it('fills gaps left by earlier large widgets (dense packing)', () => {
     const items = [inst('big', 'lg'), inst('wide', 'md'), inst('s1', 'sm'), inst('s2', 'sm')]
     const pos = packGrid(items, COLS)
     assertValid(items, pos)
-    // md lands beside lg on row 0; the sm pair fills the row-1 remainder.
-    expect(pos.get('wide')).toEqual({ col: 2, row: 0 })
-    expect(pos.get('s1')).toEqual({ col: 2, row: 1 })
-    expect(pos.get('s2')).toEqual({ col: 3, row: 1 })
+    // md lands beside lg on row 0; the sm pair fills the remainder below it.
+    expect(pos.get('wide')).toEqual({ col: 4, row: 0 })
+    expect(pos.get('s1')).toEqual({ col: 4, row: 2 })
+    expect(pos.get('s2')).toEqual({ col: 6, row: 2 })
+  })
+
+  it('packs four icons into a small widget footprint (the Apple ratio)', () => {
+    const items = [inst('s', 'sm'), inst('i1', 'icon'), inst('i2', 'icon'), inst('i3', 'icon'), inst('i4', 'icon')]
+    const pos = packGrid(items, COLS)
+    assertValid(items, pos)
+    // The four icons tile the 2x2 block beside the small widget.
+    expect(pos.get('i1')).toEqual({ col: 2, row: 0 })
+    expect(pos.get('i2')).toEqual({ col: 3, row: 0 })
+    expect(pos.get('i3')).toEqual({ col: 4, row: 0 })
+    expect(pos.get('i4')).toEqual({ col: 5, row: 0 })
+    expect(packedRows(items, pos)).toBe(2)
   })
 
   it('handles every size, in any order, without overlap', () => {
-    const sizes: WidgetSize[] = ['sm', 'md', 'lg', 'stack']
+    const sizes: WidgetSize[] = ['icon', 'sm', 'md', 'lg', 'stack']
     for (let seed = 0; seed < 32; seed++) {
-      const items = Array.from({ length: 12 }, (_, i) => inst(`k${i}`, sizes[(i * 7 + seed) % 4]))
+      const items = Array.from({ length: 12 }, (_, i) => inst(`k${i}`, sizes[(i * 7 + seed) % 5]))
       assertValid(items, packGrid(items, COLS))
     }
   })
@@ -96,8 +109,8 @@ describe('cellRect / pointerCell', () => {
     expect(cellRect({ col: 1, row: 2 }, 'lg', METRICS)).toEqual({
       left: 100 + 216,
       top: 50 + 400,
-      width: 416,
-      height: 384
+      width: 4 * 200 + 3 * 16,
+      height: 4 * 184 + 3 * 16
     })
   })
 
@@ -136,7 +149,7 @@ describe('bestInsertionIndex', () => {
     const dragged = inst('x', 'lg')
     const idx = bestInsertionIndex(board, dragged, 100 + 800, 50 + 2000, METRICS)
     const trial = [...board.slice(0, idx), dragged, ...board.slice(idx)]
-    expect(packGrid(trial, COLS).get('x')).toEqual({ col: 0, row: 1 })
+    expect(packGrid(trial, COLS).get('x')).toEqual({ col: 0, row: 2 })
   })
 
   it('is stable at ties (earliest index wins on repeated calls)', () => {
@@ -160,7 +173,7 @@ describe('clampSize', () => {
   it('every def declares its own default among its sizes', () => {
     // Guards the def table itself: a default outside sizes would make
     // clampSize recurse into nonsense.
-    const ids = ['standup', 'agenda', 'pulse', 'continue', 'activity', 'overdue', 'navigator', 'pinned-desk', 'room-portal', 'quick-links', 'app-launcher', 'quick', 'create', 'focus-timer', 'one-thing', 'where-was-i', 'stalled'] as const
+    const ids = ['standup', 'agenda', 'pulse', 'continue', 'activity', 'overdue', 'navigator', 'pinned-desk', 'room-portal', 'quick-links', 'shortcuts', 'app-launcher', 'quick', 'create', 'focus-timer', 'one-thing', 'where-was-i', 'stalled', 'new-meeting', 'pinned-conversation', 'transcribe'] as const
     for (const id of ids) {
       const def = widgetDef(id)
       expect(def.sizes.length).toBeGreaterThan(0)
