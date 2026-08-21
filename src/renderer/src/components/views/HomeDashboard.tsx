@@ -1206,8 +1206,12 @@ export default function HomeDashboard(): JSX.Element {
                         : ''
                     }`}
                   >
-                    {/* In customize mode the widget is a target, not a control. */}
-                    <div className={`h-full overflow-hidden rounded-2xl ${customize ? 'pointer-events-none select-none' : ''}`}>
+                    {/* In customize mode the widget is a target, not a control.
+                        [&>*]:h-full is the Apple tile rule: the widget's card
+                        chrome always fills its cell exactly, whatever the
+                        content height, so the board reads uniform outside
+                        customize mode too. */}
+                    <div className={`h-full overflow-hidden rounded-2xl [&>*]:h-full ${customize ? 'pointer-events-none select-none' : ''}`}>
                       {renderWidget(inst)}
                     </div>
                   </div>
@@ -1418,7 +1422,7 @@ export default function HomeDashboard(): JSX.Element {
             className="fixed left-0 top-0 z-[100] pointer-events-none"
             data-testid="home-drag-lift"
           >
-            <div className="h-full overflow-hidden rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.30)] ring-1 ring-black/[0.08] dark:ring-white/[0.08] bg-[var(--surface-base)]">
+            <div className="h-full overflow-hidden rounded-2xl [&>*]:h-full shadow-[0_24px_60px_rgba(0,0,0,0.30)] ring-1 ring-black/[0.08] dark:ring-white/[0.08] bg-[var(--surface-base)]">
               {renderWidget(liftedInst)}
             </div>
           </motion.div>,
