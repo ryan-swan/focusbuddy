@@ -741,7 +741,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'quick-links':
         return <QuickLinksWidget routes={inst.config?.routes} />
       case 'app-launcher':
-        return <AppLauncherWidget size={size} />
+        return <AppLauncherWidget />
       case 'create':
         return <CreateWidget />
       case 'focus-timer':

@@ -70,7 +70,7 @@ export function PinnedDeskWidget({ deskId }: { deskId?: string }): JSX.Element {
         <button
           onClick={() => openDesk(node)}
           data-testid={`home-pinned-desk-${node.id}`}
-          className="my-auto flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500 shrink-0">
             <Icon name={node.kind === 'folder' ? 'folder' : 'desk'} size={18} />
@@ -174,7 +174,7 @@ export function QuickLinksWidget({ routes }: { routes?: string[] }): JSX.Element
   )
 }
 
-export function AppLauncherWidget({ size = 'sm' }: { size?: WidgetSize } = {}): JSX.Element {
+export function AppLauncherWidget(): JSX.Element {
   const apps = useConnectedAppsStore((s) => s.apps)
   const launchLocal = useConnectedAppsStore((s) => s.launchLocal)
   const v = useViewStore()
@@ -185,12 +185,11 @@ export function AppLauncherWidget({ size = 'sm' }: { size?: WidgetSize } = {}): 
       {shown.length === 0 ? (
         <EmptyState text="No connected apps yet. Add some from the sidebar." />
       ) : (
-        // Icon-only, logos large enough to own their tile — the name rides
-        // the tooltip (Caleb's ruling, 2026-08-21: "just the icons, larger").
-        <div
-          className={`grid gap-2 auto-rows-fr flex-1 min-h-0 ${size === 'md' ? 'grid-cols-8' : 'grid-cols-4'}`}
-          data-testid="home-app-launcher"
-        >
+        // Icon-only, fixed square tiles in a centered wrap — the tile shape
+        // never depends on how many apps there are or how wide the widget is
+        // (Caleb's ruling, 2026-08-21: stretched slabs at md looked wrong).
+        // Names ride the tooltip.
+        <div className="my-auto flex flex-wrap content-center gap-2" data-testid="home-app-launcher">
           {shown.map((a) => (
             <button
               key={a.id}
@@ -198,7 +197,7 @@ export function AppLauncherWidget({ size = 'sm' }: { size?: WidgetSize } = {}): 
               title={a.title}
               aria-label={a.title}
               data-testid={`home-app-launch-${a.id}`}
-              className="flex items-center justify-center fb-tile fb-press p-2"
+              className="h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press"
             >
               <AppLogo app={a} size={38} glyphSize={22} />
             </button>
@@ -461,7 +460,7 @@ export function StalledDeskWidget(): JSX.Element {
         <button
           onClick={() => openDesk(stalled)}
           data-testid="home-stalled-open"
-          className="my-auto flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500 shrink-0">
             <Icon name="hourglass_bottom" size={17} />
