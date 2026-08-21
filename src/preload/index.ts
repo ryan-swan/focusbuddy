@@ -2002,7 +2002,15 @@ const api = {
     renameConversation: (id: string, title: string): Promise<void> =>
       ipcRenderer.invoke('aiChat:renameConversation', id, title),
     deleteConversation: (id: string): Promise<void> =>
-      ipcRenderer.invoke('aiChat:deleteConversation', id)
+      ipcRenderer.invoke('aiChat:deleteConversation', id),
+    // Plexii P5: link a desk the conversation produced/adopted. Element 0 of
+    // the returned list is the primary. makePrimary moves it to the front.
+    linkDesk: (
+      conversationId: string,
+      taskId: string,
+      makePrimary?: boolean
+    ): Promise<string[] | null> =>
+      ipcRenderer.invoke('aiChat:linkDesk', conversationId, taskId, makePrimary)
   },
   // PlexiProjects: roll tasks up into a scheduled plan with a critical path.
   projects: {

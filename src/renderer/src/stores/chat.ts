@@ -24,6 +24,7 @@ import {
   type MentionRef,
   type MentionResolution
 } from '../lib/assistantMentions'
+import { linkTargetForApplied } from '../lib/conversationDesks'
 
 function newTrace(): AssistantTrace {
   return {
@@ -138,6 +139,9 @@ interface ChatStore {
   newConversation: () => void
   openConversation: (id: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
+  // Link a desk to a conversation (Plexii P5). Optimistic on the local meta,
+  // persisted best-effort; element 0 of linkedDesks is the primary.
+  linkDesk: (conversationId: string, taskId: string, makePrimary?: boolean) => Promise<void>
   // Where a NEW conversation says it was started. Set by the panel from the
   // current screen just before the first send; a conversation created without
   // one records nothing rather than a placeholder.
@@ -343,6 +347,28 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (get().activeConversationId === id) get().newConversation()
     await get().refreshConversations()
   },
+  linkDesk: async (conversationId, taskId, makePrimary) => {
+    // Optimistic: the chip should appear the moment the desk exists, not after
+    // a round-trip. The idempotent server write reconciles on the next refresh.
+    set({
+      conversations: get().conversations.map((c) => {
+        if (c.id !== conversationId) return c
+        const current = c.linkedDesks ?? []
+        const next = makePrimary
+          ? [taskId, ...current.filter((t) => t !== taskId)]
+          : current.includes(taskId)
+            ? current
+            : [...current, taskId]
+        return { ...c, linkedDesks: next }
+      })
+    })
+    // Older preloads predate linkDesk — degrade to in-memory linking rather
+    // than throwing away the chip the user can already see.
+    if (typeof window.api?.aiChat?.linkDesk === 'function') {
+      await window.api.aiChat.linkDesk(conversationId, taskId, makePrimary).catch(() => {})
+      await get().refreshConversations()
+    }
+  },
   sending: false,
   hasApiKey: null,
   checkApiKey: async () => {
@@ -359,6 +385,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   markProposalApplied: (messageTs, proposalId, applied) => {
     const next = { ...get().appliedProposals, [appliedKey(messageTs, proposalId)]: applied }
     set({ appliedProposals: next })
+    // Plexii P5: a desk this conversation just produced links to it — the
+    // conversation and its desk stay pinned together from the moment of birth.
+    const producedKind = (get().proposalsByMessage[String(messageTs)] ?? []).find(
+      (p) => p.id === proposalId
+    )?.kind
+    const linkTaskId = linkTargetForApplied(producedKind, applied)
+    const linkConvId = get().activeConversationId
+    if (linkTaskId && linkConvId) void get().linkDesk(linkConvId, linkTaskId)
     // Persist so an approved card is still green after a restart (Phase 4.5 —
     // the behaviour the focus chat already had, now that both surfaces share
     // one store). Addressed by the message's own row id: a ts can collide, an

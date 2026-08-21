@@ -33,6 +33,8 @@ interface ConversationRow {
   // written before unification, which is honest — those conversations genuinely
   // do not know, and the UI says nothing rather than guessing.
   context_json: string | null
+  // Plexii P5: desks this conversation produced/adopted, element 0 = primary.
+  linked_desks_json: string | null
 }
 
 interface MessageRow {
@@ -66,7 +68,8 @@ function rowToMeta(
     updatedAt: row.updated_at,
     context: safeParse<AiChatConversationContext | null>(row.context_json, null),
     messageCount: extras?.messageCount,
-    preview: extras?.preview
+    preview: extras?.preview,
+    linkedDesks: safeParse<string[]>(row.linked_desks_json, [])
   }
 }
 
@@ -121,7 +124,7 @@ export function listConversations(): AiChatConversationMeta[] {
   const org = getActiveOrgId()
   const rows = db
     .prepare(
-      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json
+      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json, linked_desks_json
        FROM ai_chat_conversations WHERE org_id = ? ORDER BY updated_at DESC`
     )
     .all(org) as ConversationRow[]
@@ -145,7 +148,7 @@ export function getConversation(id: string): AiChatConversation | null {
   const org = getActiveOrgId()
   const row = db
     .prepare(
-      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json
+      `SELECT id, org_id, task_id, title, created_at, updated_at, context_json, linked_desks_json
        FROM ai_chat_conversations WHERE id = ? AND org_id = ?`
     )
     .get(id, org) as ConversationRow | undefined
@@ -192,8 +195,45 @@ export function createConversation(input: {
     createdAt: now,
     updatedAt: now,
     context: input.context ?? null,
-    messageCount: 0
+    messageCount: 0,
+    linkedDesks: []
   }
+}
+
+/**
+ * Link a desk to a conversation (Plexii P5). Appends by default; makePrimary
+ * moves (or inserts) it to the front, since element 0 is the primary — the
+ * pinned chip and the default push target. Idempotent: linking an
+ * already-linked desk without makePrimary changes nothing.
+ */
+export function linkDesk(
+  conversationId: string,
+  taskId: string,
+  makePrimary?: boolean
+): string[] | null {
+  const db = getDb()
+  if (!conversationOwnedByActiveOrg(conversationId)) return null
+  const row = db
+    .prepare(`SELECT linked_desks_json FROM ai_chat_conversations WHERE id = ?`)
+    .get(conversationId) as { linked_desks_json: string | null } | undefined
+  if (!row) return null
+  const current = safeParse<string[]>(row.linked_desks_json, []).filter(
+    (t) => typeof t === 'string' && t
+  )
+  let next: string[]
+  if (makePrimary) {
+    next = [taskId, ...current.filter((t) => t !== taskId)]
+  } else if (current.includes(taskId)) {
+    next = current
+  } else {
+    next = [...current, taskId]
+  }
+  db.prepare(`UPDATE ai_chat_conversations SET linked_desks_json = ?, updated_at = ? WHERE id = ?`).run(
+    JSON.stringify(next),
+    Date.now(),
+    conversationId
+  )
+  return next
 }
 
 /** Append one message to a conversation. Bumps the conversation's updated_at. */

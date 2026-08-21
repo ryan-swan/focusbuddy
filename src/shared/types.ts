@@ -2359,6 +2359,10 @@ export interface AiChatConversationMeta {
   messageCount?: number
   // First user line, for the history list preview.
   preview?: string
+  // Desks this conversation produced or adopted (Plexii P5), in link order —
+  // element 0 is the PRIMARY: the pinned chip in the header and the default
+  // push target. Grows as the chat creates desks; never limits how many.
+  linkedDesks: string[]
 }
 // A persisted message: the ChatMessage plus its proposals + applied-state, so an
 // assistant turn restores with its green "done" cards intact.

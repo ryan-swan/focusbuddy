@@ -1473,7 +1473,10 @@ export default function HomeDashboard(): JSX.Element {
                 repoints the shortcut, showing it here would promise the wrong
                 destination. */}
             <button
-              onClick={() => v.goPlexii()}
+              onClick={() => {
+                setActive(null)
+                v.goPlexii()
+              }}
               data-testid="home-ask-brain"
               title="Ask Plexii — opens the AI hub"
               className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"

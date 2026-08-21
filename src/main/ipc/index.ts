@@ -464,7 +464,8 @@ import {
   appendMessage as appendAiChatMessage,
   setMessageApplied as setAiChatMessageApplied,
   renameConversation as renameAiChatConversation,
-  deleteConversation as deleteAiChatConversation
+  deleteConversation as deleteAiChatConversation,
+  linkDesk as linkAiChatDesk
 } from '../db/aiChat'
 import { getRecentActivity, recordActivity } from '../db/activity'
 import {
@@ -2732,6 +2733,11 @@ export function registerIpcHandlers(): void {
     renameAiChatConversation(id, title)
   )
   ipcMain.handle('aiChat:deleteConversation', (_e, id: string) => deleteAiChatConversation(id))
+  ipcMain.handle(
+    'aiChat:linkDesk',
+    (_e, conversationId: string, taskId: string, makePrimary?: boolean) =>
+      linkAiChatDesk(conversationId, taskId, makePrimary)
+  )
 
   // People the renderer has genuinely fetched from the signal server, handed to
   // the main process so @-mentions can resolve one (Phase 4.7). Same shape as

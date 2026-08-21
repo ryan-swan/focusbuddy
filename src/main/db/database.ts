@@ -998,6 +998,9 @@ export function getDb(): Database.Database {
   // Plexii P4 — interactive UI blocks an assistant turn carried. Additive,
   // NULL means the turn had none (every pre-blocks row, honestly).
   ensureColumn(db, 'ai_chat_messages', 'blocks_json', 'TEXT')
+  // Plexii P5 — desks a conversation produced/adopted (element 0 = primary).
+  // NULL/absent means none yet; pre-P5 conversations honestly link nothing.
+  ensureColumn(db, 'ai_chat_conversations', 'linked_desks_json', 'TEXT')
   // What screen a conversation was started from, so it can say so later. The
   // assistant used to re-thread per screen; after unification a conversation
   // REMEMBERS its context instead of being replaced by it (plan D4).

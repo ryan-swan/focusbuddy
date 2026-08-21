@@ -150,6 +150,75 @@ test.describe('Plexii hub (Phase 1)', () => {
     ).toBeVisible({ timeout: 8_000 })
   })
 
+  // ── Phase 5: push to desk + conversation linking ─────────────────────────
+
+  test('a desk the conversation produces links to it and survives reopening', async () => {
+    const { window } = launched
+    // Seed a real persisted conversation through the hero door (the send fails
+    // for want of a key, which is fine — the conversation row is what we need).
+    await gotoHome()
+    const input = window.locator('[data-testid="start-or-ask-input"]')
+    await input.waitFor({ state: 'visible' })
+    await input.fill('Plan a supper club')
+    await window.locator('[data-testid="start-or-ask-go"]').click()
+    await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
+    await expect(
+      window.locator('[data-testid="conversation-row"]').first()
+    ).toContainText('Plan a supper club', { timeout: 10_000 })
+
+    // Before any desk exists, the persistent out offers to make one.
+    const deskButton = window.locator('[data-testid="chat-turn-into-desk"]')
+    await expect(deskButton).toContainText('Turn into desk')
+
+    // Seed an assistant turn carrying a create-task proposal onto the live
+    // conversation, so applying it exercises the real executor + link path
+    // without a model call.
+    await window.evaluate(() => {
+      const w = window as unknown as {
+        __fbChat?: {
+          getState: () => {
+            activeConversationId: string | null
+            messagesByTask: Record<string, unknown[]>
+          }
+          setState: (s: Record<string, unknown>) => void
+        }
+      }
+      const st = w.__fbChat?.getState()
+      const convId = st?.activeConversationId
+      if (!convId) throw new Error('expected a persisted conversation')
+      const ts = Date.now()
+      const existing = st.messagesByTask[convId] ?? []
+      w.__fbChat?.setState({
+        messagesByTask: {
+          ...st.messagesByTask,
+          [convId]: [...existing, { role: 'assistant', content: 'Here is the desk.', ts }]
+        },
+        proposalsByMessage: {
+          [String(ts)]: [
+            { id: 'mk-desk', kind: 'create-task', title: 'Supper club', reason: 'the workspace' }
+          ]
+        }
+      })
+    })
+
+    // Apply the card — the whole card is the apply button.
+    await window.locator('[data-testid="proposal-card-mk-desk"]').click()
+
+    // The produced desk pins to the conversation, and the out becomes a push.
+    const chip = window.locator('[data-testid="chat-linked-desk"]')
+    await expect(chip).toBeVisible({ timeout: 10_000 })
+    await expect(chip).toContainText('Supper club')
+    await expect(deskButton).toContainText('Push to desk')
+
+    // The link is durable: leave, come back through history, chip is still there.
+    await window.locator('[data-testid="conversation-new"]').click()
+    await expect(window.locator('[data-testid="chat-linked-desk"]')).toHaveCount(0)
+    await window.locator('[data-testid="conversation-row"]').first().click()
+    await expect(window.locator('[data-testid="chat-linked-desk"]')).toContainText('Supper club', {
+      timeout: 10_000
+    })
+  })
+
   // ── Phase 2: consolidation + the Plexii name ─────────────────────────────
 
   test('cmd-shift-K toggles the hub and the header Build button is gone', async () => {

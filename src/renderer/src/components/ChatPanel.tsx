@@ -24,6 +24,10 @@ import ModelPickerChip from './assistant/ModelPickerChip'
 import { ASSISTANT_CAPABILITIES } from '../lib/assistantCapabilities'
 import { useBodyDouble } from '../lib/bodyDouble'
 import { useAssistantChrome, type AssistantMode } from '../stores/assistantChrome'
+import {
+  PUSH_TO_DESK_MESSAGE,
+  TURN_INTO_DESK_MESSAGE
+} from '../lib/conversationDesks'
 import Icon from './Icon'
 
 // The three display modes, in Notion's order and with Notion's labels. The
@@ -51,6 +55,7 @@ interface Props {
 
 export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
+  const nodes = useNodeStore((s) => s.nodes)
   const send = useChatStore((s) => s.send)
   const sending = useChatStore((s) => s.sending)
   const hasApiKey = useChatStore((s) => s.hasApiKey)
@@ -108,19 +113,48 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   // A conversation carries the context it STARTED in; only a brand-new one
   // takes its framing from the screen you are on right now. So an old chat
   // still says what it was about, and never relabels itself as you walk around.
-  const startedIn = useMemo(
-    () => conversations.find((c) => c.id === activeConversationId)?.context ?? null,
+  const activeMeta = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId) ?? null,
     [conversations, activeConversationId]
   )
+  const startedIn = activeMeta?.context ?? null
+  // The desks this conversation produced (Plexii P5) — element 0 is the
+  // primary: the pinned chip and the default push target.
+  const linkedDesks = useMemo(() => activeMeta?.linkedDesks ?? [], [activeMeta])
+  const primaryDeskId = linkedDesks[0] ?? null
+  const linkConversationDesk = useChatStore((s) => s.linkDesk)
   const thread = {
     key: conversationKey,
     label: startedIn?.label ?? ctx.label,
     title: startedIn?.title ?? ctx.title,
     icon: startedIn?.icon ?? ctx.icon,
-    // The desk handed to the server for task-scoped context is always the one
-    // you are on NOW — that is live context, not a property of the conversation.
-    serverTaskId: ctx.serverTaskId
+    // The desk handed to the server for task-scoped context: the one you are
+    // on NOW when there is one; otherwise the conversation's primary linked
+    // desk (Plexii P5), so a hub chat with a desk works IN that desk — pushes
+    // land there and the model can see its canvas.
+    serverTaskId: ctx.serverTaskId ?? primaryDeskId
   }
+  // Where an approved card lands: the desk on screen when there is one,
+  // otherwise the conversation's primary linked desk — so a hub push builds on
+  // the conversation's own desk instead of failing for want of a canvas.
+  const applyTaskId = activeTaskId ?? primaryDeskId
+  // The primary desk's live node, for the pinned chip. A deleted desk renders
+  // the honest stale state instead of a link that goes nowhere.
+  const primaryDeskNode = primaryDeskId ? nodes.find((n) => n.id === primaryDeskId) ?? null : null
+  const [deskMenuOpen, setDeskMenuOpen] = useState(false)
+  const deskMenuRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!deskMenuOpen) return
+    function onPointerDown(e: PointerEvent): void {
+      if (!deskMenuRef.current?.contains(e.target as Node)) setDeskMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [deskMenuOpen])
+  const openLinkedDesk = useCallback((taskId: string): void => {
+    useNodeStore.getState().setActive(taskId)
+    useViewStore.getState().goTask(taskId)
+  }, [])
   const activeRefs = useMemo(() => activeMentions(mentions, thread.key), [mentions, thread.key])
   const messages = useMemo(
     () => messagesByTask[thread.key] ?? EMPTY_MESSAGES,
@@ -510,6 +544,42 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             {thread.title ? `${thread.title} · ` : ''}
             {thread.label}
           </p>
+          {/* The conversation's desk, pinned where the conversation lives
+              (Plexii P5). Clicking goes to it; a deleted desk says so instead
+              of linking nowhere. */}
+          {primaryDeskId && (
+            <div className="mt-1 flex items-center gap-1">
+              <button
+                type="button"
+                data-testid="chat-linked-desk"
+                disabled={!primaryDeskNode}
+                onClick={() => primaryDeskNode && openLinkedDesk(primaryDeskId)}
+                title={
+                  primaryDeskNode
+                    ? `Open the linked desk — ${primaryDeskNode.title}`
+                    : 'The linked desk was deleted'
+                }
+                className={`fb-press inline-flex max-w-full items-center gap-1 rounded-[8px] px-1.5 py-0.5 fb-t-caption transition-colors ${
+                  primaryDeskNode
+                    ? 'bg-accent/10 text-[rgb(var(--accent))] hover:bg-accent/20'
+                    : 'bg-[var(--surface-sunken)] text-[var(--ink-40)] cursor-default'
+                }`}
+              >
+                <Icon name="desk" size={11} className="shrink-0" />
+                <span className="truncate">
+                  {primaryDeskNode ? primaryDeskNode.title : 'Desk removed'}
+                </span>
+              </button>
+              {linkedDesks.length > 1 && (
+                <span
+                  className="fb-t-caption text-[var(--ink-50)]"
+                  title={`${linkedDesks.length - 1} more linked desk${linkedDesks.length > 2 ? 's' : ''}`}
+                >
+                  +{linkedDesks.length - 1}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -796,7 +866,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                 <ChatBlockView
                   key={bi}
                   block={block}
-                  activeTaskId={activeTaskId}
+                  activeTaskId={applyTaskId}
                   appliedProposals={appliedForMsg}
                   onApplied={(id, applied) => markProposalApplied(m.ts, id, applied)}
                   onConsumeProposal={(id) => consumeProposal(m.ts, id)}
@@ -939,6 +1009,82 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           <div className="flex items-center gap-1.5">
             {/* Real model picker (P7) — shared with the focus AI Chat. */}
             <ModelPickerChip />
+            {/* The persistent out (Plexii P5): any conversation with substance
+                can become a desk, and a conversation that has one can push
+                what's new to it. Both ride the normal proposal pipeline — the
+                model proposes, the user approves, nothing lands silently. */}
+            {messages.length > 0 && (
+              <div className="relative flex items-center" ref={deskMenuRef}>
+                <button
+                  type="button"
+                  data-testid="chat-turn-into-desk"
+                  disabled={sending}
+                  onClick={() => {
+                    if (useChatStore.getState().sending) return
+                    void send(
+                      thread.serverTaskId,
+                      primaryDeskId ? PUSH_TO_DESK_MESSAGE : TURN_INTO_DESK_MESSAGE,
+                      thread.key
+                    )
+                  }}
+                  title={
+                    primaryDeskId
+                      ? 'Push to desk — Plexii proposes what is new from this conversation as cards you approve'
+                      : 'Turn into desk — Plexii proposes the desk and its widgets as cards you approve'
+                  }
+                  className="fb-press inline-flex items-center gap-1 h-[26px] px-2 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] fb-t-caption font-medium text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.45)] transition-colors disabled:opacity-50"
+                >
+                  <Icon name="desk" size={12} className="shrink-0" />
+                  {primaryDeskId ? 'Push to desk' : 'Turn into desk'}
+                </button>
+                {linkedDesks.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="chat-desk-switcher"
+                      onClick={() => setDeskMenuOpen((v) => !v)}
+                      title="Choose which linked desk pushes target"
+                      aria-expanded={deskMenuOpen}
+                      className="icon-btn !h-[26px] !w-5 -ml-0.5"
+                    >
+                      <Icon name="expand_more" size={13} />
+                    </button>
+                    {deskMenuOpen && (
+                      <div
+                        data-testid="chat-desk-menu"
+                        className="fb-pop-in absolute bottom-full left-0 mb-1.5 z-30 min-w-[190px] rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+                        style={{ boxShadow: 'var(--shadow-cast)' }}
+                      >
+                        {linkedDesks.map((id) => {
+                          const node = nodes.find((n) => n.id === id) ?? null
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => {
+                                if (activeConversationId) {
+                                  void linkConversationDesk(activeConversationId, id, true)
+                                }
+                                setDeskMenuOpen(false)
+                              }}
+                              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
+                            >
+                              <Icon name="desk" size={13} className="text-[var(--ink-60)] shrink-0" />
+                              <span className="flex-1 min-w-0 truncate text-left">
+                                {node ? node.title : 'Deleted desk'}
+                              </span>
+                              {id === primaryDeskId && (
+                                <Icon name="check" size={13} className="text-accent shrink-0" />
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             <span className="flex-1" />
             <button
               type="submit"

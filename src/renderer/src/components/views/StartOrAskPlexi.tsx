@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Icon from '../Icon'
 import { useViewStore } from '../../stores/view'
+import { useNodeStore } from '../../stores/nodes'
 import { useChatStore, NEW_CHAT_KEY } from '../../stores/chat'
 
 // The top-of-Home input is a DOOR into the Plexii hub (Caleb's consolidation
@@ -26,6 +27,9 @@ export default function StartOrAskPlexi(): JSX.Element {
     chat.newConversation()
     chat.setPendingContext({ kind: 'workspace', label: 'your workspace', title: '', icon: 'auto_awesome' })
     void chat.send(null, prompt, NEW_CHAT_KEY)
+    // Being on the hub means being on no desk — clear the active task so a
+    // lingering desk can never claim this conversation's applies.
+    useNodeStore.getState().setActive(null)
     useViewStore.getState().goPlexii()
     setGoal('')
   }

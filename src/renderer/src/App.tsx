@@ -404,8 +404,14 @@ export default function App(): JSX.Element {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         const v = useViewStore.getState()
-        if (v.view.kind === 'plexii') v.back()
-        else v.goPlexii()
+        if (v.view.kind === 'plexii') {
+          v.back()
+        } else {
+          // Being on the hub means being on no desk (Plexii P5) — the same
+          // setActive(null) every other hub door performs.
+          useNodeStore.getState().setActive(null)
+          v.goPlexii()
+        }
       }
     }
     window.addEventListener('keydown', onKey)

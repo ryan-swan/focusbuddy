@@ -72,6 +72,48 @@ test('plexii hub visual shots', async () => {
   await window.waitForTimeout(400)
   await window.screenshot({ path: `${OUT}/p4-blocks.png` })
 
+  // Linked desk (P5): the seed needs a REAL persisted conversation (linking is
+  // keyed by conversation id), so reopen the hero-made one from the rail first.
+  await window.locator('[data-testid="conversation-row"]').first().click()
+  await window.waitForTimeout(600)
+  await window.evaluate(() => {
+    const w = window as unknown as {
+      __fbChat?: {
+        getState: () => {
+          activeConversationId: string | null
+          messagesByTask: Record<string, unknown[]>
+        }
+        setState: (s: Record<string, unknown>) => void
+      }
+    }
+    const st = w.__fbChat?.getState()
+    const convId = st?.activeConversationId
+    if (!convId) throw new Error('expected a persisted conversation for the P5 shot')
+    const ts = Date.now()
+    w.__fbChat?.setState({
+      messagesByTask: {
+        ...st.messagesByTask,
+        [convId]: [
+          { role: 'user', content: 'Turn this into a workspace', ts: ts - 1 },
+          { role: 'assistant', content: 'Here is the desk this becomes:', ts }
+        ]
+      },
+      proposalsByMessage: {
+        [String(ts)]: [
+          { id: 'mk-desk', kind: 'create-task', title: 'Supper club', reason: 'the workspace' }
+        ]
+      },
+      blocksByMessage: {}
+    })
+  })
+  await window.waitForTimeout(300)
+  const card = window.locator('[data-testid="proposal-card-mk-desk"]')
+  if (await card.isVisible().catch(() => false)) {
+    await card.click()
+    await window.waitForTimeout(900)
+  }
+  await window.screenshot({ path: `${OUT}/p5-linked-desk.png` })
+
   // Back home: sidebar sublist with the recent conversation.
   await window.evaluate(() => {
     const w = window as unknown as { __fbView?: { getState: () => { goHome: () => void } } }
