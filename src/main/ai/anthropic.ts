@@ -20,6 +20,7 @@ import { markdownToTiptap } from './markdownToTiptap'
 import { widgetToText } from '@shared/widgetText'
 import { mainWidgetResolvers } from './widgetSummary'
 import { retrieveSources } from '../workspaceSearch'
+import { searchWeb } from '../webSearch'
 import { relatedScopeIds } from '../db/nodeRelations'
 import { extractJson, salvageEnvelope } from './chatJson'
 import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
@@ -1038,23 +1039,54 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
       // scoped and the wording below never claims they were.
       const related = relatedScopeIds(req.taskId)
       const scope = mentionDeskIds.length > 0 ? mentionDeskIds : related
-      const rawSources = await retrieveSources(lastUser, undefined, scope.length ? scope : undefined)
+      // Workspace retrieval and web search run in PARALLEL (F4, commissioned):
+      // the web pass is keyless, best-effort, and skipped for short follow-ups
+      // (see WEB_SEARCH_MIN_QUERY). Web results continue the same [n] space so
+      // one numbering rules every citation, internal or web.
+      const [rawSources, webResults] = await Promise.all([
+        retrieveSources(lastUser, undefined, scope.length ? scope : undefined),
+        searchWeb(lastUser, 5).catch(() => [])
+      ])
       // Drop anything the user already put in front of the model by name.
       const sources = rawSources.filter((s) => !admittedIds.has(s.docId))
-      if (sources.length > 0) {
+      if (sources.length > 0 || webResults.length > 0) {
         const scopeNote =
           mentionDeskIds.length > 0
             ? 'the desks you referenced (documents and PlexiBrain entries are searched across your whole workspace)'
             : related.length > 0
               ? 'this desk and the desks you have related to it'
               : 'your workspace'
-        citedSources = sources.map((s, i) => ({
-          n: i + 1,
-          docId: s.docId,
-          title: s.title,
-          docType: s.docType,
-          snippet: s.snippet
-        }))
+        // One numbering: workspace sources first, then web results carry on.
+        citedSources = [
+          ...sources.map((s, i) => ({
+            n: i + 1,
+            docId: s.docId,
+            title: s.title,
+            docType: s.docType,
+            snippet: s.snippet
+          })),
+          ...webResults.map((w, i) => ({
+            n: sources.length + i + 1,
+            // The URL is the id — it is what a web source IS, and the renderer
+            // derives the domain slot and the open action from it.
+            docId: w.url,
+            title: w.title,
+            docType: 'web',
+            snippet: w.snippet.slice(0, 200)
+          }))
+        ]
+        const webBlock =
+          webResults.length > 0
+            ? '\nWeb results (live search, cite like any numbered source; mention the site when it matters):\n' +
+              webResults
+                .map((w, i) =>
+                  retrievalSourceLine(
+                    { docType: 'web', title: `${w.title} — ${w.domain}`, text: `${w.snippet} (${w.url})` },
+                    sources.length + i
+                  )
+                )
+                .join('\n')
+            : ''
         retrieval =
           '\n\n--- RETRIEVED MATERIAL (reference only) ---\n' +
           `Relevant material retrieved from ${scopeNote} for this question. ` +
@@ -1068,6 +1100,7 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
           // reaches the prompt (M1: the old inline 600-char cut threw away 90%
           // of every retrieved passage, invisibly to every spec).
           sources.map((s, i) => retrievalSourceLine(s, i)).join('\n') +
+          webBlock +
           '\n--- END RETRIEVED MATERIAL ---'
       }
     }

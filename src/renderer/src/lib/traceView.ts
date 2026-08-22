@@ -169,18 +169,30 @@ function mentionLine(trace: AssistantTrace): TraceLine | null {
   }
 }
 
+// Web results ride the same sources array (they share the [n] citation
+// space) but present as their OWN phase line — "Searched the web" is a
+// different act from searching the workspace, and the trace never merges
+// two acts into one claim (F4).
+function workspaceSources(trace: AssistantTrace): ChatSource[] {
+  return trace.sources.filter((s) => s.docType !== 'web')
+}
+function webSources(trace: AssistantTrace): ChatSource[] {
+  return trace.sources.filter((s) => s.docType === 'web')
+}
+
 function retrieveLabel(trace: AssistantTrace): string {
   const ms = trace.retrievalMs
   const timing = typeof ms === 'number' ? ` · ${ms}ms` : ''
-  if (trace.sources.length === 0) return `Searched your workspace · nothing relevant${timing}`
-  return `Searched your workspace · ${plural(trace.sources.length, 'source')}${timing}`
+  const ws = workspaceSources(trace)
+  if (ws.length === 0) return `Searched your workspace · nothing relevant${timing}`
+  return `Searched your workspace · ${plural(ws.length, 'source')}${timing}`
 }
 
-function sourceLeaves(trace: AssistantTrace, revealedCount: number): TraceLeaf[] {
-  return trace.sources.slice(0, Math.max(0, revealedCount)).map((s) => ({
+function sourceLeaves(sources: ChatSource[], shown: number): TraceLeaf[] {
+  return sources.slice(0, Math.max(0, shown)).map((s) => ({
     key: `${s.n}-${s.docId}`,
     label: s.title,
-    icon: s.docType === 'knowledge' ? 'menu_book' : 'description',
+    icon: s.docType === 'web' ? 'hub' : s.docType === 'knowledge' ? 'menu_book' : 'description',
     n: s.n,
     source: s
   }))
@@ -226,12 +238,22 @@ export function getTraceView(trace: AssistantTrace, revealedCount: number): Trac
   if (trace.retrievedAt === null) {
     return stop({ key: 'retrieve', label: 'Searching your workspace…', icon: 'search' })
   }
+  const ws = workspaceSources(trace)
+  const web = webSources(trace)
   completed.push({
     key: 'retrieve',
     label: retrieveLabel(trace),
     icon: 'search',
-    leaves: sourceLeaves(trace, revealedCount)
+    leaves: sourceLeaves(ws, Math.min(revealedCount, ws.length))
   })
+  if (web.length > 0) {
+    completed.push({
+      key: 'web',
+      label: `Searched the web · ${plural(web.length, 'result')}`,
+      icon: 'hub',
+      leaves: sourceLeaves(web, revealedCount - ws.length)
+    })
+  }
 
   // 2 — reading what came back, one source at a time.
   if (revealedCount < trace.sources.length) {

@@ -43,6 +43,32 @@ interface Props {
   onOpenSource?: (source: ChatSource) => void
 }
 
+// A web result's favicon, with an honest fallback: if the favicon service
+// has nothing (or the machine is offline), show the neutral connect mark
+// rather than a broken image.
+function WebFavicon({ domain }: { domain: string }): React.JSX.Element {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <Icon name="hub" size={12} className="shrink-0 text-[var(--ink-50)]" />
+  return (
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`}
+      width={12}
+      height={12}
+      className="shrink-0 rounded-[3px]"
+      onError={() => setFailed(true)}
+      alt=""
+    />
+  )
+}
+
+function domainOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
 // Total wall time of a finished trace, as a quiet suffix for the summary
 // line: "2 sources · 3.2s". Sub-second traces stay silent — a duration that
 // reads 0.3s is noise dressed as information.
@@ -191,7 +217,9 @@ export default function RetrievalTrace({
             // names its domain. Scrolls past six rows rather than growing.
             <ul className="ml-[18px] mt-0.5 rounded-[var(--radius-row)] bg-[var(--surface-sunken)]/60 px-1.5 py-1 max-h-44 overflow-y-auto flex flex-col gap-px">
               {line.leaves.map((leaf) => {
-                const identity = leaf.source ? sourceIdentity(leaf.source.docType) : null
+                const isWeb = leaf.source?.docType === 'web'
+                const domain = isWeb && leaf.source ? domainOf(leaf.source.docId) : null
+                const identity = !isWeb && leaf.source ? sourceIdentity(leaf.source.docType) : null
                 const body = (
                   <>
                     {leaf.n !== undefined && (
@@ -199,15 +227,19 @@ export default function RetrievalTrace({
                         {leaf.n}
                       </span>
                     )}
-                    <Icon
-                      name={identity?.icon ?? leaf.icon}
-                      size={12}
-                      className={`shrink-0 ${identity ? identity.tone : 'opacity-70'}`}
-                    />
+                    {isWeb && domain ? (
+                      <WebFavicon domain={domain} />
+                    ) : (
+                      <Icon
+                        name={identity?.icon ?? leaf.icon}
+                        size={12}
+                        className={`shrink-0 ${identity ? identity.tone : 'opacity-70'}`}
+                      />
+                    )}
                     <span className="truncate text-[var(--ink-80)]">{leaf.label}</span>
-                    {identity && (
+                    {(identity || domain) && (
                       <span className="ml-auto pl-3 shrink-0 fb-t-caption text-[var(--ink-40)]">
-                        {identity.location}
+                        {domain ?? identity?.location}
                       </span>
                     )}
                   </>

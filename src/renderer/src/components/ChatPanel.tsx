@@ -479,6 +479,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       case 'knowledge':
         view.goKnowledge(target.entryId)
         break
+      case 'url':
+        // A web source (F4): opens in the system browser — the citation's
+        // provenance is the open web, so that is where the click goes.
+        void window.api.files.openExternal(target.url)
+        break
       case 'desk':
         openDesk(target.taskId)
         break

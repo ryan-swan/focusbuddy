@@ -31,6 +31,8 @@ export type SourceTarget =
   | { kind: 'widget'; widgetId: string }
   // A table. Same as a widget — the owning desk needs a lookup.
   | { kind: 'table'; tableId: string }
+  // A live web result (F4) — docId IS the URL; opens in the system browser.
+  | { kind: 'url'; url: string }
   // Nothing we know how to open. Better to render a citation as plain text than
   // to offer a click that goes nowhere.
   | null
@@ -39,6 +41,7 @@ export function targetForSource(source: { docId: string; docType: string }): Sou
   const id = source.docId?.trim()
   if (!id) return null
   const type = source.docType?.trim().toLowerCase() ?? ''
+  if (type === 'web') return /^https?:\/\//i.test(id) ? { kind: 'url', url: id } : null
   if (type === 'knowledge') return { kind: 'knowledge', entryId: id }
   if (type === 'task') return { kind: 'desk', taskId: id }
   if (type === 'table') return { kind: 'table', tableId: id }

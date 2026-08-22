@@ -51,7 +51,15 @@ test('plexii F1: pair rhythm, floating composer, docked question', async () => {
       },
       traceByMessage: {
         [String(ts1)]: trace(ts1, ['PAE — Scoring Integrity', 'ResilientIQ — README', 'Feature Testing Tracker']),
-        [String(ts2)]: trace(ts2, ['AI-Routed Messenger — build-spec', 'The Build — Plexi Brain — index', 'PlexiDesk reconciliation'])
+        [String(ts2)]: {
+          ...trace(ts2, ['AI-Routed Messenger — build-spec', 'The Build — Plexi Brain — index']),
+          sources: [
+            { n: 1, docId: 'k1', title: 'AI-Routed Messenger — build-spec', docType: 'knowledge', snippet: '…' },
+            { n: 2, docId: 'doc1', title: 'The Build — Plexi Brain — index', docType: 'doc', snippet: '…' },
+            { n: 3, docId: 'https://www.apollo.io/sdr-guide', title: 'What Is an SDR in Sales? Role, Responsibilities, Metrics', docType: 'web', snippet: 'An SDR handles outbound prospecting.' },
+            { n: 4, docId: 'https://martal.ca/sdr-2026', title: 'Sales Development Representative: Role, Skills & 2026 Guide', docType: 'web', snippet: 'Skills and metrics for the modern SDR.' }
+          ]
+        }
       },
       traceDisclosureByMessage: { [String(ts1)]: 'closed', [String(ts2)]: 'closed' },
       questionByMessage: {
@@ -85,6 +93,15 @@ test('plexii F1: pair rhythm, floating composer, docked question', async () => {
   await window.waitForTimeout(400)
   await expect(window.locator('[data-testid="trace-leaf"]').first()).toBeVisible()
   await window.screenshot({ path: `${OUT}/f2-trace-open.png` })
+
+  // F4: the second trace carries web results — its own "Searched the web"
+  // phase with favicon + domain rows sharing the [n] space.
+  await window.locator('[data-testid="trace-collapsed"]').first().click()
+  await window.waitForTimeout(400)
+  const webLine = window.locator('[data-trace-line="web"]')
+  await expect(webLine).toBeVisible()
+  await expect(webLine.getByText('apollo.io')).toBeVisible()
+  await window.screenshot({ path: `${OUT}/f4-web-trace.png` })
 
   await launched.dispose()
 })
