@@ -42,6 +42,16 @@ interface Props {
   onOpenSource?: (source: ChatSource) => void
 }
 
+// Total wall time of a finished trace, as a quiet suffix for the summary
+// line: "2 sources · 3.2s". Sub-second traces stay silent — a duration that
+// reads 0.3s is noise dressed as information.
+function traceDuration(trace: AssistantTrace): string | null {
+  if (trace.completedAt === null) return null
+  const s = (trace.completedAt - trace.startedAt) / 1000
+  if (s < 1) return null
+  return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
+}
+
 export default function RetrievalTrace({
   trace,
   disclosure,
@@ -49,6 +59,16 @@ export default function RetrievalTrace({
   onOpenSource
 }: Props): JSX.Element | null {
   const sourceCount = trace.sources.length
+  // Live elapsed seconds while the work runs (P6): the machine narrates AND
+  // keeps time, in tabular numerals so the line never jitters. Appears only
+  // after 2s — fast answers never flash a stopwatch.
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    if (trace.status !== 'running') return
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [trace.status])
+  const liveElapsedS = Math.floor((nowTick - trace.startedAt) / 1000)
   // A finished trace starts fully revealed. The staggered reveal exists to show
   // work happening; replaying it for a request that completed minutes ago is a
   // re-enactment, not progress — and it fired again every time the panel
@@ -114,7 +134,12 @@ export default function RetrievalTrace({
         title="Show what the assistant did"
       >
         <Icon name="chevron_right" size={12} />
-        <span>{traceSummary(trace)}</span>
+        <span>
+          {traceSummary(trace)}
+          {traceDuration(trace) && (
+            <span className="fb-tabular"> · {traceDuration(trace)}</span>
+          )}
+        </span>
       </button>
     )
   }
@@ -142,7 +167,12 @@ export default function RetrievalTrace({
           title="Hide what the assistant did"
         >
           <Icon name="expand_more" size={12} />
-          <span>{traceSummary(trace)}</span>
+          <span>
+            {traceSummary(trace)}
+            {traceDuration(trace) && (
+              <span className="fb-tabular"> · {traceDuration(trace)}</span>
+            )}
+          </span>
         </button>
       )}
       {completed.map((line) => (
@@ -207,6 +237,9 @@ export default function RetrievalTrace({
             </span>
             <Icon name={active.icon} size={11} className="shrink-0 text-[var(--ink-50)]" />
             <span className="fb-status-shimmer">{active.label}</span>
+            {trace.status === 'running' && liveElapsedS >= 2 && (
+              <span className="fb-tabular text-[var(--ink-40)]">{liveElapsedS}s</span>
+            )}
           </div>
         )}
         {error && (

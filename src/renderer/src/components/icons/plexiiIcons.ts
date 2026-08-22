@@ -1,4 +1,4 @@
-// Plexii iconography — original brand icon set (45 marks).
+// Plexii iconography — original brand icon set (50 marks).
 // Source of truth: professional-brain/02-work/plexidesk/brand/01-knowledge/brand-assets/icons/
 // (one SVG per icon; this file mirrors their inner markup verbatim).
 // Drawn on a 24px grid, 1.75 stroke, round caps/joins, fill none, currentColor.
@@ -97,6 +97,16 @@ export const PLEXII_ICONS: Record<string, string> = {
     '<rect x="9.4" y="3.75" width="5.2" height="9.5" rx="2.6"/><path d="M6.25 11.25a5.75 5.75 0 0 0 11.5 0"/><path d="M12 17v3.25"/>',
   'discover':
     '<circle cx="12" cy="12" r="7.75"/><path d="m14.9 9.1-1.75 4.05L9.1 14.9l1.75-4.05L14.9 9.1Z"/>',
+  'write':
+    '<path d="m5.25 15.4 7.9-7.9a2 2 0 0 1 2.85 2.85l-7.9 7.9-3.7.85.85-3.7Z"/><path d="M13.75 20.5h5.75"/>',
+  'check':
+    '<path d="m5.5 12.6 4.3 4.3 8.7-9.4"/>',
+  'done':
+    '<circle cx="12" cy="12" r="7.75"/><path d="m8.7 12.3 2.3 2.3 4.3-4.8"/>',
+  'chevron-right':
+    '<path d="m9.5 6.5 5.5 5.5-5.5 5.5"/>',
+  'chevron-down':
+    '<path d="m6.5 9.75 5.5 5.5 5.5-5.5"/>',
 }
 
 // Material Symbols names that are unambiguous across the app map straight
@@ -148,4 +158,9 @@ export const PLEXII_BY_MATERIAL: Record<string, string> = {
   auto_awesome: 'ai',
   auto_awesome_motion: 'ai',
   mic: 'mic',
+  edit_note: 'write',
+  check: 'check',
+  check_circle: 'done',
+  chevron_right: 'chevron-right',
+  expand_more: 'chevron-down',
 }
