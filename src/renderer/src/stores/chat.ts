@@ -330,7 +330,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     })
   },
   openConversation: async (id) => {
-    const conv = await window.api.aiChat.getConversation(id).catch(() => null)
+    const conv = await window.api.aiChat.getConversation(id).catch((e: unknown) => {
+      // Surface the failure — a silent return here looks like a dead click
+      // and cost a debugging session to trace (a stale main process serving
+      // an old payload shape). The rail row exists, so say why it won't open.
+      console.warn('[assistant] getConversation failed for', id, e)
+      return null
+    })
     if (!conv) return
     const messages: ChatMessage[] = conv.messages.map((m) => ({
       role: m.role,
@@ -348,18 +354,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     for (const m of conv.messages) {
       const k = String(m.ts)
       messageIdByTs[k] = m.id
-      if (m.proposals.length) proposalsByMessage[k] = m.proposals
-      for (const [proposalId, applied] of Object.entries(m.applied)) {
+      // Every optional field is read defensively: a version-skewed backend (a
+      // stale dev main, an older packaged app) may omit fields this renderer
+      // is newer than, and one missing array must not throw away the whole
+      // conversation open.
+      if (m.proposals?.length) proposalsByMessage[k] = m.proposals
+      for (const [proposalId, applied] of Object.entries(m.applied ?? {})) {
         appliedProposals[appliedKey(m.ts, proposalId)] = applied
       }
-      if (m.sources.length) sourcesByMessage[k] = m.sources
-      if (m.blocks.length) blocksByMessage[k] = m.blocks
+      if (m.sources?.length) sourcesByMessage[k] = m.sources
+      if (m.blocks?.length) blocksByMessage[k] = m.blocks
       if (m.question) questionByMessage[k] = m.question
-      const restored = fromStoredTrace(m.trace)
+      const restored = fromStoredTrace(m.trace ?? null)
       if (restored) traceByMessage[k] = restored
       // The references a user turn was sent with, rehydrated onto this
       // conversation so its inline chips redraw where they were typed.
-      if (m.mentions.length) {
+      if (m.mentions?.length) {
         mentionsByMessage[k] = m.mentions.map((r) => ({
           ...r,
           icon: 'attachment',
