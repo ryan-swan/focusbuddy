@@ -3,6 +3,7 @@ import type { ChatSource } from '@shared/types'
 import Icon from '../Icon'
 import PlexiiThinking from './PlexiiThinking'
 import { isOpenable } from '../../lib/sourceTarget'
+import { sourceIdentity } from '../../lib/sourceIdentity'
 import {
   getTraceView,
   hasTraceContent,
@@ -183,8 +184,14 @@ export default function RetrievalTrace({
             <span className="truncate">{line.label}</span>
           </div>
           {line.leaves && line.leaves.length > 0 && (
-            <ul className="ml-[18px] pl-3 border-l border-dashed border-[var(--edge-soft)] flex flex-col gap-0.5">
+            // The evidence panel (F2): found sources present as a grouped
+            // result block, Claude-research style — each row wears its kind's
+            // icon in the kind's sidebar colour, with a right-aligned
+            // provenance slot naming where it lives, the way a web result
+            // names its domain. Scrolls past six rows rather than growing.
+            <ul className="ml-[18px] mt-0.5 rounded-[var(--radius-row)] bg-[var(--surface-sunken)]/60 px-1.5 py-1 max-h-44 overflow-y-auto flex flex-col gap-px">
               {line.leaves.map((leaf) => {
+                const identity = leaf.source ? sourceIdentity(leaf.source.docType) : null
                 const body = (
                   <>
                     {leaf.n !== undefined && (
@@ -192,11 +199,21 @@ export default function RetrievalTrace({
                         {leaf.n}
                       </span>
                     )}
-                    <Icon name={leaf.icon} size={11} className="shrink-0 opacity-70" />
-                    <span className="truncate">{leaf.label}</span>
+                    <Icon
+                      name={identity?.icon ?? leaf.icon}
+                      size={12}
+                      className={`shrink-0 ${identity ? identity.tone : 'opacity-70'}`}
+                    />
+                    <span className="truncate text-[var(--ink-80)]">{leaf.label}</span>
+                    {identity && (
+                      <span className="ml-auto pl-3 shrink-0 fb-t-caption text-[var(--ink-40)]">
+                        {identity.location}
+                      </span>
+                    )}
                   </>
                 )
-                const rowClass = 'flex items-center gap-1.5 text-[var(--ink-50)] w-full text-left'
+                const rowClass =
+                  'flex items-center gap-1.5 w-full text-left rounded-[var(--radius-chip)] px-1.5 py-1'
                 const openable = leaf.source && onOpenSource && isOpenable(leaf.source)
                 return (
                   <li key={leaf.key} data-testid="trace-leaf" className="fb-trace-in">
@@ -206,7 +223,7 @@ export default function RetrievalTrace({
                         data-testid="trace-leaf-link"
                         title={`Open ${leaf.label}${leaf.source?.snippet ? ` — ${leaf.source.snippet}` : ''}`}
                         onClick={() => leaf.source && onOpenSource?.(leaf.source)}
-                        className={`${rowClass} rounded hover:text-[var(--ink-100)] transition-colors`}
+                        className={`${rowClass} hover:bg-[var(--surface-raised)] transition-colors`}
                       >
                         {body}
                       </button>

@@ -79,5 +79,12 @@ test('plexii F1: pair rhythm, floating composer, docked question', async () => {
   expect(borders).toContain('borderTop=0px')
   await window.screenshot({ path: `${OUT}/f1-rhythm-dark.png` })
 
+  // F2: expand a trace — the evidence panel with kind-coloured icons and
+  // provenance slots.
+  await window.locator('[data-testid="trace-collapsed"]').first().click()
+  await window.waitForTimeout(400)
+  await expect(window.locator('[data-testid="trace-leaf"]').first()).toBeVisible()
+  await window.screenshot({ path: `${OUT}/f2-trace-open.png` })
+
   await launched.dispose()
 })
