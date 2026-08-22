@@ -1265,6 +1265,14 @@ export function registerIpcHandlers(): void {
   // per-request channel `chat:stream:<reqId>` so the assistant can show the work
   // as it happens. Caller mints the reqId. `chat:send` above is untouched and
   // stays the fallback for every other caller.
+  // Live model streams by requestId, so the composer's Stop button can abort
+  // the one it started. Entries live exactly as long as their stream.
+  const liveChatAborts = new Map<string, () => void>()
+  ipcMain.handle('chat:cancelStream', (_e, requestId: string): { ok: boolean } => {
+    const abort = liveChatAborts.get(requestId)
+    if (abort) abort()
+    return { ok: Boolean(abort) }
+  })
   ipcMain.handle(
     'chat:sendStream',
     async (e, input: ChatRequest & { requestId: string }): Promise<{ ok: boolean }> => {
@@ -1282,17 +1290,25 @@ export function registerIpcHandlers(): void {
       // through, so the two paths disagreed. Spreading also means the next
       // field added to ChatRequest cannot go missing here again.
       const { requestId: _requestId, ...chatReq } = input
-      await sendChatStream(chatReq, {
-        onMentions: (m) => send('mentions', m),
-        onSources: (t) => send('sources', t),
-        onReply: (text) => send('reply', text),
-        onReplyDelta: (text) => send('reply-delta', text),
-        onActivity: (a) => send('activity', a),
-        onTool: (tool) => send('tool', tool),
-        onQuestion: (q) => send('question', q),
-        onError: (err) => send('error', err),
-        onComplete: (resp) => send('complete', resp)
-      })
+      try {
+        await sendChatStream(
+          chatReq,
+          {
+            onMentions: (m) => send('mentions', m),
+            onSources: (t) => send('sources', t),
+            onReply: (text) => send('reply', text),
+            onReplyDelta: (text) => send('reply-delta', text),
+            onActivity: (a) => send('activity', a),
+            onTool: (tool) => send('tool', tool),
+            onQuestion: (q) => send('question', q),
+            onError: (err) => send('error', err),
+            onComplete: (resp) => send('complete', resp)
+          },
+          { onAbortReady: (abort) => liveChatAborts.set(input.requestId, abort) }
+        )
+      } finally {
+        liveChatAborts.delete(input.requestId)
+      }
       return { ok: true }
     }
   )

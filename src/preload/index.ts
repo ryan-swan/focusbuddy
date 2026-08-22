@@ -389,6 +389,11 @@ const api = {
   chat: {
     send: (req: ChatRequest): Promise<ChatResponse> => ipcRenderer.invoke('chat:send', req),
     hasApiKey: (): Promise<boolean> => ipcRenderer.invoke('chat:hasApiKey'),
+    // Abort the live model stream behind a requestId (the composer's Stop).
+    // The stream finishes through its normal path with everything that
+    // already arrived — Stop keeps the partial answer, it never discards it.
+    cancelStream: (requestId: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('chat:cancelStream', requestId),
     proactiveWelcome: (taskId: string): Promise<ChatResponse> =>
       ipcRenderer.invoke('chat:proactiveWelcome', taskId),
     // Streaming variant — the caller mints a requestId and listens on the

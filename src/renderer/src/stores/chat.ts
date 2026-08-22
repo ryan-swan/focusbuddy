@@ -158,6 +158,12 @@ interface ChatStore {
   // The mode in force right now: the active conversation's, or the pending one.
   activeMode: () => AiChatMode
   sending: boolean
+  // The in-flight stream's requestId, so Stop can abort exactly the request
+  // it belongs to. Null whenever nothing is streaming.
+  liveRequestId: string | null
+  // Abort the live stream (the composer's Stop). The turn finishes through
+  // its normal completion path with everything that already arrived.
+  cancelSend: () => void
   hasApiKey: boolean | null
   checkApiKey: () => Promise<void>
   getMessages: (taskId: string | null) => ChatMessage[]
@@ -403,6 +409,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
   sending: false,
+  liveRequestId: null,
+  cancelSend: () => {
+    const id = get().liveRequestId
+    if (id) void window.api.chat.cancelStream(id).catch(() => {})
+  },
   hasApiKey: null,
   checkApiKey: async () => {
     const has = await window.api.chat.hasApiKey()
@@ -656,7 +667,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
       const tsKey = String(ts)
       const live = get().liveTraceByThread[key]
-      const updates: Partial<ChatStore> = { sending: false }
+      const updates: Partial<ChatStore> = { sending: false, liveRequestId: null }
       if (resp.ok && resp.proposals && resp.proposals.length > 0) {
         updates.proposalsByMessage = { ...get().proposalsByMessage, [tsKey]: resp.proposals }
       }
@@ -760,6 +771,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     const requestId = `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    set({ liveRequestId: requestId })
     await new Promise<void>((resolve) => {
       let done = false
       const finish = (): void => {

@@ -20,7 +20,7 @@
 // rules, images, links. A stray paste brings words and chips, never block
 // structure.
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor, JSONContent } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
@@ -50,6 +50,12 @@ export default function MentionComposer({
   onSubmit,
   onReady
 }: Props): JSX.Element {
+  // The Placeholder extension is configured once, at editor creation — a plain
+  // closure over the prop would freeze the mount-time text forever. Reading
+  // through a ref lets the placeholder follow the conversation's mode
+  // (discovery vs chat) without re-creating the editor and losing the draft.
+  const placeholderRef = useRef(placeholder)
+  placeholderRef.current = placeholder
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -66,7 +72,7 @@ export default function MentionComposer({
       }),
       MentionNode,
       MentionSuggestion.configure({ hooks }),
-      Placeholder.configure({ placeholder: () => placeholder })
+      Placeholder.configure({ placeholder: () => placeholderRef.current })
     ],
     editorProps: {
       attributes: {
@@ -98,6 +104,12 @@ export default function MentionComposer({
   useEffect(() => {
     if (editor) editor.setEditable(!disabled)
   }, [editor, disabled])
+
+  // Placeholder text changed (mode switch): dispatch an empty transaction so
+  // the decoration re-reads the ref and repaints the new text.
+  useEffect(() => {
+    if (editor) editor.view.dispatch(editor.state.tr)
+  }, [editor, placeholder])
 
   // The hooks close over live store state; re-configure rather than re-create,
   // so the document (and therefore the draft) is never thrown away.

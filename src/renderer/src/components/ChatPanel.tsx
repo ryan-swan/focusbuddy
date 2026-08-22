@@ -60,6 +60,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const nodes = useNodeStore((s) => s.nodes)
   const send = useChatStore((s) => s.send)
   const sending = useChatStore((s) => s.sending)
+  const cancelSend = useChatStore((s) => s.cancelSend)
   const hasApiKey = useChatStore((s) => s.hasApiKey)
   const checkApiKey = useChatStore((s) => s.checkApiKey)
   const messagesByTask = useChatStore((s) => s.messagesByTask)
@@ -1126,7 +1127,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             The box's opaque surface sits above the glow, so only the rim
             shows. */}
         <div className={sending ? 'fb-ai-edge' : undefined}>
-        <div className="relative rounded-[var(--radius-card)] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+        {/* Glass at last (P5): the composer is floating chrome over the
+            transcript, so it takes the glass tier — the one glass layer on
+            the page, per the two-layer law. Focus keeps the whole-box ring,
+            composed WITH the glass shadows so the top highlight survives. */}
+        <div className="relative fb-glass-panel rounded-[var(--radius-card)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[var(--shadow-cast),var(--shadow-inset-highlight),0_0_0_3px_rgb(var(--accent)/0.13)]">
           {/* What this conversation is working from, restated at the point of
               typing. Either the objects it references (typed with "@" or
               clicked on the canvas — one layer, plan D7/D8) or, when it
@@ -1157,7 +1162,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             )}
           </div>
           <MentionComposer
-            placeholder={ctx.placeholder}
+            placeholder={discovering ? 'Start anywhere — an idea, a question, a hunch…' : ctx.placeholder}
             disabled={sending}
             hooks={mentionHooks}
             onTextChange={setDraft}
@@ -1246,15 +1251,32 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               </div>
             )}
             <span className="flex-1" />
-            <button
-              type="submit"
-              disabled={!draft.trim() || sending}
-              title="Send"
-              aria-label="Send"
-              className="w-[26px] h-[26px] rounded-full grid place-items-center shrink-0 transition-colors bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))] disabled:bg-[var(--surface-sunken)] disabled:text-[var(--ink-40)] disabled:border disabled:border-[var(--edge-soft)]"
-            >
-              <Icon name="arrow_upward" size={14} />
-            </button>
+            {/* Send ⇄ Stop (P5): while Plexii writes, the primary control is
+                stopping it — prominent, same seat, never buried. Stop keeps
+                the partial answer (the abort path completes the turn with
+                what already streamed). The square is drawn, not an icon. */}
+            {sending ? (
+              <button
+                type="button"
+                onClick={cancelSend}
+                title="Stop — keeps what has been written so far"
+                aria-label="Stop generating"
+                data-testid="chat-stop"
+                className="fb-press w-[26px] h-[26px] rounded-full grid place-items-center shrink-0 transition-colors bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))]"
+              >
+                <span className="w-[9px] h-[9px] rounded-[2px] bg-current" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!draft.trim()}
+                title="Send"
+                aria-label="Send"
+                className="fb-press w-[26px] h-[26px] rounded-full grid place-items-center shrink-0 transition-colors bg-[rgb(var(--accent))] text-white hover:bg-[rgb(var(--accent-hover))] disabled:bg-[var(--surface-sunken)] disabled:text-[var(--ink-40)] disabled:border disabled:border-[var(--edge-soft)]"
+              >
+                <Icon name="arrow_upward" size={14} />
+              </button>
+            )}
           </div>
         </div>
         {/* Discovery supplies its own invitation ("start anywhere"), so the

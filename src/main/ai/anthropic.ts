@@ -1264,7 +1264,10 @@ export interface ChatStreamCallbacks {
 
 export async function sendChatStream(
   req: ChatRequest,
-  cb: ChatStreamCallbacks
+  cb: ChatStreamCallbacks,
+  // Hands the caller a way to abort the live model stream (the composer's
+  // Stop button). Optional so every existing caller is untouched.
+  opts?: { onAbortReady?: (abort: () => void) => void }
 ): Promise<void> {
   let c: Anthropic | null
   try {
@@ -1311,6 +1314,7 @@ export async function sendChatStream(
       system: prepared.system,
       messages: prepared.msgs
     })
+    opts?.onAbortReady?.(() => stream.abort())
 
     stream.on('text', (delta: string) => consumer.push(delta))
 
@@ -1335,8 +1339,16 @@ export async function sendChatStream(
       return
     }
   } catch (e) {
-    cb.onError({ ok: false, error: (e as Error).message })
-    return
+    const err = e as Error
+    // A user Stop is not a failure. Keep everything that streamed and finish
+    // the turn with it — the fallback parser below already knows how to
+    // salvage a cut-off envelope, which is exactly what an abort leaves.
+    if (err?.name === 'APIUserAbortError' || /aborted/i.test(err?.message ?? '')) {
+      stopReason = 'aborted'
+    } else {
+      cb.onError({ ok: false, error: err.message })
+      return
+    }
   }
 
   // Same parser as the non-streaming path, over the full accumulated text.
