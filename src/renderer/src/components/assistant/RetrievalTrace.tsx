@@ -37,6 +37,12 @@ interface Props {
   // on every navigation — see onDisclosureChange.
   disclosure?: 'open' | 'closed'
   onDisclosureChange?: (state: 'open' | 'closed') => void
+  // The answer's prose has started arriving (A1). The staggered source reveal
+  // narrates work in progress; once the model is visibly WRITING, a ticker
+  // still claiming "Reading X…" is a re-enactment — and every late row shoves
+  // the streaming text down (the P3 law: nothing above the caret reflows).
+  // When settled, every remaining source snaps in within one commit.
+  settled?: boolean
   // Open a retrieved source. Every source leaf is a link, not just the ones the
   // answer cited — retrieved-but-uncited material appears nowhere else, so this
   // is the only route to it.
@@ -83,6 +89,7 @@ export default function RetrievalTrace({
   trace,
   disclosure,
   onDisclosureChange,
+  settled,
   onOpenSource
 }: Props): JSX.Element | null {
   const sourceCount = trace.sources.length
@@ -113,13 +120,19 @@ export default function RetrievalTrace({
 
   // Reveal retrieved sources one at a time. Self-rescheduling rather than an
   // interval, so a source list that grows mid-flight picks up seamlessly.
+  // Once the answer is settled (prose streaming below), the ceremony ends in
+  // one commit instead of pushing the living text down row by row.
   useEffect(() => {
     if (revealedCount >= sourceCount) return
+    if (settled) {
+      setRevealedCount(sourceCount)
+      return
+    }
     const id = window.setTimeout(() => {
       setRevealedCount((c) => Math.min(c + 1, sourceCount))
     }, SOURCE_REVEAL_INTERVAL_MS)
     return () => window.clearTimeout(id)
-  }, [sourceCount, revealedCount])
+  }, [sourceCount, revealedCount, settled])
 
   // A trace that ended in failure stays open: it's the only thing on screen
   // explaining what went wrong.

@@ -14,7 +14,6 @@ import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
 import StreamingProse from './assistant/StreamingProse'
-import PlexiiThinking from './assistant/PlexiiThinking'
 import QuestionCard from './assistant/QuestionCard'
 import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
@@ -173,6 +172,17 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   // the active thread, not by the global `sending` flag, so a request started in another
   // context can't draw its progress here.
   const liveTrace = liveTraceByThread[thread.key]
+  // The in-flight turn (A1). One trace instance for the whole send: it used
+  // to render standalone before the first delta and then remount inside the
+  // streaming turn, restarting its reveal from zero — the "searching twice"
+  // defect from Caleb's drive. The container after the map now owns the
+  // entire live turn. `streaming` is thread-true because liveTrace is
+  // per-thread; `sending` alone is global and can belong to another
+  // conversation's request.
+  const streaming = sending && !!liveTrace
+  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null
+  const streamingMsg = streaming && lastMsg?.role === 'assistant' ? lastMsg : null
+  const visibleMessages = streamingMsg ? messages.slice(0, -1) : messages
   // The follow-up question that is live for the displayed thread, if any —
   // attached to the last message and neither answered nor dismissed. Derived
   // by a pure, tested rule (lib/assistantQuestion).
@@ -888,7 +898,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             </div>
           </div>
         )}
-        {messages.map((m, i) => {
+        {visibleMessages.map((m, i) => {
           // The user's turn is a quiet accent-tinted block, built from tokens so
           // it follows every theme. It used to be hardcoded stone-900/stone-100
           // — the one element in the panel that ignored the token system and so
@@ -925,22 +935,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                         </span>
                       )
                     )}
-              </div>
-            )
-          }
-          // The actively-streaming turn takes the living-text path (P3): the
-          // reveal is paced and word-faded by StreamingProse, and the live
-          // trace heads it. Proposals, sources and interactive blocks only
-          // exist once the envelope completes, so nothing is lost by skipping
-          // the block pipeline here; on completion this same turn re-renders
-          // through it, which is also what keeps scroll-back unanimated.
-          if (sending && i === messages.length - 1) {
-            return (
-              <div key={i} className="flex flex-col gap-3" data-testid="assistant-turn">
-                {liveTrace && (
-                  <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
-                )}
-                <StreamingProse markdown={m.content} active />
               </div>
             )
           }
@@ -1053,26 +1047,23 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             </div>
           )
         })}
-        {/* While a send is in flight the trace IS the pending indicator: it says
-            what is actually happening instead of a generic "Working…". Once the
-            first delta creates the streaming turn, the trace renders INSIDE
-            that turn (above its text) — this standalone instance covers only
-            the retrieval window before any text exists. The dots remain for
-            the non-streaming path, which reports nothing until it returns and
-            so has nothing truer to show. */}
-        {sending &&
-          liveTrace &&
-          !(messages.length > 0 && messages[messages.length - 1].role === 'assistant') && (
-            <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
-          )}
-        {sending && !liveTrace && !(messages.length > 0 && messages[messages.length - 1].role === 'assistant') && (
-          // The pre-trace wait (P4): the breathing double-i, one identity for
-          // every waiting state in the AI — no dots, no spinners.
-          <div className="flex items-center gap-1.5 text-[var(--ink-50)]" data-testid="chat-pending">
-            <span className="text-accent" aria-hidden="true">
-              <PlexiiThinking size={14} />
-            </span>
-            <span className="fb-t-caption text-[var(--ink-60)]">Working…</span>
+        {/* The live turn (A1): ONE container from send to completion, so the
+            trace mounts once and never replays its reveal. Before the first
+            delta it stands alone — retrieval genuinely is the pending state,
+            and the trace says so truthfully. Once prose arrives,
+            StreamingProse joins below and the trace settles in the same
+            commit, so the ceremony never pushes the living text down. On
+            completion this container unmounts and the finished message
+            renders through the block pipeline with its trace already folded
+            to the summary line (the store closes it at settle). */}
+        {streaming && (
+          <div className="flex flex-col gap-3" data-testid="assistant-turn">
+            <RetrievalTrace
+              trace={liveTrace}
+              settled={!!streamingMsg}
+              onOpenSource={(s) => void openSource(s)}
+            />
+            {streamingMsg && <StreamingProse markdown={streamingMsg.content} active />}
           </div>
         )}
         </div>

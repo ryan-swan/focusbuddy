@@ -349,6 +349,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const blocksByMessage: Record<string, ChatUiBlock[]> = { ...get().blocksByMessage }
     const questionByMessage: Record<string, ChatQuestion> = { ...get().questionByMessage }
     const traceByMessage: Record<string, AssistantTrace> = { ...get().traceByMessage }
+    const traceDisclosureByMessage: Record<string, 'open' | 'closed'> = {
+      ...get().traceDisclosureByMessage
+    }
     const mentionsByMessage: Record<string, MentionRef[]> = { ...get().mentionsByMessage }
     const messageIdByTs: Record<string, string> = {}
     for (const m of conv.messages) {
@@ -366,7 +369,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (m.blocks?.length) blocksByMessage[k] = m.blocks
       if (m.question) questionByMessage[k] = m.question
       const restored = fromStoredTrace(m.trace ?? null)
-      if (restored) traceByMessage[k] = restored
+      if (restored) {
+        traceByMessage[k] = restored
+        // History never re-animates (P3 doctrine): a restored trace opens as
+        // its quiet summary line instead of arriving expanded and folding
+        // itself away 1.4s later on every conversation open.
+        if (!traceDisclosureByMessage[k]) traceDisclosureByMessage[k] = 'closed'
+      }
       // The references a user turn was sent with, rehydrated onto this
       // conversation so its inline chips redraw where they were typed.
       if (m.mentions?.length) {
@@ -386,6 +395,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       blocksByMessage,
       questionByMessage,
       traceByMessage,
+      traceDisclosureByMessage,
       mentionsByMessage,
       messageIdByTs,
       pendingContext: null
@@ -712,6 +722,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             status: resp.ok ? 'done' : 'error',
             error: resp.ok ? live.error : (resp.error ?? 'Something went wrong.'),
             completedAt: Date.now()
+          }
+        }
+        // Completion is a state change (A1): the audit folds to its one-line
+        // summary in the same commit the answer settles in, instead of
+        // re-expanding and folding itself 1.4s later — the post-completion
+        // layout jump Caleb read as glitch. A FAILED trace stays open: it is
+        // the only thing on screen explaining what went wrong.
+        if (resp.ok) {
+          updates.traceDisclosureByMessage = {
+            ...get().traceDisclosureByMessage,
+            [tsKey]: 'closed'
           }
         }
       }
