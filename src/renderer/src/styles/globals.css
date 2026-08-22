@@ -2423,6 +2423,109 @@ body {
    block fades out once the answer is done, and the in-flight phase carries a
    blinking square. Kept as plain CSS beside fb-dot rather than as Tailwind
    keyframes: that's how every other animation in this app is declared. */
+/* The Plexii presence (P4). Three pieces, all opacity/transform-only and all
+   frozen under prefers-reduced-motion:
+   1. fb-ii-breathing — the double-i mark's two i's breathe in alternation
+      while Plexii thinks (75's motion spec: groups not stems, floor 0.4,
+      scaleY 0.92-1.0 from the stem base, half-period offset, never spin).
+   2. fb-status-shimmer — a light sweep across the live status label.
+   3. fb-ai-edge — the accent edge-light behind the composer while
+      generating: a blurred conic gradient rotating slowly, alive only during
+      AI activity (accent = live state), gone when done. */
+.fb-ii-breathing .ii-l,
+.fb-ii-breathing .ii-r {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: fb-ii-breathe 1.2s ease-in-out infinite;
+}
+.fb-ii-breathing .ii-r {
+  animation-delay: 0.6s;
+}
+@keyframes fb-ii-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scaleY(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+.fb-ii-settled .ii-l,
+.fb-ii-settled .ii-r {
+  opacity: 1;
+  transform: none;
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+.fb-status-shimmer {
+  background: linear-gradient(90deg, var(--ink-60) 0%, var(--ink-100) 50%, var(--ink-60) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: fb-status-shimmer 2.2s linear infinite;
+}
+@keyframes fb-status-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+/* The rim is a rotating conic gradient CLIPPED to a 3px ring around the box
+   (padding + negative margin cancel, so toggling the class never reflows),
+   rotated by transform — plain compositor motion, no animated custom
+   properties, which Chromium's compositor can smear into stray tiles when
+   combined with blur. A static soft accent bloom outside carries the glow. */
+.fb-ai-edge {
+  position: relative;
+  padding: 3px;
+  margin: -3px;
+  border-radius: calc(var(--radius-card) + 3px);
+  overflow: hidden;
+  box-shadow: 0 0 24px rgb(var(--accent) / 0.22);
+}
+.fb-ai-edge::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(
+    rgb(var(--accent) / 0) 0deg,
+    rgb(var(--accent) / 0.55) 40deg,
+    rgb(var(--accent) / 0) 110deg,
+    rgb(var(--accent) / 0) 200deg,
+    rgb(var(--accent) / 0.35) 250deg,
+    rgb(var(--accent) / 0) 320deg
+  );
+  filter: blur(8px);
+  animation: fb-edge-spin 3.2s linear infinite;
+  pointer-events: none;
+}
+@keyframes fb-edge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-ii-breathing .ii-l,
+  .fb-ii-breathing .ii-r {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .fb-status-shimmer {
+    animation: none;
+    color: var(--ink-70);
+    background: none;
+  }
+  .fb-ai-edge::before {
+    animation: none;
+    background: rgb(var(--accent) / 0.18);
+  }
+}
+
 /* Streaming text (Plexii P3). Each newly revealed word fades in over ~140ms —
    the one continuous animation in the product while an answer writes itself.
    Opacity only (compositor-thread rule); no movement, no layout. The caret is
@@ -2438,23 +2541,23 @@ body {
 .fb-word-in {
   animation: fb-word-in 140ms ease-out both;
 }
+/* The caret is deliberately STATIC. It remounts on every reparse of the
+   streaming markdown (positional keys), and an infinitely-animating element
+   that remounts ~22x/sec sheds stale compositor tiles (verified: ghost
+   layers in screenshots). The words fading in are the motion; the caret
+   just marks the growing edge. */
 .fb-stream-caret {
   display: inline-block;
   width: 7px;
   height: 7px;
   margin-left: 4px;
   border-radius: 9999px;
-  background: rgb(var(--accent) / 0.8);
-  animation: fb-dot-pulse 1.2s ease-in-out infinite;
+  background: rgb(var(--accent) / 0.7);
   vertical-align: baseline;
 }
 @media (prefers-reduced-motion: reduce) {
   .fb-word-in {
     animation: none;
-  }
-  .fb-stream-caret {
-    animation: none;
-    opacity: 0.55;
   }
 }
 

@@ -14,6 +14,7 @@ import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
 import StreamingProse from './assistant/StreamingProse'
+import PlexiiThinking from './assistant/PlexiiThinking'
 import QuestionCard from './assistant/QuestionCard'
 import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
@@ -364,13 +365,32 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const stickRef = useRef(true)
   const columnRef = useRef<HTMLDivElement | null>(null)
   const [showJump, setShowJump] = useState(false)
+  const jumpTimer = useRef<number | null>(null)
   const syncStick = useCallback((): void => {
     const el = scrollRef.current
     if (!el) return
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight
     const stick = dist < 100
     stickRef.current = stick
-    setShowJump(!stick)
+    // The pill appears only after the reader has genuinely left the bottom
+    // (150ms debounce, real scrollback below them) — a single-frame layout
+    // wobble must never flash chrome into the transcript.
+    if (stick) {
+      if (jumpTimer.current !== null) window.clearTimeout(jumpTimer.current)
+      jumpTimer.current = null
+      setShowJump(false)
+    } else if (jumpTimer.current === null) {
+      jumpTimer.current = window.setTimeout(() => {
+        jumpTimer.current = null
+        const now = scrollRef.current
+        if (!now) return
+        // Re-measure live: layout may have settled back to the bottom since
+        // the scroll event that armed this timer.
+        const nowDist = now.scrollHeight - now.scrollTop - now.clientHeight
+        if (nowDist >= 100 && now.scrollHeight - now.clientHeight > 40) setShowJump(true)
+        else stickRef.current = true
+      }, 150)
+    }
   }, [])
   const jumpToLatest = useCallback((): void => {
     const el = scrollRef.current
@@ -396,7 +416,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   useEffect(() => {
     if (stickRef.current && scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages.length, lastMessageLen, sending])
+    // Completion swaps the streaming renderer for the block pipeline, which
+    // changes content height without changing message count — re-measure so
+    // the pill cannot linger over a transcript that is in fact at its end.
+    if (!sending) syncStick()
+  }, [messages.length, lastMessageLen, sending, syncStick])
 
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current
@@ -1037,13 +1061,13 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
           )}
         {sending && !liveTrace && !(messages.length > 0 && messages[messages.length - 1].role === 'assistant') && (
+          // The pre-trace wait (P4): the breathing double-i, one identity for
+          // every waiting state in the AI — no dots, no spinners.
           <div className="flex items-center gap-1.5 text-[var(--ink-50)]" data-testid="chat-pending">
-            <span className="flex gap-[3px]" aria-hidden="true">
-              <span className="w-1 h-1 rounded-full bg-current fb-dot" />
-              <span className="w-1 h-1 rounded-full bg-current fb-dot" style={{ animationDelay: '150ms' }} />
-              <span className="w-1 h-1 rounded-full bg-current fb-dot" style={{ animationDelay: '300ms' }} />
+            <span className="text-accent" aria-hidden="true">
+              <PlexiiThinking size={14} />
             </span>
-            <span className="fb-t-caption">Working…</span>
+            <span className="fb-status-shimmer fb-t-caption">Working…</span>
           </div>
         )}
         </div>
@@ -1095,7 +1119,14 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             }}
           />
         )}
-        <div className="rounded-[var(--radius-card)] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+        {/* The edge-light (P4): while Plexii generates, a quiet accent glow
+            lives at the composer's boundary — the Apple Intelligence pattern,
+            light at the edge instead of chrome takeover. Accent = live state,
+            so it is lawful; it exists only while sending and nowhere else.
+            The box's opaque surface sits above the glow, so only the rim
+            shows. */}
+        <div className={sending ? 'fb-ai-edge' : undefined}>
+        <div className="relative rounded-[var(--radius-card)] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
           {/* What this conversation is working from, restated at the point of
               typing. Either the objects it references (typed with "@" or
               clicked on the canvas — one layer, plan D7/D8) or, when it
@@ -1284,6 +1315,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           <span className="fb-t-caption font-mono text-[var(--ink-40)]">
             ↵ send · ⇧↵ newline
           </span>
+        </div>
         </div>
         </div>
       </form>

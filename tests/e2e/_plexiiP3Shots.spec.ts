@@ -81,10 +81,21 @@ test('plexii P3 streaming: paced reveal, caret, scroll lock', async () => {
     }, FULL.slice(0, upTo))
   }
 
+  const probe = async (label: string, x: number, y: number): Promise<void> => {
+    const out = await window.evaluate(([px, py]) => {
+      return document.elementsFromPoint(px as number, py as number).slice(0, 4).map((el) => {
+        const cs = getComputedStyle(el)
+        return `${el.tagName}.${(el as HTMLElement).className?.toString?.().slice(0, 90)} bg=${cs.backgroundColor} anim=${cs.animationName}`
+      })
+    }, [x, y])
+    console.log(`PROBE ${label}:\n` + out.join('\n'))
+  }
   await feed(120)
   await window.waitForTimeout(300)
   await expect(window.locator('[data-testid="streaming-prose"]')).toBeVisible()
+  await probe('early-ghost', 601, 588)
   await window.screenshot({ path: `${OUT}/p3-stream-early.png` })
+  await window.screenshot({ path: `${OUT}/p3-ghost-early-zoom.png`, clip: { x: 520, y: 545, width: 220, height: 90 } })
 
   await feed(FULL.length)
   await window.waitForTimeout(700)
@@ -117,7 +128,23 @@ test('plexii P3 streaming: paced reveal, caret, scroll lock', async () => {
   })
   await window.waitForTimeout(400)
   await expect(window.locator('[data-testid="streaming-prose"]')).toHaveCount(0)
+  const grid = await window.evaluate(() => {
+    const out: string[] = []
+    for (let dx = -30; dx <= 30; dx += 10)
+      for (let dy = -14; dy <= 14; dy += 7) {
+        const el = document.elementFromPoint(936 + dx, 710 + dy)
+        if (!el) continue
+        const cs = getComputedStyle(el)
+        const key = `${el.tagName}.${(el as HTMLElement).className?.toString?.().slice(0, 60)} bg=${cs.backgroundColor}`
+        if (!out.includes(key)) out.push(key)
+      }
+    const hov = Array.from(document.querySelectorAll(':hover')).map((e) => `${e.tagName}.${(e as HTMLElement).className?.toString?.().slice(0, 60)}`)
+    return out.concat(['HOVER: ' + hov.join(' > ')])
+  })
+  console.log('GRID:\n' + grid.join('\n'))
+  await probe('done-ghost', 936, 710)
   await window.screenshot({ path: `${OUT}/p3-stream-done.png` })
+  await window.screenshot({ path: `${OUT}/p3-ghost-done-zoom.png`, clip: { x: 860, y: 680, width: 220, height: 70 } })
 
   await launched.dispose()
 })

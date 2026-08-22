@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ChatSource } from '@shared/types'
 import Icon from '../Icon'
+import PlexiiThinking from './PlexiiThinking'
 import { isOpenable } from '../../lib/sourceTarget'
 import {
   getTraceView,
@@ -197,12 +198,15 @@ export default function RetrievalTrace({
           announce — screen readers have nothing to diff it against. */}
       <div aria-live="polite" aria-atomic="true">
         {active && (
+          // The live line (P4): the breathing double-i is the thinking
+          // indicator — the mark itself, not a spinner — and the status label
+          // carries a light shimmer sweep while the work it names is running.
           <div key={active.key} className="fb-trace-in flex items-center gap-1.5">
-            <span className="w-3 h-3 grid place-items-center shrink-0" aria-hidden="true">
-              <span className="w-1.5 h-1.5 rounded-[1px] bg-accent fb-trace-blink" />
+            <span className="w-4 h-4 grid place-items-center shrink-0 text-accent" aria-hidden="true">
+              <PlexiiThinking size={14} />
             </span>
             <Icon name={active.icon} size={11} className="shrink-0 text-[var(--ink-50)]" />
-            <span className="italic text-[var(--ink-70)]">{active.label}</span>
+            <span className="fb-status-shimmer">{active.label}</span>
           </div>
         )}
         {error && (
