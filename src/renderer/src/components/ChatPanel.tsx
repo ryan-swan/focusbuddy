@@ -797,7 +797,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       </div>
 
       {hasApiKey === false && (
-        <div className="m-3 p-3 rounded-[var(--radius-card)] bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 fb-t-label text-[var(--ink-90)] leading-relaxed flex gap-2">
+        <div className="m-3 p-3 fb-card bg-amber-500/10 fb-t-label text-[var(--ink-90)] leading-relaxed flex gap-2">
           <Icon name="key" size={16} className="text-amber-700 dark:text-amber-400 mt-0.5" />
           <div>
             <strong className="text-[var(--ink-100)]">No API key yet.</strong> Open{' '}

@@ -317,16 +317,16 @@ export default function ProposalCards({
       {placeOffer && (
         <div
           data-testid="desk-offer"
-          className="rounded-md border border-accent/40 bg-accent/5 p-2.5 flex flex-col gap-2"
+          className="fb-card bg-accent/5 p-2.5 flex flex-col gap-2"
         >
-          <div className="text-[11px] text-[var(--ink-80)] leading-snug">
+          <div className="fb-t-caption text-[var(--ink-80)] leading-snug">
             Where should <span className="font-medium">{offerLabel}</span> go?
           </div>
           {offerShowsDesk && activeTaskId && (
             <button
               onClick={() => void applyOnDesk(activeTaskId)}
               data-testid="place-this-desk"
-              className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+              className="text-left rounded-[var(--radius-chip)] px-2 py-1 fb-t-label text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
             >
               <Icon name="space_dashboard" size={13} className="text-accent shrink-0" />
               <span className="truncate">This desk</span>
@@ -336,7 +336,7 @@ export default function ProposalCards({
             <button
               onClick={() => void applyToFiles()}
               data-testid="place-files"
-              className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+              className="text-left rounded-[var(--radius-chip)] px-2 py-1 fb-t-label text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
             >
               <Icon name="folder" size={13} className="text-accent shrink-0" />
               <span className="truncate">Add to Files</span>
@@ -353,19 +353,19 @@ export default function ProposalCards({
                   }}
                   placeholder="New desk name"
                   data-testid="desk-offer-name"
-                  className="flex-1 min-w-0 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 min-w-0 rounded-[var(--radius-chip)] border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 fb-t-label focus:outline-none focus:border-accent"
                 />
                 <button
                   onClick={() => void createDeskAndApply()}
                   data-testid="desk-offer-create"
-                  className="shrink-0 rounded bg-[rgb(var(--accent))] text-white px-2.5 py-1 text-[11px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+                  className="fb-press shrink-0 rounded-[var(--radius-chip)] bg-[rgb(var(--accent))] text-white px-2.5 py-1 fb-t-caption font-medium hover:bg-[rgb(var(--accent-hover))]"
                 >
                   New desk
                 </button>
               </div>
               {desks.length > 0 && (
                 <div className="flex flex-col gap-0.5 max-h-40 overflow-auto">
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] px-0.5">
+                  <div className="fb-t-caption uppercase tracking-wide text-[var(--ink-40)] px-0.5">
                     Or another desk
                   </div>
                   {desks.slice(0, 8).map((d) => (
@@ -373,7 +373,7 @@ export default function ProposalCards({
                       key={d.id}
                       onClick={() => void applyOnDesk(d.id)}
                       data-testid={`desk-offer-existing-${d.id}`}
-                      className="text-left rounded px-2 py-1 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
+                      className="text-left rounded-[var(--radius-chip)] px-2 py-1 fb-t-label text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] flex items-center gap-2"
                     >
                       <Icon name="desktop_windows" size={13} className="text-[var(--ink-40)] shrink-0" />
                       <span className="truncate">{d.title || 'Untitled desk'}</span>
@@ -385,7 +385,7 @@ export default function ProposalCards({
           )}
           <button
             onClick={() => setPlaceOffer(null)}
-            className="text-[10px] text-[var(--ink-50)] self-start hover:underline"
+            className="fb-t-caption text-[var(--ink-50)] self-start hover:underline"
           >
             Cancel
           </button>
@@ -404,20 +404,20 @@ export default function ProposalCards({
             <div
               key={p.id}
               data-testid={`proposal-card-applied-${p.id}`}
-              className="rounded-md border border-emerald-300 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1.5"
+              className="fb-card bg-emerald-500/10 px-2.5 py-1.5"
             >
               <div className="flex items-center gap-2">
-                <span className="h-6 w-6 rounded-md inline-flex items-center justify-center bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <span className="h-6 w-6 rounded-[var(--radius-chip)] inline-flex items-center justify-center bg-emerald-500/15 text-emerald-500 shrink-0">
                   <Icon name="check" size={14} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] uppercase tracking-wider text-emerald-700/80 dark:text-emerald-400/80">
+                  <div className="fb-t-caption uppercase tracking-wider text-emerald-500/80">
                     {desc.verb} · done
                   </div>
-                  <div className="text-[12px] font-medium text-[var(--ink-100)] truncate">
+                  <div className="fb-t-label font-medium text-[var(--ink-100)] truncate">
                     {desc.subject}
                   </div>
-                  <div className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 leading-snug">
+                  <div className="fb-t-caption text-emerald-500 mt-0.5 leading-snug">
                     {applied.message}
                   </div>
                 </div>
@@ -427,7 +427,7 @@ export default function ProposalCards({
                       onClick={() => onUndo(p.id, applied)}
                       title="Undo this"
                       data-testid={`proposal-undo-${p.id}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)] px-2 py-1 text-[11px] font-medium text-[var(--ink-60)] transition-colors"
+                      className="fb-press inline-flex items-center gap-1 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] px-2 py-1 fb-t-caption font-medium text-[var(--ink-60)] hover:text-[var(--ink-90)] transition-colors"
                     >
                       <Icon name="undo" size={12} />
                       <span>Undo</span>
@@ -438,7 +438,7 @@ export default function ProposalCards({
                       onClick={() => void goToTarget(applied.target!)}
                       title="Go to what this created"
                       data-testid={`proposal-goto-${p.id}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-emerald-300 dark:border-emerald-800/60 bg-[var(--surface-raised)] hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
+                      className="fb-press inline-flex items-center gap-1 rounded-[var(--radius-chip)] bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 fb-t-caption font-medium text-emerald-500 transition-colors"
                     >
                       <span>Go to</span>
                       <Icon name="north_east" size={12} />
@@ -458,26 +458,26 @@ export default function ProposalCards({
             onClick={() => void applyOne(p)}
             disabled={isBusy || agentRunning}
             data-testid={`proposal-card-${p.id}`}
-            className="text-left rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 px-2.5 py-1.5 transition-colors group"
+            className="text-left fb-card fb-press hover:bg-accent/5 hover:outline hover:outline-1 hover:outline-[rgb(var(--accent)/0.5)] hover:-outline-offset-1 px-2.5 py-1.5 transition-colors group"
           >
             <div className="flex items-center gap-2">
-              <span className="h-6 w-6 rounded-md inline-flex items-center justify-center bg-accent/10 text-accent shrink-0">
+              <span className="h-6 w-6 rounded-[var(--radius-chip)] inline-flex items-center justify-center bg-accent/10 text-accent shrink-0">
                 <Icon name={desc.icon} size={13} />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
+                <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-50)]">
                   {desc.verb}
                 </div>
-                <div className="text-[12px] font-medium text-[var(--ink-100)] truncate">
+                <div className="fb-t-label font-medium text-[var(--ink-100)] truncate">
                   {desc.subject}
                 </div>
                 {p.reason && (
-                  <div className="text-[10px] text-[var(--ink-50)] mt-0.5 leading-snug">
+                  <div className="fb-t-caption text-[var(--ink-50)] mt-0.5 leading-snug">
                     {p.reason}
                   </div>
                 )}
                 {showToast && (
-                  <div className="text-[10px] mt-1 text-amber-700 dark:text-amber-400">
+                  <div className="fb-t-caption mt-1 text-amber-500">
                     ⚠ {toast.message}
                   </div>
                 )}
@@ -510,7 +510,7 @@ export default function ProposalCards({
                     <Icon name="close" size={11} />
                   </span>
                 )}
-                <span className="text-[10px] text-accent font-medium px-1">
+                <span className="fb-t-caption text-accent font-medium px-1">
                   {isBusy ? busyVerb(p.kind) : 'apply'}
                 </span>
               </div>
@@ -522,7 +522,7 @@ export default function ProposalCards({
         <button
           onClick={() => void applyAll()}
           disabled={busy !== null || agentRunning}
-          className="text-[11px] text-accent self-start px-1.5 py-0.5 hover:underline disabled:opacity-50"
+          className="fb-t-caption text-accent self-start px-1.5 py-0.5 hover:underline disabled:opacity-50"
         >
           Apply all {pendingCount}
         </button>
