@@ -74,7 +74,7 @@ export default function ChatBlockView({
       // and it forces long answers, tables and code to fight a 10px radius. The
       // speaker is carried by the turn's identity row, not by a container.
       return (
-        <div className="text-[13px] leading-[1.62] text-[var(--ink-90)] md-rendered">
+        <div className="!text-[15px] !leading-[1.75] text-[var(--ink-90)] md-rendered">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkCitations]}
             components={{

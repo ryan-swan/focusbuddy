@@ -139,7 +139,7 @@ export default function StreamingProse({ markdown, active }: { markdown: string;
   return (
     <div
       data-testid="streaming-prose"
-      className="fb-streaming text-[13px] leading-[1.62] text-[var(--ink-90)] md-rendered"
+      className="fb-streaming !text-[15px] !leading-[1.75] text-[var(--ink-90)] md-rendered"
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkCitations]}

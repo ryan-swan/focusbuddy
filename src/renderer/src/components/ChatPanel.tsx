@@ -819,7 +819,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         className={
           fullscreenHome
             ? 'shrink-0 mt-auto w-full max-w-[640px] mx-auto px-6 pb-5'
-            : 'flex-1 overflow-auto px-3 pt-3 pb-44'
+            : 'flex-1 overflow-auto px-3 pt-5 pb-44'
         }
       >
         {/* In fullscreen the flat page needs a readable column; elsewhere the
@@ -832,7 +832,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         <div
           ref={columnRef}
           className={
-            isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full space-y-3' : 'space-y-2.5'
+            isFullscreen && !fullscreenHome ? 'max-w-[780px] mx-auto w-full space-y-3' : 'space-y-2.5'
           }
         >
         {fullscreenHome && (
@@ -905,7 +905,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <div
                 key={i}
                 data-testid="user-turn"
-                className="ml-auto w-fit max-w-[70%] mt-6 first:mt-0 rounded-[var(--radius-card)] px-3.5 py-2.5 fb-t-body leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
+                className="ml-auto w-fit max-w-[70%] mt-8 first:mt-0 rounded-[var(--radius-card)] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
               >
                 {segments.length <= 1
                   ? m.content
@@ -936,7 +936,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           // through it, which is also what keeps scroll-back unanimated.
           if (sending && i === messages.length - 1) {
             return (
-              <div key={i} className="flex flex-col gap-2.5" data-testid="assistant-turn">
+              <div key={i} className="flex flex-col gap-3" data-testid="assistant-turn">
                 {liveTrace && (
                   <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
                 )}
@@ -974,7 +974,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           }
           const finishedTrace = traceByMessage[String(m.ts)]
           return (
-            <div key={i} className="group/turn flex flex-col gap-2.5" data-testid="assistant-turn">
+            <div key={i} className="group/turn flex flex-col gap-3" data-testid="assistant-turn">
               {/* No identity row (P2). The premium-chat convention is
                   unanimous: the asymmetry itself marks the speaker — user
                   turns sit right-anchored in a quiet tint, assistant turns are
@@ -1109,7 +1109,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           </div>
         )}
         <div
-          className={`pointer-events-auto ${isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full' : ''}`}
+          className={`pointer-events-auto ${isFullscreen && !fullscreenHome ? 'max-w-[780px] mx-auto w-full' : ''}`}
         >
         {/* Glass composer (P5), one surface that also asks (F1): the
             follow-up question docks inside this card — no separate box, no
