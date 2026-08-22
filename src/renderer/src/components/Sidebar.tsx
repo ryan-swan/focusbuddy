@@ -14,6 +14,7 @@ import OrgSwitcher from './OrgSwitcher'
 import { useViewKindEnabled } from '../lib/viewCapability'
 
 import { chimeIn } from '../lib/audioBeep'
+import { AREA_TONES } from '../lib/areaTones'
 import { splitFavourites } from '../lib/connectedAppSort'
 import NewNodeDialog from './NewNodeDialog'
 import AISetupDialog from './AISetupDialog'
@@ -293,7 +294,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
                 <CollapsedNavIcon
                   icon="plexii:office"
                   label="Office"
-                  tone="text-purple-500"
+                  tone={AREA_TONES.office}
                   active={view.kind === 'office'}
                   onClick={() => goOffice()}
                 />
@@ -302,7 +303,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
                 <CollapsedNavIcon
                   icon="diversity_3"
                   label="People"
-                  tone="text-pink-500"
+                  tone={AREA_TONES.people}
                   active={view.kind === 'plexipeople'}
                   onClick={() => goPlexiPeople()}
                 />
@@ -311,7 +312,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
                 <CollapsedNavIcon
                   icon="neurology"
                   label="Brain"
-                  tone="text-cyan-500"
+                  tone={AREA_TONES.brain}
                   active={view.kind === 'plexibrain'}
                   onClick={() => goPlexiBrain()}
                 />
@@ -322,22 +323,22 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           {/* ── Desk navigation ── */}
           <div className="w-6 h-px bg-[var(--edge-soft)] shrink-0 my-1" />
 
-          <CollapsedNavIcon icon="plexii:home"  label="Home"         tone="text-indigo-500"  active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
+          <CollapsedNavIcon icon="plexii:home"  label="Home"         tone={AREA_TONES.home}  active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
           {/* Monochrome by plexidesk-75's rail rule: no tone, accent only when active. */}
           <CollapsedNavIcon icon="plexii:ai"     label="Plexii"       active={viewIsActive({ kind: 'plexii' })}     onClick={() => { setActive(null); goPlexii() }} />
-          <CollapsedNavIcon icon="meeting_room"  label="Rooms"        tone="text-sky-500"     active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
-          <CollapsedNavIcon icon="desk"          label="Desks"        tone="text-teal-500"    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
-          <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone="text-fuchsia-500" active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
-          <CollapsedNavIcon icon="account_tree"  label="Plans"        tone="text-violet-500"  active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
-          <CollapsedNavIcon icon="checklist"     label="Tasks"        tone="text-emerald-500" active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
+          <CollapsedNavIcon icon="meeting_room"  label="Rooms"        tone={AREA_TONES.rooms}     active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
+          <CollapsedNavIcon icon="desk"          label="Desks"        tone={AREA_TONES.desks}    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
+          <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone={AREA_TONES.shared} active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
+          <CollapsedNavIcon icon="account_tree"  label="Plans"        tone={AREA_TONES.plans}  active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
+          <CollapsedNavIcon icon="checklist"     label="Tasks"        tone={AREA_TONES.tasks} active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
           {viewEnabled('calendar') && (
-            <CollapsedNavIcon icon="calendar_month" label="Calendar" tone="text-amber-500" active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
+            <CollapsedNavIcon icon="calendar_month" label="Calendar" tone={AREA_TONES.calendar} active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
           )}
           {viewEnabled('files') && (
-            <CollapsedNavIcon icon="folder" label="Files" tone="text-orange-500" active={viewIsActive({ kind: 'files' })} onClick={() => { setActive(null); goFiles() }} />
+            <CollapsedNavIcon icon="folder" label="Files" tone={AREA_TONES.files} active={viewIsActive({ kind: 'files' })} onClick={() => { setActive(null); goFiles() }} />
           )}
           {viewEnabled('vault') && (
-            <CollapsedNavIcon icon="plexii:vault" label="Vault" tone="text-rose-500" active={viewIsActive({ kind: 'vault' })} onClick={() => { setActive(null); goVault() }} />
+            <CollapsedNavIcon icon="plexii:vault" label="Vault" tone={AREA_TONES.vault} active={viewIsActive({ kind: 'vault' })} onClick={() => { setActive(null); goVault() }} />
           )}
 
           {/* ── Connected Apps ── */}
@@ -453,7 +454,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           <NavRow
             icon="plexii:home"
             label="Home"
-            tone="text-indigo-500"
+            tone={AREA_TONES.home}
             active={viewIsActive({ kind: 'home' })}
             onClick={() => {
               setActive(null)
@@ -514,7 +515,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <NavRow
                 icon="meeting_room"
                 label="Rooms"
-                tone="text-sky-500"
+                tone={AREA_TONES.rooms}
                 active={viewIsActive({ kind: 'rooms' }) || viewIsActive({ kind: 'desks' })}
                 onClick={() => {
                   setActive(null)
@@ -535,7 +536,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <NavRow
                 icon="desk"
                 label="All desks"
-                tone="text-teal-500"
+                tone={AREA_TONES.desks}
                 active={viewIsActive({ kind: 'desks' })}
                 onClick={() => {
                   setActive(null)
@@ -545,7 +546,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
               <NavRow
                 icon="folder_shared"
                 label="Shared"
-                tone="text-fuchsia-500"
+                tone={AREA_TONES.shared}
                 active={viewIsActive({ kind: 'shared' })}
                 badge={sharedInbox.length ? String(sharedInbox.length) : undefined}
                 onClick={() => {
@@ -558,7 +559,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           <NavRow
             icon="account_tree"
             label="Plans"
-            tone="text-violet-500"
+            tone={AREA_TONES.plans}
             active={viewIsActive({ kind: 'projects' })}
             onClick={() => {
               setActive(null)
@@ -568,7 +569,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
           <NavRow
             icon="checklist"
             label="Tasks"
-            tone="text-emerald-500"
+            tone={AREA_TONES.tasks}
             active={viewIsActive({ kind: 'all-tasks' })}
             onClick={() => {
               setActive(null)
@@ -579,7 +580,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             <NavRow
               icon="calendar_month"
               label="Calendar"
-              tone="text-amber-500"
+              tone={AREA_TONES.calendar}
               active={viewIsActive({ kind: 'calendar' })}
               onClick={() => {
                 setActive(null)
@@ -591,7 +592,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             <NavRow
               icon="folder"
               label="Files"
-              tone="text-orange-500"
+              tone={AREA_TONES.files}
               active={viewIsActive({ kind: 'files' })}
               onClick={() => {
                 setActive(null)
@@ -603,7 +604,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
             <NavRow
               icon="plexii:vault"
               label="Vault"
-              tone="text-rose-500"
+              tone={AREA_TONES.vault}
               active={viewIsActive({ kind: 'vault' })}
               onClick={() => {
                 setActive(null)
