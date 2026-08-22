@@ -32,7 +32,14 @@ export function renderAttachments(
     const isPinned = pinnedWidgetId !== undefined && a.widgetId === pinnedWidgetId
     const marker = isPinned ? '[PINNED · primary reference] ' : ''
     if (isPinned) pinnedTitle = a.title || 'Untitled'
-    blocks.push(`--- ${marker}${a.kind}: "${a.title || 'Untitled'}"${src} ---\n${slice}`)
+    // The sibling module (chatMentions) states every cut; this one silently
+    // dropped everything past the cap (defect #19) — the model then answered
+    // about "the open page" from its first 8000 characters as if whole.
+    const cut =
+      slice.length < text.length
+        ? `\n[Truncated — the first ${slice.length} characters are shown; the rest of this content was not read.]`
+        : ''
+    blocks.push(`--- ${marker}${a.kind}: "${a.title || 'Untitled'}"${src} ---\n${slice}${cut}`)
   }
   if (blocks.length === 0) return ''
   const pinNote = pinnedTitle

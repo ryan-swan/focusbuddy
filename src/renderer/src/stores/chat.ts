@@ -38,6 +38,7 @@ function newTrace(): AssistantTrace {
     completedAt: null,
     mentions: [],
     sources: [],
+    semantic: null,
     tools: [],
     activity: null,
     error: null
@@ -224,7 +225,8 @@ function toStoredTrace(t: AssistantTrace | undefined): StoredTrace | null {
     tools: t.tools,
     mentions: t.mentions,
     retrievalMs: t.retrievalMs,
-    error: t.error
+    error: t.error,
+    semantic: t.semantic
   }
 }
 
@@ -243,6 +245,7 @@ function fromStoredTrace(t: StoredTrace | null): AssistantTrace | null {
     completedAt: 0,
     mentions: t.mentions ?? [],
     sources: t.sources ?? [],
+    semantic: t.semantic ?? null,
     tools: t.tools ?? [],
     // A restored trace is finished work — there is no in-flight action to name.
     activity: null,
@@ -861,7 +864,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             // they are known so a broken chip does not wait for the answer.
             set({ mentionResolution: mergeMentionResolution(get().mentionResolution, m) })
           },
-          onSources: (t) => patchTrace({ retrievedAt: Date.now(), retrievalMs: t.elapsedMs, sources: t.sources }),
+          onSources: (t) =>
+            patchTrace({
+              retrievedAt: Date.now(),
+              retrievalMs: t.elapsedMs,
+              sources: t.sources,
+              // Absent on an older main process: stays unknown, discloses nothing.
+              semantic: t.semantic ?? null
+            }),
           // Token-by-token prose: the first delta creates the turn, later ones
           // grow it in place. Cumulative text, so each event simply replaces.
           onReplyDelta: (text) => {

@@ -38,6 +38,11 @@ export interface AssistantTrace {
   // Everything retrieval returned — NOT the same as what the answer cites.
   // Citation chips are derived separately, from the [n] markers in the prose.
   sources: ChatSource[]
+  // How the workspace search matched (defect #15): false = keyword-only (no
+  // embedding route configured), true = semantic ranking was available,
+  // null/absent = unknown (older main process, restored trace without the
+  // field). Optional so existing fixtures and stored traces stay valid.
+  semantic?: boolean | null
   tools: ChatToolTrace[]
   // The action the model is writing RIGHT NOW — announced the moment its
   // `"kind"` lands in the stream, before the object closes. Drawn as the
@@ -183,9 +188,13 @@ function webSources(trace: AssistantTrace): ChatSource[] {
 function retrieveLabel(trace: AssistantTrace): string {
   const ms = trace.retrievalMs
   const timing = typeof ms === 'number' ? ` · ${ms}ms` : ''
+  // Honest about HOW it searched (defect #15): with no embedding route the
+  // match is literal keywords — "churn" does not find "attrition" — and the
+  // label must not imply otherwise. Silent when semantic ran or is unknown.
+  const how = trace.semantic === false ? ' · keyword match' : ''
   const ws = workspaceSources(trace)
-  if (ws.length === 0) return `Searched your workspace · nothing relevant${timing}`
-  return `Searched your workspace · ${plural(ws.length, 'source')}${timing}`
+  if (ws.length === 0) return `Searched your workspace · nothing relevant${timing}${how}`
+  return `Searched your workspace · ${plural(ws.length, 'source')}${timing}${how}`
 }
 
 function sourceLeaves(sources: ChatSource[], shown: number): TraceLeaf[] {

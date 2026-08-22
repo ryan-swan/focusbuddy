@@ -6,7 +6,7 @@
 // later without changing callers, the contract is just "texts in, vectors out".
 
 import { resolveOpenAIKey } from '../settingsStore'
-import { localEmbed } from './localModel'
+import { localEmbed, localModelStatus } from './localModel'
 
 export const EMBED_MODEL = 'text-embedding-3-small'
 
@@ -47,4 +47,17 @@ export async function embedTexts(texts: string[]): Promise<EmbedResult> {
 export async function embedQuery(text: string): Promise<number[] | null> {
   const r = await embedTexts([text])
   return r.ok && r.vectors[0] ? r.vectors[0] : null
+}
+
+// Whether ANY embedding route is configured — a local embed model, or an
+// OpenAI key. An availability probe for honest disclosure (defect #15: with
+// neither, retrieval is literal keyword matching and nothing ever said so).
+// Probes only; never embeds anything. Never throws.
+export async function embeddingConfigured(): Promise<boolean> {
+  if (resolveOpenAIKey()) return true
+  try {
+    return (await localModelStatus()).embedModel !== null
+  } catch {
+    return false
+  }
 }

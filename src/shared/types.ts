@@ -540,6 +540,11 @@ export interface ChatToolTrace {
 export interface ChatRetrievalTrace {
   sources: ChatSource[]
   elapsedMs: number
+  // False when no embedding route was configured, so the search was literal
+  // keyword matching — the trace discloses it (defect #15: "churn" does not
+  // find "attrition" and nothing said so). Absent on an older main process
+  // (version skew): read as unknown, disclose nothing.
+  semantic?: boolean
 }
 
 // A structured follow-up the assistant asks instead of guessing — rendered as
@@ -2349,6 +2354,9 @@ export interface StoredTrace {
   mentions: ChatMentionResolved[]
   retrievalMs: number | null
   error: string | null
+  // How the search matched (defect #15): false = keyword-only. Optional so
+  // traces stored before this field simply read as unknown.
+  semantic?: boolean | null
 }
 
 export interface AiChatConversationMeta {

@@ -2,6 +2,8 @@
 // or native dependencies, so it is unit-testable on its own. workspaceSearch.ts
 // wraps these with the document store.
 
+import { docBodyToText } from '@shared/widgetText'
+
 export interface WorkspaceSource {
   docId: string
   title: string
@@ -85,6 +87,12 @@ export function extractDocText(docType: string, body: unknown): string {
         .join('\n')
         .trim()
         .slice(0, DOC_TEXT_CAP)
+    }
+    if (docType === 'map' || docType === 'design') {
+      // The shared extractor already knows these shapes (nodes/edges labels
+      // for maps, element text for designs); before this branch they returned
+      // '' here, which is why a design widget could never resolve (#10).
+      return docBodyToText(docType, body).slice(0, DOC_TEXT_CAP)
     }
   } catch {
     /* best-effort */

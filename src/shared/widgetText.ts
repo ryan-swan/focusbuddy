@@ -261,7 +261,12 @@ export function widgetToText(w: Widget, r: WidgetTextResolvers = {}): WidgetText
     case 'doc':
     case 'sheet':
     case 'slides':
-    case 'map': {
+    case 'map':
+    // Design was listed as attachable but had no case, so it fell to the
+    // default placeholder both consumers reject — permanently unreadable
+    // (defect #10). Its content is a document id exactly like the other
+    // office kinds; the docText resolver's design branch reads element text.
+    case 'design': {
       const docText = raw && r.docText ? r.docText(raw) : null
       return { ...base, text: docText && docText.trim() ? docText : '(empty document)' }
     }

@@ -26,6 +26,7 @@ import { extractJson, salvageEnvelope } from './chatJson'
 import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
 import { uiBlocksSection, validateChatUiBlocks } from './chatUiBlocks'
 import { discoverySection } from './discoveryMode'
+import { embeddingConfigured } from './embeddings'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
 import { renderMentions } from './chatMentions'
@@ -998,6 +999,10 @@ interface PreparedChatCall {
   // carried none. Derived from the same pass that built the prompt block, so
   // the renderer is told exactly what the model was given.
   mentions: ChatMentionResolved[]
+  // Whether an embedding route existed for this search (defect #15) — false
+  // means literal keyword matching, and the trace discloses it. Null when
+  // retrieval never ran.
+  semantic: boolean | null
 }
 
 async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
@@ -1029,6 +1034,9 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
   // show what it stands on. Numbered once, here, so the [n] markers the model
   // is told to write inline and the chips the renderer draws cannot disagree.
   let citedSources: ChatSource[] = []
+  // Whether an embedding route existed for this search (defect #15). Null =
+  // unknown (retrieval skipped or failed), and the trace discloses nothing.
+  let semanticAvailable: boolean | null = null
   const t0 = Date.now()
   try {
     const lastUser = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
@@ -1043,10 +1051,13 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
       // the web pass is keyless, best-effort, and skipped for short follow-ups
       // (see WEB_SEARCH_MIN_QUERY). Web results continue the same [n] space so
       // one numbering rules every citation, internal or web.
-      const [rawSources, webResults] = await Promise.all([
+      const [rawSources, webResults, semanticOn] = await Promise.all([
         retrieveSources(lastUser, undefined, scope.length ? scope : undefined),
-        searchWeb(lastUser, 5).catch(() => [])
+        searchWeb(lastUser, 5).catch(() => []),
+        // Availability probe, in parallel so disclosure costs no latency.
+        embeddingConfigured().catch(() => false)
       ])
+      semanticAvailable = semanticOn
       // Drop anything the user already put in front of the model by name.
       const sources = rawSources.filter((s) => !admittedIds.has(s.docId))
       if (sources.length > 0 || webResults.length > 0) {
@@ -1122,7 +1133,8 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     mentions: mentionReport,
     sources: citedSources,
-    retrievalMs: Date.now() - t0
+    retrievalMs: Date.now() - t0,
+    semantic: semanticAvailable
   }
 }
 
@@ -1327,7 +1339,11 @@ export async function sendChatStream(
   }
   // Retrieval is done — report it before a single token of the answer exists.
   if (prepared.mentions.length > 0) cb.onMentions(prepared.mentions)
-  cb.onSources({ sources: prepared.sources, elapsedMs: prepared.retrievalMs })
+  cb.onSources({
+    sources: prepared.sources,
+    elapsedMs: prepared.retrievalMs,
+    semantic: prepared.semantic ?? undefined
+  })
 
   // The delta → event loop lives in its own module so it can be tested without
   // this file's database imports. See chatStreamConsumer.ts.

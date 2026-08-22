@@ -109,9 +109,38 @@ function widgetResolvers(): WidgetTextResolvers {
   }
 }
 
-function resolveWidget(id: string): { text: string | null; source: string | null; reason: string | null } {
+// Webview-family widgets render their content in the canvas that hosts them;
+// the main process only ever has the ADDRESS. Saying "resolved" over a bare
+// URL was the most deceptive path in the stack (defect #6): the chip looked
+// healthy while the model received ~45 characters and answered as if it had
+// read the page.
+const WEB_WIDGET_KINDS = new Set(['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email'])
+// The office-doc kinds whose text comes through extractDocText and can land
+// exactly on its cap — the honest "longer than shown, total unknown" case.
+const DOC_WIDGET_KINDS = new Set(['doc', 'sheet', 'slides', 'map', 'design'])
+
+function resolveWidget(id: string): {
+  text: string | null
+  source: string | null
+  reason: string | null
+  upstreamTruncated?: boolean
+} {
   const w = getWidget(id)
   if (!w) return { text: null, source: null, reason: 'this widget no longer exists' }
+  // The live-page boundary, stated exactly the way unreadable files state it
+  // (#6): the address is real information and rides; the not-read fact is
+  // said in the prompt so the model can say it to the user.
+  if (WEB_WIDGET_KINDS.has(w.kind)) {
+    const url = (w.content ?? '').trim()
+    const meta = `${w.title || w.kind}${url ? ` (${url})` : ''}`
+    return {
+      text:
+        `${meta}\n[This widget's live page was not read — only its address is known from here. ` +
+        'Its rendered content rides automatically when the desk it lives on is open in front of the user.]',
+      source: url || null,
+      reason: null
+    }
+  }
   const r = widgetToText(w, widgetResolvers())
   const text = (r.text ?? '').trim()
   // The extractor returns parenthesised placeholders like "(empty document)"
@@ -124,30 +153,64 @@ function resolveWidget(id: string): { text: string | null; source: string | null
   return {
     text,
     source: r.source ?? (owner ? `on desk "${owner.title || 'Untitled'}"` : null),
-    reason: null
+    reason: null,
+    // extractDocText caps office bodies at DOC_TEXT_CAP; landing on the cap
+    // means the document continued past it and the true total is unknowable
+    // here (#11 — quoting the cap as the denominator stated a false number).
+    upstreamTruncated: DOC_WIDGET_KINDS.has(w.kind) && text.length >= DOC_TEXT_CAP
   }
 }
 
-function resolveDesk(id: string): { text: string | null; source: string | null; reason: string | null } {
+function resolveDesk(id: string): {
+  text: string | null
+  source: string | null
+  reason: string | null
+  upstreamTruncated?: boolean
+} {
   const n = getNode(id)
   if (!n || n.kind !== 'task') return { text: null, source: null, reason: 'this desk no longer exists' }
   const parts: string[] = []
   const head = `${n.title || 'Untitled desk'}${n.description ? `\n${n.description}` : ''}`.trim()
   if (head) parts.push(head)
   const resolvers = widgetResolvers()
+  const widgets = listWidgetsByTask(id)
   let used = 0
-  for (const w of listWidgetsByTask(id)) {
-    if (used >= DESK_WIDGET_LIMIT) break
+  let skipped = 0
+  let widgetCut = false
+  for (const w of widgets) {
+    // Past the limit, widgets are counted but never extracted — the count is
+    // what makes the cap honest (#9: a 40-widget desk reported success having
+    // read 12, and no notice machinery could see the cut).
+    if (used >= DESK_WIDGET_LIMIT) {
+      skipped++
+      continue
+    }
     const r = widgetToText(w, resolvers)
     const t = (r.text ?? '').trim()
     if (!t || /^\(.*\)$/.test(t)) continue
+    if (t.length > DESK_PER_WIDGET) widgetCut = true
     parts.push(`• ${w.title || w.kind}: ${t.slice(0, DESK_PER_WIDGET)}`)
     used++
   }
-  if (parts.length === 0) {
+  if (parts.length === 0 && skipped === 0) {
     return { text: null, source: null, reason: 'this desk is empty' }
   }
-  return { text: parts.join('\n'), source: `${used} widget${used === 1 ? '' : 's'} read`, reason: null }
+  if (skipped > 0) {
+    parts.push(
+      `[${skipped} more widget${skipped === 1 ? '' : 's'} on this desk ${skipped === 1 ? 'was' : 'were'} not read — mention one directly to read it in full.]`
+    )
+  }
+  return {
+    text: parts.join('\n'),
+    source:
+      skipped > 0
+        ? `read ${used} of ${used + skipped} widgets`
+        : `${used} widget${used === 1 ? '' : 's'} read`,
+    reason: null,
+    // Either cut — widgets left unread, or a widget shortened to its slice —
+    // must surface through the truncation notice, with no invented total.
+    upstreamTruncated: skipped > 0 || widgetCut
+  }
 }
 
 function resolveRoom(id: string): { text: string | null; source: string | null; reason: string | null } {
@@ -313,7 +376,16 @@ export function reportResolutions(
       resolved: got !== undefined,
       chars: got?.chars ?? 0,
       truncated: got?.truncated ?? false,
-      reason: got !== undefined ? null : (r.reason ?? 'this reference produced no readable content')
+      // Evicted is not deleted (#7): a reference that RESOLVED but lost the
+      // shared budget to earlier references must say so — the old fallback
+      // string rendered identically to a dead reference.
+      reason:
+        got !== undefined
+          ? null
+          : (r.reason ??
+            (r.text
+              ? 'left out to fit the size budget — it still exists; remove other references to include it'
+              : 'this reference produced no readable content'))
     }
   })
 }
