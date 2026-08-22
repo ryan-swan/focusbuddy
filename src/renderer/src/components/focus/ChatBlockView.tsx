@@ -89,7 +89,11 @@ export default function ChatBlockView({
               // citations. Rendered as a small accent chip so a claim and its
               // grounding read as one thing.
               span: ({ node, children, ...rest }) => {
-                const n = node?.properties?.dataCitation
+                // hProperties keys arrive in hast VERBATIM ('data-citation'),
+                // not camelized — reading only dataCitation missed every chip
+                // and rendered citations as invisible empty spans (A1 fix).
+                const n =
+                  node?.properties?.dataCitation ?? node?.properties?.['data-citation']
                 if (n === undefined || n === null || n === '') {
                   return <span {...rest}>{children}</span>
                 }

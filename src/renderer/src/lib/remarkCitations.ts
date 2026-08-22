@@ -44,6 +44,14 @@ export function splitCitations(value: string): MdNode[] | null {
       // attribute rather than a bespoke tag: react-markdown's `Components` type
       // only admits real HTML element names, so a custom tag would force a cast
       // that throws away the type checking on every other renderer override.
+      //
+      // The number ALSO rides as a text child (A1): hProperties keys are copied
+      // into hast verbatim (no camelization), and for months the renderer
+      // overrides looked up the camelized key, missed, and fell through to a
+      // bare <span> — with no child, every inline citation rendered as an
+      // INVISIBLE empty gap. The child is the belt to the override's braces:
+      // even an un-overridden span now shows the number.
+      children: [{ type: 'text', value: m[1] }],
       data: { hName: 'span', hProperties: { 'data-citation': m[1] } }
     })
     last = m.index + m[0].length

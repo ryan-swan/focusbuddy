@@ -26,6 +26,16 @@ describe('splitCitations', () => {
     expect(parts![2].value).toBe(' as of Tuesday')
   })
 
+  it('a citeRef carries its number as a text child, never an empty span (A1)', () => {
+    // hProperties keys reach hast verbatim; the renderer override used to look
+    // up a camelized key, miss, and fall through to a bare span — with no
+    // child, every inline citation rendered as an INVISIBLE gap. The child
+    // guarantees a visible number even when no override matches.
+    const parts = splitCitations('grounded [3].')
+    const cite = parts!.find((p) => p.type === 'citeRef')
+    expect(cite?.children).toEqual([{ type: 'text', value: '3' }])
+  })
+
   it('handles several markers, including adjacent ones', () => {
     const parts = splitCitations('both blockers [1][2] are open')
     expect(parts!.map((p) => p.type)).toEqual(['text', 'citeRef', 'citeRef', 'text'])

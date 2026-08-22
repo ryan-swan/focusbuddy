@@ -154,7 +154,10 @@ export default function StreamingProse({ markdown, active }: { markdown: string;
           // clickable — sources resolve when the turn completes and the
           // finished renderer takes over.
           span: ({ node, children, ...rest }) => {
-            const n = node?.properties?.dataCitation
+            // Same key fix as ChatBlockView (A1): hast keeps 'data-citation'
+            // verbatim; the camelized lookup alone never matched.
+            const n =
+              node?.properties?.dataCitation ?? node?.properties?.['data-citation']
             if (n === undefined || n === null || n === '') return <span {...rest}>{children}</span>
             return (
               <span
