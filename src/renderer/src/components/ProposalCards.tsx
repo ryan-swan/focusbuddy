@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { ActionProposal, AppliedProposal } from '@shared/types'
 import { useActionHistory } from '../stores/actionHistory'
 import { applyProposal, describeProposal, ensureDependencies } from '../lib/actionExecutor'
+import ProposalPreview from './assistant/ProposalPreview'
 import { useAgentLoop } from '../stores/agentLoop'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
@@ -476,6 +477,12 @@ export default function ProposalCards({
                     {p.reason}
                   </div>
                 )}
+                {/* The miniature (F3): the real thing this card would create,
+                    small — actual columns, actual items, actual first lines.
+                    Kinds with nothing to preview add nothing. */}
+                <div className="mt-1.5 empty:hidden">
+                  <ProposalPreview p={p} />
+                </div>
                 {showToast && (
                   <div className="fb-t-caption mt-1 text-amber-500">
                     ⚠ {toast.message}

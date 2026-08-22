@@ -31,9 +31,10 @@ test('plexii P7: proposal cards in one design generation', async () => {
         },
         proposalsByMessage: {
           [String(ts)]: [
-            { id: 'todo-1', kind: 'create-todo-list', title: 'Wedding Planning Checklist', items: ['Book venue', 'Send invites'], reason: 'Core wedding milestones to track' },
-            { id: 'task-1', kind: 'create-task', title: 'Vendors & Bookings', reason: 'Track all vendors in one place' },
-            { id: 'page-1', kind: 'create-page', title: 'Wedding At-a-Glance', content: '{}', reason: 'Quick-reference card for key details' }
+            { id: 'todo-1', kind: 'create-todo-list', title: 'Wedding Planning Checklist', items: ['Book venue', 'Send invites', 'Confirm caterer', 'Order flowers', 'Print place cards'], reason: 'Core wedding milestones to track' },
+            { id: 'table-1', kind: 'create-table', title: 'Vendors & Bookings', columns: [{ label: 'Vendor', type: 'text-short' }, { label: 'Service', type: 'text-short' }, { label: 'Cost', type: 'number' }, { label: 'Booked', type: 'checkbox' }, { label: 'Notes', type: 'text-long' }], reason: 'Track all vendors in one place' },
+            { id: 'sticky-1', kind: 'create-widget', widgetKind: 'sticky', title: 'Wedding At-a-Glance', content: 'June 14 · Rosewood Barn · 120 guests · budget $18k', reason: 'Quick-reference card for key details' },
+            { id: 'task-1', kind: 'create-task', title: 'Wedding planning', notes: 'The desk that holds it all', reason: 'A home for everything below' }
           ]
         },
         appliedProposals: {
@@ -51,7 +52,7 @@ test('plexii P7: proposal cards in one design generation', async () => {
     await waitForReady(window)
     await seed()
     await expect(window.locator('[data-testid="proposal-card-applied-todo-1"]')).toBeVisible()
-    await expect(window.locator('[data-testid="proposal-card-task-1"]')).toBeVisible()
+    await expect(window.locator('[data-testid="proposal-card-table-1"]')).toBeVisible()
     await window.screenshot({ path: `${OUT}/p7-cards-${theme}.png` })
   }
 
