@@ -18,7 +18,14 @@ function str(v: unknown, cap: number): string | null {
   if (typeof v !== 'string') return null
   const t = v.trim()
   if (!t) return null
-  return t.length > cap ? t.slice(0, cap - 1) + '…' : t
+  if (t.length <= cap) return t
+  // Cut at a word boundary, never mid-word — "Googl…" in a rendered card is a
+  // defect, not a truncation. Only fall back to the hard cut when the tail has
+  // no space to break at (one unbroken token).
+  const hard = t.slice(0, cap - 1)
+  const lastSpace = hard.lastIndexOf(' ')
+  const cut = lastSpace > cap - 41 ? hard.slice(0, lastSpace) : hard
+  return cut.trimEnd() + '…'
 }
 
 function optStr(v: unknown, cap: number): string | undefined {
@@ -101,22 +108,27 @@ function sanitizeCards(b: Record<string, unknown>): ChatUiBlock | null {
 
 // The prompt section teaching the model to emit blocks — beside its validator
 // so the contract and the gate can never drift apart (the chatQuestion.ts
-// pattern). Universal: every Plexii answer prefers visual blocks over prose
-// lists, per Caleb's ruling — this is the default style, not a mode.
+// pattern). Re-ruled 2026-08-22 (Caleb, program ruling R5): blocks are
+// INTERACTIVE CONTROLS, never containers for an answer's substance.
+// Informational answers are streamed markdown prose; anything inline that is
+// not direct words must act when tapped. This reverses the earlier
+// "prefer blocks over prose" default, which produced non-streaming,
+// truncated card-grid answers.
 export function uiBlocksSection(): string {
   return (
-    '\n\nVISUAL BLOCKS — the Plexii answer style:\n' +
-    'Your envelope may include an optional "blocks" array placed between "reply" and "actions". Blocks render as real UI inside your message: tappable choices, sliders, icon rows, small cards. Use them so answers feel visual and interactive instead of text-heavy — this is the DEFAULT style for every answer, not a special mode.\n' +
+    '\n\nINTERACTIVE BLOCKS — controls, never content:\n' +
+    'Your envelope may include an optional "blocks" array placed between "reply" and "actions". Blocks render as real UI inside your message, and every one of them DOES something when tapped — the tap comes back to you as the user\'s next message. They are never containers for the substance of an answer.\n' +
+    'THE PROSE RULE: when the user asked a question — research, an overview, an explanation, a comparison — the "reply" field IS the answer. Write it in full flowing markdown (short headings, paragraphs, lists, tables where they genuinely help) with [n] citations inline; it streams to the user as you write it. NEVER move an informational answer\'s content into blocks: a 1-sentence reply beside content-stuffed cards reads as a broken answer.\n' +
     'The only four shapes:\n' +
-    '{"type":"choices","id":"c1","prompt":"optional one-line lead-in","multi":false,"options":[{"id":"o1","label":"Podcast studio","icon":"mic","description":"optional one-liner"}]} — tappable options. The user\'s tap is sent back to you as their next message. Use "multi":true when several can apply at once.\n' +
-    '{"type":"scale","id":"s1","label":"How ambitious should this be?","min":1,"max":10,"minLabel":"Safe","maxLabel":"Moonshot"} — a slider; the committed value comes back as the user\'s next message.\n' +
-    '{"type":"icon-row","items":[{"icon":"description","label":"Docs"},{"icon":"table_chart","label":"Tracker"}]} — presentational row of real icons for tools, apps, or steps you name.\n' +
-    '{"type":"cards","items":[{"icon":"rocket_launch","title":"Launch week","body":"one line"}]} — small info cards for enumerable points.\n' +
+    '{"type":"choices","id":"c1","prompt":"optional one-line lead-in","multi":false,"options":[{"id":"o1","label":"Podcast studio","icon":"mic","description":"optional one-liner"}]} — tappable options for a decision you are offering the user. Use "multi":true when several can apply at once.\n' +
+    '{"type":"scale","id":"s1","label":"How ambitious should this be?","min":1,"max":10,"minLabel":"Safe","maxLabel":"Moonshot"} — a slider for a quantity or intensity; the committed value comes back as the user\'s next message.\n' +
+    '{"type":"icon-row","items":[{"icon":"description","label":"Docs"},{"icon":"table_chart","label":"Tracker"}]} — a compact tappable row naming tools, apps, or steps; tapping one asks you to say more about it.\n' +
+    '{"type":"cards","items":[{"icon":"rocket_launch","title":"Launch week","body":"one line"}]} — small tappable cards for OPTIONS or directions the user may want to drill into; a tap asks you to expand on that item. Cards are doors, not paragraphs: a one-line body at most, never the answer itself.\n' +
     'Block rules:\n' +
-    '- Prefer blocks over prose lists: 3+ enumerable points → "cards"; offering directions or options → "choices"; asking for a quantity or intensity → "scale"; naming tools/apps/steps → "icon-row". Keep "reply" to 1-2 short sentences and let the blocks carry the structure.\n' +
+    '- Offering directions or choices → "choices". Asking for a quantity → "scale". Naming tools/apps/steps → "icon-row". Enumerable OPTIONS to explore further → "cards". Information the user asked for → full markdown prose in "reply", always.\n' +
     '- "icon" values are Google Material Symbols names ("rocket_launch","description","calendar_month","search","checklist","mic","table_chart","groups","edit_note","travel_explore").\n' +
     '- Blocks display and ask — they never create. Widgets still require "actions" entries; a clarifying question you NEED answered before acting still uses the "question" object.\n' +
-    '- At most 3 blocks per turn, at most 6 options/items each. A plain factual one-liner needs no blocks; omit the array rather than sending it empty.'
+    '- At most 3 blocks per turn, at most 6 options/items each. Most answers need no blocks at all; omit the array rather than sending it empty.'
   )
 }
 

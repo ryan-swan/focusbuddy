@@ -84,11 +84,32 @@ describe('validateChatUiBlocks', () => {
     expect(choices.options[0].label.endsWith('…')).toBe(true)
   })
 
+  it('truncates at a word boundary, never mid-word (A1, ruling R5)', () => {
+    // 300 chars of real words: the cut must land after a complete word. The
+    // shipped defect was "Googl…" — a card body sliced mid-token.
+    const body = 'alpha bravo '.repeat(25).trim()
+    const out = validateChatUiBlocks([{ type: 'cards', items: [{ title: 'T', body }] }])
+    const card = out[0] as Extract<ChatUiBlock, { type: 'cards' }>
+    const b = card.items[0].body ?? ''
+    expect(b.endsWith('…')).toBe(true)
+    expect(b.length).toBeLessThanOrEqual(240)
+    const lastWord = b.slice(0, -1).split(' ').pop()
+    expect(['alpha', 'bravo']).toContain(lastWord)
+  })
+
   it('prompt section names all four shapes it validates', () => {
     const s = uiBlocksSection()
     for (const t of ['"choices"', '"scale"', '"icon-row"', '"cards"']) {
       expect(s).toContain(t)
     }
+  })
+
+  it('prompt section carries the prose rule, not the blocks-by-default rule (A1)', () => {
+    const s = uiBlocksSection()
+    // The answer's substance streams as prose; blocks are controls that act.
+    expect(s).toContain('IS the answer')
+    expect(s).toContain('never containers')
+    expect(s).not.toContain('DEFAULT style for every answer')
   })
 })
 
