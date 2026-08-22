@@ -569,9 +569,9 @@ export default function HomeDashboard(): JSX.Element {
 
   const openDesk = (n: FbNode): void => {
     if (n.kind === 'folder') {
-      // A folder desk has no canvas of its own; open it in the segment workspace.
-      setActive(null)
-      v.goPlexiDesk()
+      // A folder node is a room: land on its dashboard, same as RoomsView.
+      setActive(n.id)
+      v.goRoom(n.id)
       return
     }
     setActive(n.id)
@@ -837,7 +837,10 @@ export default function HomeDashboard(): JSX.Element {
                   return (
                     <button
                       key={r.id}
-                      onClick={() => setNavRoom(r.id)}
+                      // First click selects (fills the desks column); a second
+                      // click on the selected room opens it for real.
+                      onClick={() => (active ? openDesk(r) : setNavRoom(r.id))}
+                      title={active ? 'Open room' : undefined}
                       data-testid={`home-nav-room-${r.id}`}
                       className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left shrink-0 transition-colors ${
                         active ? 'bg-[rgb(var(--accent)/0.10)]' : 'hover:bg-[var(--surface-sunken)]'
@@ -846,7 +849,7 @@ export default function HomeDashboard(): JSX.Element {
                       <span className={`inline-flex h-7 w-7 items-center justify-center rounded-md shrink-0 ${roomTint(r.id)}`}>
                         <Icon name="folder" size={15} />
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[12.5px] ${active ? 'text-[var(--ink-100)] font-medium' : 'text-[var(--ink-90)]'}`}>
                           {r.title || 'Untitled room'}
                         </span>
@@ -854,6 +857,9 @@ export default function HomeDashboard(): JSX.Element {
                           {count} {count === 1 ? 'desk' : 'desks'}
                         </span>
                       </span>
+                      {active && (
+                        <Icon name="chevron_right" size={14} className="text-[var(--ink-40)] shrink-0" />
+                      )}
                     </button>
                   )
                 })}

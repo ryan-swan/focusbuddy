@@ -70,8 +70,9 @@ function useOpenDesk(): (n: FbNode) => void {
   const setActive = useNodeStore((s) => s.setActive)
   return (n) => {
     if (n.kind === 'folder') {
-      setActive(null)
-      v.goPlexiDesk()
+      // A folder node is a room: land on its dashboard, same as RoomsView.
+      setActive(n.id)
+      v.goRoom(n.id)
       return
     }
     setActive(n.id)
@@ -148,6 +149,7 @@ export function RoomPortalWidget({ roomId, size = 'lg' }: { roomId?: string; siz
       title={room && !room.archived ? room.title || 'Untitled room' : 'Room portal'}
       icon="door_open"
       tone="sky"
+      action={room && !room.archived ? { label: 'Open', onClick: () => openDesk(room) } : undefined}
     >
       {!room || room.archived ? (
         <EmptyState text="This room is gone. Remove the widget or open another." />
