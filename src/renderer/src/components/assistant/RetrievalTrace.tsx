@@ -236,7 +236,7 @@ export default function RetrievalTrace({
               <PlexiiThinking size={14} />
             </span>
             <Icon name={active.icon} size={11} className="shrink-0 text-[var(--ink-50)]" />
-            <span className="fb-status-shimmer">{active.label}</span>
+            <span className="text-[var(--ink-70)]">{active.label}</span>
             {trace.status === 'running' && liveElapsedS >= 2 && (
               <span className="fb-tabular text-[var(--ink-40)]">{liveElapsedS}s</span>
             )}

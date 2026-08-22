@@ -53,17 +53,16 @@ test('plexii P4: breathing mark, shimmer, edge-light', async () => {
   await window.waitForTimeout(900)
   await expect(window.locator('[data-testid="plexii-thinking"]').first()).toBeVisible()
   await window.screenshot({ path: `${OUT}/p4-presence-dark.png` })
-  // The edge-light wrapper must be active while sending.
-  const edges = await window.locator('.fb-ai-edge').count()
-  expect(edges).toBe(1)
+  // F1 ruling: no edge-light, no shimmer — the breathing mark is the only
+  // thinking motion, ever.
+  expect(await window.locator('.fb-ai-edge').count()).toBe(0)
+  expect(await window.locator('.fb-status-shimmer').count()).toBe(0)
 
-  // And gone when the work completes.
   await window.evaluate(() => {
     const w = window as unknown as { __fbChat?: { setState: (s: Record<string, unknown>) => void } }
     w.__fbChat?.setState({ sending: false, liveTraceByThread: {} })
   })
   await window.waitForTimeout(300)
-  expect(await window.locator('.fb-ai-edge').count()).toBe(0)
   await window.screenshot({ path: `${OUT}/p4-presence-idle.png` })
 
   await launched.dispose()

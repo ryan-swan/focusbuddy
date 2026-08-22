@@ -594,7 +594,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           onDelete={(id) => void deleteConversation(id)}
         />
       )}
-      <div className="px-3 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
+      <div className="px-3 py-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           {/* Sentence case, not shouted. The uppercase treatment made a 13px
               label read as a system banner rather than a product surface. */}
@@ -814,21 +814,20 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         className={
           fullscreenHome
             ? 'shrink-0 mt-auto w-full max-w-[640px] mx-auto px-6 pb-5'
-            : 'flex-1 overflow-auto px-3 py-3'
+            : 'flex-1 overflow-auto px-3 pt-3 pb-44'
         }
       >
         {/* In fullscreen the flat page needs a readable column; elsewhere the
             card provides the width. Always the same wrapper node — classes
             only — so switching modes mid-conversation re-lays-out without
             remounting the panel. */}
-        {/* Turn rhythm (P2): large gaps BETWEEN turns, tight spacing within
-            one — the premium-chat convention. The fullscreen column narrows to
-            a ~68-character reading measure; the card modes keep a smaller gap
-            so short panels don't feel sparse. */}
+        {/* Turn rhythm (F1): a question and its answer read as one pair —
+            tight inside the pair, real air between pairs. The base gap is
+            small; each USER turn opens a new pair with its own top margin. */}
         <div
           ref={columnRef}
           className={
-            isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full space-y-6' : 'space-y-4'
+            isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full space-y-3' : 'space-y-2.5'
           }
         >
         {fullscreenHome && (
@@ -901,7 +900,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <div
                 key={i}
                 data-testid="user-turn"
-                className="ml-auto w-fit max-w-[70%] rounded-[var(--radius-card)] px-3.5 py-2.5 fb-t-body leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
+                className="ml-auto w-fit max-w-[70%] mt-6 first:mt-0 rounded-[var(--radius-card)] px-3.5 py-2.5 fb-t-body leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
               >
                 {segments.length <= 1
                   ? m.content
@@ -932,7 +931,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           // through it, which is also what keeps scroll-back unanimated.
           if (sending && i === messages.length - 1) {
             return (
-              <div key={i} className="flex flex-col gap-1.5" data-testid="assistant-turn">
+              <div key={i} className="flex flex-col gap-2.5" data-testid="assistant-turn">
                 {liveTrace && (
                   <RetrievalTrace trace={liveTrace} onOpenSource={(s) => void openSource(s)} />
                 )}
@@ -970,7 +969,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           }
           const finishedTrace = traceByMessage[String(m.ts)]
           return (
-            <div key={i} className="group/turn flex flex-col gap-1.5" data-testid="assistant-turn">
+            <div key={i} className="group/turn flex flex-col gap-2.5" data-testid="assistant-turn">
               {/* No identity row (P2). The premium-chat convention is
                   unanimous: the asymmetry itself marks the speaker — user
                   turns sit right-anchored in a quiet tint, assistant turns are
@@ -1068,27 +1067,10 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             <span className="text-accent" aria-hidden="true">
               <PlexiiThinking size={14} />
             </span>
-            <span className="fb-status-shimmer fb-t-caption">Working…</span>
+            <span className="fb-t-caption text-[var(--ink-60)]">Working…</span>
           </div>
         )}
         </div>
-        {/* The way back down while the position is locked. Floating chrome, so
-            it takes the glass tier; sticky inside the scroll area, zero height
-            in flow so it never pushes content. */}
-        {!fullscreenHome && (
-          <div className="sticky bottom-1 h-0 flex justify-center pointer-events-none">
-            {showJump && (
-              <button
-                type="button"
-                onClick={jumpToLatest}
-                data-testid="jump-to-latest"
-                className="pointer-events-auto -translate-y-9 fb-glass-panel fb-press rounded-full h-7 px-3 flex items-center gap-1.5 fb-t-caption font-medium text-[var(--ink-90)] shadow-[var(--shadow-cast)]"
-              >
-                <span aria-hidden="true">↓</span> Jump to latest
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* The composer is one container that holds the field AND its actions,
@@ -1097,41 +1079,50 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           In the fullscreen home it joins the greeting as one centered column
           (mt-auto above + mb-auto here center the pair), with the capability
           row and suggestion cards underneath. */}
+      {/* The bottom region floats (F1). No dividing line anywhere: the
+          composer hangs over the transcript on a soft fade of the page
+          colour, and the transcript scrolls underneath (the scroll area
+          carries matching bottom padding). */}
       <form
         onSubmit={handleSend}
         className={
           fullscreenHome
             ? 'p-3 pt-0 mb-auto w-full max-w-[640px] mx-auto'
-            : 'p-3 border-t border-[var(--edge-soft)]'
+            : 'absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-10 pointer-events-none bg-gradient-to-t from-[var(--surface-base)] via-[var(--surface-base)]/85 to-transparent'
         }
       >
-        <div className={isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full' : ''}>
-        {/* The assistant's follow-up question, when it asked one, sits directly
-            above the composer — pick an option and Send, or just type below
-            (any send on this thread is the answer). */}
-        {activeQuestion && (
-          <QuestionCard
-            question={activeQuestion.question}
-            disabled={sending}
-            onDismiss={() => dismissQuestion(activeQuestion.messageTs)}
-            onAnswer={(option) => {
-              if (sending) return
-              void send(thread.serverTaskId, option, thread.key)
-            }}
-          />
+        {!fullscreenHome && showJump && (
+          <div className="flex justify-center mb-2 pointer-events-none">
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              data-testid="jump-to-latest"
+              className="pointer-events-auto fb-glass-panel fb-press rounded-full h-7 px-3 flex items-center gap-1.5 fb-t-caption font-medium text-[var(--ink-90)] shadow-[var(--shadow-cast)]"
+            >
+              <span aria-hidden="true">↓</span> Jump to latest
+            </button>
+          </div>
         )}
-        {/* The edge-light (P4): while Plexii generates, a quiet accent glow
-            lives at the composer's boundary — the Apple Intelligence pattern,
-            light at the edge instead of chrome takeover. Accent = live state,
-            so it is lawful; it exists only while sending and nowhere else.
-            The box's opaque surface sits above the glow, so only the rim
-            shows. */}
-        <div className={sending ? 'fb-ai-edge' : undefined}>
-        {/* Glass at last (P5): the composer is floating chrome over the
-            transcript, so it takes the glass tier — the one glass layer on
-            the page, per the two-layer law. Focus keeps the whole-box ring,
-            composed WITH the glass shadows so the top highlight survives. */}
+        <div
+          className={`pointer-events-auto ${isFullscreen && !fullscreenHome ? 'max-w-[720px] mx-auto w-full' : ''}`}
+        >
+        {/* Glass composer (P5), one surface that also asks (F1): the
+            follow-up question docks inside this card — no separate box, no
+            extra border. The edge-light is gone by ruling: the breathing
+            double-i is the only thinking motion. */}
         <div className="relative fb-glass-panel rounded-[var(--radius-card)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[var(--shadow-cast),var(--shadow-inset-highlight),0_0_0_3px_rgb(var(--accent)/0.13)]">
+          {activeQuestion && (
+            <QuestionCard
+              docked
+              question={activeQuestion.question}
+              disabled={sending}
+              onDismiss={() => dismissQuestion(activeQuestion.messageTs)}
+              onAnswer={(option) => {
+                if (sending) return
+                void send(thread.serverTaskId, option, thread.key)
+              }}
+            />
+          )}
           {/* What this conversation is working from, restated at the point of
               typing. Either the objects it references (typed with "@" or
               clicked on the canvas — one layer, plan D7/D8) or, when it
@@ -1337,7 +1328,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           <span className="fb-t-caption font-mono text-[var(--ink-40)]">
             ↵ send · ⇧↵ newline
           </span>
-        </div>
         </div>
         </div>
       </form>
