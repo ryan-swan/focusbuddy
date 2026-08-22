@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { JSONContent } from '@tiptap/core'
 import type {
   ActionProposal,
   AiChatConversationContext,
@@ -116,6 +117,14 @@ interface ChatStore {
   // (plan P1's first rendering). Kept per message rather than derived, because
   // the conversation's live set changes and the transcript must not.
   mentionsByMessage: Record<string, MentionRef[]>
+  // The composer's unsent draft per conversation (A1, defect AI-16): the
+  // TipTap document JSON, so mention chips survive, not just the words. The
+  // panel unmounts whenever you walk to a desk or collapse to the pill; the
+  // draft living only in the editor meant that walk ATE what was being
+  // typed. Session-scoped by design — an unsent draft is not durable data.
+  draftDocByThread: Record<string, JSONContent>
+  // null deletes the entry (an emptied composer has no draft).
+  setThreadDraft: (threadKey: string, doc: JSONContent | null) => void
   // ── One persisted conversation system (Phase 4.5) ────────────────────────
   // The panel and the focus chat used to be two engines: in-memory per-screen
   // threads here, SQLite conversations there, bridged one-way by the 3a.3
@@ -269,6 +278,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   mentions: [],
   mentionResolution: {},
   mentionsByMessage: {},
+  draftDocByThread: {},
+  setThreadDraft: (threadKey, doc) => {
+    const next = { ...get().draftDocByThread }
+    if (doc === null) delete next[threadKey]
+    else next[threadKey] = doc
+    set({ draftDocByThread: next })
+  },
   addMentionRef: (ref) => {
     const r = addMention(get().mentions, ref)
     if (r.added) set({ mentions: r.mentions })
@@ -317,10 +333,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     delete nextMessages[key]
     const nextLive = { ...get().liveTraceByThread }
     delete nextLive[key]
+    // A second New chat must not inherit the first one's half-typed draft.
+    const nextDrafts = { ...get().draftDocByThread }
+    delete nextDrafts[key]
     set({
       activeConversationId: null,
       messagesByTask: nextMessages,
       liveTraceByThread: nextLive,
+      draftDocByThread: nextDrafts,
       messageIdByTs: {},
       mentions: clearConversationMentions(get().mentions, key),
       pendingContext: null,
@@ -403,6 +423,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   deleteConversation: async (id) => {
     await window.api.aiChat.deleteConversation(id).catch(() => {})
+    const nextDrafts = { ...get().draftDocByThread }
+    delete nextDrafts[id]
+    set({ draftDocByThread: nextDrafts })
     if (get().activeConversationId === id) get().newConversation()
     await get().refreshConversations()
   },
@@ -554,7 +577,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const nextMessages = { ...get().messagesByTask }
         delete nextMessages[NEW_CHAT_KEY]
         nextMessages[meta.id] = carried
+        // A draft typed before the first send belongs to the conversation it
+        // just became — the composer keeps it through the re-key.
+        const nextDrafts = { ...get().draftDocByThread }
+        if (nextDrafts[NEW_CHAT_KEY]) {
+          nextDrafts[meta.id] = nextDrafts[NEW_CHAT_KEY]
+          delete nextDrafts[NEW_CHAT_KEY]
+        }
         set({
+          draftDocByThread: nextDrafts,
           activeConversationId: meta.id,
           // The new row is not in the list until the next refresh, so seed it
           // now — otherwise activeMode() would read 'chat' for a conversation
@@ -931,6 +962,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     const nextLive = { ...get().liveTraceByThread }
     delete nextLive[key]
+    const nextDrafts = { ...get().draftDocByThread }
+    delete nextDrafts[key]
     set({
       messagesByTask: next,
       proposalsByMessage: nextProposals,
@@ -942,6 +975,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       questionByMessage: nextQuestions,
       mentionsByMessage: nextMentionsByMessage,
       liveTraceByThread: nextLive,
+      draftDocByThread: nextDrafts,
       // A cleared conversation has nothing left referencing it.
       mentions: clearConversationMentions(get().mentions, key)
     })

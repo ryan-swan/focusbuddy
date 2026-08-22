@@ -222,6 +222,37 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   // disabled on an empty box — the document remains the source of truth.
   const [draft, setDraft] = useState('')
   const editorRef = useRef<import('@tiptap/core').Editor | null>(null)
+  // Draft persistence (A1, defect AI-16): the panel unmounts when you walk to
+  // a desk or collapse to the pill, and the draft used to live only in the
+  // editor — the walk ate what was being typed. Every change now mirrors the
+  // document into the store per conversation; this pair restores it when the
+  // editor (re)appears or the conversation changes. The key ref keeps the
+  // change handler stable (TipTap captures onUpdate once, at creation).
+  const draftKeyRef = useRef(conversationKey)
+  draftKeyRef.current = conversationKey
+  const loadedDraftKey = useRef<string | null>(null)
+  const handleComposerChange = useCallback((text: string, doc: import('@tiptap/core').JSONContent): void => {
+    setDraft(text)
+    useChatStore.getState().setThreadDraft(draftKeyRef.current, text.trim() ? doc : null)
+  }, [])
+  const restoreDraft = useCallback((ed: import('@tiptap/core').Editor, key: string): void => {
+    if (loadedDraftKey.current === key) return
+    loadedDraftKey.current = key
+    const stored = useChatStore.getState().draftDocByThread[key]
+    if (stored) {
+      ed.commands.setContent(stored)
+      setDraft(docToInput(stored).text)
+    } else if (!ed.isEmpty) {
+      // Switching to a conversation that has no draft: the box belongs to it
+      // now, and the previous conversation's words are safe under its own key.
+      ed.commands.clearContent()
+      setDraft('')
+    }
+  }, [])
+  useEffect(() => {
+    const ed = editorRef.current
+    if (ed) restoreDraft(ed, conversationKey)
+  }, [conversationKey, restoreDraft])
   // Fill the composer without sending — what the suggestion rows and home cards
   // have always done. Goes through the editor because there is no textarea to
   // set a value on any more.
@@ -1152,10 +1183,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             placeholder={discovering ? 'Start anywhere — an idea, a question, a hunch…' : ctx.placeholder}
             disabled={sending}
             hooks={mentionHooks}
-            onTextChange={setDraft}
+            onTextChange={handleComposerChange}
             onSubmit={() => void submitComposer()}
             onReady={(ed) => {
               editorRef.current = ed
+              restoreDraft(ed, conversationKey)
             }}
           />
           <div className="flex items-center gap-1.5">

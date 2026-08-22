@@ -33,9 +33,10 @@ interface Props {
   placeholder: string
   disabled: boolean
   hooks: MentionSuggestionHooks
-  // Fired on every change with the current plain-text rendering, so the host
-  // can enable/disable Send without owning the document.
-  onTextChange: (text: string) => void
+  // Fired on every change with the current plain-text rendering (so the host
+  // can enable/disable Send) and the document itself (so the host can keep
+  // the draft alive across unmounts — A1, defect AI-16).
+  onTextChange: (text: string, doc: JSONContent) => void
   // Enter (or ⌘↵) with content. The host reads the document through the handle.
   onSubmit: () => void
   // Handed the editor so the host can read the document and clear it on send.
@@ -93,7 +94,8 @@ export default function MentionComposer({
       }
     },
     onUpdate: ({ editor: e }) => {
-      onTextChange(docToInput(e.getJSON() as JSONContent).text)
+      const doc = e.getJSON() as JSONContent
+      onTextChange(docToInput(doc).text, doc)
     }
   })
 
