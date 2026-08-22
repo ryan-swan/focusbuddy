@@ -211,3 +211,10 @@ export const useFocusSessionStore = create<FocusSessionStore>((set, get) => ({
     }
   }
 }))
+
+// Thin handle for debugging + e2e (same convention as __fbView/__fbNodes): the
+// real store, not a mock. Changes nothing about user behaviour.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbFocusSession?: typeof useFocusSessionStore }).__fbFocusSession =
+    useFocusSessionStore
+}

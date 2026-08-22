@@ -42,6 +42,18 @@ export default function WrapupOverlay(): JSX.Element | null {
       .catch(() => setFolders([]))
   }, [status, folderId])
 
+  // Escape mirrors the X and the backdrop: the wrap-up never holds the screen.
+  useEffect(() => {
+    if (status === 'idle') return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      dismiss()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [status, dismiss])
+
   if (status === 'idle') return null
 
   return (

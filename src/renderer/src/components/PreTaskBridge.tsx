@@ -58,6 +58,19 @@ export default function PreTaskBridge(): JSX.Element | null {
     return () => window.clearTimeout(id)
   }, [activeTask, secondsLeft])
 
+  // The bridge is an offer, not a gate: Escape always dismisses it.
+  useEffect(() => {
+    if (!activeTask) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setActiveTask(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [activeTask])
+
   if (!activeTask) return null
 
   function close(): void {
@@ -97,8 +110,22 @@ export default function PreTaskBridge(): JSX.Element | null {
   const reasonLine = reasons.join(' · ')
 
   return (
-    <div className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm">
-      <div className="bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
+    <div
+      className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close()
+      }}
+    >
+      <div className="relative bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
+        <button
+          onClick={close}
+          aria-label="Close"
+          title="Close (Esc)"
+          data-testid="pre-task-bridge-close"
+          className="icon-btn absolute top-2.5 right-2.5 text-[var(--ink-50)]"
+        >
+          <Icon name="close" size={16} />
+        </button>
         <div className="px-5 pt-5 pb-3 text-center">
           <div className="text-2xl mb-1">🌱</div>
           <h3 className="text-base font-semibold text-[var(--ink-100)]">

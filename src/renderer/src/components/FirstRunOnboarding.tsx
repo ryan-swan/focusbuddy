@@ -33,6 +33,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
   const [key, setKey] = useState('')
   const [keyStatus, setKeyStatus] = useState<KeyStatus>({ kind: 'idle' })
   const [seeding, setSeeding] = useState(false)
+  const [seedError, setSeedError] = useState<string | null>(null)
 
   const isActive = activeModuleId === CORE_MODULE_ID
   // Reset to the first step each time the core module (re)opens, so a replay
@@ -42,8 +43,23 @@ export default function FirstRunOnboarding(): JSX.Element | null {
       setStep(0)
       setKey('')
       setKeyStatus({ kind: 'idle' })
+      setSeedError(null)
     }
   }, [isActive])
+
+  // Every step is skippable, so Escape always is too — no state can strand a
+  // new user inside their very first dialog. Ignored only mid-seed.
+  useEffect(() => {
+    if (!isActive || seeding) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      skip()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, seeding])
 
   if (!isActive) return null
 
@@ -72,6 +88,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
   // data — a genuinely useful first task with an orientation note on its canvas.
   async function createStarter(): Promise<void> {
     setSeeding(true)
+    setSeedError(null)
     try {
       const folder = await window.api.nodes.create({
         parentId: null,
@@ -101,6 +118,10 @@ export default function FirstRunOnboarding(): JSX.Element | null {
       })
       await refreshNodes()
       finish(() => goTask(firstTask.id))
+    } catch {
+      // Never strand the user on the last step: surface the failure and leave
+      // both Start blank and a retry available.
+      setSeedError('Could not create the starter workspace. Try again, or start blank.')
     } finally {
       setSeeding(false)
     }
@@ -305,6 +326,12 @@ export default function FirstRunOnboarding(): JSX.Element | null {
                 <span>Start blank</span>
               </button>
             </div>
+            {seedError && (
+              <div className="mt-3 text-[12px] text-red-400 inline-flex items-center gap-1.5" data-testid="onboarding-seed-error">
+                <Icon name="error_outline" size={13} />
+                <span>{seedError}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

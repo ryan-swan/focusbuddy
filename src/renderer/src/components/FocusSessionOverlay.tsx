@@ -57,6 +57,22 @@ export default function FocusSessionOverlay(): JSX.Element | null {
     }
   }, [active, remaining, zeroFired])
 
+  // The end-of-session choice is an offer, not a gate: Escape counts the
+  // session as done — the least-commitment choice — instead of trapping the
+  // user until they pick one of four buttons.
+  useEffect(() => {
+    if (!showChoice) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      chimeIn()
+      void finish('done')
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showChoice])
+
   if (!active) return null
 
   const task = active.taskId ? nodes.find((n) => n.id === active.taskId) ?? null : null
@@ -169,7 +185,12 @@ export default function FocusSessionOverlay(): JSX.Element | null {
 
       {/* End-of-session choice modal */}
       {showChoice && (
-        <div className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/30 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/30 backdrop-blur-sm"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) void handleDone()
+          }}
+        >
           <div className="bg-[var(--surface-raised)] w-full max-w-sm mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
             <div className="px-5 py-4 text-center">
               <div className="text-3xl mb-1">✨</div>

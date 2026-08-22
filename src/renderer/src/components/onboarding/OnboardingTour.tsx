@@ -88,6 +88,19 @@ export default function OnboardingTour(): JSX.Element | null {
     }
   }, [isSteps, step, activeStep, activeModuleId])
 
+  // Escape ends the tour — the same promise the Skip button makes, on the key
+  // everyone reaches for first.
+  useEffect(() => {
+    if (!isSteps) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      skip()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [isSteps, skip])
+
   if (!isSteps || !mod || !step) return null
 
   const isLast = activeStep >= mod.steps.length - 1
