@@ -132,7 +132,7 @@ export default function DailyBriefCard(): JSX.Element {
             {actions.map((a) => {
               const done = scheduled.has(a.taskId)
               return (
-                <div key={a.taskId} className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1.5">
+                <div key={a.taskId} className="flex items-center gap-2 rounded-lg bg-[var(--surface-base)] px-2 py-1.5">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px] text-[var(--ink-90)]">{a.title}</div>
                     <div className="text-[10.5px] text-[var(--ink-50)]">{whenLabel(a.startMs)} · {a.durationMin} min</div>

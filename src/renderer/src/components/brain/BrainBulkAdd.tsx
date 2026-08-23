@@ -67,7 +67,7 @@ export default function BrainBulkAdd(): JSX.Element {
   }
 
   const btn =
-    'flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-[var(--edge-soft)] text-[11.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent))]/40 hover:text-[rgb(var(--accent))] disabled:opacity-50'
+    'flex-1 inline-flex items-center justify-center gap-1.5 h-8 fb-btn-surface fb-press text-[11.5px] text-[var(--ink-80)] hover:text-[rgb(var(--accent))] disabled:opacity-50'
 
   return (
     <div className="px-3 pb-2.5" data-testid="brain-bulk-add">

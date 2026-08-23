@@ -178,7 +178,7 @@ export function PromptDialogHost(): JSX.Element | null {
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
-        className="w-[min(440px,90vw)] rounded-xl border border-[var(--edge-soft)] dark:border-white/10 bg-[var(--surface-raised)] shadow-2xl p-4"
+        className="fb-card w-[min(440px,90vw)] dark:border-white/10 p-4"
         data-testid="prompt-dialog"
       >
         <div className="text-[14px] font-semibold text-[var(--ink-100)]">{req.title}</div>

@@ -127,7 +127,7 @@ function DocRefField(props: FieldEditorProps & { value: string[] }): JSX.Element
         return (
           <span
             key={id}
-            className="inline-flex items-center gap-1 max-w-full rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] pl-1.5 pr-1 py-0.5"
+            className="inline-flex items-center gap-1 max-w-full rounded-md bg-[var(--surface-sunken)] pl-1.5 pr-1 py-0.5"
           >
             <button
               onClick={(e) => {
@@ -555,7 +555,7 @@ function AttachmentChip({
     }
   }, [fileId])
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)]">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[var(--surface-sunken)]">
       <Icon name="attach_file" size={10} />
       <a
         href={`fb-file://${fileId}`}

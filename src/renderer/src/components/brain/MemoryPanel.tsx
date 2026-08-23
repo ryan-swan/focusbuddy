@@ -61,7 +61,7 @@ export default function MemoryPanel(): JSX.Element {
   }
 
   const btn =
-    'text-[11px] px-2 py-1 rounded-md border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50'
+    'text-[11px] px-2 py-1 fb-btn-surface fb-press text-[var(--ink-70)] disabled:opacity-50'
 
   return (
     <div className="mt-3 pt-3 border-t border-[var(--edge-soft)]" data-testid="memory-panel">
@@ -78,7 +78,7 @@ export default function MemoryPanel(): JSX.Element {
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as MemoryKind)}
-          className="text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md px-1.5"
+          className="fb-field text-[11px] px-1.5"
         >
           <option value="fact">Fact</option>
           <option value="preference">Preference</option>
@@ -91,7 +91,7 @@ export default function MemoryPanel(): JSX.Element {
             if (e.key === 'Enter') void remember()
           }}
           placeholder="Remember this…"
-          className="flex-1 min-w-0 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md px-2 py-1 focus:outline-none focus:border-accent"
+          className="fb-field flex-1 min-w-0 text-[12px] px-2 py-1"
         />
         <button onClick={() => void remember()} disabled={!text.trim()} className={btn} data-testid="memory-remember">
           Remember

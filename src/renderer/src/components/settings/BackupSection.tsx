@@ -87,7 +87,7 @@ export default function BackupSection(): JSX.Element {
         <button
           onClick={() => void onExport()}
           disabled={busy !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
+          className="fb-btn-surface inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
         >
           <Icon name="download" size={13} />
           <span>{busy === 'export' ? 'Exporting…' : 'Export a backup'}</span>
@@ -95,7 +95,7 @@ export default function BackupSection(): JSX.Element {
         <button
           onClick={() => void onRestore()}
           disabled={busy !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
+          className="fb-btn-surface inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
         >
           <Icon name="restore" size={13} />
           <span>{busy === 'restore' ? 'Restoring…' : 'Restore from backup…'}</span>

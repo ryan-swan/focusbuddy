@@ -98,7 +98,7 @@ export default function AiAssistPreview(): JSX.Element | null {
     >
       <div
         data-testid="ai-assist-preview"
-        className="w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-[var(--surface-raised)] shadow-2xl border border-[var(--edge-soft)]"
+        className="fb-card w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <Icon name="auto_awesome" size={18} className="text-accent" />

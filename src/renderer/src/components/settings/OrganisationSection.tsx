@@ -83,7 +83,7 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
           <button
             onClick={onManage}
             data-testid="settings-org-manage"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="fb-btn-surface w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="settings" size={13} />
             Manage organisation
@@ -97,7 +97,7 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
           <button
             onClick={onManage}
             data-testid="settings-org-manage"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="fb-btn-surface w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="apartment" size={13} />
             Manage organisation

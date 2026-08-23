@@ -95,7 +95,7 @@ export default function AccountSection(): JSX.Element {
               onClick={() => void handleSignOut()}
               disabled={busy}
               data-testid="account-signout"
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-field)] fb-t-caption border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+              className="fb-btn-surface shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-field)] fb-t-caption text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
             >
               <Icon name="logout" size={13} />
               {busy ? 'Signing out…' : 'Sign out'}
@@ -114,7 +114,7 @@ export default function AccountSection(): JSX.Element {
                 placeholder="First name"
                 maxLength={40}
                 data-testid="account-first-name"
-                className="flex-1 min-w-0 rounded-[var(--radius-field)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
+                className="fb-field flex-1 min-w-0 rounded-[var(--radius-field)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
               />
               <input
                 value={lastName}
@@ -122,7 +122,7 @@ export default function AccountSection(): JSX.Element {
                 placeholder="Last name"
                 maxLength={40}
                 data-testid="account-last-name"
-                className="flex-1 min-w-0 rounded-[var(--radius-field)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
+                className="fb-field flex-1 min-w-0 rounded-[var(--radius-field)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
               />
               <button
                 onClick={() => void handleSaveName()}

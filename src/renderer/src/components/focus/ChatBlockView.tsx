@@ -137,7 +137,7 @@ export default function ChatBlockView({
       // no affordance. The tooltip carries the retrieved excerpt, which is the
       // closest thing to "the line this came from" that retrieval hands back.
       const chipClass =
-        'inline-flex items-center gap-1.5 max-w-full rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-1.5 pr-2 py-0.5 text-[10px] text-[var(--ink-70)]'
+        'inline-flex items-center gap-1.5 max-w-full rounded-full bg-[var(--surface-sunken)] pl-1.5 pr-2 py-0.5 text-[10px] text-[var(--ink-70)]'
       return (
         <div className="flex flex-wrap gap-1" data-testid="chat-sources">
           {block.sources.map((s) => {
@@ -195,7 +195,7 @@ export default function ChatBlockView({
       // ProposalCards; the connector chip above it names the integration.
       return (
         <div className="max-w-[92%] flex flex-col gap-1">
-          <div className="inline-flex items-center gap-1.5 self-start rounded-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] px-2 py-0.5">
+          <div className="inline-flex items-center gap-1.5 self-start rounded-full bg-[var(--surface-sunken)] px-2 py-0.5">
             <Icon name={meta.icon} size={12} className="text-[rgb(var(--accent))]" />
             <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-50)]">
               {meta.label}
@@ -241,7 +241,7 @@ export default function ChatBlockView({
         <button
           onClick={() => block.widgetId && onOpenWidget?.(block.widgetId)}
           disabled={!block.widgetId}
-          className="max-w-[92%] flex items-center gap-2.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent px-3 py-2 text-left transition-colors disabled:cursor-default"
+          className="fb-btn-surface max-w-[92%] flex items-center gap-2.5 hover:border-accent px-3 py-2 text-left transition-colors disabled:cursor-default"
         >
           <span className="h-7 w-7 rounded-md bg-[var(--surface-sunken)] flex items-center justify-center text-[var(--ink-50)] shrink-0">
             <Icon name="widgets" size={15} />
@@ -283,7 +283,7 @@ function BlockShell({
   children: React.ReactNode
 }): JSX.Element {
   return (
-    <div className="max-w-[92%] rounded-lg border border-dashed border-[var(--edge-soft)] bg-[var(--surface-sunken)]/50 px-3 py-2.5">
+    <div className="max-w-[92%] rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5">
       <div className="flex items-center gap-1.5 mb-1">
         <Icon name={icon} size={14} className="text-[var(--ink-50)]" />
         <span className="text-[12px] font-medium text-[var(--ink-90)]">{label}</span>

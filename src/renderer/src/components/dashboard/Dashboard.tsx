@@ -257,7 +257,7 @@ export default function Dashboard({
         {/* Header — suppressed when the parent view renders its own */}
         {!hideHeader && (
           <div className="flex items-center gap-3 mb-2">
-            <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[var(--surface-raised)]/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
+            <div className="inline-flex items-center justify-center h-10 w-10 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] shrink-0">
               <Icon name={icon} size={20} className="text-accent" />
             </div>
             <div className="flex-1 min-w-0">
@@ -333,11 +333,11 @@ export default function Dashboard({
         {/* Column chooser — visible in edit mode so the layout can be set to
             one, two or three columns. Persisted per dashboard key. */}
         {editing && (
-          <div className="flex items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/60 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-xl bg-[var(--surface-sunken)] px-3 py-2">
             <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
               Columns
             </span>
-            <div className="inline-flex rounded-lg border border-[var(--edge-soft)] overflow-hidden">
+            <div className="inline-flex rounded-lg bg-[var(--surface-sunken)] overflow-hidden">
               {([1, 2, 3] as DashboardColumns[]).map((n) => (
                 <button
                   key={n}
@@ -479,7 +479,7 @@ export default function Dashboard({
                     <button
                       key={k}
                       onClick={() => addCard(k)}
-                      className="flex items-start gap-2 p-2 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left"
+                      className="fb-btn-surface flex items-start gap-2 p-2 hover:border-accent hover:bg-accent/5 transition-colors text-left"
                     >
                       <Icon
                         name={meta.icon}

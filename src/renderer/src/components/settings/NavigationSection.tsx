@@ -221,7 +221,7 @@ function NavPreview({ nav }: { nav: NavPrefs }): JSX.Element {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        className="relative h-[120px] w-full rounded-[var(--radius-field)] overflow-hidden cursor-grab active:cursor-grabbing border border-[var(--edge-soft)] touch-none"
+        className="relative h-[120px] w-full rounded-[var(--radius-field)] overflow-hidden cursor-grab active:cursor-grabbing shadow-[0_0_0_1px_var(--edge-hairline)] touch-none"
         style={{
           backgroundColor: 'rgb(var(--accent) / 0.04)',
           backgroundImage:

@@ -127,7 +127,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
     >
       <div
         data-testid="widget-setup-preview"
-        className="w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col rounded-lg bg-[var(--surface-raised)] shadow-2xl border border-[var(--edge-soft)]"
+        className="fb-card w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <Icon name="auto_awesome" size={18} className="text-accent" />
@@ -181,7 +181,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
                 <p className="text-sm text-[var(--ink-70)]">{structured.summary}</p>
               )}
               {structured.applyAs === 'page-doc' && (
-                <div className="rounded-md border border-[var(--edge-soft)] p-3">
+                <div className="rounded-md bg-[var(--surface-sunken)] p-3">
                   <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">
                     Page outline
                   </div>
@@ -202,7 +202,7 @@ export default function WidgetSetupPreview(): JSX.Element | null {
                 </div>
               )}
               {structured.applyAs === 'webview-url' && (
-                <div className="rounded-md border border-[var(--edge-soft)] p-3">
+                <div className="rounded-md bg-[var(--surface-sunken)] p-3">
                   <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">
                     Open this address
                   </div>

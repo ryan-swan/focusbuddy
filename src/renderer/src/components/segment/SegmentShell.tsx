@@ -147,7 +147,7 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
                     key={a.key}
                     onClick={() => setActiveKey(a.key)}
                     data-testid={`segment-tile-${a.key}`}
-                    className="flex flex-col items-start gap-2.5 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4 text-left hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+                    className="fb-btn-surface flex flex-col items-start gap-2.5 p-4 text-left hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
                   >
                     <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${a.tone}`} style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                       <Icon name={a.icon} size={22} />

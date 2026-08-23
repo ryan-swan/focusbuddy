@@ -79,7 +79,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
       <AiSourceSection />
 
       {usage && usage.calls > 0 && (
-        <div className="rounded-[var(--radius-field)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 px-3 py-2 text-[11.5px] text-[var(--ink-70)]" data-testid="ai-usage-summary">
+        <div className="rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2 text-[11.5px] text-[var(--ink-70)]" data-testid="ai-usage-summary">
           <div className="flex items-center justify-between">
             <span>AI usage on this device</span>
             <span className="text-[var(--ink-90)] font-medium">~${usage.costUsd.toFixed(2)} est.</span>
@@ -324,7 +324,7 @@ function AiSourceSection(): JSX.Element {
       </div>
 
       {status && status.mode !== 'byok' && (
-        <div className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-[var(--radius-field)] px-2.5 py-2 mb-2">
+        <div className="fb-card rounded-[var(--radius-field)] px-2.5 py-2 mb-2">
           {!status.signedIn ? (
             <div className="fb-t-caption text-[var(--ink-50)] leading-snug">
               Sign in to your PlexiDesk account to use credits. New accounts start
@@ -362,7 +362,7 @@ function AiSourceSection(): JSX.Element {
                     onClick={() => void topUp(amt)}
                     disabled={busy}
                     data-testid={`ai-topup-${amt}`}
-                    className="flex-1 fb-t-caption border border-[var(--edge-soft)] rounded-[var(--radius-field)] py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                    className="fb-btn-surface flex-1 fb-t-caption rounded-[var(--radius-field)] py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                   >
                     Add ${amt}
                   </button>
@@ -608,7 +608,7 @@ function ApiKeyRow({
       )}
 
       {hint.hasKey && !editing && (
-        <div className="flex items-center justify-between bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-[var(--radius-field)] px-2.5 py-1.5 mb-2">
+        <div className="fb-card flex items-center justify-between rounded-[var(--radius-field)] px-2.5 py-1.5 mb-2">
           <code className="text-xs font-mono text-[var(--ink-70)]">
             ••••••••{hint.last4 ?? '????'}
           </code>

@@ -47,21 +47,21 @@ export default function PrivacyHelpSection(): JSX.Element {
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))}
             data-testid="help-replay-onboarding"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="fb-btn-surface w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="explore" size={14} /> Take a tour / replay onboarding
           </button>
           <button
             onClick={() => void window.api.files.openExternal(HELP_BASE)}
             data-testid="help-guides"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="fb-btn-surface w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="help" size={14} /> Help &amp; guides
           </button>
           <button
             onClick={() => void window.api.files.openExternal(PRICING_URL)}
             data-testid="help-pricing"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="fb-btn-surface w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="sell" size={14} /> Plans &amp; pricing
           </button>

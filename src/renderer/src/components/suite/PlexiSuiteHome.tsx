@@ -251,7 +251,7 @@ export default function PlexiSuiteHome(): JSX.Element {
         >
           <Icon name="search" size={18} className="text-[var(--ink-50)] group-hover:text-accent transition-colors" />
           <span className="flex-1 text-left text-[14px] text-[var(--ink-50)]">Search anything in Plexi</span>
-          <span className="shrink-0 hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-50)] fb-tabular">
+          <span className="shrink-0 hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-50)] fb-tabular">
             ⌘K
           </span>
         </button>

@@ -99,7 +99,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
   if (!loaded) return null
 
   const inputCls =
-    'w-full px-3 py-2 rounded-[var(--radius-field)] text-[13px] text-[var(--ink-100)] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] focus:outline-none focus:border-accent'
+    'w-full px-3 py-2 rounded-[var(--radius-field)] text-[13px] text-[var(--ink-100)] bg-[var(--surface-sunken)] focus:outline-none focus:border-accent'
 
   return (
     <div className="pt-3 border-t border-[var(--edge-soft)] space-y-2">
@@ -118,7 +118,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
             onClick={() => (enabled ? setStage('disable') : void beginSetup())}
             disabled={busy}
             data-testid="twofa-toggle"
-            className="shrink-0 px-2.5 py-1.5 rounded-[var(--radius-field)] fb-t-caption border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+            className="fb-btn-surface shrink-0 px-2.5 py-1.5 rounded-[var(--radius-field)] fb-t-caption text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
           >
             {busy ? 'Working…' : enabled ? 'Turn off' : 'Turn on'}
           </button>
@@ -131,7 +131,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
             Add this secret to your authenticator app (Google Authenticator, 1Password, Authy), then enter the
             6-digit code it shows.
           </p>
-          <div className="font-mono text-[12px] tracking-[0.15em] text-[var(--ink-100)] break-all select-all bg-[var(--surface-raised)] rounded-[var(--radius-chip)] px-2 py-1.5 border border-[var(--edge-soft)]">
+          <div className="fb-card font-mono text-[12px] tracking-[0.15em] text-[var(--ink-100)] break-all select-all rounded-[var(--radius-chip)] px-2 py-1.5">
             {secret}
           </div>
           <div className="fb-t-caption text-[var(--ink-50)] break-all select-all">{otpauth}</div>
@@ -164,7 +164,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
           </p>
           <div className="grid grid-cols-2 gap-1 font-mono fb-t-caption text-[var(--ink-100)] select-all">
             {recovery.map((c) => (
-              <div key={c} className="bg-[var(--surface-raised)] rounded-[var(--radius-chip)] px-2 py-1 border border-[var(--edge-soft)]">
+              <div key={c} className="fb-card rounded-[var(--radius-chip)] px-2 py-1">
                 {c}
               </div>
             ))}

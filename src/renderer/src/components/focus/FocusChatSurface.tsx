@@ -327,7 +327,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
                 <div>
                   <span
                     data-testid="focus-chat-context-chip"
-                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] text-[var(--ink-60)]"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[10px] text-[var(--ink-60)]"
                     title="This conversation is scoped to your whole workspace"
                   >
                     <Icon name="travel_explore" size={11} className="shrink-0" />
@@ -378,7 +378,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
                         type="button"
                         onClick={() => setDraft(s.text)}
                         data-testid="focus-chat-suggestion"
-                        className="text-left px-3 py-2.5 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2.5"
+                        className="fb-btn-surface text-left px-3 py-2.5 hover:border-[rgb(var(--accent)/0.45)] hover:bg-[var(--surface-sunken)] transition-colors flex items-center gap-2.5"
                       >
                         <Icon name={s.icon} size={15} className="text-accent shrink-0" />
                         <span className="text-[12.5px] text-[var(--ink-80)] truncate">{s.text}</span>

@@ -128,7 +128,7 @@ export default function FocusAddSurface({ onOpenWidget }: Props): JSX.Element {
                 disabled={noTask || busy !== null}
                 title={opt.hint}
                 data-testid={`focus-add-create-${opt.kind}`}
-                className="group flex flex-col items-start gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-sunken)] hover:border-accent hover:bg-accent/5 px-3.5 py-3 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="fb-tile group flex flex-col items-start gap-2 hover:border-accent hover:bg-accent/5 px-3.5 py-3 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span className="h-8 w-8 rounded-lg bg-[var(--surface-raised)] flex items-center justify-center text-[rgb(var(--accent))] group-hover:bg-accent/10 transition-colors">
                   <Icon name={busy === opt.kind ? 'hourglass_top' : opt.icon} size={17} className={busy === opt.kind ? 'animate-spin' : ''} />
@@ -157,7 +157,7 @@ export default function FocusAddSurface({ onOpenWidget }: Props): JSX.Element {
                   onChange={(e) => setOpenQuery(e.target.value)}
                   placeholder="Search documents"
                   data-testid="focus-add-open-search"
-                  className="w-48 bg-[var(--surface-sunken)] text-[var(--ink-100)] border border-[var(--edge-soft)] rounded-md pl-7 pr-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="fb-field w-48 text-[var(--ink-100)] pl-7 pr-2 py-1 text-[12px]"
                 />
               </div>
             )}

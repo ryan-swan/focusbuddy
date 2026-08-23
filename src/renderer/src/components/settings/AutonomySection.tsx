@@ -90,7 +90,7 @@ export default function AutonomySection(): JSX.Element {
       </div>
 
       {/* Effective level readout — makes the interaction of the scopes visible. */}
-      <div className="rounded-[var(--radius-card)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-3" data-testid="autonomy-effective">
+      <div className="rounded-[var(--radius-card)] bg-[var(--surface-sunken)] p-3" data-testid="autonomy-effective">
         <div className="fb-t-caption uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold">In effect now</div>
         <div className="text-[13px] text-[var(--ink-100)] mt-1 font-medium">{autonomyLabel(resolved.level)}</div>
         <div className="fb-t-caption text-[var(--ink-50)] mt-0.5">
@@ -128,7 +128,7 @@ export default function AutonomySection(): JSX.Element {
             {orgMsg && <div className="fb-t-caption text-rose-500 mt-1.5">{orgMsg}</div>}
           </div>
         ) : (
-          <div className="rounded-[var(--radius-field)] border border-[var(--edge-soft)] p-3" data-testid="autonomy-org-readonly">
+          <div className="rounded-[var(--radius-field)] bg-[var(--surface-sunken)] p-3" data-testid="autonomy-org-readonly">
             <div className="fb-t-caption text-[var(--ink-70)] font-medium">Organisation policy</div>
             <div className="text-[12px] text-[var(--ink-60)] mt-1">
               {store.orgPolicyPresent

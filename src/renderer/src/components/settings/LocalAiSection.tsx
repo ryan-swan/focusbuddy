@@ -54,7 +54,7 @@ export default function LocalAiSection(): JSX.Element {
   }
 
   const btn =
-    'fb-t-caption px-2.5 py-1.5 rounded-[var(--radius-field)] border border-[var(--edge-soft)] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)] disabled:opacity-50'
+    'fb-t-caption px-2.5 py-1.5 fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50'
 
   return (
     <div className="mt-3 pt-3 border-t border-[var(--edge-soft)]" data-testid="local-ai-section">
@@ -68,7 +68,7 @@ export default function LocalAiSection(): JSX.Element {
       </div>
 
       {status && (
-        <div className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-[var(--radius-field)] px-2.5 py-2 mb-2 fb-t-caption">
+        <div className="fb-card rounded-[var(--radius-field)] px-2.5 py-2 mb-2 fb-t-caption">
           {status.available ? (
             <div className="text-[var(--ink-70)] leading-snug">
               Local AI is running. Writing model{' '}

@@ -87,7 +87,7 @@ export default function PinTray(): JSX.Element | null {
       {open && (
         <div
           data-testid="pin-tray-panel"
-          className="mb-2 w-[300px] max-h-[60vh] overflow-y-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2"
+          className="fb-card mb-2 w-[300px] max-h-[60vh] overflow-y-auto p-2"
         >
           <div className="flex items-center gap-1.5 px-1 pb-1.5">
             <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold flex-1">
@@ -100,7 +100,7 @@ export default function PinTray(): JSX.Element | null {
               <li
                 key={item.id}
                 data-testid={`pin-item-${item.id}`}
-                className="group rounded-lg border border-[var(--edge-soft)] px-2.5 py-2 hover:bg-[var(--surface-sunken)]"
+                className="group rounded-lg bg-[var(--surface-sunken)] px-2.5 py-2 hover:bg-[var(--surface-raised)]"
               >
                 <div className="flex items-center gap-2">
                   <Icon name={PIN_ICON[item.kind]} size={14} className="text-[var(--ink-40)] shrink-0" />
@@ -117,7 +117,7 @@ export default function PinTray(): JSX.Element | null {
                     <button
                       onClick={() => openPin(item)}
                       data-testid={`pin-open-${item.id}`}
-                      className="h-6 px-2 rounded-md text-[11px] text-[var(--ink-70)] hover:bg-[var(--surface-raised)] border border-[var(--edge-soft)]"
+                      className="fb-btn-surface h-6 px-2 text-[11px] text-[var(--ink-70)] hover:bg-[var(--surface-raised)]"
                     >
                       Open
                     </button>
@@ -155,7 +155,7 @@ export default function PinTray(): JSX.Element | null {
         onClick={() => setOpen((o) => !o)}
         data-testid="pin-tray-toggle"
         title={`${items.length} pinned item${items.length > 1 ? 's' : ''}`}
-        className="fb-floating-chrome inline-flex items-center gap-1.5 h-10 px-3 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.12)]"
+        className="fb-floating-chrome inline-flex items-center gap-1.5 h-10 px-3 fb-btn-surface fb-press rounded-full text-[var(--ink-80)]"
       >
         <Icon name="push_pin" size={16} className="text-[rgb(var(--accent))]" filled />
         <span className="text-[12px] font-medium fb-tabular">{items.length}</span>

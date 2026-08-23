@@ -97,13 +97,13 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
   }
 
   const inputCls =
-    'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent'
+    'w-full bg-[var(--surface-sunken)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent'
 
   return (
     <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="email-task-dialog"
-        className="w-[480px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4 space-y-3"
+        className="fb-card w-[480px] max-w-[92vw] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">

@@ -95,7 +95,7 @@ export default function AIAssistantCard(): JSX.Element {
             key={s.id}
             onClick={() => void ask(s.prompt)}
             disabled={busy}
-            className="group flex items-center gap-2 px-2.5 py-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 disabled:opacity-50 text-left text-[12px] text-[var(--ink-70)] transition-colors"
+            className="fb-btn-surface group flex items-center gap-2 px-2.5 py-2 hover:border-accent hover:bg-accent/5 disabled:opacity-50 text-left text-[12px] text-[var(--ink-70)] transition-colors"
           >
             <Icon
               name="add"
@@ -114,12 +114,12 @@ export default function AIAssistantCard(): JSX.Element {
         </div>
       )}
       {response && (
-        <div className="mb-3 p-3 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+        <div className="mb-3 p-3 rounded-md bg-[var(--surface-sunken)] text-[12px] text-[var(--ink-70)] leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
           {response}
         </div>
       )}
       {busy && !response && (
-        <div className="mb-3 p-3 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-50)] inline-flex items-center gap-2">
+        <div className="mb-3 p-3 rounded-md bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-50)] inline-flex items-center gap-2">
           <Icon name="hourglass_empty" size={12} />
           <span>Thinking…</span>
         </div>
@@ -137,7 +137,7 @@ export default function AIAssistantCard(): JSX.Element {
             }
           }}
           placeholder="Ask anything…"
-          className="flex-1 px-3 py-2 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-accent"
+          className="fb-field flex-1 px-3 py-2 text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
         />
         <button
           onClick={() => void ask(input)}
