@@ -144,7 +144,7 @@ export default function PlexiApiView(): JSX.Element {
               onChange={(e) => setPortText(e.target.value)}
               onBlur={() => void savePort()}
               data-testid="api-port"
-              className="w-24 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1 text-[12px] fb-tabular text-[var(--ink-100)] focus:outline-none"
+              className="fb-field w-24 px-2 py-1 text-[12px] fb-tabular text-[var(--ink-100)]"
             />
             {status?.running && (
               <code className="ml-1 text-[11.5px] text-[var(--ink-70)] bg-[var(--surface-sunken)] px-2 py-1 rounded" data-testid="api-base-url">
@@ -162,7 +162,7 @@ export default function PlexiApiView(): JSX.Element {
           {revealed && (
             <div className="rounded-lg border border-[rgb(var(--accent)/0.30)] bg-[rgb(var(--accent)/0.06)] p-3 mb-3" data-testid="api-token-revealed">
               <p className="text-[11.5px] text-[var(--ink-70)]">Copy this token now. It is shown once and cannot be retrieved later.</p>
-              <code className="mt-1 block break-all text-[12px] text-[var(--ink-100)] bg-[var(--surface-base)] border border-[var(--edge-soft)] rounded px-2 py-1.5">
+              <code className="mt-1 block break-all text-[12px] text-[var(--ink-100)] bg-[var(--surface-base)] rounded px-2 py-1.5">
                 {revealed.secret}
               </code>
             </div>
@@ -174,7 +174,7 @@ export default function PlexiApiView(): JSX.Element {
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Token name"
               data-testid="api-token-name"
-              className="flex-1 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] focus:outline-none placeholder:text-[var(--ink-50)]"
+              className="fb-card flex-1 px-2 py-1.5 text-[12.5px] focus:outline-none placeholder:text-[var(--ink-50)]"
             />
             <label className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] cursor-pointer">
               <input type="checkbox" checked={newWrite} data-testid="api-token-write" onChange={(e) => setNewWrite(e.target.checked)} className="accent-[rgb(var(--accent))]" />

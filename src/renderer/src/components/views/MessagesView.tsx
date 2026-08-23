@@ -842,7 +842,7 @@ export default function MessagesView(): JSX.Element {
                     aria-label={`Call ${callTargetName}`}
                     title="Start a video call"
                     data-testid="messages-call"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon name="videocam" size={15} /> Call
                   </button>
@@ -851,7 +851,7 @@ export default function MessagesView(): JSX.Element {
                   onClick={() => goMeetings()}
                   title="Start a meeting in PlexiMeet"
                   data-testid="messages-meet"
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                 >
                   <Icon name="groups" size={15} /> Meet
                 </button>
@@ -861,7 +861,7 @@ export default function MessagesView(): JSX.Element {
                     onChange={(e) => setTranslateLang(e.target.value)}
                     title="Translate messages to"
                     data-testid="messages-translate-lang"
-                    className="h-8 rounded-lg border border-[var(--edge-soft)] bg-transparent text-[12px] text-[var(--ink-70)] px-1.5 hover:bg-[var(--surface-sunken)]"
+                    className="fb-field h-8 text-[12px] text-[var(--ink-70)] px-1.5 hover:bg-[var(--surface-sunken)]"
                   >
                     {['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Hindi', 'Arabic']
                       .concat(
@@ -883,7 +883,7 @@ export default function MessagesView(): JSX.Element {
                     onClick={() => setShowRecall(true)}
                     title="Catch up or ask this channel"
                     data-testid="messages-recall"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon name="bolt" size={15} /> Recall
                   </button>
@@ -893,7 +893,7 @@ export default function MessagesView(): JSX.Element {
                     onClick={() => setShowPulse(true)}
                     title="Decisions, questions and action items in this channel"
                     data-testid="messages-pulse"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon name="radar" size={15} /> Pulse
                   </button>
@@ -903,7 +903,7 @@ export default function MessagesView(): JSX.Element {
                     onClick={() => setShowSchedules(true)}
                     title="Scheduled AI tasks for this channel"
                     data-testid="messages-schedules"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon name="schedule" size={15} /> Schedules
                   </button>
@@ -914,7 +914,7 @@ export default function MessagesView(): JSX.Element {
                       onClick={() => setShowMembers((v) => !v)}
                       title="Members"
                       data-testid="messages-members"
-                      className="inline-flex items-center gap-1 h-8 px-2 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                      className="fb-btn-surface inline-flex items-center gap-1 h-8 px-2 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                     >
                       <Icon name="group" size={15} /> {activeConv.members.length}
                     </button>
@@ -997,7 +997,7 @@ export default function MessagesView(): JSX.Element {
                     }}
                     title={`Notifications: ${activeConv?.notifLevel ?? 'all'} (click to cycle all → mentions → muted)`}
                     data-testid="messages-notif"
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface inline-flex items-center justify-center h-8 w-8 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                   >
                     <Icon
                       name={
@@ -1015,7 +1015,7 @@ export default function MessagesView(): JSX.Element {
                   onClick={() => pinToCanvas()}
                   title="Pin this conversation to your current desk"
                   data-testid="messages-pin"
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  className="fb-btn-surface inline-flex items-center justify-center h-8 w-8 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                 >
                   <Icon name="push_pin" size={15} />
                 </button>
@@ -1156,7 +1156,7 @@ function ThreadPanel({
             <button
               onClick={() => void onSummarise()}
               disabled={summarising}
-              className="inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-[var(--edge-soft)] text-[11px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
+              className="fb-btn-surface inline-flex items-center gap-1 h-7 px-2 text-[11px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
               title="Summarise this thread"
               data-testid="thread-summarise"
             >
@@ -1333,7 +1333,7 @@ export function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element
       <button
         onClick={onClick}
         data-testid={testid}
-        className="w-full text-left rounded-lg border border-[var(--edge-soft)] p-2 hover:bg-[var(--surface-sunken)]"
+        className="fb-btn-surface w-full text-left p-2 hover:bg-[var(--surface-sunken)]"
       >
         <div className="text-[12.5px] text-[var(--ink-100)] break-words">{title}</div>
         <div className="text-[11px] text-[var(--ink-50)] truncate">{sub}</div>
@@ -1348,7 +1348,7 @@ export function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element
       data-testid="briefing-panel"
     >
       <div
-        className="w-[500px] max-h-[80vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        className="fb-card fb-press w-[500px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
@@ -1485,7 +1485,7 @@ export function PulsePanel({ conversationId, onClose }: { conversationId: string
       data-testid="pulse-panel"
     >
       <div
-        className="w-[500px] max-h-[80vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        className="fb-card fb-press w-[500px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
@@ -1496,7 +1496,7 @@ export function PulsePanel({ conversationId, onClose }: { conversationId: string
             <button
               onClick={() => void onRefresh()}
               disabled={busy}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
+              className="fb-btn-surface inline-flex items-center gap-1 h-7 px-2.5 text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
               data-testid="pulse-refresh"
             >
               <Icon name="refresh" size={13} /> {busy ? 'Reading…' : 'Refresh'}
@@ -1529,7 +1529,7 @@ export function PulsePanel({ conversationId, onClose }: { conversationId: string
                     {groupItems.map((it) => (
                       <div
                         key={it.id}
-                        className="rounded-lg border border-[var(--edge-soft)] p-2 flex items-start gap-2"
+                        className="rounded-lg bg-[var(--surface-sunken)] p-2 flex items-start gap-2"
                         data-testid="pulse-item"
                       >
                         <div className="min-w-0 flex-1">
@@ -1678,7 +1678,7 @@ export function RecallPanel({ conversationId, onClose }: { conversationId: strin
       data-testid="recall-panel"
     >
       <div
-        className="w-[480px] max-h-[78vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        className="fb-card fb-press w-[480px] max-h-[78vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
@@ -1709,7 +1709,7 @@ export function RecallPanel({ conversationId, onClose }: { conversationId: strin
                 onKeyDown={(e) => e.key === 'Enter' && void onAsk()}
                 placeholder="e.g. what did we decide about the launch date?"
                 data-testid="recall-ask-input"
-                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+                className="fb-field flex-1 px-2 py-1 text-[12px] text-[var(--ink-90)]"
               />
               <button
                 onClick={() => void onAsk()}
@@ -1778,7 +1778,7 @@ export function SchedulesPanel({ conversationId, onClose }: { conversationId: st
       data-testid="schedules-panel"
     >
       <div
-        className="w-[460px] max-h-[75vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        className="fb-card fb-press w-[460px] max-h-[75vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
@@ -1801,14 +1801,14 @@ export function SchedulesPanel({ conversationId, onClose }: { conversationId: st
             placeholder="e.g. Post a short standup prompt and summarise yesterday's messages"
             data-testid="schedule-instruction"
             rows={2}
-            className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)] resize-none"
+            className="fb-field w-full px-2 py-1 text-[12px] text-[var(--ink-90)] resize-none"
           />
           <div className="flex gap-1.5 mt-1.5">
             <select
               value={recurrence}
               onChange={(e) => setRecurrence(e.target.value as 'daily' | 'weekly' | 'monthly')}
               data-testid="schedule-recurrence"
-              className="bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              className="fb-field px-2 py-1 text-[12px] text-[var(--ink-90)]"
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
@@ -1834,7 +1834,7 @@ export function SchedulesPanel({ conversationId, onClose }: { conversationId: st
             items.map((s) => (
               <div
                 key={s.id}
-                className="rounded-lg border border-[var(--edge-soft)] p-2 flex items-start gap-2"
+                className="rounded-lg bg-[var(--surface-sunken)] p-2 flex items-start gap-2"
                 data-testid="schedule-row"
               >
                 <div className="min-w-0 flex-1">
@@ -1958,14 +1958,14 @@ function BotRolesConfig({ token, orgId }: { token: string; orgId: string }): JSX
           }}
           placeholder="handle"
           data-testid="bot-role-handle"
-          className="w-24 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+          className="fb-field w-24 px-2 py-1 text-[12px] text-[var(--ink-90)]"
         />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Name"
           data-testid="bot-role-name"
-          className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+          className="fb-field flex-1 px-2 py-1 text-[12px] text-[var(--ink-90)]"
         />
       </div>
       <textarea
@@ -1974,7 +1974,7 @@ function BotRolesConfig({ token, orgId }: { token: string; orgId: string }): JSX
         placeholder="What is this agent's role? (e.g. research questions and summarise findings)"
         rows={2}
         data-testid="bot-role-instructions"
-        className="w-full mt-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)] resize-none"
+        className="fb-field w-full mt-1.5 px-2 py-1 text-[12px] text-[var(--ink-90)] resize-none"
       />
       <div className="flex items-center gap-2 mt-1.5">
         <button
@@ -2076,7 +2076,7 @@ function AiMemberConfig({ token, orgId }: { token: string; orgId: string }): JSX
               }}
               placeholder={status.configured ? 'Replace key (sk-ant-…)' : 'sk-ant-…'}
               data-testid="ai-member-key-input"
-              className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              className="fb-field flex-1 px-2 py-1 text-[12px] text-[var(--ink-90)]"
             />
             <button
               onClick={() => void onSave()}
@@ -2090,7 +2090,7 @@ function AiMemberConfig({ token, orgId }: { token: string; orgId: string }): JSX
               <button
                 onClick={() => void onRemove()}
                 disabled={busy}
-                className="px-3 py-1 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
+                className="fb-btn-surface px-3 py-1 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-40"
                 data-testid="ai-member-key-remove"
               >
                 Remove
@@ -2173,7 +2173,7 @@ export function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Elemen
       data-testid="channel-browser"
     >
       <div
-        className="w-[420px] max-h-[70vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+        className="fb-card fb-press w-[420px] max-h-[70vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
@@ -2190,7 +2190,7 @@ export function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Elemen
             <select
               value={orgId ?? ''}
               onChange={(e) => setOrgId(e.target.value)}
-              className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              className="fb-field w-full px-2 py-1 text-[12px] text-[var(--ink-90)]"
               data-testid="channel-browser-org"
             >
               {orgs.map((o) => (
@@ -2234,7 +2234,7 @@ export function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Elemen
                 ) : (
                   <button
                     onClick={() => void onJoin(c.id)}
-                    className="shrink-0 h-7 px-3 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface shrink-0 h-7 px-3 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
                     data-testid="channel-join"
                   >
                     Join
@@ -2258,7 +2258,7 @@ export function ChannelBrowser({ onClose }: { onClose: () => void }): JSX.Elemen
                 onKeyDown={(e) => e.key === 'Enter' && void onCreate()}
                 placeholder="new-channel-name"
                 data-testid="channel-create-name"
-                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+                className="fb-field flex-1 px-2 py-1 text-[12px] text-[var(--ink-90)]"
               />
               <button
                 onClick={() => void onCreate()}

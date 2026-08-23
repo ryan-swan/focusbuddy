@@ -576,7 +576,7 @@ function GalleryCard(props: {
       data-testid={`index-card-${props.id}`}
     >
       <button onClick={props.onOpen} className="block w-full text-left">
-        <div className="h-36 flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)]">
+        <div className="h-36 flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)]">
           {props.thumb}
         </div>
         <div className="px-3 py-2">
@@ -678,7 +678,7 @@ function KanbanBoard<T>(props: {
                 style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
                 className={`block w-full text-left ${PLEXI_CARD} overflow-hidden fb-lift fb-press fb-fade-in-up`}
               >
-                <div className="h-24 overflow-hidden bg-[var(--surface-base)] border-b border-[var(--edge-soft)] flex items-center justify-center">
+                <div className="h-24 overflow-hidden bg-[var(--surface-base)] flex items-center justify-center">
                   {props.thumb(it)}
                 </div>
                 <div className="px-2.5 py-1.5">

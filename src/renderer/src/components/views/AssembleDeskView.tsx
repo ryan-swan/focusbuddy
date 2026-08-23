@@ -136,7 +136,7 @@ export default function AssembleDeskView(): JSX.Element {
           subtitle="Search your workspace, gather related items, and open a new desk that holds them."
         />
 
-        <div className="mt-2 flex items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2">
+        <div className="fb-card mt-2 flex items-center gap-2 px-3 py-2">
           <Icon name="search" size={16} className="text-[var(--ink-50)]" />
           <input
             value={query}
@@ -199,7 +199,7 @@ export default function AssembleDeskView(): JSX.Element {
         {/* Collected tray + create */}
         {collected.length > 0 && (
           <div
-            className="mt-5 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4"
+            className="fb-card mt-5 p-4"
             data-testid="assemble-tray"
           >
             <div className="flex items-center justify-between gap-3">
@@ -226,7 +226,7 @@ export default function AssembleDeskView(): JSX.Element {
               {collected.map((w) => (
                 <li
                   key={w.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1 text-[12px]"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-sunken)] px-2.5 py-1 text-[12px]"
                 >
                   <Icon name={catalogFor(w.kind)?.icon ?? 'widgets'} size={13} className="text-[var(--ink-50)]" />
                   <span className="max-w-[160px] truncate">{labelFor(w)}</span>
@@ -247,7 +247,7 @@ export default function AssembleDeskView(): JSX.Element {
                 value={deskName}
                 onChange={(e) => setDeskName(e.target.value)}
                 placeholder="New desk name"
-                className="flex-1 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-3 py-1.5 text-[13px] outline-none focus:border-[rgb(var(--accent))]"
+                className="fb-field flex-1 px-3 py-1.5 text-[13px]"
                 data-testid="assemble-desk-name"
               />
               <button

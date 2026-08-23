@@ -303,7 +303,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
             value={inviteHandle}
             onChange={(e) => setInviteHandle(e.target.value)}
             placeholder="Invite by handle, e.g. @alex"
-            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="fb-field flex-1 px-3 py-1.5 text-[12px]"
             data-testid="livefolder-invite-handle"
           />
           <button onClick={() => void sendInvite()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livefolder-invite-send">

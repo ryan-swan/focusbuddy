@@ -315,7 +315,7 @@ export default function OrgAdminView(): JSX.Element {
               }}
               placeholder="New organization…"
               data-testid="org-new-name"
-              className="bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent w-40"
+              className="fb-field px-2 py-1 text-[12px] w-40"
             />
             <button onClick={() => void doCreate()} disabled={!newOrg.trim()} className="icon-btn disabled:opacity-40" title="Create" data-testid="org-create">
               <Icon name="add" size={15} />
@@ -353,7 +353,7 @@ export default function OrgAdminView(): JSX.Element {
                     key={`hs-${orgHours.start}`}
                     onBlur={(e) => void saveHours({ start: numOrNull(e.target.value) ?? 9, end: orgHours.end })}
                     data-testid="org-hours-start"
-                    className="w-14 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
+                    className="fb-field w-14 text-[12px] text-center px-1.5 py-0.5"
                   />
                   <span className="text-[11px] text-[var(--ink-40)]">to</span>
                   <input
@@ -362,7 +362,7 @@ export default function OrgAdminView(): JSX.Element {
                     key={`he-${orgHours.end}`}
                     onBlur={(e) => void saveHours({ start: orgHours.start, end: numOrNull(e.target.value) ?? 17 })}
                     data-testid="org-hours-end"
-                    className="w-14 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
+                    className="fb-field w-14 text-[12px] text-center px-1.5 py-0.5"
                   />
                   <span className="text-[11px] text-[var(--ink-40)]">local · inherited by every office and person</span>
                 </span>
@@ -401,7 +401,7 @@ export default function OrgAdminView(): JSX.Element {
                           value={m.role}
                           onChange={(e) => void doRole(m.accountId, e.target.value as OrgRole)}
                           data-testid={`org-role-${m.accountId}`}
-                          className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
+                          className="fb-field text-[12px] px-1.5 py-0.5"
                         >
                           {ROLE_OPTIONS.map((r) => (
                             <option key={r} value={r}>
@@ -498,12 +498,12 @@ export default function OrgAdminView(): JSX.Element {
                   }}
                   placeholder="Invite by email…"
                   data-testid="org-invite-email"
-                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="fb-field flex-1 px-2 py-1 text-[12px]"
                 />
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as OrgRole)}
-                  className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 focus:outline-none"
+                  className="fb-field text-[12px] px-1.5 py-1"
                 >
                   <option value="admin">admin</option>
                   <option value="member">member</option>
@@ -548,7 +548,7 @@ export default function OrgAdminView(): JSX.Element {
                   }}
                   placeholder="New office or location name…"
                   data-testid="org-office-new"
-                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="fb-field flex-1 px-2 py-1 text-[12px]"
                 />
                 <button onClick={() => void addOffice()} disabled={!newOffice.trim()} className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50" data-testid="org-office-add">
                   Add office
@@ -618,14 +618,14 @@ export default function OrgAdminView(): JSX.Element {
                   onChange={(e) => setSsoConn(e.target.value)}
                   placeholder="WorkOS connection id (conn_…)"
                   data-testid="org-sso-conn"
-                  className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="fb-field w-full px-2 py-1 text-[12px]"
                 />
                 <input
                   value={ssoDomain}
                   onChange={(e) => setSsoDomain(e.target.value)}
                   placeholder="Email domain (acme.com)"
                   data-testid="org-sso-domain"
-                  className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                  className="fb-field w-full px-2 py-1 text-[12px]"
                 />
                 <div className="flex items-center gap-2">
                   <button
@@ -704,7 +704,7 @@ export default function OrgAdminView(): JSX.Element {
                 placeholder="Available once the server enables directory sync."
                 data-testid="org-scim-baseurl"
                 onFocus={(e) => e.currentTarget.select()}
-                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+                className="fb-field flex-1 px-2 py-1 text-[12px] font-mono"
               />
               <CopyButton text={scim.baseUrl} disabled={!scim.baseUrl} />
             </div>
@@ -807,7 +807,7 @@ function CopyButton({ text, disabled }: { text: string; disabled?: boolean }): J
         }
       }}
       disabled={disabled}
-      className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-[var(--edge-soft)] hover:border-accent disabled:opacity-40"
+      className="fb-btn-surface inline-flex items-center gap-1 text-[12px] px-2 py-1 hover:border-accent disabled:opacity-40"
       title="Copy"
     >
       <Icon name={copied ? 'check' : 'content_copy'} size={13} />
@@ -861,7 +861,7 @@ function ProfileEditor({
   if (!profile) {
     return <div className="pl-7 pb-2 text-[11px] text-[var(--ink-40)]">Loading profile…</div>
   }
-  const field = 'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const field = 'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 focus:outline-none focus:border-accent'
   const photoSrc = absolutePhotoUrl(`/orgs/${profile.orgId}/members/${profile.accountId}/photo`) + (photoBust ? `?v=${photoBust}` : '')
   return (
     <div className="pl-7 pb-3 grid grid-cols-2 gap-2" data-testid="org-profile-editor">
@@ -936,7 +936,7 @@ function ProfileEditor({
           key={`pws-${profile.workStart}`}
           onBlur={(e) => onSave({ workStart: numOrNull(e.target.value) })}
           placeholder="start"
-          className="w-16 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
+          className="fb-field w-16 text-[12px] text-center px-1.5 py-0.5"
         />
         <span className="text-[11px] text-[var(--ink-40)]">to</span>
         <input
@@ -945,7 +945,7 @@ function ProfileEditor({
           key={`pwe-${profile.workEnd}`}
           onBlur={(e) => onSave({ workEnd: numOrNull(e.target.value) })}
           placeholder="end"
-          className="w-16 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none"
+          className="fb-field w-16 text-[12px] text-center px-1.5 py-0.5"
         />
         <span className="text-[11px] text-[var(--ink-40)]">blank = inherit office, then company</span>
       </div>
@@ -966,8 +966,8 @@ function OfficeRow({
   onSave: (patch: OfficeInput) => void
   onDelete: () => void
 }): JSX.Element {
-  const field = 'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent'
-  const small = 'w-16 text-[12px] text-center bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none'
+  const field = 'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const small = 'w-16 text-[12px] text-center bg-[var(--surface-sunken)] rounded px-1.5 py-0.5 focus:outline-none'
   if (!canAdmin) {
     return (
       <div className="text-[12px] text-[var(--ink-70)] flex items-center gap-2">

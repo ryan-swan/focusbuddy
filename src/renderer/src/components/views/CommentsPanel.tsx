@@ -113,7 +113,7 @@ function Thread({
             }}
             placeholder="Reply…"
             data-testid={`comment-reply-${root.id}`}
-            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="fb-field flex-1 px-2 py-1 text-[12px]"
           />
           <button onClick={submit} disabled={!reply.trim()} className="icon-btn disabled:opacity-40" title="Reply">
             <Icon name="send" size={13} />

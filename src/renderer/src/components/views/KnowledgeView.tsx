@@ -85,7 +85,7 @@ export default function KnowledgeView(): JSX.Element {
           </p>
         </div>
         <div className="px-3 py-2.5 flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-1.5 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5">
+          <div className="fb-card flex-1 flex items-center gap-1.5 px-2 py-1.5">
             <Icon name="search" size={14} className="text-[var(--ink-70)]" />
             <input
               value={query}

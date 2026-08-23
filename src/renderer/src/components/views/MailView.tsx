@@ -103,7 +103,7 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
     <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-lg mx-auto px-6 py-10">
         <div className="flex items-center gap-3 mb-2">
-          <div className="inline-flex items-center justify-center h-11 w-11 rounded-[var(--radius-row)] bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[var(--shadow-soft)]">
+          <div className="fb-card inline-flex items-center justify-center h-11 w-11 rounded-[var(--radius-row)]">
             <Icon name="mail" size={22} className="text-accent" />
           </div>
           <div>
@@ -496,7 +496,7 @@ function ReadingPane(): JSX.Element {
           {open.attachments.map((a, i) => (
             <span
               key={i}
-              className="fb-t-caption inline-flex items-center gap-1 rounded-[var(--radius-chip)] border border-[var(--edge-soft)] px-2 py-1"
+              className="fb-t-caption inline-flex items-center gap-1 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] px-2 py-1"
             >
               <Icon name="description" size={12} />
               {a.filename}

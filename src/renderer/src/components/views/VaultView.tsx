@@ -44,7 +44,7 @@ function UnlockedVaultView({ onLock }: { onLock: () => Promise<void> }): JSX.Ele
     <div className="h-full overflow-auto desk-paper no-tod">
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
         <header className="flex items-center gap-3">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
+          <div className="inline-flex items-center justify-center h-10 w-10 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] shrink-0">
             <Icon name="lock_open" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
@@ -268,7 +268,7 @@ function UnlockedVault(): JSX.Element {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search entries…"
-            className="w-full bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] rounded-md pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+            className="fb-field w-full bg-white/80 dark:bg-stone-900/80 pl-7 pr-3 py-1.5 text-sm"
           />
         </div>
         <button onClick={() => setAdding(true)} className="btn-primary shrink-0">
@@ -594,7 +594,7 @@ function ChangeMasterPasswordDialog({ onClose }: { onClose: () => void }): JSX.E
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col"
+        className="fb-card fb-press w-full max-w-md mx-4 overflow-hidden flex flex-col"
       >
         <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
@@ -735,7 +735,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col max-h-[85vh]"
+        className="fb-card fb-press w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[85vh]"
       >
         <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">

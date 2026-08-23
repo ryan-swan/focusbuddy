@@ -934,7 +934,7 @@ function ShortcutComposer({
             }}
             placeholder="Paste a link, or search desks, rooms, documents, apps"
             data-testid="home-shortcut-composer-input"
-            className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+            className="fb-field w-full px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
           />
 
           {!query.trim() && (
@@ -947,7 +947,7 @@ function ShortcutComposer({
             <button
               onClick={() => toggle({ kind: 'url', url, label: urlLabel(url) })}
               data-testid="home-shortcut-composer-add-url"
-              className="mt-2 flex w-full items-center gap-2.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-2 text-left hover:border-[rgb(var(--accent)/0.5)] hover:bg-[var(--surface-sunken)] transition-colors"
+              className="fb-btn-surface mt-2 flex w-full items-center gap-2.5 px-2.5 py-2 text-left hover:border-[rgb(var(--accent)/0.5)] hover:bg-[var(--surface-sunken)] transition-colors"
             >
               <ShortcutChip target={{ kind: 'url', url }} icon="language" tone="text-indigo-500" apps={apps} chip={28} glyph={15} />
               <span className="min-w-0 flex-1">
@@ -1023,7 +1023,7 @@ function ShortcutComposer({
                           if (e.key === 'Escape') setRenamingKey(null)
                         }}
                         data-testid="home-shortcut-composer-rename"
-                        className="flex-1 min-w-0 rounded border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent))]"
+                        className="fb-field flex-1 min-w-0 px-1.5 py-0.5 text-[12.5px] text-[var(--ink-100)]"
                       />
                     ) : (
                       <span className="min-w-0 flex-1">
@@ -1713,7 +1713,7 @@ function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
               onChange={(e) => setTitle(e.target.value)}
               aria-label="Transcription name"
               data-testid="home-transcribe-title"
-              className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 text-[13px] font-medium text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent))]"
+              className="fb-field w-full px-3 py-2 text-[13px] font-medium text-[var(--ink-100)]"
             />
             <div className="max-h-40 overflow-y-auto rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-[12px] leading-relaxed text-[var(--ink-80)] whitespace-pre-wrap">
               {phase.transcript || 'Silence. Nothing was heard.'}
@@ -1753,7 +1753,7 @@ function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
                   value={deskQuery}
                   onChange={(e) => setDeskQuery(e.target.value)}
                   placeholder="Search desks…"
-                  className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+                  className="fb-field w-full px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                 />
                 {desks.length === 0 ? (
                   <p className="py-4 text-center text-[12px] text-[var(--ink-50)]">No desks match.</p>

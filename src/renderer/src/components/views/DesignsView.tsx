@@ -77,7 +77,7 @@ export default function DesignsView(): JSX.Element {
                   disabled={busy}
                   onClick={() => void create(blankDesign(s), s.label)}
                   data-testid={`designs-size-${s.id}`}
-                  className="group flex flex-col items-center gap-1.5 w-[112px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2.5 hover:border-accent hover:shadow-sm transition disabled:opacity-50"
+                  className="fb-btn-surface group flex flex-col items-center gap-1.5 w-[112px] p-2.5 hover:border-accent hover:shadow-sm transition disabled:opacity-50"
                 >
                   <div className="flex items-center justify-center w-full h-12">
                     <div
@@ -101,7 +101,7 @@ export default function DesignsView(): JSX.Element {
                       disabled={busy || !size}
                       onClick={() => size && void create(designFromTemplate(t, size, brand), t.label)}
                       data-testid={`designs-template-${t.id}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:border-accent hover:bg-accent/5 disabled:opacity-50"
+                      className="fb-btn-surface inline-flex items-center gap-1 px-2.5 py-1.5 text-[12px] text-[var(--ink-70)] hover:border-accent hover:bg-accent/5 disabled:opacity-50"
                     >
                       <Icon name="auto_awesome" size={12} className="text-accent" /> {t.label}
                     </button>
@@ -122,7 +122,7 @@ export default function DesignsView(): JSX.Element {
               {designs.map((d) => (
                 <div
                   key={d.id}
-                  className="group flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5 hover:border-accent cursor-pointer"
+                  className="fb-card fb-press group flex items-center gap-2 px-3 py-2.5 hover:border-accent cursor-pointer"
                   onClick={() => goDocument(d.id)}
                   data-testid={`designs-open-${d.id}`}
                 >

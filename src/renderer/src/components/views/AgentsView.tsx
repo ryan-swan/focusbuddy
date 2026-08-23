@@ -85,7 +85,7 @@ export default function AgentsView(): JSX.Element {
             </button>
           </div>
         ) : (
-          <div className="mt-2 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden">
+          <div className="fb-card mt-2 overflow-hidden">
             <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--ink-50)] border-b border-[var(--edge-soft)]">
               <span>Agent</span>
               <span>Status</span>

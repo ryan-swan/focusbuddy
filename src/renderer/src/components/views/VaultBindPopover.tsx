@@ -90,7 +90,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
         {boundEntry && (
           <button
             onClick={() => void toggleAutofill()}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
+            className="fb-btn-surface text-[10px] px-1.5 py-0.5 hover:bg-[var(--surface-sunken)]"
             title="Toggle auto-fill for this app"
           >
             {app.autofillEnabled ? 'enabled' : 'disabled'}
@@ -108,7 +108,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
       {unlocked && !creating && (
         <>
           {boundEntry && (
-            <div className="flex items-center gap-2 mx-1 mb-2 p-2 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)]">
+            <div className="flex items-center gap-2 mx-1 mb-2 p-2 rounded bg-[var(--surface-sunken)]">
               <Icon name="key" size={14} className="text-accent shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-[12px] font-medium text-[var(--ink-90)] truncate">

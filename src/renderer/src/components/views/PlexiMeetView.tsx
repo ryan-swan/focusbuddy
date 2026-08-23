@@ -286,7 +286,7 @@ export default function PlexiMeetView(): JSX.Element {
                 onClick={() => void startRecording()}
                 data-testid="meet-record"
                 disabled={!!busy}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                 title="Record audio, transcribe it and extract action items"
               >
                 <Icon name="mic" size={15} /> Record notes
@@ -295,7 +295,7 @@ export default function PlexiMeetView(): JSX.Element {
             <button
               onClick={() => setShowMsg((v) => !v)}
               data-testid="meet-message"
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
               title="Record a quick message and send it to a teammate who is away"
             >
               <Icon name="voicemail" size={15} /> Message
@@ -304,7 +304,7 @@ export default function PlexiMeetView(): JSX.Element {
               onClick={() => void addManual()}
               data-testid="meet-add"
               disabled={!!busy}
-              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface inline-flex items-center gap-1 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
               title="Add a meeting from notes" aria-label="Add a meeting from notes"
             >
               <Icon name="edit_note" size={15} />
@@ -313,7 +313,7 @@ export default function PlexiMeetView(): JSX.Element {
 
           {/* Record-a-message picker: choose a teammate (away ones flagged) and leave them a voice note. */}
           {showMsg && (
-            <div className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2" data-testid="meet-message-picker">
+            <div className="fb-card p-2" data-testid="meet-message-picker">
               {msgRecording && msgTo ? (
                 <button
                   onClick={stopMessage}
@@ -363,7 +363,7 @@ export default function PlexiMeetView(): JSX.Element {
         )}
 
         <div className="px-3 pb-2">
-          <div className="flex items-center gap-1.5 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5">
+          <div className="fb-card flex items-center gap-1.5 px-2 py-1.5">
             <Icon name="search" size={14} className="text-[var(--ink-70)]" />
             <input
               value={query}
@@ -543,7 +543,7 @@ function MeetingDetail({
             onChange={(e) => setSummary(e.target.value)}
             onBlur={() => summary !== meeting.summary && onChange({ summary })}
             placeholder="The AI summary appears here after recording, or write your own notes."
-            className="w-full min-h-[80px] resize-y rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.40)]"
+            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.40)]"
           />
         </section>
 
@@ -552,13 +552,13 @@ function MeetingDetail({
             <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Action items</h2>
             <div className="space-y-1.5">
               {meeting.actionItems.map((item, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2">
+                <div key={i} className="fb-card flex items-center gap-2 px-3 py-2">
                   <Icon name="task_alt" size={15} className="text-[rgb(var(--accent))] shrink-0" />
                   <span className="flex-1 text-[13px] text-[var(--ink-90)]">{item}</span>
                   <button
                     onClick={() => void makeTask(i, item)}
                     disabled={madeTasks[i]}
-                    className="shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-[var(--edge-soft)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                    className="fb-btn-surface shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                     data-testid={`meet-make-task-${i}`}
                   >
                     <Icon name={madeTasks[i] ? 'check' : 'add_task'} size={13} /> {madeTasks[i] ? 'Added' : 'Task'}
@@ -582,7 +582,7 @@ function MeetingDetail({
               onChange={(e) => setTranscript(e.target.value)}
               onBlur={() => transcript !== meeting.transcript && onChange({ transcript })}
               placeholder="The full transcript appears here after recording, or paste your own."
-              className="w-full min-h-[160px] resize-y rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)] focus:outline-none"
+              className="fb-card w-full min-h-[160px] resize-y px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)] focus:outline-none"
             />
           )}
         </section>

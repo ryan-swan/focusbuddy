@@ -73,7 +73,7 @@ export default function StartOrAskPlexi(): JSX.Element {
               key={ex}
               onClick={() => setGoal(ex)}
               disabled={sending}
-              className="text-[11px] px-2 py-0.5 rounded-full border border-[var(--edge-soft)] text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+              className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[var(--ink-60)] hover:bg-[var(--surface-raised)] disabled:opacity-50"
             >
               {ex}
             </button>

@@ -119,7 +119,7 @@ export default function DecisionsView(): JSX.Element {
               {rows.map(({ decision, atRisk, riskyObjectIds }) => (
                 <li
                   key={decision.id}
-                  className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4"
+                  className="fb-card p-4"
                   data-testid="decision-row"
                   data-at-risk={atRisk}
                 >
@@ -167,7 +167,7 @@ export default function DecisionsView(): JSX.Element {
                       <button
                         type="button"
                         onClick={() => openDesk(decision.affectedDeskIds[0])}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+                        className="fb-btn-surface inline-flex items-center gap-1 px-2.5 py-1 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
                         data-testid="decision-open-desk"
                       >
                         <Icon name="open_in_new" size={13} /> Open desk
@@ -176,7 +176,7 @@ export default function DecisionsView(): JSX.Element {
                     <button
                       type="button"
                       onClick={() => void cancel(decision.id)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] text-[var(--ink-60)] hover:text-rose-600 hover:border-rose-400/50"
+                      className="fb-btn-surface inline-flex items-center gap-1 px-2.5 py-1 text-[12px] text-[var(--ink-60)] hover:text-rose-600 hover:border-rose-400/50"
                       data-testid="decision-cancel"
                     >
                       <Icon name="close" size={13} /> Retire

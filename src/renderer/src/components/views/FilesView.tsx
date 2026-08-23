@@ -362,7 +362,7 @@ function Toolbar({ onNewFolder, onAddFiles, onImportFolder, onAddDoc }: { onNewF
           <select
             value={sortKey}
             onChange={(e) => setSort(e.target.value as FileSortKey)}
-            className="h-8 rounded-lg border border-[var(--edge-soft)] bg-transparent text-[12px] px-2 text-[var(--ink-70)]"
+            className="fb-field h-8 text-[12px] px-2 text-[var(--ink-70)]"
             title="Sort by"
             data-testid="files-sort-select"
           >
@@ -373,7 +373,7 @@ function Toolbar({ onNewFolder, onAddFiles, onImportFolder, onAddDoc }: { onNewF
             <option value="modified">Date modified</option>
           </select>
         )}
-        <div className="flex items-center rounded-lg border border-[var(--edge-soft)] overflow-hidden">
+        <div className="flex items-center rounded-lg bg-[var(--surface-sunken)] overflow-hidden">
           {modes.map((m) => (
             <button
               key={m.id}
@@ -711,7 +711,7 @@ function DocPickerModal({
 }): JSX.Element {
   return (
     <div className="fixed inset-0 z-[250] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
-      <div className="w-[420px] max-w-[92vw] max-h-[80vh] overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="fb-card w-[420px] max-w-[92vw] max-h-[80vh] overflow-auto p-4" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-3">
           <Icon name="post_add" size={16} className="text-accent" />
           <span className="text-[14px] font-semibold text-[var(--ink-90)]">File an existing document here</span>

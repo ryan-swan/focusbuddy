@@ -76,7 +76,7 @@ export default function InsightsView(): JSX.Element {
     <div className="h-full overflow-auto desk-paper no-tod" data-testid="insights-view">
       <div className="max-w-2xl mx-auto px-6 py-6">
         <header className="flex items-center gap-3 mb-4">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
+          <div className="inline-flex items-center justify-center h-10 w-10 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] shrink-0">
             <Icon name="insights" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
@@ -103,7 +103,7 @@ export default function InsightsView(): JSX.Element {
         </header>
 
         {/* What to work on now — energy-matched suggestions */}
-        <section className="mb-5 rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 p-4">
+        <section className="fb-card mb-5 p-4">
           <h2 className="text-[13px] font-semibold text-[var(--ink-90)] mb-2 flex items-center gap-1.5">
             <Icon name="bolt" size={15} className="text-accent" /> What to work on now
           </h2>
@@ -177,7 +177,7 @@ export default function InsightsView(): JSX.Element {
             </section>
 
             {/* When you focus */}
-            <section className="mb-5 rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 p-4">
+            <section className="fb-card mb-5 p-4">
               <h2 className="text-[13px] font-semibold text-[var(--ink-90)] mb-1 flex items-center gap-1.5">
                 <Icon name="schedule" size={15} className="text-accent" /> When you focus
               </h2>
@@ -204,7 +204,7 @@ export default function InsightsView(): JSX.Element {
 
             {/* Top tasks */}
             {topTasks.length > 0 && (
-              <section className="rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 p-4">
+              <section className="fb-card p-4">
                 <h2 className="text-[13px] font-semibold text-[var(--ink-90)] mb-2 flex items-center gap-1.5">
                   <Icon name="trophy" size={15} className="text-accent" /> Where your focus went
                 </h2>
@@ -238,7 +238,7 @@ export default function InsightsView(): JSX.Element {
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }): JSX.Element {
   return (
-    <div className="rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 px-3 py-3 text-center">
+    <div className="fb-card px-3 py-3 text-center">
       <div className="text-[18px] font-semibold text-[var(--ink-100)] tabular-nums">{value}</div>
       <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] mt-0.5">{label}</div>
       {hint && <div className="text-[9px] text-[var(--ink-40)]">{hint}</div>}

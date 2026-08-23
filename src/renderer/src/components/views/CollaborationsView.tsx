@@ -104,7 +104,7 @@ export default function CollaborationsView(): JSX.Element {
     <div className="h-full overflow-auto desk-paper no-tod" data-testid="collaborations-view">
       <div className="max-w-2xl mx-auto px-6 py-6">
         <header className="flex items-center gap-3 mb-4">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
+          <div className="inline-flex items-center justify-center h-10 w-10 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] shrink-0">
             <Icon name="group" size={20} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
@@ -144,7 +144,7 @@ export default function CollaborationsView(): JSX.Element {
                   key={d.id}
                   onClick={() => void open(d)}
                   data-testid="collaboration-item"
-                  className="flex items-center gap-3 rounded-xl border border-[var(--edge-soft)] bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
+                  className="fb-card fb-press fb-lift flex items-center gap-3 px-3.5 py-3 cursor-pointer"
                 >
                   <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
                     <Icon name={meta.icon} size={17} />

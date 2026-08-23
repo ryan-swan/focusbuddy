@@ -497,7 +497,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             value={inviteHandle}
             onChange={(e) => setInviteHandle(e.target.value)}
             placeholder="Invite by handle, e.g. @alex"
-            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="fb-field flex-1 px-3 py-1.5 text-[12px]"
             data-testid="livedoc-invite-handle"
           />
           <button onClick={() => void sendInvite()} className="btn-primary text-[12px] px-3 py-1.5" data-testid="livedoc-invite-send">
@@ -512,7 +512,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
                   key={t.id}
                   onClick={() => void inviteTeam(t.id)}
                   data-testid={`livedoc-invite-team-${t.id}`}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:text-accent"
+                  className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-0.5 hover:border-accent hover:text-accent"
                 >
                   <Icon name="group" size={12} />
                   {t.name}
@@ -536,7 +536,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             }}
             placeholder="Comment on the selected text…"
             data-testid="livedoc-comment-input"
-            className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="fb-card flex-1 px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
           />
           <button
             onClick={() => void submitComment()}

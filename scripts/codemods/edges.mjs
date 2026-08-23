@@ -240,8 +240,12 @@ function matchAnyRule(words, tag) {
       && (words.includes(RAISED) || words.includes(SUNKEN) || words.some(isRaisedAlpha))) return 'popover'
   if (!floating && boxed && words.some(isRaisedAlpha) && words.some(isBlur) && !words.includes('rounded-full')) return 'raised-blur'
   if (!boxed || words.includes('rounded-full') || floating) return null
+  // A boxed input/select/textarea takes the field skin whatever its fill:
+  // sunken, base, transparent ghost, or the undefined var(--surface) (a
+  // latent bug in a few views; fb-field replaces it with a real token).
+  if (isFieldTag(tag)) return 'field'
   if (words.includes(RAISED)) return 'raised'
-  if (words.includes(SUNKEN)) return isFieldTag(tag) ? 'field' : 'sunken'
+  if (words.includes(SUNKEN)) return 'sunken'
   // Outlined ghost buttons: a stroke is the only thing making them a control.
   // Apple's secondary buttons are filled, not outlined (R5.4); they take the
   // raised surface-button skin. Caleb rules the bucket on the first sheet.
@@ -277,7 +281,9 @@ export function rewriteString(text, tag) {
       // .fb-field is a base skin in the components layer: width, padding and
       // text utilities on the element stay and win in the cascade, so only
       // the stroke, the fill, the radius and hand-rolled focus styling go.
-      removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN || isRadius(t)
+      removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN
+        || t === 'bg-[var(--surface-base)]' || t === 'bg-[var(--surface)]' || t === 'bg-transparent'
+        || isRadius(t)
         || /^focus:(outline-none|border-|ring-)/.test(t) || t === 'outline-none')
       added = ['fb-field']
       break

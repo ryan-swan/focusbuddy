@@ -171,7 +171,7 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
           style={{ position: 'fixed', top: pos.top, left: pos.left }}
           /* Portaled to body + z above the floating assistant (z-120) so items are
              always clickable, below dialogs/command-center. */
-          className="z-[130] w-[260px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2"
+          className="fb-card z-[130] w-[260px] p-2"
         >
           <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold px-1 pb-1.5">
             Views
@@ -195,7 +195,7 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
                         : 'border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]'
                     }`}
                   >
-                    <div className="h-[52px] w-full rounded-md overflow-hidden bg-[var(--surface)] border border-[var(--edge-soft)]">
+                    <div className="h-[52px] w-full rounded-md overflow-hidden bg-[var(--surface-sunken)]">
                       <v.Preview />
                     </div>
                     <div className="mt-1 flex items-center gap-1">

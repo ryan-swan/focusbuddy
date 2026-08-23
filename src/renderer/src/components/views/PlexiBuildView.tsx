@@ -232,7 +232,7 @@ function AppBuilder({
           className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
           data-testid="app-name"
         />
-        <div className="inline-flex rounded-md border border-[var(--edge-soft)] overflow-hidden">
+        <div className="inline-flex rounded-md bg-[var(--surface-sunken)] overflow-hidden">
           <button
             onClick={() => setPreview(false)}
             className={`px-3 py-1.5 text-[12px] font-medium ${!preview ? 'bg-[rgb(var(--accent))] text-white' : 'text-[var(--ink-90)]'}`}
@@ -266,7 +266,7 @@ function AppBuilder({
               key={t}
               onClick={() => add(t)}
               data-testid={`palette-${t}`}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11.5px] text-[var(--ink-90)] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface inline-flex items-center gap-1 px-2 py-1 text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
             >
               <Icon name={APP_COMPONENT_META[t].icon} size={13} /> {APP_COMPONENT_META[t].label}
             </button>
@@ -328,7 +328,7 @@ function BuildComponent({
   onMove: (dir: -1 | 1) => void
 }): JSX.Element {
   const inputCls =
-    'w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.50)]'
+    'w-full text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.50)]'
   return (
     <div className={`${PLEXI_CARD} p-3`} data-testid={`build-component-${c.type}`}>
       <div className="flex items-center gap-1.5 mb-2">
@@ -405,7 +405,7 @@ function BuildComponent({
 function PreviewComponent({ c }: { c: AppComponent }): JSX.Element {
   const [val, setVal] = useState<string | boolean>(c.fieldType === 'checkbox' ? false : '')
   const inputCls =
-    'w-full text-[13px] bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-3 py-2 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent))]'
+    'fb-card w-full text-[13px] px-3 py-2 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent))]'
 
   switch (c.type) {
     case 'heading':

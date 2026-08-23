@@ -354,7 +354,7 @@ function FlowEditor({
               else if (v === 'task-completed' || v === 'row-added') setTrigger({ kind: 'event', event: v })
               else setTrigger({ kind: 'schedule', every: v as 'daily' | 'weekly' | 'monthly' })
             }}
-            className="ml-1 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none"
+            className="fb-field ml-1 px-2 py-1 text-[12px] text-[var(--ink-100)]"
           >
             <option value="manual">I run it manually</option>
             <option value="daily">Every day</option>
@@ -398,7 +398,7 @@ function FlowEditor({
             key={t}
             onClick={() => addAction(t)}
             data-testid={`flow-add-${t}`}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[var(--edge-soft)] text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+            className="fb-btn-surface inline-flex items-center gap-1 px-2 py-1 text-[11.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
           >
             <Icon name={ACTION_ICON[t]} size={13} /> {ACTION_LABELS[t]}
           </button>
@@ -461,7 +461,7 @@ function ActionCard({
   onMove: (dir: -1 | 1) => void
 }): JSX.Element {
   const field =
-    'w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)] placeholder:text-[var(--ink-50)]'
+    'fb-field w-full px-2 py-1.5 text-[12.5px] placeholder:text-[var(--ink-50)]'
 
   // Hold the editable action locally so typing is snappy and never races the
   // parent prop. The edit commits upward on blur. Committing here is keyed by the

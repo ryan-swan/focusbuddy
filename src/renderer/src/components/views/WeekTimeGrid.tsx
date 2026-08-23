@@ -588,7 +588,7 @@ function BlockComposer({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[340px] rounded-[var(--radius-card)] bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[var(--shadow-cast)] fb-pop-in p-4 space-y-3"
+        className="fb-card fb-press w-[340px] rounded-[var(--radius-card)] fb-pop-in p-4 space-y-3"
         data-testid="block-composer"
       >
         <div className="flex items-center gap-2">
@@ -601,7 +601,7 @@ function BlockComposer({
 
         {prefillNode ? (
           <div
-            className="flex items-center gap-2 rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1.5"
+            className="flex items-center gap-2 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-2 py-1.5"
             data-testid="composer-prefill"
           >
             <Icon
@@ -683,7 +683,7 @@ function BlockComposer({
 
         {inviteNote && (
           <div
-            className="rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2.5 py-2 fb-t-label text-[var(--ink-70)]"
+            className="rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-2.5 py-2 fb-t-label text-[var(--ink-70)]"
             data-testid="composer-invite-note"
           >
             {inviteNote}

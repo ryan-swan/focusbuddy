@@ -84,7 +84,7 @@ export default function ExternalMdEditorView({ path }: Props): JSX.Element {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-6 desk-paper no-tod">
         <div className="max-w-md">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--edge-soft)] mb-4">
+          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-[var(--surface-sunken)] mb-4">
             <Icon name="description" size={28} className="text-accent" />
           </div>
           <h2 className="text-xl font-semibold text-[var(--ink-100)] mb-2">Cannot open this document</h2>

@@ -93,7 +93,7 @@ export default function DeskDataViews({
         {items.length === 0 ? (
           empty
         ) : layout === 'table' ? (
-          <div className="overflow-x-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]">
+          <div className="fb-card overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide text-[var(--ink-50)] border-b border-[var(--edge-soft)]">
@@ -139,7 +139,7 @@ export default function DeskDataViews({
                   key={w.id}
                   onClick={() => open(w)}
                   data-testid={`data-item-${w.id}`}
-                  className="flex flex-col items-start gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3 text-left hover:border-[rgb(var(--accent))]/40"
+                  className="fb-btn-surface flex flex-col items-start gap-2 p-3 text-left hover:border-[rgb(var(--accent))]/40"
                 >
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--ink-60)]">
                     <Icon name={m.icon} size={18} />
@@ -160,7 +160,7 @@ export default function DeskDataViews({
                   onClick={() => open(w)}
                   data-testid={`data-item-${w.id}`}
                   title={m.label}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2.5 h-7 text-[12px] text-[var(--ink-90)] hover:border-[rgb(var(--accent))]/40"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-sunken)] px-2.5 h-7 text-[12px] text-[var(--ink-90)] hover:text-[rgb(var(--accent))]"
                 >
                   <Icon name={m.icon} size={13} className="text-[var(--ink-40)]" />
                   <span className="max-w-[160px] truncate">{widgetDisplayName(w)}</span>
@@ -178,7 +178,7 @@ export default function DeskDataViews({
                   <button
                     onClick={() => open(w)}
                     data-testid={`data-item-${w.id}`}
-                    className="w-full flex items-center gap-3 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2 text-left hover:border-[rgb(var(--accent))]/40"
+                    className="fb-btn-surface w-full flex items-center gap-3 px-3 py-2 text-left hover:border-[rgb(var(--accent))]/40"
                   >
                     <Icon name={m.icon} size={16} className="text-[var(--ink-40)] shrink-0" />
                     <span className="min-w-0 flex-1">

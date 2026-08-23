@@ -148,7 +148,7 @@ export default function StandupHome(): JSX.Element | null {
         </span>
         <span className="fb-t-title text-[var(--ink-90)]">Your standup</span>
         {inSharedOrg && (
-          <div className="ml-2 inline-flex rounded-lg border border-[var(--edge-soft)] overflow-hidden text-[11px]">
+          <div className="ml-2 inline-flex rounded-lg bg-[var(--surface-sunken)] overflow-hidden text-[11px]">
             {(['personal', 'team'] as const).map((s) => (
               <button
                 key={s}
@@ -226,7 +226,7 @@ export default function StandupHome(): JSX.Element | null {
                     key={r.id}
                     onClick={() => openRef(r.kind, r.id)}
                     data-testid={`standup-nextup-${r.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--edge-soft)] px-2.5 h-7 text-[12px] text-[var(--ink-80)] hover:border-[rgb(var(--accent))]/40 hover:text-[rgb(var(--accent))]"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-sunken)] px-2.5 h-7 text-[12px] text-[var(--ink-80)] hover:text-[rgb(var(--accent))]"
                   >
                     <Icon name="arrow_forward" size={12} className="text-[var(--ink-40)]" />
                     <span className="max-w-[180px] truncate">{r.title}</span>

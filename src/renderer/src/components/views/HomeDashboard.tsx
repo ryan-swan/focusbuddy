@@ -1822,7 +1822,7 @@ function WidgetPickerOverlay({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search widgets"
-                    className="h-8 w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] pl-8 pr-2 text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+                    className="fb-field h-8 w-full pl-8 pr-2 text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                   />
                 </div>
                 <div className="flex gap-1">
@@ -2006,7 +2006,7 @@ function WidgetConfigPicker({
           placeholder={
             kind === 'desk' ? 'Search desks…' : kind === 'room' ? 'Search rooms…' : 'Search people and conversations…'
           }
-          className="w-full mb-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-[rgb(var(--accent))]"
+          className="fb-field w-full mb-2 px-3 py-2 fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
         />
         {kind === 'conversation' ? (
           people.length === 0 && convs.length === 0 ? (

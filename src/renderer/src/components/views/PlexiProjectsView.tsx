@@ -404,7 +404,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
           <span className="text-[var(--ink-30)]">/</span>
           <h1 className="fb-display text-[16px] font-bold tracking-tight text-[var(--ink-100)] truncate">{plan?.title ?? 'Plan'}</h1>
           <div className="ml-auto flex items-center gap-2">
-            <div className="inline-flex items-center rounded-lg border border-[var(--edge-soft)] p-0.5" role="tablist" aria-label="Plan view">
+            <div className="inline-flex items-center rounded-lg bg-[var(--surface-sunken)] p-0.5" role="tablist" aria-label="Plan view">
               {VIEW_MODES.map((m) => (
                 <button
                   key={m.id}
@@ -436,7 +436,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                   }}
                   placeholder="New task title…"
                   data-testid="projects-new-task-input"
-                  className="h-8 w-48 rounded-lg bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+                  className="fb-field h-8 w-48 px-2.5 text-[12.5px] text-[var(--ink-100)]"
                 />
                 <button
                   onClick={() => void addTask()}
@@ -457,7 +457,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
               <button
                 onClick={() => setAdding(true)}
                 data-testid="projects-add-task"
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
               >
                 <Icon name="add" size={15} /> Add task
               </button>
@@ -465,7 +465,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
             <button
               onClick={() => void setBaseline()}
               data-testid="projects-set-baseline"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
               title={plan?.hasBaseline ? 'Re-capture the baseline at the current plan' : 'Capture the current plan as a baseline to track variance against'}
             >
               <Icon name="flag_circle" size={15} /> {plan?.hasBaseline ? 'Baseline set' : 'Set baseline'}
@@ -476,7 +476,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                 data-testid="projects-calendar-settings"
                 aria-label="Working calendar"
                 title="Working calendar"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface inline-flex h-8 w-8 items-center justify-center text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
               >
                 <Icon name="event_available" size={15} />
               </button>
@@ -488,7 +488,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
               onClick={() => void levelResources()}
               data-testid="projects-level"
               title="Level resources: push each person's overlapping tasks so they never run at once"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
             >
               <Icon name="balance" size={15} /> Level
             </button>
@@ -496,7 +496,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
               onClick={() => void exportXml()}
               data-testid="projects-export-xml"
               title="Export to Microsoft Project (XML)"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
             >
               <Icon name="ios_share" size={15} /> Export
             </button>
@@ -1099,7 +1099,7 @@ function TaskEditor({
             value={toDateInput(task.planStart)}
             data-testid="task-plan-start"
             onChange={(e) => void patch({ planStart: fromDateInput(e.target.value) })}
-            className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+            className="fb-field mt-1 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
           />
         </label>
         <label className="block">
@@ -1109,7 +1109,7 @@ function TaskEditor({
             value={toDateInput(task.planDue)}
             data-testid="task-plan-due"
             onChange={(e) => void patch({ planDue: fromDateInput(e.target.value) })}
-            className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+            className="fb-field mt-1 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
           />
         </label>
 
@@ -1133,7 +1133,7 @@ function TaskEditor({
                   void patch({ estimateMinutes: days * 8 * 60 })
                 }
               }}
-              className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+              className="fb-field mt-1 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
             />
           </label>
         )}
@@ -1164,7 +1164,7 @@ function TaskEditor({
               }
             }}
             placeholder="Pick a teammate or type a name"
-            className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+            className="fb-field mt-1 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
           />
           <datalist id="plexi-assignee-suggestions">
             {assigneeSuggestions.map((s) => (
@@ -1209,7 +1209,7 @@ function TaskEditor({
               data-testid="task-must-start"
               onChange={(e) => void patch({ mustStartMs: fromDateInput(e.target.value) })}
               title="Pin the start to this date, overriding dependencies"
-              className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+              className="fb-field mt-1 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
             />
           </label>
           <label className="block">
@@ -1246,7 +1246,7 @@ function TaskEditor({
                 const raw = e.target.value.trim()
                 void patch({ cost: raw === '' ? null : Number(raw) })
               }}
-              className="mt-1 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-[rgb(var(--accent)/0.55)]"
+              className="fb-field mt-1 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
             />
           </label>
         )}
@@ -1265,7 +1265,7 @@ function TaskEditor({
                     value={dep?.type ?? 'FS'}
                     data-testid={`dep-type-${d}`}
                     onChange={(e) => void changeDep(d, e.target.value as DepType, dep?.lag ?? 0)}
-                    className="shrink-0 rounded bg-[var(--surface-base)] border border-[var(--edge-soft)] text-[10.5px] px-1 py-0.5 focus:outline-none"
+                    className="fb-field shrink-0 text-[10.5px] px-1 py-0.5"
                     title="Link type"
                   >
                     <option value="FS">FS</option>
@@ -1279,7 +1279,7 @@ function TaskEditor({
                     data-testid={`dep-lag-${d}`}
                     onChange={(e) => void changeDep(d, dep?.type ?? 'FS', Math.trunc(Number(e.target.value) || 0))}
                     title="Lag in working days"
-                    className="shrink-0 w-10 rounded bg-[var(--surface-base)] border border-[var(--edge-soft)] text-[10.5px] px-1 py-0.5 focus:outline-none fb-tabular"
+                    className="fb-field shrink-0 w-10 text-[10.5px] px-1 py-0.5 fb-tabular"
                   />
                   <button onClick={() => void removeDep(d)} className="shrink-0 text-[var(--ink-50)] hover:text-rose-500">
                     <Icon name="close" size={12} />
@@ -1297,7 +1297,7 @@ function TaskEditor({
                   setDepPick(e.target.value)
                   if (e.target.value) void addDep(e.target.value)
                 }}
-                className="flex-1 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none"
+                className="fb-field flex-1 px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
               >
                 <option value="">Add a predecessor…</option>
                 {candidates.map((c) => (
@@ -1311,7 +1311,7 @@ function TaskEditor({
                 data-testid="task-new-dep-type"
                 onChange={(e) => setDepType(e.target.value as DepType)}
                 title="Type for the next link you add"
-                className="shrink-0 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] text-[11px] px-1.5 py-1.5 focus:outline-none"
+                className="fb-field shrink-0 text-[11px] px-1.5 py-1.5"
               >
                 <option value="FS">FS</option>
                 <option value="SS">SS</option>
@@ -1324,7 +1324,7 @@ function TaskEditor({
                 data-testid="task-new-dep-lag"
                 onChange={(e) => setDepLag(Math.trunc(Number(e.target.value) || 0))}
                 title="Lag in working days for the next link"
-                className="shrink-0 w-11 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] text-[11px] px-1.5 py-1.5 focus:outline-none fb-tabular"
+                className="fb-field shrink-0 w-11 text-[11px] px-1.5 py-1.5 fb-tabular"
               />
             </div>
           )}
@@ -1353,7 +1353,7 @@ function TaskEditor({
                 setSuccPick(e.target.value)
                 if (e.target.value) void addSucc(e.target.value)
               }}
-              className="mt-1.5 w-full rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none"
+              className="fb-field mt-1.5 w-full px-2 py-1.5 text-[12px] text-[var(--ink-100)]"
             >
               <option value="">Add a successor…</option>
               {succCandidates.map((c) => (
@@ -1663,7 +1663,7 @@ function CalendarView({
         <button
           onClick={() => setMonth((s) => (s.m === 0 ? { y: s.y - 1, m: 11 } : { y: s.y, m: s.m - 1 }))}
           data-testid="calendar-prev"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+          className="fb-btn-surface inline-flex h-8 w-8 items-center justify-center text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
         >
           <Icon name="chevron_left" size={16} />
         </button>
@@ -1671,13 +1671,13 @@ function CalendarView({
         <button
           onClick={() => setMonth((s) => (s.m === 11 ? { y: s.y + 1, m: 0 } : { y: s.y, m: s.m + 1 }))}
           data-testid="calendar-next"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+          className="fb-btn-surface inline-flex h-8 w-8 items-center justify-center text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
         >
           <Icon name="chevron_right" size={16} />
         </button>
         <button
           onClick={() => setMonth({ y: new Date().getFullYear(), m: new Date().getMonth() })}
-          className="ml-1 inline-flex items-center h-8 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+          className="fb-btn-surface ml-1 inline-flex items-center h-8 px-2.5 text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
         >
           Today
         </button>
@@ -2141,7 +2141,7 @@ function CalendarSettings({
                 value={holiday}
                 onChange={(e) => setHoliday(e.target.value)}
                 data-testid="calendar-holiday-input"
-                className="flex-1 rounded-md bg-[var(--surface-base)] border border-[var(--edge-soft)] px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none"
+                className="fb-field flex-1 px-2 py-1 text-[12px] text-[var(--ink-100)]"
               />
               <button
                 onClick={() => {

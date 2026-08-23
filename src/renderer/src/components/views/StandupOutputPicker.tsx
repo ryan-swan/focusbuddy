@@ -96,7 +96,7 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
         disabled={!input}
         title="Save or send this standup"
         data-testid="standup-output-btn"
-        className="icon-btn h-7 px-2 gap-1.5 inline-flex items-center text-[12px] text-[var(--ink-60)] hover:text-[rgb(var(--accent))] disabled:opacity-40 rounded-lg border border-[var(--edge-soft)]"
+        className="fb-btn-surface icon-btn h-7 px-2 gap-1.5 inline-flex items-center text-[12px] text-[var(--ink-60)] hover:text-[rgb(var(--accent))] disabled:opacity-40"
       >
         <Icon name="ios_share" size={14} />
         <span>Save</span>
@@ -145,7 +145,7 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
                   data-testid="desk-select"
                   value={deskId}
                   onChange={(e) => setDeskId(e.target.value)}
-                  className="w-full h-8 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface)] px-2 text-[13px]"
+                  className="fb-field w-full h-8 px-2 text-[13px]"
                 >
                   <option value="">Choose a desk…</option>
                   {desks.map((d) => (
@@ -178,7 +178,7 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
                 data-testid="folder-select"
                 value={folderId}
                 onChange={(e) => setFolderId(e.target.value)}
-                className="w-full h-8 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface)] px-2 text-[13px]"
+                className="fb-field w-full h-8 px-2 text-[13px]"
               >
                 <option value="">Drive (root)</option>
                 {folders.map((f) => (
@@ -217,14 +217,14 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
                 value={roomName}
                 onChange={(e) => setRoomName(e.target.value)}
                 placeholder="Room name"
-                className="w-full h-8 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface)] px-2 text-[13px]"
+                className="fb-field w-full h-8 px-2 text-[13px]"
               />
               <input
                 data-testid="new-desk-name"
                 value={deskName}
                 onChange={(e) => setDeskName(e.target.value)}
                 placeholder="Desk name"
-                className="w-full h-8 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface)] px-2 text-[13px]"
+                className="fb-field w-full h-8 px-2 text-[13px]"
               />
               <div className="flex justify-between items-center pt-1">
                 <button className="text-[12px] text-[var(--ink-50)] hover:text-[var(--ink-90)]" onClick={() => setStep('menu')}>
@@ -257,7 +257,7 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
                   <button
                     data-testid="result-open"
                     onClick={openResult}
-                    className="h-7 px-3 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface h-7 px-3 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
                   >
                     Open
                   </button>

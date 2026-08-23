@@ -74,7 +74,7 @@ function InlineThread({ parentId, myId }: { parentId: string; myId: string }): J
           }}
           placeholder="Reply in thread…"
           data-testid="flow-thread-input"
-          className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-lg px-2.5 py-1.5 text-[12.5px] text-[var(--ink-90)] outline-none focus:border-[rgb(var(--accent)/0.5)]"
+          className="fb-field flex-1 px-2.5 py-1.5 text-[12.5px] text-[var(--ink-90)]"
         />
         <button onClick={() => void submit()} disabled={!draft.trim()} className="btn-primary px-2.5 py-1.5 text-[12px] disabled:opacity-40" aria-label="Send reply">
           <Icon name="send" size={13} />
@@ -137,7 +137,7 @@ function ConversationBody({ conversationId, title }: { conversationId: string; t
         <div className="shrink-0 px-3 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2 overflow-x-auto" data-testid="flow-pins">
           <Icon name="push_pin" size={12} className="text-[var(--ink-40)] shrink-0" />
           {pins.map((p) => (
-            <span key={p.id} className="text-[11.5px] text-[var(--ink-70)] whitespace-nowrap bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-full px-2 py-0.5 max-w-[220px] truncate">
+            <span key={p.id} className="text-[11.5px] text-[var(--ink-70)] whitespace-nowrap bg-[var(--surface-sunken)] rounded-full px-2 py-0.5 max-w-[220px] truncate">
               {p.body || '[attachment]'}
             </span>
           ))}
@@ -404,7 +404,7 @@ export default function FlowView(): JSX.Element {
                         }
                       }}
                       placeholder="add @handle"
-                      className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-90)]"
+                      className="fb-field flex-1 px-2 py-1 text-[12px] text-[var(--ink-90)]"
                     />
                   </div>
                 )}
@@ -469,7 +469,7 @@ export default function FlowView(): JSX.Element {
           {/* Command / ask bar */}
           <div className="sticky top-0 z-20 pt-4 pb-2 fb-glass-chrome">
             <div className="flex items-center gap-2">
-              <label className="flex-1 flex items-center gap-2 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-xl px-3 py-2 focus-within:border-[rgb(var(--accent)/0.5)]">
+              <label className="fb-card flex-1 flex items-center gap-2 px-3 py-2 focus-within:border-[rgb(var(--accent)/0.5)]">
                 <Icon name="search" size={16} className="text-[var(--ink-40)]" />
                 <input
                   value={query}
@@ -590,7 +590,7 @@ export default function FlowView(): JSX.Element {
                       key={h.messageId}
                       onClick={() => openFocus(h.conversationId)}
                       data-testid="flow-search-hit"
-                      className="text-left rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3.5 py-2.5 hover:border-[rgb(var(--accent)/0.35)]"
+                      className="fb-btn-surface text-left px-3.5 py-2.5 hover:border-[rgb(var(--accent)/0.35)]"
                     >
                       <div className="text-[11px] text-[var(--ink-40)] mb-0.5">{h.conversationTitle}</div>
                       <div className="text-[13px] text-[var(--ink-90)] break-words">{h.body}</div>

@@ -290,7 +290,7 @@ export default function PlexiSearchView(): JSX.Element {
                           <button
                             key={s.docId}
                             onClick={() => openSource(s)}
-                            className="inline-flex items-center gap-1 text-[11.5px] px-2 py-1 rounded-md bg-[var(--surface-sunken)] text-[var(--ink-90)] hover:bg-[rgb(var(--accent)/0.10)] border border-[var(--edge-soft)]"
+                            className="fb-tile inline-flex items-center gap-1 text-[11.5px] px-2 py-1 text-[var(--ink-90)] hover:bg-[rgb(var(--accent)/0.10)]"
                           >
                             <Icon name={s.docType === 'knowledge' ? 'neurology' : 'description'} size={12} />
                             {s.title || 'Untitled'}

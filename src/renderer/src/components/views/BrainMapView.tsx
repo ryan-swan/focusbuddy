@@ -124,7 +124,7 @@ export default function BrainMapView(): JSX.Element {
             </p>
           </div>
         ) : (
-          <div className="mt-2 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3">
+          <div className="fb-card mt-2 p-3">
             <svg
               viewBox={`0 0 ${SIZE} ${SIZE}`}
               className="w-full h-auto"

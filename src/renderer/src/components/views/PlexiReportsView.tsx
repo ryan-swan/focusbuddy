@@ -342,7 +342,7 @@ function ReportEditor({
               value={report.schedule}
               data-testid="report-schedule"
               onChange={(e) => void patch({ schedule: e.target.value as ReportSchedule })}
-              className="mt-1.5 w-full rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none"
+              className="fb-card mt-1.5 w-full px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none"
             >
               {SCHEDULES.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
@@ -357,7 +357,7 @@ function ReportEditor({
               onBlur={() => void patch({ recipients: recipientsText.split(',').map((s) => s.trim()).filter(Boolean) })}
               data-testid="report-recipients"
               placeholder="name@company.com, ..."
-              className="mt-1.5 w-full rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none placeholder:text-[var(--ink-50)]"
+              className="fb-card mt-1.5 w-full px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none placeholder:text-[var(--ink-50)]"
             />
           </label>
         </div>
@@ -401,7 +401,7 @@ function ReportEditor({
           )}
           <pre
             data-testid="report-output"
-            className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink-90)] bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg p-4 font-sans"
+            className="fb-card whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink-90)] p-4 font-sans"
           >
             {output}
           </pre>

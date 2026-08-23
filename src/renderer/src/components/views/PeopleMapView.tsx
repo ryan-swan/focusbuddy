@@ -984,7 +984,7 @@ export default function PeopleMapView(): JSX.Element {
             <>
               {orgs.filter((o) => !o.personal).length > 0 && (
                 <select
-                  className="text-[12px] bg-transparent text-[var(--ink-70)] border border-[var(--edge-soft)] dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent"
+                  className="fb-field text-[12px] text-[var(--ink-70)] dark:border-white/10 px-2 py-1.5"
                   value={orgId ?? ''}
                   onChange={(e) => setOrgId(e.target.value || null)}
                   data-testid="people-map-org"
