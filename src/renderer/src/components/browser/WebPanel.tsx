@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../Icon'
+import EnginePickerChip from './EnginePickerChip'
 import { useWebPanel } from '../../stores/webPanel'
 import { sanitizeWebviewUrl } from '../../lib/browserUrl'
 
@@ -129,6 +130,7 @@ export default function WebPanel(): React.JSX.Element | null {
           <span className="text-[var(--ink-90)]">{title || hostnameOf(currentUrl || src)}</span>
           <span className="ml-2">{hostnameOf(currentUrl || src)}</span>
         </div>
+        <EnginePickerChip />
         <button
           className="icon-btn !h-6 !w-6"
           onClick={() => void window.api.files.openExternal(currentUrl || src)}

@@ -65,3 +65,54 @@ test('plexii A2: one door — URL, web search, ask Plexii, and the web panel', a
 
   await launched.dispose()
 })
+
+test('plexii A2: the engine picker pins a choice and the next search honours it', async () => {
+  const launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), process.env.SHOT_THEME ?? 'dark')
+  await window.reload()
+  await waitForReady(window)
+
+  const input = window.locator('[data-testid="command-palette-input"]')
+  const panel = window.locator('[data-testid="web-panel"]')
+
+  // A search opens the panel on the default engine (keyless DuckDuckGo).
+  await window.keyboard.press(CMD_K)
+  await input.fill('standing desk setups')
+  await window.locator('[data-testid="palette-row-omni-search"]').click()
+  await expect(panel).toBeVisible()
+  await expect(panel.locator('div[title]').first()).toContainText('duckduckgo.com', { timeout: 15000 })
+
+  // The toolbar chip opens the model-picker-style menu; picking Google pins it.
+  await window.locator('[data-testid="web-panel-engine-toggle"]').click()
+  const menu = window.locator('[data-testid="web-panel-engine-menu"]')
+  await expect(menu).toBeVisible()
+  // The honesty note: in-chat answers stay keyless DDG.
+  await expect(menu).toContainText('in-chat web answers stay on keyless DuckDuckGo')
+  await window.waitForTimeout(400) // let the pop-in settle so the shot shows steady state
+  await window.screenshot({ path: `${OUT}/omni-7-engine-menu.png` })
+  await window.locator('[data-testid="web-panel-engine-google"]').click()
+  await window.locator('[data-testid="web-panel-close"]').click()
+
+  // The NEXT search rides the pinned engine.
+  await window.keyboard.press(CMD_K)
+  await input.fill('standing desk setups')
+  await window.locator('[data-testid="palette-row-omni-search"]').click()
+  await expect(panel).toBeVisible()
+  await expect(panel.locator('div[title]').first()).toContainText('google.com', { timeout: 15000 })
+  await window.screenshot({ path: `${OUT}/omni-8-engine-pinned.png` })
+
+  // Pinned = survives a reload (localStorage preference).
+  await window.reload()
+  await waitForReady(window)
+  await window.keyboard.press(CMD_K)
+  await input.fill('standing desk setups')
+  const row = window.locator('[data-testid="palette-row-omni-search"]')
+  await expect(row).toBeVisible()
+  await row.click()
+  await expect(panel.locator('div[title]').first()).toContainText('google.com', { timeout: 15000 })
+
+  await launched.dispose()
+})
