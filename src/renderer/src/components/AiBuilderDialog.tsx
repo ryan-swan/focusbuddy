@@ -180,7 +180,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
                   <button
                     key={example}
                     onClick={() => setPrompt(example)}
-                    className="text-[10px] px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                    className="fb-btn-surface text-[10px] px-2 py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                   >
                     {example}
                   </button>

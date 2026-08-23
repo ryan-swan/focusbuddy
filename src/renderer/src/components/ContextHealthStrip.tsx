@@ -80,7 +80,7 @@ export default function ContextHealthStrip({ deskId, variant = 'header' }: Props
                 if (r.node!.kind === 'folder') goProject(r.id)
                 else goTask(r.id)
               }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--edge-soft)] px-2 py-0.5 hover:bg-[var(--surface-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 hover:bg-[var(--surface-raised)] transition-colors"
               title={`Open ${r.node!.title}`}
             >
               <span className="truncate max-w-[140px] text-[var(--ink-100)]">{r.node!.title}</span>

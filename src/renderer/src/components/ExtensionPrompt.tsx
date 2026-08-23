@@ -35,7 +35,7 @@ export default function ExtensionPrompt({
 
   return (
     <div className="fb-scrim fixed inset-0 z-[60] flex items-center justify-center p-6">
-      <div className="bg-[var(--surface-raised)] rounded-lg shadow-2xl border border-[var(--edge-soft)] w-full max-w-md overflow-hidden">
+      <div className="fb-card w-full max-w-md overflow-hidden">
         <div className="px-5 py-3 border-b border-[var(--edge-soft)] bg-red-50 flex items-center gap-2">
           <Icon name="alarm" size={20} className="text-red-700" />
           <h3 className="text-sm font-semibold text-[var(--ink-100)]">Time's up on this task</h3>

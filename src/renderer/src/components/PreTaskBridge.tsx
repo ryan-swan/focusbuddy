@@ -116,7 +116,7 @@ export default function PreTaskBridge(): JSX.Element | null {
         if (e.target === e.currentTarget) close()
       }}
     >
-      <div className="relative bg-[var(--surface-raised)] w-full max-w-md mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
+      <div className="fb-card relative w-full max-w-md mx-4 overflow-hidden">
         <button
           onClick={close}
           aria-label="Close"
@@ -140,7 +140,7 @@ export default function PreTaskBridge(): JSX.Element | null {
         <div className="px-5 pb-3 space-y-2">
           <button
             onClick={handleFivePromise}
-            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left group"
+            className="fb-btn-surface w-full flex items-start gap-3 p-3 hover:border-accent hover:bg-accent/5 transition-colors text-left group"
           >
             <Icon name="bolt" size={18} className="text-accent shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -155,7 +155,7 @@ export default function PreTaskBridge(): JSX.Element | null {
 
           <button
             onClick={handleBodyDouble}
-            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left group"
+            className="fb-btn-surface w-full flex items-start gap-3 p-3 hover:border-accent hover:bg-accent/5 transition-colors text-left group"
           >
             <Icon name="group" size={18} className="text-accent shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -175,7 +175,7 @@ export default function PreTaskBridge(): JSX.Element | null {
 
           <button
             onClick={handleAIDraft}
-            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors text-left group"
+            className="fb-btn-surface w-full flex items-start gap-3 p-3 hover:border-accent hover:bg-accent/5 transition-colors text-left group"
           >
             <Icon name="auto_awesome" size={18} className="text-accent shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">

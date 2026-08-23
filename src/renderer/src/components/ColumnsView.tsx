@@ -309,7 +309,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
       <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--edge-soft)] bg-[var(--surface-raised)]">
         <Icon name="view_column" size={16} className="text-[var(--ink-50)]" />
         <span className="text-[13px] font-medium text-[var(--ink-90)]">Columns</span>
-        <div className="ml-2 inline-flex rounded-lg border border-[var(--edge-soft)] overflow-hidden">
+        <div className="ml-2 inline-flex rounded-lg bg-[var(--surface-sunken)] overflow-hidden">
           {GROUPS.map((g) => (
             <button
               key={g.value}
@@ -340,7 +340,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
             onClick={() => void runTopic()}
             disabled={topic.loading}
             data-testid="columns-topic-regroup"
-            className="ml-2 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+            className="fb-btn-surface ml-2 inline-flex items-center gap-1 h-7 px-2.5 text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
           >
             <Icon name={topic.loading ? 'autorenew' : 'auto_awesome'} size={13} className={topic.loading ? 'animate-spin' : ''} />
             {topic.loading ? 'Grouping…' : 'Regroup'}
@@ -354,7 +354,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
           <button
             onClick={() => setViewMode(taskId, 'canvas')}
             data-testid="columns-to-canvas"
-            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--edge-soft)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+            className="fb-btn-surface inline-flex items-center gap-1 h-7 px-2.5 text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
             title="Back to the canvas"
           >
             <Icon name="grid_view" size={14} /> Canvas
@@ -433,7 +433,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                   col.items.map((w) => (
                     <div
                       key={w.id}
-                      className={`w-full shrink-0 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden shadow-sm ${
+                      className={`fb-card w-full shrink-0 overflow-hidden ${
                         dragId === w.id ? 'opacity-40' : ''
                       }`}
                       data-testid={`column-card-${w.id}`}

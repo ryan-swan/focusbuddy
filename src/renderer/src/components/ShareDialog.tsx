@@ -263,7 +263,7 @@ export default function ShareDialog({
       onClose={onClose}
       label={`Share this ${KIND_LABEL[kind]}`}
       z={260}
-      className="w-[460px] max-h-[80vh] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl flex flex-col"
+      className="fb-card w-[460px] max-h-[80vh] flex flex-col"
     >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <div className="h-8 w-8 rounded-full bg-accent/10 inline-flex items-center justify-center">
@@ -301,7 +301,7 @@ export default function ShareDialog({
               unmistakable that the link below is a FROZEN snapshot, not live — this
               is the footgun where someone shares a link expecting live updates. */}
           {(kind === 'folder' || kind === 'task') && (
-            <div className="flex items-start gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-2.5">
+            <div className="flex items-start gap-2 rounded-md bg-[var(--surface-sunken)] p-2.5">
               <Icon name="info" size={14} className="text-[var(--ink-40)] mt-0.5 shrink-0" />
               <div className="text-[11px] text-[var(--ink-60)] leading-snug">
                 <span className="font-semibold text-[var(--ink-80)]">Or send a read-only snapshot link.</span>{' '}
@@ -392,7 +392,7 @@ export default function ShareDialog({
                 Link ready{justCopiedId === fresh.id ? ' — copied!' : ''}
               </div>
               <div className="flex items-center gap-1.5">
-                <code className="flex-1 text-[11px] font-mono bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 truncate">
+                <code className="fb-card flex-1 text-[11px] font-mono px-2 py-1 truncate">
                   {viewerUrlFor(fresh.token)}
                 </code>
                 <button
@@ -408,7 +408,7 @@ export default function ShareDialog({
 
           {/* Invite by email — sends a link + lands the share in their inbox */}
           {inviteToken && (
-            <div className="rounded-md border border-[var(--edge-soft)] p-2.5 space-y-2">
+            <div className="rounded-md bg-[var(--surface-sunken)] p-2.5 space-y-2">
               <div className="text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)]">
                 Invite by email
               </div>
@@ -422,7 +422,7 @@ export default function ShareDialog({
                   }}
                   placeholder="name@example.com"
                   data-testid="invite-email"
-                  className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-90)] outline-none focus:border-accent"
+                  className="fb-field flex-1 text-[12px] px-2 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-90)]"
                 />
                 <button
                   onClick={() => void handleInvite()}

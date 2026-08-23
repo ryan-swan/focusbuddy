@@ -137,7 +137,7 @@ export default function WidgetPalette({
             promptUpgrade(`The ${entry.label} widget is a Pro feature.`)
             setOpen(false)
           }}
-          className="relative flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[var(--ink-40)] text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
+          className="fb-tile relative flex flex-col items-center gap-1 px-2 py-2 text-[var(--ink-40)] text-[10px] leading-tight cursor-pointer transition-colors hover:border-accent/40"
           data-testid={`palette-locked-${entry.kind}`}
         >
           <span className="absolute top-1 right-1 text-accent">
@@ -161,7 +161,7 @@ export default function WidgetPalette({
           e.dataTransfer.setData(DRAG_MIME, entry.kind)
           e.dataTransfer.effectAllowed = 'copy'
         }}
-        className="flex flex-col items-center gap-1 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
+        className="fb-btn-surface flex flex-col items-center gap-1 px-2 py-2 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[10px] leading-tight cursor-grab active:cursor-grabbing transition-colors"
         data-testid={`palette-add-${entry.kind}`}
       >
         <Icon name={entry.icon} size={18} className="text-[var(--ink-70)]" />
@@ -320,7 +320,7 @@ export default function WidgetPalette({
                     onBringSynced()
                     setOpen(false)
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[11px]"
+                  className="fb-btn-surface w-full flex items-center gap-2 px-2 py-2 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[11px]"
                   data-testid="palette-bring-synced"
                 >
                   <Icon name="link" size={14} className="text-accent" />
@@ -343,7 +343,7 @@ export default function WidgetPalette({
                     onImport()
                     setOpen(false)
                   }}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[11px]"
+                  className="fb-btn-surface w-full flex items-center gap-2 px-2 py-2 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)] text-[11px]"
                   data-testid="palette-import-file"
                 >
                   <Icon name="upload_file" size={14} className="text-[var(--ink-70)]" />

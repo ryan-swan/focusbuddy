@@ -689,7 +689,7 @@ export default function VoiceCommandFAB({ embedded = false }: FABProps): JSX.Ele
                 const visible = proposals.filter((p) => p._status !== 'dismissed')
                 return (
                   <div
-                    className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3 shadow-xl"
+                    className="fb-card p-3"
                     data-testid="voice-command-result"
                   >
                     {reply && (

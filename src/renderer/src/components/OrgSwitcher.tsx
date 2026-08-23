@@ -99,7 +99,7 @@ export default function OrgSwitcher(): JSX.Element {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Organisation: ${active?.name ?? 'Personal'}. Open to switch.`}
-        className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] hover:border-[rgb(var(--accent)/0.5)] text-left transition-colors"
+        className="fb-tile flex items-center gap-2 w-full px-2.5 py-2 hover:border-[rgb(var(--accent)/0.5)] text-left transition-colors"
       >
         <span
           className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-white shrink-0 ${

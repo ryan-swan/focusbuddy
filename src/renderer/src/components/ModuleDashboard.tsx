@@ -201,7 +201,7 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
               <button
                 onClick={() => setCustomizing((v) => !v)}
                 data-testid={`module-dashboard-customize-${moduleKey}`}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--edge-soft)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface inline-flex items-center gap-1.5 h-9 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
               >
                 <Icon name="tune" size={15} /> Customize
               </button>

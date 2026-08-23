@@ -87,7 +87,7 @@ export default function FolderPickerModal({
     <div className="fixed inset-0 z-[320] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="folder-picker"
-        className="w-[460px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl flex flex-col max-h-[80vh]"
+        className="fb-card w-[460px] max-w-[92vw] flex flex-col max-h-[80vh]"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 px-4 h-12 border-b border-[var(--edge-soft)]">
@@ -134,7 +134,7 @@ export default function FolderPickerModal({
           </div>
         )}
 
-        <div className="flex-1 overflow-auto mt-2 mx-3 rounded-lg border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)]">
+        <div className="flex-1 overflow-auto mt-2 mx-3 rounded-lg bg-[var(--surface-sunken)] divide-y divide-[var(--edge-soft)]">
           {shown === null ? (
             <div className="px-3 py-2 text-[12px] text-[var(--ink-40)]">Loading…</div>
           ) : shown.length === 0 ? (

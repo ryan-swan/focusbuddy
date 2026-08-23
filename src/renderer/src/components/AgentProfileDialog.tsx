@@ -62,7 +62,7 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
-        className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl"
+        className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl bg-[var(--surface-sunken)] shadow-2xl"
         data-testid="agent-profile-dialog"
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
@@ -92,7 +92,7 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="e.g. reviews supplier contracts and flags risky or unusual clauses with a short rationale"
-              className="w-full h-16 resize-none rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-2 text-[12px] focus:outline-none focus:ring-1 focus:ring-accent"
+              className="fb-field w-full h-16 resize-none bg-[var(--surface-raised)] px-2.5 py-2 text-[12px]"
               data-testid="agent-profile-desc"
             />
             <button
@@ -128,14 +128,14 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Profile name (e.g. Contract Reviewer)"
-              className="w-full rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-1.5 text-[12px] font-medium focus:outline-none focus:ring-1 focus:ring-accent"
+              className="fb-field w-full bg-[var(--surface-raised)] px-2.5 py-1.5 text-[12px] font-medium"
               data-testid="agent-profile-name"
             />
             <input
               value={blurb}
               onChange={(e) => setBlurb(e.target.value)}
               placeholder="One-line summary"
-              className="w-full rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+              className="fb-field w-full bg-[var(--surface-raised)] px-2.5 py-1.5 text-[11px]"
               data-testid="agent-profile-blurb"
             />
             <div>
@@ -146,7 +146,7 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 placeholder="You are a … You approach work by …"
-                className="w-full h-24 resize-none rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] px-2.5 py-2 text-[12px] leading-snug focus:outline-none focus:ring-1 focus:ring-accent"
+                className="fb-field w-full h-24 resize-none bg-[var(--surface-raised)] px-2.5 py-2 text-[12px] leading-snug"
                 data-testid="agent-profile-prompt"
               />
             </div>

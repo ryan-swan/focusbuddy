@@ -191,7 +191,7 @@ export default function FocusSessionOverlay(): JSX.Element | null {
             if (e.target === e.currentTarget) void handleDone()
           }}
         >
-          <div className="bg-[var(--surface-raised)] w-full max-w-sm mx-4 rounded-xl shadow-2xl border border-[var(--edge-soft)] overflow-hidden">
+          <div className="fb-card w-full max-w-sm mx-4 overflow-hidden">
             <div className="px-5 py-4 text-center">
               <div className="text-3xl mb-1">✨</div>
               <h3 className="text-base font-semibold text-[var(--ink-100)] mb-1">
@@ -224,14 +224,14 @@ export default function FocusSessionOverlay(): JSX.Element | null {
               <div className="flex gap-2">
                 <button
                   onClick={() => void handleKeepGoing(15 * 60)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] text-xs text-[var(--ink-70)] transition-colors"
+                  className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 py-2 hover:bg-[var(--surface-sunken)] text-xs text-[var(--ink-70)] transition-colors"
                 >
                   <Icon name="timer" size={13} />
                   15 min
                 </button>
                 <button
                   onClick={() => void handleKeepGoing(25 * 60)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] text-xs text-[var(--ink-70)] transition-colors"
+                  className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 py-2 hover:bg-[var(--surface-sunken)] text-xs text-[var(--ink-70)] transition-colors"
                 >
                   <Icon name="timer" size={13} />
                   25 min (pomodoro)

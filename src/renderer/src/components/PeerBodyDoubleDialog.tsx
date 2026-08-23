@@ -163,7 +163,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
       }}
     >
       <div
-        className="w-[460px] max-h-[80vh] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl flex flex-col"
+        className="fb-card w-[460px] max-h-[80vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header — stays consistent across all phases */}
@@ -233,7 +233,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                         // queue. Real matcher will route by room id.
                         void startLooking('light', `In ${room.name}`)
                       }}
-                      className="text-left p-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 transition-colors flex items-center gap-2"
+                      className="fb-btn-surface text-left p-2 hover:border-accent hover:bg-accent/5 transition-colors flex items-center gap-2"
                     >
                       <span className="text-[18px] shrink-0">{room.emoji}</span>
                       <div className="flex-1 min-w-0">
@@ -357,7 +357,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                     value={workingOnDraft}
                     onChange={(e) => setWorkingOnDraft(e.target.value)}
                     placeholder="e.g. drafting Q3 brief, deep work on a paper, inbox triage"
-                    className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
+                    className="fb-field w-full text-[13px] px-2.5 py-1.5"
                     maxLength={80}
                   />
                 </div>
@@ -613,7 +613,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
                           ? 'Say hi + share what you\'re working on…'
                           : 'Send a message…'
                       }
-                      className="flex-1 text-[12px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
+                      className="fb-field flex-1 text-[12px] px-2.5 py-1.5"
                     />
                     <button
                       onClick={() => {

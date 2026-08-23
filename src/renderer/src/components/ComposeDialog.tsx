@@ -101,7 +101,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
       }}
       label={initial?.subject?.toLowerCase().startsWith('re:') ? 'Reply' : 'New message'}
       z={260}
-      className="w-[560px] max-w-[92vw] max-h-[88vh] flex flex-col rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl"
+      className="fb-card w-[560px] max-w-[92vw] max-h-[88vh] flex flex-col"
     >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
           <Icon name="edit" size={16} className="text-accent" />

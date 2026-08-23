@@ -517,7 +517,7 @@ export default function SettingsPanel({
                   <button
                     key={feel}
                     onClick={() => haptic(feel)}
-                    className="px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors capitalize"
+                    className="fb-btn-surface px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors capitalize"
                   >
                     {feel}
                   </button>

@@ -53,7 +53,7 @@ export default function WhatsNewPanel({ onClose }: Props): JSX.Element {
       <div
         ref={ref}
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--surface-raised)] w-full max-w-lg mx-4 rounded-lg shadow-2xl border border-[var(--edge-soft)] overflow-hidden flex flex-col max-h-[85vh]"
+        className="fb-card fb-press w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[85vh]"
       >
         <div className="px-5 py-4 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">

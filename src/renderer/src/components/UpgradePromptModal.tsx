@@ -29,7 +29,7 @@ export default function UpgradePromptModal(): JSX.Element | null {
       onClose={dismiss}
       label={`A ${tierName} feature`}
       z={9999}
-      className="bg-[var(--surface-raised)] rounded-xl shadow-2xl border border-[var(--edge-soft)] max-w-sm w-full p-6"
+      className="fb-card max-w-sm w-full p-6"
       testId="upgrade-prompt-modal"
     >
         <div className="flex items-start justify-between mb-2">

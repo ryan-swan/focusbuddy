@@ -748,7 +748,7 @@ function LinkIntentPicker({
         transform: 'translate(-50%, 0)',
         pointerEvents: 'auto'
       }}
-      className="w-60 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl text-[11px] overflow-hidden"
+      className="fb-card w-60 text-[11px] overflow-hidden"
     >
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--edge-soft)]">
         <span className="font-semibold text-[var(--ink-70)]">How should this connect?</span>
@@ -834,7 +834,7 @@ function WireEditor({
       data-link-popover
       data-testid="wire-editor"
       onMouseDown={(e) => e.stopPropagation()}
-      className="w-64 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl text-[11px] overflow-hidden"
+      className="fb-card w-64 text-[11px] overflow-hidden"
     >
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[var(--edge-soft)]">
         <span className="font-semibold text-[var(--ink-70)]">Live wire</span>
@@ -881,7 +881,7 @@ function WireEditor({
                         onChange({ verb: r.verb })
                         onRunNow()
                       }}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-[var(--edge-soft)] text-[10px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--surface-sunken)] text-[10px] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
                     >
                       <Icon name={r.icon} size={11} />
                       {r.label}
@@ -903,7 +903,7 @@ function WireEditor({
                   onRunNow()
                 }
               }}
-              className="w-full px-2 py-1 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-70)] focus:outline-none focus:border-accent"
+              className="fb-field w-full px-2 py-1 text-[11px] text-[var(--ink-70)]"
               data-testid="wire-verb-input"
             />
             <div className="flex items-center gap-1.5 mt-1.5">
@@ -956,7 +956,7 @@ function WireEditor({
                 <li
                   key={run.id}
                   data-testid={`wire-run-${run.id}`}
-                  className="rounded border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1"
+                  className="rounded bg-[var(--surface-sunken)] px-2 py-1"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] text-[var(--ink-70)] truncate">
@@ -987,7 +987,7 @@ function WireEditor({
 
         <button
           onClick={onUnlink}
-          className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-50)] hover:text-red-600 hover:border-red-300 transition-colors"
+          className="fb-btn-surface w-full inline-flex items-center justify-center gap-1 px-2 py-1 text-[var(--ink-50)] hover:text-red-600 hover:border-red-300 transition-colors"
           data-testid="wire-unlink"
         >
           <Icon name="link_off" size={12} />

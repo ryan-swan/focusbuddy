@@ -176,7 +176,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
       onClose={onClose}
       label="New meeting"
       z={300}
-      className="w-[400px] rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4 space-y-3"
+      className="fb-card w-[400px] p-4 space-y-3"
       testId="new-meeting-dialog"
     >
       <div className="flex items-center gap-2">
@@ -185,7 +185,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
       </div>
 
       {/* Mode toggle */}
-      <div className="inline-flex self-start rounded-md border border-[var(--edge-soft)] overflow-hidden text-[12px]" data-testid="new-meeting-mode">
+      <div className="inline-flex self-start rounded-md bg-[var(--surface-sunken)] overflow-hidden text-[12px]" data-testid="new-meeting-mode">
         {(['now', 'schedule'] as const).map((m) => (
           <button
             key={m}

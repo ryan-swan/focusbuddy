@@ -168,7 +168,7 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
             {/* Preview + actions */}
             <div className="flex-1 min-w-0 flex flex-col p-4 gap-3">
               <div
-                className="flex-1 min-h-0 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden flex items-center justify-center"
+                className="fb-card flex-1 min-h-0 overflow-hidden flex items-center justify-center"
                 data-testid="history-preview"
               >
                 {preview ? (

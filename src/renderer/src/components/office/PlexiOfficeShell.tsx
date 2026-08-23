@@ -429,7 +429,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                     data-locked="true"
                     aria-disabled="true"
                     title={ent.reason}
-                    className="relative flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 opacity-50 cursor-not-allowed"
+                    className="fb-btn-surface relative flex flex-col items-center gap-2 p-3.5 opacity-50 cursor-not-allowed"
                   >
                     <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${a.tone}`} style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                       <Icon name={a.icon} size={22} />
@@ -445,7 +445,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                   key={a.key}
                   onClick={() => void launch(a)}
                   data-testid={`office-app-${a.key}`}
-                  className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+                  className="fb-btn-surface flex flex-col items-center gap-2 p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
                 >
                   <span className={`inline-flex items-center justify-center w-11 h-11 rounded-xl ${a.tone}`} style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                     <Icon name={a.icon} size={22} />
@@ -459,7 +459,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
               <button
                 onClick={openMeet}
                 data-testid="office-app-meet"
-                className="flex flex-col items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
+                className="fb-btn-surface flex flex-col items-center gap-2 p-3.5 hover:border-[rgb(var(--accent)/0.5)] hover:shadow-sm transition"
               >
                 <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-violet-500" style={{ background: 'color-mix(in srgb, currentColor 12%, transparent)' }}>
                   <Icon name="video_call" size={22} />
@@ -474,7 +474,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
             {/* Main column */}
             <div className="flex-1 min-w-0 space-y-5">
               {/* Templates */}
-              <section className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
+              <section className="fb-card p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-[15px] font-semibold">Start with a template</h2>
                 </div>
@@ -483,7 +483,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                     <button
                       key={t}
                       onClick={() => setTab(t)}
-                      className={`px-2.5 py-1 rounded-full text-[12px] ${tab === t ? 'bg-[rgb(var(--accent))] text-white' : 'border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
+                      className={`px-2.5 py-1 rounded-full text-[12px] ${tab === t ? 'bg-[rgb(var(--accent))] text-white' : 'fb-btn-surface text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
                     >
                       {tabLabel(t)}
                     </button>
@@ -495,7 +495,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                       key={tp.id}
                       onClick={() => void createType(tp.docType, tp.label)}
                       data-testid={`office-template-${tp.id}`}
-                      className="group text-left rounded-xl border border-[var(--edge-soft)] overflow-hidden hover:border-[rgb(var(--accent)/0.5)] transition"
+                      className="fb-btn-surface group text-left overflow-hidden hover:border-[rgb(var(--accent)/0.5)] transition"
                     >
                       <div className={`h-24 ${tp.preview} flex items-center justify-center`}>
                         <Icon name={TYPE_ICON[tp.docType]?.icon ?? 'description'} size={26} className="text-white/90" />
@@ -515,7 +515,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                   add a Location column or collaborator avatars: those are not real
                   fields on a document, so they are omitted rather than invented. */}
               {page === 'home' ? (
-                <section className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
+                <section className="fb-card p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-[15px] font-semibold">Recent</h2>
                   </div>
@@ -525,7 +525,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                         key={t.id}
                         onClick={() => setRecentTab(t.id)}
                         data-testid={`office-recent-tab-${t.id}`}
-                        className={`px-2.5 py-1 rounded-full text-[12px] ${recentTab === t.id ? 'bg-[rgb(var(--accent))] text-white' : 'border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
+                        className={`px-2.5 py-1 rounded-full text-[12px] ${recentTab === t.id ? 'bg-[rgb(var(--accent))] text-white' : 'fb-btn-surface text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'}`}
                       >
                         {t.label}
                       </button>
@@ -573,7 +573,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                   )}
                 </section>
               ) : (
-                <section className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-4">
+                <section className="fb-card p-4">
                   <h2 className="text-[15px] font-semibold mb-3">{page === 'trash' ? 'Trash' : page === 'starred' ? 'Starred' : 'Recent files'}</h2>
                   {visibleDocs(officeDocs, page, starred).length === 0 ? (
                     <p className="text-[12.5px] text-[var(--ink-50)] py-6 text-center">
@@ -732,7 +732,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
           </div>
 
           {/* AI assistant bar */}
-          <div className="mt-6 flex items-center gap-3 rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-4 py-3">
+          <div className="fb-card mt-6 flex items-center gap-3 px-4 py-3">
             <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-[rgb(var(--accent)/0.15)] text-[rgb(var(--accent))]">
               <Icon name="auto_awesome" size={18} />
             </span>
@@ -779,7 +779,7 @@ const TEMPLATES: { id: string; label: string; docType: DocType; preview: string 
 
 function RailCard({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3.5">
+    <div className="fb-card p-3.5">
       <h3 className="text-[12px] font-semibold mb-2">{title}</h3>
       {children}
     </div>

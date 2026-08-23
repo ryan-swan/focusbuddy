@@ -117,7 +117,7 @@ export default function ResumeModal({ task, onClose }: Props): JSX.Element {
       onClick={onClose}
     >
       <div
-        className="bg-[var(--surface-raised)] rounded-lg shadow-2xl border border-[var(--edge-soft)] w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+        className="fb-card fb-press w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2">

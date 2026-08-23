@@ -72,7 +72,7 @@ export default class WidgetErrorBoundary extends Component<Props, State> {
           type="button"
           onClick={this.reset}
           data-testid="widget-error-retry"
-          className="mt-1 inline-flex items-center gap-1 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-base)] hover:bg-[var(--surface-sunken)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-70)] transition-colors"
+          className="mt-1 inline-flex items-center gap-1 fb-btn-surface fb-press px-2.5 py-1 text-[11px] font-medium text-[var(--ink-70)] transition-colors"
         >
           <Icon name="refresh" size={12} />
           <span>Retry</span>

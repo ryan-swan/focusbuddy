@@ -70,7 +70,7 @@ export default function AISetupDialog({ task, onClose, onAccept }: Props): JSX.E
       onClose={onClose}
       label="Let me set up your desk"
       z={60}
-      className="bg-[var(--surface-raised)] rounded-lg shadow-2xl border border-[var(--edge-soft)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+      className="fb-card w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
     >
         <div className="px-5 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center gap-2">
           <Icon name="auto_awesome" size={20} className="text-accent" />

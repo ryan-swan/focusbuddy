@@ -128,7 +128,7 @@ export default function ThemeBuilder({
           <div className="flex items-center gap-1">
             <button
               onClick={onResetCustomization}
-              className="text-[10px] px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface text-[10px] px-2 py-1 text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]"
               data-testid="themestudio-reset"
               title="Reset background, glass and icon customisations to default"
             >
@@ -260,7 +260,7 @@ export default function ThemeBuilder({
                     if (isValidHex(next)) onCustomAccentChange(next)
                   }}
                   placeholder="#7c3aed"
-                  className="mt-0.5 w-28 px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] font-mono text-[var(--ink-70)] focus:outline-none focus:border-accent"
+                  className="fb-field mt-0.5 w-28 px-1.5 py-0.5 text-[11px] font-mono text-[var(--ink-70)]"
                   data-testid="themestudio-custom-hex"
                 />
               </div>
@@ -444,7 +444,7 @@ export default function ThemeBuilder({
             {c.deskBgMode === 'gradient' && (
               <div className="space-y-2.5">
                 <div
-                  className="h-12 rounded-lg border border-[var(--edge-soft)]"
+                  className="h-12 rounded-lg shadow-[0_0_0_1px_var(--edge-hairline)]"
                   style={{
                     background: `linear-gradient(${c.gradAngle}deg, ${c.gradFrom}, ${c.gradTo})`
                   }}
@@ -631,7 +631,7 @@ function SwatchRow({
   compact?: boolean
 }): JSX.Element {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2">
+    <div className="fb-card flex items-center gap-2.5 p-2">
       <label
         className="relative h-8 w-8 rounded-md overflow-hidden border border-[var(--edge-firm)] cursor-pointer shrink-0"
         title={label}
@@ -654,7 +654,7 @@ function SwatchRow({
             value={value}
             spellCheck={false}
             onChange={(e) => onChange(e.target.value)}
-            className="mt-0.5 w-24 px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] font-mono text-[var(--ink-70)] focus:outline-none focus:border-accent"
+            className="fb-field mt-0.5 w-24 px-1.5 py-0.5 text-[11px] font-mono text-[var(--ink-70)]"
             data-testid={`${testid}-hex`}
           />
         )}

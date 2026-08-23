@@ -816,7 +816,7 @@ function FocusModeInner(): JSX.Element | null {
             className={
               useGrid
                 ? 'w-full h-full flex flex-col overflow-visible bg-transparent'
-                : `bg-[var(--surface-raised)] shadow-2xl w-full h-full flex flex-col overflow-hidden border border-[var(--edge-soft)] ${
+                : `fb-card w-full h-full flex flex-col overflow-hidden ${
                     maximized ? '' : 'rounded-lg'
                   }`
             }

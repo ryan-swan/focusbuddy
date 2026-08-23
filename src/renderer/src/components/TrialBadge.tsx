@@ -101,7 +101,7 @@ function TierPickerModal({ onClose }: { onClose: () => void }): JSX.Element {
       onClose={onClose}
       label="Pick a plan"
       z={9999}
-      className="bg-[var(--surface-raised)] rounded-xl shadow-2xl border border-[var(--edge-soft)] max-w-md w-full p-6"
+      className="fb-card max-w-md w-full p-6"
       testId="tier-picker-modal"
     >
         <div className="flex items-center justify-between mb-2">

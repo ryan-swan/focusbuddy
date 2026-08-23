@@ -100,7 +100,7 @@ export default function RelatedDesksModal(): JSX.Element | null {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter desks"
-            className="w-full h-8 px-2.5 rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[12px] outline-none focus:border-[rgb(var(--accent))]"
+            className="fb-field w-full h-8 px-2.5 text-[12px]"
             data-testid="related-desks-filter"
           />
         </div>

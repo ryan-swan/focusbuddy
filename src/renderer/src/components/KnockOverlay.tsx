@@ -48,7 +48,7 @@ export default function KnockOverlay(): JSX.Element | null {
         <button
           onClick={callBack}
           data-testid="knock-callback"
-          className="flex-1 h-8 rounded-lg border border-[var(--edge-soft)] text-[var(--ink-90)] text-[12.5px] font-medium inline-flex items-center justify-center gap-1.5 hover:bg-[var(--surface-sunken)]"
+          className="fb-btn-surface flex-1 h-8 text-[var(--ink-90)] text-[12.5px] font-medium inline-flex items-center justify-center gap-1.5 hover:bg-[var(--surface-sunken)]"
         >
           <Icon name="videocam" size={14} /> Call back
         </button>

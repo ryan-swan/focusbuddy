@@ -119,10 +119,10 @@ export default function SharePeoplePicker({
         onChange={(e) => setQuery(e.target.value)}
         placeholder={hasOrg ? 'Search people by name, @handle or email…' : 'Add someone by email…'}
         data-testid="share-picker-search"
-        className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-90)] outline-none focus:border-accent"
+        className="fb-field w-full text-[12px] px-2 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-90)]"
       />
 
-      <div className="max-h-40 overflow-auto rounded border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)]/60">
+      <div className="max-h-40 overflow-auto rounded bg-[var(--surface-sunken)] divide-y divide-[var(--edge-soft)]/60">
         {matches.map((p: DirectoryPerson) => (
           <button
             key={p.accountId}
@@ -169,7 +169,7 @@ export default function SharePeoplePicker({
         <select
           value={perm}
           onChange={(e) => onPermChange(e.target.value as 'view' | 'edit')}
-          className="text-[12px] px-1.5 py-1.5 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-90)] outline-none shrink-0"
+          className="fb-field text-[12px] px-1.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-90)] shrink-0"
           title="What the people you add can do"
         >
           <option value="edit">Can edit</option>

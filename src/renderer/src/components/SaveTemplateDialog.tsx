@@ -209,7 +209,7 @@ export default function SaveTemplateDialog({
       }}
     >
       <div
-        className="w-[520px] max-h-[85vh] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl flex flex-col"
+        className="fb-card w-[520px] max-h-[85vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--edge-soft)]">
@@ -247,7 +247,7 @@ export default function SaveTemplateDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Template name"
-              className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
+              className="fb-field w-full text-[13px] px-2.5 py-1.5"
             />
           </div>
           <div>
@@ -259,7 +259,7 @@ export default function SaveTemplateDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this template for?"
-              className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md focus:outline-none focus:border-accent"
+              className="fb-field w-full text-[13px] px-2.5 py-1.5"
             />
           </div>
 
@@ -287,7 +287,7 @@ export default function SaveTemplateDialog({
                 </button>
               </div>
             </div>
-            <div className="max-h-[260px] overflow-y-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 py-1">
+            <div className="max-h-[260px] overflow-y-auto rounded-md bg-[var(--surface-sunken)] py-1">
               {taskWidgets.length === 0 ? (
                 <div className="px-4 py-6 text-center text-[12px] text-[var(--ink-50)]">
                   This task has no widgets to template yet.

@@ -163,7 +163,7 @@ export default function TeamPresenceButton(): JSX.Element | null {
               <button
                 onClick={() => setStatus(myStatus === 'busy' ? 'online' : 'busy')}
                 disabled={myInvisible}
-                className="text-[10.5px] px-2 py-1 rounded-md border border-[var(--edge-soft)] dark:border-white/10 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.06] disabled:opacity-40"
+                className="fb-btn-surface text-[10.5px] px-2 py-1 dark:border-white/10 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.06] disabled:opacity-40"
                 title="Toggle do-not-disturb"
               >
                 {myStatus === 'busy' ? 'Available' : 'Busy'}

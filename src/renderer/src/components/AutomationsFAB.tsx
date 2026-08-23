@@ -217,7 +217,7 @@ export default function AutomationsFAB(): JSX.Element {
                     <li
                       key={`${r.kind}-${r.id}`}
                       data-testid={`automation-row-${r.id}`}
-                      className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1.5"
+                      className="rounded-lg bg-[var(--surface-sunken)] px-2 py-1.5"
                     >
                       <div className="flex items-center gap-2">
                         <Icon

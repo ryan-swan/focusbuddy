@@ -170,7 +170,7 @@ export default function MakeTaskDialog({
       onClose={onClose}
       label="Make this a task"
       z={250}
-      className="w-[380px] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4"
+      className="fb-card w-[380px] p-4"
     >
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="task_alt" size={16} className="text-accent" />
@@ -226,7 +226,7 @@ export default function MakeTaskDialog({
                   placeholder="Search folders…"
                   className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent"
                 />
-                <div className="mt-1 max-h-40 overflow-auto rounded border border-[var(--edge-soft)]">
+                <div className="mt-1 max-h-40 overflow-auto rounded bg-[var(--surface-sunken)]">
                   {folders
                     .filter((f: FbNode) =>
                       (f.title || '').toLowerCase().includes(folderQuery.trim().toLowerCase())

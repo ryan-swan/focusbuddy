@@ -64,7 +64,7 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
       onClose={close}
       label="Start a meeting"
       z={300}
-      className="w-[380px] rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4 space-y-3"
+      className="fb-card w-[380px] p-4 space-y-3"
       testId="meeting-launch-dialog"
     >
         <div className="flex items-center gap-2">

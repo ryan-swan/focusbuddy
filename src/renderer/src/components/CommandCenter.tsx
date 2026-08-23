@@ -713,7 +713,7 @@ export default function CommandCenter({
             aria-modal="true"
           >
             <div
-              className="w-[520px] max-w-[88vw] max-h-[60vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl overflow-hidden"
+              className="fb-card w-[520px] max-w-[88vw] max-h-[60vh] flex flex-col overflow-hidden"
               onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--edge-soft)]">

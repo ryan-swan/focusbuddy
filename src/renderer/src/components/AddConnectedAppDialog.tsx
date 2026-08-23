@@ -326,7 +326,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
 
               {picked && (
                 <>
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)]">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--surface-sunken)]">
                     {picked.iconPngBase64 ? (
                       <img
                         src={`data:image/png;base64,${picked.iconPngBase64}`}

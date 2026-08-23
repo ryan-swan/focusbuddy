@@ -294,7 +294,7 @@ export default function NewNodeDialog({
             onClose()
           }
         }}
-        className={`bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-2xl w-full ${
+        className={`fb-card fb-press w-full ${
           composer ? 'max-w-[880px]' : 'max-w-lg'
         } overflow-hidden max-h-[86vh] flex flex-col shadow-[0_32px_80px_-16px_rgba(0,0,0,0.5)]`}
       >
@@ -534,7 +534,7 @@ export default function NewNodeDialog({
                       <span className="text-[11px] text-[var(--ink-50)] shrink-0">Change</span>
                     </button>
                   ) : (
-                    <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden">
+                    <div className="fb-card overflow-hidden">
                       <input
                         autoFocus
                         value={folderQuery}
@@ -638,7 +638,7 @@ export default function NewNodeDialog({
                 </div>
 
                 {velocity && (
-                  <div className="px-3 py-2 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-90)] flex items-start gap-2">
+                  <div className="fb-card px-3 py-2 text-[11px] text-[var(--ink-90)] flex items-start gap-2">
                     <Icon name="insights" size={13} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                     <div>
                       <div>
@@ -666,7 +666,7 @@ export default function NewNodeDialog({
                   <button
                     type="button"
                     onClick={() => promptUpgrade('AI task setup is a Pro feature.')}
-                    className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5 text-left"
+                    className="fb-btn-surface w-full px-3 py-2.5 text-left"
                     data-testid="ai-setup-locked"
                   >
                     <div className="text-xs font-medium text-[var(--ink-70)] flex items-center gap-1.5">
@@ -757,7 +757,7 @@ export default function NewNodeDialog({
                   </div>
 
                   {velocity && (
-                    <div className="px-3 py-2 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] text-[var(--ink-90)] flex items-start gap-2">
+                    <div className="px-3 py-2 rounded-lg bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-90)] flex items-start gap-2">
                       <Icon name="insights" size={13} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                       <div>
                         <div>
@@ -783,7 +783,7 @@ export default function NewNodeDialog({
                     <button
                       type="button"
                       onClick={() => promptUpgrade('AI task setup is a Pro feature.')}
-                      className="w-full rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left"
+                      className="fb-tile w-full px-3 py-2.5 text-left"
                       data-testid="ai-setup-locked"
                     >
                       <div className="text-xs font-medium text-[var(--ink-70)] flex items-center gap-1.5">

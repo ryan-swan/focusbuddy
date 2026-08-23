@@ -94,7 +94,7 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
       onMouseDown={onClose}
     >
       <div
-        className="w-[min(520px,94vw)] max-h-[78vh] flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl"
+        className="fb-card w-[min(520px,94vw)] max-h-[78vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="sync-widget-picker"
       >
@@ -139,7 +139,7 @@ export default function SyncWidgetPicker({ targetTaskId, onClose }: Props): JSX.
                 value={taskQuery}
                 onChange={(e) => setTaskQuery(e.target.value)}
                 placeholder="Search tasks…"
-                className="w-full h-8 px-2.5 text-[12px] rounded-md bg-[var(--surface-sunken)] border border-[var(--edge-soft)] focus:outline-none focus:border-accent"
+                className="fb-field w-full h-8 px-2.5 text-[12px]"
               />
             </div>
             <div className="p-2 overflow-y-auto">
