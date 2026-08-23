@@ -37,7 +37,9 @@ import PlexiMarketplaceView from './views/PlexiMarketplaceView'
 import ExternalMdEditorView from './views/ExternalMdEditorView'
 import PlexiiHubView from './views/PlexiiHubView'
 import CapabilityGate from './CapabilityGate'
+import PageEnter from './chrome/pageEnter'
 import { VIEW_CAPABILITY } from '../lib/viewCapability'
+import type { View } from '../stores/view'
 
 // Feature surfaces that respect an entitlement live in lib/viewCapability so the
 // enforcement backbone here and every navigation surface (sidebar, per-area
@@ -65,6 +67,13 @@ export default function MainPane(): JSX.Element {
 
 function MainPaneSurface(): JSX.Element {
   const view = useViewStore((s) => s.view)
+  // Home runs its own richer first-paint cascade; the page-level rise would
+  // stack under it and double the motion. Every other view unravels in.
+  if (view.kind === 'home') return renderView(view)
+  return <PageEnter id={JSON.stringify(view)}>{renderView(view)}</PageEnter>
+}
+
+function renderView(view: View): JSX.Element {
   switch (view.kind) {
     case 'home':
       return <HomeDashboard />

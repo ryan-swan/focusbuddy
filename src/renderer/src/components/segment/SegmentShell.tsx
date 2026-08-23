@@ -12,6 +12,7 @@ import {
   MenuRestorePill,
   useMinimizable
 } from '../chrome/floatingMenu'
+import PageEnter from '../chrome/pageEnter'
 
 // A reusable "segment" shell: a full-bleed area with its own dedicated side menu
 // and a home of app tiles. Each segment (PlexiWork, PlexiConnect, PlexiFlow) is a
@@ -120,12 +121,20 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
       </div>
       )}
 
-      {/* Content: an app view inline, or the segment home of app tiles */}
+      {/* Content: an app view inline, or the segment home of app tiles.
+          Inner app switches unravel in like every page (PageEnter), except
+          the Home dashboard, which runs its own richer widget cascade. */}
       <div className="flex-1 min-w-0 overflow-hidden">
         {active ? (
-          <div className="h-full overflow-auto">{active.render()}</div>
+          active.key === 'home' ? (
+            <div className="h-full overflow-auto">{active.render()}</div>
+          ) : (
+            <PageEnter id={`segment-app-${active.key}`} className="h-full overflow-auto">
+              {active.render()}
+            </PageEnter>
+          )
         ) : (
-          <div className="h-full overflow-auto">
+          <PageEnter id="segment-home" className="h-full overflow-auto">
             <div className="max-w-[1100px] mx-auto px-6 py-8">
               <div className="flex items-center gap-2.5 mb-1">
                 <Icon name={def.icon} size={22} className="text-[rgb(var(--accent))]" />
@@ -149,7 +158,7 @@ export default function SegmentShell({ def, initialApp }: { def: SegmentDef; ini
                 ))}
               </div>
             </div>
-          </div>
+          </PageEnter>
         )}
       </div>
     </div>

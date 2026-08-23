@@ -4,6 +4,7 @@ import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { personDisplayName } from '../../lib/personName'
 import SegmentSwitcher from '../segment/SegmentSwitcher'
+import PageEnter from '../chrome/pageEnter'
 import OrgSwitcher from '../OrgSwitcher'
 import UpgradeCard from '../UpgradeCard'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
@@ -381,7 +382,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
         ) : (
           <OfficeSidebar page={page} onPage={(p) => { setActiveComms(null); setPage(p) }} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={activeComms} onExit={goHome} onMinimize={minimizeMenu} starredCount={starred.size} entInputs={entInputs} />
         )}
-        <div className="flex-1 min-w-0 overflow-auto" data-testid={`office-comms-${comms.key}`}>{content}</div>
+        <PageEnter id={`office-comms-${comms.key}`} className="flex-1 min-w-0 overflow-auto" testid={`office-comms-${comms.key}`}>{content}</PageEnter>
       </div>
     )
   }
@@ -394,7 +395,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
         <OfficeSidebar page={page} onPage={setPage} onLaunch={(a) => void launch(a)} onComms={openComms} activeComms={null} onExit={goHome} onMinimize={minimizeMenu} starredCount={starred.size} entInputs={entInputs} />
       )}
 
-      <div className="flex-1 min-w-0 overflow-auto">
+      <PageEnter id={`office-page-${page}`} className="flex-1 min-w-0 overflow-auto">
         <div className="w-full px-8 py-6">
           {/* Header */}
           <div className="flex items-start gap-4 mb-5">
@@ -748,7 +749,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
             </button>
           </div>
         </div>
-      </div>
+      </PageEnter>
     </div>
   )
 }
