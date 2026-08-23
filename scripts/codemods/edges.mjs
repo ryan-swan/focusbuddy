@@ -18,8 +18,9 @@
 //                                           are left for the hand pass
 //   raised + clickable div              ->  `fb-card fb-press`
 //   raised + static                     ->  `fb-card`
-//   sunken + <input|select|textarea>    ->  listed only (.fb-field by hand; it
-//                                           is a full skin, width 100%)
+//   sunken + <input|select|textarea>    ->  `fb-field` (a base skin; width and
+//                                           text utilities on the element win
+//                                           in the cascade and stay)
 //   sunken + interactive                ->  `fb-tile`
 //   sunken + static                     ->  `border` + the edge class dropped
 //                                           (luminance step); radius untouched
@@ -27,6 +28,7 @@
 //   floating boxed popover/menu         ->  `fb-glass-panel` + row radius (card
 //                                           radius when wide) + fb-pop-in
 //   in-flow bg-raised/NN + backdrop-blur ->  content never glass: `fb-card`
+//   no-fill <button>/<a> (outlined)     ->  `fb-btn-surface` (rule ghost-button)
 //   everything else                     ->  listed, never rewritten.
 //
 // Safety: dry-run by default; idempotent (a rewritten file has no idiom left
@@ -239,7 +241,11 @@ function matchAnyRule(words, tag) {
   if (!floating && boxed && words.some(isRaisedAlpha) && words.some(isBlur) && !words.includes('rounded-full')) return 'raised-blur'
   if (!boxed || words.includes('rounded-full') || floating) return null
   if (words.includes(RAISED)) return 'raised'
-  if (words.includes(SUNKEN)) return isFieldTag(tag) ? null : 'sunken'
+  if (words.includes(SUNKEN)) return isFieldTag(tag) ? 'field' : 'sunken'
+  // Outlined ghost buttons: a stroke is the only thing making them a control.
+  // Apple's secondary buttons are filled, not outlined (R5.4); they take the
+  // raised surface-button skin. Caleb rules the bucket on the first sheet.
+  if (!words.some((t) => /^bg-/.test(t)) && isButtonTag(tag)) return 'ghost-button'
   return null
 }
 
@@ -266,6 +272,18 @@ export function rewriteString(text, tag) {
     case 'raised':
       removed = words.filter((t) => t === 'border' || t === SOFT || t === RAISED || isRadius(t) || isShadow(t))
       added = isButtonTag(tag) ? ['fb-btn-surface'] : isInteractive(tag) ? ['fb-card', 'fb-press'] : ['fb-card']
+      break
+    case 'field':
+      // .fb-field is a base skin in the components layer: width, padding and
+      // text utilities on the element stay and win in the cascade, so only
+      // the stroke, the fill, the radius and hand-rolled focus styling go.
+      removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN || isRadius(t)
+        || /^focus:(outline-none|border-|ring-)/.test(t) || t === 'outline-none')
+      added = ['fb-field']
+      break
+    case 'ghost-button':
+      removed = words.filter((t) => t === 'border' || t === SOFT || isRadius(t) || isShadow(t))
+      added = ['fb-btn-surface']
       break
     case 'sunken':
       if (isInteractive(tag)) {
