@@ -29,7 +29,11 @@ const TONE_STROKE: Record<Tone, string> = {
   rose: 'rgb(244 63 94)',
   violet: 'rgb(139 92 246)',
   sky: 'rgb(14 165 233)',
-  stone: 'rgb(120 113 108)'
+  // Stone is the NEUTRAL tone: it rides the theme's ink ramp instead of the
+  // fixed stone palette, so it stays legible on atelier's navy the same way
+  // it does on light and dark. (The chromatic tones read fine across themes;
+  // a fixed grey does not.)
+  stone: 'var(--ink-40)'
 }
 
 const TONE_TEXT: Record<Tone, string> = {
@@ -39,7 +43,7 @@ const TONE_TEXT: Record<Tone, string> = {
   rose: 'text-rose-500',
   violet: 'text-violet-500',
   sky: 'text-sky-500',
-  stone: 'text-stone-500'
+  stone: 'text-[var(--ink-60)]'
 }
 const TONE_CHIP: Record<Tone, string> = {
   accent: 'bg-accent/10 text-accent',
@@ -48,7 +52,7 @@ const TONE_CHIP: Record<Tone, string> = {
   rose: 'bg-rose-500/10 text-rose-500',
   violet: 'bg-violet-500/10 text-violet-500',
   sky: 'bg-sky-500/10 text-sky-500',
-  stone: 'bg-stone-500/10 text-stone-500'
+  stone: 'bg-[color-mix(in_oklab,var(--ink-50)_12%,transparent)] text-[var(--ink-60)]'
 }
 
 /** Page header with the "Good morning, Sarah 👋" greeting + an actions slot. */
@@ -104,7 +108,7 @@ export function StatTile({
         {delta && (
           <span
             className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${
-              delta.dir === 'up' ? 'text-emerald-500' : delta.dir === 'down' ? 'text-rose-500' : 'text-stone-400'
+              delta.dir === 'up' ? 'text-emerald-500' : delta.dir === 'down' ? 'text-rose-500' : 'text-[var(--ink-40)]'
             }`}
           >
             {delta.dir !== 'flat' && (
@@ -175,8 +179,8 @@ const PILL: Record<PillTone, { dot: string; text: string; bg: string }> = {
   rose: { dot: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10' },
   sky: { dot: 'bg-sky-500', text: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-500/10' },
   accent: { dot: 'bg-accent', text: 'text-accent', bg: 'bg-accent/10' },
-  offline: { dot: 'bg-stone-400', text: 'text-stone-500', bg: 'bg-stone-500/10' },
-  stone: { dot: 'bg-stone-400', text: 'text-stone-500', bg: 'bg-stone-500/10' }
+  offline: { dot: 'bg-[var(--ink-40)]', text: 'text-[var(--ink-60)]', bg: 'bg-[color-mix(in_oklab,var(--ink-50)_12%,transparent)]' },
+  stone: { dot: 'bg-[var(--ink-40)]', text: 'text-[var(--ink-60)]', bg: 'bg-[color-mix(in_oklab,var(--ink-50)_12%,transparent)]' }
 }
 
 /** A small status pill: a colored dot + label on a tinted ground. */
