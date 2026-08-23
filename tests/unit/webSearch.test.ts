@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDdgHtml, WEB_SEARCH_MIN_QUERY, searchWeb } from '../../src/main/webSearch'
+import { parseDdgHtml, WEB_SEARCH_MIN_QUERY, searchWeb, rankWebResults, domainMatchesQuery } from '../../src/main/webSearch'
 import { targetForSource, isOpenable } from '../../src/renderer/src/lib/sourceTarget'
 
 // F4: the web pass is best-effort and honest — parse what is real, drop
@@ -58,5 +58,45 @@ describe('web source routing', () => {
   })
   it('a web source with a non-http id is not clickable', () => {
     expect(targetForSource({ docId: 'javascript:alert(1)', docType: 'web' })).toBeNull()
+  })
+})
+
+describe('rankWebResults — canonical over aggregators (AI-15)', () => {
+  const r = (domain: string, title = domain): import('../../src/main/webSearch').WebResult => ({
+    title,
+    url: `https://${domain}/`,
+    domain,
+    snippet: ''
+  })
+
+  it("the venue's own site outranks its Yelp listing (Caleb's case)", () => {
+    const ranked = rankWebResults('eleven canterbury venue hire', [
+      r('yelp.com', 'Eleven Canterbury - Yelp'),
+      r('tripadvisor.com', 'Eleven Canterbury - Tripadvisor'),
+      r('elevencanterbury.com', 'Eleven Canterbury — Home')
+    ])
+    expect(ranked[0].domain).toBe('elevencanterbury.com')
+  })
+
+  it('aggregators are demoted, never dropped', () => {
+    const ranked = rankWebResults('best tacos near me', [r('yelp.com'), r('tripadvisor.com')])
+    expect(ranked).toHaveLength(2)
+    expect(ranked.map((x) => x.domain)).toEqual(['yelp.com', 'tripadvisor.com'])
+  })
+
+  it('engine order stands when no signal separates results', () => {
+    const ranked = rankWebResults('standing desk ergonomics', [
+      r('wired.com'),
+      r('nytimes.com'),
+      r('healthline.com')
+    ])
+    expect(ranked.map((x) => x.domain)).toEqual(['wired.com', 'nytimes.com', 'healthline.com'])
+  })
+
+  it('a two-word entity matches its joined domain, subdomained aggregators still count', () => {
+    expect(domainMatchesQuery('canterburyhall.co.uk', 'canterbury hall wedding')).toBe(true)
+    expect(domainMatchesQuery('nytimes.com', 'canterbury hall wedding')).toBe(false)
+    const ranked = rankWebResults('x', [r('m.yelp.com'), r('somesite.org')])
+    expect(ranked[0].domain).toBe('somesite.org')
   })
 })

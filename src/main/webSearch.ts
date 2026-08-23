@@ -67,6 +67,68 @@ export function parseDdgHtml(html: string, limit = 5): WebResult[] {
   return out
 }
 
+// Web source quality (A2, AI-15): prefer the canonical site over aggregators.
+// Caleb's case: asking about a venue opened its Yelp listing instead of the
+// venue's own site. Two deterministic signals, applied as a stable rerank so
+// engine order still breaks ties:
+// - A domain whose own name matches the query's terms IS the entity
+//   ("eleven canterbury" → elevencanterbury.com) and moves up.
+// - Directory/review aggregators move down — never out: when the aggregator
+//   is all the web has, it still shows.
+const AGGREGATOR_DOMAINS = new Set([
+  'yelp.com',
+  'tripadvisor.com',
+  'yellowpages.com',
+  'foursquare.com',
+  'mapquest.com',
+  'bbb.org',
+  'thumbtack.com',
+  'angi.com',
+  'opentable.com',
+  'facebook.com',
+  'instagram.com',
+  'pinterest.com',
+  'reddit.com',
+  'quora.com'
+])
+
+function isAggregator(domain: string): boolean {
+  const parts = domain.split('.')
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (AGGREGATOR_DOMAINS.has(parts.slice(i).join('.'))) return true
+  }
+  return false
+}
+
+// True when the query's words are the domain's own name — the strongest
+// available "this site IS the thing" signal without fetching pages.
+export function domainMatchesQuery(domain: string, query: string): boolean {
+  const root = domain.split('.').slice(0, -1).join('').replace(/[^a-z0-9]/g, '')
+  if (root.length < 4) return false
+  const terms = (query.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter(
+    (t) => !['the', 'and', 'for', 'near', 'best', 'top', 'www', 'com'].includes(t)
+  )
+  if (terms.length === 0) return false
+  const joined = terms.join('')
+  if (root.includes(joined) || joined.includes(root)) return true
+  // Two or more distinct query words inside the domain name also count
+  // ("canterbury hall venue" → canterburyhall.co.uk).
+  let hits = 0
+  for (const t of terms) if (t.length >= 4 && root.includes(t)) hits++
+  return hits >= 2
+}
+
+// Stable rerank, exported pure so the rules are unit-locked.
+export function rankWebResults(query: string, results: WebResult[]): WebResult[] {
+  return results
+    .map((r, i) => ({
+      r,
+      score: i + (isAggregator(r.domain) ? 2.5 : 0) - (domainMatchesQuery(r.domain, query) ? 3 : 0)
+    }))
+    .sort((a, b) => a.score - b.score)
+    .map((x) => x.r)
+}
+
 // Queries this short are follow-ups ("yes", "do it"), not research questions;
 // searching the web for them is noise wearing a trenchcoat.
 export const WEB_SEARCH_MIN_QUERY = 15
@@ -87,7 +149,9 @@ export async function searchWeb(query: string, limit = 5): Promise<WebResult[]> 
       }
     })
     if (!res.ok) return []
-    return parseDdgHtml(await res.text(), limit)
+    // Parse deeper than the ask so a canonical site sitting just below the
+    // fold can outrank the aggregators above it (AI-15), then cut to limit.
+    return rankWebResults(query, parseDdgHtml(await res.text(), limit * 2)).slice(0, limit)
   } catch {
     return []
   } finally {
