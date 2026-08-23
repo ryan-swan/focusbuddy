@@ -202,3 +202,7 @@ export const useOnboarding = create<OnboardingStore>((set, get) => ({
 // Re-export the registry so callers (the tour hub, command palette) can list
 // modules without reaching past the store.
 export { ONBOARDING_MODULES }
+
+// Spec access, same convention as __fbView: e2e drives first-run flows that a
+// seeded profile would otherwise never show (the freshness check sees nodes).
+;(window as unknown as { __fbOnboarding?: typeof useOnboarding }).__fbOnboarding = useOnboarding

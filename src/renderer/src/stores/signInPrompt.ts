@@ -16,3 +16,8 @@ export const useSignInPrompt = create<SignInPromptStore>((set) => ({
   requestOpen: () => set({ open: true }),
   close: () => set({ open: false })
 }))
+
+// Spec access, same convention as __fbView: e2e opens the modal on demand
+// (the boot-path rules never fire in a seeded profile).
+;(window as unknown as { __fbSignInPrompt?: typeof useSignInPrompt }).__fbSignInPrompt =
+  useSignInPrompt

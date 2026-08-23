@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import Icon from './Icon'
+import PlexiiMark from './brand/PlexiiMark'
 import { markReleaseSeen, type ChangelogEntry } from '../lib/changelog'
 
 // First-run "What's new in vX.Y.Z" modal. Shown once per version on the first
@@ -48,7 +49,7 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
         <div className="flex items-start justify-between gap-3 border-b border-[var(--edge-soft)] px-5 py-4">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
-              <Icon name="auto_awesome" size={14} />
+              <PlexiiMark height={14} motion="once" title={null} />
               Updated {versionLabel}
             </div>
             <h2 className="mt-1 text-lg font-semibold text-[var(--ink-100)]">

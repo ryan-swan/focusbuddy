@@ -4,6 +4,7 @@ import { useOnboarding, CORE_MODULE_ID } from '../stores/onboarding'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import Icon from './Icon'
+import PlexiiMark from './brand/PlexiiMark'
 
 // First-run onboarding — shown once to a genuinely fresh install (see the
 // onboarding store, which grandfathers existing users). Three steps: a short
@@ -155,12 +156,9 @@ export default function FirstRunOnboarding(): JSX.Element | null {
 
         {step === 0 && (
           <div className="px-6 py-6">
-            <div
-              className="h-12 w-12 rounded-xl inline-flex items-center justify-center mb-4"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(99,102,241,0.2))' }}
-            >
-              <Icon name="auto_awesome" size={24} className="text-white" />
-            </div>
+            {/* Hero surface: the wordmark with the master artwork's gradient ii,
+                allowed to live-loop here — onboarding is the one celebratory door. */}
+            <PlexiiMark wordmark gradient height={40} letterColor="#FFFFFF" motion="loop" className="mb-4" />
             <h1 className="text-2xl font-semibold mb-2">Welcome to PlexiDesk</h1>
             <p className="text-[14px] text-stone-300 leading-relaxed mb-1">
               A glass-canvas workspace where notes, pages, tables, browsers and timers live side by

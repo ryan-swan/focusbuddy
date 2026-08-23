@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import PlexiiLogo from './PlexiiLogo'
+import PlexiiMark from './brand/PlexiiMark'
 import { useAccountStore } from '../stores/account'
 import { useSignInPrompt } from '../stores/signInPrompt'
 import { useOnboarding } from '../stores/onboarding'
@@ -160,7 +160,8 @@ export default function LaunchSignInModal(): JSX.Element | null {
         }}
       >
         <div className="flex justify-center mb-4">
-          <PlexiiLogo height={26} variant="white" />
+          {/* Hero surface: the master artwork's gradient ii, one cycle on open. */}
+          <PlexiiMark wordmark gradient height={26} letterColor="#FFFFFF" motion="once" />
         </div>
         <div className="flex items-center gap-3 mb-1">
           <div
