@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { confirmDialog } from '../plexi/PromptDialog'
 import type { DocType } from '@shared/types'
 import { useDocumentsStore } from '../../stores/documents'
@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
 import { createLiveDoc } from '../../lib/docCollabClient'
 import Icon from '../Icon'
+import { DashboardHeader } from '../plexi'
 import DocFiledInChip from '../DocFiledInChip'
 import { setDocDrag } from '../../lib/docMetaCache'
 
@@ -57,6 +58,7 @@ export default function DocumentsView(): JSX.Element {
   const [audience, setAudience] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
   const [showTrash, setShowTrash] = useState(false)
 
   useEffect(() => {
@@ -124,37 +126,38 @@ export default function DocumentsView(): JSX.Element {
   const verb = docType === 'doc' ? 'document' : docType === 'sheet' ? 'spreadsheet' : 'deck'
 
   return (
-    <div className="h-full overflow-auto desk-paper no-tod">
+    // Token surface, not desk-paper: atelier forces desk-paper to cream while its
+    // ink ramp is light-on-navy, so token text on paper is invisible there. The
+    // index views (the reference) render on --surface-base for exactly this reason.
+    <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="w-full px-6 py-8">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-100">Documents</h1>
-          <p className="text-[13px] text-stone-500 dark:text-stone-400 mt-0.5">
-            Start with AI and get a real first draft, then make it yours. Documents, spreadsheets and
-            slides, all in your workspace.
-          </p>
-        </header>
+        <DashboardHeader
+          title="Documents"
+          subtitle="Start with AI and get a real first draft, then make it yours. Documents, spreadsheets and slides, all in your workspace."
+        />
 
         {/* Create with AI */}
-        <div className="rounded-2xl border border-stone-200 dark:border-stone-700 bg-white/85 dark:bg-stone-900/80 shadow-sm p-5 mb-8">
+        <div className="fb-card fb-fade-in-up p-5 mb-8">
           <div className="flex gap-2 mb-4">
             {TYPES.map((t) => (
               <button
                 key={t.type}
                 onClick={() => setDocType(t.type)}
-                className={`flex-1 rounded-xl border p-3 text-left transition-colors ${
+                className={`flex-1 rounded-[var(--radius-row)] border p-3 text-left fb-press transition-colors ${
                   docType === t.type
                     ? 'border-accent bg-accent/[0.06]'
-                    : 'border-stone-200 dark:border-stone-700 hover:border-accent/50'
+                    : 'border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.5)]'
                 }`}
               >
-                <Icon name={t.icon} size={20} className={docType === t.type ? 'text-accent' : 'text-stone-400'} />
-                <div className="text-[13px] font-medium text-stone-800 dark:text-stone-100 mt-1.5">{t.label}</div>
-                <div className="text-[11px] text-stone-500 dark:text-stone-400">{t.blurb}</div>
+                <Icon name={t.icon} size={20} className={docType === t.type ? 'text-accent' : 'text-[var(--ink-40)]'} />
+                <div className="fb-t-body font-medium text-[var(--ink-100)] mt-1.5">{t.label}</div>
+                <div className="fb-t-caption">{t.blurb}</div>
               </button>
             ))}
           </div>
 
           <textarea
+            ref={promptRef}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => {
@@ -162,34 +165,34 @@ export default function DocumentsView(): JSX.Element {
             }}
             placeholder={`Describe the ${verb} you want. For example: a one-page launch plan for our new pricing, with goals, timeline and risks.`}
             rows={3}
-            className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-xl px-3.5 py-2.5 text-[14px] focus:outline-none focus:border-accent resize-none"
+            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-[var(--radius-field)] px-3.5 py-2.5 fb-t-body text-[var(--ink-100)] focus:outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)] resize-none"
           />
           <div className="flex items-center gap-2 mt-3">
             <input
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
               placeholder="Who is it for? (optional)"
-              className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+              className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-[var(--radius-field)] px-3 py-2 fb-t-body text-[var(--ink-100)] focus:outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]"
             />
             <button onClick={() => void create()} disabled={busy || !prompt.trim()} className="btn-primary shrink-0">
               <Icon name="auto_awesome" size={15} />
               {busy ? 'Creating…' : 'Create with AI'}
             </button>
           </div>
-          {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-2">{error}</div>}
+          {error && <div className="fb-t-label text-rose-500 mt-2">{error}</div>}
 
-          <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center gap-3 text-[12px] text-stone-500 dark:text-stone-400">
+          <div className="mt-3 pt-3 border-t border-[var(--edge-soft)] flex items-center gap-3 fb-t-label text-[var(--ink-50)]">
             <span>Or start blank:</span>
             {TYPES.map((t) => (
-              <button key={t.type} onClick={() => void blank(t.type)} className="inline-flex items-center gap-1 hover:text-accent">
+              <button key={t.type} onClick={() => void blank(t.type)} className="inline-flex items-center gap-1 fb-press hover:text-accent">
                 <Icon name={t.icon} size={13} />
                 {t.label}
               </button>
             ))}
-            <span className="w-px h-3.5 bg-stone-200 dark:bg-stone-700" />
+            <span className="w-px h-3.5 bg-[var(--edge-soft)]" />
             <button
               onClick={() => void importVisio()}
-              className="inline-flex items-center gap-1 hover:text-accent"
+              className="inline-flex items-center gap-1 fb-press hover:text-accent"
               data-testid="documents-import-vsdx"
               title="Import a Microsoft Visio diagram (.vsdx)"
             >
@@ -200,28 +203,36 @@ export default function DocumentsView(): JSX.Element {
         </div>
 
         {/* Recent */}
-        <h2 className="text-[13px] font-semibold text-stone-700 dark:text-stone-300 mb-2">Recent</h2>
+        <h2 className="fb-t-caption uppercase tracking-[0.1em] font-semibold mb-2">Recent</h2>
         {list.length === 0 ? (
-          <p className="text-[13px] text-stone-500 dark:text-stone-400 py-6 text-center rounded-xl border border-dashed border-stone-300 dark:border-stone-700">
-            No documents yet. Create your first one above.
-          </p>
+          <div className="py-10 text-center rounded-[var(--radius-card)] border border-dashed border-[var(--edge-firm)]">
+            <Icon name="description" size={26} className="text-[var(--ink-30)] mx-auto" />
+            <p className="fb-t-body text-[var(--ink-50)] mt-2">No documents yet.</p>
+            <button
+              onClick={() => promptRef.current?.focus()}
+              className="mt-3 inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-90)]"
+            >
+              <Icon name="auto_awesome" size={14} /> Start writing
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {list.map((d) => (
+            {list.map((d, i) => (
               <div
                 key={d.id}
                 draggable
                 onDragStart={(e) => setDocDrag(e, { id: d.id, docType: d.docType, title: d.title })}
                 onClick={() => goDocument(d.id)}
-                className="group flex items-center gap-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/70 px-3.5 py-3 cursor-pointer hover:border-accent/50 hover:shadow-sm transition"
+                style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
+                className="group flex items-center gap-3 fb-tile fb-press fb-lift fb-fade-in-up px-3.5 py-3 cursor-pointer"
               >
-                <div className="h-9 w-9 rounded-lg bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
+                <div className="h-9 w-9 rounded-[var(--radius-chip)] bg-accent/10 text-accent inline-flex items-center justify-center shrink-0">
                   <Icon name={typeIcon(d.docType)} size={17} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-medium text-stone-900 dark:text-stone-100 truncate">{d.title}</div>
+                  <div className="fb-t-body font-medium text-[var(--ink-100)] truncate">{d.title}</div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-stone-400 dark:text-stone-500">Edited {relTime(d.updatedAt)}</span>
+                    <span className="fb-t-caption">Edited {relTime(d.updatedAt)}</span>
                     <span onClick={(e) => e.stopPropagation()}>
                       <DocFiledInChip docId={d.id} compact />
                     </span>
@@ -233,7 +244,7 @@ export default function DocumentsView(): JSX.Element {
                       e.stopPropagation()
                       void collaborate(d.id)
                     }}
-                    className="text-stone-400 hover:text-accent p-1"
+                    className="text-[var(--ink-40)] hover:text-accent p-1.5 fb-press"
                     title="Collaborate (share live)"
                     data-testid="doc-collaborate"
                   >
@@ -245,7 +256,7 @@ export default function DocumentsView(): JSX.Element {
                       // Recoverable: lands in the Trash below, with an Undo toast.
                       void remove(d.id)
                     }}
-                    className="text-stone-400 hover:text-red-500 p-1 focus-visible:opacity-100"
+                    className="text-[var(--ink-40)] hover:text-rose-500 p-1.5 fb-press focus-visible:opacity-100"
                     title="Move to trash (recoverable below)"
                   >
                     <Icon name="delete" size={15} />
@@ -262,7 +273,7 @@ export default function DocumentsView(): JSX.Element {
           <div className="mt-6">
             <button
               onClick={() => setShowTrash((v) => !v)}
-              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+              className="inline-flex items-center gap-1.5 fb-t-body font-semibold text-[var(--ink-50)] hover:text-[var(--ink-90)] fb-press"
               aria-expanded={showTrash}
             >
               <Icon name={showTrash ? 'expand_more' : 'chevron_right'} size={15} />
@@ -273,21 +284,21 @@ export default function DocumentsView(): JSX.Element {
                 {trashed.map((d) => (
                   <div
                     key={d.id}
-                    className="flex items-center gap-3 rounded-xl border border-dashed border-stone-300 dark:border-stone-700 bg-white/40 dark:bg-stone-900/40 px-3.5 py-3"
+                    className="flex items-center gap-3 rounded-[var(--radius-row)] border border-dashed border-[var(--edge-firm)] bg-[var(--surface-sunken)] px-3.5 py-3"
                   >
-                    <div className="h-9 w-9 rounded-lg bg-stone-200/60 dark:bg-stone-800 text-stone-400 inline-flex items-center justify-center shrink-0">
+                    <div className="h-9 w-9 rounded-[var(--radius-chip)] bg-[var(--surface-base)] text-[var(--ink-40)] inline-flex items-center justify-center shrink-0">
                       <Icon name={typeIcon(d.docType)} size={17} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-medium text-stone-500 dark:text-stone-400 truncate line-through decoration-stone-300 dark:decoration-stone-600">
+                      <div className="fb-t-body font-medium text-[var(--ink-50)] truncate line-through decoration-[var(--edge-firm)]">
                         {d.title}
                       </div>
-                      <div className="text-[11px] text-stone-400 dark:text-stone-500">In trash</div>
+                      <div className="fb-t-caption">In trash</div>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => void restore(d.id)}
-                        className="text-stone-400 hover:text-accent p-1"
+                        className="text-[var(--ink-40)] hover:text-accent p-1.5 fb-press"
                         title="Restore"
                         data-testid="doc-restore"
                       >
@@ -304,7 +315,7 @@ export default function DocumentsView(): JSX.Element {
                             if (ok) void purge(d.id)
                           })
                         }}
-                        className="text-stone-400 hover:text-red-500 p-1"
+                        className="text-[var(--ink-40)] hover:text-rose-500 p-1.5 fb-press"
                         title="Delete forever"
                         data-testid="doc-purge"
                       >
