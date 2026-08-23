@@ -174,7 +174,7 @@ export default function PlexiApiView(): JSX.Element {
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Token name"
               data-testid="api-token-name"
-              className="fb-card flex-1 px-2 py-1.5 text-[12.5px] focus:outline-none placeholder:text-[var(--ink-50)]"
+              className="fb-card flex-1 px-2 py-1.5 text-[12.5px] placeholder:text-[var(--ink-50)]"
             />
             <label className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] cursor-pointer">
               <input type="checkbox" checked={newWrite} data-testid="api-token-write" onChange={(e) => setNewWrite(e.target.checked)} className="accent-[rgb(var(--accent))]" />

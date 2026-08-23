@@ -685,7 +685,7 @@ function FocusModeInner(): JSX.Element | null {
       // overlay (z-[60]) so focusing an object from column mode shows the pane
       // rather than staying hidden behind the columns; still below the dialog /
       // popover layer (z-100+). Was z-50 (fine on the canvas, too low for columns).
-      className="fb-scrim fixed inset-0 z-[90] flex flex-col outline-none"
+      className="fb-scrim fixed inset-0 z-[90] flex flex-col"
       data-testid="widget-focus-mode"
       onMouseDown={onOverlayMouseDown}
       onWheel={onWheelNav}

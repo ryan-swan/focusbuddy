@@ -116,6 +116,25 @@ body {
     transform: scale(0.97);
     transition-duration: var(--dur-instant);
   }
+  /* R6.3 (Edges + Glass Phase 3): hover is an invitation — it arrives fast
+     and leaves a beat slower, so controls feel alive without flickering.
+     The :hover rule carries the enter duration; the base rule carries the
+     exit. Applies to the two material controls every surface composes. */
+  .fb-tile,
+  .fb-btn-surface {
+    transition-duration: var(--dur-base);
+  }
+  .fb-tile:hover,
+  .fb-btn-surface:hover {
+    transition-duration: var(--dur-quick);
+  }
+  /* R6.2: everything a user can push, dips — the surface button included,
+     so the ~90 converted ghost buttons press without each site remembering
+     fb-press. Composes with fb-press harmlessly (same transform). */
+  .fb-btn-surface:active {
+    transform: scale(0.97);
+    transition-duration: var(--dur-instant);
+  }
 
   /* Floating surfaces (menus, popovers) arrive, they don't appear. */
   @keyframes fb-pop-in {

@@ -978,7 +978,7 @@ export default function WidgetFrame({
                 }}
                 placeholder={widgetDisplayName(widget, headerLabel)}
                 aria-label="Widget name"
-                className="widget-nodrag min-w-0 flex-1 bg-transparent border-b border-accent/60 outline-none text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-90)] placeholder:text-[var(--ink-40)] placeholder:normal-case"
+                className="widget-nodrag min-w-0 flex-1 bg-transparent border-b border-accent/60 text-[10px] uppercase tracking-[0.08em] font-medium text-[var(--ink-90)] placeholder:text-[var(--ink-40)] placeholder:normal-case"
               />
             ) : (
               <span

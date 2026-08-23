@@ -652,7 +652,7 @@ function ApiKeyRow({
               placeholder={config.placeholder}
               autoComplete="off"
               spellCheck={false}
-              className="fb-field text-xs font-mono pr-12 focus:outline-none"
+              className="fb-field text-xs font-mono pr-12"
             />
             <button
               type="button"

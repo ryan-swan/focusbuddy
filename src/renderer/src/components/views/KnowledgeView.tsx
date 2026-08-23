@@ -92,7 +92,7 @@ export default function KnowledgeView(): JSX.Element {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search knowledge"
               data-testid="brain-search"
-              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
+              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
             />
           </div>
           <button
@@ -217,7 +217,7 @@ function Editor({
           onBlur={() => title !== entry.title && onChange({ title })}
           placeholder="Entry title"
           data-testid="brain-title"
-          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)]"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
         />
         <button
           onClick={onDelete}
@@ -249,7 +249,7 @@ function Editor({
             }
           }}
           placeholder="Add tag…"
-          className="bg-transparent text-[11px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none w-24"
+          className="bg-transparent text-[11px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] w-24"
         />
       </div>
 
@@ -259,7 +259,7 @@ function Editor({
         onBlur={() => body !== entry.body && onChange({ body })}
         placeholder="Write what should be remembered. The AI will ground its answers in this."
         data-testid="brain-body"
-        className="flex-1 w-full resize-none px-5 py-4 bg-transparent text-[14px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
+        className="flex-1 w-full resize-none px-5 py-4 bg-transparent text-[14px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
       />
     </div>
   )

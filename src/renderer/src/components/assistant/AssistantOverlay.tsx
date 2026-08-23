@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ChatPanel from '../ChatPanel'
 import Icon from '../Icon'
+import WebPanel from '../browser/WebPanel'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
 import StandupHome from '../views/StandupHome'
@@ -66,7 +67,21 @@ const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
   { id: 'work', label: 'Work', icon: 'smart_toy' }
 ]
 
+// The always-mounted web panel (A2, R4): it rides this component because it
+// is the one assistant surface App.tsx always renders — the panel must
+// exist on every view (the hub included, where the chrome below
+// early-returns), so the default export mounts it unconditionally beside
+// the chrome. The omnibar routes live in CommandCenter — one door.
 export default function AssistantOverlay(): JSX.Element {
+  return (
+    <>
+      <WebPanel />
+      <AssistantOverlayChrome />
+    </>
+  )
+}
+
+function AssistantOverlayChrome(): JSX.Element {
   const open = useAssistantChrome((s) => s.open)
   const mode = useAssistantChrome((s) => s.mode)
   const width = useAssistantChrome((s) => s.width)

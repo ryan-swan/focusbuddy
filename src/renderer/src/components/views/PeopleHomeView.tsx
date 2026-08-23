@@ -268,7 +268,7 @@ export default function PeopleHomeView(): JSX.Element {
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search people by name, role or team"
                       data-testid="people-directory-search"
-                      className="flex-1 bg-transparent fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+                      className="flex-1 bg-transparent fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                     />
                   </div>
                 </div>

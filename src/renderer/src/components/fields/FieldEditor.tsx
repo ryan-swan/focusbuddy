@@ -227,8 +227,8 @@ function ShortText({ def, value, variant, onCommit, autoFocus }: SubProps<string
       }}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-2 py-1 fb-body outline-none focus:bg-[var(--surface-raised)]'
-          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)]'
+          ? 'w-full bg-transparent px-2 py-1 fb-body focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)]'
       }
     />
   )
@@ -249,8 +249,8 @@ function LongText({ def, value, variant, onCommit }: SubProps<string>): JSX.Elem
       rows={variant === 'cell' ? 1 : 4}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-2 py-1 fb-body outline-none resize-none focus:bg-[var(--surface-raised)]'
-          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)] resize-y'
+          ? 'w-full bg-transparent px-2 py-1 fb-body resize-none focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)] resize-y'
       }
     />
   )
@@ -287,8 +287,8 @@ function NumberInput({
         }}
         className={
           variant === 'cell'
-            ? 'flex-1 bg-transparent px-1 py-1 fb-body outline-none text-right focus:bg-[var(--surface-raised)]'
-            : 'flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)] text-right'
+            ? 'flex-1 bg-transparent px-1 py-1 fb-body text-right focus:bg-[var(--surface-raised)]'
+            : 'flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)] text-right'
         }
       />
       {config.suffix && (
@@ -487,8 +487,8 @@ function DateInput({ def, value, variant, onCommit }: SubProps<number | null>): 
       }}
       className={
         variant === 'cell'
-          ? 'w-full bg-transparent px-1 py-1 fb-body outline-none focus:bg-[var(--surface-raised)]'
-          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:outline-none focus:border-[var(--edge-firm)]'
+          ? 'w-full bg-transparent px-1 py-1 fb-body focus:bg-[var(--surface-raised)]'
+          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)]'
       }
     />
   )

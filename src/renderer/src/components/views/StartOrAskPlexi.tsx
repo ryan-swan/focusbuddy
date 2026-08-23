@@ -55,7 +55,7 @@ export default function StartOrAskPlexi(): JSX.Element {
             disabled={sending}
             data-testid="start-or-ask-input"
             placeholder="Ask Plexii anything — a question, an idea, a plan"
-            className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none disabled:opacity-60"
+            className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] disabled:opacity-60"
           />
           <button
             onClick={start}

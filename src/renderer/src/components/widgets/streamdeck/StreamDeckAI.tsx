@@ -629,7 +629,7 @@ export default function StreamDeckAI({
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
                 placeholder='e.g. "media controls" — AI will suggest a single play/pause button OR a folder of play, pause, next, previous, volume — you pick.'
-                className="w-full px-3 py-2 rounded-md text-[12px] text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-md text-[12px] text-stone-100 placeholder:text-stone-500"
                 style={{
                   background: 'rgba(0,0,0,0.32)',
                   border: '1px solid rgba(255,255,255,0.08)'

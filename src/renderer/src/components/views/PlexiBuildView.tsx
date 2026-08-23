@@ -229,7 +229,7 @@ function AppBuilder({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => name !== app.name && onChange({ name })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)]"
           data-testid="app-name"
         />
         <div className="inline-flex rounded-md bg-[var(--surface-sunken)] overflow-hidden">
@@ -328,7 +328,7 @@ function BuildComponent({
   onMove: (dir: -1 | 1) => void
 }): JSX.Element {
   const inputCls =
-    'w-full text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.50)]'
+    'w-full text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent)/0.50)]'
   return (
     <div className={`${PLEXI_CARD} p-3`} data-testid={`build-component-${c.type}`}>
       <div className="flex items-center gap-1.5 mb-2">
@@ -405,7 +405,7 @@ function BuildComponent({
 function PreviewComponent({ c }: { c: AppComponent }): JSX.Element {
   const [val, setVal] = useState<string | boolean>(c.fieldType === 'checkbox' ? false : '')
   const inputCls =
-    'fb-card w-full text-[13px] px-3 py-2 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent))]'
+    'fb-card w-full text-[13px] px-3 py-2 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent))]'
 
   switch (c.type) {
     case 'heading':

@@ -147,7 +147,7 @@ export default function ChartWidget({ widget }: Props): JSX.Element {
             value={config.title ?? ''}
             onChange={(e) => save({ ...config, title: e.target.value })}
             placeholder="Untitled chart"
-            className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-90)] outline-none placeholder:text-[var(--ink-30)]"
+            className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-90)] placeholder:text-[var(--ink-30)]"
           />
           <button
             onClick={() => {
@@ -315,7 +315,7 @@ function ChartConfigPanel({
   onChange: (next: ChartConfig) => void
 }): JSX.Element {
   const selectCls =
-    'text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1 text-[var(--ink-100)] focus:outline-none focus:border-accent'
+    'text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1 text-[var(--ink-100)] focus:border-accent'
 
   return (
     <div className="shrink-0 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 px-2.5 py-2 space-y-2">

@@ -915,7 +915,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
   const body = (
     <div
       ref={bodyRef}
-      className="h-full w-full bg-[var(--surface-raised)] overflow-auto relative outline-none"
+      className="h-full w-full bg-[var(--surface-raised)] overflow-auto relative"
       data-testid="table-body"
       tabIndex={0}
       onKeyDown={onTableKeyDown}
@@ -938,7 +938,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           value={table.title}
           onChange={(e) => renameTable(e.target.value)}
           placeholder="Untitled table"
-          className="flex-1 bg-transparent text-[14px] font-semibold text-[var(--ink-90)] outline-none placeholder-[var(--ink-30)]"
+          className="flex-1 bg-transparent text-[14px] font-semibold text-[var(--ink-90)] placeholder-[var(--ink-30)]"
         />
         <span className="text-[11px] text-[var(--ink-40)] font-medium tabular-nums">
           {rows.length} {rows.length === 1 ? 'row' : 'rows'}

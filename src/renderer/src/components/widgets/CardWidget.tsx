@@ -157,7 +157,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onChange={(e) => set({ title: e.target.value })}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder="Title"
-            className="flex-1 bg-transparent text-[15px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
           />
         </div>
         {pickIcon && (
@@ -189,7 +189,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onMouseDown={(e) => e.stopPropagation()}
             onBlur={() => setBodyEditing(false)}
             placeholder="Write something… **bold**, *italic*, paste a link"
-            className="flex-1 min-h-0 w-full resize-none bg-transparent text-[13px] leading-relaxed text-[var(--ink-70)] placeholder:text-[var(--ink-40)] focus:outline-none"
+            className="flex-1 min-h-0 w-full resize-none bg-transparent text-[13px] leading-relaxed text-[var(--ink-70)] placeholder:text-[var(--ink-40)]"
           />
         ) : (
           <div

@@ -147,7 +147,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
                 if (e.key === 'Enter' || e.key === 'Escape') setEditingLabel(false)
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="pointer-events-auto max-w-[90%] bg-[var(--surface-raised)]/80 text-center text-sm text-[var(--ink-100)] rounded px-2 py-0.5 border border-[var(--edge-firm)] focus:outline-none"
+              className="pointer-events-auto max-w-[90%] bg-[var(--surface-raised)]/80 text-center text-sm text-[var(--ink-100)] rounded px-2 py-0.5 border border-[var(--edge-firm)]"
             />
           ) : (
             <span className="text-sm font-medium text-[var(--ink-100)] text-center break-words drop-shadow-sm">
@@ -182,7 +182,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
         <select
           value={data.shape}
           onChange={(e) => set({ shape: e.target.value as ShapeType })}
-          className="h-6 bg-stone-800 text-stone-100 text-[11px] rounded px-1 border border-white/10 focus:outline-none"
+          className="h-6 bg-stone-800 text-stone-100 text-[11px] rounded px-1 border border-white/10"
           title="Shape"
         >
           {SHAPES.map((s) => (

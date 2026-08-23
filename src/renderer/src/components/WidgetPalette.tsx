@@ -246,7 +246,7 @@ export default function WidgetPalette({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search widgets and objects"
                 data-testid="palette-search"
-                className="w-full h-7 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12px] text-[var(--ink-90)] placeholder:text-[var(--ink-40)] outline-none focus:border-[rgb(var(--accent)/0.6)]"
+                className="w-full h-7 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12px] text-[var(--ink-90)] placeholder:text-[var(--ink-40)] focus:border-[rgb(var(--accent)/0.6)]"
               />
             </div>
           </div>

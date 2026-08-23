@@ -1420,7 +1420,7 @@ function SidePanel({
         <input
           value={node.label}
           onChange={(e) => onLabelEdit(e.target.value)}
-          className="w-full text-[13px] font-medium bg-transparent border-b border-[var(--edge-soft)] px-1 py-1 focus:outline-none focus:border-accent text-[var(--ink-100)]"
+          className="w-full text-[13px] font-medium bg-transparent border-b border-[var(--edge-soft)] px-1 py-1 focus:border-accent text-[var(--ink-100)]"
           data-testid="mindmap-node-label-input"
         />
         <div className="flex flex-wrap gap-1">

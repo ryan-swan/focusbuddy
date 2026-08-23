@@ -280,7 +280,7 @@ export default function SectionWidget({
                   setEditing(false)
                 }
               }}
-              className="bg-[var(--surface-raised)]/95 text-[var(--ink-100)] px-1.5 py-0.5 rounded text-xs w-40 focus:outline-none"
+              className="bg-[var(--surface-raised)]/95 text-[var(--ink-100)] px-1.5 py-0.5 rounded text-xs w-40"
             />
           ) : (
             <span

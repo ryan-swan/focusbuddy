@@ -893,7 +893,7 @@ function ShortcutComposer({
       onClose={close}
       label="Edit shortcuts"
       z={260}
-      className="fb-glass-pillow rounded-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[76vh] outline-none"
+      className="fb-glass-pillow rounded-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[76vh]"
       testId="home-shortcut-composer"
     >
       <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2.5">
@@ -907,7 +907,7 @@ function ShortcutComposer({
           placeholder="Shortcuts"
           aria-label="Box name"
           data-testid="home-shortcut-composer-title"
-          className="flex-1 min-w-0 bg-transparent text-[13.5px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[13.5px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
         />
         <button
           onClick={close}
@@ -1654,7 +1654,7 @@ function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
       onClose={onClose}
       label="Transcribe"
       z={260}
-      className="fb-glass-pillow rounded-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[76vh] outline-none"
+      className="fb-glass-pillow rounded-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[76vh]"
       testId="home-transcribe-overlay"
     >
       <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2.5">

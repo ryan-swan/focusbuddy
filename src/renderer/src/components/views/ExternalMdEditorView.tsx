@@ -36,7 +36,7 @@ export default function ExternalMdEditorView({ path }: Props): JSX.Element {
       Markdown.configure({ html: false, transformPastedText: true })
     ],
     editorProps: {
-      attributes: { class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh]' }
+      attributes: { class: 'prose prose-invert max-w-none min-h-[60vh]' }
     },
     onUpdate: ({ editor: e }) => {
       setState((prev) => (prev === 'loading' || prev === 'load-error' ? prev : 'dirty'))

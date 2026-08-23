@@ -92,7 +92,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
   }
 
   const inputCls =
-    'w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent'
+    'w-full text-[13px] px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:border-accent'
 
   return createPortal(
     <Modal
@@ -175,7 +175,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             onChange={(e) => setBody(e.target.value)}
             rows={12}
             placeholder="Write your message…"
-            className="w-full text-[13px] px-2.5 py-2 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:outline-none focus:border-accent resize-none leading-relaxed"
+            className="w-full text-[13px] px-2.5 py-2 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:border-accent resize-none leading-relaxed"
           />
           {error && <div className="text-[12px] text-red-600 dark:text-red-400">{error}</div>}
         </div>

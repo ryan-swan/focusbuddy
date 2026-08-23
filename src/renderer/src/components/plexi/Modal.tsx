@@ -109,7 +109,7 @@ export default function Modal({
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
-        className={className || 'outline-none'}
+        className={className || ''}
         data-testid={testId}
       >
         {children}

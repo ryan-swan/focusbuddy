@@ -681,7 +681,7 @@ function RenameInput({ initial, onCommit, onCancel }: { initial: string; onCommi
         else if (e.key === 'Escape') onCancel()
       }}
       onBlur={(e) => onCommit(e.target.value)}
-      className="min-w-0 flex-1 bg-[var(--surface-raised)] border border-accent rounded px-1 py-0.5 text-[12px] focus:outline-none"
+      className="min-w-0 flex-1 bg-[var(--surface-raised)] border border-accent rounded px-1 py-0.5 text-[12px]"
     />
   )
 }

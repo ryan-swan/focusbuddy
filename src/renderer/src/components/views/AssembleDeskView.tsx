@@ -142,7 +142,7 @@ export default function AssembleDeskView(): JSX.Element {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search widgets across every desk"
-            className="flex-1 bg-transparent outline-none text-[14px] placeholder:text-[var(--ink-40)]"
+            className="flex-1 bg-transparent text-[14px] placeholder:text-[var(--ink-40)]"
             data-testid="assemble-search"
             autoFocus
           />

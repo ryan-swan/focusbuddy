@@ -234,7 +234,7 @@ export default function PlexiSearchView(): JSX.Element {
             }}
             placeholder="Search everything. Up and down to move, Enter to open, Cmd+Enter to ask"
             data-testid="plexisearch-input"
-            className="flex-1 min-w-0 bg-transparent text-[15px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[15px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
           />
           <button
             onClick={() => void runAsk()}

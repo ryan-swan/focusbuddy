@@ -204,7 +204,7 @@ export function PromptDialogHost(): JSX.Element | null {
             onChange={(e) => setValue(e.target.value)}
             placeholder={req.placeholder}
             rows={6}
-            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] font-mono focus:outline-none focus:border-accent resize-y"
+            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] font-mono focus:border-accent resize-y"
             data-testid="prompt-dialog-input"
           />
         ) : (
@@ -213,7 +213,7 @@ export function PromptDialogHost(): JSX.Element | null {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={req.placeholder}
-            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent"
             data-testid="prompt-dialog-input"
           />
         )}

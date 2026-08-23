@@ -379,7 +379,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
                         setRenameText('')
                       }
                     }}
-                    className="flex-1 bg-[var(--surface-raised)] border border-accent rounded px-1.5 py-0.5 text-[13px] focus:outline-none"
+                    className="flex-1 bg-[var(--surface-raised)] border border-accent rounded px-1.5 py-0.5 text-[13px]"
                   />
                 ) : (
                   <button onClick={() => void onOpen(e)} className="flex-1 min-w-0 text-left text-[13px] text-[var(--ink-90)] truncate">

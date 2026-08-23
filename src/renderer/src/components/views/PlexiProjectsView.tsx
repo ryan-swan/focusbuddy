@@ -1065,7 +1065,7 @@ function TaskEditor({
               }
             }}
             placeholder="Task title"
-            className="flex-1 min-w-0 rounded-md bg-transparent border border-transparent hover:border-[var(--edge-soft)] focus:border-[rgb(var(--accent)/0.55)] px-1.5 py-1 text-[13px] font-semibold text-[var(--ink-100)] focus:outline-none focus:bg-[var(--surface-base)]"
+            className="flex-1 min-w-0 rounded-md bg-transparent border border-transparent hover:border-[var(--edge-soft)] focus:border-[rgb(var(--accent)/0.55)] px-1.5 py-1 text-[13px] font-semibold text-[var(--ink-100)] focus:bg-[var(--surface-base)]"
           />
           <button onClick={onClose} className="shrink-0 p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)]" title="Close">
             <Icon name="close" size={15} />
@@ -1220,7 +1220,7 @@ function TaskEditor({
               data-testid="task-deadline"
               onChange={(e) => void patch({ deadlineMs: fromDateInput(e.target.value) })}
               title="Flag the task if the schedule finishes past this date"
-              className={`mt-1 w-full rounded-md bg-[var(--surface-base)] border px-2 py-1.5 text-[12px] text-[var(--ink-100)] focus:outline-none ${
+              className={`mt-1 w-full rounded-md bg-[var(--surface-base)] border px-2 py-1.5 text-[12px] text-[var(--ink-100)] ${
                 task.deadlineMiss ? 'border-rose-500/60' : 'border-[var(--edge-soft)] focus:border-[rgb(var(--accent)/0.55)]'
               }`}
             />

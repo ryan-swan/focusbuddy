@@ -150,7 +150,7 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
             setTested(false)
           }}
           placeholder="you@example.com"
-          className="w-full mb-3 fb-field fb-t-body focus:outline-none"
+          className="w-full mb-3 fb-field fb-t-body"
         />
 
         <label className="block fb-t-label text-[var(--ink-70)] mb-1">
@@ -164,7 +164,7 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
             setTested(false)
           }}
           placeholder="App password (recommended) or mailbox password"
-          className="w-full mb-1 fb-field fb-t-body focus:outline-none"
+          className="w-full mb-1 fb-field fb-t-body"
         />
         <p className="fb-t-caption mb-3">
           Stored encrypted on this device with your OS keychain. It never leaves your machine.
@@ -189,7 +189,7 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
                   setTested(false)
                 }}
                 placeholder="imap.example.com"
-                className="w-full fb-field fb-t-body focus:outline-none"
+                className="w-full fb-field fb-t-body"
               />
             </div>
             <div>
@@ -201,7 +201,7 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
                   setPort(Number(e.target.value))
                   setTested(false)
                 }}
-                className="w-full fb-field fb-t-body focus:outline-none"
+                className="w-full fb-field fb-t-body"
               />
             </div>
             <label className="col-span-2 flex items-center gap-2 fb-t-label text-[var(--ink-60)]">

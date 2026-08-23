@@ -78,7 +78,7 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
         <input
           value={color}
           onChange={(e) => setColor(e.target.value)}
-          className={`flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 font-mono focus:outline-none focus:border-[var(--edge-firm)] ${
+          className={`flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 font-mono focus:border-[var(--edge-firm)] ${
             inline ? 'text-base' : 'text-xs'
           }`}
         />

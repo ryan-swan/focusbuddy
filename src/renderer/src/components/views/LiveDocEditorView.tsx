@@ -536,7 +536,7 @@ export default function LiveDocEditorView({ liveDocId, onBack }: Props): JSX.Ele
             }}
             placeholder="Comment on the selected text…"
             data-testid="livedoc-comment-input"
-            className="fb-card flex-1 px-3 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+            className="fb-card flex-1 px-3 py-1.5 text-[12px] focus:border-accent"
           />
           <button
             onClick={() => void submitComment()}

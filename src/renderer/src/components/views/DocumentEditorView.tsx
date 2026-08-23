@@ -189,7 +189,7 @@ export default function DocumentEditorView({ documentId, onBack }: Props): JSX.E
         <input
           value={active.title}
           onChange={(e) => void rename(e.target.value)}
-          className="flex-1 min-w-0 bg-transparent text-[14px] font-semibold text-stone-900 dark:text-stone-100 focus:outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[14px] font-semibold text-stone-900 dark:text-stone-100"
         />
         <DocFiledInChip docId={active.id} className="shrink-0 max-w-[220px]" />
         <button

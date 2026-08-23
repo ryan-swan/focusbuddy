@@ -405,7 +405,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
                     }}
-                    className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-100)] focus:outline-none"
+                    className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-100)]"
                   />
                 ) : (
                   <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-[var(--ink-100)]">{col.title}</span>

@@ -107,7 +107,7 @@ function SignBox({ signer, onSign }: { signer: Signer; onSign: (kind: SignatureK
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           placeholder="Type your full name"
-          className="w-full text-[20px] px-3 py-2 rounded-lg bg-stone-900 text-stone-50 border border-white/10 focus:outline-none focus:border-accent"
+          className="w-full text-[20px] px-3 py-2 rounded-lg bg-stone-900 text-stone-50 border border-white/10 focus:border-accent"
           style={{ fontFamily: 'var(--font-hand)' }}
         />
       ) : (
@@ -154,7 +154,7 @@ function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
             <input
               defaultValue={req.title}
               onBlur={(e) => void update(req.id, { title: e.target.value })}
-              className="w-full text-[16px] font-semibold bg-transparent text-stone-900 dark:text-stone-50 border-b border-transparent hover:border-stone-300 focus:border-accent focus:outline-none"
+              className="w-full text-[16px] font-semibold bg-transparent text-stone-900 dark:text-stone-50 border-b border-transparent hover:border-stone-300 focus:border-accent"
             />
           ) : (
             <h2 className="text-[16px] font-semibold text-stone-900 dark:text-stone-50 truncate">{req.title}</h2>
@@ -180,7 +180,7 @@ function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
           defaultValue={req.body}
           onBlur={(e) => void update(req.id, { body: e.target.value })}
           placeholder="Paste or write the agreement to be signed…"
-          className="w-full h-40 text-[13px] leading-relaxed px-3 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:outline-none focus:border-accent"
+          className="w-full h-40 text-[13px] leading-relaxed px-3 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent"
         />
       ) : (
         <div className="text-[13px] leading-relaxed whitespace-pre-wrap px-3 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 max-h-48 overflow-auto">
@@ -258,9 +258,9 @@ function Composer({ onCreate, onClose }: { onCreate: (t: string, b: string, name
   const names = signers.split(/[\n,]/).map((n) => n.trim()).filter(Boolean)
   return (
     <div className={`${PLEXI_CARD} p-3`} data-testid="sign-composer">
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Agreement title" className="w-full text-[13px] font-medium px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:outline-none focus:border-accent" data-testid="sign-new-title" />
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="What is being agreed…" className="mt-2 w-full h-20 text-[12.5px] px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:outline-none focus:border-accent" />
-      <textarea value={signers} onChange={(e) => setSigners(e.target.value)} placeholder="Signers, one per line or comma-separated (in signing order)" className="mt-2 w-full h-16 text-[12.5px] px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:outline-none focus:border-accent" />
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Agreement title" className="w-full text-[13px] font-medium px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent" data-testid="sign-new-title" />
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="What is being agreed…" className="mt-2 w-full h-20 text-[12.5px] px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent" />
+      <textarea value={signers} onChange={(e) => setSigners(e.target.value)} placeholder="Signers, one per line or comma-separated (in signing order)" className="mt-2 w-full h-16 text-[12.5px] px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent" />
       <div className="mt-2 flex items-center gap-2">
         <button onClick={() => onCreate(title || 'Untitled agreement', body, names)} disabled={!title.trim()} className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-accent text-white disabled:opacity-40" data-testid="sign-new-create">Create draft</button>
         <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg text-stone-500">Cancel</button>

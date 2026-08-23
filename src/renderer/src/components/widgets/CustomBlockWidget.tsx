@@ -197,7 +197,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
         <input
           value={data.title}
           onChange={(e) => setData((d) => ({ ...d, title: e.target.value }))}
-          className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-100)] focus:outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold text-[var(--ink-100)]"
           placeholder="Block title"
         />
         <div className="flex items-center rounded-full bg-[var(--surface-sunken)] p-0.5 text-[11px]">
@@ -438,7 +438,7 @@ function FieldControl({
   const disabled = mode === 'design'
   const stop = (e: React.SyntheticEvent): void => e.stopPropagation()
   const inputCls =
-    'fb-card w-full px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-accent disabled:bg-[var(--surface-sunken)]'
+    'fb-card w-full px-2 py-1 text-[12px] text-[var(--ink-100)] focus:border-accent disabled:bg-[var(--surface-sunken)]'
   const labelEl =
     field.type !== 'divider' && field.type !== 'heading' && field.type !== 'checkbox' ? (
       <div className="text-[10px] uppercase tracking-wide text-[var(--ink-50)] mb-0.5 truncate">

@@ -1986,7 +1986,7 @@ function WidgetConfigPicker({
       onClose={onCancel}
       label={`Set up ${def.name}`}
       z={260}
-      className="fb-glass-pillow rounded-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[70vh] outline-none"
+      className="fb-glass-pillow rounded-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[70vh]"
       testId="home-widget-config"
     >
       <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2">

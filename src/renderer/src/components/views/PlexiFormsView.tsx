@@ -222,7 +222,7 @@ function FormEditor({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== form.title && onChangeMeta({ title })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)]"
           data-testid="form-title"
         />
         <div className="inline-flex rounded-md bg-[var(--surface-sunken)] overflow-hidden text-[12px] font-medium">
@@ -279,7 +279,7 @@ function BuildTab({
 }): JSX.Element {
   const [desc, setDesc] = useState(form.description)
   const inputCls =
-    'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none'
+    'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-50)]'
   return (
     <div className="space-y-5">
       <textarea
@@ -288,7 +288,7 @@ function BuildTab({
         onBlur={() => desc !== form.description && onChangeMeta({ description: desc })}
         placeholder="Form description (optional)"
         rows={2}
-        className="fb-card w-full resize-y px-3 py-2 text-[13px] text-[var(--ink-90)] placeholder:text-[var(--ink-50)] focus:outline-none"
+        className="fb-card w-full resize-y px-3 py-2 text-[13px] text-[var(--ink-90)] placeholder:text-[var(--ink-50)]"
       />
 
       <div>

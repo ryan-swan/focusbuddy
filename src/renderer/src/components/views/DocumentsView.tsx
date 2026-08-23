@@ -165,14 +165,14 @@ export default function DocumentsView(): JSX.Element {
             }}
             placeholder={`Describe the ${verb} you want. For example: a one-page launch plan for our new pricing, with goals, timeline and risks.`}
             rows={3}
-            className="fb-field fb-t-body px-3.5 py-2.5 focus:outline-none resize-none"
+            className="fb-field fb-t-body px-3.5 py-2.5 resize-none"
           />
           <div className="flex items-center gap-2 mt-3">
             <input
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
               placeholder="Who is it for? (optional)"
-              className="fb-field fb-t-body flex-1 focus:outline-none"
+              className="fb-field fb-t-body flex-1"
             />
             <button onClick={() => void create()} disabled={busy || !prompt.trim()} className="btn-primary shrink-0">
               <Icon name="auto_awesome" size={15} />

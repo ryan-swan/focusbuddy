@@ -370,7 +370,7 @@ export default function PlexiMeetView(): JSX.Element {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search meetings"
               data-testid="meet-search"
-              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none"
+              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
             />
           </div>
         </div>
@@ -522,7 +522,7 @@ function MeetingDetail({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== meeting.title && onChange({ title })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)] outline-none"
+          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)]"
           data-testid="meet-title"
         />
         <button
@@ -543,7 +543,7 @@ function MeetingDetail({
             onChange={(e) => setSummary(e.target.value)}
             onBlur={() => summary !== meeting.summary && onChange({ summary })}
             placeholder="The AI summary appears here after recording, or write your own notes."
-            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:outline-none focus:border-[rgb(var(--accent)/0.40)]"
+            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent)/0.40)]"
           />
         </section>
 
@@ -582,7 +582,7 @@ function MeetingDetail({
               onChange={(e) => setTranscript(e.target.value)}
               onBlur={() => transcript !== meeting.transcript && onChange({ transcript })}
               placeholder="The full transcript appears here after recording, or paste your own."
-              className="fb-card w-full min-h-[160px] resize-y px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)] focus:outline-none"
+              className="fb-card w-full min-h-[160px] resize-y px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)]"
             />
           )}
         </section>

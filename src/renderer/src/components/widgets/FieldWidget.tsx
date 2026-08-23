@@ -156,7 +156,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
           value={state.def.label}
           onChange={(e) => void updateLabel(e.target.value)}
           placeholder="Field label"
-          className="flex-1 bg-transparent text-[13px] font-semibold text-[var(--ink-90)] outline-none placeholder:text-[var(--ink-30)]"
+          className="flex-1 bg-transparent text-[13px] font-semibold text-[var(--ink-90)] placeholder:text-[var(--ink-30)]"
         />
         <span className="text-[9px] uppercase tracking-wider text-[var(--ink-40)]">
           {FIELD_TYPE_LABELS[state.def.type]}

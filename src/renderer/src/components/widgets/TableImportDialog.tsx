@@ -127,7 +127,7 @@ export default function TableImportDialog({
   }
 
   const selectCls =
-    'fb-card text-[11px] px-1.5 py-1 text-[var(--ink-70)] focus:outline-none focus:border-accent'
+    'fb-card text-[11px] px-1.5 py-1 text-[var(--ink-70)] focus:border-accent'
 
   return createPortal(
     <div

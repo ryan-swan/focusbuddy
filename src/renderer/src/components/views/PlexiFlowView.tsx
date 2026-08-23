@@ -317,7 +317,7 @@ function FlowEditor({
           data-testid="flow-title"
           placeholder="Flow title"
           aria-label="Flow title"
-          className="fb-display-hero flex-1 bg-transparent text-[20px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)]"
+          className="fb-display-hero flex-1 bg-transparent text-[20px] font-bold text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
         />
         <label className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] cursor-pointer shrink-0">
           <input

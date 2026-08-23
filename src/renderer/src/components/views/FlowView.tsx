@@ -476,7 +476,7 @@ export default function FlowView(): JSX.Element {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search your conversations…"
                   data-testid="flow-search"
-                  className="flex-1 bg-transparent text-[13.5px] text-[var(--ink-100)] outline-none"
+                  className="flex-1 bg-transparent text-[13.5px] text-[var(--ink-100)]"
                 />
               </label>
               <button onClick={resort} className="icon-btn" title="Re-sort by most recent" data-testid="flow-resort">

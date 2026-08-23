@@ -176,7 +176,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
         const sel = window.getSelection()?.toString() ?? ''
         setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
       }}
-      className={`w-full h-full resize-none bg-transparent text-stone-800 leading-relaxed focus:outline-none placeholder:text-stone-500/60 font-serif ${
+      className={`w-full h-full resize-none bg-transparent text-stone-800 leading-relaxed placeholder:text-stone-500/60 font-serif ${
         'fb-body'
       }`}
     />

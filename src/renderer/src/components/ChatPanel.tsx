@@ -15,6 +15,7 @@ import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
 import StreamingProse from './assistant/StreamingProse'
 import { cascadeDurationMs } from '../lib/traceView'
+import { useWebPanel } from '../stores/webPanel'
 import QuestionCard from './assistant/QuestionCard'
 import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
@@ -615,9 +616,10 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         view.goKnowledge(target.entryId)
         break
       case 'url':
-        // A web source (F4): opens in the system browser — the citation's
-        // provenance is the open web, so that is where the click goes.
-        void window.api.files.openExternal(target.url)
+        // A web source opens in the in-app browser panel (A2, R4/R13): the
+        // web never leaves Plexi. The panel's toolbar carries the explicit
+        // system-browser escape.
+        useWebPanel.getState().openWeb(target.url)
         break
       case 'desk':
         openDesk(target.taskId)

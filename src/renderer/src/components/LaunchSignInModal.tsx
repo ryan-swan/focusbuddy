@@ -237,7 +237,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500"
               style={{
                 background: 'rgba(0,0,0,0.32)',
                 border: '1px solid rgba(255,255,255,0.08)'
@@ -260,7 +260,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
                   maxLength={40}
                   autoComplete="given-name"
                   data-testid="signup-first-name"
-                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500"
                   style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
                 />
               </div>
@@ -276,7 +276,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
                   maxLength={40}
                   autoComplete="family-name"
                   data-testid="signup-last-name"
-                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500"
                   style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
                 />
               </div>
@@ -292,7 +292,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={mode === 'signup' ? 8 : undefined}
-              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none"
+              className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500"
               style={{
                 background: 'rgba(0,0,0,0.32)',
                 border: '1px solid rgba(255,255,255,0.08)'
@@ -327,7 +327,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
                 required
                 autoFocus
                 data-testid="signin-2fa-code"
-                className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 focus:outline-none tracking-[0.3em] font-mono"
+                className="w-full px-3 py-2 rounded-md text-stone-100 placeholder:text-stone-500 tracking-[0.3em] font-mono"
                 style={{ background: 'rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.08)' }}
                 placeholder="123456"
                 autoComplete="one-time-code"

@@ -120,7 +120,7 @@ export default function AiAssistPreview(): JSX.Element | null {
             onChange={(e) => setInstr(e.target.value)}
             rows={2}
             placeholder="Describe what you want done with the text"
-            className="w-full resize-none rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-sm text-[var(--ink-100)] focus:outline-none focus:border-accent"
+            className="w-full resize-none rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-sm text-[var(--ink-100)] focus:border-accent"
           />
 
           {status === 'loading' && (

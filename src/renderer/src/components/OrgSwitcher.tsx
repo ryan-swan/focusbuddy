@@ -138,7 +138,7 @@ export default function OrgSwitcher(): JSX.Element {
               }}
               data-testid={`org-option-${o.id}`}
               aria-current={o.id === activeOrgId ? 'true' : undefined}
-              className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[13px] text-left hover:bg-[var(--surface-sunken)] focus:bg-[var(--surface-sunken)] focus:outline-none"
+              className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[13px] text-left hover:bg-[var(--surface-sunken)] focus:bg-[var(--surface-sunken)]"
             >
               <span
                 className={`inline-flex items-center justify-center w-5 h-5 rounded text-white shrink-0 ${
@@ -161,7 +161,7 @@ export default function OrgSwitcher(): JSX.Element {
               closeAndRefocus()
             }}
             data-testid="org-switcher-manage"
-            className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[13px] text-left hover:bg-[var(--surface-sunken)] focus:bg-[var(--surface-sunken)] focus:outline-none text-[var(--ink-70)]"
+            className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[13px] text-left hover:bg-[var(--surface-sunken)] focus:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
           >
             <span className="inline-flex items-center justify-center w-5 h-5 shrink-0">
               <Icon name="settings" size={14} />

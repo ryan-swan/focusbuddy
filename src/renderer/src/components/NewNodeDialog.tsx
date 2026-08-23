@@ -540,7 +540,7 @@ export default function NewNodeDialog({
                         value={folderQuery}
                         onChange={(e) => setFolderQuery(e.target.value)}
                         placeholder="Search Rooms…"
-                        className="w-full bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)] px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+                        className="w-full bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)] px-3 py-2 text-sm text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                       />
                       <div className="max-h-40 overflow-auto">
                         <button

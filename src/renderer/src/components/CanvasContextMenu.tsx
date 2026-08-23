@@ -255,7 +255,7 @@ function MenuPanel({
       data-floating-menu
       role="menu"
       tabIndex={-1}
-      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fb-context-menu fixed z-[260] py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm outline-none"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fb-context-menu fixed z-[260] py-1 min-w-[210px] max-h-[85vh] overflow-y-auto text-sm"
       style={{ left: pos.left, top: pos.top }}
       onKeyDown={onKeyDown}
       onContextMenu={(e) => e.preventDefault()}

@@ -99,7 +99,7 @@ export default function TwoFactorSettings(): JSX.Element | null {
   if (!loaded) return null
 
   const inputCls =
-    'w-full px-3 py-2 rounded-[var(--radius-field)] text-[13px] text-[var(--ink-100)] bg-[var(--surface-sunken)] focus:outline-none focus:border-accent'
+    'w-full px-3 py-2 rounded-[var(--radius-field)] text-[13px] text-[var(--ink-100)] bg-[var(--surface-sunken)] focus:border-accent'
 
   return (
     <div className="pt-3 border-t border-[var(--edge-soft)] space-y-2">

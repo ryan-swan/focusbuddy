@@ -221,6 +221,17 @@ const popoverRadius = (words) =>
     ? 'rounded-[var(--radius-card)]'
     : 'rounded-[var(--radius-row)]'
 
+// R6.4: a stripped outline with nothing in its place kills the global
+// concentric focus ring. Remove outline-none when the element provides no
+// focus-visible treatment of its own and is not an editing surface.
+const isEditingTag = (tag) => /contentEditable|role=["']textbox["']/.test(tag)
+const OUTLINE = /^(focus:)?outline-none$/
+const matchFocus = (words, tag) =>
+  words.some((t) => OUTLINE.test(t)) && !words.some((t) => /^focus-visible:/.test(t))
+    && !words.some((t) => /^focus:ring/.test(t)) && !isEditingTag(tag)
+    ? 'focus'
+    : null
+
 // Which rule (if any) a class list falls under. The integrity check counts
 // the same thing, so the two can never disagree.
 let activeRules = null  // null = every rule; set from --rules a,b,c
@@ -239,7 +250,7 @@ function matchAnyRule(words, tag) {
   if (floating && boxed && !words.includes('rounded-full') && !isButtonTag(tag)
       && (words.includes(RAISED) || words.includes(SUNKEN) || words.some(isRaisedAlpha))) return 'popover'
   if (!floating && boxed && words.some(isRaisedAlpha) && words.some(isBlur) && !words.includes('rounded-full')) return 'raised-blur'
-  if (!boxed || words.includes('rounded-full') || floating) return null
+  if (!boxed || words.includes('rounded-full') || floating) return matchFocus(words, tag)
   // A boxed input/select/textarea takes the field skin whatever its fill:
   // sunken, base, transparent ghost, or the undefined var(--surface) (a
   // latent bug in a few views; fb-field replaces it with a real token).
@@ -250,7 +261,10 @@ function matchAnyRule(words, tag) {
   // Apple's secondary buttons are filled, not outlined (R5.4); they take the
   // raised surface-button skin. Caleb rules the bucket on the first sheet.
   if (!words.some((t) => /^bg-/.test(t)) && isButtonTag(tag)) return 'ghost-button'
-  return null
+  // Last resort everywhere (R6.4): strip a bare outline-none that leaves
+  // keyboard users with no focus treatment at all; the global concentric
+  // ring returns. Boxed elements reach here only when no richer rule fits.
+  return matchFocus(words, tag)
 }
 
 export function rewriteString(text, tag) {
@@ -260,6 +274,10 @@ export function rewriteString(text, tag) {
   let removed = []
   let added = []
   switch (rule) {
+    case 'focus':
+      removed = words.filter((t) => OUTLINE.test(t))
+      added = []
+      break
     case 'scrim':
       removed = words.filter((t) => isDimBg(t) || isBlur(t))
       added = ['fb-scrim']

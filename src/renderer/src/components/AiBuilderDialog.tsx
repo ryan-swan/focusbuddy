@@ -130,7 +130,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
             }}
             placeholder="e.g. Track my freelance clients with status and contact info, plus a notes page for each project"
             rows={3}
-            className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-accent resize-none"
+            className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:border-accent resize-none"
           />
           <div className="flex items-center justify-between mt-2">
             <span className="text-[10px] text-[var(--ink-40)]">

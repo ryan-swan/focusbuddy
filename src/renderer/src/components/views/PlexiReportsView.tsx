@@ -309,7 +309,7 @@ function ReportEditor({
         data-testid="report-title"
         placeholder="Report title"
         aria-label="Report title"
-        className="fb-display-hero w-full bg-transparent text-[20px] font-bold text-[var(--ink-100)] outline-none placeholder:text-[var(--ink-50)] mb-4"
+        className="fb-display-hero w-full bg-transparent text-[20px] font-bold text-[var(--ink-100)] placeholder:text-[var(--ink-50)] mb-4"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -342,7 +342,7 @@ function ReportEditor({
               value={report.schedule}
               data-testid="report-schedule"
               onChange={(e) => void patch({ schedule: e.target.value as ReportSchedule })}
-              className="fb-card mt-1.5 w-full px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none"
+              className="fb-card mt-1.5 w-full px-2 py-1.5 text-[12.5px] text-[var(--ink-100)]"
             >
               {SCHEDULES.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
@@ -357,7 +357,7 @@ function ReportEditor({
               onBlur={() => void patch({ recipients: recipientsText.split(',').map((s) => s.trim()).filter(Boolean) })}
               data-testid="report-recipients"
               placeholder="name@company.com, ..."
-              className="fb-card mt-1.5 w-full px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] focus:outline-none placeholder:text-[var(--ink-50)]"
+              className="fb-card mt-1.5 w-full px-2 py-1.5 text-[12.5px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
             />
           </label>
         </div>

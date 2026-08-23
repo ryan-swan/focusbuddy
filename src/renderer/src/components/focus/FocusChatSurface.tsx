@@ -349,7 +349,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
                   rows={1}
                   placeholder="Ask your workspace…"
                   data-testid="focus-chat-input"
-                  className="w-full resize-none bg-transparent text-[var(--ink-100)] placeholder:text-[var(--ink-50)] text-[13px] leading-[1.45] max-h-[160px] focus:outline-none"
+                  className="w-full resize-none bg-transparent text-[var(--ink-100)] placeholder:text-[var(--ink-50)] text-[13px] leading-[1.45] max-h-[160px]"
                 />
                 <div className="flex items-center gap-1.5">
                   <ModelPickerChip />

@@ -106,7 +106,7 @@ export default function FolderPickerModal({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search folders"
               data-testid="folder-picker-search"
-              className="w-full h-8 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12.5px] outline-none focus:border-[rgb(var(--accent)/0.6)]"
+              className="w-full h-8 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12.5px] focus:border-[rgb(var(--accent)/0.6)]"
             />
           </div>
         </div>
@@ -181,7 +181,7 @@ export default function FolderPickerModal({
                 if (e.key === 'Enter') void createHere()
               }}
               placeholder="New folder name"
-              className="flex-1 h-8 px-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12px] outline-none focus:border-[rgb(var(--accent)/0.6)]"
+              className="flex-1 h-8 px-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12px] focus:border-[rgb(var(--accent)/0.6)]"
             />
             <button
               onClick={() => void createHere()}

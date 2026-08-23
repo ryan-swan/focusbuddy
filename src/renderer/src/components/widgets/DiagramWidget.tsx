@@ -142,7 +142,7 @@ function EditableLabel({
           }
           e.stopPropagation()
         }}
-        className="bg-[var(--surface-raised)] text-[var(--ink-100)] text-[12px] text-center rounded px-1 outline-none border border-accent w-full"
+        className="bg-[var(--surface-raised)] text-[var(--ink-100)] text-[12px] text-center rounded px-1 border border-accent w-full"
         onClick={(e) => e.stopPropagation()}
       />
     )

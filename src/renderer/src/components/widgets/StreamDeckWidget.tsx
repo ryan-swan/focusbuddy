@@ -1256,7 +1256,7 @@ function SlotTile({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       data-speeddeck-slot={slot}
-      className="group relative overflow-hidden focus:outline-none transition-transform"
+      className="group relative overflow-hidden transition-transform"
       style={{
         borderRadius: 10,
         background: hasContent

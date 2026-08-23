@@ -187,7 +187,7 @@ export default function StreamDeckButtonConfig({
                   onChange={(e) => setLabel(e.target.value)}
                   placeholder="e.g. Spotify"
                   maxLength={20}
-                  className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none"
+                  className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100"
                   style={{
                     background: 'rgba(0,0,0,0.32)',
                     border: '1px solid rgba(255,255,255,0.08)'
@@ -247,7 +247,7 @@ export default function StreamDeckButtonConfig({
                   value={icon}
                   onChange={(e) => setIcon(e.target.value)}
                   placeholder="or type any Material Symbol name"
-                  className="mt-1.5 w-full px-2.5 py-1 rounded-md text-[11px] text-stone-200 font-mono focus:outline-none"
+                  className="mt-1.5 w-full px-2.5 py-1 rounded-md text-[11px] text-stone-200 font-mono"
                   style={{
                     background: 'rgba(0,0,0,0.32)',
                     border: '1px solid rgba(255,255,255,0.06)'

@@ -659,7 +659,7 @@ function LivingHeader(props: LivingHeaderProps): JSX.Element {
                 if (e.key === 'Escape') onCancelEdit()
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="w-full text-[12px] px-1.5 py-0.5 bg-[var(--surface-raised)] border border-accent rounded focus:outline-none"
+              className="w-full text-[12px] px-1.5 py-0.5 bg-[var(--surface-raised)] border border-accent rounded"
               placeholder="What should this page summarize?"
             />
           ) : (

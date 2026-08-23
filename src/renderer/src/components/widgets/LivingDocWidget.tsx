@@ -161,7 +161,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
               setEditingBrief(false)
             }
           }}
-          className="flex-1 bg-transparent text-[11px] text-[var(--ink-70)] focus:outline-none border-b border-accent"
+          className="flex-1 bg-transparent text-[11px] text-[var(--ink-70)] border-b border-accent"
         />
       ) : (
         <button

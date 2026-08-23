@@ -269,7 +269,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
       }}
       // field-sizing: content (fb-sticky-textarea, globals.css) grows the
       // textarea with its text so the sticky auto-grows instead of scrolling.
-      className={`fb-sticky-textarea w-full min-h-[2.5rem] resize-none bg-transparent text-stone-900 font-hand focus:outline-none placeholder:text-stone-700/40 ${
+      className={`fb-sticky-textarea w-full min-h-[2.5rem] resize-none bg-transparent text-stone-900 font-hand placeholder:text-stone-700/40 ${
         'fb-body'
       }`}
     />

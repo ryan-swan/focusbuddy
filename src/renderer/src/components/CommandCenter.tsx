@@ -14,6 +14,10 @@ import { entitlementFor, capabilityForDocType, DOC_TYPE_LABEL } from '../lib/ent
 import { canCreateWidget } from '../lib/gating'
 import { promptUpgrade } from '../stores/upgradePrompt'
 import { useEditorCommandStore } from '../stores/editorCommands'
+import { classifyOmniInput, searchUrl } from '../lib/omniIntent'
+import { useWebPanel } from '../stores/webPanel'
+import { useAssistantChrome } from '../stores/assistantChrome'
+import { useChatStore, NEW_CHAT_KEY } from '../stores/chat'
 import { useDocumentsStore } from '../stores/documents'
 import { useQuickCreate } from '../stores/quickCreate'
 import { recencyRank } from '../lib/viewRecency'
@@ -631,6 +635,53 @@ export default function CommandCenter({
       })
     }
 
+    // The omnibar routes (A2, AI-01, R11-R13): the palette is the one door,
+    // so the three routes the workspace could not answer live here — a URL
+    // opens in the in-app web panel, a phrase can search the web, a question
+    // goes to Plexii. Ranking encodes the intent preview: an address or a
+    // question outranks everything (Enter does what the shape of the input
+    // says); a bare phrase's web search sits above static nav but below a
+    // strong workspace hit, so naming a document still goes to the document
+    // and Tab/arrows reach the web in one step. Never on an empty query.
+    if (q !== '') {
+      const intents = classifyOmniInput(query, [])
+      const lead = intents[0]?.kind
+      for (const intent of intents) {
+        if (intent.kind === 'goto') continue // the palette's own rows navigate
+        const top = intent.kind === lead && (lead === 'url' || lead === 'ask')
+        items.push({
+          id: `omni-${intent.kind}`,
+          label:
+            intent.kind === 'url'
+              ? intent.label
+              : intent.kind === 'search'
+                ? `Search the web — “${query.trim()}”`
+                : `Ask Plexii — “${query.trim()}”`,
+          hint:
+            intent.kind === 'url'
+              ? 'Opens in Plexi'
+              : intent.kind === 'search'
+                ? 'Web results in Plexi'
+                : 'Plexii answers in the side panel',
+          icon: intent.kind === 'url' ? 'language' : intent.kind === 'search' ? 'travel_explore' : 'forum',
+          kind: 'action',
+          score: top ? 2000 : intent.kind === 'search' ? 175 : 60,
+          run: () => {
+            const text = query.trim()
+            if (intent.kind === 'url' && intent.url) {
+              useWebPanel.getState().openWeb(intent.url)
+            } else if (intent.kind === 'search') {
+              useWebPanel.getState().openWeb(searchUrl(useWebPanel.getState().engine, text))
+            } else {
+              useAssistantChrome.getState().openPanel()
+              void useChatStore.getState().send(null, text, NEW_CHAT_KEY)
+            }
+            closePalette()
+          }
+        })
+      }
+    }
+
     const ranked = items
       .filter((i) => (q === '' ? true : i.score > 0))
       .sort((a, b) => b.score - a.score)
@@ -729,6 +780,7 @@ export default function CommandCenter({
                 )}
                 <input
                   ref={inputRef}
+                  data-testid="command-palette-input"
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value)
@@ -740,7 +792,7 @@ export default function CommandCenter({
                       ? `Command the ${editorScope.toLowerCase()}, or search everything…`
                       : 'Search everything — tasks, notes, docs, files, actions…'
                   }
-                  className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+                  className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                 />
                 <kbd className="text-[10px] font-mono text-[var(--ink-40)] bg-[var(--surface-sunken)] px-1.5 py-0.5 rounded">
                   Esc
@@ -756,6 +808,7 @@ export default function CommandCenter({
                     {results.map((r, i) => (
                       <button
                         key={r.id}
+                        data-testid={`palette-row-${r.id}`}
                         role="option"
                         aria-selected={i === highlightIdx}
                         onMouseEnter={() => setHighlightIdx(i)}

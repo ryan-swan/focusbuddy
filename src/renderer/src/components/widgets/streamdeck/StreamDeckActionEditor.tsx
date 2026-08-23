@@ -88,7 +88,7 @@ function KindPicker({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as ActionKind)}
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -153,7 +153,7 @@ function OpenAppEditor({
         value={a.target}
         onChange={(e) => onChange({ ...a, target: e.target.value })}
         placeholder='e.g. "Visual Studio Code" or /Applications/Spotify.app'
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none font-mono"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 font-mono"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -186,7 +186,7 @@ function OpenUrlEditor({
         value={a.url}
         onChange={(e) => onChange({ ...a, url: e.target.value })}
         placeholder="https://"
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -244,7 +244,7 @@ function KeyComboEditor({
         value={a.key}
         onChange={(e) => onChange({ ...a, key: e.target.value })}
         placeholder='single character ("t") or special key ("enter", "tab", "f5", "arrow-up")'
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none font-mono"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 font-mono"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -277,7 +277,7 @@ function TypeTextEditor({
         onChange={(e) => onChange({ ...a, text: e.target.value })}
         rows={4}
         placeholder="What to type"
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none font-mono"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 font-mono"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -399,7 +399,7 @@ function RunShellEditor({
         onChange={(e) => onChange({ ...a, command: e.target.value })}
         rows={3}
         placeholder='e.g. say "deploy complete" or git -C ~/myrepo pull'
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none font-mono"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 font-mono"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -414,7 +414,7 @@ function RunShellEditor({
         max={60000}
         value={a.timeoutMs ?? 10000}
         onChange={(e) => onChange({ ...a, timeoutMs: parseInt(e.target.value, 10) || 10000 })}
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none font-mono"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 font-mono"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'
@@ -443,7 +443,7 @@ function DelayEditor({
         max={60000}
         value={a.ms}
         onChange={(e) => onChange({ ...a, ms: parseInt(e.target.value, 10) || 0 })}
-        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 focus:outline-none font-mono"
+        className="w-full px-2.5 py-1.5 rounded-md text-[12px] text-stone-100 font-mono"
         style={{
           background: 'rgba(0,0,0,0.32)',
           border: '1px solid rgba(255,255,255,0.08)'

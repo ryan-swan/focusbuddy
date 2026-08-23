@@ -305,7 +305,7 @@ export function MessageRow({
                 }}
                 rows={1}
                 data-testid={`msg-edit-input-${m.id}`}
-                className="resize-none rounded-md px-2 py-1 text-[13px] text-stone-900 bg-white/95 focus:outline-none min-w-[180px]"
+                className="resize-none rounded-md px-2 py-1 text-[13px] text-stone-900 bg-white/95 min-w-[180px]"
               />
               <div className="flex items-center gap-2 text-[10px] text-white/80">
                 <button onClick={() => { const t = editText.trim(); if (t) onEdit?.(t); setEditing(false) }} className="underline">Save</button>
@@ -1239,7 +1239,7 @@ function ThreadPanel({
           placeholder="Reply…"
           rows={1}
           data-testid="thread-composer"
-          className="flex-1 resize-none bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+          className="flex-1 resize-none bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:border-accent"
         />
         <button
           onClick={() => void submit()}

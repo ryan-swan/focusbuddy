@@ -332,7 +332,7 @@ export default function OrgAdminView(): JSX.Element {
                 <input
                   defaultValue={detail.org.name}
                   onBlur={(e) => void doRename(e.target.value)}
-                  className="text-[15px] font-semibold bg-transparent border-b border-transparent hover:border-[var(--edge-firm)] focus:border-accent focus:outline-none"
+                  className="text-[15px] font-semibold bg-transparent border-b border-transparent hover:border-[var(--edge-firm)] focus:border-accent"
                   data-testid="org-rename"
                 />
               ) : (
@@ -721,7 +721,7 @@ export default function OrgAdminView(): JSX.Element {
                     value={scimToken}
                     data-testid="org-scim-token"
                     onFocus={(e) => e.currentTarget.select()}
-                    className="flex-1 bg-[var(--surface-sunken)] border border-accent rounded px-2 py-1 text-[12px] font-mono focus:outline-none"
+                    className="flex-1 bg-[var(--surface-sunken)] border border-accent rounded px-2 py-1 text-[12px] font-mono"
                   />
                   <CopyButton text={scimToken} />
                 </div>
@@ -861,7 +861,7 @@ function ProfileEditor({
   if (!profile) {
     return <div className="pl-7 pb-2 text-[11px] text-[var(--ink-40)]">Loading profile…</div>
   }
-  const field = 'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 focus:outline-none focus:border-accent'
+  const field = 'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 focus:border-accent'
   const photoSrc = absolutePhotoUrl(`/orgs/${profile.orgId}/members/${profile.accountId}/photo`) + (photoBust ? `?v=${photoBust}` : '')
   return (
     <div className="pl-7 pb-3 grid grid-cols-2 gap-2" data-testid="org-profile-editor">
@@ -966,8 +966,8 @@ function OfficeRow({
   onSave: (patch: OfficeInput) => void
   onDelete: () => void
 }): JSX.Element {
-  const field = 'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 focus:outline-none focus:border-accent'
-  const small = 'w-16 text-[12px] text-center bg-[var(--surface-sunken)] rounded px-1.5 py-0.5 focus:outline-none'
+  const field = 'text-[12px] bg-[var(--surface-sunken)] rounded px-2 py-1 focus:border-accent'
+  const small = 'w-16 text-[12px] text-center bg-[var(--surface-sunken)] rounded px-1.5 py-0.5'
   if (!canAdmin) {
     return (
       <div className="text-[12px] text-[var(--ink-70)] flex items-center gap-2">
