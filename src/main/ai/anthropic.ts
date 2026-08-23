@@ -1053,12 +1053,15 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
   try {
     const lastUser = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     if (lastUser.trim()) {
-      // Referencing desks narrows the pool that CAN be narrowed — tasks, tables
-      // and canvas notes, which belong to a desk. Documents and PlexiBrain
-      // entries carry no desk affiliation in the data model, so they are not
-      // scoped and the wording below never claims they were.
+      // Desk scope PRIORITISES the pools that carry a desk id — tasks, tables
+      // and canvas content get demoted when off-scope, never excluded (#12).
+      // Documents and PlexiBrain entries carry no desk affiliation in the data
+      // model, so they are not scoped and the wording below never claims they
+      // were. Mentioned desks ADD to the current desk's neighbourhood rather
+      // than replacing it (#14): "compare this against what we have here" must
+      // keep "here" searchable.
       const related = relatedScopeIds(req.taskId)
-      const scope = mentionDeskIds.length > 0 ? mentionDeskIds : related
+      const scope = [...new Set([...mentionDeskIds, ...related])]
       // Workspace retrieval and web search run in PARALLEL (F4, commissioned):
       // the web pass is keyless, best-effort, and skipped for short follow-ups
       // (see WEB_SEARCH_MIN_QUERY). Web results continue the same [n] space so
@@ -1073,12 +1076,18 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
       // Drop anything the user already put in front of the model by name.
       const sources = rawSources.filter((s) => !admittedIds.has(s.docId))
       if (sources.length > 0 || webResults.length > 0) {
+        // Honest about demote-not-exclude, and it only claims a related-desk
+        // network when one exists (#13: relatedScopeIds always contains the
+        // desk itself, so length 1 means no relations).
         const scopeNote =
           mentionDeskIds.length > 0
-            ? 'the desks you referenced (documents and PlexiBrain entries are searched across your whole workspace)'
-            : related.length > 0
-              ? 'this desk and the desks you have related to it'
-              : 'your workspace'
+            ? 'your whole workspace, prioritising the desks you referenced' +
+              (related.length > 0 ? ' and this desk' : '')
+            : related.length > 1
+              ? 'your whole workspace, prioritising this desk and the desks you have related to it'
+              : related.length === 1
+                ? 'your whole workspace, prioritising this desk'
+                : 'your workspace'
         // One numbering: workspace sources first, then web results carry on.
         citedSources = [
           ...sources.map((s, i) => ({

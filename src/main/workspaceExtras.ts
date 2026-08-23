@@ -7,7 +7,7 @@
 import { listNodes } from './db/nodes'
 import { listTables, listRows } from './db/tables'
 import { listWidgetsByKind } from './db/widgets'
-import { rankSources, extractDocText, type WorkspaceSource } from './workspaceRank'
+import { rankSources, mergeScopedPools, extractDocText, type WorkspaceSource } from './workspaceRank'
 import type { FbTable, FbRow } from '@shared/fields'
 
 type Candidate = { docId: string; title: string; docType: string; text: string }
@@ -47,41 +47,51 @@ export function noteWidgetText(kind: string, content: string): string {
 // Gather and keyword-rank workspace content that is NOT a document: tasks,
 // tables, and canvas notes. Returns the top matches as WorkspaceSources.
 //
-// scopeNodeIds encodes user-driven relatedness: when provided, only content
-// belonging to those desks (the current desk plus the desks the user explicitly
-// related to it) is considered, so the brain never assumes two unrelated desks
-// in the same org have anything to do with each other. Omit it for an explicit
-// whole-workspace search.
+// scopeNodeIds encodes user-driven relatedness: the current desk plus the
+// desks the user explicitly related to it. Scoped content leads; everything
+// else in the SAME org is demoted, never excluded (#12) — the answer sitting
+// on an unrelated desk must still be findable, just ranked behind on-desk
+// matches. Omit scopeNodeIds for a flat whole-workspace search.
+//
+// The org boundary is absolute and separate from scope: tables and widgets
+// carry no org of their own, only a desk id, so anything whose desk is not one
+// of the active org's nodes never enters the pool at all. (Before this check
+// an unscoped search read every org's tables and canvas notes — a leak, not a
+// demotion candidate.)
 export function collectExtraSources(
   query: string,
   limit = 6,
   scopeNodeIds?: string[]
 ): WorkspaceSource[] {
-  const scope = scopeNodeIds ? new Set(scopeNodeIds) : null
-  const inScopeTask = (taskId: string | null | undefined): boolean =>
-    !scope || (taskId != null && scope.has(taskId))
-  const pool: Candidate[] = []
+  const scope = scopeNodeIds && scopeNodeIds.length > 0 ? new Set(scopeNodeIds) : null
+  const orgNodeIds = new Set<string>()
+  const inPool: Candidate[] = []
+  const offPool: Candidate[] = []
+  const add = (taskId: string | null | undefined, c: Candidate): void => {
+    if (taskId == null || !orgNodeIds.has(taskId)) return
+    ;(!scope || scope.has(taskId) ? inPool : offPool).push(c)
+  }
 
   for (const n of listNodes()) {
+    orgNodeIds.add(n.id)
     if (n.kind !== 'task') continue
-    if (scope && !scope.has(n.id)) continue
     const text = `${n.title}\n${n.description ?? ''}`.trim()
-    if (text) pool.push({ docId: n.id, title: n.title || 'Untitled task', docType: 'task', text })
+    if (!text) continue
+    const cand = { docId: n.id, title: n.title || 'Untitled task', docType: 'task', text }
+    ;(!scope || scope.has(n.id) ? inPool : offPool).push(cand)
   }
 
   for (const t of listTables()) {
-    if (!inScopeTask(t.taskId)) continue
     const text = tableToText(t, listRows(t.id))
-    if (text) pool.push({ docId: t.id, title: t.title || 'Untitled table', docType: 'table', text })
+    if (text) add(t.taskId, { docId: t.id, title: t.title || 'Untitled table', docType: 'table', text })
   }
 
   for (const kind of ['note', 'sticky', 'markdown', 'page'] as const) {
     for (const w of listWidgetsByKind(kind)) {
-      if (!inScopeTask(w.taskId)) continue
       const text = noteWidgetText(kind, w.content || '').trim()
-      if (text) pool.push({ docId: w.id, title: w.title || text.slice(0, 40), docType: 'note', text })
+      if (text) add(w.taskId, { docId: w.id, title: w.title || text.slice(0, 40), docType: 'note', text })
     }
   }
 
-  return rankSources(query, pool, limit)
+  return mergeScopedPools(rankSources(query, inPool, limit), rankSources(query, offPool, limit), limit)
 }

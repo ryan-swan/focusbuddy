@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rankSources, extractDocText, chunkText, relevanceGate } from '../../src/main/workspaceRank'
+import { rankSources, extractDocText, chunkText, relevanceGate, mergeScopedPools } from '../../src/main/workspaceRank'
 import type { WorkspaceSource } from '../../src/main/workspaceRank'
 
 describe('extractDocText', () => {
@@ -115,5 +115,40 @@ describe('relevanceGate (A1 drive feedback: coincidences must not pad the trace)
 
   it('passes everything through when the query carries no signal terms', () => {
     expect(relevanceGate('a of the', [src('a', 'T', 'x', 1)])).toHaveLength(1)
+  })
+})
+
+describe('mergeScopedPools — desk scope demotes, never excludes (#12)', () => {
+  const src = (docId: string, score: number): WorkspaceSource => ({
+    docId,
+    title: docId,
+    docType: 'note',
+    snippet: '',
+    text: 'x',
+    score
+  })
+
+  it('keeps off-scope sources in the pool at a demoted rank', () => {
+    const merged = mergeScopedPools([src('on', 10)], [src('off', 10)], 6)
+    expect(merged.map((s) => s.docId)).toEqual(['on', 'off'])
+    expect(merged[1].score).toBeLessThan(merged[0].score)
+  })
+
+  it('lets a strong off-scope match outrank a weak on-scope one', () => {
+    const merged = mergeScopedPools([src('weak-on', 1)], [src('strong-off', 10)], 6)
+    expect(merged[0].docId).toBe('strong-off')
+  })
+
+  it('respects the limit across both pools', () => {
+    const ins = [src('a', 9), src('b', 8)]
+    const offs = [src('c', 20), src('d', 1)]
+    const merged = mergeScopedPools(ins, offs, 3)
+    expect(merged).toHaveLength(3)
+    expect(merged.map((s) => s.docId)).toEqual(['a', 'c', 'b'])
+  })
+
+  it('is a plain sort when there is nothing off-scope', () => {
+    const merged = mergeScopedPools([src('a', 1), src('b', 5)], [], 6)
+    expect(merged.map((s) => s.docId)).toEqual(['b', 'a'])
   })
 })

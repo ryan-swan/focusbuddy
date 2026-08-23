@@ -220,6 +220,26 @@ export function rankSources(
   return scored.slice(0, limit)
 }
 
+// Desk scope demotes, never excludes (#12). The old scope filter made an
+// answer sitting on an unrelated desk invisible forever with no gap reported,
+// while the same question from Home found it instantly. Off-scope content now
+// stays in the pool at a fraction of its score: an on-desk match still wins
+// every tie, but a strong off-desk match survives to be cited.
+export const OFF_SCOPE_DEMOTION = 0.45
+
+// Merge an in-scope pool with a demoted off-scope pool. Both must come from
+// the SAME scorer so the scores are comparable — demotion is a ratio, and a
+// ratio of incomparable numbers would be noise, not a preference.
+export function mergeScopedPools(
+  inScope: WorkspaceSource[],
+  offScope: WorkspaceSource[],
+  limit: number,
+  demotion = OFF_SCOPE_DEMOTION
+): WorkspaceSource[] {
+  const demoted = offScope.map((s) => ({ ...s, score: s.score * demotion }))
+  return [...inScope, ...demoted].sort((a, b) => b.score - a.score).slice(0, limit)
+}
+
 // The relevance gate (A2 prep, from Caleb's live-drive feedback). Keyword
 // pools admit anything with a single term hit, so "Research the best ways to
 // be an SDR in 2026" dragged every doc containing "research" into the trace
