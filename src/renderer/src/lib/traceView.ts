@@ -88,6 +88,30 @@ export interface TraceView {
 // enough to read, fast enough that six sources don't outlast the answer.
 export const SOURCE_REVEAL_INTERVAL_MS = 260
 
+// Rotating thinking verbs (AI-29 — Caleb: "phrases it says when something is
+// loading… watch the words rotate and know it's thinking"). The active line
+// stays HONEST about the phase; within a phase the label cycles synonyms so a
+// wait reads alive rather than stuck. Every retrieve verb is true (workspace
+// and web search genuinely run in parallel); the read-N phase keeps its real
+// per-source label because "Reading Henderson contract…" beats any verb.
+// Pure data + a pure picker so the words are unit-locked; cadence belongs to
+// the component.
+export const THINKING_ROTATIONS: Record<string, string[]> = {
+  retrieve: [
+    'Searching your workspace…',
+    'Searching the web…',
+    'Scanning your desks…',
+    'Gathering context…'
+  ],
+  answer: ['Thinking…', 'Pondering…', 'Shaping the answer…', 'Writing…']
+}
+
+export function rotatedLabel(key: string, canonical: string, tick: number): string {
+  const set = THINKING_ROTATIONS[key]
+  if (!set || set.length === 0 || tick < 0) return canonical
+  return set[tick % set.length]
+}
+
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }

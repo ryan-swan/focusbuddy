@@ -59,6 +59,15 @@ function maskCode(s: string): string {
   return out.join('')
 }
 
+// An INLINE construct that is still open after this many characters is not a
+// construct — it is a stray unpaired marker the model left in its prose. An
+// unbounded hold on one of those hid the ENTIRE rest of the answer and then
+// flooded it at completion (Caleb's second rejudge: "took a few seconds and
+// just populated"). Past the cap, showing the literal beats hiding the text;
+// fences stay unbounded on purpose — a code block legitimately runs long and
+// arriving whole is its shipped, judged behaviour.
+const MAX_INLINE_HOLD = 160
+
 // One holdback pass. Returns `visible` unchanged when it already ends on
 // renderable ground, or a shorter string cut before the first construct that
 // cannot yet render true.
@@ -68,14 +77,23 @@ function holdIncomplete(visible: string): string {
   if (fences && fences.length % 2 === 1) {
     return visible.slice(0, visible.lastIndexOf('```'))
   }
+  // Bounded hold for inline constructs: null means "too far back — a stray
+  // marker, reveal the literal rather than hide the tail".
+  const holdAt = (at: number): string | null =>
+    at >= 0 && visible.length - at <= MAX_INLINE_HOLD ? visible.slice(0, at) : null
   const masked = maskCode(visible)
   // Unclosed inline code: any backtick surviving the mask has no closer yet.
-  const tick = masked.lastIndexOf('`')
-  if (tick >= 0) return visible.slice(0, tick)
+  {
+    const h = holdAt(masked.lastIndexOf('`'))
+    if (h !== null) return h
+  }
   // Unclosed strong / strikethrough runs flash as literal marks, then snap.
   for (const mark of ['**', '~~']) {
     const count = masked.split(mark).length - 1
-    if (count % 2 === 1) return visible.slice(0, masked.lastIndexOf(mark))
+    if (count % 2 === 1) {
+      const h = holdAt(masked.lastIndexOf(mark))
+      if (h !== null) return h
+    }
   }
   // An unmatched "[" is a link, image, or citation still being written.
   {
@@ -85,21 +103,27 @@ function holdIncomplete(visible: string): string {
       else if (masked[i] === ']') stack.pop()
     }
     if (stack.length > 0) {
-      const at = stack[0]
-      return visible.slice(0, visible[at - 1] === '!' ? at - 1 : at)
+      const at = stack[stack.length - 1]
+      const h = holdAt(visible[at - 1] === '!' ? at - 1 : at)
+      if (h !== null) return h
     }
     // "](url…" whose ")" has not arrived: hold from the matching "[".
     const lp = masked.lastIndexOf('](')
     if (lp >= 0 && masked.indexOf(')', lp) === -1) {
+      let at = lp
       let depth = 0
       for (let i = lp; i >= 0; i--) {
         if (masked[i] === ']') depth++
         else if (masked[i] === '[') {
           depth--
-          if (depth === 0) return visible.slice(0, visible[i - 1] === '!' ? i - 1 : i)
+          if (depth === 0) {
+            at = visible[i - 1] === '!' ? i - 1 : i
+            break
+          }
         }
       }
-      return visible.slice(0, lp)
+      const h = holdAt(at)
+      if (h !== null) return h
     }
   }
   const nl = visible.lastIndexOf('\n')

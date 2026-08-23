@@ -73,4 +73,15 @@ describe('safeCut — construct holdback (AI-27: nothing renders until it render
     expect(cut).toContain('`a ** b`')
     expect(cut).toContain('x[1')
   })
+
+  it('a stray unpaired marker stops holding after a bounded distance (AI-28)', () => {
+    // Caleb's second rejudge: "took a few seconds and just populated" — one
+    // forgotten ** early in the answer held EVERYTHING after it invisible
+    // until completion, then flooded. Past the cap, the literal renders and
+    // the prose keeps typing.
+    const text = 'a ** stray marker\n\n' + 'word '.repeat(80)
+    const cut = safeCut(text, text.length - 10)
+    expect(cut.length).toBeGreaterThan(200)
+    expect(cut).toContain('word word')
+  })
 })

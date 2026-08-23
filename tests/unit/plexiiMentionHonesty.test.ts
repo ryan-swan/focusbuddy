@@ -38,7 +38,11 @@ import { resolveMentions, reportResolutions, type ResolvedMention } from '../../
 import { renderMentions } from '../../src/main/ai/chatMentions'
 import { renderAttachments } from '../../src/main/ai/chatAttachments'
 import { DOC_TEXT_CAP } from '../../src/main/workspaceRank'
-import { getTraceView, type AssistantTrace } from '../../src/renderer/src/lib/traceView'
+import {
+  getTraceView,
+  rotatedLabel,
+  type AssistantTrace
+} from '../../src/renderer/src/lib/traceView'
 import type { ChatMentionRef } from '../../src/shared/types'
 
 function ref(kind: ChatMentionRef['kind'], id: string, title: string): ChatMentionRef {
@@ -184,5 +188,21 @@ describe('#15 — the trace says when search was keyword-only', () => {
   it('unknown (older main / restored trace) discloses nothing', () => {
     const view = getTraceView(base, 1)
     expect(view.completed.find((l) => l.key === 'retrieve')?.label).not.toContain('keyword')
+  })
+})
+
+describe('rotating thinking verbs (AI-29, Caleb: watch the words rotate)', () => {
+  it('cycles the phase set, staying inside honest phases', () => {
+    expect(rotatedLabel('answer', 'Writing the answer…', 0)).toBe('Thinking…')
+    expect(rotatedLabel('answer', 'Writing the answer…', 1)).toBe('Pondering…')
+    expect(rotatedLabel('answer', 'x', 4)).toBe('Thinking…')
+    expect(rotatedLabel('retrieve', 'Searching your workspace…', 1)).toBe('Searching the web…')
+  })
+
+  it('phases without a rotation keep their real label — Reading stays Reading', () => {
+    expect(rotatedLabel('read-3', 'Reading Henderson contract…', 2)).toBe(
+      'Reading Henderson contract…'
+    )
+    expect(rotatedLabel('answer', 'canonical', -1)).toBe('canonical')
   })
 })

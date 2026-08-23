@@ -8,6 +8,7 @@ import {
   getTraceView,
   hasTraceContent,
   traceSummary,
+  rotatedLabel,
   SOURCE_REVEAL_INTERVAL_MS,
   type AssistantTrace
 } from '../../lib/traceView'
@@ -291,14 +292,27 @@ export default function RetrievalTrace({
       <div aria-live="polite" aria-atomic="true">
         {active && (
           // The live line (P4): the breathing double-i is the thinking
-          // indicator — the mark itself, not a spinner — and the status label
-          // carries a light shimmer sweep while the work it names is running.
+          // indicator — the mark itself, not a spinner. The label rotates
+          // through honest phase verbs every 2s (AI-29, Caleb's ask), each
+          // swap arriving on the quiet trace fade; once prose starts typing
+          // this line completes and the words themselves carry the motion.
           <div key={active.key} className="fb-trace-in flex items-center gap-1.5">
             <span className="w-4 h-4 grid place-items-center shrink-0 text-accent" aria-hidden="true">
               <PlexiiThinking size={14} />
             </span>
             <Icon name={active.icon} size={11} className="shrink-0 text-[var(--ink-50)]" />
-            <span className="text-[var(--ink-70)]">{active.label}</span>
+            {(() => {
+              const label = rotatedLabel(
+                active.key,
+                active.label,
+                trace.status === 'running' ? Math.floor(liveElapsedS / 2) : -1
+              )
+              return (
+                <span key={label} className="fb-trace-in text-[var(--ink-70)]">
+                  {label}
+                </span>
+              )
+            })()}
             {trace.status === 'running' && liveElapsedS >= 2 && (
               <span className="fb-tabular text-[var(--ink-40)]">{liveElapsedS}s</span>
             )}
