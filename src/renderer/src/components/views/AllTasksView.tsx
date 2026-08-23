@@ -299,9 +299,10 @@ export default function AllTasksView(): JSX.Element {
             <EmptyState filter={filter} hasSearch={search.trim().length > 0} />
           ) : (
             <ul className="divide-y divide-[var(--edge-soft)]">
-              {visible.slice(0, renderCap).map((task) => (
+              {visible.slice(0, renderCap).map((task, i) => (
                 <TaskRow
                   key={task.id}
+                  enterDelay={Math.min(i * 25, 250)}
                   task={task}
                   nodes={nodes}
                   onOpen={() => openTask(task)}
@@ -364,6 +365,7 @@ function EmptyState({
 }
 
 interface RowProps {
+  enterDelay: number
   task: FbNode
   nodes: FbNode[]
   onOpen: () => void
@@ -373,6 +375,7 @@ interface RowProps {
 }
 
 function TaskRow({
+  enterDelay,
   task,
   nodes,
   onOpen,
@@ -411,7 +414,7 @@ function TaskRow({
   const isDone = task.status === 'done'
 
   return (
-    <ListRow as="li" className="px-4 py-2 group fb-fade-in-up">
+    <ListRow as="li" className="px-4 py-2 group fb-fade-in-up" style={{ animationDelay: `${enterDelay}ms` }}>
       <button
         onClick={onMarkDone}
         disabled={isDone}
