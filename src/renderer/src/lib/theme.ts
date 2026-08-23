@@ -340,7 +340,12 @@ export function loadTheme(): {
   const font = localStorage.getItem(KEY_FONT) as FontChoice | null
   return {
     mode:
-      mode && ['light', 'dark', 'auto', 'futuristic', 'atelier'].includes(mode) ? mode : 'auto',
+      // Every ThemeMode must be listed here or the choice silently falls back
+      // to 'auto' on the next launch. Gemstone was missing from the day it
+      // shipped (b230ad6), so it never survived a relaunch.
+      mode && ['light', 'dark', 'auto', 'futuristic', 'atelier', 'gemstone'].includes(mode)
+        ? mode
+        : 'auto',
     accent:
       accent && ['violet', 'blue', 'emerald', 'rose', 'heritage', 'custom'].includes(accent)
         ? accent
