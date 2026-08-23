@@ -2494,13 +2494,12 @@ body {
 /* Streaming text (Plexii P3, reshaped by AI-30). Opacity and transform only
    (compositor-thread rule); nothing here causes layout. The caret is a static
    dot pinned after the last block of the streaming turn. */
-/* Sentence waves (AI-30). The answer lands a wave at a time: block rows rise
-   into place with the app's entrance motion (fb-fade-in-up's recipe, so a
-   paragraph arrives exactly like an inbox row), and text continuing inside an
-   already-landed block fades in — inline runs cannot transform, and a fade is
-   the right weight for a sentence joining its paragraph. Both use `both` so a
-   wave is invisible until its animation starts. Successor to the per-word
-   fade (fb-word-in), retired at Caleb's third rejudge. */
+/* The flow (A1 round 4c). Each newly revealed word fades in (fb-wave-in) at
+   a pace where consecutive fades overlap, so the answer reads as one
+   continuous motion; block elements rise into place (fb-wave-rise, the
+   fb-fade-in-up recipe) so a paragraph or list row arrives exactly like an
+   inbox row. Both use `both` so a node is invisible until its animation
+   starts. Inline runs cannot transform, which is why words fade. */
 @keyframes fb-wave-in {
   from {
     opacity: 0;
@@ -2510,7 +2509,7 @@ body {
   }
 }
 .fb-wave-in {
-  animation: fb-wave-in var(--dur-slow) var(--ease-spring-glide) both;
+  animation: fb-wave-in 280ms ease-out both;
 }
 .fb-wave-rise {
   animation: fb-fade-in-up var(--dur-base) var(--ease-spring-soft) both;

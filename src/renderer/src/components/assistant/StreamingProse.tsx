@@ -1,60 +1,58 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkCitations from '../../lib/remarkCitations'
-import { waveEnds, REVEAL_CPS, WAVE_MIN_BEAT_MS } from '../../lib/streamReveal'
+import { safeCut, REVEAL_CPS, COMMIT_MS } from '../../lib/streamReveal'
 
-// The living text (Plexii UI/UX P3, reshaped by AI-30). Network chunks arrive
-// in bursts, but the DISPLAY reveals at a constant readable pace. The unit of
-// reveal is a WAVE — a couple of sentences, or one row of a list or table —
-// and each wave rises into place the way an Office inbox row does, so the
-// answer reads as sections settling rather than as paint or as a typewriter.
-// Server speed and display speed are decoupled: the pace clock keeps its
-// rhythm to the very last wave, including after the stream has ended. An
-// answer that arrived in one burst still lands in waves, never all at once.
+// The living text (Plexii UI/UX P3, settled in A1 round 4c). Network chunks
+// arrive in bursts, but the DISPLAY reveals at one constant readable pace,
+// word by word, each new word fading in — a continuous flow, never paint
+// and never blocks. Block elements (a paragraph, a list row, a heading)
+// rise into place the way an Office inbox row does, so structure arrives
+// with the app's motion while the words inside it keep flowing. Server
+// speed and display speed are decoupled, and the clock keeps its pace to
+// the very last word, including after the stream has ended: an answer that
+// arrived in one burst still reads out at reading pace, never all at once.
 //
-// Used for the actively-streaming turn AND for the same turn while it drains
-// after completion (the caller keeps this mounted until `onDrained`).
-// Completed turns render through ChatBlockView, which is also what guarantees
-// the no-replay rule: scroll-back never re-animates.
+// Why words and not sentences: round 4 tried sentence waves (a couple of
+// sentences landing as one unit). At the model's real cadence that meant a
+// block, then a second of nothing, then a block — Caleb: "rigid and
+// glitchy… it NEEDs to be smooth like butter". Flow is butter; waves are
+// not.
+//
+// Used for the actively-streaming turn AND for the same turn while it
+// drains after completion (the caller keeps this mounted until `onDrained`).
+// Completed turns render through ChatBlockView, which is also what
+// guarantees the no-replay rule: scroll-back never re-animates.
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-// The clock may bank at most this many characters ahead of the last landed
-// wave — enough to absorb token jitter (~a third of a second), not enough to
-// repay a stall upstream (the model pausing, the stream closing late) as a
-// flood: every wave still takes its own time to land.
-const BANK_CHARS = 80
-
-export interface WaveReveal {
-  // The text to render: whole waves only.
+export interface SmoothedStream {
   visible: string
-  // Where each visible wave begins, ascending, starting at 0. Stable for an
-  // append-only stream — the renderer splits text at these offsets so earlier
-  // waves keep their DOM nodes (and never re-animate) as later ones land.
-  waveStarts: number[]
-  // Every wave of a finished stream is on screen.
+  // Every character of a finished stream is on screen.
   drained: boolean
 }
 
-// Reveal `target` (a cumulative, append-only string) wave by wave at constant
-// pace. `active` is true while the stream is open; once it closes the trailing
-// text becomes the last wave and the clock runs on until it has landed.
-// `holdUntil` (epoch ms) delays the first wave — the trace's source cascade
-// lands first, then the answer begins (Caleb's "tree lands first" ruling).
-export function useWaveReveal(target: string, active: boolean, holdUntil = 0): WaveReveal {
+// Reveal `target` (a cumulative, append-only string) at constant pace.
+// `active` is true while the stream is open; once it closes the clock runs
+// on until the tail has landed. `holdUntil` (epoch ms) delays the first
+// commit — the trace's source cascade lands first, then the answer begins.
+//
+// There is deliberately no catch-up mode: a burst upstream, or a stream that
+// closes early, is never repaid as a flood. The backlog simply reads out at
+// pace (Caleb's ruling: same pace to the end).
+export function useSmoothedStream(target: string, active: boolean, holdUntil = 0): SmoothedStream {
   const reduced = useMemo(prefersReducedMotion, [])
-  const ends = useMemo(() => waveEnds(target, !active), [target, active])
-  const [shown, setShown] = useState(0)
-  const shownRef = useRef(0)
-  const endsRef = useRef(ends)
-  endsRef.current = ends
-  // The clock starts when there is something to reveal, not at mount: a long
-  // pre-first-token wait must not bank budget and flood the opening.
-  const t0 = useRef<number | null>(null)
-  const lastRelease = useRef(0)
+  const [visible, setVisible] = useState('')
+  const revealLen = useRef(0)
+  const lastTick = useRef<number | null>(null)
+  const lastCommit = useRef(0)
+  const targetRef = useRef(target)
+  targetRef.current = target
+  const activeRef = useRef(active)
+  activeRef.current = active
 
   useEffect(() => {
     if (reduced) return
@@ -63,54 +61,47 @@ export function useWaveReveal(target: string, active: boolean, holdUntil = 0): W
     // the frame clock is performance time. Convert once.
     const holdPerf = holdUntil > 0 ? holdUntil - (Date.now() - performance.now()) : 0
     const tick = (now: number): void => {
-      const e = endsRef.current
-      const n = shownRef.current
-      if (t0.current !== null) {
-        // Clamp the bank on EVERY tick, idle ones included. The clock may run
-        // past what the next wave needs by only the jitter allowance — and
-        // while it waits on the model (or on the stream closing) past the
-        // last landed wave by the same — so whatever arrives next lands at
-        // reading pace no matter how long it took to arrive.
-        const need = n < e.length ? e[n] : n > 0 ? e[n - 1] : 0
-        const maxT0 = now - ((need + BANK_CHARS) / REVEAL_CPS) * 1000
-        if (t0.current < maxT0) t0.current = maxT0
-      }
-      if (n < e.length) {
-        if (t0.current === null) t0.current = Math.max(holdPerf, now)
-        const budget = ((now - t0.current) / 1000) * REVEAL_CPS
-        if (e[n] <= budget && now - lastRelease.current >= WAVE_MIN_BEAT_MS) {
-          shownRef.current = n + 1
-          lastRelease.current = now
-          setShown(n + 1)
+      const t = targetRef.current
+      if (now >= holdPerf && t.length > 0) {
+        // The clock starts at the first frame with text to show, not at
+        // mount: a long pre-first-token wait banks nothing.
+        if (lastTick.current === null) lastTick.current = now
+        const backlog = t.length - revealLen.current
+        if (backlog > 0) {
+          revealLen.current = Math.min(t.length, revealLen.current + ((now - lastTick.current) / 1000) * REVEAL_CPS)
+          if (now - lastCommit.current >= COMMIT_MS) {
+            lastCommit.current = now
+            setVisible(safeCut(t, Math.floor(revealLen.current)))
+          }
+        } else if (!activeRef.current) {
+          // Stream closed and every character is out: the last commit shows
+          // the whole text (safeCut may have held a tail until now).
+          setVisible(t)
         }
+        lastTick.current = now
       }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-    // The loop reads the latest waves through a ref; restarting it on every
+    // The loop reads the latest target through a ref; restarting it on every
     // delta would stutter the clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduced, holdUntil])
 
-  if (reduced) {
-    return { visible: target, waveStarts: [0], drained: !active }
-  }
-  const count = Math.min(shown, ends.length)
-  const visible = count === 0 ? '' : target.slice(0, ends[count - 1])
-  const waveStarts = [0]
-  for (let i = 0; i < count - 1; i++) waveStarts.push(ends[i])
-  return { visible, waveStarts, drained: !active && count >= ends.length }
+  if (reduced) return { visible: target, drained: !active }
+  return { visible, drained: !active && visible === target }
 }
 
-// ── Marking the waves in the rendered tree ─────────────────────────────────
+// ── Marking the words and blocks in the rendered tree ──────────────────────
 //
-// Every block element rises in (the inbox motion); text is split at wave
-// starts and each piece fades in as its own span. Classes are constant for
-// the life of the turn and split points only ever append, so a node that has
-// already landed keeps its identity across reparses and its animation plays
-// exactly once, on mount. Code/pre stay untouched inside — fading fragments
-// of a code block read as flicker, not writing.
+// Every word of every text node becomes a fading span; positional keys mean
+// the already-revealed prefix keeps its DOM nodes across reparses, so only
+// the newly arrived words mount, and only mounting nodes animate. Block
+// elements rise on mount (the inbox motion); inline elements that mount
+// whole (a citation chip, a link) fade as a unit. Classes are constant for
+// the life of the turn, so nothing ever re-animates. Code/pre stay untouched
+// inside — fading fragments of a code block read as flicker, not writing.
 
 type HastNode = {
   type: string
@@ -118,12 +109,9 @@ type HastNode = {
   value?: string
   children?: HastNode[]
   properties?: Record<string, unknown>
-  position?: { start?: { offset?: number }; end?: { offset?: number } }
 }
 
-const RISING_BLOCKS = new Set(['p', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'hr', 'tr'])
-// Inline elements fade in whole; the text inside them is not split again.
-const INLINE_FADE = new Set(['strong', 'em', 'del', 'a', 'code', 'span', 'img'])
+const RISING_BLOCKS = new Set(['p', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'hr', 'tr', 'blockquote'])
 
 function addClass(node: HastNode, cls: string): void {
   const props = node.properties ?? (node.properties = {})
@@ -133,7 +121,7 @@ function addClass(node: HastNode, cls: string): void {
   props.className = list
 }
 
-function fadeSpan(value: string): HastNode {
+function wordSpan(value: string): HastNode {
   return {
     type: 'element',
     tagName: 'span',
@@ -142,50 +130,23 @@ function fadeSpan(value: string): HastNode {
   }
 }
 
-// Split one text node at the wave starts that fall inside it. Offsets are
-// source offsets while `value` is the unescaped text, so a seam can drift by
-// an escape or two; it is then nudged to the next whitespace so no word is
-// ever split across two fades.
-function splitText(node: HastNode, waveStarts: number[]): HastNode[] {
-  const value = node.value ?? ''
-  const start = node.position?.start?.offset
-  if (start === undefined) return [fadeSpan(value)]
-  const cuts: number[] = []
-  for (const ws of waveStarts) {
-    const rel = ws - start
-    if (rel <= 0 || rel >= value.length) continue
-    let at = rel
-    while (at < value.length && !/\s/.test(value[at])) at++
-    if (at > 0 && at < value.length && (cuts.length === 0 || at > cuts[cuts.length - 1])) cuts.push(at)
-  }
-  const out: HastNode[] = []
-  let from = 0
-  for (const c of cuts) {
-    out.push(fadeSpan(value.slice(from, c)))
-    from = c
-  }
-  out.push(fadeSpan(value.slice(from)))
-  return out
-}
-
-function markWaves(node: HastNode, waveStarts: number[]): void {
+function markTree(node: HastNode): void {
   if (!node.children) return
   if (node.tagName === 'code' || node.tagName === 'pre') return
   const next: HastNode[] = []
   for (const child of node.children) {
     if (child.type === 'text' && typeof child.value === 'string' && child.value.trim()) {
-      next.push(...splitText(child, waveStarts))
+      for (const part of child.value.split(/(\s+)/)) {
+        if (!part) continue
+        if (/^\s+$/.test(part)) next.push({ type: 'text', value: part })
+        else next.push(wordSpan(part))
+      }
       continue
     }
     if (child.type === 'element' && child.tagName) {
-      if (RISING_BLOCKS.has(child.tagName)) {
-        addClass(child, 'fb-wave-rise')
-        markWaves(child, waveStarts)
-      } else if (INLINE_FADE.has(child.tagName)) {
-        addClass(child, 'fb-wave-in')
-      } else {
-        markWaves(child, waveStarts)
-      }
+      if (RISING_BLOCKS.has(child.tagName)) addClass(child, 'fb-wave-rise')
+      else if (child.tagName === 'span' || child.tagName === 'img') addClass(child, 'fb-wave-in')
+      markTree(child)
     }
     next.push(child)
   }
@@ -208,9 +169,9 @@ function caretNode(): HastNode {
   }
 }
 
-function rehypeWaves(waveStarts: number[], caret: boolean) {
+function rehypeFlow(caret: boolean) {
   return (tree: HastNode): void => {
-    markWaves(tree, waveStarts)
+    markTree(tree)
     if (!caret) return
     const kids = tree.children ?? []
     const last = [...kids].reverse().find((n) => n.type === 'element')
@@ -220,18 +181,50 @@ function rehypeWaves(waveStarts: number[], caret: boolean) {
   }
 }
 
+// The element overrides MUST be stable identities. Defined inline in the
+// `components` prop they were new function types on every commit, so React
+// unmounted and remounted EVERY span and link ~22 times a second — each
+// remount restarting its fade. That was the "flash" under every reveal
+// design since P3 (measured: 78,906 characters torn down during one
+// 5-second answer). Module-level components reconcile in place.
+const StreamLink: Components['a'] = ({ href, children, node: _node, ...rest }) => (
+  <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+    {children}
+  </a>
+)
+
+// Inline [n] markers during the stream: the quiet chip, not yet clickable —
+// sources resolve when the turn completes and the finished renderer takes
+// over. Same key fix as ChatBlockView (A1): hast keeps 'data-citation'
+// verbatim; the camelized lookup alone never matched.
+const StreamSpan: Components['span'] = ({ node, children, ...rest }) => {
+  const n = node?.properties?.dataCitation ?? node?.properties?.['data-citation']
+  if (n === undefined || n === null || n === '') return <span {...rest}>{children}</span>
+  return (
+    <span
+      data-testid="chat-citation"
+      className="fb-wave-in inline-grid place-items-center align-[1.5px] mx-[1px] min-w-[14px] h-[14px] px-[3px] rounded-[4px] bg-accent/15 text-accent text-[9px] font-mono font-semibold"
+    >
+      {String(n)}
+    </span>
+  )
+}
+
+const COMPONENTS: Components = { a: StreamLink, span: StreamSpan }
+const REMARK_PLUGINS = [remarkGfm, remarkCitations]
+
 interface Props {
   markdown: string
   // The stream is still open. False while the finished turn drains.
   active: boolean
-  // Epoch ms before which no wave may land (the source cascade's end).
+  // Epoch ms before which nothing may show (the source cascade's end).
   holdUntil?: number
-  // Fired once every wave of a finished stream is on screen.
+  // Fired once every character of a finished stream is on screen.
   onDrained?: () => void
 }
 
 export default function StreamingProse({ markdown, active, holdUntil = 0, onDrained }: Props): React.JSX.Element {
-  const { visible, waveStarts, drained } = useWaveReveal(markdown, active, holdUntil)
+  const { visible, drained } = useSmoothedStream(markdown, active, holdUntil)
   const drainedRef = useRef(false)
   useEffect(() => {
     if (drained && !drainedRef.current) {
@@ -239,45 +232,16 @@ export default function StreamingProse({ markdown, active, holdUntil = 0, onDrai
       onDrained?.()
     }
   }, [drained, onDrained])
-  // The caret marks the growing edge until the last wave has landed.
-  // unified calls each entry as a plugin factory; the factory closes over
-  // this render's wave starts and returns the transformer.
-  const plugins = useMemo(() => [() => rehypeWaves(waveStarts, !drained)], [waveStarts, drained])
+  // unified calls each entry as a plugin factory. The caret marks the
+  // growing edge until the last word has landed.
+  const plugins = useMemo(() => [() => rehypeFlow(!drained)], [drained])
   return (
     <div
       data-testid="streaming-prose"
       data-drained={drained ? 'true' : 'false'}
       className="fb-streaming !text-[15px] !leading-[1.75] text-[var(--ink-90)] md-rendered"
     >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkCitations]}
-        rehypePlugins={plugins}
-        components={{
-          a: ({ href, children, ...rest }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
-              {children}
-            </a>
-          ),
-          // Inline [n] markers during the stream: the quiet chip, not yet
-          // clickable — sources resolve when the turn completes and the
-          // finished renderer takes over.
-          span: ({ node, children, ...rest }) => {
-            // Same key fix as ChatBlockView (A1): hast keeps 'data-citation'
-            // verbatim; the camelized lookup alone never matched.
-            const n =
-              node?.properties?.dataCitation ?? node?.properties?.['data-citation']
-            if (n === undefined || n === null || n === '') return <span {...rest}>{children}</span>
-            return (
-              <span
-                data-testid="chat-citation"
-                className="inline-grid place-items-center align-[1.5px] mx-[1px] min-w-[14px] h-[14px] px-[3px] rounded-[4px] bg-accent/15 text-accent text-[9px] font-mono font-semibold"
-              >
-                {String(n)}
-              </span>
-            )
-          }
-        }}
-      >
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={plugins} components={COMPONENTS}>
         {visible}
       </ReactMarkdown>
     </div>
