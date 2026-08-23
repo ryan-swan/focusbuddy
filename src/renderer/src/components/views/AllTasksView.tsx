@@ -226,7 +226,7 @@ export default function AllTasksView(): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-auto desk-paper no-tod">
+    <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-3">
         {/* Header */}
         <DashboardHeader title="All Tasks" subtitle="Every task across every project, flat." />
@@ -240,19 +240,19 @@ export default function AllTasksView(): JSX.Element {
               <button
                 key={f.value}
                 onClick={() => setFilter(f.value)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full fb-t-label fb-press transition-colors ${
                   active
-                    ? 'bg-accent/15 text-accent border border-accent/40'
-                    : 'bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-[var(--edge-firm)]'
+                    ? 'bg-accent/15 text-accent shadow-[0_0_0_1px_rgb(var(--accent)/0.4)]'
+                    : 'bg-[var(--surface-sunken)] shadow-[0_0_0_1px_var(--edge-hairline)] text-[var(--ink-70)] hover:shadow-[0_0_0_1px_var(--edge-firm)]'
                 }`}
               >
                 <Icon name={f.icon} size={12} filled={active} />
                 <span>{f.label}</span>
                 <span
-                  className={`text-[10px] font-mono px-1 rounded ${
+                  className={`fb-t-caption font-mono px-1 rounded-[var(--radius-chip)] ${
                     active
-                      ? 'bg-accent/20 text-accent'
-                      : 'bg-[color-mix(in_oklab,var(--ink-100)_6%,transparent)] text-[var(--ink-60)]'
+                      ? 'bg-accent/20 !text-accent'
+                      : 'bg-[var(--surface-base)] text-[var(--ink-60)]'
                   }`}
                 >
                   {count}
@@ -311,7 +311,7 @@ export default function AllTasksView(): JSX.Element {
                 />
               ))}
               {visible.length > renderCap && (
-                <li ref={sentinelRef} className="py-3 text-center text-[11px] text-[var(--ink-50)]">
+                <li ref={sentinelRef} className="py-3 text-center fb-t-caption">
                   Loading more…
                 </li>
               )}
@@ -319,7 +319,7 @@ export default function AllTasksView(): JSX.Element {
           )}
         </div>
 
-        <div className="text-[11px] text-[var(--ink-50)] text-center">
+        <div className="fb-t-caption text-center">
           {visible.length} of {counts.open + counts.done} task{visible.length === 1 ? '' : 's'}{' '}
           shown
         </div>
@@ -345,11 +345,20 @@ function EmptyState({
           ? 'Nothing in the next 7 days.'
           : filter === 'done'
             ? 'Nothing completed yet. When you finish tasks they show up here.'
-            : 'No open tasks. Add one from the sidebar.'
+            : 'No open tasks yet.'
+  const showCreate = !hasSearch && filter !== 'done'
   return (
     <div className="py-10 text-center">
       <Icon name="partly_cloudy_day" size={32} className="text-[var(--ink-30)] mb-2" />
-      <p className="text-sm text-[var(--ink-70)] leading-relaxed px-6">{msg}</p>
+      <p className="fb-t-body text-[var(--ink-70)] leading-relaxed px-6">{msg}</p>
+      {showCreate && (
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('fb:command-new-task'))}
+          className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-90)]"
+        >
+          <Icon name="add" size={14} /> New task
+        </button>
+      )}
     </div>
   )
 }
@@ -402,12 +411,12 @@ function TaskRow({
   const isDone = task.status === 'done'
 
   return (
-    <ListRow as="li" className="px-4 py-2 group">
+    <ListRow as="li" className="px-4 py-2 group fb-fade-in-up">
       <button
         onClick={onMarkDone}
         disabled={isDone}
         title={isDone ? 'Already done' : 'Mark done'}
-        className={`shrink-0 h-5 w-5 inline-flex items-center justify-center rounded-full border transition-colors ${
+        className={`shrink-0 h-5 w-5 inline-flex items-center justify-center rounded-full border fb-press transition-colors ${
           isDone
             ? 'border-emerald-500 bg-emerald-500 text-white cursor-default'
             : task.status === 'in_progress'
@@ -424,7 +433,7 @@ function TaskRow({
       <div className="flex-1 min-w-0">
         <button
           onClick={onOpen}
-          className={`text-sm text-left truncate w-full ${
+          className={`fb-t-body text-left truncate w-full ${
             isDone
               ? 'line-through text-[var(--ink-50)]'
               : 'text-[var(--ink-100)] hover:text-accent'
@@ -433,7 +442,7 @@ function TaskRow({
           {task.title}
         </button>
         {path.length > 0 && (
-          <div className="text-[10px] text-[var(--ink-70)] truncate flex items-center gap-0.5 mt-0.5">
+          <div className="fb-t-caption text-[var(--ink-70)] truncate flex items-center gap-0.5 mt-0.5">
             {path.map((segment, i) => (
               <span key={i} className="flex items-center gap-0.5">
                 {i > 0 && <Icon name="chevron_right" size={10} />}
@@ -463,8 +472,7 @@ function TaskRow({
       {!isDone && (
         <button
           onClick={onQuickStart}
-          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white transition-all shrink-0"
-          style={{ backgroundColor: 'rgb(var(--accent))' }}
+          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent fb-t-caption !text-white font-medium fb-press transition-all shrink-0"
           title="Start a 5-minute focus session on this task"
         >
           <Icon name="bolt" size={11} />
