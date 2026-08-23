@@ -936,7 +936,7 @@ function DestinationPicker({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg shadow-xl w-full max-w-[320px] p-2"
+        className="fb-card fb-press w-full max-w-[320px] p-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-1.5 px-1">
@@ -986,7 +986,7 @@ function DestinationPicker({
               <button
                 key={d.kind}
                 onClick={() => onPickNew(d.kind)}
-                className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)]"
+                className="fb-btn-surface flex flex-col items-center gap-0.5 px-2 py-2 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)]"
                 data-testid={`voice-dest-${d.kind}`}
               >
                 <Icon name={d.icon} size={16} className="text-[var(--ink-70)]" />
@@ -1000,7 +1000,7 @@ function DestinationPicker({
               <button
                 key={w.id}
                 onClick={() => onPickAppend(w)}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-left"
+                className="fb-btn-surface w-full flex items-center gap-1.5 px-2 py-1.5 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-left"
                 data-testid={`voice-dest-append-${w.id}`}
               >
                 <Icon

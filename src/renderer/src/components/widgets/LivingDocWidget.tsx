@@ -130,7 +130,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
           if (e.key === 'Enter') void startLiving()
         }}
         placeholder="e.g. a running summary of everything on this task"
-        className="w-full max-w-[330px] px-3 py-2 rounded-md text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] focus:outline-none focus:border-accent text-[var(--ink-90)]"
+        className="fb-field w-full max-w-[330px] px-3 py-2 text-[12px] text-[var(--ink-90)]"
       />
       <button
         data-testid="livingdoc-start"

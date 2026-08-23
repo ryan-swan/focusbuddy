@@ -476,7 +476,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
             }}
             placeholder='Tell the AI what to draft — e.g. "Write a meeting agenda for…"'
             rows={2}
-            className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="fb-field w-full text-[13px] px-2.5 py-1.5 resize-none"
           />
           {aiError && (
             <div className="text-[11px] text-amber-700 dark:text-amber-400 px-1">
@@ -492,7 +492,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
                 <Icon name="visibility" size={11} />
                 <span>Preview — review before inserting</span>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md p-2.5 text-[12px] text-[var(--ink-90)] whitespace-pre-wrap font-mono">
+              <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--surface-sunken)] rounded-md p-2.5 text-[12px] text-[var(--ink-90)] whitespace-pre-wrap font-mono">
                 {aiStaged.markdown}
               </div>
             </div>

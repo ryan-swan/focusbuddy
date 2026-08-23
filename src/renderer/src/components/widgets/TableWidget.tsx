@@ -1216,7 +1216,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             }}
             placeholder='e.g. "Add 5 fictional podcast episodes about climate tech"'
             rows={2}
-            className="w-full text-[13px] px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md resize-none text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="fb-field w-full text-[13px] px-2.5 py-1.5 resize-none text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
           />
           <div className="flex items-center gap-2 text-[11px] flex-wrap">
             <label className="text-[var(--ink-50)]">Rows:</label>
@@ -1240,7 +1240,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   onChange={(e) =>
                     setAiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))
                   }
-                  className="w-14 px-2 py-0.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[var(--ink-90)] focus:outline-none focus:border-accent"
+                  className="fb-field w-14 px-2 py-0.5 text-[var(--ink-90)]"
                 />
                 <span className="text-[var(--ink-40)]">fixed</span>
               </>
@@ -1319,7 +1319,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                   Step 2 — Approve {aiStaged.length} {aiStaged.length === 1 ? 'row' : 'rows'}
                 </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded-md">
+              <div className="flex-1 min-h-0 overflow-auto bg-[var(--surface-sunken)] rounded-md">
                 <table className="w-full text-[11px]">
                   <thead className="bg-[var(--surface-sunken)] sticky top-0">
                     <tr>

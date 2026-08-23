@@ -1565,7 +1565,7 @@ function SidePanel({
               {attachedWidgets.map((w) => (
                 <li
                   key={w.id}
-                  className="text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 flex items-center gap-2"
+                  className="text-[11px] bg-[var(--surface-sunken)] rounded px-2 py-1 flex items-center gap-2"
                   data-testid={`mindmap-attached-${w.id}`}
                 >
                   <Icon
@@ -1664,7 +1664,7 @@ function SidePanel({
                 return (
                   <li
                     key={a.slug}
-                    className="text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1.5"
+                    className="text-[11px] bg-[var(--surface-sunken)] rounded px-2 py-1.5"
                     data-testid={`mindmap-agent-${a.slug}`}
                   >
                     <div className="flex items-start gap-1.5 mb-1">
@@ -1724,7 +1724,7 @@ function SidePanel({
           {Object.keys(conversations).length > 0 && (
             <button
               onClick={onUndoLastApply}
-              className="mt-2 w-full text-[10px] px-2 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] inline-flex items-center justify-center gap-1.5"
+              className="fb-btn-surface mt-2 w-full text-[10px] px-2 py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] inline-flex items-center justify-center gap-1.5"
               data-testid="mindmap-undo-last-apply"
               title="Reverses the most recent applied proposal across all agents (deletes the entity it created)"
             >
@@ -1905,7 +1905,7 @@ function ConversationView({
             }}
             placeholder="Reply to the agent…"
             disabled={busy === 'invoke'}
-            className="flex-1 min-w-0 text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-0.5 focus:outline-none focus:border-accent disabled:opacity-60"
+            className="fb-field flex-1 min-w-0 text-[10px] px-1.5 py-0.5 disabled:opacity-60"
             data-testid={`mindmap-reply-input-${suggestion.slug}`}
           />
           <button
@@ -1983,7 +1983,7 @@ function AgentBuilderModal({
       onClick={onCancel}
     >
       <div
-        className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg shadow-xl w-full max-w-[420px] p-3 max-h-[90%] overflow-y-auto"
+        className="fb-card fb-press w-full max-w-[420px] p-3 max-h-[90%] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
@@ -2002,7 +2002,7 @@ function AgentBuilderModal({
             <input
               value={slug}
               onChange={(e) => setSlug(slugify(e.target.value))}
-              className="w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent"
+              className="fb-field w-full text-[12px] px-2 py-1"
               data-testid="agent-wizard-slug"
             />
           </Field>
@@ -2010,7 +2010,7 @@ function AgentBuilderModal({
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent"
+              className="fb-field w-full text-[12px] px-2 py-1"
               data-testid="agent-wizard-description"
             />
           </Field>
@@ -2066,7 +2066,7 @@ function AgentBuilderModal({
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               rows={5}
-              className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 focus:outline-none focus:border-accent font-mono"
+              className="fb-field w-full text-[11px] px-2 py-1 font-mono"
               data-testid="agent-wizard-purpose"
             />
           </Field>
@@ -2130,7 +2130,7 @@ function ToolPickerModal({
       onClick={onCancel}
     >
       <div
-        className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-lg shadow-xl w-full max-w-[360px] p-3 max-h-[80%] overflow-y-auto"
+        className="fb-card fb-press w-full max-w-[360px] p-3 max-h-[80%] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
@@ -2157,7 +2157,7 @@ function ToolPickerModal({
                     <button
                       key={entry.kind}
                       onClick={() => onPick(entry.kind)}
-                      className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)]"
+                      className="fb-btn-surface flex flex-col items-center gap-0.5 px-1.5 py-1.5 hover:border-accent hover:bg-accent/5 dark:hover:bg-accent/10 text-[var(--ink-70)]"
                       title={entry.hint}
                       data-testid={`mindmap-tool-${entry.kind}`}
                     >

@@ -100,7 +100,7 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
     <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="office-add-dialog"
-        className="w-[440px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+        className="fb-card w-[440px] max-w-[92vw] p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -117,7 +117,7 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
             onClick={() => void createNew()}
             disabled={!!busy}
             data-testid="office-add-new"
-            className="flex flex-col items-start gap-1 rounded-lg border border-[var(--edge-soft)] p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
+            className="fb-btn-surface flex flex-col items-start gap-1 p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
           >
             <Icon name="add" size={18} className="text-accent" />
             <span className="text-[13px] font-medium text-[var(--ink-90)]">Create new</span>
@@ -128,7 +128,7 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
             onClick={() => void importFile()}
             disabled={!!busy}
             data-testid="office-add-import"
-            className="flex flex-col items-start gap-1 rounded-lg border border-[var(--edge-soft)] p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
+            className="fb-btn-surface flex flex-col items-start gap-1 p-3 hover:border-accent hover:bg-accent/[0.04] disabled:opacity-50 text-left"
           >
             <Icon name="upload_file" size={18} className="text-accent" />
             <span className="text-[13px] font-medium text-[var(--ink-90)]">Import a file</span>
@@ -145,10 +145,10 @@ export default function OfficeDocAddDialog({ docType, onPicked, onClose }: Props
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search ${meta.label.toLowerCase()}s…`}
               data-testid="office-add-search"
-              className="w-full mb-1.5 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              className="fb-field w-full mb-1.5 px-2 py-1 text-[12px]"
             />
           )}
-          <div className="max-h-48 overflow-auto rounded-lg border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)]">
+          <div className="max-h-48 overflow-auto rounded-lg bg-[var(--surface-sunken)] divide-y divide-[var(--edge-soft)]">
             {filtered === null ? (
               <div className="px-3 py-2 text-[12px] text-[var(--ink-40)]">Loading…</div>
             ) : filtered.length === 0 ? (

@@ -157,7 +157,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
               }
             }}
             placeholder="https://docs.google.com/…"
-            className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] focus:outline-none focus:ring-2 focus:ring-accent"
+            className="fb-field flex-1 min-w-0 text-[11px] px-2 py-1.5 bg-[var(--surface-raised)]"
             data-testid="file-url-input"
           />
           <button

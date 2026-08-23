@@ -133,7 +133,7 @@ export function ListView({
       {rows.map((row) => (
         <div
           key={row.id}
-          className="group rounded-md border border-[var(--edge-soft)] hover:border-accent/40 bg-[var(--surface-raised)]/40 px-3 py-2 transition-colors"
+          className="group fb-tile px-3 py-2"
         >
           <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
@@ -207,7 +207,7 @@ export function CardsView({
         {rows.map((row) => (
           <div
             key={row.id}
-            className="group rounded-lg border border-[var(--edge-soft)] hover:border-accent/40 bg-[var(--surface-raised)]/50 p-3 flex flex-col gap-1.5 transition-colors"
+            className="group fb-tile p-3 flex flex-col gap-1.5"
           >
             {titleCol && (
               <div className="text-[13px] font-medium text-[var(--ink-90)]">
@@ -312,7 +312,7 @@ export function KanbanView({
             onChange={(e) =>
               setViewConfig({ ...viewConfig, kanbanColumnId: e.target.value })
             }
-            className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
+            className="fb-field px-1.5 py-0.5 text-[var(--ink-70)]"
           >
             {selectCols.map((c) => (
               <option key={c.id} value={c.id}>
@@ -331,7 +331,7 @@ export function KanbanView({
           return (
             <div
               key={laneId}
-              className="shrink-0 w-[240px] rounded-md bg-[var(--surface-sunken)]/60 border border-[var(--edge-soft)] flex flex-col"
+              className="shrink-0 w-[240px] rounded-md bg-[var(--surface-sunken)] flex flex-col"
               onDragOver={(e) => {
                 if (e.dataTransfer.types.includes('text/fb-row-id')) {
                   e.preventDefault()
@@ -370,7 +370,7 @@ export function KanbanView({
                       e.dataTransfer.setData('text/fb-row-id', row.id)
                       e.dataTransfer.effectAllowed = 'move'
                     }}
-                    className="group rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2 hover:border-accent/40 cursor-grab active:cursor-grabbing transition-colors"
+                    className="fb-card group p-2 hover:border-accent/40 cursor-grab active:cursor-grabbing transition-colors"
                   >
                     {titleCol && (
                       <div className="text-[12px] text-[var(--ink-90)]">
@@ -522,7 +522,7 @@ export function CalendarView({
               onChange={(e) =>
                 setViewConfig({ ...viewConfig, calendarColumnId: e.target.value })
               }
-              className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
+              className="fb-field px-1.5 py-0.5 text-[var(--ink-70)]"
             >
               {dateCols.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -533,7 +533,7 @@ export function CalendarView({
           </div>
         )}
       </div>
-      <div className="grid grid-cols-7 gap-px bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded overflow-hidden text-[11px]">
+      <div className="grid grid-cols-7 gap-px bg-[var(--surface-sunken)] rounded overflow-hidden text-[11px]">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
           <div
             key={d}
@@ -708,7 +708,7 @@ export function GanttView({
             onChange={(e) =>
               setViewConfig({ ...viewConfig, ganttStartColumnId: e.target.value })
             }
-            className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
+            className="fb-field px-1.5 py-0.5 text-[var(--ink-70)]"
           >
             {dateCols.map((c) => (
               <option key={c.id} value={c.id}>
@@ -722,7 +722,7 @@ export function GanttView({
             onChange={(e) =>
               setViewConfig({ ...viewConfig, ganttEndColumnId: e.target.value })
             }
-            className="bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-0.5 text-[var(--ink-70)]"
+            className="fb-field px-1.5 py-0.5 text-[var(--ink-70)]"
           >
             {dateCols.map((c) => (
               <option key={c.id} value={c.id}>

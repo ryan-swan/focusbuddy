@@ -127,7 +127,7 @@ export default function TableImportDialog({
   }
 
   const selectCls =
-    'text-[11px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-1.5 py-1 text-[var(--ink-70)] focus:outline-none focus:border-accent'
+    'fb-card text-[11px] px-1.5 py-1 text-[var(--ink-70)] focus:outline-none focus:border-accent'
 
   return createPortal(
     <div
@@ -140,7 +140,7 @@ export default function TableImportDialog({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl">
+      <div className="fb-card w-full max-w-2xl max-h-[85vh] flex flex-col">
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center gap-2">
           <Icon name="upload_file" size={16} />
           <div className="flex-1 min-w-0">

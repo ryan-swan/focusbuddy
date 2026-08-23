@@ -112,13 +112,13 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
 
   const rendered = (
     <div
-      className={`fb-note-rendered w-full h-full whitespace-pre-wrap text-[var(--ink-100)] leading-relaxed font-serif cursor-text ${
+      className={`fb-note-rendered w-full h-full whitespace-pre-wrap text-stone-800 leading-relaxed font-serif cursor-text ${
         'fb-body'
       }`}
       onClick={enterEdit}
     >
       {text.trim() === '' ? (
-        <span className="text-[var(--ink-50)]/40">Notes, thoughts, anything that doesn’t fit on a sticky…</span>
+        <span className="text-stone-500/60">Notes, thoughts, anything that doesn’t fit on a sticky…</span>
       ) : (
         splitStickyBlocks(text).map((block, bi) => {
           if (block.type === 'table') {
@@ -130,7 +130,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
                       {block.headers.map((h, hi) => (
                         <th
                           key={hi}
-                          className="border border-[var(--edge-firm)] px-2 py-1 bg-[var(--surface-sunken)] text-left font-semibold align-top"
+                          className="border border-stone-300 px-2 py-1 bg-stone-100 text-left font-semibold align-top"
                         >
                           {renderInline(h)}
                         </th>
@@ -141,7 +141,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
                     {block.rows.map((row, ri) => (
                       <tr key={ri}>
                         {block.headers.map((_, ci) => (
-                          <td key={ci} className="border border-[var(--edge-firm)] px-2 py-1 align-top">
+                          <td key={ci} className="border border-stone-300 px-2 py-1 align-top">
                             {renderInline(row[ci] ?? '')}
                           </td>
                         ))}
@@ -176,7 +176,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
         const sel = window.getSelection()?.toString() ?? ''
         setCtxMenu({ x: e.clientX, y: e.clientY, selectionText: sel })
       }}
-      className={`w-full h-full resize-none bg-transparent text-[var(--ink-100)] leading-relaxed focus:outline-none placeholder:text-[var(--ink-50)]/40 font-serif ${
+      className={`w-full h-full resize-none bg-transparent text-stone-800 leading-relaxed focus:outline-none placeholder:text-stone-500/60 font-serif ${
         'fb-body'
       }`}
     />

@@ -286,7 +286,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
             <button
               key={t.type}
               onClick={() => addField(t.type)}
-              className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-accent text-[10px] text-[var(--ink-70)]"
+              className="fb-btn-surface inline-flex items-center gap-1 px-1.5 py-1 hover:border-accent text-[10px] text-[var(--ink-70)]"
               title={`Add ${t.label}`}
             >
               <Icon name={t.icon} size={13} />
@@ -307,7 +307,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
               value={sel.label}
               onChange={(e) => patchField(sel.id, { label: e.target.value })}
               placeholder="Label"
-              className="flex-1 min-w-0 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              className="fb-field flex-1 min-w-0 bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
             />
           )}
           {sel.type === 'select' && (
@@ -317,7 +317,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                 patchField(sel.id, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })
               }
               placeholder="Option A, Option B"
-              className="flex-1 min-w-0 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+              className="fb-field flex-1 min-w-0 bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
             />
           )}
           {sel.type !== 'divider' && sel.type !== 'heading' && (
@@ -438,7 +438,7 @@ function FieldControl({
   const disabled = mode === 'design'
   const stop = (e: React.SyntheticEvent): void => e.stopPropagation()
   const inputCls =
-    'w-full bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-accent disabled:bg-[var(--surface-sunken)]'
+    'fb-card w-full px-2 py-1 text-[12px] text-[var(--ink-100)] focus:outline-none focus:border-accent disabled:bg-[var(--surface-sunken)]'
   const labelEl =
     field.type !== 'divider' && field.type !== 'heading' && field.type !== 'checkbox' ? (
       <div className="text-[10px] uppercase tracking-wide text-[var(--ink-50)] mb-0.5 truncate">

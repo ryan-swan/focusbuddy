@@ -78,7 +78,7 @@ export default function WebhookWidget({
           if (e.key === 'Enter') persist(url)
         }}
         data-testid="webhook-url"
-        className="w-full px-2 py-1.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[11px] focus:outline-none focus:border-accent"
+        className="fb-field w-full px-2 py-1.5 text-[11px]"
       />
       <p className="text-[10px] text-[var(--ink-45)] leading-snug">
         Wire a tool into this and its content POSTs here whenever it changes.

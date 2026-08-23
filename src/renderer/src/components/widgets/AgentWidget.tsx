@@ -245,7 +245,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
       <div className="relative px-2.5 pt-2 pb-1.5 border-b border-[var(--edge-soft)]">
         <button
           onClick={() => setProfileMenu((v) => !v)}
-          className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md border border-[var(--edge-soft)] hover:border-accent/50 bg-[var(--surface-sunken)] text-left"
+          className="fb-tile w-full flex items-center gap-1.5 px-2 py-1 hover:border-accent/50 text-left"
           data-testid="agent-profile-button"
           title={profile.systemPrompt}
         >
@@ -344,7 +344,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
                       intervalSec: job.intervalSec ?? edit.intervalSec
                     })
                   }
-                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
+                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full bg-[var(--surface-sunken)] text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
                 >
                   <Icon name={job.icon} size={12} />
                   {job.label}
@@ -498,7 +498,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
               onChange={(e) =>
                 set({ intervalSec: Math.max(MIN_INTERVAL_SEC, Number(e.target.value) || MIN_INTERVAL_SEC) })
               }
-              className="w-12 px-1 py-0.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[10px] focus:outline-none focus:border-accent"
+              className="fb-field w-12 px-1 py-0.5 text-[10px]"
               data-testid="agent-interval"
             />
             s

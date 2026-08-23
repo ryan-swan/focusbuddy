@@ -685,7 +685,7 @@ function CompactChildView({
           pointerEvents: 'auto',
           ...dragStyle
         }}
-        className="group flex items-center gap-2 px-3 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:shadow-sm cursor-pointer transition-colors"
+        className="fb-card fb-press group flex items-center gap-2 px-3 hover:border-[var(--edge-firm)] hover:shadow-sm cursor-pointer transition-colors"
         onPointerDown={onPointerDown}
         onClick={handleOpen}
         title="Drag out of the section to move it back to the desk"
@@ -731,7 +731,7 @@ function CompactChildView({
     >
       <button
         onClick={handleOpen}
-        className="w-full h-full flex flex-col items-center justify-center gap-1 rounded-md bg-[var(--surface-raised)] border border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:shadow-md transition-colors p-2"
+        className="fb-btn-surface w-full h-full flex flex-col items-center justify-center gap-1 hover:border-[var(--edge-firm)] hover:shadow-md transition-colors p-2"
         title={title}
       >
         <span

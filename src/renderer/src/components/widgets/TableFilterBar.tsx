@@ -176,7 +176,7 @@ export default function TableFilterBar({
                         <select
                           value={filter?.conjunction ?? 'and'}
                           onChange={(e) => setConjunction(e.target.value as 'and' | 'or')}
-                          className="bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[10px] text-[var(--ink-70)] lowercase"
+                          className="fb-field px-1 py-0.5 text-[10px] text-[var(--ink-70)] lowercase"
                         >
                           <option value="and">and</option>
                           <option value="or">or</option>
@@ -314,7 +314,7 @@ function FilterRuleEditor({
         <select
           value={rule.columnId}
           onChange={(e) => onColumn(e.target.value)}
-          className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
+          className="fb-field flex-1 min-w-0 px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
         >
           {columns.map((c) => (
             <option key={c.id} value={c.id}>
@@ -325,7 +325,7 @@ function FilterRuleEditor({
         <select
           value={rule.operator}
           onChange={(e) => onOperator(e.target.value as FilterOperator)}
-          className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
+          className="fb-field flex-1 min-w-0 px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
         >
           {operators.map((op) => (
             <option key={op} value={op}>
@@ -387,7 +387,7 @@ function FilterValueEditor({
       <select
         value={typeof rule.value === 'string' ? rule.value : ''}
         onChange={(e) => onValue(e.target.value || null)}
-        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
+        className="fb-field w-full px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
       >
         <option value="">Select…</option>
         {options.map((o) => (
@@ -406,7 +406,7 @@ function FilterValueEditor({
         value={typeof rule.value === 'number' ? rule.value : ''}
         onChange={(e) => onValue(e.target.value === '' ? null : Number(e.target.value))}
         placeholder="Value"
-        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
+        className="fb-field w-full px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
       />
     )
   }
@@ -424,7 +424,7 @@ function FilterValueEditor({
           const [y, m, d] = e.target.value.split('-').map(Number)
           onValue(Date.UTC(y, m - 1, d))
         }}
-        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
+        className="fb-field w-full px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
       />
     )
   }
@@ -436,7 +436,7 @@ function FilterValueEditor({
       value={typeof rule.value === 'string' ? rule.value : ''}
       onChange={(e) => onValue(e.target.value)}
       placeholder="Value"
-      className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
+      className="fb-field w-full px-1.5 py-1 text-[11px] text-[var(--ink-70)]"
     />
   )
 }

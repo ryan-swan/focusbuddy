@@ -115,7 +115,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
             <button
               key={t}
               onClick={() => void chooseType(t)}
-              className="inline-flex items-center gap-1.5 px-2 py-2 rounded-md border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 text-left transition-colors"
+              className="fb-btn-surface inline-flex items-center gap-1.5 px-2 py-2 hover:border-accent hover:bg-accent/5 text-left transition-colors"
             >
               <Icon name={FIELD_TYPE_ICONS[t]} size={15} className="text-accent shrink-0" />
               <span className="text-[12px] text-[var(--ink-70)] leading-tight">

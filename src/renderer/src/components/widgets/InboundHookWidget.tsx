@@ -92,7 +92,7 @@ export default function InboundHookWidget({
               value={cfg.url}
               data-testid="inbound-hook-url"
               onFocus={(e) => e.currentTarget.select()}
-              className="flex-1 min-w-0 px-2 py-1.5 rounded bg-[var(--surface-sunken)] border border-[var(--edge-soft)] text-[10px] font-mono focus:outline-none focus:border-accent"
+              className="fb-field flex-1 min-w-0 px-2 py-1.5 text-[10px] font-mono"
             />
             <button
               onClick={copy}

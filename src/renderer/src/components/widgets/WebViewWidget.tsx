@@ -593,7 +593,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                 onMouseDown={(e) => e.stopPropagation()}
                 spellCheck={false}
                 placeholder="https://…"
-                className="w-full h-6 px-2 text-[11px] rounded bg-[var(--surface-raised)] border border-[var(--edge-soft)] focus:border-[var(--edge-firm)] focus:outline-none text-[var(--ink-90)] truncate"
+                className="fb-field w-full h-6 px-2 text-[11px] bg-[var(--surface-raised)] text-[var(--ink-90)] truncate"
                 title={currentUrl}
               />
             </div>

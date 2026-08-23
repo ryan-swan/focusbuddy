@@ -162,7 +162,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
         </div>
         {pickIcon && (
           <div
-            className="flex flex-wrap gap-1 p-1.5 rounded-lg bg-[var(--surface-raised)] shadow-xl border border-[var(--edge-soft)] max-w-[220px]"
+            className="fb-card flex flex-wrap gap-1 p-1.5 max-w-[220px]"
             onMouseDown={(e) => e.stopPropagation()}
             data-testid="card-icon-picker"
           >
