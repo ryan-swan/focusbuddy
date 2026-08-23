@@ -19,6 +19,19 @@
 // and this has to make a runtime decision about an unvalidated value.
 const DOCUMENT_TYPES = new Set(['doc', 'sheet', 'slides', 'map', 'design'])
 
+// Widget kinds the chunk index retrieves (A2, #16). Like 'note', each docId is
+// the widget's own id; the desk it sits on needs a lookup by the caller.
+const WIDGET_TYPES = new Set([
+  'living-doc',
+  'card',
+  'custom-block',
+  'field',
+  'agent',
+  'mindmap',
+  'diagram',
+  'chart'
+])
+
 export type SourceTarget =
   // An office document — open it directly.
   | { kind: 'document'; documentId: string }
@@ -33,6 +46,10 @@ export type SourceTarget =
   | { kind: 'table'; tableId: string }
   // A live web result (F4) — docId IS the URL; opens in the system browser.
   | { kind: 'url'; url: string }
+  // A Drive file (A2, #17) — docId is the fb_files id; reveal it in Files.
+  | { kind: 'file'; fileId: string }
+  // A past Plexii conversation (A2, #17) — docId is the conversation id.
+  | { kind: 'chat'; conversationId: string }
   // Nothing we know how to open. Better to render a citation as plain text than
   // to offer a click that goes nowhere.
   | null
@@ -46,8 +63,11 @@ export function targetForSource(source: { docId: string; docType: string }): Sou
   if (type === 'task') return { kind: 'desk', taskId: id }
   if (type === 'table') return { kind: 'table', tableId: id }
   // 'note' covers every note-shaped widget kind the extras pool collects —
-  // note, sticky, markdown and page all arrive under this one label.
-  if (type === 'note') return { kind: 'widget', widgetId: id }
+  // note, sticky, markdown and page all arrive under this one label. The
+  // chunk-indexed kinds keep their own labels but land the same way.
+  if (type === 'note' || WIDGET_TYPES.has(type)) return { kind: 'widget', widgetId: id }
+  if (type === 'file') return { kind: 'file', fileId: id }
+  if (type === 'chat') return { kind: 'chat', conversationId: id }
   if (DOCUMENT_TYPES.has(type)) return { kind: 'document', documentId: id }
   return null
 }

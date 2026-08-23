@@ -23,3 +23,20 @@ describe('sourceIdentity', () => {
     expect(sourceIdentity('knowledge')!.location).toBe('PlexiBrain')
   })
 })
+
+describe('A2 reach identities (#16/#17)', () => {
+  it('every retrievable type wears an identity in the trace', () => {
+    for (const type of ['living-doc', 'card', 'custom-block', 'field', 'agent', 'mindmap', 'diagram', 'chart', 'file', 'chat']) {
+      const id = sourceIdentity(type)
+      expect(id, type).not.toBeNull()
+      expect(id?.icon).toBeTruthy()
+      expect(id?.tone).toBeTruthy()
+      expect(id?.location).toBeTruthy()
+    }
+  })
+
+  it('widget kinds wear the desks tone — colour answers WHERE', () => {
+    expect(sourceIdentity('living-doc')?.tone).toBe(sourceIdentity('note')?.tone)
+    expect(sourceIdentity('chart')?.tone).toBe(sourceIdentity('task')?.tone)
+  })
+})

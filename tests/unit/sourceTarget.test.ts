@@ -75,3 +75,24 @@ describe('isOpenable', () => {
     }
   })
 })
+
+describe('A2 reach types (#16/#17)', () => {
+  const s = (docId: string, docType: string): { docId: string; docType: string } => ({ docId, docType })
+
+  it('routes every chunk-indexed widget kind to its widget', () => {
+    for (const kind of ['living-doc', 'card', 'custom-block', 'field', 'agent', 'mindmap', 'diagram', 'chart']) {
+      expect(targetForSource(s('w-1', kind))).toEqual({ kind: 'widget', widgetId: 'w-1' })
+    }
+  })
+
+  it('routes a file source to the Drive and a chat source to its conversation', () => {
+    expect(targetForSource(s('f-1', 'file'))).toEqual({ kind: 'file', fileId: 'f-1' })
+    expect(targetForSource(s('c-1', 'chat'))).toEqual({ kind: 'chat', conversationId: 'c-1' })
+  })
+
+  it('every new type is openable — a citation is never a dead door (R5)', () => {
+    for (const type of ['living-doc', 'card', 'custom-block', 'field', 'agent', 'mindmap', 'diagram', 'chart', 'file', 'chat']) {
+      expect(isOpenable(s('id-1', type))).toBe(true)
+    }
+  })
+})

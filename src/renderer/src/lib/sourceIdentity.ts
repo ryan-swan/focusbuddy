@@ -27,7 +27,21 @@ const IDENTITIES: Record<string, SourceIdentity> = {
   design: { icon: 'gesture', tone: areaTone('office'), location: 'Documents' },
   task: { icon: 'desk', tone: areaTone('desks'), location: 'Desks' },
   table: { icon: 'table_chart', tone: areaTone('desks'), location: 'Tables' },
-  note: { icon: 'edit_note', tone: areaTone('desks'), location: 'Desk notes' }
+  note: { icon: 'edit_note', tone: areaTone('desks'), location: 'Desk notes' },
+  // Canvas widget kinds the chunk index retrieves (A2, #16). They live on
+  // desks, so colour answers WHERE with the desks tone; the glyph answers
+  // WHAT with each kind's own icon — the same names the widget catalogue uses.
+  'living-doc': { icon: 'auto_awesome', tone: areaTone('desks'), location: 'Desks' },
+  card: { icon: 'view_agenda', tone: areaTone('desks'), location: 'Desks' },
+  'custom-block': { icon: 'dashboard_customize', tone: areaTone('desks'), location: 'Desks' },
+  field: { icon: 'edit_note', tone: areaTone('desks'), location: 'Desks' },
+  agent: { icon: 'smart_toy', tone: areaTone('desks'), location: 'Desks' },
+  mindmap: { icon: 'account_tree', tone: areaTone('desks'), location: 'Desks' },
+  diagram: { icon: 'schema', tone: areaTone('desks'), location: 'Desks' },
+  chart: { icon: 'bar_chart', tone: areaTone('desks'), location: 'Desks' },
+  // Drive files and past Plexii conversations (A2, #17).
+  file: { icon: 'draft', tone: areaTone('files'), location: 'Files' },
+  chat: { icon: 'forum', tone: areaTone('home'), location: 'Plexii chats' }
 }
 
 export function sourceIdentity(docType: string | undefined): SourceIdentity | null {

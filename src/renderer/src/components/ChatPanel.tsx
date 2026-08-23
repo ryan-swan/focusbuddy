@@ -4,6 +4,7 @@ import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { targetForSource } from '../lib/sourceTarget'
 import { useChatStore, appliedKey, NEW_CHAT_KEY } from '../stores/chat'
+import { useFileManagerStore } from '../stores/fileManager'
 import MentionComposer from './assistant/MentionComposer'
 import MentionRefRow from './assistant/MentionRefRow'
 import ConversationList from './assistant/ConversationList'
@@ -651,6 +652,24 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         openDesk(table.taskId)
         break
       }
+      case 'file': {
+        // Reveal the cited file in the Drive: its folder opens with the file
+        // selected, mirroring what a search hit does.
+        const entry =
+          typeof window.api.fileManager?.get === 'function'
+            ? await window.api.fileManager.get(target.fileId).catch(() => null)
+            : null
+        view.goFiles()
+        const fm = useFileManagerStore.getState()
+        await fm.openFolder(entry?.parentId ?? null)
+        fm.select(target.fileId)
+        break
+      }
+      case 'chat':
+        // A cited past conversation opens as the panel's live conversation,
+        // exactly like picking it from the history rail.
+        await useChatStore.getState().openConversation(target.conversationId)
+        break
     }
   }
 
