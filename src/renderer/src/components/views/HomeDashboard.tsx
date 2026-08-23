@@ -1354,7 +1354,7 @@ export default function HomeDashboard(): JSX.Element {
                           title={`Size: ${inst.size}. Click for the next size`}
                           aria-label={`Change size of ${def.name}, currently ${inst.size}`}
                           data-testid={`home-slot-size-${inst.key}`}
-                          className="h-6 px-1.5 rounded-full inline-flex items-center gap-0.5 bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
+                          className="h-6 px-1.5 rounded-full inline-flex items-center gap-0.5 bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
                         >
                           <Icon name="open_in_full" size={11} />
                           <span className="text-[9.5px] font-semibold uppercase tracking-wide">{inst.size}</span>
@@ -1369,7 +1369,7 @@ export default function HomeDashboard(): JSX.Element {
                           title={`Edit ${def.name}`}
                           aria-label={`Edit ${def.name}`}
                           data-testid={`home-slot-edit-${inst.key}`}
-                          className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
+                          className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)] shadow"
                         >
                           <Icon name="edit" size={12} />
                         </button>
@@ -1382,7 +1382,7 @@ export default function HomeDashboard(): JSX.Element {
                         title={`Remove ${def.name}`}
                         aria-label={`Remove ${def.name}`}
                         data-testid={`home-slot-remove-${inst.key}`}
-                        className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] text-[var(--ink-60)] hover:text-rose-500 shadow"
+                        className="h-6 w-6 rounded-full inline-flex items-center justify-center bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-rose-500 shadow"
                       >
                         <Icon name="close" size={12} />
                       </button>

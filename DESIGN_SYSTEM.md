@@ -67,6 +67,25 @@ Ratified with Caleb for the Edges + Glass mission; the Apple research behind it 
   dips (`fb-press`), keyboard focus is the global concentric ring: restyle it, never
   `outline-none` it away.
 
+Phase 4 (2026-08-23) closed the long tail and settled three more points:
+
+- **`fb-field` is `width: 100%` by design** — right for form fields, wrong for a
+  select in a toolbar row. A field in a row context carries its own width utility
+  (`w-auto`, `w-12`, `flex-1`); the element's utility wins the cascade. Both stroke
+  tokens are the same debt: the codemod treats `--edge-firm` exactly like
+  `--edge-soft` in every rewrite rule.
+- **Toasts are chrome, colour is state.** A toast capsule is
+  `fb-glass-chrome rounded-full border border-[color:var(--glass-chrome-border)]
+  shadow-md`; its semantics live in a `ring-1 ring-<tone>/25` and the text/icon
+  tint — never in a tinted surface (HyperfocusGuardian, WidgetSetupAffordance and
+  BringMeBack are the references).
+- **When a literal colour is lawful, its comment says why.** The taxonomy that
+  survived the sweep: forced-dark stages (video, presenter, onboarding, the
+  signature pad, Tooltip, the undo HUD capsule, MetricsOverlay's debug chrome),
+  paper materials (note / sticky / calculator faces and their table rules),
+  swatch-containment hairlines around arbitrary colours, and handle contrast
+  rings over arbitrary content. Everything else literal is debt.
+
 ## The missing layer — shared dashboard primitives
 
 The gap between the mockups and the app was never the tokens; it was that every
