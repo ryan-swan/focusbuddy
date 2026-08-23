@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ChatPanel from '../ChatPanel'
 import Icon from '../Icon'
 import WebPanel from '../browser/WebPanel'
+import PlexiiMark from '../brand/PlexiiMark'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
 import StandupHome from '../views/StandupHome'
@@ -186,7 +187,12 @@ function AssistantOverlayChrome(): JSX.Element {
         className="fb-floating-chrome fixed right-[14px] bottom-[42px] z-[120] h-10 w-10 rounded-full grid place-items-center border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-accent hover:border-[rgb(var(--accent)/0.5)] transition-colors"
         style={FLOATING_MENU_STYLE}
       >
-        <Icon name="auto_awesome" size={18} filled />
+        {/* Brand motion Phase 1: the pill wears the ii mark — one blink on
+            mount, a wink on hover. Collision law: blink = alive, breathe =
+            thinking, never both on one surface, so while an answer is in
+            flight (the ping dot below) the mark holds still. Decorative
+            (title null): the button's aria-label already names it. */}
+        <PlexiiMark height={18} motion={sending ? 'off' : 'once+hover'} title={null} />
         {sending && (
           <span className="absolute -top-0.5 -right-0.5 inline-flex h-2 w-2" aria-label="working">
             <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-70 animate-ping" />
