@@ -47,7 +47,7 @@ export default function RoomThumb({ deskWidgetSets, width, height }: Props): JSX
       {tiles.map((ws, i) => (
         <div
           key={i}
-          className="overflow-hidden rounded-[3px] bg-[var(--surface-sunken)] ring-1 ring-black/5 dark:ring-white/5"
+          className="overflow-hidden rounded-[3px] bg-[var(--surface-sunken)] ring-1 ring-[var(--edge-hairline)]"
         >
           <DeskMiniature widgets={ws} width={Math.max(1, tw)} height={Math.max(1, th)} padding={3} />
         </div>

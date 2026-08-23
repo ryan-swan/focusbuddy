@@ -126,7 +126,11 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     thumb: (d) => (
       <div className="h-full w-full flex items-center justify-center">{deskThumb(d, 320, 144)}</div>
     ),
-    smallIcon: (d) => <div className="h-full w-full">{deskThumb(d, 32, 32)}</div>,
+    // A 32px well is too small for a live miniature (its caption turns to noise);
+    // icons are monochrome at rest per the icon doctrine.
+    smallIcon: (d) => (
+      <Icon name={d.kind === 'folder' ? 'folder' : 'desk'} size={16} className="text-[var(--ink-50)]" />
+    ),
     metaLine: (d) => {
       const room = d.parentId ? roomTitleById.get(d.parentId) : null
       const count = widgetsByDesk[d.id] ? realWidgetCount(widgetsByDesk[d.id]) : null
@@ -261,7 +265,7 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     headerActions: roomId ? (
       <button
         onClick={() => goRooms()}
-        className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg border border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+        className="inline-flex items-center gap-1 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
       >
         <Icon name="arrow_back" size={15} /> All rooms
       </button>

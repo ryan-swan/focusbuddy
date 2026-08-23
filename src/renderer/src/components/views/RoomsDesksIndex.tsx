@@ -196,7 +196,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
   }, [visible, activeGroup])
 
   const controlCls =
-    'h-8 rounded-[10px] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)] text-[12.5px] text-[var(--ink-90)] px-2'
+    'h-8 rounded-[var(--radius-field)] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)] fb-t-label text-[var(--ink-90)] px-2'
 
   return (
     <div
@@ -214,7 +214,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                 <button
                   onClick={onNew}
                   data-testid={`${storageKey}-new`}
-                  className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+                  className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] bg-[rgb(var(--accent))] text-white fb-t-label fb-press hover:bg-[rgb(var(--accent-hover))]"
                 >
                   <Icon name="add" size={16} /> {newLabel ?? 'New'}
                 </button>
@@ -225,14 +225,14 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
 
         {/* Toolbar: mode switch on the left, then search / group / filter. */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="inline-flex rounded-[10px] overflow-hidden bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)]">
+          <div className="inline-flex rounded-[var(--radius-field)] overflow-hidden bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)]">
             {MODES.map((m) => (
               <button
                 key={m.key}
                 onClick={() => setMode(m.key)}
                 title={m.label}
                 data-testid={`${storageKey}-mode-${m.key}`}
-                className={`h-8 w-9 inline-flex items-center justify-center ${
+                className={`h-8 w-9 inline-flex items-center justify-center fb-press ${
                   mode === m.key
                     ? 'bg-[rgb(var(--accent))] text-white'
                     : 'bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
@@ -259,7 +259,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
           </div>
 
           {groups.length > 0 && (
-            <label className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-50)]">
+            <label className="inline-flex items-center gap-1 fb-t-caption">
               Group
               <select
                 value={groupKey}
@@ -278,7 +278,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
           )}
 
           {filters.length > 0 && (
-            <label className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-50)]">
+            <label className="inline-flex items-center gap-1 fb-t-caption">
               Filter
               <select
                 value={filterKey}
@@ -296,14 +296,45 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             </label>
           )}
 
-          <span className="ml-auto text-[11px] text-[var(--ink-45)] fb-tabular">
+          <span className="ml-auto fb-t-caption fb-tabular">
             {visible.length} {visible.length === 1 ? 'item' : 'items'}
           </span>
         </div>
 
         {visible.length === 0 ? (
-          <div className="py-16 text-center text-[var(--ink-55)] text-[13px]">
-            Nothing to show here yet.
+          // Two honest empty states: a search that matched nothing offers a way
+          // back; a genuinely empty index offers the first creation.
+          <div className="py-16 text-center" data-testid={`${storageKey}-empty`}>
+            <Icon
+              name={search.trim() ? 'search_off' : 'grid_view'}
+              size={28}
+              className="text-[var(--ink-30)] mx-auto"
+            />
+            <p className="fb-t-title text-[var(--ink-90)] mt-3">
+              {search.trim() ? 'Nothing matches' : 'Nothing here yet'}
+            </p>
+            <p className="fb-t-body text-[var(--ink-50)] mt-1">
+              {search.trim()
+                ? `No results for “${search.trim()}”.`
+                : 'Create the first one and it will live here.'}
+            </p>
+            {search.trim() ? (
+              <button
+                onClick={() => setSearch('')}
+                className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-90)]"
+              >
+                Clear search
+              </button>
+            ) : (
+              onNew && (
+                <button
+                  onClick={onNew}
+                  className="mt-4 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] bg-[rgb(var(--accent))] text-white fb-t-label fb-press hover:bg-[rgb(var(--accent-hover))]"
+                >
+                  <Icon name="add" size={16} /> {newLabel ?? 'New'}
+                </button>
+              )
+            )}
           </div>
         ) : mode === 'kanban' ? (
           <KanbanBoard
@@ -347,10 +378,10 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
               <div key={bucket.id}>
                 {activeGroup && (
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[11px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-50)]">
+                    <span className="fb-t-caption uppercase tracking-[0.1em] font-semibold">
                       {bucket.label || 'Ungrouped'}
                     </span>
-                    <span className="text-[11px] text-[var(--ink-40)] fb-tabular">
+                    <span className="fb-t-caption text-[var(--ink-40)] fb-tabular">
                       {bucket.items.length}
                     </span>
                     <div className="flex-1 h-px bg-[var(--edge-soft)]" />
@@ -358,10 +389,11 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                 )}
                 {mode === 'gallery' ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {bucket.items.map((it) => (
+                    {bucket.items.map((it, i) => (
                       <GalleryCard
                         key={idOf(it)}
                         id={idOf(it)}
+                        enterDelay={Math.min(i * 35, 350)}
                         title={titleOf(it)}
                         badge={badge?.(it)}
                         thumb={thumb(it)}
@@ -378,10 +410,11 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                   </div>
                 ) : (
                   <div className="fb-card overflow-hidden divide-y divide-[var(--edge-soft)]">
-                    {bucket.items.map((it) => (
+                    {bucket.items.map((it, i) => (
                       <ListRow
                         key={idOf(it)}
                         id={idOf(it)}
+                        enterDelay={Math.min(i * 35, 350)}
                         title={titleOf(it)}
                         badge={badge?.(it)}
                         icon={smallIcon(it)}
@@ -422,7 +455,7 @@ function ActionStrip({ actions }: { actions: IndexAction[] }): JSX.Element | nul
             a.onClick()
           }}
           title={a.title ?? a.label}
-          className="inline-flex items-center justify-center h-6 w-6 rounded-[8px] bg-[var(--surface-raised)]/95 shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-soft)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/95 shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-soft)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press"
         >
           <Icon name={a.icon} size={14} />
         </button>
@@ -475,7 +508,7 @@ function IndexContextMenu({
         style={{ left: pos.left, top: pos.top }}
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="index-context-menu"
-        className="absolute min-w-[200px] rounded-[12px] fb-glass-panel fb-pop-in py-1"
+        className="absolute min-w-[200px] rounded-[var(--radius-row)] fb-glass-panel fb-pop-in py-1"
       >
         {menu.actions.map((a) => (
           <button
@@ -485,7 +518,7 @@ function IndexContextMenu({
               a.onClick()
             }}
             data-testid={`index-context-menu-${a.key}`}
-            className="w-full flex items-center gap-2.5 px-3 h-8 text-left text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+            className="w-full flex items-center gap-2.5 px-3 h-8 text-left fb-t-body text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] fb-press"
           >
             <Icon name={a.icon} size={15} className="text-[var(--ink-60)] shrink-0" />
             <span className="truncate">{a.label}</span>
@@ -516,6 +549,7 @@ function bucketByFirstGroup<T>(
 
 function GalleryCard(props: {
   id: string
+  enterDelay: number
   title: string
   badge?: ReactNode
   thumb: ReactNode
@@ -535,7 +569,8 @@ function GalleryCard(props: {
       onDragOver={(e) => props.canReorder && e.preventDefault()}
       onDrop={props.onDrop}
       onContextMenu={props.onContextMenu}
-      className={`group relative ${PLEXI_CARD} overflow-hidden fb-lift ${
+      style={{ animationDelay: `${props.enterDelay}ms` }}
+      className={`group relative ${PLEXI_CARD} overflow-hidden fb-lift fb-press fb-fade-in-up ${
         props.dragging ? 'opacity-40' : ''
       }`}
       data-testid={`index-card-${props.id}`}
@@ -546,10 +581,10 @@ function GalleryCard(props: {
         </div>
         <div className="px-3 py-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="truncate text-[13px] font-medium text-[var(--ink-100)]">{props.title}</span>
+            <span className="truncate fb-t-body font-medium text-[var(--ink-100)]">{props.title}</span>
             {props.badge}
           </div>
-          <div className="text-[11px] text-[var(--ink-50)] mt-0.5 truncate">{props.meta}</div>
+          <div className="fb-t-caption mt-0.5 truncate">{props.meta}</div>
         </div>
       </button>
       {props.actions && (
@@ -563,6 +598,7 @@ function GalleryCard(props: {
 
 function ListRow(props: {
   id: string
+  enterDelay: number
   title: string
   badge?: ReactNode
   icon: ReactNode
@@ -582,7 +618,8 @@ function ListRow(props: {
       onDragOver={(e) => props.canReorder && e.preventDefault()}
       onDrop={props.onDrop}
       onContextMenu={props.onContextMenu}
-      className={`group flex items-center gap-3 px-3 h-12 bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] ${
+      style={{ animationDelay: `${props.enterDelay}ms` }}
+      className={`group flex items-center gap-3 px-3 h-12 bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] fb-press fb-fade-in-up ${
         props.dragging ? 'opacity-40' : ''
       }`}
       data-testid={`index-row-${props.id}`}
@@ -590,15 +627,15 @@ function ListRow(props: {
       {props.canReorder && (
         <Icon name="drag_indicator" size={15} className="text-[var(--ink-30)] cursor-grab shrink-0" />
       )}
-      <div className="w-8 h-8 rounded-md overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
+      <div className="w-8 h-8 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
         {props.icon}
       </div>
       <button onClick={props.onOpen} className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="truncate text-[13px] text-[var(--ink-100)]">{props.title}</span>
+          <span className="truncate fb-t-body text-[var(--ink-100)]">{props.title}</span>
           {props.badge}
         </div>
-        <div className="truncate text-[11px] text-[var(--ink-50)]">{props.meta}</div>
+        <div className="truncate fb-t-caption">{props.meta}</div>
       </button>
       {props.actions && (
         <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -626,28 +663,29 @@ function KanbanBoard<T>(props: {
       {props.groups.map((col) => (
         <div key={col.id} className="w-64 shrink-0">
           <div className="flex items-center gap-2 mb-2 px-1">
-            <span className="text-[12px] font-semibold text-[var(--ink-90)]">
+            <span className="fb-t-label font-semibold text-[var(--ink-90)]">
               {col.label || 'Ungrouped'}
             </span>
-            <span className="text-[11px] text-[var(--ink-40)] fb-tabular">{col.items.length}</span>
+            <span className="fb-t-caption text-[var(--ink-40)] fb-tabular">{col.items.length}</span>
           </div>
-          <div className="space-y-2 rounded-xl bg-[var(--surface-sunken)] p-2 min-h-[80px]">
-            {col.items.map((it) => (
+          <div className="space-y-2 rounded-[var(--radius-card)] bg-[var(--surface-sunken)] p-2 min-h-[80px]">
+            {col.items.map((it, i) => (
               <button
                 key={props.idOf(it)}
                 onClick={() => props.onOpen(it)}
                 onContextMenu={(e) => props.onItemContextMenu(e, it)}
                 data-testid={`kanban-card-${props.idOf(it)}`}
-                className={`block w-full text-left ${PLEXI_CARD} overflow-hidden fb-lift`}
+                style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
+                className={`block w-full text-left ${PLEXI_CARD} overflow-hidden fb-lift fb-press fb-fade-in-up`}
               >
                 <div className="h-24 overflow-hidden bg-[var(--surface-base)] border-b border-[var(--edge-soft)] flex items-center justify-center">
                   {props.thumb(it)}
                 </div>
                 <div className="px-2.5 py-1.5">
-                  <div className="truncate text-[12.5px] font-medium text-[var(--ink-100)]">
+                  <div className="truncate fb-t-label text-[var(--ink-100)]">
                     {props.titleOf(it)}
                   </div>
-                  <div className="truncate text-[10.5px] text-[var(--ink-50)]">
+                  <div className="truncate fb-t-caption">
                     {props.metaLine(it)}
                   </div>
                 </div>
@@ -672,9 +710,9 @@ function TableView<T>(props: {
 }): JSX.Element {
   return (
     <div className="overflow-x-auto fb-card">
-      <table className="w-full text-[12.5px]" data-testid={`${props.storageKey}-table`}>
+      <table className="w-full fb-t-body" data-testid={`${props.storageKey}-table`}>
         <thead>
-          <tr className="bg-[var(--surface-sunken)] text-[var(--ink-55)] text-[11px] uppercase tracking-[0.06em]">
+          <tr className="bg-[var(--surface-sunken)] fb-t-caption uppercase tracking-[0.06em]">
             <th className="text-left font-semibold px-3 py-2">Name</th>
             {props.columns.map((c) => (
               <th
@@ -711,7 +749,7 @@ function TableGroup<T>(props: {
         <tr className="bg-[var(--surface-base)]">
           <td
             colSpan={props.columns.length + 1}
-            className="px-3 py-1.5 text-[11px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-50)]"
+            className="px-3 py-1.5 fb-t-caption uppercase tracking-[0.08em] font-semibold"
           >
             {props.bucket.label}
           </td>
@@ -723,11 +761,11 @@ function TableGroup<T>(props: {
           onClick={() => props.onOpen(it)}
           onContextMenu={(e) => props.onItemContextMenu(e, it)}
           data-testid={`table-row-${props.idOf(it)}`}
-          className="hover:bg-[var(--surface-hover)] cursor-pointer"
+          className="hover:bg-[var(--surface-hover)] active:bg-[var(--surface-sunken)] cursor-pointer"
         >
           <td className="px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
+              <span className="w-6 h-6 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
                 {props.smallIcon(it)}
               </span>
               <span className="truncate text-[var(--ink-100)]">{props.titleOf(it)}</span>
@@ -787,26 +825,27 @@ function TimelineView<T>(props: {
           <div key={s.label}>
             <div className="flex items-center gap-2 mb-2 -ml-4">
               <span className="w-3.5 h-3.5 rounded-full bg-[rgb(var(--accent))] ring-4 ring-[var(--surface-base)] shrink-0" />
-              <span className="text-[12px] font-semibold text-[var(--ink-90)]">{s.label}</span>
-              <span className="text-[11px] text-[var(--ink-40)] fb-tabular">{s.items.length}</span>
+              <span className="fb-t-label font-semibold text-[var(--ink-90)]">{s.label}</span>
+              <span className="fb-t-caption text-[var(--ink-40)] fb-tabular">{s.items.length}</span>
             </div>
             <div className="space-y-1.5">
-              {s.items.map((it) => (
+              {s.items.map((it, i) => (
                 <button
                   key={props.idOf(it)}
                   onClick={() => props.onOpen(it)}
                   onContextMenu={(e) => props.onItemContextMenu(e, it)}
                   data-testid={`timeline-row-${props.idOf(it)}`}
-                  className="flex items-center gap-2.5 w-full text-left fb-tile fb-press px-3 py-2"
+                  style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
+                  className="flex items-center gap-2.5 w-full text-left fb-tile fb-press fb-fade-in-up px-3 py-2"
                 >
-                  <span className="w-7 h-7 rounded-md overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
+                  <span className="w-7 h-7 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
                     {props.smallIcon(it)}
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block truncate text-[12.5px] text-[var(--ink-100)]">
+                    <span className="block truncate fb-t-body text-[var(--ink-100)]">
                       {props.titleOf(it)}
                     </span>
-                    <span className="block truncate text-[11px] text-[var(--ink-50)]">
+                    <span className="block truncate fb-t-caption">
                       {props.metaLine(it)}
                     </span>
                   </span>

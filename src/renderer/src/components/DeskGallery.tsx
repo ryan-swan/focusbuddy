@@ -68,14 +68,14 @@ export default function DeskGallery(): JSX.Element {
       <div className="h-full flex items-center justify-center desk-paper">
         <div className="text-center max-w-md px-6">
           <Icon name="desk" size={48} className="text-[var(--ink-50)] mb-3" />
-          <h2 className="text-xl font-semibold text-[var(--ink-100)] mb-2">No desks yet</h2>
-          <p className="text-[var(--ink-70)] text-sm leading-relaxed mb-4">
+          <h2 className="fb-t-hero text-[var(--ink-100)] mb-2">No desks yet</h2>
+          <p className="fb-t-body text-[var(--ink-70)] leading-relaxed mb-4">
             A desk is a canvas you fill with notes, files, browsers and tools. Create your first one to get started.
           </p>
           <button
             onClick={newDesk}
             data-testid="desk-gallery-new-empty"
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[rgb(var(--accent))] text-white text-[13px] font-medium hover:bg-[rgb(var(--accent-hover))]"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] bg-[rgb(var(--accent))] text-white fb-t-label fb-press hover:bg-[rgb(var(--accent-hover))]"
           >
             <Icon name="add" size={16} /> New desk
           </button>
@@ -92,7 +92,7 @@ export default function DeskGallery(): JSX.Element {
           subtitle="Every desk is a canvas. Open one to bring its notes, files and tools to the surface."
         />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {desks.map((d) => {
+          {desks.map((d, i) => {
             const ws = widgetsByDesk[d.id] ?? []
             const count = ws.filter(
               (w) => !w.archived && !w.pinned && w.parentSectionId === null && w.kind !== 'minimap'
@@ -102,7 +102,8 @@ export default function DeskGallery(): JSX.Element {
                 key={d.id}
                 onClick={() => openDesk(d)}
                 data-testid={`desk-card-${d.id}`}
-                className={`group text-left ${PLEXI_CARD} overflow-hidden fb-lift hover:border-[rgb(var(--accent)/0.5)]`}
+                style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
+                className={`group text-left ${PLEXI_CARD} overflow-hidden fb-lift fb-press fb-fade-in-up hover:border-[rgb(var(--accent)/0.5)]`}
               >
                 <div className="h-36 flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)] border-b border-[var(--edge-soft)]">
                   <DeskMiniature widgets={ws} width={320} height={144} />
@@ -112,12 +113,12 @@ export default function DeskGallery(): JSX.Element {
                     name={d.kind === 'folder' ? 'folder' : 'task_alt'}
                     size={16}
                     filled
-                    className={d.kind === 'folder' ? 'text-amber-700 shrink-0' : 'text-[var(--ink-50)] shrink-0'}
+                    className="text-[var(--ink-50)] shrink-0"
                   />
-                  <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-[var(--ink-100)]">
+                  <span className="flex-1 min-w-0 truncate fb-t-body font-medium text-[var(--ink-100)]">
                     {d.title || 'Untitled desk'}
                   </span>
-                  <span className="text-[11px] text-[var(--ink-50)] fb-tabular shrink-0">
+                  <span className="fb-t-caption fb-tabular shrink-0">
                     {count === 0 ? 'empty' : count}
                   </span>
                 </div>
@@ -127,10 +128,10 @@ export default function DeskGallery(): JSX.Element {
           <button
             onClick={newDesk}
             data-testid="desk-card-new"
-            className="rounded-xl border border-dashed border-[var(--edge-firm)] flex flex-col items-center justify-center gap-2 min-h-[180px] text-[var(--ink-50)] fb-lift hover:border-[rgb(var(--accent)/0.5)] hover:text-[rgb(var(--accent))]"
+            className="rounded-[var(--radius-card)] border border-dashed border-[var(--edge-firm)] flex flex-col items-center justify-center gap-2 min-h-[180px] text-[var(--ink-50)] fb-lift fb-press fb-fade-in-up hover:border-[rgb(var(--accent)/0.5)] hover:text-[rgb(var(--accent))]"
           >
             <Icon name="add" size={22} />
-            <span className="text-[13px] font-medium">New desk</span>
+            <span className="fb-t-body font-medium">New desk</span>
           </button>
         </div>
       </div>
