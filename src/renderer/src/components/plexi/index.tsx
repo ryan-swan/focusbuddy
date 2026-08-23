@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Icon from '../Icon'
 
 // ── Plexi dashboard primitives ──────────────────────────────────────────────
@@ -203,6 +203,7 @@ export function ListRow({
   trailing,
   onClick,
   className = '',
+  style,
   children
 }: {
   as?: 'div' | 'li'
@@ -213,15 +214,18 @@ export function ListRow({
   trailing?: ReactNode
   onClick?: () => void
   className?: string
+  // Merged over the depth padding — the passthrough exists mainly so list
+  // consumers can set the entrance convention's per-row animation-delay.
+  style?: CSSProperties
   children?: ReactNode
 }): JSX.Element {
   return (
     <Tag
       onClick={onClick}
-      style={depth > 0 ? { paddingLeft: depth * 14 + 8 } : undefined}
+      style={depth > 0 || style ? { ...(depth > 0 ? { paddingLeft: depth * 14 + 8 } : {}), ...style } : undefined}
       className={`flex items-center gap-2 rounded-[var(--radius-row)] transition-colors ${
         active ? 'bg-[rgb(var(--accent)/0.10)]' : 'hover:bg-[var(--surface-sunken)]'
-      } ${className}`}
+      } ${onClick ? 'fb-press cursor-pointer' : ''} ${className}`}
     >
       {icon && <Icon name={icon} size={16} className="shrink-0 text-[var(--ink-50)]" />}
       {title != null && (
