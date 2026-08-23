@@ -125,7 +125,7 @@ export default function OrgSwitcher(): JSX.Element {
           role="menu"
           aria-label="Switch organisation"
           onKeyDown={onMenuKeyDown}
-          className="absolute left-2 right-2 mt-1 z-30 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-2 right-2 mt-1 z-30 py-1"
           data-testid="org-switcher-menu"
         >
           {orgs.map((o) => (

@@ -1061,7 +1061,7 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
             to drill back up. */}
         {breadcrumb.length > 1 && (
           <div
-            className="sticky top-0 z-10 bg-[var(--surface-sunken)]/95 backdrop-blur px-3 py-1.5 border-b border-[var(--edge-soft)] flex items-center gap-1 text-[10px] overflow-x-auto"
+            className="sticky top-0 z-10 fb-glass-chrome px-3 py-1.5 border-b border-[var(--edge-soft)] flex items-center gap-1 text-[10px] overflow-x-auto"
             data-testid="mindmap-breadcrumb"
           >
             {breadcrumb.map((b, i) => (
@@ -1979,7 +1979,7 @@ function AgentBuilderModal({
 
   return (
     <div
-      className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4"
+      className="fb-scrim absolute inset-0 z-30 flex items-center justify-center p-4"
       onClick={onCancel}
     >
       <div
@@ -2126,7 +2126,7 @@ function ToolPickerModal({
   const grouped = entriesByCategory()
   return (
     <div
-      className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4"
+      className="fb-scrim absolute inset-0 z-30 flex items-center justify-center p-4"
       onClick={onCancel}
     >
       <div

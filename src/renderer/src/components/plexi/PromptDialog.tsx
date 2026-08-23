@@ -166,7 +166,7 @@ export function PromptDialogHost(): JSX.Element | null {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
+      className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center"
       onMouseDown={cancel}
       data-testid="prompt-dialog-overlay"
     >

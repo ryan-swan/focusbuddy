@@ -704,7 +704,7 @@ export default function CommandCenter({
       {paletteOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[200] bg-stone-900/30 backdrop-blur-[2px] flex items-start justify-center pt-[18vh]"
+            className="fb-scrim fixed inset-0 z-[200] flex items-start justify-center pt-[18vh]"
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) closePalette()
             }}

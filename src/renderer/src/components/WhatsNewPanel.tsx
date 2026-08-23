@@ -47,7 +47,7 @@ export default function WhatsNewPanel({ onClose }: Props): JSX.Element {
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[180] flex items-center justify-center"
       onClick={onClose}
     >
       <div

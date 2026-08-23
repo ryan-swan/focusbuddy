@@ -155,7 +155,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
   // trap the fixed overlay inside its own box — see plexi/Modal.tsx.
   return createPortal(
     <div
-      className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[170] flex items-center justify-center"
       onClick={onClose}
     >
       <div

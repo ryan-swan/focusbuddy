@@ -220,7 +220,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
         />
         {pickAccent && (
           <div
-            className="absolute right-0 mt-1 flex flex-col gap-1.5 p-1.5 rounded-lg bg-[var(--surface-raised)] shadow-xl border border-[var(--edge-soft)] z-10"
+            className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 mt-1 flex flex-col gap-1.5 p-1.5 z-10"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex gap-1">

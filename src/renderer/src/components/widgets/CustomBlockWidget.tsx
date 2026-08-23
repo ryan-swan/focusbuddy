@@ -229,7 +229,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
           </button>
           {tplMenu && (
             <div
-              className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]"
+              className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-7 z-20 w-56 py-1 text-[12px]"
               onMouseDown={(e) => e.stopPropagation()}
             >
               <button

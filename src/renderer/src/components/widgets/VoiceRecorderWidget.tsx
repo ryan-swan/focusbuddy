@@ -932,7 +932,7 @@ function DestinationPicker({
   ]
   return (
     <div
-      className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-3"
+      className="fb-scrim absolute inset-0 z-30 flex items-center justify-center p-3"
       onClick={onClose}
     >
       <div

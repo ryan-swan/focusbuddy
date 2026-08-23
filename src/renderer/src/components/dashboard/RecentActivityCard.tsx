@@ -91,7 +91,7 @@ export default function RecentActivityCard({ taskIds }: Props): JSX.Element {
     .slice(0, MAX_ROWS)
 
   return (
-    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur">
+    <div className="fb-card">
       <div className="px-4 pt-4 pb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
         <Icon name="history" size={12} />
         <span>Recent activity</span>

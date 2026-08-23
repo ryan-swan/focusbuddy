@@ -159,7 +159,7 @@ export default function TableFilterBar({
         {filterOpen && (
           <div
             data-testid="table-filter-panel"
-            className="absolute left-0 top-full mt-1 z-50 w-[360px] max-w-[88vw] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2.5 space-y-2"
+            className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in absolute left-0 top-full mt-1 z-50 w-[360px] max-w-[88vw] p-2.5 space-y-2"
           >
             {rules.length === 0 ? (
               <div className="text-[11px] text-[var(--ink-50)] px-1 py-2">
@@ -255,7 +255,7 @@ export default function TableFilterBar({
         {groupOpen && (
           <div
             data-testid="table-group-panel"
-            className="absolute left-0 top-full mt-1 z-50 w-48 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
+            className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 top-full mt-1 z-50 w-48 py-1"
           >
             <button
               onClick={() => setGroupColumn(null)}

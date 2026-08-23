@@ -363,7 +363,7 @@ export default function FlowView(): JSX.Element {
               <Icon name="group" size={15} /> <span className="text-[12px]">{conv?.members.length ?? 0}</span>
             </button>
             {showMembers && conv && (
-              <div className="absolute right-0 top-full mt-1 z-30 w-64 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg p-2" data-testid="flow-members-popover">
+              <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-full mt-1 z-30 w-64 p-2" data-testid="flow-members-popover">
                 {conv.kind === 'channel' && (
                   <button
                     onClick={() => void setVisibility(focusId, conv.visibility === 'public' ? 'private' : 'public')}
@@ -467,7 +467,7 @@ export default function FlowView(): JSX.Element {
       <div className="flex-1 min-w-0 overflow-auto">
         <div className="w-full px-6 pb-20">
           {/* Command / ask bar */}
-          <div className="sticky top-0 z-20 pt-4 pb-2 bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] backdrop-blur">
+          <div className="sticky top-0 z-20 pt-4 pb-2 fb-glass-chrome">
             <div className="flex items-center gap-2">
               <label className="flex-1 flex items-center gap-2 bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-xl px-3 py-2 focus-within:border-[rgb(var(--accent)/0.5)]">
                 <Icon name="search" size={16} className="text-[var(--ink-40)]" />

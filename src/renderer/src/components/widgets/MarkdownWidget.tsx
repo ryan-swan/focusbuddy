@@ -388,7 +388,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
           <div className="fixed inset-0 z-40" onMouseDown={() => setSlashOpen(false)} />
           <div
             data-testid="md-slash-menu"
-            className="absolute z-50 w-52 max-h-64 overflow-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+            className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 w-52 max-h-64 overflow-auto py-1"
             style={{ top: slashPos.top, left: slashPos.left }}
           >
             <SlashItem icon="title" label="Heading 1" shortcut="#" onClick={() => applyBlock((e) => e.chain().focus().toggleHeading({ level: 1 }).run())} />

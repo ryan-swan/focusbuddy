@@ -119,7 +119,7 @@ export default function TeamPresenceButton(): JSX.Element | null {
                 ? { top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }
                 : { top: 48, right: 8 }
             })()}
-            className="fixed z-[200] w-72 rounded-xl border border-[var(--edge-soft)] dark:border-white/10 bg-[var(--surface-raised)] shadow-xl overflow-hidden"
+            className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[200] w-72 overflow-hidden"
           >
           <div className="px-3 py-2.5 border-b border-[var(--edge-soft)] dark:border-white/10">
             <div className="flex items-center justify-between">

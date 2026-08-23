@@ -134,7 +134,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[240] flex items-center justify-center bg-stone-950/55 backdrop-blur-md"
+      className="fb-scrim fixed inset-0 z-[240] flex items-center justify-center"
       role="dialog"
       aria-label="Welcome to PlexiDesk"
       aria-modal="true"

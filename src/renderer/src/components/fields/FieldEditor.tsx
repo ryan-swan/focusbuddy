@@ -361,7 +361,7 @@ function SingleSelect({
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 mt-1 left-0 min-w-[160px] py-1">
           <button
             onClick={() => {
               onCommit(null)
@@ -437,7 +437,7 @@ function MultiSelect({
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[160px] rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1 max-h-60 overflow-y-auto">
+        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 mt-1 left-0 min-w-[160px] py-1 max-h-60 overflow-y-auto">
           {options.map((opt) => {
             const checked = value.includes(opt.id)
             return (
@@ -761,7 +761,7 @@ function RelationField({
         </button>
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 min-w-[200px] max-h-64 overflow-y-auto rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 mt-1 left-0 min-w-[200px] max-h-64 overflow-y-auto py-1">
           <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--ink-40)] border-b border-[var(--edge-soft)]">
             {table.title} — pick {multi ? 'records' : 'a record'}
           </div>

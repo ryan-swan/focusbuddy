@@ -1685,7 +1685,7 @@ function WidgetPickerOverlay({
     >
       {/* Scrim: home stays visible but recedes behind the blur. */}
       <div
-        className="absolute inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-md"
+        className="fb-scrim absolute inset-0"
         onClick={onClose}
       />
       <motion.div

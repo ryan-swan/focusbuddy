@@ -99,7 +99,7 @@ export default function MindmapStartingKit({
 
   return (
     <div
-      className="absolute top-3 left-1/2 -translate-x-1/2 z-[180] w-[min(620px,92vw)] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/95 backdrop-blur shadow-2xl"
+      className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in absolute top-3 left-1/2 -translate-x-1/2 z-[180] w-[min(620px,92vw)]"
       onMouseDown={(e) => e.stopPropagation()}
       data-testid="mindmap-starting-kit"
     >

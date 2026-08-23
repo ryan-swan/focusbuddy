@@ -445,7 +445,7 @@ function GenericFilePreview({
         )}
       </div>
       {/* Footer strip — slim, high-contrast, never dominates the thumb. */}
-      <div className="shrink-0 border-t border-[var(--edge-soft)] bg-[var(--surface-raised)]/80 backdrop-blur-sm px-2 py-1 flex items-center justify-between gap-2">
+      <div className="shrink-0 border-t border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1 flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1 text-left">
           <div className="text-[11px] font-medium text-[var(--ink-90)] truncate">
             {file?.originalName ?? 'File'}

@@ -261,7 +261,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
         {profileMenu && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setProfileMenu(false)} />
-            <div className="absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-64 overflow-y-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1">
+            <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-2.5 right-2.5 top-full mt-1 z-20 max-h-64 overflow-y-auto py-1">
               <div className="sticky top-0 bg-[var(--surface-raised)] px-2 pb-1.5 pt-0.5 border-b border-[var(--edge-soft)]">
                 <input
                   autoFocus

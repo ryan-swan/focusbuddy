@@ -146,7 +146,7 @@ export default function LaunchSignInModal(): JSX.Element | null {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      className="fb-scrim fixed inset-0 z-[280] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Sign in to PlexiDesk"

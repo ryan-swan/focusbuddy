@@ -208,7 +208,7 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
               {customizing && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setCustomizing(false)} />
-                  <div className="absolute right-0 mt-1.5 z-20 w-56 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2">
+                  <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 mt-1.5 z-20 w-56 p-2">
                     <p className="px-2 py-1 text-[11px] text-[var(--ink-50)]">Sections on this dashboard</p>
                     {sectionOpts.filter((s) => s.available).map((s) => (
                       <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--surface-sunken)] cursor-pointer">

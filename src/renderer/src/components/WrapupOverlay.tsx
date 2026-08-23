@@ -57,7 +57,7 @@ export default function WrapupOverlay(): JSX.Element | null {
   if (status === 'idle') return null
 
   return (
-    <div className="fixed inset-0 z-[210] bg-stone-900/40 backdrop-blur-[2px] flex items-start justify-center pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
+    <div className="fb-scrim fixed inset-0 z-[210] flex items-start justify-center pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
       <div className="w-[560px] max-w-[92vw] max-h-[78vh] flex flex-col rounded-2xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl overflow-hidden" data-testid="wrapup-panel">
         <div className="px-5 py-3.5 border-b border-[var(--edge-soft)] flex items-center gap-2.5">
           <Icon name="summarize" size={18} className="text-rose-500" filled />

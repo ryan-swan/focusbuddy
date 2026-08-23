@@ -149,7 +149,7 @@ function HabitGardenPopover({ buckets, anchorEl, onClose }: PopoverProps): JSX.E
   return (
     <div
       ref={ref}
-      className="fixed z-[180] w-72 rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl backdrop-blur"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[180] w-72"
       style={style}
     >
       <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between">

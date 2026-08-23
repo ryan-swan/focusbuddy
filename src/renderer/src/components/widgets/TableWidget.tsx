@@ -922,7 +922,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     >
       {selNote && (
         <div
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-1.5 text-[12px] shadow-lg"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 text-[12px]"
           data-testid="table-paste-note"
         >
           <span className="text-[var(--ink-70)]">{selNote}</span>
@@ -1589,7 +1589,7 @@ function ColumnHeader({
         title="Drag to resize column"
       />
       {open && (
-        <div className="absolute z-50 mt-1 left-0 w-56 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2 space-y-1.5 text-[var(--ink-70)] font-normal">
+        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 mt-1 left-0 w-56 p-2 space-y-1.5 text-[var(--ink-70)] font-normal">
           <input
             value={col.label}
             onChange={(e) => onRename(e.target.value)}
@@ -1732,7 +1732,7 @@ function ColumnAdder({ onAdd }: { onAdd: (t: FieldType) => void }): JSX.Element 
         <Icon name="add" size={12} />
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-44 rounded border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 z-50 mt-1 w-44 py-1">
           {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
             <button
               key={t}
@@ -1794,7 +1794,7 @@ function HeaderContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-[100] w-52 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[100] w-52 py-1 text-[var(--ink-70)]"
       style={{ left, top }}
       onContextMenu={(e) => e.preventDefault()}
     >

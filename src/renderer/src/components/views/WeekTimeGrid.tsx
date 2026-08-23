@@ -583,7 +583,7 @@ function BlockComposer({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center"
       onClick={onCancel}
     >
       <div

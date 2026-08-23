@@ -169,6 +169,12 @@
   --glass-pillow-blur: saturate(170%) blur(calc(40px * var(--fb-glass-blur-scale)));
   --glass-pillow-border: oklch(100% 0 0 / 0.55);
 
+  /* The scrim behind a modal (Edges + Glass, Caleb 2026-08-23). Not a
+     material: it dims the page so the sheet reads as the one thing to deal
+     with, with the lightest blur as a depth cue. One fill per theme replaces
+     ~30 hand-rolled stone-literal backdrops. */
+  --scrim-fill: oklch(12% 0.010 264 / 0.32);
+
   /* ── Radii — a more deliberate scale ────────────────────────────────────── */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -245,6 +251,8 @@
 
   --glass-pillow-fill: oklch(27% 0.014 264 / calc(0.78 * var(--fb-glass-opacity-scale)));
   --glass-pillow-border: oklch(100% 0 0 / 0.10);
+
+  --scrim-fill: oklch(0% 0 0 / 0.55);
 }
 
 /* ── Futuristic theme — inherits dark but cranks the accent infusion ─────── */
@@ -330,6 +338,8 @@
 
   --glass-pillow-fill: oklch(24% 0.025 250 / calc(0.84 * var(--fb-glass-opacity-scale)));
   --glass-pillow-border: rgb(var(--accent) / 0.18);
+
+  --scrim-fill: oklch(8% 0.030 250 / 0.58); /* navy-tinted, never pure black */
 }
 
 /* Atelier body — deep navy with a subtle warm vignette in the corners so it
@@ -386,6 +396,14 @@
   box-shadow:
     var(--shadow-deep),
     var(--shadow-inset-highlight);
+}
+
+/* The modal scrim. Apply to the fixed inset-0 backdrop; the sheet inside it
+   takes fb-glass-pillow (or fb-card when it must be opaque). */
+.fb-scrim {
+  background-color: var(--scrim-fill);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 /* Softer glass treatment for dashboard cards — composes with Tailwind's

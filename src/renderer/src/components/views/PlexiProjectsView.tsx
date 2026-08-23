@@ -2099,7 +2099,7 @@ function CalendarSettings({
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute right-0 mt-1.5 z-40 w-64 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-3" data-testid="calendar-settings">
+      <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 mt-1.5 z-40 w-64 p-3" data-testid="calendar-settings">
         <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">Working days</p>
         {!cal ? (
           <p className="text-[12px] text-[var(--ink-50)] py-2">Loading…</p>

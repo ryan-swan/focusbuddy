@@ -209,8 +209,7 @@ export function MenuRestorePill({
       title={title}
       aria-label={title}
       data-testid="menu-restore-pill"
-      className="fb-floating-chrome absolute top-[12px] left-[12px] z-20 inline-flex items-center gap-1.5 h-8 pl-2 pr-2.5 rounded-[12px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[12px] font-medium text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.4)] transition-colors"
-      style={FLOATING_MENU_STYLE}
+      className="fb-floating-chrome absolute top-[12px] left-[12px] z-20 inline-flex items-center gap-1.5 h-8 pl-2 pr-2.5 fb-btn-surface fb-press text-[12px] font-medium text-[var(--ink-80)] hover:text-[var(--ink-100)]"
     >
       <Icon name="menu" size={16} />
       <span>{label}</span>

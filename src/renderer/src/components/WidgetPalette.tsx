@@ -216,7 +216,7 @@ export default function WidgetPalette({
         <div
           ref={popoverRef}
           data-floating-menu
-          className="fixed z-[200] w-[340px] max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl"
+          className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in fixed z-[200] w-[340px] max-h-[60vh] overflow-y-auto"
           style={{ top: popoverPos.top, left: popoverPos.left }}
           role="dialog"
           aria-label="Desk objects"

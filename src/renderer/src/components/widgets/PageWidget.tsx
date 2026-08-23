@@ -370,7 +370,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
 
       {slashOpen && slashPos && (
         <div
-          className="absolute z-50 w-56 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 w-56 py-1"
           style={{ top: slashPos.top, left: slashPos.left }}
         >
           <SlashItem

@@ -58,7 +58,7 @@ export default function AgentProfileDialog({ onClose, onSave }: Props): JSX.Elem
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center p-4"
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div

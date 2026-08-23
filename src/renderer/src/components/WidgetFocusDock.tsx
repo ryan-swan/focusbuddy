@@ -223,7 +223,7 @@ export default function WidgetFocusDock({
 
               {/* Kind glyph chip, bottom-left, so type is legible even when the
                   thumbnail is dense. */}
-              <div className="absolute bottom-1 left-1 h-4 w-4 rounded-[5px] bg-[var(--surface-raised)]/85 backdrop-blur-sm flex items-center justify-center shadow-sm">
+              <div className="absolute bottom-1 left-1 h-4 w-4 rounded-[5px] bg-[var(--surface-raised)] flex items-center justify-center shadow-sm">
                 <Icon
                   name={entry?.icon ?? 'apps'}
                   size={10}

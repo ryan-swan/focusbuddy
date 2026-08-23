@@ -105,7 +105,7 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
       {open && (
         <div
           data-testid="standup-output-menu"
-          className="absolute right-0 top-9 z-[95] w-72 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1.5"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-9 z-[95] w-72 p-1.5"
         >
           {step === 'menu' && (
             <div className="space-y-0.5">

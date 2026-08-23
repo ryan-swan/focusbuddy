@@ -131,7 +131,7 @@ export default function TableImportDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Import into table"

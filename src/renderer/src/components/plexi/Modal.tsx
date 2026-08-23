@@ -96,7 +96,7 @@ export default function Modal({
   // viewport the containing block no matter where the modal is mounted.
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
+      className="fb-scrim fixed inset-0 flex items-center justify-center"
       style={{ zIndex: z }}
       onMouseDown={closeOnBackdrop ? onClose : undefined}
     >

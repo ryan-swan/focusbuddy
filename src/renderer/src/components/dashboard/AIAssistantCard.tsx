@@ -76,7 +76,7 @@ export default function AIAssistantCard(): JSX.Element {
   }
 
   return (
-    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
+    <div className="fb-card p-4 fb-glass-soft">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold">
           <Icon name="auto_awesome" size={12} className="text-accent" />

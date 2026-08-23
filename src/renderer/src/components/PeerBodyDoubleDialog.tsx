@@ -157,7 +157,7 @@ export default function PeerBodyDoubleDialog({ onClose }: Props): JSX.Element {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[260] bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center"
+      className="fb-scrim fixed inset-0 z-[260] flex items-center justify-center"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}

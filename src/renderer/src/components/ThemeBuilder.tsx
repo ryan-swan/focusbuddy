@@ -107,13 +107,13 @@ export default function ThemeBuilder({
   const customActive = accent === 'custom'
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div
         ref={ref}
         className="w-full max-w-md max-h-[86vh] overflow-y-auto rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[var(--surface-sunken)]/95"
         data-testid="theme-builder"
       >
-        <div className="sticky top-0 z-10 px-4 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/90 backdrop-blur flex items-center justify-between">
+        <div className="sticky top-0 z-10 px-4 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="palette" size={18} className="text-accent" />
             <div>

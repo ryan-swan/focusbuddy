@@ -622,7 +622,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
                     onMouseDown={(e) => e.stopPropagation()}
                   />
                   <div
-                    className="absolute right-0 top-7 z-50 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+                    className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-7 z-50 w-44 py-1"
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--ink-40)]">
@@ -689,7 +689,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
               className="absolute inset-0 cursor-pointer group bg-transparent"
               title="Click to interact — scroll pans the canvas while not active"
             >
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-stone-900/80 backdrop-blur text-[11px] text-stone-50 shadow flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full fb-glass-chrome border text-[11px] text-[var(--ink-90)] shadow-[var(--shadow-soft)] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
                 <Icon name="touch_app" size={12} />
                 <span>Click to interact</span>
               </div>

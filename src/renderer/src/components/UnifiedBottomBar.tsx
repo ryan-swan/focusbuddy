@@ -52,10 +52,11 @@ export default function UnifiedBottomBar(): JSX.Element {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
-            className={`rounded-2xl bg-[var(--surface-raised)]/90 dark:bg-[var(--surface-raised)]/95 backdrop-blur-2xl shadow-[0_-4px_40px_rgba(0,0,0,0.26),0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.10)] transition-shadow duration-300 ${
-              voiceActive
-                ? 'ring-1 ring-violet-400/30 shadow-[0_-4px_40px_rgba(0,0,0,0.26),0_8px_32px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.10),0_0_0_1px_rgba(139,92,246,0.30)]'
-                : 'ring-1 ring-black/[0.10] dark:ring-white/[0.10]'
+            // Floating chrome over the canvas: the chrome glass tier (Edges +
+            // Glass), its rim from the tier's border, elevation from the token
+            // shadow. The accent ring is state (voice live), never decoration.
+            className={`rounded-[var(--radius-card)] fb-glass-chrome border shadow-[var(--shadow-deep)] transition-shadow duration-300 ${
+              voiceActive ? 'ring-1 ring-[rgb(var(--accent)/0.3)]' : ''
             }`}
           >
             <div className="flex items-center justify-center px-3 py-2 relative overflow-visible">

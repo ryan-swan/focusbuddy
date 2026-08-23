@@ -102,7 +102,7 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
   const previewBox = useMemo(() => ({ w: 460, h: 300 }), [])
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div
         ref={ref}
         className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[var(--surface-sunken)]/95 flex flex-col"

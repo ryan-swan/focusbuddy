@@ -126,7 +126,7 @@ export default function StreamDeckButtonConfig({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[260] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fb-scrim fixed inset-0 z-[260] flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}

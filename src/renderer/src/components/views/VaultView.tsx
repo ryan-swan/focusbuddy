@@ -118,7 +118,7 @@ function CreateVaultPanel(): JSX.Element {
 
   return (
     <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
-      <div className="w-full max-w-md bg-white/85 dark:bg-stone-900/85 backdrop-blur border border-[var(--edge-soft)] rounded-2xl p-6 shadow-xl">
+      <div className="w-full max-w-md fb-card p-6">
         <div className="text-center mb-5">
           <Icon name="enhanced_encryption" size={32} className="text-accent mx-auto mb-2" />
           <h1 className="text-lg font-semibold text-[var(--ink-100)]">
@@ -204,7 +204,7 @@ function UnlockVaultPanel(): JSX.Element {
 
   return (
     <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
-      <div className="w-full max-w-sm bg-white/85 dark:bg-stone-900/85 backdrop-blur border border-[var(--edge-soft)] rounded-2xl p-6 shadow-xl">
+      <div className="w-full max-w-sm fb-card p-6">
         <div className="text-center mb-5">
           <Icon name="lock" size={28} className="text-accent mx-auto mb-2" />
           <h1 className="text-lg font-semibold text-[var(--ink-100)]">
@@ -293,7 +293,7 @@ function UnlockedVault(): JSX.Element {
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--edge-soft)] bg-white/85 dark:bg-stone-900/85 backdrop-blur overflow-hidden">
+        <div className="fb-card overflow-hidden">
           <ul className="divide-y divide-[var(--edge-soft)]">
             {filtered.map((e) => (
               <EntryRow key={e.id} entry={e} onRemove={() => void removeEntry(e.id)} />
@@ -589,7 +589,7 @@ function ChangeMasterPasswordDialog({ onClose }: { onClose: () => void }): JSX.E
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[180] flex items-center justify-center"
       onClick={onClose}
     >
       <div
@@ -730,7 +730,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[180] flex items-center justify-center"
       onClick={onClose}
     >
       <div

@@ -60,7 +60,7 @@ function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Eleme
       </button>
       {open && (
         <div
-          className="absolute z-20 bottom-full mb-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 p-1 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-20 bottom-full mb-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 p-1"
           data-testid="react-palette"
         >
           {QUICK_EMOJIS.map((e) => (
@@ -245,7 +245,7 @@ export function MessageRow({
             <Icon name="more_horiz" size={14} />
           </button>
           {menuOpen && (
-            <div className="absolute z-20 bottom-full mb-1 right-0 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg py-1 w-28">
+            <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-20 bottom-full mb-1 right-0 py-1 w-28">
               {onEdit && (
                 <button
                   onClick={() => {
@@ -920,7 +920,7 @@ export default function MessagesView(): JSX.Element {
                     </button>
                     {showMembers && (
                       <div
-                        className="absolute right-0 top-full mt-1 z-30 w-64 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg p-2"
+                        className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-full mt-1 z-30 w-64 p-2"
                         data-testid="members-popover"
                       >
                         {activeConv.kind === 'channel' && (

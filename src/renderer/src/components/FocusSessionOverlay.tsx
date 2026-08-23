@@ -186,7 +186,7 @@ export default function FocusSessionOverlay(): JSX.Element | null {
       {/* End-of-session choice modal */}
       {showChoice && (
         <div
-          className="fixed inset-0 z-[170] flex items-center justify-center bg-stone-900/30 backdrop-blur-sm"
+          className="fb-scrim fixed inset-0 z-[170] flex items-center justify-center"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) void handleDone()
           }}

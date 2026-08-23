@@ -504,7 +504,7 @@ export default function Dashboard({
 
         {/* Empty state — user removed every card */}
         {!editing && cardIds.length === 0 && (
-          <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-6 text-center">
+          <div className="fb-card p-6 text-center">
             <Icon
               name="dashboard_customize"
               size={28}

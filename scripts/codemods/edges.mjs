@@ -4,6 +4,7 @@
 //   node scripts/codemods/edges.mjs --census              bucket the border debt
 //   node scripts/codemods/edges.mjs --dir components/views   dry-run the rewrite (default)
 //   node scripts/codemods/edges.mjs --dir components/views --write
+//   node scripts/codemods/edges.mjs --dir components --rules scrim,popover,raised-blur   (Phase 1 only)
 //
 // Census: counts every border idiom in renderer TSX and buckets the boxed
 // `border border-[var(--edge-soft)]` idiom by fill, radius and interactivity,
@@ -22,6 +23,10 @@
 //   sunken + interactive                ->  `fb-tile`
 //   sunken + static                     ->  `border` + the edge class dropped
 //                                           (luminance step); radius untouched
+//   fixed/absolute inset-0 + dim + blur ->  the dim and blur become `fb-scrim`
+//   floating boxed popover/menu         ->  `fb-glass-panel` + row radius (card
+//                                           radius when wide) + fb-pop-in
+//   in-flow bg-raised/NN + backdrop-blur ->  content never glass: `fb-card`
 //   everything else                     ->  listed, never rewritten.
 //
 // Safety: dry-run by default; idempotent (a rewritten file has no idiom left
@@ -48,6 +53,13 @@ const AI_LANE = [
   'lib/assistant'
 ]
 
+// Deferred until Caleb has talked to Michael (DESIGN_SYSTEM names these as the
+// second workstream's live area). Skipped unless --include-deferred.
+const DEFERRED = ['components/documents/', 'components/officeApp/']
+// Owned by plexidesk-75 (icons, chrome marks, the desk breadcrumb): never
+// rewritten here; findings go to them by message or inbox note.
+const OWNED_BY_75 = ['components/CanvasBreadcrumb.tsx']
+
 const args = process.argv.slice(2)
 const flag = (n) => args.includes(n)
 const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined }
@@ -63,6 +75,8 @@ function walk(dir, out = []) {
 }
 const rel = (p) => relative(SRC, p)
 const isAiLane = (p) => AI_LANE.some((a) => rel(p).startsWith(a))
+const isDeferred = (p) => DEFERRED.some((a) => rel(p).startsWith(a))
+const isOwnedBy75 = (p) => OWNED_BY_75.some((a) => rel(p) === a)
 
 const SOFT = 'border-[var(--edge-soft)]'
 const FIRM = 'border-[var(--edge-firm)]'
@@ -195,34 +209,76 @@ const isFloating = (words) =>
 const isButtonTag = (tag) => /^<(button|a)\b/.test(tag) || /\brole=["']button["']/.test(tag)
 const isFieldTag = (tag) => /^<(input|select|textarea)\b/.test(tag)
 
+const isDimBg = (t) => /^(dark:)?bg-(black|stone-9[05]0)\/\d+$/.test(t)
+const isBlur = (t) => /^backdrop-blur/.test(t)
+const isRaisedAlpha = (t) => /^bg-\[var\(--surface-raised\)\]\/\d+$/.test(t)
+const hasMotion = (words) => words.some((t) => /^(animate-|fb-pop-in|fb-fade|fb-spring|motion-)/.test(t))
+// A wide popover is a sheet and takes the card radius; a menu takes the row radius.
+const popoverRadius = (words) =>
+  words.some((t) => /^(w-(80|96|\[(3[2-9]\d|[4-9]\d\d|min\()|max-w-(lg|xl|2xl)))/.test(t))
+    ? 'rounded-[var(--radius-card)]'
+    : 'rounded-[var(--radius-row)]'
+
+// Which rule (if any) a class list falls under. The integrity check counts
+// the same thing, so the two can never disagree.
+let activeRules = null  // null = every rule; set from --rules a,b,c
+export const setActiveRules = (list) => { activeRules = list ? new Set(list) : null }
+const allowed = (rule) => (rule && (!activeRules || activeRules.has(rule)) ? rule : null)
+
+export function matchRule(words, tag) {
+  return allowed(matchAnyRule(words, tag))
+}
+
+function matchAnyRule(words, tag) {
+  const boxed = words.includes('border') && words.includes(SOFT)
+  const floating = isFloating(words)
+  if (words.some((t) => t === 'inset-0') && (words.includes('fixed') || words.includes('absolute'))
+      && words.some(isDimBg) && words.some(isBlur)) return 'scrim'
+  if (floating && boxed && !words.includes('rounded-full') && !isButtonTag(tag)
+      && (words.includes(RAISED) || words.includes(SUNKEN) || words.some(isRaisedAlpha))) return 'popover'
+  if (!floating && boxed && words.some(isRaisedAlpha) && words.some(isBlur) && !words.includes('rounded-full')) return 'raised-blur'
+  if (!boxed || words.includes('rounded-full') || floating) return null
+  if (words.includes(RAISED)) return 'raised'
+  if (words.includes(SUNKEN)) return isFieldTag(tag) ? null : 'sunken'
+  return null
+}
+
 export function rewriteString(text, tag) {
-  const toks = text.split(/(\s+)/)  // keep whitespace so formatting survives
-  const words = toks.filter((t) => t && !/^\s+$/.test(t))
-  if (!(words.includes('border') && words.includes(SOFT))) return null
-  if (words.includes('rounded-full')) return null  // capsules: hand pass
-  if (isFloating(words)) return null  // popovers and menus: glass-panel tier by hand
+  const words = text.split(/\s+/).filter(Boolean)
+  const rule = matchRule(words, tag)
+  if (!rule) return null
   let removed = []
   let added = []
-  if (words.includes(RAISED)) {
-    removed = words.filter((t) => t === 'border' || t === SOFT || t === RAISED || isRadius(t) || isShadow(t))
-    if (isButtonTag(tag)) added = ['fb-btn-surface']
-    else if (isInteractive(tag)) added = ['fb-card', 'fb-press']
-    else added = ['fb-card']
-  } else if (words.includes(SUNKEN)) {
-    if (isFieldTag(tag)) return null  // .fb-field by hand, per surface
-    const interactive = isInteractive(tag)
-    if (interactive) {
-      removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN || isRadius(t))
-      added = ['fb-tile']
-    } else {
-      removed = words.filter((t) => t === 'border' || t === SOFT)
-      added = []
-    }
-  } else {
-    return null  // listed by the census, rewritten by hand
+  switch (rule) {
+    case 'scrim':
+      removed = words.filter((t) => isDimBg(t) || isBlur(t))
+      added = ['fb-scrim']
+      break
+    case 'popover':
+      removed = words.filter((t) => t === 'border' || t === SOFT || /^dark:border-/.test(t) || t === RAISED || t === SUNKEN
+        || isRaisedAlpha(t) || isRadius(t) || isShadow(t) || isBlur(t))
+      added = ['fb-glass-panel', popoverRadius(words), ...(hasMotion(words) ? [] : ['fb-pop-in'])]
+      break
+    case 'raised-blur':
+      removed = words.filter((t) => t === 'border' || t === SOFT || isRaisedAlpha(t) || isBlur(t) || isRadius(t) || isShadow(t))
+      added = isButtonTag(tag) ? ['fb-btn-surface'] : isInteractive(tag) ? ['fb-card', 'fb-press'] : ['fb-card']
+      break
+    case 'raised':
+      removed = words.filter((t) => t === 'border' || t === SOFT || t === RAISED || isRadius(t) || isShadow(t))
+      added = isButtonTag(tag) ? ['fb-btn-surface'] : isInteractive(tag) ? ['fb-card', 'fb-press'] : ['fb-card']
+      break
+    case 'sunken':
+      if (isInteractive(tag)) {
+        removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN || isRadius(t))
+        added = ['fb-tile']
+      } else {
+        removed = words.filter((t) => t === 'border' || t === SOFT)
+        added = []
+      }
+      break
   }
   const kept = words.filter((t) => !removed.includes(t))
-  return { text: [...added, ...kept].join(' '), removed, added }
+  return { text: [...added, ...kept].join(' '), removed, added, rule }
 }
 
 // Pure: rewrite one file's source. Returns { out, log } or { refused: true }.
@@ -238,7 +294,7 @@ export function rewriteSource(src, file = 'x.tsx') {
     const body = s.exprs.length ? restoreTemplate(s, r.text) : r.text
     out += src.slice(last, s.start) + body
     last = s.end
-    log.push({ removed: r.removed, added: r.added })
+    log.push({ removed: r.removed, added: r.added, rule: r.rule })
   }
   const rewrites = log.filter((l) => l.removed)
   if (!rewrites.length) return { out: src, log: [] }
@@ -246,12 +302,7 @@ export function rewriteSource(src, file = 'x.tsx') {
   // Integrity: the output must contain exactly one fewer boxed idiom per
   // rewrite, every added class must be present, and nothing but the planned
   // tokens may differ between input and output.
-  const count = (text) => classStrings(text, file).filter((x) => {
-    const w = x.text.split(/\s+/)
-    if (!(w.includes('border') && w.includes(SOFT)) || w.includes('rounded-full') || isFloating(w)) return false
-    if (w.includes(RAISED)) return true
-    return w.includes(SUNKEN) && !isFieldTag(enclosingTag(text, x.start))
-  }).length
+  const count = (text) => classStrings(text, file).filter((x) => matchRule(x.text.split(/\s+/).filter(Boolean), enclosingTag(text, x.start))).length
   const before = count(src), after = count(out)
   const tokensOf = (t) => t.split(/[\s'"`]+/).filter(Boolean)
   const bag = (arr) => arr.reduce((m, t) => (m.set(t, (m.get(t) ?? 0) + 1), m), new Map())
@@ -315,13 +366,20 @@ if (!isCli) {
 } else {
   const dir = opt('--dir')
   if (!dir) { console.error('need --census or --dir <path under src/renderer/src>'); process.exit(2) }
+  if (opt('--rules')) setActiveRules(opt('--rules').split(','))
   const files = all.filter((f) => rel(f).startsWith(dir))
+    .filter((f) => flag('--include-deferred') || !isDeferred(f))
+    .filter((f) => !isOwnedBy75(f))
   const write = flag('--write')
   let total = 0, refused = 0
   for (const f of files) {
     const r = rewriteFile(f, write)
     if (r.refused) refused++
-    if (r.changed) { total += r.changed; console.log(`${write ? 'wrote' : 'would rewrite'} ${rel(f)}: ${r.changed} element(s)`) }
+    if (r.changed) {
+      total += r.changed
+      const rules = r.log.filter((l) => l.rule).map((l) => l.rule).join(', ')
+      console.log(`${write ? 'wrote' : 'would rewrite'} ${rel(f)}: ${r.changed} element(s) [${rules}]`)
+    }
   }
   console.log(`\n${write ? 'WROTE' : 'DRY RUN'}: ${total} element(s) in ${files.length} file(s) under ${dir}; refused ${refused}`)
   if (refused) process.exit(1)

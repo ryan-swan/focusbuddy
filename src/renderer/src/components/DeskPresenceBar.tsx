@@ -96,7 +96,7 @@ export default function DeskPresenceBar({ taskId }: { taskId: string }): JSX.Ele
           </button>
           {showInvited && (
             <div
-              className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-lg p-2"
+              className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-full mt-1 z-30 w-52 p-2"
               data-testid="desk-invited-popover"
             >
               <div className="text-[10.5px] uppercase tracking-wide text-[var(--ink-40)] mb-1">Invited, not here</div>

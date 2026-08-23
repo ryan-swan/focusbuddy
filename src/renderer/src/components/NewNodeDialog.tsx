@@ -276,7 +276,7 @@ export default function NewNodeDialog({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 dark:bg-black/55 backdrop-blur-[2px]"
+      className="fb-scrim fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.form
@@ -343,7 +343,7 @@ export default function NewNodeDialog({
                 />
               </div>
               {jumpQuery.trim() && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-10 max-h-44 overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-[0_12px_32px_rgba(0,0,0,0.25)]">
+                <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 right-0 top-full mt-1 z-10 max-h-44 overflow-auto shadow-[0_12px_32px_rgba(0,0,0,0.25)]">
                   {existingTasks
                     .filter((t) =>
                       (t.title || '').toLowerCase().includes(jumpQuery.trim().toLowerCase())

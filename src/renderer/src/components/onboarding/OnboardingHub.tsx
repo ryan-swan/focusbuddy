@@ -31,7 +31,7 @@ export default function OnboardingHub(): JSX.Element | null {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[245] flex items-center justify-center bg-stone-950/50 backdrop-blur-sm"
+      className="fb-scrim fixed inset-0 z-[245] flex items-center justify-center"
       onMouseDown={() => setOpen(false)}
       role="dialog"
       aria-label="Tours and onboarding"

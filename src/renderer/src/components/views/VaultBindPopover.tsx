@@ -81,7 +81,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-1 z-50 w-72 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-full mt-1 z-50 w-72 p-2"
     >
       <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-[var(--edge-soft)]">
         <span className="text-[11px] uppercase tracking-wider text-[var(--ink-50)]">

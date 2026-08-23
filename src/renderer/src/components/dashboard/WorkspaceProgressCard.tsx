@@ -97,7 +97,7 @@ export default function WorkspaceProgressCard({
   const dash = (stats.pct / 100) * C
 
   return (
-    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4 fb-glass-soft">
+    <div className="fb-card p-4 fb-glass-soft">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-3">
         <Icon name="trending_up" size={12} />
         <span>This week</span>

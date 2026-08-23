@@ -113,7 +113,7 @@ export default function ResumeModal({ task, onClose }: Props): JSX.Element {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/45 backdrop-blur-md p-6"
+      className="fb-scrim fixed inset-0 z-[60] flex items-center justify-center p-6"
       onClick={onClose}
     >
       <div

@@ -141,7 +141,7 @@ export default function FocusClusterTab({
 
       {/* Group affordance chip — a grid glyph + pane count, bottom-left, so the tab
           reads unmistakably as a GROUP (not a single widget) at a glance. */}
-      <div className="absolute bottom-1 left-1 h-4 min-w-4 px-1 rounded-[5px] bg-[var(--surface-raised)]/85 backdrop-blur-sm flex items-center justify-center gap-0.5 shadow-sm">
+      <div className="absolute bottom-1 left-1 h-4 min-w-4 px-1 rounded-[5px] bg-[var(--surface-raised)] flex items-center justify-center gap-0.5 shadow-sm">
         <Icon
           name="grid_view"
           size={9}

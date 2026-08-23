@@ -18,7 +18,7 @@ export default function EnergyCard(): JSX.Element {
   const recent = history.slice(0, 6)
 
   return (
-    <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)]/85 backdrop-blur p-4">
+    <div className="fb-card p-4">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-semibold mb-3">
         <Icon name="bolt" size={12} />
         <span>Energy</span>

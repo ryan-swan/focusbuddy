@@ -211,7 +211,7 @@ export default function ViewSelector({ taskId }: { taskId: string }): JSX.Elemen
                     }}
                     data-testid={`view-default-${v.mode}`}
                     title={isDefault ? 'Default view for this desk' : 'Set as default view for this desk'}
-                    className="absolute top-2 right-2 h-6 w-6 inline-flex items-center justify-center rounded-md bg-[var(--surface-raised)]/80 backdrop-blur text-[var(--ink-40)] hover:text-amber-500"
+                    className="absolute top-2 right-2 h-6 w-6 inline-flex items-center justify-center rounded-md bg-[var(--surface-raised)] text-[var(--ink-40)] hover:text-amber-500"
                   >
                     <Icon name={isDefault ? 'star' : 'star_border'} size={14} className={isDefault ? 'text-amber-500' : ''} />
                   </button>
