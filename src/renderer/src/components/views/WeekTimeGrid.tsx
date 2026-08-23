@@ -224,7 +224,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           <div
             key={i}
             style={{ height: HOUR_PX }}
-            className="text-[10px] font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
+            className="fb-t-caption font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
           >
             {START_HOUR + i}:00
           </div>
@@ -244,7 +244,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           return (
             <div key={dayIndex} className="flex flex-col min-w-0">
               <div
-                className={`text-center text-[11px] font-semibold py-1 rounded ${
+                className={`text-center fb-t-caption font-semibold py-1 rounded-[var(--radius-chip)] ${
                   isToday
                     ? 'text-accent'
                     : 'text-[var(--ink-50)]'
@@ -254,10 +254,10 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
               </div>
               <div
                 ref={(el) => (colRefs.current[dayIndex] = el)}
-                className={`relative rounded-lg border ${
+                className={`relative rounded-[var(--radius-row)] border ${
                   isToday
                     ? 'border-accent/40 bg-accent/[0.03]'
-                    : 'border-[var(--edge-soft)] bg-white/50 dark:bg-stone-900/40'
+                    : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
                 }`}
                 style={{ height: gridHeight }}
                 onClick={(e) => onColumnClick(e, dayIndex)}
@@ -291,9 +291,9 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                       data-testid="time-block"
                       onPointerDown={(e) => beginDrag(e, block, 'move')}
                       onClick={(e) => e.stopPropagation()}
-                      className={`absolute left-0.5 right-0.5 rounded-md px-1.5 py-1 text-[10px] overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
+                      className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 py-1 fb-t-caption overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
                         done
-                          ? 'bg-emerald-100/90 dark:bg-emerald-950/50 border-emerald-300/50 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300'
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                           : isPast
                             ? 'bg-[var(--surface-sunken)]/90 border-[var(--edge-firm)]/50 text-[var(--ink-50)]'
                             : 'bg-accent/15 border-accent/40 text-[var(--ink-90)]'
@@ -315,8 +315,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                               void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded text-white"
-                            style={{ backgroundColor: 'rgb(var(--accent))' }}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"
                             title="Join this meeting"
                             data-testid="block-join-meeting"
                           >
@@ -330,7 +329,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                               setCalMenu({ block, x: e.clientX, y: e.clientY })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)]"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
                             title="Add to my calendar"
                             data-testid="block-add-to-calendar"
                           >
@@ -344,7 +343,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                               jumpToNode(linked)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)]"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
                             title={linked.kind === 'folder' ? 'Open this folder' : 'Jump to this task'}
                             data-testid="block-jump"
                           >
@@ -358,8 +357,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                               focusBlock(block)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded text-white"
-                            style={{ backgroundColor: 'rgb(var(--accent))' }}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"
                             title="Start a focus session for this block"
                             data-testid="block-focus"
                           >
@@ -372,7 +370,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             void updateBlock(block.id, { status: done ? 'planned' : 'done' })
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)]"
+                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
                           title={done ? 'Mark not done' : 'Mark done'}
                         >
                           <Icon name={done ? 'undo' : 'check'} size={9} />
@@ -392,7 +390,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             }
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded bg-white/70 dark:bg-stone-900/70 text-[var(--ink-70)] hover:text-red-600"
+                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
                           title="Delete block"
                           data-testid="block-delete"
                         >
@@ -458,18 +456,18 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCalMenu(null)} />
           <div
-            className="fixed z-50 w-52 rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-xl p-1 text-xs"
+            className="fixed z-50 w-52 rounded-[var(--radius-row)] fb-glass-panel fb-pop-in p-1 fb-t-label"
             style={{
               left: Math.min(calMenu.x, window.innerWidth - 220),
               top: Math.min(calMenu.y, window.innerHeight - 120)
             }}
             data-testid="add-to-calendar-menu"
           >
-            <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-[var(--ink-50)]">
+            <div className="px-2 py-1 fb-t-caption uppercase tracking-wide">
               Add to calendar
             </div>
             <button
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-[var(--hover)] flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 rounded-[var(--radius-chip)] hover:bg-[var(--surface-sunken)] fb-press flex items-center gap-2"
               onClick={() => {
                 const b = calMenu.block
                 void window.api.calendar.addMeetingIcs({
@@ -485,7 +483,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
               Apple Calendar / Outlook
             </button>
             <button
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-[var(--hover)] flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 rounded-[var(--radius-chip)] hover:bg-[var(--surface-sunken)] fb-press flex items-center gap-2"
               onClick={() => {
                 const b = calMenu.block
                 void window.api.files.openExternal(
@@ -585,25 +583,25 @@ function BlockComposer({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onCancel}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[340px] rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-4 space-y-3"
+        className="w-[340px] rounded-[var(--radius-card)] bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[var(--shadow-cast)] fb-pop-in p-4 space-y-3"
         data-testid="block-composer"
       >
         <div className="flex items-center gap-2">
           <Icon name="schedule" size={16} className="text-accent" />
-          <h3 className="text-sm font-semibold text-[var(--ink-100)]">Book time</h3>
-          <span className="ml-auto text-[11px] font-mono text-[var(--ink-50)]">
+          <h3 className="fb-t-title text-[var(--ink-100)]">Book time</h3>
+          <span className="ml-auto fb-t-caption font-mono">
             {fmtTime(startMs)}
           </span>
         </div>
 
         {prefillNode ? (
           <div
-            className="flex items-center gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1.5"
+            className="flex items-center gap-2 rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2 py-1.5"
             data-testid="composer-prefill"
           >
             <Icon
@@ -611,20 +609,20 @@ function BlockComposer({
               size={14}
               className="text-accent shrink-0"
             />
-            <span className="text-sm text-[var(--ink-90)] truncate">
+            <span className="fb-t-body text-[var(--ink-90)] truncate">
               {prefillNode.title}
             </span>
           </div>
         ) : (
           <>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+              <span className="fb-t-caption uppercase tracking-wider font-medium">
                 Task
               </span>
               <select
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
-                className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+                className="fb-field fb-t-body mt-1"
                 data-testid="composer-task"
               >
                 <option value="">Focus time (no task)</option>
@@ -638,14 +636,14 @@ function BlockComposer({
 
             {!taskId && (
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+                <span className="fb-t-caption uppercase tracking-wider font-medium">
                   Label (optional)
                 </span>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Focus time"
-                  className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+                  className="fb-field fb-t-body mt-1"
                 />
               </label>
             )}
@@ -661,12 +659,12 @@ function BlockComposer({
             data-testid="composer-meeting-toggle"
           />
           <Icon name="videocam" size={14} className="text-accent" />
-          <span className="text-sm text-[var(--ink-90)]">Video meeting</span>
+          <span className="fb-t-body text-[var(--ink-90)]">Video meeting</span>
         </label>
 
         {isMeeting && (
           <label className="block">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+            <span className="fb-t-caption uppercase tracking-wider font-medium">
               Invite people (emails)
             </span>
             <textarea
@@ -674,10 +672,10 @@ function BlockComposer({
               onChange={(e) => setInvitees(e.target.value)}
               placeholder="alex@acme.com, sam@acme.com"
               rows={2}
-              className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm resize-none"
+              className="fb-field fb-t-body mt-1 resize-none"
               data-testid="composer-invitees"
             />
-            <span className="mt-1 block text-[11px] text-[var(--ink-50)]">
+            <span className="mt-1 block fb-t-caption">
               Each invitee gets an email with the time and a link to join in PlexiDesk.
             </span>
           </label>
@@ -685,7 +683,7 @@ function BlockComposer({
 
         {inviteNote && (
           <div
-            className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2.5 py-2 text-[12px] text-[var(--ink-70)]"
+            className="rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2.5 py-2 fb-t-label text-[var(--ink-70)]"
             data-testid="composer-invite-note"
           >
             {inviteNote}
@@ -693,13 +691,13 @@ function BlockComposer({
         )}
 
         <label className="block">
-          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+          <span className="fb-t-caption uppercase tracking-wider font-medium">
             Length
           </span>
           <select
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+            className="fb-field fb-t-body mt-1"
           >
             {[15, 25, 30, 45, 60, 90, 120].map((m) => (
               <option key={m} value={m}>
@@ -710,13 +708,13 @@ function BlockComposer({
         </label>
 
         <label className="block">
-          <span className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+          <span className="fb-t-caption uppercase tracking-wider font-medium">
             Repeats
           </span>
           <select
             value={repeat}
             onChange={(e) => setRepeat(e.target.value as TimeBlockRecurrence | '')}
-            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+            className="fb-field fb-t-body mt-1"
             data-testid="block-repeat"
           >
             <option value="">Does not repeat</option>

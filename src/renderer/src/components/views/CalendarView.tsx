@@ -7,6 +7,7 @@ import { useViewStore } from '../../stores/view'
 import { priorityScore } from '../../lib/dashboardScope'
 import { futuristicPowerOn } from '../../lib/audioBeep'
 import Icon from '../Icon'
+import { DashboardHeader } from '../plexi'
 import WeekTimeGrid from './WeekTimeGrid'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -136,60 +137,56 @@ export default function CalendarView(): JSX.Element {
   })
 
   return (
-    <div className="h-full overflow-auto desk-paper no-tod">
+    <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-3">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-1">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm shrink-0">
-            <Icon name="calendar_month" size={20} className="text-accent" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
-              Calendar
-            </h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400">
-              {mode === 'month'
-                ? 'Tasks placed by due date. Sorted within each day by urgency × importance + due-date boost.'
-                : 'Book time to focus. Click a slot to add a block, drag to reschedule, start a session from any block.'}
-            </p>
-          </div>
-          {/* Month / Week toggle */}
-          <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shrink-0">
-            {(['month', 'week'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-2.5 py-1 rounded text-[11px] font-medium capitalize transition-colors ${
-                  mode === m
-                    ? 'bg-white dark:bg-stone-900 text-accent shadow-sm'
-                    : 'text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200'
-                }`}
-                data-testid={`calendar-mode-${m}`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button onClick={goPrev} className="icon-btn" title="Previous">
-              <Icon name="chevron_left" size={16} />
-            </button>
-            <button onClick={jumpToToday} className="btn-ghost">
-              Today
-            </button>
-            <button onClick={goNext} className="icon-btn" title="Next">
-              <Icon name="chevron_right" size={16} />
-            </button>
-          </div>
-        </div>
+        <DashboardHeader
+          title="Calendar"
+          subtitle={
+            mode === 'month'
+              ? 'Tasks placed by due date. Sorted within each day by urgency × importance + due-date boost.'
+              : 'Book time to focus. Click a slot to add a block, drag to reschedule, start a session from any block.'
+          }
+          actions={
+            <div className="flex items-center gap-2">
+              {/* Month / Week toggle */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] shadow-[0_0_0_1px_var(--edge-hairline)] shrink-0">
+                {(['month', 'week'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={`px-2.5 py-1 rounded-[var(--radius-chip)] fb-t-label capitalize fb-press transition-colors ${
+                      mode === m
+                        ? 'bg-[var(--surface-raised)] text-accent shadow-[var(--shadow-soft)]'
+                        : 'text-[var(--ink-50)] hover:text-[var(--ink-80)]'
+                    }`}
+                    data-testid={`calendar-mode-${m}`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={goPrev} className="icon-btn" title="Previous">
+                  <Icon name="chevron_left" size={16} />
+                </button>
+                <button onClick={jumpToToday} className="btn-ghost">
+                  Today
+                </button>
+                <button onClick={goNext} className="icon-btn" title="Next">
+                  <Icon name="chevron_right" size={16} />
+                </button>
+              </div>
+            </div>
+          }
+        />
 
         {mode === 'week' && (
           <>
             <div className="flex items-baseline gap-3 mb-2">
-              <h2 className="text-lg font-medium text-stone-900 dark:text-stone-100">
+              <h2 className="fb-t-title text-[var(--ink-100)]">
                 {weekLabel}
               </h2>
-              <span className="text-[11px] text-stone-500 dark:text-stone-400">
+              <span className="fb-t-caption">
                 {blockCount} block{blockCount === 1 ? '' : 's'} booked
               </span>
             </div>
@@ -200,13 +197,13 @@ export default function CalendarView(): JSX.Element {
         {mode === 'month' && (
         <>
         <div className="flex items-baseline gap-3 mb-2">
-          <h2 className="text-lg font-medium text-stone-900 dark:text-stone-100">
+          <h2 className="fb-t-title text-[var(--ink-100)]">
             {monthLabel}
           </h2>
-          <span className="text-[11px] text-stone-500 dark:text-stone-400">
+          <span className="fb-t-caption">
             {monthTasks.length} task{monthTasks.length === 1 ? '' : 's'} due
             {monthOverdue > 0 && (
-              <span className="ml-2 text-red-700 dark:text-red-400">
+              <span className="ml-2 text-rose-500">
                 {monthOverdue} overdue
               </span>
             )}
@@ -217,9 +214,17 @@ export default function CalendarView(): JSX.Element {
             surface is for, instead of a bare grid. Only when there is truly
             nothing: no tasks due this month and no time blocks anywhere. */}
         {monthTasks.length === 0 && blockCount === 0 && (
-          <p className="text-[12px] text-stone-500 dark:text-stone-400 mb-2">
-            Nothing scheduled yet. Give a task a due date, or switch to Week view and drag on the grid to block time for focused work.
-          </p>
+          <div className="mb-2 flex items-center gap-3">
+            <p className="fb-t-body text-[var(--ink-50)]">
+              Nothing scheduled yet. Give a task a due date, or block time for focused work.
+            </p>
+            <button
+              onClick={() => setMode('week')}
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-90)] shrink-0"
+            >
+              <Icon name="view_week" size={14} /> Plan your week
+            </button>
+          </div>
         )}
 
         {/* Day-of-week header */}
@@ -227,7 +232,7 @@ export default function CalendarView(): JSX.Element {
           {DAY_LABELS.map((d) => (
             <div
               key={d}
-              className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-semibold py-1 px-2"
+              className="fb-t-caption uppercase tracking-wider font-semibold py-1 px-2"
             >
               {d}
             </div>
@@ -235,7 +240,7 @@ export default function CalendarView(): JSX.Element {
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-1 fb-fade-in-up">
           {days.map((d) => {
             const inMonth = d.getMonth() === viewMonth.getMonth()
             const isToday = sameDay(d, today)
@@ -243,28 +248,28 @@ export default function CalendarView(): JSX.Element {
             return (
               <div
                 key={d.getTime()}
-                className={`rounded-lg border min-h-[100px] flex flex-col p-1.5 ${
+                className={`rounded-[var(--radius-row)] border min-h-[100px] flex flex-col p-1.5 ${
                   isToday
                     ? 'border-accent bg-accent/5'
                     : inMonth
-                      ? 'border-stone-200 dark:border-stone-700 bg-white/70 dark:bg-stone-900/60'
-                      : 'border-stone-100 dark:border-stone-800 bg-transparent opacity-50'
+                      ? 'border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
+                      : 'border-[var(--edge-soft)] bg-transparent opacity-50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span
-                    className={`text-xs font-mono tabular-nums ${
+                    className={`fb-t-label font-mono fb-tabular ${
                       isToday
                         ? 'text-accent font-semibold'
                         : inMonth
-                          ? 'text-stone-700 dark:text-stone-300'
-                          : 'text-stone-400 dark:text-stone-600'
+                          ? 'text-[var(--ink-70)]'
+                          : 'text-[var(--ink-30)]'
                     }`}
                   >
                     {d.getDate()}
                   </span>
                   {dayTasks.length > 0 && (
-                    <span className="text-[9px] font-mono text-stone-400 dark:text-stone-500">
+                    <span className="fb-t-caption font-mono">
                       {dayTasks.length}
                     </span>
                   )}
@@ -280,7 +285,7 @@ export default function CalendarView(): JSX.Element {
                     />
                   ))}
                   {dayTasks.length > 4 && (
-                    <div className="text-[9px] text-stone-500 dark:text-stone-400 px-1">
+                    <div className="fb-t-caption px-1">
                       +{dayTasks.length - 4} more
                     </div>
                   )}
@@ -290,7 +295,7 @@ export default function CalendarView(): JSX.Element {
           })}
         </div>
 
-        <p className="text-[10px] text-stone-500 dark:text-stone-500 text-center pt-2">
+        <p className="fb-t-caption text-center pt-2">
           Hover a task → quick-start 5 min. Click → open in canvas. Add due dates from the edit
           dialog (pencil on any sidebar row) to populate this view.
         </p>
@@ -317,14 +322,14 @@ function CalendarTaskChip({
   const isDone = task.status === 'done'
   const isInProgress = task.status === 'in_progress'
 
-  let bg = 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300'
-  if (isDone) bg = 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 line-through'
-  else if (isOverdue) bg = 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'
-  else if (isInProgress) bg = 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+  let bg = 'bg-[var(--surface-base)] shadow-[0_0_0_1px_var(--edge-hairline)] text-[var(--ink-70)]'
+  if (isDone) bg = 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 line-through'
+  else if (isOverdue) bg = 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+  else if (isInProgress) bg = 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
 
   return (
     <div
-      className={`rounded px-1.5 py-0.5 text-[10px] truncate group/chip cursor-pointer flex items-center gap-1 ${bg}`}
+      className={`rounded-[var(--radius-chip)] px-1.5 py-0.5 fb-t-caption truncate group/chip cursor-pointer fb-press flex items-center gap-1 ${bg}`}
       onClick={onOpen}
       title={`${task.title}${task.dueDate ? ` · due ${new Date(task.dueDate).toLocaleDateString()}` : ''}`}
     >
@@ -335,8 +340,7 @@ function CalendarTaskChip({
             e.stopPropagation()
             onQuickStart()
           }}
-          className="opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 h-3.5 w-3.5 inline-flex items-center justify-center rounded shrink-0"
-          style={{ backgroundColor: 'rgb(var(--accent))', color: 'white' }}
+          className="opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 h-3.5 w-3.5 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press shrink-0"
           title="Just 5 min on this task"
         >
           <Icon name="bolt" size={9} />
