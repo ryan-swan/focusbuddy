@@ -29,6 +29,8 @@
 // not account for every removed token; never touches the AI lane's paths.
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import ts from 'typescript'
 
 const ROOT = resolve(new URL('../../', import.meta.url).pathname)
 const SRC = join(ROOT, 'src/renderer/src')
@@ -65,23 +67,48 @@ const isAiLane = (p) => AI_LANE.some((a) => rel(p).startsWith(a))
 const SOFT = 'border-[var(--edge-soft)]'
 const FIRM = 'border-[var(--edge-firm)]'
 
-// Every string literal that could be a className: '...', "...", `...` (template
-// literals are scanned as a whole; ${} segments are left in place untouched).
-const STRING_RE = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g
-
-function classStrings(src) {
+// Every string-like literal, found on the TypeScript AST so apostrophes in
+// JSX text and comments can never desync the scan (a regex scanner silently
+// swallowed 129 real class strings into code spans). Template expressions
+// are returned as ONE entry whose `text` is the static class words with each
+// ${expression} replaced by a placeholder; `exprs` restores them byte-for-byte.
+export function classStrings(src, file = 'x.tsx') {
+  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const out = []
-  let m
-  while ((m = STRING_RE.exec(src))) {
-    const s = m[2]
-    if (!/\bborder\b/.test(s) && !/outline-none/.test(s) && !/backdrop-blur/.test(s)) continue
-    out.push({ start: m.index, end: m.index + m[0].length, quote: m[1], text: s })
+  const interesting = (t) => /\bborder\b/.test(t) || /outline-none/.test(t) || /backdrop-blur/.test(t)
+  const visit = (n) => {
+    if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
+      const start = n.getStart(sf)
+      if (interesting(n.text)) out.push({ start: start + 1, end: n.getEnd() - 1, quote: src[start], text: n.text, exprs: [] })
+    } else if (ts.isTemplateExpression(n)) {
+      const start = n.getStart(sf)
+      const exprs = []
+      let text = n.head.text
+      n.templateSpans.forEach((span, i) => {
+        const from = n.head === undefined ? 0 : (i === 0 ? n.head.getEnd() : n.templateSpans[i - 1].literal.getEnd())
+        const to = span.literal.getStart(sf)
+        exprs.push(src.slice(from, to))  // the raw `${ ... }` minus the head's trailing "${" and literal's leading "}"
+        // No padding: an expression glued to text (rounded-${size}) must stay
+        // one word, and one separated by whitespace must stay separate.
+        text += `__EXPR${i}__` + span.literal.text
+      })
+      if (interesting(text)) out.push({ start: start + 1, end: n.getEnd() - 1, quote: '`', text, exprs, template: n })
+      n.templateSpans.forEach((span) => visit(span.expression))
+      return
+    }
+    ts.forEachChild(n, visit)
   }
-  return out
+  visit(sf)
+  return out.sort((a, b) => a.start - b.start)
+}
+
+// Rebuild a template expression's source from rewritten static text.
+function restoreTemplate(entry, text) {
+  return text.replace(/__EXPR(\d+)__/g, (_, i) => '${' + entry.exprs[Number(i)] + '}')
 }
 
 // The opening tag that carries this string (for interactivity + tag name).
-function enclosingTag(src, at) {
+export function enclosingTag(src, at) {
   const open = src.lastIndexOf('<', at)
   if (open < 0) return ''
   let depth = 0
@@ -114,7 +141,7 @@ function census(files) {
   const byDir = {}
   for (const f of files) {
     const src = readFileSync(f, 'utf8')
-    for (const s of classStrings(src)) {
+    for (const s of classStrings(src, f)) {
       const toks = s.text.split(/\s+/).filter(Boolean)
       const tag = enclosingTag(src, s.start)
       if (toks.includes(SOFT)) counts['edge-soft (any)']++
@@ -168,7 +195,7 @@ const isFloating = (words) =>
 const isButtonTag = (tag) => /^<(button|a)\b/.test(tag) || /\brole=["']button["']/.test(tag)
 const isFieldTag = (tag) => /^<(input|select|textarea)\b/.test(tag)
 
-function rewriteString(text, tag) {
+export function rewriteString(text, tag) {
   const toks = text.split(/(\s+)/)  // keep whitespace so formatting survives
   const words = toks.filter((t) => t && !/^\s+$/.test(t))
   if (!(words.includes('border') && words.includes(SOFT))) return null
@@ -198,59 +225,93 @@ function rewriteString(text, tag) {
   return { text: [...added, ...kept].join(' '), removed, added }
 }
 
-function rewriteFile(f, write) {
-  const src = readFileSync(f, 'utf8')
+// Pure: rewrite one file's source. Returns { out, log } or { refused: true }.
+export function rewriteSource(src, file = 'x.tsx') {
   let out = ''
   let last = 0
   const log = []
-  for (const s of classStrings(src)) {
-    if (s.quote === '`' && /\$\{/.test(s.text)) {
-      // Template literal with expressions: rewrite only the static class words.
-      // Expressions are left byte-identical.
-      const r = rewriteString(s.text.replace(/\$\{[^}]*\}/g, (m) => ` __EXPR${log.length}_${Buffer.from(m).toString('hex')}__ `), enclosingTag(src, s.start))
-      if (!r) continue
-      const restored = r.text.replace(/__EXPR\d+_([0-9a-f]+)__/g, (_, h) => Buffer.from(h, 'hex').toString())
-      out += src.slice(last, s.start) + s.quote + restored + s.quote
-      last = s.end
-      log.push({ removed: r.removed, added: r.added })
-      continue
-    }
+  for (const s of classStrings(src, file)) {
     const r = rewriteString(s.text, enclosingTag(src, s.start))
     if (!r) continue
-    out += src.slice(last, s.start) + s.quote + r.text + s.quote
+    if (r.text.split(/\s+/).some((w) => /^rounded-.*__EXPR/.test(w)))
+      log.push({ note: `${file}: a radius built from an expression sits beside the kit class; check by hand` })
+    const body = s.exprs.length ? restoreTemplate(s, r.text) : r.text
+    out += src.slice(last, s.start) + body
     last = s.end
     log.push({ removed: r.removed, added: r.added })
   }
-  if (!log.length) return { changed: 0 }
+  const rewrites = log.filter((l) => l.removed)
+  if (!rewrites.length) return { out: src, log: [] }
   out += src.slice(last)
   // Integrity: the output must contain exactly one fewer boxed idiom per
   // rewrite, every added class must be present, and nothing but the planned
   // tokens may differ between input and output.
-  const count = (s) => classStrings(s).filter((x) => {
+  const count = (text) => classStrings(text, file).filter((x) => {
     const w = x.text.split(/\s+/)
     if (!(w.includes('border') && w.includes(SOFT)) || w.includes('rounded-full') || isFloating(w)) return false
     if (w.includes(RAISED)) return true
-    return w.includes(SUNKEN) && !isFieldTag(enclosingTag(s, x.start))
+    return w.includes(SUNKEN) && !isFieldTag(enclosingTag(text, x.start))
   }).length
   const before = count(src), after = count(out)
-  const tokensOf = (s) => s.split(/[\s'"`]+/).filter(Boolean)
+  const tokensOf = (t) => t.split(/[\s'"`]+/).filter(Boolean)
   const bag = (arr) => arr.reduce((m, t) => (m.set(t, (m.get(t) ?? 0) + 1), m), new Map())
   const a = bag(tokensOf(src)), b = bag(tokensOf(out))
-  const planned = bag(log.flatMap((l) => l.removed)), plannedAdd = bag(log.flatMap((l) => l.added))
-  let ok = before - after === log.length
+  const planned = bag(rewrites.flatMap((l) => l.removed)), plannedAdd = bag(rewrites.flatMap((l) => l.added))
+  let ok = before - after === rewrites.length
   for (const [t, n] of a) { const d = n - (b.get(t) ?? 0); if (d > 0 && (planned.get(t) ?? 0) !== d) ok = false }
   for (const [t, n] of b) { const d = n - (a.get(t) ?? 0); if (d > 0 && (plannedAdd.get(t) ?? 0) !== d) ok = false }
-  if (!ok) {
-    console.error(`REFUSED ${rel(f)}: integrity check failed (before=${before} after=${after} rewrites=${log.length})`)
-    return { changed: 0, refused: true }
-  }
-  if (write) writeFileSync(f, out)
-  return { changed: log.length, log }
+  if (!ok) return { refused: true, before, after, rewrites: rewrites.length }
+  return { out, log }
 }
 
-const all = walk(SRC).filter((f) => !isAiLane(f))
-if (flag('--census')) {
+function rewriteFile(f, write) {
+  const src = readFileSync(f, 'utf8')
+  const r = rewriteSource(src, rel(f))
+  if (r.refused) {
+    console.error(`REFUSED ${rel(f)}: integrity check failed (before=${r.before} after=${r.after} rewrites=${r.rewrites})`)
+    return { changed: 0, refused: true }
+  }
+  for (const l of r.log) if (l.note) console.log(`NOTE ${l.note}`)
+  const changed = r.log.filter((l) => l.removed).length
+  if (changed && write) writeFileSync(f, r.out)
+  return { changed, log: r.log }
+}
+
+// --inventory glass: every floating boxed element and every ad-hoc blur, with
+// file:line and the class string, bucketed for the Phase 1 glass rollout.
+function inventoryGlass(files) {
+  const rows = []
+  for (const f of files) {
+    const src = readFileSync(f, 'utf8')
+    for (const s of classStrings(src, f)) {
+      const toks = s.text.split(/\s+/).filter(Boolean)
+      const line = src.slice(0, s.start).split('\n').length
+      const floating = isFloating(toks)
+      const blur = toks.some((t) => /^backdrop-blur/.test(t))
+      const tier = toks.find((t) => /^fb-glass-/.test(t))
+      const boxed = toks.includes('border') && toks.includes(SOFT)
+      if (!(floating && boxed) && !(blur && !tier)) continue
+      rows.push({ file: rel(f), line, floating, blur, boxed, tier: tier ?? '', text: s.text.slice(0, 110) })
+    }
+  }
+  const sect = (title, pred) => {
+    const r = rows.filter(pred)
+    console.log(`\n## ${title} (${r.length})\n`)
+    for (const x of r) console.log(`- ${x.file}:${x.line}  \`${x.text}\``)
+  }
+  sect('Floating boxed (fixed/absolute + z, border edge-soft): panel tier candidates', (x) => x.floating && x.boxed)
+  sect('Ad-hoc backdrop-blur on a FLOATING element (no tier): adopt a tier', (x) => x.blur && !x.tier && x.floating)
+  sect('Ad-hoc backdrop-blur on an IN-FLOW element (no tier): content, flatten or justify', (x) => x.blur && !x.tier && !x.floating)
+}
+
+const isCli = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+const all = isCli ? walk(SRC).filter((f) => !isAiLane(f)) : []
+if (!isCli) {
+  // imported by tests: no side effects
+} else if (flag('--census')) {
   census(all)
+} else if (opt('--inventory') === 'glass') {
+  inventoryGlass(all)
 } else {
   const dir = opt('--dir')
   if (!dir) { console.error('need --census or --dir <path under src/renderer/src>'); process.exit(2) }
