@@ -139,7 +139,11 @@ describe('searchChunks — passage-level BM25, org-scoped', () => {
   it('builds a safe MATCH from messy input and returns nothing for none', () => {
     expect(ftsQuery('  ')).toBeNull()
     expect(ftsQuery('a')).toBeNull()
-    expect(ftsQuery('venue "quoted" AND (paren)')).toBe('"venue" OR "quoted" OR "and" OR "paren"')
+    // Prefix tokens (#28): 4+ char terms match forward inflections, and an
+    // -ed term also tries its stripped stems. Short tokens stay exact.
+    expect(ftsQuery('venue "quoted" AND (paren)')).toBe(
+      '"venue"* OR "quoted"* OR "quot"* OR "quote"* OR "and" OR "paren"*'
+    )
     // Operators and quotes in the user's text never reach FTS as syntax.
     seed(db, 'd1', 'Notes', 'Nothing special here.')
     expect(() => searchChunks(db, 'NEAR("x" OR *', { orgId: ORG })).not.toThrow()
@@ -297,5 +301,28 @@ describe('chunk_date carries the source updatedAt', () => {
       .prepare(`SELECT chunk_date AS d FROM fb_chunks WHERE source_id = 'c1'`)
       .get() as { d: number }
     expect(Number(row.d)).toBe(1234567)
+  })
+})
+
+describe('inflection matching (#28)', () => {
+  it('a query in the present tense finds the past-tense passage', () => {
+    const db = freshDb()
+    reindexSourceChunks(db, {
+      sourceType: 'chat',
+      sourceId: 'c1',
+      title: 'Pricing strategy',
+      text: 'You: What should our pricing be?\n\nPlexii: We decided pricing is three numbers on one page.',
+      sourceKind: 'chat',
+      orgId: ORG
+    })
+    const hits = searchChunks(db, 'what did we decide about pricing', { orgId: ORG, sourceType: 'chat' })
+    expect(hits.map((h) => h.sourceId)).toEqual(['c1'])
+  })
+
+  it('a plural query finds the singular passage', () => {
+    const db = freshDb()
+    seed(db, 'd1', 'Contract note', 'The renewal clause triggers in March.')
+    const hits = searchChunks(db, 'renewals clause', { orgId: ORG })
+    expect(hits.map((h) => h.sourceId)).toEqual(['d1'])
   })
 })

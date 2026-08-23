@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rankSources, extractDocText, chunkText, relevanceGate, mergeScopedPools } from '../../src/main/workspaceRank'
+import { rankSources, extractDocText, chunkText, relevanceGate, mergeScopedPools, termVariants, termMatches } from '../../src/main/workspaceRank'
 import type { WorkspaceSource } from '../../src/main/workspaceRank'
 
 describe('extractDocText', () => {
@@ -150,5 +150,33 @@ describe('mergeScopedPools — desk scope demotes, never excludes (#12)', () => 
   it('is a plain sort when there is nothing off-scope', () => {
     const merged = mergeScopedPools([src('a', 1), src('b', 5)], [], 6)
     expect(merged.map((s) => s.docId)).toEqual(['b', 'a'])
+  })
+})
+
+describe('termVariants / termMatches (#28) and the recall query', () => {
+  it('strips plural and past-tense suffixes, never below 3 chars', () => {
+    expect(termVariants('renewals')).toContain('renewal')
+    expect(termVariants('decided')).toContain('decide')
+    expect(termVariants('policies')).toContain('policy')
+    expect(termVariants('sdr')).toEqual(['sdr'])
+  })
+
+  it('matches across inflections in both directions', () => {
+    expect(termMatches('the renewal clause', 'renewals')).toBe(true)
+    expect(termMatches('we decided pricing', 'decide')).toBe(true)
+    expect(termMatches('unrelated text', 'renewals')).toBe(false)
+  })
+
+  it("the canonical recall question survives the gate (Caleb's #18 phrase)", () => {
+    const src: WorkspaceSource = {
+      docId: 'c1',
+      title: 'Pricing strategy',
+      docType: 'chat',
+      snippet: '',
+      text: 'You: What should our pricing be?\nPlexii: We decided pricing is three numbers on one page.',
+      score: 8
+    }
+    const kept = relevanceGate('What did we decide about pricing last week?', [src])
+    expect(kept).toHaveLength(1)
   })
 })

@@ -32,6 +32,7 @@ import {
   extractDocText,
   selectPassages,
   mergeScopedPools,
+  termVariants,
   type WorkspaceSource
 } from './workspaceRank'
 
@@ -286,7 +287,16 @@ export interface ChunkHit {
 export function ftsQuery(query: string): string | null {
   const terms = (query.toLowerCase().match(/[a-z0-9]{2,}/g) ?? []).slice(0, 12)
   if (terms.length === 0) return null
-  return terms.map((t) => `"${t}"`).join(' OR ')
+  // Prefix queries give forward inflection matching without a stemmer
+  // ("decide"* finds decided/decides); the stripped variants cover the
+  // reverse direction ("renewals" also tries "renewal"*). Short tokens stay
+  // exact — a 2-3 char prefix would match half the language (#28).
+  const tokens = new Set<string>()
+  for (const t of terms) {
+    for (const v of termVariants(t)) tokens.add(v.length >= 4 ? `"${v}"*` : `"${v}"`)
+    if (tokens.size >= 24) break
+  }
+  return [...tokens].join(' OR ')
 }
 
 // Passage-level search, grouped back to sources. Org-scoped; `sourceType`

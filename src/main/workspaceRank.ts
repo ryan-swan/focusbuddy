@@ -119,8 +119,34 @@ const STOPWORDS = new Set([
   'the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was', 'but', 'not', 'you', 'your', 'our', 'its',
   'has', 'have', 'had', 'will', 'can', 'all', 'any', 'out', 'who', 'what', 'when', 'how', 'why', 'were', 'they',
   'their', 'them', 'then', 'than', 'into', 'over', 'per', 'via', 'etc', 'also', 'such', 'each', 'about', 'would',
-  'there', 'which', 'been', 'more', 'some', 'one', 'two', 'get', 'got', 'use', 'using', 'new'
+  'there', 'which', 'been', 'more', 'some', 'one', 'two', 'get', 'got', 'use', 'using', 'new',
+  // Auxiliaries carry no signal but used to count toward the relevance gate's
+  // coverage bar — "what DID we decide" demanded a hit for "did" and culled
+  // the source that answered.
+  'did', 'does', 'doing', 'done'
 ])
+
+// Minimal inflection handling (#28): 'renewals' must find 'renewal',
+// 'decided' must find 'decide'. Substring matching already covers the
+// forward direction (term ⊂ its longer inflection in the text); these
+// stripped variants cover the reverse, without a stemmer dependency.
+export function termVariants(term: string): string[] {
+  const v = [term]
+  if (term.length > 4) {
+    if (term.endsWith('ies')) v.push(term.slice(0, -3) + 'y')
+    else if (term.endsWith('es')) v.push(term.slice(0, -2))
+    if (term.endsWith('s') && !term.endsWith('ss')) v.push(term.slice(0, -1))
+    if (term.endsWith('ed')) v.push(term.slice(0, -2), term.slice(0, -1))
+    if (term.endsWith('ing')) v.push(term.slice(0, -3), term.slice(0, -3) + 'e')
+  }
+  return [...new Set(v.filter((x) => x.length > 2))]
+}
+
+// One term-vs-text rule shared by the gate and the scorer, so "matches"
+// means the same thing everywhere.
+export function termMatches(hay: string, term: string): boolean {
+  return termVariants(term).some((v) => hay.includes(v))
+}
 
 // Split text into ~size-char chunks on paragraph/line boundaries so ranking can
 // find a passage buried deep in a long document instead of only its head.
@@ -148,7 +174,13 @@ export function chunkText(text: string, size = 800): string[] {
 
 function scoreHay(hay: string, terms: string[]): number {
   let s = 0
-  for (const t of terms) s += Math.min(hay.split(t).length - 1, 6)
+  for (const t of terms) {
+    // Best variant wins (#28): count occurrences of whichever inflection
+    // actually appears, capped as before.
+    let best = 0
+    for (const v of termVariants(t)) best = Math.max(best, hay.split(v).length - 1)
+    s += Math.min(best, 6)
+  }
   return s
 }
 
@@ -261,7 +293,7 @@ export function relevanceGate(query: string, sources: WorkspaceSource[]): Worksp
   return sources.filter((s) => {
     const hay = `${s.title}\n${s.text}`.toLowerCase()
     let hits = 0
-    for (const t of terms) if (hay.includes(t)) hits++
+    for (const t of terms) if (termMatches(hay, t)) hits++
     if (hits < needed) return false
     return s.score >= top * 0.3
   })
