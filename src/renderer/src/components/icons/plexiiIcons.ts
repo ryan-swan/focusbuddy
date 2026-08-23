@@ -1,4 +1,4 @@
-// Plexii iconography — original brand icon set (50 marks).
+// Plexii iconography — original brand icon set (52 marks).
 // Source of truth: professional-brain/02-work/plexidesk/brand/01-knowledge/brand-assets/icons/
 // (one SVG per icon; this file mirrors their inner markup verbatim).
 // Drawn on a 24px grid, 1.75 stroke, round caps/joins, fill none, currentColor.
@@ -107,6 +107,10 @@ export const PLEXII_ICONS: Record<string, string> = {
     '<path d="m9.5 6.5 5.5 5.5-5.5 5.5"/>',
   'chevron-down':
     '<path d="m6.5 9.75 5.5 5.5 5.5-5.5"/>',
+  'arrow-left':
+    '<path d="M19.5 12H4.5"/><path d="m10.5 6-6 6 6 6"/>',
+  'arrow-right':
+    '<path d="M4.5 12h15"/><path d="m13.5 6 6 6-6 6"/>',
 }
 
 // Material Symbols names that are unambiguous across the app map straight
@@ -163,4 +167,6 @@ export const PLEXII_BY_MATERIAL: Record<string, string> = {
   check_circle: 'done',
   chevron_right: 'chevron-right',
   expand_more: 'chevron-down',
+  arrow_back: 'arrow-left',
+  arrow_forward: 'arrow-right',
 }

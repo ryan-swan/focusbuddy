@@ -35,6 +35,7 @@ import { useKnockStore } from './stores/knock'
 import BringMeBack from './components/BringMeBack'
 import HyperfocusGuardian from './components/HyperfocusGuardian'
 import PreTaskBridge from './components/PreTaskBridge'
+import HistoryNav, { useHistoryKeys } from './components/HistoryNav'
 import SmartStackModal from './components/SmartStackModal'
 import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
@@ -96,6 +97,8 @@ export default function App(): JSX.Element {
     minimized: sidebarMinimized,
     toggle: toggleSidebar
   } = useMinimizable('fb.sidebar.minimized')
+  // ⌘←/⌘→ and mouse back/forward drive the view history from anywhere.
+  useHistoryKeys()
   // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
   // over the main area, replacing the global sidebar / desk panels.
   const currentView = useViewStore((s) => s.view)
@@ -485,6 +488,8 @@ export default function App(): JSX.Element {
         }`}
       >
         <div className="titlebar-nodrag flex items-center gap-2">
+          {/* Back/forward through the view history — the true back button. */}
+          <HistoryNav />
           {/* "Local · encrypted" — the trust chip. Reflects whether the
               user has set up the vault (and unlocked it). Reinforces the
               BYO-key promise without nagging. Hidden on a fresh install
