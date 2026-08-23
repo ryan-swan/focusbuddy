@@ -826,7 +826,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         includeMemory: true,
         pinnedWidgetId,
         mentions: wireMentions,
-        mode
+        mode,
+        // Keeps this conversation out of its own chat-history retrieval pool.
+        conversationId: persist ?? undefined
       })
       settle(resp)
       return
@@ -852,7 +854,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           includeMemory: true,
           pinnedWidgetId,
           mentions: wireMentions,
-          mode
+          mode,
+          // Keeps this conversation out of its own chat-history retrieval pool.
+          conversationId: persist ?? undefined
         },
         {
           onMentions: (m) => {

@@ -9,7 +9,13 @@ import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, rankSources, relevanceGate, type WorkspaceSource } from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
-import { chunkIndexActive, chunkSearchDocuments, chunkSearchWidgets } from './chunkIndex'
+import {
+  chunkIndexActive,
+  chunkSearchDocuments,
+  chunkSearchWidgets,
+  chunkSearchFiles,
+  chunkSearchChats
+} from './chunkIndex'
 import { collectExtraSources } from './workspaceExtras'
 
 export type { WorkspaceSource } from './workspaceRank'
@@ -25,7 +31,8 @@ export const RETRIEVAL_SOURCE_LIMIT = 10
 export async function retrieveSources(
   query: string,
   limit = RETRIEVAL_SOURCE_LIMIT,
-  scopeNodeIds?: string[]
+  scopeNodeIds?: string[],
+  opts?: { excludeChatId?: string }
 ): Promise<WorkspaceSource[]> {
   // Knowledge: curated company truth, ranked semantically (or keyword fallback)
   // and surfaced first so it grounds the answer ahead of looser document matches.
@@ -62,7 +69,15 @@ export async function retrieveSources(
   // read — living docs, cards, custom blocks, fields, agents, mindmaps,
   // diagrams, charts — passage-searched through the chunk index. Desk scope
   // demotes off-scope widgets rather than excluding them (#12).
-  const widgetSources = chunkIndexActive() ? chunkSearchWidgets(query, limit, scopeNodeIds) : []
+  const widgetSources = chunkSearchWidgets(query, limit, scopeNodeIds)
+
+  // Files (#17): Drive files with extractable text, passage-searched. Before
+  // this pool a file was @-mentionable but never FOUND.
+  const fileSources = chunkSearchFiles(query, limit)
+
+  // Chat history (#17): past Plexii conversations, minus the one being
+  // answered right now — the recall mechanism #18 asked for.
+  const chatSources = chunkSearchChats(query, limit, opts?.excludeChatId)
 
   // Interleave the pools round-robin so documents, tasks/tables/notes, widgets
   // and knowledge all get a fair shot at the limited source slots. Curated
@@ -71,8 +86,8 @@ export async function retrieveSources(
   // analysed (Caleb's drive: an SDR question dragged in every doc containing
   // "research"). An emptied pool is an honest result — the trace says
   // "nothing relevant" and web results lead.
-  const pools = [kSources, docSources, extraSources, widgetSources].map((p) =>
-    relevanceGate(query, p)
+  const pools = [kSources, docSources, extraSources, widgetSources, fileSources, chatSources].map(
+    (p) => relevanceGate(query, p)
   )
   const merged: WorkspaceSource[] = []
   const seen = new Set<string>()

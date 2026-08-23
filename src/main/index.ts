@@ -16,7 +16,7 @@ import { registerHaptyxAuthProtocol } from './authProtocol'
 import { installAutoUpdater, checkForUpdates } from './autoUpdate'
 import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
-import { sweepDocumentChunks, sweepWidgetChunks } from './chunkIndex'
+import { sweepDocumentChunks, sweepWidgetChunks, sweepChatChunks, sweepFileChunks } from './chunkIndex'
 import { runDueReports } from './db/reports'
 import { installMainCrashHandlers, recordCrash } from './db/crashLog'
 
@@ -521,13 +521,28 @@ app.whenReady().then(() => {
     try {
       const d = sweepDocumentChunks()
       const w = sweepWidgetChunks()
-      if (d.indexed + d.removed + w.indexed + w.removed > 0) {
+      const c = sweepChatChunks()
+      if (d.indexed + d.removed + w.indexed + w.removed + c.indexed + c.removed > 0) {
         // eslint-disable-next-line no-console
         console.log(
-          `[chunk-index] sweep: docs ${d.indexed} indexed / ${d.removed} removed, ` +
-            `widgets ${w.indexed} indexed / ${w.removed} removed`
+          `[chunk-index] sweep: docs ${d.indexed}/${d.removed}, ` +
+            `widgets ${w.indexed}/${w.removed}, chats ${c.indexed}/${c.removed} (indexed/removed)`
         )
       }
+      // Files last and async: extraction is the expensive step (PDF parse,
+      // OCR), batch-capped per boot with the remainder reported, never
+      // silently dropped.
+      void sweepFileChunks()
+        .then((f) => {
+          if (f.indexed + f.removed + f.deferred > 0) {
+            // eslint-disable-next-line no-console
+            console.log(
+              `[chunk-index] files: ${f.indexed} indexed, ${f.removed} removed` +
+                (f.deferred > 0 ? `, ${f.deferred} deferred to the next boot` : '')
+            )
+          }
+        })
+        .catch((err) => console.error('[chunk-index] file sweep failed:', err))
     } catch (err) {
       console.error('[chunk-index] sweep failed:', err)
     }

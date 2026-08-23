@@ -505,6 +505,11 @@ export interface ChatRequest {
   // 'discovery' adds the guided-discovery prompt layer on top of everything
   // else. Optional so every non-conversational caller is untouched.
   mode?: AiChatMode
+  // The persisted conversation this request belongs to, when there is one.
+  // Retrieval uses it to keep the CURRENT conversation out of the chat-history
+  // pool (A2, #17) — its content is already the message history, and citing it
+  // back as a discovered source would be theatre. Optional and additive.
+  conversationId?: string
 }
 
 // A retrieved workspace document the assistant was grounded on. Slimmed from

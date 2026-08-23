@@ -130,6 +130,16 @@ function rowToMessage(row: MessageRow): AiChatStoredMessage {
 }
 
 /** All conversations for the active org, newest-updated first, with a preview. */
+// Chunk-index freshness (A2, #17): a conversation re-enters the chat
+// retrieval pool as it grows or is renamed, and leaves when deleted.
+// Dynamically imported so this db module never gains a static dependency on
+// the retrieval layer; best-effort by design.
+function pokeChatChunks(conversationId: string, removed = false): void {
+  void import('../chunkIndex')
+    .then((m) => m.reindexChatChunks(conversationId, removed))
+    .catch(() => {})
+}
+
 export function listConversations(): AiChatConversationMeta[] {
   const db = getDb()
   const org = getActiveOrgId()
@@ -315,6 +325,7 @@ export function appendMessage(
     created_at: now
   })
   db.prepare(`UPDATE ai_chat_conversations SET updated_at = ? WHERE id = ?`).run(now, conversationId)
+  pokeChatChunks(conversationId)
   return {
     id,
     role: message.role,
@@ -359,6 +370,7 @@ export function renameConversation(id: string, title: string): void {
     id,
     getActiveOrgId()
   )
+  pokeChatChunks(id) // the title weighs 5:1 in chunk search — keep it current
 }
 
 /** Delete a conversation and all its messages. */
@@ -372,4 +384,5 @@ export function deleteConversation(id: string): void {
   if (!owned) return
   db.prepare(`DELETE FROM ai_chat_messages WHERE conversation_id = ?`).run(id)
   db.prepare(`DELETE FROM ai_chat_conversations WHERE id = ?`).run(id)
+  pokeChatChunks(id, true) // deleted conversations stop grounding answers
 }

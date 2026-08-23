@@ -1067,7 +1067,9 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
       // (see WEB_SEARCH_MIN_QUERY). Web results continue the same [n] space so
       // one numbering rules every citation, internal or web.
       const [rawSources, webResults, semanticOn] = await Promise.all([
-        retrieveSources(lastUser, undefined, scope.length ? scope : undefined),
+        retrieveSources(lastUser, undefined, scope.length ? scope : undefined, {
+          excludeChatId: req.conversationId
+        }),
         searchWeb(lastUser, 5).catch(() => []),
         // Availability probe, in parallel so disclosure costs no latency.
         embeddingConfigured().catch(() => false)

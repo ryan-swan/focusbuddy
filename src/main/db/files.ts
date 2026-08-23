@@ -115,6 +115,7 @@ function insertFileRow(meta: {
        (id, original_name, mime_type, size_bytes, ext, created_at, parent_id, kind, display_name, updated_at, org_id)
      VALUES (@id, @originalName, @mimeType, @sizeBytes, @ext, @createdAt, @parentId, 'file', @originalName, @createdAt, @orgId)`
   ).run({ ...meta, parentId: meta.parentId ?? null, orgId: getActiveOrgId() })
+  pokeFileChunks([meta.id])
   return rowToFile({
     id: meta.id,
     original_name: meta.originalName,
@@ -133,6 +134,57 @@ export function getFile(id: string): FbFile | null {
   return row ? rowToFile(row) : null
 }
 
+// ── Chunk-index support (A2, #17) ────────────────────────────────────────────
+
+// The slice of a file row the chunk index needs. Kept here so the retrieval
+// layer never learns this module's schema.
+export interface IndexableFile {
+  id: string
+  name: string
+  ext: string
+  sizeBytes: number
+  updatedAt: number
+}
+
+const INDEXABLE_COLS = `id, COALESCE(NULLIF(display_name, ''), original_name) AS name, ext,
+       size_bytes AS sizeBytes, COALESCE(updated_at, created_at) AS updatedAt`
+
+// Every real (non-folder), non-trashed file of the active org.
+export function listIndexableFiles(): IndexableFile[] {
+  const db = getDb()
+  return db
+    .prepare(
+      `SELECT ${INDEXABLE_COLS} FROM fb_files
+       WHERE kind = 'file' AND trashed_at IS NULL AND org_id = ?`
+    )
+    .all(getActiveOrgId()) as IndexableFile[]
+}
+
+export function getIndexableFile(id: string): IndexableFile | null {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT ${INDEXABLE_COLS} FROM fb_files
+       WHERE id = ? AND kind = 'file' AND trashed_at IS NULL AND org_id = ?`
+    )
+    .get(id, getActiveOrgId()) as IndexableFile | undefined
+  return row ?? null
+}
+
+// Chunk-index freshness (A2, #17): a file's text enters retrieval when it
+// lands and leaves when it is trashed or purged, whichever path wrote it.
+// Dynamically imported so the db layer never gains a static dependency on the
+// retrieval layer; indexFileChunks itself decides index-vs-remove from the
+// row's current state. Best-effort by design.
+function pokeFileChunks(ids: string[], force = false): void {
+  if (!ids.length) return
+  void import('../chunkIndex')
+    .then(async (m) => {
+      for (const id of ids) await m.indexFileChunks(id, { force })
+    })
+    .catch(() => {})
+}
+
 export function deleteFile(id: string): boolean {
   const file = getFile(id)
   if (!file) return false
@@ -143,6 +195,7 @@ export function deleteFile(id: string): boolean {
   }
   const db = getDb()
   const r = db.prepare('DELETE FROM fb_files WHERE id = ?').run(id)
+  if (r.changes > 0) pokeFileChunks([id]) // resolves to removal: the row is gone
   return r.changes > 0
 }
 
@@ -196,6 +249,9 @@ export function writeSyncedFileBytes(id: string, bytes: Uint8Array): boolean {
   try {
     mkdirSync(filesDir(), { recursive: true })
     writeFileSync(file.storedPath, bytes)
+    // The bytes changed but the row (and so the cheap version stamp) did not —
+    // force the re-extract.
+    pokeFileChunks([id], true)
     return true
   } catch {
     return false
@@ -489,6 +545,7 @@ export function deleteEntry(id: string): string[] {
   db.transaction(() => {
     for (const i of ids) stmt.run(now, i)
   })()
+  pokeFileChunks(ids) // trashed content stops grounding answers
   return ids
 }
 
@@ -500,6 +557,7 @@ export function restoreEntries(ids: string[]): boolean {
   db.transaction(() => {
     for (const i of ids) stmt.run(i)
   })()
+  pokeFileChunks(ids) // restored content is retrievable again
   return true
 }
 
@@ -568,6 +626,7 @@ export function purgeEntry(id: string): boolean {
   db.transaction(() => {
     for (const i of ids) del.run(i)
   })()
+  pokeFileChunks(ids) // resolves to removal: the rows are gone
   return true
 }
 

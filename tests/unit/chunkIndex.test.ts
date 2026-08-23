@@ -10,6 +10,10 @@ import {
   searchChunks,
   ftsQuery,
   widgetChunkSource,
+  ledgerGet,
+  ledgerPut,
+  ledgerDelete,
+  chatTranscriptText,
   type ChunkDb
 } from '../../src/main/chunkIndex'
 
@@ -237,5 +241,61 @@ describe('widget chunks (#16)', () => {
     }
     const hits = searchChunks(db, 'falcon rollout', { orgId: 'personal', sourceType: 'widget' })
     expect(hits.map((h) => h.sourceId)).toEqual(['w-mine'])
+  })
+})
+
+describe('the extraction ledger (#17)', () => {
+  it('records, updates, and forgets a source version', () => {
+    const db = freshDb()
+    expect(ledgerGet(db, 'file', 'f1')).toBeNull()
+    ledgerPut(db, 'file', 'f1', ORG, 'v1-hash', 3)
+    expect(ledgerGet(db, 'file', 'f1')).toBe('v1-hash')
+    ledgerPut(db, 'file', 'f1', ORG, 'v2-hash', 0)
+    expect(ledgerGet(db, 'file', 'f1')).toBe('v2-hash')
+    ledgerDelete(db, 'file', 'f1')
+    expect(ledgerGet(db, 'file', 'f1')).toBeNull()
+  })
+
+  it('a zero-chunk verdict is remembered — that is its whole purpose', () => {
+    const db = freshDb()
+    ledgerPut(db, 'file', 'scanned-pdf', ORG, 'bytes-v1', 0)
+    // The sweep's contract: same hash → no re-extraction. The ledger answers
+    // for files that yielded nothing just like ones that yielded chunks.
+    expect(ledgerGet(db, 'file', 'scanned-pdf')).toBe('bytes-v1')
+  })
+})
+
+describe('chat transcript text (#17)', () => {
+  it('renders user/assistant turns and skips system + empty ones', () => {
+    const text = chatTranscriptText([
+      { role: 'system', content: 'be helpful' },
+      { role: 'user', content: 'What did we decide about pricing?' },
+      { role: 'assistant', content: 'Three numbers on one page.' },
+      { role: 'user', content: '   ' }
+    ])
+    expect(text).toBe('You: What did we decide about pricing?\n\nPlexii: Three numbers on one page.')
+  })
+
+  it('an empty conversation yields no text at all', () => {
+    expect(chatTranscriptText([{ role: 'system', content: 'x' }])).toBe('')
+  })
+})
+
+describe('chunk_date carries the source updatedAt', () => {
+  it('stores the caller stamp so sweeps can pre-check without loading content', () => {
+    const db = freshDb()
+    reindexSourceChunks(db, {
+      sourceType: 'chat',
+      sourceId: 'c1',
+      title: 'Pricing chat',
+      text: 'You: pricing?\n\nPlexii: three numbers.',
+      sourceKind: 'chat',
+      orgId: ORG,
+      updatedAt: 1234567
+    })
+    const row = db
+      .prepare(`SELECT chunk_date AS d FROM fb_chunks WHERE source_id = 'c1'`)
+      .get() as { d: number }
+    expect(Number(row.d)).toBe(1234567)
   })
 })

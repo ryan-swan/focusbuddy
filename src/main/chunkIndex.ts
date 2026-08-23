@@ -23,6 +23,9 @@ import { getDocMetadata } from './db/docMetadata'
 import { getWidget, listWidgetsByKind } from './db/widgets'
 import { listNodes } from './db/nodes'
 import { listTables, listRows } from './db/tables'
+import { listIndexableFiles, getIndexableFile, type IndexableFile } from './db/files'
+import { listConversations, getConversation } from './db/aiChat'
+import { extractFileText } from './fileText'
 import { widgetToText, type ResolvedTable, type WidgetTextResolvers } from '@shared/widgetText'
 import type { Widget, WidgetKind } from '@shared/types'
 import {
@@ -76,6 +79,20 @@ export function ensureChunkTables(db: ChunkDb): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fb_chunks_room ON fb_chunks(room_id)`)
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fb_chunks_date ON fb_chunks(chunk_date DESC)`)
   db.exec(`CREATE INDEX IF NOT EXISTS idx_fb_chunks_kind ON fb_chunks(source_kind)`)
+  // The extraction ledger (#17): which sources have been read, at which
+  // content version, and how many chunks came of it. Exists so an EXPENSIVE
+  // extraction (a PDF parse, an OCR pass) runs once per file version even
+  // when it yields nothing — zero chunks is a result, not an invitation to
+  // re-extract every boot.
+  db.exec(`CREATE TABLE IF NOT EXISTS fb_chunk_ledger (
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  org_id TEXT NOT NULL DEFAULT 'personal',
+  content_hash TEXT NOT NULL,
+  chunk_count INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (source_type, source_id)
+)`)
   db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS fb_chunks_fts USING fts5(
       chunk_id UNINDEXED, org_id UNINDEXED, title, text
     )`)
@@ -213,6 +230,39 @@ export function reindexSourceChunks(db: ChunkDb, input: ChunkSourceInput): numbe
 export function removeSourceChunks(db: ChunkDb, sourceType: string, sourceId: string): void {
   ensureChunkTables(db)
   db.prepare(`DELETE FROM fb_chunks WHERE source_type = ? AND source_id = ?`).run(sourceType, sourceId)
+}
+
+// ── The extraction ledger ──────────────────────────────────────────────────
+
+export function ledgerGet(db: ChunkDb, sourceType: string, sourceId: string): string | null {
+  const r = db
+    .prepare(`SELECT content_hash AS h FROM fb_chunk_ledger WHERE source_type = ? AND source_id = ?`)
+    .get(sourceType, sourceId) as { h: string } | undefined
+  return r?.h ?? null
+}
+
+export function ledgerPut(
+  db: ChunkDb,
+  sourceType: string,
+  sourceId: string,
+  orgId: string,
+  hash: string,
+  chunkCount: number
+): void {
+  db.prepare(
+    `INSERT INTO fb_chunk_ledger (source_type, source_id, org_id, content_hash, chunk_count, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(source_type, source_id) DO UPDATE SET
+       org_id = excluded.org_id, content_hash = excluded.content_hash,
+       chunk_count = excluded.chunk_count, updated_at = excluded.updated_at`
+  ).run(sourceType, sourceId, orgId, hash, chunkCount, Date.now())
+}
+
+export function ledgerDelete(db: ChunkDb, sourceType: string, sourceId: string): void {
+  db.prepare(`DELETE FROM fb_chunk_ledger WHERE source_type = ? AND source_id = ?`).run(
+    sourceType,
+    sourceId
+  )
 }
 
 // ── Search ─────────────────────────────────────────────────────────────────
@@ -550,6 +600,20 @@ export function chunkSearchWidgets(
   limit = 6,
   scopeNodeIds?: string[]
 ): WorkspaceSource[] {
+  try {
+    return chunkSearchWidgetsInner(query, limit, scopeNodeIds)
+  } catch {
+    // Retrieval must never break on an unavailable index — an empty pool is
+    // the honest degraded result, same contract as chunkIndexActive().
+    return []
+  }
+}
+
+function chunkSearchWidgetsInner(
+  query: string,
+  limit: number,
+  scopeNodeIds?: string[]
+): WorkspaceSource[] {
   const hits = searchChunks(appDb(), query, {
     orgId: getActiveOrgId(),
     sourceType: 'widget',
@@ -575,4 +639,260 @@ export function chunkSearchWidgets(
     shaped.filter((s) => !s.inScope).map((s) => s.source),
     limit
   )
+}
+
+// ── Files (#17) ────────────────────────────────────────────────────────────
+//
+// Files were @-mentionable but never FOUND — you had to already know the
+// name. This pool reads every Drive file whose format carries text (the same
+// families fileText.ts can extract) and makes its contents passage-searchable.
+// Extraction is the expensive step, so the ledger gates it: one read per file
+// version, even when the result is "no text here".
+
+const FILE_INDEXABLE_EXT = /^\.?(pdf|docx|xlsx|xls|csv|txt|md|markdown|json|tsv|log|html?|xml|yaml|yml|rtf)$/i
+const FILE_MAX_BYTES = 15 * 1024 * 1024
+// How many NEW extractions one boot sweep will run. Deferred files are
+// reported, not silently dropped, and the next boot continues where this one
+// stopped (the ledger remembers).
+export const FILE_SWEEP_BATCH = 40
+
+// Cheap version stamp — no byte read. Size + updated_at changes on every
+// ingest; synced byte overwrites bypass it, so that hook forces.
+function fileVersionHash(f: IndexableFile): string {
+  return `${CHUNK_PARAMS_VERSION}:${f.sizeBytes}:${f.updatedAt}`
+}
+
+// (Re)index one file, extraction included — async and best-effort. Missing or
+// trashed files drop their chunks; unreadable or non-text files are recorded
+// in the ledger as zero chunks so they are never re-extracted for nothing.
+export async function indexFileChunks(fileId: string, opts: { force?: boolean } = {}): Promise<void> {
+  try {
+    const db = appDb()
+    ensureChunkTables(db)
+    const f = getIndexableFile(fileId)
+    if (!f) {
+      removeSourceChunks(db, 'file', fileId)
+      ledgerDelete(db, 'file', fileId)
+      return
+    }
+    const org = getActiveOrgId()
+    const hash = fileVersionHash(f)
+    if (!opts.force && ledgerGet(db, 'file', f.id) === hash) return
+    if (!FILE_INDEXABLE_EXT.test(f.ext || '') || f.sizeBytes > FILE_MAX_BYTES) {
+      removeSourceChunks(db, 'file', f.id)
+      ledgerPut(db, 'file', f.id, org, hash, 0)
+      return
+    }
+    const text = ((await extractFileText(f.id)) ?? '').trim()
+    // fileText's honest failure note is a message to a human, not content.
+    if (!text || text.startsWith("(couldn't read")) {
+      removeSourceChunks(db, 'file', f.id)
+      ledgerPut(db, 'file', f.id, org, hash, 0)
+      return
+    }
+    const n = reindexSourceChunks(db, {
+      sourceType: 'file',
+      sourceId: f.id,
+      title: f.name,
+      text,
+      sourceKind: (f.ext || '').replace(/^\./, '').toLowerCase() || 'file',
+      orgId: org,
+      updatedAt: f.updatedAt
+    })
+    ledgerPut(db, 'file', f.id, org, hash, n)
+  } catch {
+    // Indexing must never break an ingest; the sweep reconciles later.
+  }
+}
+
+// Reconcile the file population for the active org. At most FILE_SWEEP_BATCH
+// new extractions per run — the remainder is counted and reported so a big
+// first boot converges over a few launches instead of wedging one.
+export async function sweepFileChunks(): Promise<{ indexed: number; removed: number; deferred: number }> {
+  const db = appDb()
+  ensureChunkTables(db)
+  const org = getActiveOrgId()
+  const files = listIndexableFiles()
+  const live = new Set(files.map((f) => f.id))
+  let indexed = 0
+  let deferred = 0
+  let budget = FILE_SWEEP_BATCH
+  for (const f of files) {
+    if (ledgerGet(db, 'file', f.id) === fileVersionHash(f)) continue
+    if (budget <= 0) {
+      deferred++
+      continue
+    }
+    budget--
+    await indexFileChunks(f.id)
+    indexed++
+  }
+  let removed = 0
+  const stale = db
+    .prepare(`SELECT DISTINCT source_id AS id FROM fb_chunks WHERE source_type = 'file' AND org_id = ?`)
+    .all(org) as Array<{ id: string }>
+  for (const s of stale) {
+    if (!live.has(s.id)) {
+      removeSourceChunks(db, 'file', s.id)
+      ledgerDelete(db, 'file', s.id)
+      removed++
+    }
+  }
+  // Zero-chunk ledger rows (org-scoped — file ids are unique, but another
+  // org's rows must survive an org switch) whose file is gone.
+  const lstale = db
+    .prepare(`SELECT source_id AS id FROM fb_chunk_ledger WHERE source_type = 'file' AND org_id = ?`)
+    .all(org) as Array<{ id: string }>
+  for (const s of lstale) {
+    if (!live.has(s.id)) ledgerDelete(db, 'file', s.id)
+  }
+  return { indexed, removed, deferred }
+}
+
+// The file pool for retrieval: docType 'file', titled by the Drive name.
+export function chunkSearchFiles(query: string, limit = 6): WorkspaceSource[] {
+  try {
+    return chunkSearchFilesInner(query, limit)
+  } catch {
+    return [] // same best-effort contract as the widget pool
+  }
+}
+
+function chunkSearchFilesInner(query: string, limit: number): WorkspaceSource[] {
+  const hits = searchChunks(appDb(), query, {
+    orgId: getActiveOrgId(),
+    sourceType: 'file',
+    limit
+  })
+  return hits.map((h, i) => {
+    const joined = h.passages.join('\n…\n')
+    return {
+      docId: h.sourceId,
+      title: h.title || 'Untitled file',
+      docType: 'file',
+      snippet: joined.replace(/\s+/g, ' ').trim().slice(0, 200),
+      text: selectPassages(query, joined),
+      score: 1 - i * 0.01
+    }
+  })
+}
+
+// ── Chat history (#17, the mechanism behind #18) ───────────────────────────
+//
+// Past Plexii conversations become a retrieval pool, so "what did we decide
+// about pricing last week" has somewhere to look. The transcript is indexed
+// as plain turns; the CURRENT conversation is excluded at search time (its
+// content is already the model's message history — citing it back as a
+// discovered source would be theatre).
+
+// Pure, exported for tests: a conversation's messages as indexable text.
+export function chatTranscriptText(
+  messages: Array<{ role: string; content: string }>
+): string {
+  return messages
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim().length > 0)
+    .map((m) => `${m.role === 'user' ? 'You' : 'Plexii'}: ${m.content.trim()}`)
+    .join('\n\n')
+}
+
+// (Re)index one conversation — the append/rename chokepoints, best-effort.
+// getConversation is org-guarded: a conversation the active org does not own
+// resolves null and is left alone (its own org reindexes it), EXCEPT when the
+// caller knows it was deleted (removed = true), which drops chunks globally.
+export function reindexChatChunks(conversationId: string, removed = false): void {
+  try {
+    const db = appDb()
+    if (removed) {
+      removeSourceChunks(db, 'chat', conversationId)
+      return
+    }
+    const convo = getConversation(conversationId)
+    if (!convo) return
+    const text = chatTranscriptText(convo.messages)
+    if (!text.trim()) {
+      removeSourceChunks(db, 'chat', conversationId)
+      return
+    }
+    reindexSourceChunks(db, {
+      sourceType: 'chat',
+      sourceId: conversationId,
+      title: convo.meta.title?.trim() || convo.meta.preview?.trim() || 'Untitled chat',
+      text,
+      sourceKind: 'chat',
+      roomId: convo.meta.taskId ?? null,
+      orgId: getActiveOrgId(),
+      updatedAt: convo.meta.updatedAt
+    })
+  } catch {
+    // Indexing must never break a chat write; the sweep reconciles later.
+  }
+}
+
+// Reconcile the active org's conversations. The cheap pre-check rides
+// chunk_date (stored as the conversation's updated_at), so an untouched
+// conversation costs one SELECT, not a transcript load.
+export function sweepChatChunks(): { indexed: number; removed: number } {
+  const db = appDb()
+  ensureChunkTables(db)
+  const org = getActiveOrgId()
+  const convos = listConversations()
+  const live = new Set(convos.map((c) => c.id))
+  let indexed = 0
+  for (const c of convos) {
+    const fresh = db
+      .prepare(
+        `SELECT 1 FROM fb_chunks WHERE source_type = 'chat' AND source_id = ? AND chunk_date = ? LIMIT 1`
+      )
+      .get(c.id, c.updatedAt)
+    if (fresh) continue
+    reindexChatChunks(c.id)
+    indexed++
+  }
+  let removed = 0
+  const stale = db
+    .prepare(`SELECT DISTINCT source_id AS id FROM fb_chunks WHERE source_type = 'chat' AND org_id = ?`)
+    .all(org) as Array<{ id: string }>
+  for (const s of stale) {
+    if (!live.has(s.id)) {
+      removeSourceChunks(db, 'chat', s.id)
+      removed++
+    }
+  }
+  return { indexed, removed }
+}
+
+// The chat pool for retrieval: docType 'chat', titled by the conversation.
+export function chunkSearchChats(
+  query: string,
+  limit = 6,
+  excludeConversationId?: string
+): WorkspaceSource[] {
+  try {
+    return chunkSearchChatsInner(query, limit, excludeConversationId)
+  } catch {
+    return [] // same best-effort contract as the widget pool
+  }
+}
+
+function chunkSearchChatsInner(
+  query: string,
+  limit: number,
+  excludeConversationId?: string
+): WorkspaceSource[] {
+  const hits = searchChunks(appDb(), query, {
+    orgId: getActiveOrgId(),
+    sourceType: 'chat',
+    limit: limit + 1
+  }).filter((h) => h.sourceId !== excludeConversationId)
+  return hits.slice(0, limit).map((h, i) => {
+    const joined = h.passages.join('\n…\n')
+    return {
+      docId: h.sourceId,
+      title: h.title || 'Untitled chat',
+      docType: 'chat',
+      snippet: joined.replace(/\s+/g, ' ').trim().slice(0, 200),
+      text: selectPassages(query, joined),
+      score: 1 - i * 0.01
+    }
+  })
 }
