@@ -6,7 +6,7 @@
 // semanticRetrieval.ts. Both are unit-testable without the database.
 
 import { listDocuments, getDocument } from './db/documents'
-import { extractDocText, rankSources, type WorkspaceSource } from './workspaceRank'
+import { extractDocText, rankSources, relevanceGate, type WorkspaceSource } from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
 import { collectExtraSources } from './workspaceExtras'
@@ -56,8 +56,12 @@ export async function retrieveSources(
 
   // Interleave the three pools round-robin so documents, tasks/tables/notes and
   // knowledge all get a fair shot at the limited source slots. Curated knowledge
-  // still leads each round.
-  const pools = [kSources, docSources, extraSources]
+  // still leads each round. Each pool passes the relevance gate first: a weak
+  // single-term coincidence must not ride into the trace looking analysed
+  // (Caleb's drive: an SDR question dragged in every doc containing
+  // "research"). An emptied pool is an honest result — the trace says
+  // "nothing relevant" and web results lead.
+  const pools = [kSources, docSources, extraSources].map((p) => relevanceGate(query, p))
   const merged: WorkspaceSource[] = []
   const seen = new Set<string>()
   for (let i = 0; merged.length < limit && pools.some((p) => p[i]); i++) {

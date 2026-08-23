@@ -219,3 +219,30 @@ export function rankSources(
   scored.sort((a, b) => b.score - a.score)
   return scored.slice(0, limit)
 }
+
+// The relevance gate (A2 prep, from Caleb's live-drive feedback). Keyword
+// pools admit anything with a single term hit, so "Research the best ways to
+// be an SDR in 2026" dragged every doc containing "research" into the trace
+// as if it had been analysed. A source must match enough of the question to
+// plausibly be ABOUT it: distinct-term coverage scaled to the query's size
+// (5+ signal terms need 3 hits, 3-4 need 2, shorter queries 1), and at least
+// 30% of the pool's top score, so one strong match pushes the weak tail out.
+// Per-pool, because scores are not comparable across pools. Keyword-only by
+// design: when semantic ranking goes live (A2), its matches bypass term
+// coverage — "churn" finding "attrition" with zero shared terms is the whole
+// point — and get the relative cut derived from the measured cosine overlap
+// instead.
+export function relevanceGate(query: string, sources: WorkspaceSource[]): WorkspaceSource[] {
+  if (sources.length === 0) return sources
+  const terms = queryTerms(query)
+  if (terms.length === 0) return sources
+  const needed = terms.length >= 5 ? 3 : terms.length >= 3 ? 2 : 1
+  const top = Math.max(...sources.map((s) => s.score))
+  return sources.filter((s) => {
+    const hay = `${s.title}\n${s.text}`.toLowerCase()
+    let hits = 0
+    for (const t of terms) if (hay.includes(t)) hits++
+    if (hits < needed) return false
+    return s.score >= top * 0.3
+  })
+}

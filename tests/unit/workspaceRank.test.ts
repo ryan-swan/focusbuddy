@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { rankSources, extractDocText, chunkText } from '../../src/main/workspaceRank'
+import { rankSources, extractDocText, chunkText, relevanceGate } from '../../src/main/workspaceRank'
+import type { WorkspaceSource } from '../../src/main/workspaceRank'
 
 describe('extractDocText', () => {
   it('pulls text from a Tiptap document body', () => {
@@ -74,5 +75,45 @@ describe('rankSources — chunk-level grounding', () => {
     // The returned grounding text carries the matching passage, not the doc head.
     expect(r[0].text).toContain('refund policy allows thirty day returns')
     expect(r[0].snippet.toLowerCase()).toContain('refund')
+  })
+})
+
+describe('relevanceGate (A1 drive feedback: coincidences must not pad the trace)', () => {
+  const src = (docId: string, title: string, text: string, score: number): WorkspaceSource => ({
+    docId,
+    title,
+    docType: 'document',
+    snippet: '',
+    text,
+    score
+  })
+
+  it('drops single-term coincidences on a wordy query — the SDR scenario', () => {
+    const q = 'Research the best ways to be an SDR in 2026'
+    const kept = relevanceGate(q, [
+      src('a', 'SDR outreach playbook', 'sdr research: the ways teams prospect in 2026', 10),
+      src('b', 'Research & Intake — index', 'an index of intake material', 4),
+      src('c', 'Sales SOPs — index', 'standard operating procedures', 3)
+    ])
+    expect(kept.map((s) => s.docId)).toEqual(['a'])
+  })
+
+  it('a short query still matches on a single hit', () => {
+    const kept = relevanceGate('Henderson', [
+      src('a', 'Henderson renewal', 'the henderson contract terms', 5)
+    ])
+    expect(kept).toHaveLength(1)
+  })
+
+  it('a strong match pushes the weak tail out even when coverage passes', () => {
+    const kept = relevanceGate('wedding venue budget', [
+      src('a', 'Wedding budget', 'venue wedding budget ceiling and totals', 20),
+      src('b', 'Old note', 'wedding venue mentioned once in passing', 2)
+    ])
+    expect(kept.map((s) => s.docId)).toEqual(['a'])
+  })
+
+  it('passes everything through when the query carries no signal terms', () => {
+    expect(relevanceGate('a of the', [src('a', 'T', 'x', 1)])).toHaveLength(1)
   })
 })
