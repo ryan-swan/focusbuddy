@@ -66,12 +66,12 @@ export function DashboardHeader({
   return (
     <header className="flex items-start justify-between gap-4 flex-wrap mb-5">
       <div className="min-w-0">
-        <h1 className="fb-display-hero text-[22px] leading-tight text-[var(--ink-100)] flex items-center gap-2">
+        <h1 className="fb-display-hero fb-t-hero text-[var(--ink-100)] flex items-center gap-2">
           {greeting ?? title}
           {greeting && <span className="text-[20px]">👋</span>}
         </h1>
         {(subtitle || greeting) && (
-          <p className="mt-1 text-[13px] text-[var(--ink-50)]">{subtitle ?? title}</p>
+          <p className="mt-1 fb-t-body text-[var(--ink-50)]">{subtitle ?? title}</p>
         )}
       </div>
       {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
@@ -219,7 +219,7 @@ export function ListRow({
     <Tag
       onClick={onClick}
       style={depth > 0 ? { paddingLeft: depth * 14 + 8 } : undefined}
-      className={`flex items-center gap-2 rounded-lg transition-colors ${
+      className={`flex items-center gap-2 rounded-[var(--radius-row)] transition-colors ${
         active ? 'bg-[rgb(var(--accent)/0.10)]' : 'hover:bg-[var(--surface-sunken)]'
       } ${className}`}
     >
