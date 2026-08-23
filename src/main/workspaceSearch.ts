@@ -9,6 +9,7 @@ import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, rankSources, relevanceGate, type WorkspaceSource } from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
+import { chunkIndexActive, chunkSearchDocuments } from './chunkIndex'
 import { collectExtraSources } from './workspaceExtras'
 
 export type { WorkspaceSource } from './workspaceRank'
@@ -44,11 +45,14 @@ export async function retrieveSources(
     })
     .filter((k) => k.text.trim().length > 0)
 
-  // Documents are ranked by meaning when an embedding key is set and by keyword
-  // otherwise, the same honest fallback knowledge uses. semanticSearchDocuments
-  // builds the document pool itself, so the duplicate listDocuments walk that
-  // used to live here is gone.
-  const docSources = await semanticSearchDocuments(query, limit)
+  // Documents ride the chunk index (A2, R10): passage-level BM25 over
+  // fb_chunks_fts, so a question matches the paragraph that answers it
+  // rather than a substring of a document's opening (defect #2). A fresh
+  // profile before its first sweep falls back to the legacy whole-document
+  // path — the same results as before, never fewer.
+  const docSources = chunkIndexActive()
+    ? chunkSearchDocuments(query, limit)
+    : await semanticSearchDocuments(query, limit)
 
   // Extras: tasks, tables and canvas notes — the rest of the environment, so the
   // brain is grounded in more than documents. Keyword-ranked.

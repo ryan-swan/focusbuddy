@@ -337,6 +337,7 @@ import {
   reindexDocuments,
   documentSemanticActive
 } from '../documentRetrieval'
+import { reindexDocumentChunks } from '../chunkIndex'
 import { enrichDocument, enrichAllDocuments } from '../ai/enrichDocuments'
 import { localModelStatus } from '../ai/localModel'
 import { getDocMetadata } from '../db/docMetadata'
@@ -2665,7 +2666,9 @@ export function registerIpcHandlers(): void {
   // Permanent removal is only the Trash view's explicit "Delete forever".
   ipcMain.handle('documents:delete', (_e, id: string) => {
     bumpAnswerCacheVersion() // the doc set changed — invalidate cached answers
-    return trashDocument(id)
+    const ok = trashDocument(id)
+    reindexDocumentChunks(id) // the doc is now trashed: its chunks come out
+    return ok
   })
   ipcMain.handle('documents:listTrashed', () => listTrashedDocuments())
   ipcMain.handle('documents:restore', (_e, id: string) => {
@@ -2676,7 +2679,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('documents:purge', (_e, id: string) => {
     deleteEmbedding('document', id)
     bumpAnswerCacheVersion() // the doc set changed — invalidate cached answers
-    return deleteDocument(id)
+    const ok = deleteDocument(id)
+    reindexDocumentChunks(id)
+    return ok
   })
   // Version history.
   ipcMain.handle('documents:listSnapshots', (_e, docId: string) => listDocSnapshots(docId))

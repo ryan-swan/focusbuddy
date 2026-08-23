@@ -13,6 +13,7 @@ import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
 import { listDocMetadata, getDocMetadata, type DocMetadata } from './db/docMetadata'
 import { bumpAnswerCacheVersion } from './ai/answerCache'
 import { cosineSim, blendSemantic, type ScoredItem } from '@shared/semantic'
+import { reindexDocumentChunks } from './chunkIndex'
 
 const KIND = 'document'
 // Cap the text we embed so a very long document stays inside the embedding
@@ -93,6 +94,9 @@ export async function embedDocument(docId: string): Promise<void> {
   // A document changed (this is the save/restore chokepoint), so any cached
   // workspace answer is now potentially stale — invalidate the answer cache.
   bumpAnswerCacheVersion()
+  // Keep the chunk index in step (A2, R10): content-hash cheap, synchronous,
+  // and independent of the embedding key below.
+  reindexDocumentChunks(docId)
   const full = getDocument(docId)
   if (!full) return
   const meta = listDocuments().find((m) => m.id === docId)
