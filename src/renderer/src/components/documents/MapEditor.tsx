@@ -655,6 +655,7 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
         ))}
         <div className="w-px h-4 bg-[var(--edge-firm)] mx-0.5" />
         {NODE_COLORS.map((c) => (
+          // Swatch containment: a literal hairline holds arbitrary colours, including white-on-white.
           <button
             key={c}
             onClick={() => setColor(c)}

@@ -303,6 +303,7 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
         <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onPickImage} />
         <div className="w-px h-4 bg-[var(--surface-sunken)] mx-0.5" />
         {NODE_COLORS.map((c) => (
+          // Swatch containment: a literal hairline holds arbitrary colours.
           <button
             key={c}
             onClick={() => setColor(c)}

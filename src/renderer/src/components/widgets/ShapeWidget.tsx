@@ -179,6 +179,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
         className="absolute top-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full fb-glass-chrome border px-1.5 py-1 shadow-[var(--shadow-cast)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         onMouseDown={(e) => e.stopPropagation()}
       >
+        {/* Dark HUD toolbar over arbitrary shape colours; literal by design. */}
         <select
           value={data.shape}
           onChange={(e) => set({ shape: e.target.value as ShapeType })}

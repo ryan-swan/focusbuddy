@@ -124,6 +124,7 @@ export default function NoteWidget({ widget, inline = false }: Props): JSX.Eleme
           if (block.type === 'table') {
             return (
               <div key={`t${bi}`} className="my-1.5 overflow-auto" data-testid={`note-table-${bi}`}>
+                {/* Note paper table: rules are drawn relative to the always-light paper, not the theme. */}
                 <table className="border-collapse text-[0.92em] font-sans">
                   <thead>
                     <tr>

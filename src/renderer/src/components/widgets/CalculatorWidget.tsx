@@ -84,6 +84,7 @@ export default function CalculatorWidget({ widget, inline = false }: Props): JSX
 
   const content = (
     <div className={`h-full w-full bg-[#f6f3eb] flex flex-col gap-2 ${inline ? 'p-6' : 'p-2'}`}>
+      {/* Calculator face: a physical-object material, forced light in every theme. */}
       <div
         className={`flex-1 min-h-0 bg-white border border-stone-300 rounded p-2 flex flex-col justify-end overflow-hidden`}
       >

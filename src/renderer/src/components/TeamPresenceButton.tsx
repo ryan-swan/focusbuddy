@@ -121,7 +121,7 @@ export default function TeamPresenceButton(): JSX.Element | null {
             })()}
             className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[200] w-72 overflow-hidden"
           >
-          <div className="px-3 py-2.5 border-b border-[var(--edge-soft)] dark:border-white/10">
+          <div className="px-3 py-2.5 border-b border-[var(--edge-soft)]">
             <div className="flex items-center justify-between">
               <h3 className="text-[12px] font-semibold uppercase tracking-tight text-[var(--ink-70)]">
                 Team
@@ -163,7 +163,7 @@ export default function TeamPresenceButton(): JSX.Element | null {
               <button
                 onClick={() => setStatus(myStatus === 'busy' ? 'online' : 'busy')}
                 disabled={myInvisible}
-                className="fb-btn-surface text-[10.5px] px-2 py-1 dark:border-white/10 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.06] disabled:opacity-40"
+                className="fb-btn-surface text-[10.5px] px-2 py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.06] disabled:opacity-40"
                 title="Toggle do-not-disturb"
               >
                 {myStatus === 'busy' ? 'Available' : 'Busy'}
@@ -174,7 +174,7 @@ export default function TeamPresenceButton(): JSX.Element | null {
                 className={`text-[10.5px] px-2 py-1 rounded-md border inline-flex items-center gap-1 ${
                   myInvisible
                     ? 'border-accent/40 text-accent hover:bg-accent/[0.06]'
-                    : 'border-[var(--edge-soft)] dark:border-white/10 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.06]'
+                    : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] dark:hover:bg-white/[0.06]'
                 }`}
                 title={myInvisible ? 'Go back online to your team' : 'Hide yourself from the People Map and team presence'}
               >

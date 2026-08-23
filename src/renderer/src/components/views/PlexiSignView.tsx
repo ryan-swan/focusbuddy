@@ -103,6 +103,7 @@ function SignBox({ signer, onSign }: { signer: Signer; onSign: (kind: SignatureK
         </span>
       </div>
       {kind === 'typed' ? (
+        // Signature stage: forced-dark pad in every theme; its hairline is relative to the stage.
         <input
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
@@ -154,7 +155,7 @@ function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
             <input
               defaultValue={req.title}
               onBlur={(e) => void update(req.id, { title: e.target.value })}
-              className="w-full text-[16px] font-semibold bg-transparent text-stone-900 dark:text-stone-50 border-b border-transparent hover:border-stone-300 focus:border-accent"
+              className="w-full text-[16px] font-semibold bg-transparent text-stone-900 dark:text-stone-50 border-b border-transparent hover:border-[var(--edge-firm)] focus:border-accent"
             />
           ) : (
             <h2 className="text-[16px] font-semibold text-stone-900 dark:text-stone-50 truncate">{req.title}</h2>
@@ -169,7 +170,7 @@ function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
             <button onClick={() => void send(req.id)} className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-accent text-white" data-testid="sign-send">Send</button>
           )}
           {req.status === 'out_for_signature' && (
-            <button onClick={() => void voidRequest(req.id)} className="text-[12px] px-3 py-1.5 rounded-lg border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300">Void</button>
+            <button onClick={() => void voidRequest(req.id)} className="fb-btn-surface text-[12px] px-3 py-1.5 text-[var(--ink-60)]">Void</button>
           )}
         </div>
       </div>
@@ -180,10 +181,10 @@ function RequestDetail({ req }: { req: PlexiSignRequest }): JSX.Element {
           defaultValue={req.body}
           onBlur={(e) => void update(req.id, { body: e.target.value })}
           placeholder="Paste or write the agreement to be signed…"
-          className="w-full h-40 text-[13px] leading-relaxed px-3 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent"
+          className="fb-field w-full h-40 text-[13px] leading-relaxed px-3 py-2"
         />
       ) : (
-        <div className="text-[13px] leading-relaxed whitespace-pre-wrap px-3 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 max-h-48 overflow-auto">
+        <div className="text-[13px] leading-relaxed whitespace-pre-wrap px-3 py-2 rounded-lg bg-[var(--surface-sunken)] max-h-48 overflow-auto">
           {req.body || <span className="text-stone-400">No agreement text.</span>}
         </div>
       )}
@@ -258,9 +259,9 @@ function Composer({ onCreate, onClose }: { onCreate: (t: string, b: string, name
   const names = signers.split(/[\n,]/).map((n) => n.trim()).filter(Boolean)
   return (
     <div className={`${PLEXI_CARD} p-3`} data-testid="sign-composer">
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Agreement title" className="w-full text-[13px] font-medium px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent" data-testid="sign-new-title" />
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="What is being agreed…" className="mt-2 w-full h-20 text-[12.5px] px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent" />
-      <textarea value={signers} onChange={(e) => setSigners(e.target.value)} placeholder="Signers, one per line or comma-separated (in signing order)" className="mt-2 w-full h-16 text-[12.5px] px-2.5 py-2 rounded-lg bg-stone-50 dark:bg-white/[0.03] border border-stone-200 dark:border-white/10 focus:border-accent" />
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Agreement title" className="fb-field w-full text-[13px] font-medium px-2.5 py-2" data-testid="sign-new-title" />
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="What is being agreed…" className="fb-field mt-2 w-full h-20 text-[12.5px] px-2.5 py-2" />
+      <textarea value={signers} onChange={(e) => setSigners(e.target.value)} placeholder="Signers, one per line or comma-separated (in signing order)" className="fb-field mt-2 w-full h-16 text-[12.5px] px-2.5 py-2" />
       <div className="mt-2 flex items-center gap-2">
         <button onClick={() => onCreate(title || 'Untitled agreement', body, names)} disabled={!title.trim()} className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-accent text-white disabled:opacity-40" data-testid="sign-new-create">Create draft</button>
         <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg text-stone-500">Cancel</button>

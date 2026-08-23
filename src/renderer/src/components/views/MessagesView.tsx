@@ -633,7 +633,7 @@ export default function MessagesView(): JSX.Element {
   return (
     <div className="h-full flex desk-paper no-tod">
       {/* Conversation list */}
-      <div className="w-64 shrink-0 border-r border-stone-200 dark:border-stone-800 flex flex-col">
+      <div className="w-64 shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
         <div className="px-3 py-3 flex items-center justify-between">
           <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Messages</h1>
           <div className="flex items-center gap-1">
@@ -700,7 +700,7 @@ export default function MessagesView(): JSX.Element {
                 placeholder="@handle or email"
                 autoFocus
                 data-testid="messages-new-handle"
-                className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px]"
+                className="fb-field flex-1 px-2 py-1 text-[12px]"
               />
               <button onClick={() => void submitNew()} className="btn-primary px-2 py-1 text-[11px]">
                 Start
@@ -718,7 +718,7 @@ export default function MessagesView(): JSX.Element {
               placeholder="Search messages…"
               autoFocus
               data-testid="messages-search-input"
-              className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[12px]"
+              className="fb-field w-full px-2 py-1 text-[12px]"
             />
           </div>
         )}
@@ -738,7 +738,7 @@ export default function MessagesView(): JSX.Element {
                     setViewingActivity(false)
                   }}
                   data-testid="activity-item"
-                  className="w-full text-left px-3 py-2 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors"
+                  className="w-full text-left px-3 py-2 border-b border-[var(--edge-soft)] hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors"
                 >
                   <div className="text-[11px] font-medium text-stone-700 dark:text-stone-300 truncate inline-flex items-center gap-1">
                     <Icon name={a.reason === 'mention' ? 'alternate_email' : 'reply'} size={11} className="text-accent" />
@@ -761,7 +761,7 @@ export default function MessagesView(): JSX.Element {
                     setSearchQuery('')
                   }}
                   data-testid="search-hit"
-                  className="w-full text-left px-3 py-2 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors"
+                  className="w-full text-left px-3 py-2 border-b border-[var(--edge-soft)] hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors"
                 >
                   <div className="text-[11px] font-medium text-stone-700 dark:text-stone-300 truncate">
                     {h.conversationTitle}
@@ -780,7 +780,7 @@ export default function MessagesView(): JSX.Element {
                 key={c.id}
                 onClick={() => void open(c.id)}
                 data-testid="conversation-row"
-                className={`w-full text-left px-3 py-2 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors ${
+                className={`w-full text-left px-3 py-2 border-b border-[var(--edge-soft)] hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors ${
                   c.id === activeId ? 'bg-accent/[0.06]' : ''
                 }`}
               >
@@ -830,7 +830,7 @@ export default function MessagesView(): JSX.Element {
           // list, and the receiver must be able to reply immediately. Title
           // falls back until the list catches up.
           <>
-            <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between gap-2">
+            <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0">
                 <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
                 <span className="truncate">{headerTitle}</span>
@@ -970,7 +970,7 @@ export default function MessagesView(): JSX.Element {
                             }}
                             placeholder="@handle to add"
                             data-testid="members-add-handle"
-                            className="flex-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded px-2 py-1 text-[11px]"
+                            className="fb-field flex-1 px-2 py-1 text-[11px]"
                           />
                         </div>
                         {memberError && <div className="text-[10px] text-red-500 mt-1">{memberError}</div>}
@@ -1144,10 +1144,10 @@ function ThreadPanel({
 
   return (
     <div
-      className="w-80 shrink-0 border-l border-stone-200 dark:border-stone-800 flex flex-col"
+      className="w-80 shrink-0 border-l border-[var(--edge-soft)] flex flex-col"
       data-testid="thread-panel"
     >
-      <div className="px-4 py-3 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">
         <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5">
           <Icon name="forum" size={14} className="text-accent" /> Thread
         </h2>
@@ -1209,7 +1209,7 @@ function ThreadPanel({
               translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
               onReact={(e) => void react(parent.id, e)}
             />
-            <div className="text-[10px] uppercase tracking-wide text-stone-400 border-b border-stone-100 dark:border-stone-800/60 pb-1">
+            <div className="text-[10px] uppercase tracking-wide text-stone-400 border-b border-[var(--edge-soft)] pb-1">
               {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
             </div>
           </>
@@ -1226,7 +1226,7 @@ function ThreadPanel({
         ))}
         <div ref={endRef} />
       </div>
-      <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-800 flex items-end gap-2">
+      <div className="px-3 py-3 border-t border-[var(--edge-soft)] flex items-end gap-2">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -1239,7 +1239,7 @@ function ThreadPanel({
           placeholder="Reply…"
           rows={1}
           data-testid="thread-composer"
-          className="flex-1 resize-none bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:border-accent"
+          className="fb-field flex-1 resize-none px-3 py-2 text-[13px]"
         />
         <button
           onClick={() => void submit()}

@@ -302,6 +302,7 @@ export default function SectionWidget({
             {children.length}
           </span>
 
+          {/* Section header chrome sits on the user's own colour; white literals are relative to it. */}
           <div
             className="flex items-center gap-0.5 pl-1.5 border-l border-white/30"
             onMouseDown={(e) => e.stopPropagation()}

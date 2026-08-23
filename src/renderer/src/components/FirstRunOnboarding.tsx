@@ -139,6 +139,7 @@ export default function FirstRunOnboarding(): JSX.Element | null {
       aria-label="Welcome to PlexiDesk"
       aria-modal="true"
     >
+      {/* Onboarding stage: forced-dark card in every theme; hairlines are relative to the stage. */}
       <div className="w-[560px] max-w-[92vw] rounded-2xl bg-[rgba(16,24,39,0.96)] border border-white/10 shadow-2xl overflow-hidden text-stone-100">
         {/* Progress dots */}
         <div className="flex items-center gap-1.5 px-6 pt-5">

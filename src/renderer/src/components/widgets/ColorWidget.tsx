@@ -63,6 +63,7 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
 
   const content = (
     <div className={`h-full w-full bg-[var(--surface-raised)] flex flex-col gap-2 ${inline ? 'p-6' : 'p-3'}`}>
+      {/* Swatch containment: a literal hairline holds the arbitrary picked colour. */}
       <div
         className={`flex-1 rounded border border-black/10 ${inline ? 'min-h-[200px]' : 'min-h-[60px]'}`}
         style={{ backgroundColor: color }}
@@ -89,7 +90,7 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
       <div className="flex gap-1.5">
         <button
           onClick={() => void copyHex()}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded bg-stone-100 hover:bg-stone-200 text-stone-900 border border-stone-300"
+          className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5"
         >
           <Icon name={copied ? 'check' : 'content_copy'} size={14} />
           <span>{copied ? 'copied' : 'copy hex'}</span>

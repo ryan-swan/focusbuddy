@@ -76,6 +76,7 @@ export default function CallOverlay(): JSX.Element | null {
   // Incoming call: a compact card with accept / decline.
   if (status === 'incoming') {
     return (
+      // Video stage: forced-dark chrome; white hairlines are relative to the stage, not the theme.
       <div className="fixed bottom-5 right-5 z-[200] w-[300px] rounded-2xl bg-stone-900 text-white shadow-2xl border border-white/10 p-4" data-testid="call-incoming">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold uppercase">
@@ -117,6 +118,7 @@ export default function CallOverlay(): JSX.Element | null {
 
   // Active call window (outgoing/connecting/connected/ended).
   return (
+    // Video stage: forced-dark chrome; white hairlines are relative to the stage, not the theme.
     <div className="fixed bottom-5 right-5 z-[200] w-[360px] rounded-2xl bg-stone-900 text-white shadow-2xl border border-white/10 overflow-hidden" data-testid="call-window">
       <div className="relative aspect-video bg-stone-950">
         {media === 'video' && remoteStream ? (

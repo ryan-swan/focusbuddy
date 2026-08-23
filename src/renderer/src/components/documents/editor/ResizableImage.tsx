@@ -43,6 +43,7 @@ function ImageView({ node, updateAttributes, selected }: NodeViewProps): JSX.Ele
         draggable={false}
       />
       {selected && (
+        // Resize handle: the contrast ring keeps it visible over any image.
         <span
           onMouseDown={startResize}
           className="absolute -bottom-1 -right-1 h-3 w-3 rounded-sm bg-accent border-2 border-white dark:border-stone-900 cursor-nwse-resize"

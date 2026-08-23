@@ -153,7 +153,7 @@ export default function ShortcutsOverlay({ onClose }: { onClose: () => void }): 
             onClose()
           }
         }}
-        className="fb-card w-[min(640px,92vw)] max-h-[80vh] overflow-auto dark:border-white/10 p-5"
+        className="fb-card w-[min(640px,92vw)] max-h-[80vh] overflow-auto p-5"
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

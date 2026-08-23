@@ -101,6 +101,7 @@ export default function DocBubbleMenu({ editor, onAiRewrite }: Props): JSX.Eleme
         options={{ placement: 'bottom', offset: 8 }}
         shouldShow={({ editor: e, from, to }) => from !== to && !e.isActive('codeBlock')}
       >
+        {/* Forced-dark bubble chrome over the always-light page paper; its edge is relative to the paper. */}
         <div
           data-testid="doc-bubble-menu"
           // Keep the editor selection alive when a button is pressed. Without this,

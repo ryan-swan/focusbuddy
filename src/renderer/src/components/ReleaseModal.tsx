@@ -39,13 +39,13 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-white/10 bg-[var(--surface-raised)] shadow-2xl"
+        className="fb-card flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={`What's new in PlexiDesk ${versionLabel}`}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--edge-soft)]/70 px-5 py-4 dark:border-white/10">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--edge-soft)] px-5 py-4">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
               <Icon name="auto_awesome" size={14} />
@@ -100,7 +100,7 @@ export default function ReleaseModal({ entry, onClose }: Props): JSX.Element {
           )}
         </div>
 
-        <div className="flex items-center justify-end border-t border-[var(--edge-soft)]/70 px-5 py-3 dark:border-white/10">
+        <div className="flex items-center justify-end border-t border-[var(--edge-soft)] px-5 py-3">
           <button onClick={onClose} className="btn-primary text-sm">
             Got it
           </button>

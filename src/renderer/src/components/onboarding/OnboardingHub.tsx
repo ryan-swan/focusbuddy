@@ -36,6 +36,7 @@ export default function OnboardingHub(): JSX.Element | null {
       role="dialog"
       aria-label="Tours and onboarding"
     >
+      {/* Onboarding stage: forced-dark card in every theme; hairlines are relative to the stage. */}
       <div
         className="w-[520px] max-w-[92vw] rounded-2xl bg-[rgba(16,24,39,0.97)] border border-white/10 shadow-2xl text-stone-100 overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}

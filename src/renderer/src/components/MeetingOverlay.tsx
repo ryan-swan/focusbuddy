@@ -130,6 +130,7 @@ export default function MeetingOverlay(): JSX.Element | null {
   // Incoming invite while not in a room: a compact ringing card.
   if (status === 'idle' && incomingInvite) {
     return (
+      // Video stage: forced-dark chrome; white hairlines are relative to the stage, not the theme.
       <div className="fixed bottom-5 right-5 z-[200] w-[320px] rounded-2xl bg-stone-900 text-white shadow-2xl border border-white/10 p-4" data-testid="meeting-invite">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold">

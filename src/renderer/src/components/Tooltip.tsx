@@ -102,6 +102,7 @@ export default function Tooltip({
       {children}
       {open &&
         createPortal(
+          // Tooltip is a forced-dark surface in every theme; its hairline is relative to that stage, not the theme.
           <div
             ref={tipRef}
             role="tooltip"

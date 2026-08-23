@@ -192,6 +192,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
                   <thead>
                     <tr>
                       {block.headers.map((h, hi) => (
+                        // Sticky paper table: rules are drawn relative to the sticky's own paper colour.
                         <th key={hi} className="border border-black/20 px-1.5 py-0.5 bg-black/[0.04] text-left font-semibold align-top">
                           {renderInline(h)}
                         </th>
@@ -301,6 +302,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
             className="h-6 w-6 shrink-0 rounded-full inline-flex items-center justify-center"
             aria-label={`Color ${c}`}
           >
+            {/* Swatch containment on the sticky's own paper. */}
             <span
               className="h-3 w-3 rounded-full border border-black/10 hover:scale-125 transition-transform"
               style={{ backgroundColor: c }}

@@ -626,7 +626,7 @@ export default function VoiceCommandFAB({ embedded = false }: FABProps): JSX.Ele
                   }}
                   rows={3}
                   placeholder={transcript ? '' : 'Transcribing…'}
-                  className="w-full bg-stone-50/40 dark:bg-stone-800/40 border border-stone-200/60 dark:border-stone-700/60 rounded px-2 py-1.5 text-[12px] text-stone-900 dark:text-stone-100 focus:border-accent resize-none"
+                  className="fb-field w-full px-2 py-1.5 text-[12px] resize-none"
                   data-testid="voice-command-transcript"
                 />
                 <div className="flex items-center justify-between mt-2">

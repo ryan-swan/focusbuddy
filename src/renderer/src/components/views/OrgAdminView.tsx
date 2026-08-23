@@ -978,7 +978,7 @@ function OfficeRow({
     )
   }
   return (
-    <div className="rounded-lg border border-[var(--edge-soft)]/70 dark:border-white/10 p-2" data-testid={`office-row-${office.id}`}>
+    <div className="rounded-lg border border-[var(--edge-soft)] p-2" data-testid={`office-row-${office.id}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <input defaultValue={office.name} onBlur={(e) => onSave({ name: e.target.value })} className={`${field} flex-1 min-w-[120px] font-medium`} data-testid="office-name" />
         <select defaultValue={office.kind} onChange={(e) => onSave({ kind: e.target.value as OfficeKind })} className={field}>

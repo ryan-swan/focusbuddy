@@ -75,6 +75,7 @@ export default function PresentOverlay({ slides, theme, startIndex, onClose }: P
         </div>
       </div>
 
+      {/* Presenter stage: forced-dark chrome over the slide; hairlines are relative to the stage. */}
       <div className="w-[340px] shrink-0 border-l border-white/10 p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="text-[12px] uppercase tracking-wide text-white/50">Presenter</span>

@@ -65,7 +65,7 @@ export default function SharedRecipientBadges({
 
       {open && (
         <span
-          className="absolute left-0 top-5 z-[60] min-w-[160px] max-w-[240px] rounded-lg bg-stone-900 border border-stone-700 shadow-xl p-2 text-[11px] text-stone-200"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 top-5 z-[60] min-w-[160px] max-w-[240px] p-2 text-[11px] text-[var(--ink-70)]"
           data-testid="shared-recipient-tooltip"
         >
           <div className="text-[9px] uppercase tracking-wider text-stone-500 mb-1">

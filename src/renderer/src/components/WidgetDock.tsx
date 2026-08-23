@@ -47,8 +47,8 @@ export default function WidgetDock(): JSX.Element | null {
                 title={`Go to ${labelFor(w)} on the canvas`}
                 className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-md border transition-colors text-xs max-w-[180px] ${
                   isActive
-                    ? 'border-stone-900 dark:border-stone-100 bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900'
-                    : 'border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] hover:border-stone-500 dark:hover:border-stone-500'
+                    ? 'border-[var(--ink-90)] bg-[var(--ink-90)] text-[var(--surface-raised)]'
+                    : 'border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
                 }`}
               >
                 <Icon name={entry?.icon ?? 'apps'} size={14} />

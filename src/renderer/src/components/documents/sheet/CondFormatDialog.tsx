@@ -156,6 +156,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-[var(--ink-50)]">Fill</span>
               {SWATCHES.map((s) => (
+                // Swatch containment: a literal hairline holds arbitrary colours.
                 <button
                   key={s}
                   onClick={() => setBg(s)}
@@ -227,6 +228,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
           <div className="border-t border-[var(--edge-soft)] pt-2 space-y-1 max-h-40 overflow-auto">
             {rules.map((r) => (
               <div key={r.id} className="flex items-center gap-2 text-[12px]">
+                {/* Swatch containment: a literal hairline holds arbitrary colours. */}
                 <span
                   className="h-3.5 w-3.5 rounded border border-black/10"
                   style={{

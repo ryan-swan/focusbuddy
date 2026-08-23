@@ -204,11 +204,12 @@ export default function ThemeBuilder({
                   title={o.label}
                   className={`flex flex-col items-center gap-1 py-2 rounded-md border transition-colors ${
                     accent === o.value
-                      ? 'border-stone-700 dark:border-stone-300 bg-[var(--surface-sunken)]'
+                      ? 'border-[rgb(var(--accent))] bg-[var(--surface-sunken)]'
                       : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)]'
                   }`}
                   data-testid={`themestudio-accent-${o.value}`}
                 >
+                  {/* Contrast ring: keeps the accent dot visible over any preview colour. */}
                   <span
                     className="h-5 w-5 rounded-full border-2 border-white dark:border-stone-900 shadow"
                     style={{ backgroundColor: o.preview }}

@@ -500,6 +500,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     } ${isActive ? 'outline outline-2 -outline-offset-1 outline-accent' : ''}`}
                   >
                     {showHandle && (
+                      // Fill handle: the white/dark contrast ring keeps it visible over any cell colour.
                       <span
                         data-testid="sheet-fill-handle"
                         title="Drag to fill. Double-click to fill down to the end of your data."

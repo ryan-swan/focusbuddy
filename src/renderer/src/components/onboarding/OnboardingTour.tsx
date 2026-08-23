@@ -137,6 +137,7 @@ export default function OnboardingTour(): JSX.Element | null {
       )}
 
       {/* Step card */}
+      {/* Onboarding stage: forced-dark card in every theme; hairlines are relative to the stage. */}
       <div
         className="absolute w-[360px] max-w-[92vw] rounded-2xl bg-[rgba(16,24,39,0.97)] border border-white/10 shadow-2xl text-stone-100 p-5"
         style={cardStyle}

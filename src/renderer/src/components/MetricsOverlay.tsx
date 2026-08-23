@@ -142,6 +142,7 @@ export default function MetricsOverlay(): JSX.Element | null {
   )
 
   return createPortal(
+    // Debug chrome: deliberately stone-literal, a fixed dark instrument outside the theme system.
     <div
       className="fixed left-2 bottom-2 z-[500] w-72 rounded-lg bg-stone-900/95 border border-stone-700 shadow-2xl text-[11px] font-mono text-stone-200 backdrop-blur"
       data-testid="metrics-overlay"
