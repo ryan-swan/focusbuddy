@@ -27,6 +27,7 @@ export default function UndoToast(): JSX.Element | null {
 
   return createPortal(
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[260] pointer-events-none">
+      {/* Forced-dark HUD capsule in every theme (like the video stage); its hairline is relative to the capsule, not the theme. */}
       <div
         data-testid="undo-toast"
         className="pointer-events-auto flex items-center gap-3 rounded-full bg-stone-900/95 dark:bg-stone-800/95 text-stone-100 border border-white/10 shadow-2xl pl-4 pr-2 py-2 text-[13px]"

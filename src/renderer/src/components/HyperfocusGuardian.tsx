@@ -43,7 +43,7 @@ export default function HyperfocusGuardian(): JSX.Element | null {
     const sec = stretchRemaining % 60
     return (
       <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[160] pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700 shadow-2xl backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-full fb-glass-chrome border border-[color:var(--glass-chrome-border)] shadow-md ring-1 ring-emerald-500/25">
           <Icon name="self_improvement" size={18} className="text-emerald-700 dark:text-emerald-400" />
           <div className="text-sm">
             <div className="text-emerald-900 dark:text-emerald-100 font-medium">
@@ -71,7 +71,7 @@ export default function HyperfocusGuardian(): JSX.Element | null {
 
   return (
     <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[160] pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 shadow-2xl backdrop-blur text-sm animate-[fadeInUp_400ms_ease-out]">
+      <div className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-full fb-glass-chrome border border-[color:var(--glass-chrome-border)] shadow-md ring-1 ring-amber-500/25 text-sm animate-[fadeInUp_400ms_ease-out]">
         <Icon name="local_fire_department" size={16} className="text-amber-600 dark:text-amber-400" />
         <span className="text-[var(--ink-90)]">
           You're on fire —{' '}

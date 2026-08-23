@@ -48,7 +48,7 @@ export default function BringMeBack(): JSX.Element | null {
 
   return (
     <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[160] pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-full bg-[var(--surface-raised)] border border-accent/40 shadow-2xl backdrop-blur animate-[fadeInUp_300ms_ease-out] text-sm">
+      <div className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-full fb-glass-chrome border border-[color:var(--glass-chrome-border)] shadow-md ring-1 ring-[rgb(var(--accent)/0.3)] animate-[fadeInUp_300ms_ease-out] text-sm">
         <Icon name="waving_hand" size={16} className="text-accent" />
         <span className="text-[var(--ink-70)]">
           Welcome back —{' '}
