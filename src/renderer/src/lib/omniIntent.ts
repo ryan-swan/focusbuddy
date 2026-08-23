@@ -75,7 +75,8 @@ function askIntent(): OmniIntent {
 }
 
 function gotoIntent(target: OmniTarget): OmniIntent {
-  const noun = target.kind === 'desk' ? ' desk' : target.kind === 'document' ? '' : ''
+  // Name the kind, but never stutter: "Wedding desk" already says desk.
+  const noun = target.kind === 'desk' && !/\bdesk\s*$/i.test(target.title) ? ' desk' : ''
   return { kind: 'goto', label: `Go to ${target.title}${noun}`, target }
 }
 
@@ -130,6 +131,42 @@ export function classifyOmniInput(rawInput: string, targets: OmniTarget[]): Omni
     if (named.length > 0) push(gotoIntent(named[0]))
   }
   return out
+}
+
+// The composer's door (A2, AI-01 — the mascot side of "one door"; Caleb's
+// omni-aware-composer pick, 2026-08-23). A chat composer is a chat surface
+// FIRST, so this is deliberately stricter than classifyOmniInput: Enter is
+// diverted only on unambiguous non-chat input — a bare address, or a
+// take-me-to phrase naming something real — and a short, searchy phrase
+// merely OFFERS the web behind Tab while Enter still chats. Questions and
+// work requests grow no chrome at all: asking Plexii is what the box is for.
+// Returns the ordered intents (first = what Enter does), or [] for pure chat.
+export function composerOmniIntents(rawInput: string, targets: OmniTarget[]): OmniIntent[] {
+  const text = rawInput.trim()
+  // Multiline or long input is a composed message, never a command.
+  if (!text || /\n/.test(text) || text.length > 160) return []
+
+  if (!/\s/.test(text) && DOMAIN_RE.test(text)) {
+    return [urlIntent(text), askIntent()]
+  }
+
+  const go = text.match(GOTO_PREFIX)
+  if (go) {
+    const out: OmniIntent[] = []
+    if (!/\s/.test(go[2]) && DOMAIN_RE.test(go[2])) out.push(urlIntent(go[2]))
+    for (const m of matchTargets(go[2], targets, 2)) out.push(gotoIntent(m))
+    if (out.length > 0) {
+      out.push(askIntent())
+      return out
+    }
+  }
+
+  if (/\?\s*$/.test(text) || QUESTION_START.test(text) || ASK_VERBS.test(text)) return []
+
+  // A short bare phrase reads searchy: offer the web one Tab away, Enter
+  // still chats (the chat's own grounding searches the web anyway).
+  if (text.split(/\s+/).length <= 6) return [askIntent(), searchIntent(text)]
+  return []
 }
 
 // The search engines the omnibar can hand a query to (AI-02 seeds). Keyless:

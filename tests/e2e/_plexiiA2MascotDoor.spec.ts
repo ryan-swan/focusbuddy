@@ -1,0 +1,62 @@
+import { test, expect } from '@playwright/test'
+import { launchApp, waitForReady } from './_helpers'
+
+// A2 mascot door (AI-01, R11): the assistant panel's composer is the third
+// door. A bare URL diverts Enter to the in-app browser with a visible
+// preview; take-me-to navigates to a real desk; a question grows no chrome
+// and stays pure chat. Throwaway; delete when A2 closes.
+const OUT = process.env.SHOT_DIR ?? '/tmp'
+
+test('plexii A2 mascot door: the composer previews, diverts, and stays chat-first', async () => {
+  const launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), process.env.SHOT_THEME ?? 'dark')
+  // Seed BEFORE the reload so the renderer's node store boots with the desk.
+  await window.evaluate(async () => {
+    const api = (window as unknown as { api: { nodes: { create: (d: unknown) => Promise<unknown> } } }).api
+    await api.nodes.create({ parentId: null, kind: 'task', title: 'Wedding desk' })
+  })
+  await window.reload()
+  await waitForReady(window)
+
+  // In through the mascot: the pill opens the panel, the chat tab holds the
+  // composer.
+  await window.locator('[data-testid="assistant-pill"]').click()
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
+  const composer = window.locator('[data-testid="chat-composer"]')
+  await expect(composer).toBeVisible()
+
+  // A bare URL: the strip previews "Open plexi.so" as what Enter does (R11),
+  // and Enter opens the in-app panel — no message is sent.
+  await composer.click()
+  await window.keyboard.type('plexi.so', { delay: 5 })
+  const urlChip = window.locator('[data-testid="composer-intent-url"]')
+  await expect(urlChip).toContainText('Open plexi.so')
+  await window.screenshot({ path: `${OUT}/door-1-url-preview.png` })
+  await window.keyboard.press('Enter')
+  const panel = window.locator('[data-testid="web-panel"]')
+  await expect(panel).toBeVisible()
+  await expect(composer).toHaveText('') // the box cleared; nothing was sent
+  await window.screenshot({ path: `${OUT}/door-2-url-opened.png` })
+  await window.locator('[data-testid="web-panel-close"]').click()
+
+  // Take-me-to naming a real desk: the strip previews Go to, Enter navigates.
+  await composer.click()
+  await window.keyboard.type('take me to the wedding desk', { delay: 5 })
+  const gotoChip = window.locator('[data-testid="composer-intent-goto"]').first()
+  await expect(gotoChip).toContainText('Go to Wedding desk')
+  await window.screenshot({ path: `${OUT}/door-3-goto-preview.png` })
+  await window.keyboard.press('Enter')
+  await expect(window.locator('text=Wedding desk').first()).toBeVisible({ timeout: 5000 })
+  await window.screenshot({ path: `${OUT}/door-4-desk-opened.png` })
+
+  // A question grows no chrome: no intent strip, Enter would simply chat.
+  await composer.click()
+  await window.keyboard.type('what should our launch plan cover?', { delay: 5 })
+  await expect(window.locator('[data-testid="composer-intent-row"]')).toHaveCount(0)
+  await window.screenshot({ path: `${OUT}/door-5-question-quiet.png` })
+
+  await launched.dispose()
+})

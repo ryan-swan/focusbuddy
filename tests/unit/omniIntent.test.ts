@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyOmniInput, matchTargets, searchUrl, type OmniTarget } from '../../src/renderer/src/lib/omniIntent'
+import { classifyOmniInput, matchTargets, searchUrl, type OmniTarget, composerOmniIntents } from '../../src/renderer/src/lib/omniIntent'
 
 // A2, AI-01, R11 — the omnibar routes by showing, never by silent guessing.
 // These pin WHAT Enter will do for each shape of input.
@@ -72,5 +72,49 @@ describe('matchTargets and searchUrl', () => {
   it('search urls encode the query for the chosen engine', () => {
     expect(searchUrl('duckduckgo', 'a b')).toBe('https://duckduckgo.com/?q=a%20b')
     expect(searchUrl('google', 'a&b')).toContain('google.com/search?q=a%26b')
+  })
+})
+
+describe('composerOmniIntents — the mascot door is chat-first (AI-01)', () => {
+  const targets = [
+    { kind: 'desk' as const, id: 'd1', title: 'Wedding desk' },
+    { kind: 'page' as const, id: 'files', title: 'Files' },
+    { kind: 'document' as const, id: 'doc1', title: 'Launch plan' }
+  ]
+
+  it('a bare address diverts Enter to the in-app browser', () => {
+    const intents = composerOmniIntents('plexi.so', targets)
+    expect(intents[0]?.kind).toBe('url')
+    expect(intents[0]?.url).toBe('https://plexi.so')
+    expect(intents.some((i) => i.kind === 'ask')).toBe(true)
+  })
+
+  it('take-me-to naming something real diverts to navigation', () => {
+    const intents = composerOmniIntents('take me to the wedding desk', targets)
+    expect(intents[0]?.kind).toBe('goto')
+    expect(intents[0]?.target?.id).toBe('d1')
+  })
+
+  it('take-me-to naming nothing never diverts Enter from chat', () => {
+    const intents = composerOmniIntents('open a savings account', targets)
+    // No dead nav attempt: Enter chats; at most the web rides behind Tab.
+    expect(intents[0]?.kind ?? 'ask').toBe('ask')
+    expect(intents.some((i) => i.kind === 'goto' || i.kind === 'url')).toBe(false)
+  })
+
+  it('questions and work requests grow no chrome at all', () => {
+    expect(composerOmniIntents('what should our pricing be?', targets)).toEqual([])
+    expect(composerOmniIntents('draft an email to Michael about the launch', targets)).toEqual([])
+  })
+
+  it('a short searchy phrase keeps Enter on chat and offers the web behind Tab', () => {
+    const intents = composerOmniIntents('best standing desk 2026', targets)
+    expect(intents[0]?.kind).toBe('ask')
+    expect(intents[1]?.kind).toBe('search')
+  })
+
+  it('multiline or long input is a composed message, never a command', () => {
+    expect(composerOmniIntents('plexi.so\nand some more', targets)).toEqual([])
+    expect(composerOmniIntents(`${'very long phrase '.repeat(12)}`, targets)).toEqual([])
   })
 })
