@@ -89,9 +89,12 @@ export interface TraceView {
 // Rows mount together and stagger by index, exactly the inbox's numbers, so
 // the panel takes its final height once and nothing below it is shoved row
 // by row. The phase line leads, its rows follow.
-export const CASCADE_LINE_LEAD_MS = 60
-export const CASCADE_STAGGER_MS = 25
-export const CASCADE_STAGGER_CAP_MS = 250
+// Caleb's closing A1 dial: the inbox numbers (25ms) read "very fast" on the
+// trace — found links and documents deserve a beat each. Slower stagger,
+// same loved motion.
+export const CASCADE_LINE_LEAD_MS = 90
+export const CASCADE_STAGGER_MS = 60
+export const CASCADE_STAGGER_CAP_MS = 600
 // Must match --dur-base, the fb-fade-in-up duration.
 export const CASCADE_ROW_MS = 240
 

@@ -112,14 +112,14 @@ describe('getTraceView — phases only advance on real events', () => {
     expect(getTraceView(t, 2).active).toBeNull()
   })
 
-  it('cascade timing: the inbox numbers, zero when there is nothing to cascade', () => {
+  it('cascade timing: a beat per row, zero when there is nothing to cascade', () => {
     expect(cascadeDurationMs(0)).toBe(0)
-    expect(cascadeDelayMs(0)).toBe(60)
-    expect(cascadeDelayMs(4)).toBe(160)
+    expect(cascadeDelayMs(0)).toBe(90)
+    expect(cascadeDelayMs(4)).toBe(90 + 240)
     // Capped: a long list never outlasts ~10 rows' worth of stagger.
-    expect(cascadeDelayMs(40)).toBe(310)
-    expect(cascadeDurationMs(1)).toBe(300)
-    expect(cascadeDurationMs(6)).toBe(60 + 125 + 240)
+    expect(cascadeDelayMs(40)).toBe(90 + 600)
+    expect(cascadeDurationMs(1)).toBe(90 + 240)
+    expect(cascadeDurationMs(6)).toBe(90 + 300 + 240)
   })
 
   it('carries the source on each leaf so the trace can open it', () => {
