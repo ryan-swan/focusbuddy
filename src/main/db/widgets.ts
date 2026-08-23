@@ -109,6 +109,17 @@ function nextZ(taskId: string): number {
   return row.next
 }
 
+
+// Chunk-index freshness (A2, #16): a widget's content re-enters retrieval the
+// moment it changes, whichever path wrote it (IPC, the action executor, the
+// living-doc scheduler). Dynamically imported so the db layer never gains a
+// static dependency on the retrieval layer; best-effort by design.
+function pokeChunkIndex(widgetId: string): void {
+  void import('../chunkIndex')
+    .then((m) => m.reindexWidgetChunks(widgetId))
+    .catch(() => {})
+}
+
 export function createWidget(draft: WidgetDraft): Widget {
   const db = getDb()
   // WS01 lifecycle: honour a client-provided id so a widget created on one device
@@ -151,6 +162,7 @@ export function createWidget(draft: WidgetDraft): Widget {
     now
   })
   const row = db.prepare('SELECT * FROM widgets WHERE id = ?').get(id) as WidgetRow
+  pokeChunkIndex(id)
   return rowToWidget(row)
 }
 
@@ -247,7 +259,16 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
       db.prepare(
         `UPDATE widgets SET ${syncSet.join(', ')} WHERE sync_group_id = @sgid AND id != @self`
       ).run(sp)
+      // The fan-out wrote the copies' content directly, so their chunks are
+      // stale too — reindex each copy, not just the edited original.
+      const copies = db
+        .prepare('SELECT id FROM widgets WHERE sync_group_id = ? AND id != ?')
+        .all(updated.syncGroupId, id) as Array<{ id: string }>
+      for (const c of copies) pokeChunkIndex(c.id)
     }
+  }
+  if (updated && (patch.content !== undefined || patch.title !== undefined || patch.livingQuery !== undefined)) {
+    pokeChunkIndex(id)
   }
   return updated
 }
@@ -257,12 +278,14 @@ export function updateWidget(id: string, patch: WidgetPatch): Widget | null {
 export function deleteWidget(id: string): boolean {
   const db = getDb()
   const result = db.prepare('UPDATE widgets SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(Date.now(), id)
+  if (result.changes > 0) pokeChunkIndex(id) // trashed content stops grounding answers
   return result.changes > 0
 }
 
 export function restoreWidget(id: string): boolean {
   const db = getDb()
   const result = db.prepare('UPDATE widgets SET trashed_at = NULL WHERE id = ?').run(id)
+  if (result.changes > 0) pokeChunkIndex(id) // restored content is retrievable again
   return result.changes > 0
 }
 

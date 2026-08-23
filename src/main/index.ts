@@ -16,7 +16,7 @@ import { registerHaptyxAuthProtocol } from './authProtocol'
 import { installAutoUpdater, checkForUpdates } from './autoUpdate'
 import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
-import { sweepDocumentChunks } from './chunkIndex'
+import { sweepDocumentChunks, sweepWidgetChunks } from './chunkIndex'
 import { runDueReports } from './db/reports'
 import { installMainCrashHandlers, recordCrash } from './db/crashLog'
 
@@ -513,15 +513,20 @@ app.whenReady().then(() => {
   setTimeout(runDueAutomation, 20_000)
   setInterval(runDueAutomation, 5 * 60_000)
 
-  // Chunk-index sweep (A2, R10): reconcile fb_chunks with the document
-  // population once per boot — content-hash cheap for unchanged docs, and it
-  // removes chunks whose document is gone. Deferred off the boot path.
+  // Chunk-index sweep (A2, R10 + #16): reconcile fb_chunks with the document
+  // and widget populations once per boot — content-hash cheap for unchanged
+  // sources, and it removes chunks whose source is gone. Deferred off the
+  // boot path.
   setTimeout(() => {
     try {
-      const r = sweepDocumentChunks()
-      if (r.indexed > 0 || r.removed > 0) {
+      const d = sweepDocumentChunks()
+      const w = sweepWidgetChunks()
+      if (d.indexed + d.removed + w.indexed + w.removed > 0) {
         // eslint-disable-next-line no-console
-        console.log(`[chunk-index] sweep: ${r.indexed} indexed, ${r.removed} removed`)
+        console.log(
+          `[chunk-index] sweep: docs ${d.indexed} indexed / ${d.removed} removed, ` +
+            `widgets ${w.indexed} indexed / ${w.removed} removed`
+        )
       }
     } catch (err) {
       console.error('[chunk-index] sweep failed:', err)

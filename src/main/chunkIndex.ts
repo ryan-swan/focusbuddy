@@ -20,7 +20,17 @@ import { getDb } from './db/database'
 import { getActiveOrgId } from './db/activeOrg'
 import { listDocuments, getDocument } from './db/documents'
 import { getDocMetadata } from './db/docMetadata'
-import { extractDocText, selectPassages, type WorkspaceSource } from './workspaceRank'
+import { getWidget, listWidgetsByKind } from './db/widgets'
+import { listNodes } from './db/nodes'
+import { listTables, listRows } from './db/tables'
+import { widgetToText, type ResolvedTable, type WidgetTextResolvers } from '@shared/widgetText'
+import type { Widget, WidgetKind } from '@shared/types'
+import {
+  extractDocText,
+  selectPassages,
+  mergeScopedPools,
+  type WorkspaceSource
+} from './workspaceRank'
 
 // The subset of the database API this module touches. Both better-sqlite3
 // (the app) and node:sqlite's DatabaseSync (the tests) satisfy it.
@@ -211,6 +221,8 @@ export interface ChunkHit {
   sourceId: string
   title: string
   sourceKind: string | null
+  // The desk the source lives on, when the source type has one (widgets).
+  roomId: string | null
   // Best (lowest) BM25 rank among the source's matched chunks.
   rank: number
   // The matched passages, best first, capped.
@@ -228,8 +240,7 @@ export function ftsQuery(query: string): string | null {
 }
 
 // Passage-level search, grouped back to sources. Org-scoped; `sourceType`
-// bounds which population is searched (the document pool passes 'document';
-// widget kinds join in a later A2 phase).
+// bounds which population is searched ('document', 'widget', 'file', 'chat').
 export function searchChunks(
   db: ChunkDb,
   query: string,
@@ -243,19 +254,33 @@ export function searchChunks(
   const rows = db
     .prepare(
       `SELECT c.source_id AS sourceId, c.title AS title, c.source_kind AS sourceKind,
-              c.text AS text, bm25(fb_chunks_fts, 0, 0, 5.0, 1.0) AS rank
+              c.room_id AS roomId, c.text AS text, bm25(fb_chunks_fts, 0, 0, 5.0, 1.0) AS rank
        FROM fb_chunks_fts f JOIN fb_chunks c ON c.id = f.chunk_id
        WHERE fb_chunks_fts MATCH ? AND f.org_id = ?${opts.sourceType ? ' AND c.source_type = ?' : ''}
        ORDER BY rank LIMIT 80`
     )
     .all(
       ...(opts.sourceType ? [match, opts.orgId, opts.sourceType] : [match, opts.orgId])
-    ) as Array<{ sourceId: string; title: string; sourceKind: string | null; text: string; rank: number }>
+    ) as Array<{
+    sourceId: string
+    title: string
+    sourceKind: string | null
+    roomId: string | null
+    text: string
+    rank: number
+  }>
   const bySource = new Map<string, ChunkHit>()
   for (const r of rows) {
     let hit = bySource.get(r.sourceId)
     if (!hit) {
-      hit = { sourceId: r.sourceId, title: r.title, sourceKind: r.sourceKind, rank: r.rank, passages: [] }
+      hit = {
+        sourceId: r.sourceId,
+        title: r.title,
+        sourceKind: r.sourceKind,
+        roomId: r.roomId,
+        rank: r.rank,
+        passages: []
+      }
       bySource.set(r.sourceId, hit)
     }
     if (hit.passages.length < perSource) hit.passages.push(r.text)
@@ -382,4 +407,172 @@ export function chunkSearchDocuments(query: string, limit = 6): WorkspaceSource[
       entities: meta?.entities
     }
   })
+}
+
+// ── Widgets (#16) ──────────────────────────────────────────────────────────
+//
+// The widget kinds the chunk index carries — the ones that hold real user
+// content and were previously unreachable by retrieval. NOT indexed here, on
+// purpose: note/sticky/markdown/page (the extras pool already ranks them),
+// table (the extras pool reads fb_tables directly), doc/sheet/slides/map/
+// design (their content IS an fb_documents row, already the document pool),
+// and the webview family (live pages are the canvas-attachment lane, #19/#20).
+export const INDEXED_WIDGET_KINDS: ReadonlySet<WidgetKind> = new Set<WidgetKind>([
+  'living-doc',
+  'card',
+  'custom-block',
+  'field',
+  'agent',
+  'mindmap',
+  'diagram',
+  'chart'
+])
+
+// A chart widget's content references a table; resolve it so the chart's text
+// names its series over the real table, same shape the attachment path uses.
+function chartTableResolver(tableId: string): ResolvedTable | null {
+  const t = listTables().find((x) => x.id === tableId)
+  if (!t) return null
+  return {
+    title: t.title,
+    columns: t.schema.columns.map((c) => ({ id: c.id, label: c.label })),
+    rows: listRows(t.id).map((r) => r.cells as Record<string, unknown>)
+  }
+}
+
+// Pure-ish shape step, exported for tests: a widget reduced to the chunk
+// source it should index as, or null when it has nothing sayable. widgetToText
+// yields honest placeholders like "(diagram)" for unreadable content — those
+// never enter the index, because retrieval quoting a placeholder as evidence
+// would be decoration, not grounding.
+export function widgetChunkSource(
+  w: Widget,
+  orgId: string,
+  resolvers: WidgetTextResolvers = {}
+): ChunkSourceInput | null {
+  if (!INDEXED_WIDGET_KINDS.has(w.kind)) return null
+  const wt = widgetToText(w, resolvers)
+  const text = (wt.text || '').trim()
+  if (!text || /^\(.*\)$/.test(text)) return null
+  return {
+    sourceType: 'widget',
+    sourceId: w.id,
+    title: w.title || text.replace(/\s+/g, ' ').slice(0, 60),
+    text,
+    sourceKind: w.kind,
+    roomId: w.taskId ?? null,
+    orgId,
+    updatedAt: w.updatedAt
+  }
+}
+
+// The active org's node ids — the org fence for widgets, which carry no org of
+// their own, only a desk. A widget whose desk is not one of the active org's
+// nodes is not this org's content and is never indexed under its org id.
+function activeOrgNodeIds(): Set<string> {
+  return new Set(listNodes().map((n) => n.id))
+}
+
+// (Re)index one widget — the save chokepoint, best-effort. Also the removal
+// path: a trashed widget, an emptied one, or a kind we do not index drops its
+// chunks so stale canvas content never grounds an answer.
+export function reindexWidgetChunks(widgetId: string): void {
+  try {
+    const db = appDb()
+    // The Widget shape does not carry trash state; read it off the row — a
+    // trashed widget's content must stop grounding answers immediately.
+    const row = db.prepare(`SELECT trashed_at AS t FROM widgets WHERE id = ?`).get(widgetId) as
+      | { t: number | null }
+      | undefined
+    const w = row && row.t == null ? getWidget(widgetId) : null
+    if (!w) {
+      removeSourceChunks(db, 'widget', widgetId)
+      return
+    }
+    if (!INDEXED_WIDGET_KINDS.has(w.kind)) return
+    if (w.taskId == null || !activeOrgNodeIds().has(w.taskId)) return
+    const input = widgetChunkSource(w, getActiveOrgId(), { table: chartTableResolver })
+    if (!input) {
+      removeSourceChunks(db, 'widget', widgetId)
+      return
+    }
+    reindexSourceChunks(db, input)
+  } catch {
+    // Indexing must never break a widget save; the sweep reconciles later.
+  }
+}
+
+// Reconcile the widget population for the active org: index what is missing
+// or changed (content-hash cheap), drop chunks whose widget is gone, trashed,
+// or emptied. Runs with the boot sweep.
+export function sweepWidgetChunks(): { indexed: number; removed: number } {
+  const db = appDb()
+  ensureChunkTables(db)
+  const org = getActiveOrgId()
+  const orgNodes = activeOrgNodeIds()
+  const live = new Set<string>()
+  let indexed = 0
+  for (const kind of INDEXED_WIDGET_KINDS) {
+    for (const w of listWidgetsByKind(kind)) {
+      if (w.taskId == null || !orgNodes.has(w.taskId)) continue
+      const input = widgetChunkSource(w, org, { table: chartTableResolver })
+      if (!input) continue
+      live.add(w.id)
+      const before = db
+        .prepare(
+          `SELECT count(*) AS n, min(content_hash) AS h FROM fb_chunks WHERE source_type = 'widget' AND source_id = ?`
+        )
+        .get(w.id) as { n: number; h: string | null }
+      if (Number(before.n) === 0 || before.h !== contentHash(input.title, input.text)) {
+        reindexSourceChunks(db, input)
+        indexed++
+      }
+    }
+  }
+  const stale = db
+    .prepare(`SELECT DISTINCT source_id AS id FROM fb_chunks WHERE source_type = 'widget' AND org_id = ?`)
+    .all(org) as Array<{ id: string }>
+  let removed = 0
+  for (const s of stale) {
+    if (!live.has(s.id)) {
+      removeSourceChunks(db, 'widget', s.id)
+      removed++
+    }
+  }
+  return { indexed, removed }
+}
+
+// The widget pool for retrieval. docType carries the widget KIND so the trace
+// can say what a source is (a living doc, an agent, a chart) and the citation
+// can route to it. Desk scope demotes off-scope widgets, never excludes (#12).
+export function chunkSearchWidgets(
+  query: string,
+  limit = 6,
+  scopeNodeIds?: string[]
+): WorkspaceSource[] {
+  const hits = searchChunks(appDb(), query, {
+    orgId: getActiveOrgId(),
+    sourceType: 'widget',
+    limit: limit * 2
+  })
+  const scope = scopeNodeIds && scopeNodeIds.length > 0 ? new Set(scopeNodeIds) : null
+  const shaped = hits.map((h, i) => {
+    const joined = h.passages.join('\n…\n')
+    return {
+      source: {
+        docId: h.sourceId,
+        title: h.title || 'Untitled',
+        docType: h.sourceKind ?? 'widget',
+        snippet: joined.replace(/\s+/g, ' ').trim().slice(0, 200),
+        text: selectPassages(query, joined),
+        score: 1 - i * 0.01
+      },
+      inScope: !scope || (h.roomId != null && scope.has(h.roomId))
+    }
+  })
+  return mergeScopedPools(
+    shaped.filter((s) => s.inScope).map((s) => s.source),
+    shaped.filter((s) => !s.inScope).map((s) => s.source),
+    limit
+  )
 }

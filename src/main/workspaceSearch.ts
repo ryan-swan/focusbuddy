@@ -9,7 +9,7 @@ import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, rankSources, relevanceGate, type WorkspaceSource } from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
-import { chunkIndexActive, chunkSearchDocuments } from './chunkIndex'
+import { chunkIndexActive, chunkSearchDocuments, chunkSearchWidgets } from './chunkIndex'
 import { collectExtraSources } from './workspaceExtras'
 
 export type { WorkspaceSource } from './workspaceRank'
@@ -58,14 +58,22 @@ export async function retrieveSources(
   // brain is grounded in more than documents. Keyword-ranked.
   const extraSources = collectExtraSources(query, limit, scopeNodeIds)
 
-  // Interleave the three pools round-robin so documents, tasks/tables/notes and
-  // knowledge all get a fair shot at the limited source slots. Curated knowledge
-  // still leads each round. Each pool passes the relevance gate first: a weak
-  // single-term coincidence must not ride into the trace looking analysed
-  // (Caleb's drive: an SDR question dragged in every doc containing
+  // Widgets (#16): the content-bearing canvas kinds the extras pool never
+  // read — living docs, cards, custom blocks, fields, agents, mindmaps,
+  // diagrams, charts — passage-searched through the chunk index. Desk scope
+  // demotes off-scope widgets rather than excluding them (#12).
+  const widgetSources = chunkIndexActive() ? chunkSearchWidgets(query, limit, scopeNodeIds) : []
+
+  // Interleave the pools round-robin so documents, tasks/tables/notes, widgets
+  // and knowledge all get a fair shot at the limited source slots. Curated
+  // knowledge still leads each round. Each pool passes the relevance gate
+  // first: a weak single-term coincidence must not ride into the trace looking
+  // analysed (Caleb's drive: an SDR question dragged in every doc containing
   // "research"). An emptied pool is an honest result — the trace says
   // "nothing relevant" and web results lead.
-  const pools = [kSources, docSources, extraSources].map((p) => relevanceGate(query, p))
+  const pools = [kSources, docSources, extraSources, widgetSources].map((p) =>
+    relevanceGate(query, p)
+  )
   const merged: WorkspaceSource[] = []
   const seen = new Set<string>()
   for (let i = 0; merged.length < limit && pools.some((p) => p[i]); i++) {

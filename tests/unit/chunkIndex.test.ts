@@ -9,6 +9,7 @@ import {
   removeSourceChunks,
   searchChunks,
   ftsQuery,
+  widgetChunkSource,
   type ChunkDb
 } from '../../src/main/chunkIndex'
 
@@ -138,5 +139,103 @@ describe('searchChunks — passage-level BM25, org-scoped', () => {
     // Operators and quotes in the user's text never reach FTS as syntax.
     seed(db, 'd1', 'Notes', 'Nothing special here.')
     expect(() => searchChunks(db, 'NEAR("x" OR *', { orgId: ORG })).not.toThrow()
+  })
+})
+
+describe('widget chunks (#16)', () => {
+  const widget = (over: Record<string, unknown>): import('../../src/shared/types').Widget =>
+    ({
+      id: 'w1',
+      taskId: 'desk1',
+      kind: 'card',
+      title: '',
+      content: '',
+      x: 0,
+      y: 0,
+      width: 260,
+      height: 200,
+      zIndex: 1,
+      color: null,
+      status: null,
+      pinned: false,
+      pinnedScreenX: null,
+      pinnedScreenY: null,
+      parentSectionId: null,
+      layout: null,
+      sourceAppId: null,
+      mode: null,
+      pinnedZone: null,
+      livingQuery: null,
+      livingGeneratedAt: null,
+      livingPaused: false,
+      createdAt: 1,
+      updatedAt: 2,
+      archived: false,
+      syncGroupId: null,
+      ...over
+    }) as import('../../src/shared/types').Widget
+
+  it('shapes a living-doc widget into a chunk source with its desk as room', () => {
+    const content = JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Sprint summary: checkout flow shipped.' }] }]
+    })
+    const input = widgetChunkSource(
+      widget({ kind: 'living-doc', title: 'Desk digest', content }),
+      'personal'
+    )
+    expect(input?.sourceType).toBe('widget')
+    expect(input?.sourceKind).toBe('living-doc')
+    expect(input?.roomId).toBe('desk1')
+    expect(input?.text).toContain('checkout flow shipped')
+  })
+
+  it('derives a title from the text when the widget has none', () => {
+    const input = widgetChunkSource(
+      widget({ kind: 'card', content: JSON.stringify({ title: 'Pricing call', body: 'Three numbers on one page.' }) }),
+      'personal'
+    )
+    expect(input?.title).toContain('Pricing call')
+  })
+
+  it('never indexes a placeholder, an empty widget, or an unindexed kind', () => {
+    expect(widgetChunkSource(widget({ kind: 'diagram', content: 'not json' }), 'p')).toBeNull()
+    expect(widgetChunkSource(widget({ kind: 'card', content: '' }), 'p')).toBeNull()
+    expect(widgetChunkSource(widget({ kind: 'note', content: 'plain note text' }), 'p')).toBeNull()
+  })
+
+  it('searchChunks carries the room id through for scope demotion', () => {
+    const db = freshDb()
+    reindexSourceChunks(db, {
+      sourceType: 'widget',
+      sourceId: 'w-on',
+      title: 'Card',
+      text: 'The migration checklist lives here.',
+      sourceKind: 'card',
+      roomId: 'desk-a',
+      orgId: ORG
+    })
+    const hits = searchChunks(db, 'migration checklist', { orgId: ORG, sourceType: 'widget' })
+    expect(hits[0]?.roomId).toBe('desk-a')
+    expect(hits[0]?.sourceKind).toBe('card')
+  })
+
+  it('widget chunks respect the org boundary like every other type', () => {
+    const db = freshDb()
+    for (const [id, org] of [
+      ['w-mine', 'personal'],
+      ['w-theirs', 'org_other']
+    ] as const) {
+      reindexSourceChunks(db, {
+        sourceType: 'widget',
+        sourceId: id,
+        title: 'Agent',
+        text: 'The falcon rollout agenda.',
+        sourceKind: 'agent',
+        orgId: org
+      })
+    }
+    const hits = searchChunks(db, 'falcon rollout', { orgId: 'personal', sourceType: 'widget' })
+    expect(hits.map((h) => h.sourceId)).toEqual(['w-mine'])
   })
 })
