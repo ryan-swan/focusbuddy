@@ -6,6 +6,17 @@ import { launchApp, waitForReady, type LaunchedApp } from './_helpers'
 
 let launched: LaunchedApp | null = null
 
+// Mail and Inbox moved into the PlexiOffice area (commit aa5fe9a): the old
+// sidebar entries this spec clicked no longer exist. Navigate the current
+// path — the area switcher, then the Office comms entry.
+async function openOfficeComms(
+  window: import('@playwright/test').Page,
+  app: 'mail' | 'inbox'
+): Promise<void> {
+  await window.locator('[data-testid="switch-office"]').click()
+  await window.locator(`[data-testid="office-comms-app-${app}"]`).click()
+}
+
 test.afterEach(async () => {
   if (launched) {
     await launched.dispose()
@@ -40,8 +51,7 @@ test('step2 - sidebar Mail nav entry opens setup form with provider presets', as
   const { window } = launched
   await waitForReady(window)
 
-  // Click the "Mail" sidebar entry.
-  await window.getByRole('button', { name: /^Mail$/i }).click()
+  await openOfficeComms(window, 'mail')
 
   // The setup form heading should appear.
   await expect(window.getByRole('heading', { name: /connect your email/i })).toBeVisible({
@@ -60,7 +70,7 @@ test('step3 - clicking Gmail preset fills the IMAP host', async () => {
   const { window } = launched
   await waitForReady(window)
 
-  await window.getByRole('button', { name: /^Mail$/i }).click()
+  await openOfficeComms(window, 'mail')
   await expect(window.getByRole('heading', { name: /connect your email/i })).toBeVisible({
     timeout: 8_000
   })
@@ -85,7 +95,7 @@ test('step4 - test connection to bogus server returns friendly error', async () 
   const { window } = launched
   await waitForReady(window)
 
-  await window.getByRole('button', { name: /^Mail$/i }).click()
+  await openOfficeComms(window, 'mail')
   await expect(window.getByRole('heading', { name: /connect your email/i })).toBeVisible({
     timeout: 8_000
   })
@@ -120,9 +130,7 @@ test('step4 - test connection to bogus server returns friendly error', async () 
 
   // Wait for the inline error to appear — up to 20 s to cover the 12 s
   // greetingTimeout in the rare case the OS doesn't refuse immediately.
-  const errorDiv = window.locator(
-    'div.text-red-600, div.text-red-400, [class*="text-red"]'
-  )
+  const errorDiv = window.locator('[data-testid="mail-setup-error"]')
   await expect(errorDiv.first()).toBeVisible({ timeout: 20_000 })
 
   const errorText = (await errorDiv.first().textContent()) ?? ''
@@ -147,10 +155,11 @@ test('step5 - Inbox view renders without crashing when no account is set', async
   const { window } = launched
   await waitForReady(window)
 
-  // Navigate to PlexiInbox.
-  const inboxBtn = window.getByRole('button', { name: /^PlexiInbox$/i })
-  await expect(inboxBtn).toBeVisible({ timeout: 5_000 })
-  await inboxBtn.click()
+  // Navigate to the Inbox via its current home in PlexiOffice comms.
+  await openOfficeComms(window, 'inbox')
+  await expect(window.getByRole('heading', { name: /^PlexiInbox$/i })).toBeVisible({
+    timeout: 5_000
+  })
 
   // The view renders — either sign-in prompt or the unified feed. Either is
   // acceptable; the test just checks there is no crash (no error overlay

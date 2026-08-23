@@ -196,7 +196,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
   }, [visible, activeGroup])
 
   const controlCls =
-    'h-8 rounded-[var(--radius-field)] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)] fb-t-label text-[var(--ink-90)] px-2'
+    'fb-field h-8 !py-0 fb-t-label px-2'
 
   return (
     <div

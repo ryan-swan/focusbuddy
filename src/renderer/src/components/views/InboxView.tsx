@@ -7,6 +7,7 @@ import { useSharesStore } from '../../stores/shares'
 import { acceptShareIntoWorkspace } from '../../lib/acceptShare'
 import { useSignInPrompt } from '../../stores/signInPrompt'
 import Icon from '../Icon'
+import { DashboardHeader } from '../plexi'
 
 // PlexiInbox — your internal PlexiDesk notifications, and only those: direct
 // and shared-space chat, folders/files/canvases/widgets shared with you, and
@@ -113,11 +114,11 @@ export default function InboxView(): JSX.Element {
   // PlexiInbox needs a PlexiDesk account (email lives in Mail, separately).
   if (!account) {
     return (
-      <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
+      <div className="h-full flex items-center justify-center bg-[var(--surface-base)] px-6">
         <div className="text-center max-w-sm">
           <Icon name="inbox" size={32} className="text-[var(--ink-40)] mx-auto mb-3" />
-          <h1 className="text-lg font-semibold text-[var(--ink-100)] mb-1">PlexiInbox</h1>
-          <p className="text-[13px] text-[var(--ink-50)] mb-4">
+          <h1 className="fb-t-title text-[var(--ink-100)] mb-1">PlexiInbox</h1>
+          <p className="fb-t-body text-[var(--ink-50)] mb-4">
             Sign in to see your PlexiDesk notifications here, chat messages, shared folders and
             files, and contact requests. Email is in Mail.
           </p>
@@ -135,44 +136,48 @@ export default function InboxView(): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-auto desk-paper no-tod">
+    <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-2xl mx-auto px-6 py-6">
-        <header className="flex items-center gap-3 mb-4">
-          <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-[var(--edge-soft)] shadow-sm shrink-0">
-            <Icon name="inbox" size={20} className="text-accent" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-[var(--ink-100)]">PlexiInbox</h1>
-            <p className="text-[12px] text-[var(--ink-50)]">
-              Your PlexiDesk notifications: chat, shared items, and contact requests. Email is in Mail.
-            </p>
-          </div>
-          <button onClick={refreshAll} className="icon-btn" title="Refresh">
-            <Icon name="refresh" size={16} />
-          </button>
-        </header>
+        <DashboardHeader
+          title="PlexiInbox"
+          subtitle="Your PlexiDesk notifications: chat, shared items, and contact requests. Email is in Mail."
+          actions={
+            <button onClick={refreshAll} className="icon-btn" title="Refresh">
+              <Icon name="refresh" size={16} />
+            </button>
+          }
+        />
 
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--edge-firm)] p-10 text-center">
+          <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--edge-firm)] p-10 text-center">
             <Icon name="inbox" size={26} className="text-[var(--ink-40)] mx-auto mb-2" />
-            <p className="text-sm text-[var(--ink-70)]">Your PlexiInbox is clear.</p>
-            <p className="text-[12px] text-[var(--ink-50)] mt-1">
+            <p className="fb-t-body text-[var(--ink-70)]">Your PlexiInbox is clear.</p>
+            <p className="fb-t-label text-[var(--ink-50)] mt-1">
               No new chat, shared items, or contact requests right now. Email lives in Mail.
             </p>
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--edge-soft)] bg-white/85 dark:bg-stone-900/85 overflow-hidden divide-y divide-[var(--edge-soft)]">
-            {rows.map((r) => (
+          <div className="fb-card overflow-hidden divide-y divide-[var(--edge-soft)]">
+            {rows.map((r, i) => (
               <div
                 key={r.key}
                 onClick={r.onClick}
+                role={r.onClick ? 'button' : undefined}
+                tabIndex={r.onClick ? 0 : undefined}
+                onKeyDown={(e) => {
+                  if (r.onClick && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault()
+                    r.onClick()
+                  }
+                }}
                 data-testid="inbox-item"
-                className={`px-4 py-3 flex items-start gap-3 transition-colors ${
-                  r.onClick ? 'cursor-pointer hover:bg-[var(--surface-sunken)]' : ''
+                style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
+                className={`px-4 py-3 flex items-start gap-3 fb-fade-in-up transition-colors ${
+                  r.onClick ? 'cursor-pointer hover:bg-[var(--surface-sunken)] fb-press' : ''
                 }`}
               >
                 <div
-                  className={`h-8 w-8 rounded-lg inline-flex items-center justify-center shrink-0 ${
+                  className={`h-8 w-8 rounded-[var(--radius-chip)] inline-flex items-center justify-center shrink-0 ${
                     r.unread > 0
                       ? 'bg-accent/15 text-accent'
                       : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
@@ -183,7 +188,7 @@ export default function InboxView(): JSX.Element {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-[13px] truncate ${
+                      className={`fb-t-body truncate ${
                         r.unread > 0
                           ? 'font-semibold text-[var(--ink-100)]'
                           : 'font-medium text-[var(--ink-90)]'
@@ -191,17 +196,17 @@ export default function InboxView(): JSX.Element {
                     >
                       {r.title}
                     </span>
-                    <span className="ml-auto shrink-0 text-[10px] text-[var(--ink-40)]">
+                    <span className="ml-auto shrink-0 fb-t-caption text-[var(--ink-40)]">
                       {relTime(r.ts)}
                     </span>
                     {!r.contactId && r.unread > 0 && (
-                      <span className="shrink-0 text-[10px] font-semibold text-white bg-accent rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                      <span className="shrink-0 fb-t-caption !text-white font-semibold bg-accent rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
                         {r.unread}
                       </span>
                     )}
                   </div>
                   {r.preview && (
-                    <div className="text-[12px] text-[var(--ink-50)] truncate mt-0.5">
+                    <div className="fb-t-caption truncate mt-0.5">
                       {r.preview}
                     </div>
                   )}
@@ -213,14 +218,14 @@ export default function InboxView(): JSX.Element {
                           goMessages()
                         }}
                         data-testid="contact-accept"
-                        className="btn-primary px-2.5 py-1 text-[11px]"
+                        className="btn-primary px-2.5 py-1 fb-t-label"
                       >
                         Accept
                       </button>
                       <button
                         onClick={() => void declineContact(r.contactId!)}
                         data-testid="contact-decline"
-                        className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-70)] px-2 py-1"
+                        className="fb-t-label text-[var(--ink-50)] hover:text-[var(--ink-70)] px-2 py-1 fb-press"
                       >
                         Decline
                       </button>

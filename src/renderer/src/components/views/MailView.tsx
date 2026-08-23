@@ -100,17 +100,17 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-auto desk-paper no-tod">
+    <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-lg mx-auto px-6 py-10">
         <div className="flex items-center gap-3 mb-2">
-          <div className="inline-flex items-center justify-center h-11 w-11 rounded-xl bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-700 shadow-sm">
+          <div className="inline-flex items-center justify-center h-11 w-11 rounded-[var(--radius-row)] bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[var(--shadow-soft)]">
             <Icon name="mail" size={22} className="text-accent" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
+            <h1 className="fb-t-hero text-[var(--ink-100)]">
               Connect your email
             </h1>
-            <p className="text-[12px] text-stone-500 dark:text-stone-400">
+            <p className="fb-t-label text-[var(--ink-50)]">
               Read your inbox here, next to your work. Plain IMAP, no Google or Microsoft sign-in
               required.
             </p>
@@ -122,10 +122,10 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
             <button
               key={p.label}
               onClick={() => applyPreset(p)}
-              className={`text-[12px] px-2.5 py-1 rounded-full border transition-colors ${
+              className={`fb-t-label px-2.5 py-1 rounded-full border fb-press transition-colors ${
                 host === p.host
                   ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent/60'
+                  : 'border-[var(--edge-firm)] text-[var(--ink-60)] hover:border-[rgb(var(--accent)/0.6)]'
               }`}
             >
               {p.label}
@@ -134,13 +134,13 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
         </div>
 
         {presetNote && (
-          <div className="mb-4 text-[12px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 py-2 flex gap-2">
+          <div className="mb-4 fb-t-label text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-[var(--radius-row)] px-3 py-2 flex gap-2">
             <Icon name="info" size={14} className="shrink-0 mt-0.5" />
             <span>{presetNote}</span>
           </div>
         )}
 
-        <label className="block text-[12px] font-medium text-stone-700 dark:text-stone-300 mb-1">
+        <label className="block fb-t-label text-[var(--ink-70)] mb-1">
           Email address
         </label>
         <input
@@ -150,10 +150,10 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
             setTested(false)
           }}
           placeholder="you@example.com"
-          className="w-full mb-3 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+          className="w-full mb-3 fb-field fb-t-body focus:outline-none"
         />
 
-        <label className="block text-[12px] font-medium text-stone-700 dark:text-stone-300 mb-1">
+        <label className="block fb-t-label text-[var(--ink-70)] mb-1">
           Password
         </label>
         <input
@@ -164,15 +164,15 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
             setTested(false)
           }}
           placeholder="App password (recommended) or mailbox password"
-          className="w-full mb-1 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+          className="w-full mb-1 fb-field fb-t-body focus:outline-none"
         />
-        <p className="text-[11px] text-stone-400 dark:text-stone-500 mb-3">
+        <p className="fb-t-caption mb-3">
           Stored encrypted on this device with your OS keychain. It never leaves your machine.
         </p>
 
         <button
           onClick={() => setAdvanced((v) => !v)}
-          className="text-[12px] text-stone-500 dark:text-stone-400 hover:text-accent inline-flex items-center gap-1 mb-2"
+          className="fb-t-label text-[var(--ink-50)] hover:text-accent inline-flex items-center gap-1 mb-2 fb-press"
         >
           <Icon name={advanced ? 'expand_more' : 'chevron_right'} size={14} />
           IMAP server settings
@@ -181,7 +181,7 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
         {advanced && (
           <div className="mb-3 grid grid-cols-[1fr_88px] gap-2">
             <div>
-              <label className="block text-[11px] text-stone-500 mb-1">IMAP host</label>
+              <label className="block fb-t-caption mb-1">IMAP host</label>
               <input
                 value={host}
                 onChange={(e) => {
@@ -189,11 +189,11 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
                   setTested(false)
                 }}
                 placeholder="imap.example.com"
-                className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+                className="w-full fb-field fb-t-body focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-stone-500 mb-1">Port</label>
+              <label className="block fb-t-caption mb-1">Port</label>
               <input
                 type="number"
                 value={port}
@@ -201,10 +201,10 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
                   setPort(Number(e.target.value))
                   setTested(false)
                 }}
-                className="w-full bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+                className="w-full fb-field fb-t-body focus:outline-none"
               />
             </div>
-            <label className="col-span-2 flex items-center gap-2 text-[12px] text-stone-600 dark:text-stone-300">
+            <label className="col-span-2 flex items-center gap-2 fb-t-label text-[var(--ink-60)]">
               <input
                 type="checkbox"
                 checked={secure}
@@ -219,13 +219,13 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
         )}
 
         {!advanced && host && (
-          <p className="text-[11px] text-stone-400 dark:text-stone-500 mb-3">
+          <p className="fb-t-caption mb-3">
             Connecting to {host}:{port} {secure ? 'over SSL' : ''}
           </p>
         )}
 
         {error && (
-          <div className="mb-3 text-[12px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg px-3 py-2">
+          <div data-testid="mail-setup-error" className="mb-3 fb-t-label text-rose-500 bg-rose-500/10 border border-rose-500/25 rounded-[var(--radius-row)] px-3 py-2">
             {error}
           </div>
         )}
@@ -241,12 +241,12 @@ function SetupForm({ onConnected }: { onConnected: () => void }): JSX.Element {
           <button
             onClick={() => void onTest()}
             disabled={!canSubmit || busy !== 'idle'}
-            className="text-[13px] px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent disabled:opacity-50"
+            className="fb-t-body px-3 py-2 fb-btn-surface fb-press text-[var(--ink-70)] disabled:opacity-50"
           >
             {busy === 'testing' ? 'Testing…' : 'Test connection'}
           </button>
           {tested && (
-            <span className="text-[12px] text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+            <span className="fb-t-label text-emerald-500 inline-flex items-center gap-1">
               <Icon name="check_circle" size={14} /> Connection works
             </span>
           )}
@@ -306,14 +306,14 @@ function ReadingPane(): JSX.Element {
 
   if (loading && !open) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[13px] text-stone-400">
+      <div className="flex-1 flex items-center justify-center fb-t-body text-[var(--ink-40)]">
         Loading message…
       </div>
     )
   }
   if (!open) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[13px] text-stone-400 dark:text-stone-500">
+      <div className="flex-1 flex items-center justify-center fb-t-body text-[var(--ink-40)]">
         Select an email to read it.
       </div>
     )
@@ -334,33 +334,33 @@ function ReadingPane(): JSX.Element {
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
-      <div className="px-5 pt-4 pb-3 border-b border-stone-200 dark:border-stone-800">
-        <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100 mb-1">
+      <div className="px-5 pt-4 pb-3 border-b border-[var(--edge-soft)]">
+        <h2 className="fb-t-title text-[var(--ink-100)] mb-1">
           {open.subject}
         </h2>
-        <div className="flex items-center gap-2 text-[12px] text-stone-500 dark:text-stone-400">
-          <span className="font-medium text-stone-700 dark:text-stone-300">{open.fromName}</span>
-          {open.fromAddress && <span className="text-stone-400">&lt;{open.fromAddress}&gt;</span>}
+        <div className="flex items-center gap-2 fb-t-label text-[var(--ink-50)]">
+          <span className="font-medium text-[var(--ink-70)]">{open.fromName}</span>
+          {open.fromAddress && <span className="text-[var(--ink-40)]">&lt;{open.fromAddress}&gt;</span>}
           <span className="ml-auto">{fmtTime(open.date)}</span>
         </div>
         <div className="flex items-center gap-2 mt-2.5 flex-wrap">
           <button
             onClick={() => startCompose(replyToOpen(false) ?? undefined)}
-            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+            className="fb-t-label px-2.5 py-1 fb-btn-surface fb-press text-[var(--ink-70)] inline-flex items-center gap-1.5"
           >
             <Icon name="reply" size={13} />
             Reply
           </button>
           <button
             onClick={() => startCompose(replyToOpen(true) ?? undefined)}
-            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+            className="fb-t-label px-2.5 py-1 fb-btn-surface fb-press text-[var(--ink-70)] inline-flex items-center gap-1.5"
           >
             <Icon name="reply_all" size={13} />
             Reply all
           </button>
           <button
             onClick={forwardOpen}
-            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+            className="fb-t-label px-2.5 py-1 fb-btn-surface fb-press text-[var(--ink-70)] inline-flex items-center gap-1.5"
           >
             <Icon name="forward" size={13} />
             Forward
@@ -368,27 +368,27 @@ function ReadingPane(): JSX.Element {
           <button
             onClick={() => setTaskDialogOpen(true)}
             data-testid="mail-make-task"
-            className="text-[12px] px-2.5 py-1 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-accent inline-flex items-center gap-1.5"
+            className="fb-t-label px-2.5 py-1 fb-btn-surface fb-press text-[var(--ink-70)] inline-flex items-center gap-1.5"
           >
             <Icon name={taskState === 'done' ? 'check' : 'add_task'} size={13} />
             {taskState === 'done' ? 'Task created' : 'Make a task'}
           </button>
           {open.attachments.length > 0 && (
-            <span className="text-[12px] text-stone-500 dark:text-stone-400 inline-flex items-center gap-1">
+            <span className="fb-t-label text-[var(--ink-50)] inline-flex items-center gap-1">
               <Icon name="attach_file" size={13} />
               {open.attachments.length} attachment{open.attachments.length > 1 ? 's' : ''}
             </span>
           )}
         </div>
         {taskError && (
-          <div className="mt-1.5 text-[11px] text-red-600 dark:text-red-400">{taskError}</div>
+          <div className="mt-1.5 fb-t-caption !text-rose-500">{taskError}</div>
         )}
       </div>
 
       {!draftDismissed && (loadingDraft || replyDraft) && (
-        <div className="border-b border-stone-200 dark:border-stone-800 px-5 py-3 bg-violet-50/50 dark:bg-violet-950/10">
+        <div className="border-b border-[var(--edge-soft)] px-5 py-3 bg-violet-50/50 dark:bg-violet-950/10">
           {loadingDraft ? (
-            <div className="flex items-center gap-2 text-[12px] text-violet-700 dark:text-violet-300">
+            <div className="flex items-center gap-2 fb-t-label text-violet-700 dark:text-violet-300">
               <Icon name="auto_awesome" size={14} className="animate-pulse" />
               Drafting a reply in your voice…
             </div>
@@ -396,62 +396,62 @@ function ReadingPane(): JSX.Element {
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Icon name="auto_awesome" size={14} className="text-violet-600 dark:text-violet-400" />
-                <span className="text-[11px] uppercase tracking-wider font-medium text-violet-700 dark:text-violet-300">
+                <span className="fb-t-caption uppercase tracking-wider font-medium !text-violet-700 dark:!text-violet-300">
                   Suggested reply
                 </span>
                 {typeof replyDraft.confidence === 'number' && (
-                  <span className="text-[10px] text-stone-400">
+                  <span className="fb-t-caption">
                     {Math.round(replyDraft.confidence * 100)}% confident
                   </span>
                 )}
               </div>
-              <p className="text-[13px] text-stone-800 dark:text-stone-200 whitespace-pre-wrap leading-relaxed max-h-40 overflow-auto">
+              <p className="fb-t-body text-[var(--ink-90)] whitespace-pre-wrap leading-relaxed max-h-40 overflow-auto">
                 {replyDraft.reply}
               </p>
               {replyDraft.note && (
-                <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-400 italic">
+                <p className="mt-1 fb-t-caption italic">
                   {replyDraft.note}
                 </p>
               )}
               <div className="flex items-center gap-2 mt-2">
                 <button
                   onClick={() => applyDraft(replyDraft.reply as string)}
-                  className="text-[12px] px-2.5 py-1 rounded-lg bg-accent text-white hover:brightness-110 inline-flex items-center gap-1.5"
+                  className="fb-t-label px-2.5 py-1 rounded-[var(--radius-chip)] bg-accent text-white hover:brightness-110 inline-flex items-center gap-1.5 fb-press"
                 >
                   <Icon name="edit" size={13} />
                   Edit and send
                 </button>
                 <button
                   onClick={() => open && void suggestReply(open)}
-                  className="text-[12px] px-2 py-1 rounded-lg text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+                  className="fb-t-label px-2 py-1 text-[var(--ink-50)] hover:text-[var(--ink-70)] fb-press"
                 >
                   Redraft
                 </button>
                 <button
                   onClick={() => setDraftDismissed(true)}
-                  className="ml-auto text-[12px] px-2 py-1 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                  className="ml-auto fb-t-label px-2 py-1 text-[var(--ink-40)] hover:text-[var(--ink-60)] fb-press"
                 >
                   Dismiss
                 </button>
               </div>
             </div>
           ) : replyDraft?.skip ? (
-            <div className="flex items-center gap-2 text-[12px] text-stone-500 dark:text-stone-400">
+            <div className="flex items-center gap-2 fb-t-label text-[var(--ink-50)]">
               <Icon name="auto_awesome" size={13} />
               <span>AI saw no reply needed{replyDraft.skipReason ? ` — ${replyDraft.skipReason}` : ''}.</span>
               <button
                 onClick={() => setDraftDismissed(true)}
-                className="ml-auto text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                className="ml-auto text-[var(--ink-40)] hover:text-[var(--ink-60)] fb-press"
               >
                 <Icon name="close" size={13} />
               </button>
             </div>
           ) : replyDraft?.needsApiKey ? (
-            <div className="text-[12px] text-stone-500 dark:text-stone-400">
+            <div className="fb-t-label text-[var(--ink-50)]">
               Add an Anthropic API key in Settings to get AI reply suggestions.
             </div>
           ) : replyDraft?.error ? (
-            <div className="flex items-center gap-2 text-[12px] text-stone-500 dark:text-stone-400">
+            <div className="flex items-center gap-2 fb-t-label text-[var(--ink-50)]">
               <span>Could not draft a reply. {replyDraft.error}</span>
               <button
                 onClick={() => open && void suggestReply(open)}
@@ -465,7 +465,7 @@ function ReadingPane(): JSX.Element {
       )}
 
       {open.html && hasRemote && !showRemote && (
-        <div className="shrink-0 px-4 py-1.5 text-[12px] bg-amber-500/10 border-b border-amber-500/20 text-stone-700 dark:text-stone-200 flex items-center gap-2">
+        <div className="shrink-0 px-4 py-1.5 fb-t-label bg-amber-500/10 border-b border-amber-500/20 text-[var(--ink-70)] flex items-center gap-2">
           <Icon name="visibility_off" size={13} className="shrink-0" />
           <span className="flex-1">Remote images are blocked to stop senders tracking when you open mail.</span>
           <button onClick={() => setShowRemote(true)} className="underline underline-offset-2 shrink-0" data-testid="mail-load-remote">
@@ -485,18 +485,18 @@ function ReadingPane(): JSX.Element {
             className="w-full h-full bg-white"
           />
         ) : (
-          <pre className="px-5 py-4 text-[13px] text-stone-800 dark:text-stone-200 whitespace-pre-wrap break-words font-sans leading-relaxed">
+          <pre className="px-5 py-4 fb-t-body text-[var(--ink-90)] whitespace-pre-wrap break-words font-sans leading-relaxed">
             {open.text || '(This message has no text body.)'}
           </pre>
         )}
       </div>
 
       {open.attachments.length > 0 && (
-        <div className="border-t border-stone-200 dark:border-stone-800 px-5 py-2.5 flex flex-wrap gap-2">
+        <div className="border-t border-[var(--edge-soft)] px-5 py-2.5 flex flex-wrap gap-2">
           {open.attachments.map((a, i) => (
             <span
               key={i}
-              className="text-[11px] inline-flex items-center gap-1 rounded-md border border-stone-200 dark:border-stone-700 px-2 py-1 text-stone-600 dark:text-stone-300"
+              className="fb-t-caption inline-flex items-center gap-1 rounded-[var(--radius-chip)] border border-[var(--edge-soft)] px-2 py-1"
             >
               <Icon name="description" size={12} />
               {a.filename}
@@ -616,16 +616,16 @@ export default function MailView(): JSX.Element {
   }
 
   return (
-    <div className="h-full flex desk-paper no-tod">
+    <div className="h-full flex bg-[var(--surface-base)] text-[var(--ink-100)]">
       {/* List */}
-      <div className="w-80 shrink-0 border-r border-stone-200 dark:border-stone-800 flex flex-col">
-        <div className="px-3 py-3 flex items-center gap-2 border-b border-stone-100 dark:border-stone-800/60">
+      <div className="w-80 shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+        <div className="px-3 py-3 flex items-center gap-2 border-b border-[var(--edge-soft)]">
           <Icon name="mail" size={16} className="text-accent shrink-0" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
+            <h1 className="fb-t-body font-semibold text-[var(--ink-100)] truncate">
               Mail{unread > 0 ? ` · ${unread} unread` : ''}
             </h1>
-            <p className="text-[11px] text-stone-400 dark:text-stone-500 truncate">
+            <p className="fb-t-caption truncate">
               {account?.email}
             </p>
           </div>
@@ -645,7 +645,7 @@ export default function MailView(): JSX.Element {
             </button>
             {menuOpen && (
               <div
-                className="absolute right-0 top-8 z-10 w-44 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-lg py-1 text-[12px]"
+                className="absolute right-0 top-8 z-10 w-44 rounded-[var(--radius-row)] fb-glass-panel fb-pop-in py-1 fb-t-label"
                 onMouseLeave={() => setMenuOpen(false)}
               >
                 <button
@@ -653,7 +653,7 @@ export default function MailView(): JSX.Element {
                     setMenuOpen(false)
                     setReconfiguring(true)
                   }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200"
+                  className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)] text-[var(--ink-90)] fb-press"
                 >
                   Account settings
                 </button>
@@ -662,7 +662,7 @@ export default function MailView(): JSX.Element {
                     setMenuOpen(false)
                     void disconnect()
                   }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-stone-100 dark:hover:bg-stone-800 text-red-600 dark:text-red-400"
+                  className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)] text-rose-500 fb-press"
                 >
                   Disconnect mailbox
                 </button>
@@ -673,21 +673,21 @@ export default function MailView(): JSX.Element {
 
         <div className="flex-1 overflow-auto">
           {error && (
-            <div className="m-2 text-[12px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg px-3 py-2">
+            <div className="m-2 fb-t-label text-rose-500 bg-rose-500/10 border border-rose-500/25 rounded-[var(--radius-row)] px-3 py-2">
               {error}
             </div>
           )}
           {threads.length > 0 && (
-            <p className="px-3 py-1 text-[10.5px] text-stone-400 dark:text-stone-500 border-b border-stone-100 dark:border-stone-800/60">
+            <p className="px-3 py-1 fb-t-caption border-b border-[var(--edge-soft)]">
               j / k move through the inbox, r replies, a archives
             </p>
           )}
           {threads.length === 0 && !loadingList ? (
-            <p className="text-[12px] text-stone-500 dark:text-stone-400 px-3 py-4">
+            <p className="fb-t-label text-[var(--ink-50)] px-3 py-4">
               {error ? 'Could not load your inbox.' : 'No messages.'}
             </p>
           ) : (
-            threads.map((t) => {
+            threads.map((t, i) => {
               // A thread is "active" when the open message belongs to it.
               const active = openUid != null && t.messages.some((m) => m.uid === openUid)
               // Who to show: distinct participants, abbreviated for multi-person threads.
@@ -700,24 +700,25 @@ export default function MailView(): JSX.Element {
                   key={t.id}
                   data-testid="mail-thread"
                   onClick={() => void openMessage(t.latest.uid)}
-                  className={`w-full text-left px-3 py-2.5 border-b border-stone-100 dark:border-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors ${
+                  style={{ animationDelay: `${Math.min(i * 25, 250)}ms` }}
+                  className={`w-full text-left px-3 py-2.5 border-b border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] fb-press fb-fade-in-up transition-colors ${
                     active ? 'bg-accent/[0.06]' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     {t.unread && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
                     <span
-                      className={`text-[13px] truncate flex-1 ${
+                      className={`fb-t-body truncate flex-1 ${
                         t.unread
-                          ? 'font-semibold text-stone-900 dark:text-stone-100'
-                          : 'text-stone-600 dark:text-stone-300'
+                          ? 'font-semibold text-[var(--ink-100)]'
+                          : 'text-[var(--ink-60)]'
                       }`}
                     >
                       {who}
                     </span>
                     {t.count > 1 && (
                       <span
-                        className="shrink-0 text-[10px] font-medium text-stone-500 dark:text-stone-400 bg-stone-200/70 dark:bg-stone-700/60 rounded-full px-1.5 leading-[16px]"
+                        className="shrink-0 fb-t-caption font-medium bg-[var(--surface-sunken)] rounded-full px-1.5 leading-[16px]"
                         title={`${t.count} messages in this conversation`}
                         data-testid="mail-thread-count"
                       >
@@ -725,15 +726,15 @@ export default function MailView(): JSX.Element {
                       </span>
                     )}
                     {t.hasAttachments && (
-                      <Icon name="attach_file" size={12} className="text-stone-400 shrink-0" />
+                      <Icon name="attach_file" size={12} className="text-[var(--ink-40)] shrink-0" />
                     )}
-                    <span className="text-[10px] text-stone-400 shrink-0">{fmtTime(t.date)}</span>
+                    <span className="fb-t-caption shrink-0">{fmtTime(t.date)}</span>
                   </div>
                   <div
-                    className={`text-[12px] truncate mt-0.5 ${
+                    className={`fb-t-label truncate mt-0.5 ${
                       t.unread
-                        ? 'text-stone-700 dark:text-stone-200'
-                        : 'text-stone-500 dark:text-stone-400'
+                        ? 'text-[var(--ink-90)]'
+                        : 'text-[var(--ink-50)]'
                     }`}
                   >
                     {t.subject}
