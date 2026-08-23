@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { StreamingEnvelopeScanner } from '../../src/main/ai/streamingEnvelope'
+import { StreamingEnvelopeScanner, decodeReplyFragment } from '../../src/main/ai/streamingEnvelope'
 
 // The scanner is what makes "watch the tools being prepared" honest: an object
 // is handed over the moment its closing brace lands, and never before. These
@@ -380,5 +380,37 @@ describe('unescaped quotes inside the reply (the A1 drive defect)', () => {
     expect(s.extractReply()).toBeNull()
     s.push(',"actions":[]}')
     expect(s.extractReply()).toBe('done.')
+  })
+})
+
+// AI-31: Caleb's round-4 drive. The model quoted a definition in its prose
+// with bare quotes; JSON.parse threw on the fragment and the old fallback
+// handed the renderer the RAW slice — literal \n and ### on screen, the
+// whole answer collapsed into one heading, every wave remounted (the flash).
+describe('reply decoding survives the model\'s unescaped quotes (AI-31)', () => {
+  const body =
+    '# How to Be a Great SDR\\n\\nThe role has shifted [8].\\n\\n### 1. Lead with signals\\nThe new definition: "a strategic operator" who guides the engine [12].'
+
+  it('decodes every escape even when the fragment contains bare quotes', () => {
+    const out = decodeReplyFragment(body)
+    expect(out).toContain('# How to Be a Great SDR\n\nThe role')
+    expect(out).toContain('\n\n### 1. Lead with signals\nThe new definition: "a strategic operator" who')
+    expect(out).not.toContain('\\n')
+  })
+
+  it('keeps a torn or unknown escape literal, decodes \\uXXXX', () => {
+    expect(decodeReplyFragment('caf\\u00e9 \\x tail\\')).toBe('café \\x tail\\')
+  })
+
+  it('the live peek never flips to raw text when a bare quote arrives mid-stream', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"First line.\\n\\nSecond line with a ')
+    const before = s.peekReply()
+    expect(before).toBe('First line.\n\nSecond line with a ')
+    s.push('"quoted phrase" and more.\\n\\n### Heading\\nBody","actions":[]}')
+    const after = s.peekReply()
+    expect(after).toBe('First line.\n\nSecond line with a "quoted phrase" and more.\n\n### Heading\nBody')
+    expect(after!.startsWith(before!)).toBe(true)
+    expect(s.extractReply()).toBe(after)
   })
 })

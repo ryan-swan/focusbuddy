@@ -3,7 +3,7 @@
 // recovery logic can be unit tested in isolation (anthropic.ts pulls in the
 // SQLite layer and can't load under vitest).
 
-import { replyQuoteRole } from './streamingEnvelope'
+import { decodeReplyFragment, replyQuoteRole } from './streamingEnvelope'
 
 export function extractJson(text: string): string | null {
   // Allow Claude to wrap in markdown ```json ... ``` or just return raw JSON.
@@ -74,17 +74,9 @@ export function salvageEnvelope(
         }
         replyEndIdx = i
         replyCut = !closed && body.length > 0
-        try {
-          reply = JSON.parse(`"${body}"`) as string
-        } catch {
-          // The body carries the model's unescaped quotes; decode the common
-          // escapes by hand rather than dropping a recovered answer whole.
-          reply = body
-            .replace(/\\n/g, '\n')
-            .replace(/\\t/g, '\t')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\')
-        }
+        // The body may carry the model's unescaped quotes; the shared
+        // decoder handles them the same way the live scanner does.
+        reply = decodeReplyFragment(body)
       }
     }
   }

@@ -170,3 +170,168 @@ test('plexii A1 waves: cascade, sentence waves, drain to the end', async () => {
 
   await launched.dispose()
 })
+
+// A stream shaped like a real query: the pre-retrieval wait, sources
+// landing, token-sized deltas, a tool arriving ABOVE the prose mid-stream,
+// and an answer long enough to overflow the viewport so the follow-scroll
+// has to glide rather than jump.
+const LONG = [
+  'Here is the full picture for the launch, drawn from the budget sheet and the runsheet [1][3]. The venue decision gates everything else. Nothing downstream can be booked until it is made.',
+  '',
+  '## Venue',
+  '',
+  'The Foundry fits 180 and sits inside the $1,200 ceiling [1][4]. The Annex is cheaper but caps at 90, which loses the partner tables. A third option, the Loft, has no date in September.',
+  '',
+  '## Date and runsheet',
+  '',
+  '- Doors at 6pm on a Thursday [3].',
+  '- Partner remarks at 6:40, ten minutes each.',
+  '- Demo at 7:15, thirty minutes with questions.',
+  '- Close by 8:30 so the venue can reset.',
+  '',
+  '## Partners',
+  '',
+  'The three anchor partners carry the announcement [2]. Each gets a one-paragraph note they can forward the same morning. None of them has been asked yet, so that is the first message to send.',
+  '',
+  '## Budget',
+  '',
+  '| Item | Cost |',
+  '|---|---|',
+  '| Venue | $1,200 |',
+  '| Catering | $900 |',
+  '| Print | $150 |',
+  '',
+  'That leaves $250 of the ceiling. If you want, I can draft the runsheet and the partner note now. Both land on this desk and you can apply them one at a time or all together.'
+].join('\n')
+
+test('plexii A1 waves: a real-shaped stream glides', async () => {
+  const launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  window.on('pageerror', (e) => console.log('PAGEERROR', e.message))
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), process.env.SHOT_THEME ?? 'dark')
+  await window.reload()
+  await waitForReady(window)
+
+  const ts = 1_755_900_100_000
+  type W = {
+    __fbView?: { getState: () => { goPlexii: () => void } }
+    __fbChat?: {
+      getState: () => { messagesByTask: Record<string, unknown[]>; liveTraceByThread: Record<string, Record<string, unknown>> }
+      setState: (s: Record<string, unknown>) => void
+    }
+  }
+  // 0) Send: the trace stands alone, searching.
+  await window.evaluate(
+    ({ ts }) => {
+      const w = window as unknown as W
+      w.__fbView?.getState().goPlexii()
+      w.__fbChat?.setState({
+        activeConversationId: null,
+        sending: true,
+        liveRequestId: 'probe2',
+        messagesByTask: { __new__: [{ role: 'user', content: 'Give me the full launch picture.', ts: ts - 10_000 }] },
+        liveTraceByThread: {
+          __new__: {
+            status: 'running', startedAt: Date.now(), retrievedAt: null, retrievalMs: null, repliedAt: null,
+            completedAt: null, mentions: [], semantic: false, sources: [], tools: [], activity: null, error: null
+          }
+        }
+      })
+    },
+    { ts }
+  )
+  await window.waitForTimeout(700)
+  await window.screenshot({ path: `${OUT}/real-0-searching.png` })
+  // 1) Sources land under the active line: the panel grows, rows cascade.
+  await window.evaluate(
+    ({ sources }) => {
+      const w = window as unknown as W
+      const live = w.__fbChat!.getState().liveTraceByThread.__new__
+      w.__fbChat!.setState({ liveTraceByThread: { __new__: { ...live, retrievedAt: Date.now(), retrievalMs: 388, sources } } })
+    },
+    { sources: SRC }
+  )
+  await window.waitForTimeout(100)
+  await window.screenshot({ path: `${OUT}/real-1-panel-growing.png` })
+  await window.waitForTimeout(900)
+  // 2) Token-sized deltas every 30ms; a tool lands above the prose midway.
+  const scrollSamples: number[] = []
+  let toolSent = false
+  for (let i = 0; i < LONG.length; i += 6) {
+    const chunk = LONG.slice(0, i + 6)
+    await window.evaluate(
+      ({ chunk, ts }) => {
+        const w = window as unknown as W
+        const s = w.__fbChat!.getState()
+        const msgs = s.messagesByTask.__new__ as { role: string }[]
+        const head = msgs[msgs.length - 1]?.role === 'assistant' ? msgs.slice(0, -1) : msgs
+        const live = s.liveTraceByThread.__new__
+        w.__fbChat!.setState({
+          messagesByTask: { __new__: [...head, { role: 'assistant', content: chunk, ts }] },
+          // The store stamps repliedAt on the first delta.
+          liveTraceByThread: { __new__: { ...live, repliedAt: live.repliedAt ?? Date.now() } }
+        })
+      },
+      { chunk, ts }
+    )
+    if (!toolSent && i > LONG.length / 2) {
+      toolSent = true
+      await window.evaluate(() => {
+        const w = window as unknown as W
+        const live = w.__fbChat!.getState().liveTraceByThread.__new__
+        w.__fbChat!.setState({
+          liveTraceByThread: {
+            __new__: { ...live, activity: { index: 0, kind: 'create-doc', label: 'Generating the runsheet' } }
+          }
+        })
+      })
+      await window.waitForTimeout(600)
+      await window.evaluate(() => {
+        const w = window as unknown as W
+        const live = w.__fbChat!.getState().liveTraceByThread.__new__
+        w.__fbChat!.setState({
+          liveTraceByThread: {
+            __new__: { ...live, tools: [{ index: 0, kind: 'create-doc', label: 'Launch runsheet' }] }
+          }
+        })
+      })
+      await window.waitForTimeout(120)
+      await window.screenshot({ path: `${OUT}/real-2-tool-landed.png` })
+    }
+    if (i % 60 === 0) {
+      scrollSamples.push(await window.evaluate(() => document.querySelector('[data-testid="chat-scroll"]')?.scrollTop ?? -1))
+    }
+    await window.waitForTimeout(30)
+  }
+  await window.screenshot({ path: `${OUT}/real-3-streaming-long.png` })
+  // 3) Settle, drain, fold.
+  await window.evaluate(
+    ({ sources, ts }) => {
+      const w = window as unknown as W
+      const live = w.__fbChat!.getState().liveTraceByThread.__new__
+      w.__fbChat!.setState({
+        sending: false,
+        liveRequestId: null,
+        liveTraceByThread: {},
+        traceByMessage: { [String(ts)]: { ...live, activity: null, status: 'done', repliedAt: Date.now() - 50, completedAt: Date.now() } },
+        sourcesByMessage: { [String(ts)]: sources },
+        proposalsByMessage: {
+          [String(ts)]: [{ id: 'p-9', kind: 'create-doc', title: 'Launch runsheet', reason: 'Doors at 6pm, three partner slots' }]
+        }
+      })
+    },
+    { sources: SRC, ts }
+  )
+  const prose = window.locator('[data-testid="streaming-prose"]')
+  await expect(prose).toHaveCount(0, { timeout: 20_000 })
+  await window.waitForTimeout(200)
+  await window.screenshot({ path: `${OUT}/real-4-handoff.png` })
+  await expect(window.locator('[data-testid="trace-collapsed"]')).toBeVisible({ timeout: 4000 })
+  await window.waitForTimeout(400)
+  await window.screenshot({ path: `${OUT}/real-5-done.png` })
+  // eslint-disable-next-line no-console
+  console.log('scrollTop samples:', scrollSamples.join(' '))
+  await launched.dispose()
+})

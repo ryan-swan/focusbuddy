@@ -25,6 +25,51 @@ function escapeRegExp(s: string): string {
 // "proposals", chat uses "actions"; "question" and "blocks" sit between.
 const AFTER_REPLY_KEYS = ['"actions"', '"proposals"', '"question"', '"blocks"']
 
+// Decode a JSON string fragment that may carry the model's UNESCAPED quotes
+// (AI-31). `JSON.parse('"…"')` throws on a bare quote, and the old fallback
+// returned the raw slice — so the moment the model quoted something in its
+// prose, the whole answer on screen flipped from decoded text to literal
+// `\n` and `###` junk, every construct collapsed into one heading, and the
+// renderer remounted the lot (Caleb: "formatted horribly… the screen flash
+// with all of the population of text"). This walk is total: every escape
+// decodes, a bare quote is kept as a quote, a torn or unknown escape stays
+// literal. Shared by the live peek, the final extract, and chatJson's salvage
+// so all three agree on what the reply says.
+export function decodeReplyFragment(raw: string): string {
+  let out = ''
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]
+    if (c !== '\\') {
+      out += c
+      continue
+    }
+    const n = raw[i + 1]
+    switch (n) {
+      case 'n': out += '\n'; i++; break
+      case 't': out += '\t'; i++; break
+      case 'r': out += '\r'; i++; break
+      case 'b': out += '\b'; i++; break
+      case 'f': out += '\f'; i++; break
+      case '"': out += '"'; i++; break
+      case '\\': out += '\\'; i++; break
+      case '/': out += '/'; i++; break
+      case 'u': {
+        const hex = raw.slice(i + 2, i + 6)
+        if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+          out += String.fromCharCode(parseInt(hex, 16))
+          i += 5
+        } else {
+          out += c
+        }
+        break
+      }
+      default:
+        out += c
+    }
+  }
+  return out
+}
+
 // What does an UNESCAPED quote inside the reply string mean? 'close' when the
 // envelope genuinely continues after it (`,"actions":`, `,"question":`, or the
 // closing brace), 'content' when it is prose the model forgot to escape, and
@@ -142,12 +187,7 @@ export class StreamingEnvelopeScanner {
       i += 1
       cut = i
     }
-    const slice = this.buf.slice(start, cut)
-    try {
-      return JSON.parse(`"${slice}"`) as string
-    } catch {
-      return slice
-    }
+    return decodeReplyFragment(this.buf.slice(start, cut))
   }
 
   extractReply(): string | null {
@@ -177,13 +217,7 @@ export class StreamingEnvelopeScanner {
           continue
         }
         this.replyEnd = i
-        // Decode the JSON string fragment by reparsing it within a tiny envelope.
-        try {
-          const json = `"${this.buf.slice(start, i)}"`
-          return JSON.parse(json) as string
-        } catch {
-          return this.buf.slice(start, i)
-        }
+        return decodeReplyFragment(this.buf.slice(start, i))
       }
       i += 1
     }

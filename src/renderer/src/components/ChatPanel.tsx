@@ -452,9 +452,58 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const columnRef = useRef<HTMLDivElement | null>(null)
   const [showJump, setShowJump] = useState(false)
   const jumpTimer = useRef<number | null>(null)
+  // The follow glides (AI-30). Content now grows a wave at a time rather
+  // than a character at a time, so snapping scrollTop to the bottom on every
+  // resize would yank the transcript by a wave's height each beat once the
+  // answer overflows the viewport. Instead the viewport eases toward the
+  // bottom on the frame clock, re-reading the target every frame so it
+  // tracks growth that lands mid-glide. Reduced motion snaps as before.
+  const followRaf = useRef(0)
+  const following = useRef(false)
+  const syncStickRef = useRef<() => void>(() => {})
+  const followBottom = useCallback((): void => {
+    const el = scrollRef.current
+    if (!el) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    cancelAnimationFrame(followRaf.current)
+    let expected = el.scrollTop
+    const step = (): void => {
+      const now = scrollRef.current
+      if (!now || !stickRef.current) {
+        following.current = false
+        return
+      }
+      // The reader moved the viewport themselves since the last frame: the
+      // glide lets go at once and the stick rule re-measures from there.
+      if (Math.abs(now.scrollTop - expected) > 2) {
+        following.current = false
+        syncStickRef.current()
+        return
+      }
+      const target = now.scrollHeight - now.clientHeight
+      const d = target - now.scrollTop
+      if (Math.abs(d) < 0.5) {
+        now.scrollTop = target
+        following.current = false
+        return
+      }
+      now.scrollTop += d * 0.2
+      expected = now.scrollTop
+      followRaf.current = requestAnimationFrame(step)
+    }
+    following.current = true
+    followRaf.current = requestAnimationFrame(step)
+  }, [])
+  useEffect(() => () => cancelAnimationFrame(followRaf.current), [])
   const syncStick = useCallback((): void => {
     const el = scrollRef.current
     if (!el) return
+    // Our own glide fires scroll events; mid-glide the distance can read as
+    // "left the bottom" for a frame. Only the reader's scrolling counts.
+    if (following.current) return
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight
     const stick = dist < 100
     stickRef.current = stick
@@ -478,6 +527,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       }, 150)
     }
   }, [])
+  syncStickRef.current = syncStick
   const jumpToLatest = useCallback((): void => {
     const el = scrollRef.current
     if (!el) return
@@ -490,12 +540,12 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     const col = columnRef.current
     if (!el || !col) return
     const ro = new ResizeObserver(() => {
-      if (stickRef.current) el.scrollTop = el.scrollHeight
+      if (stickRef.current) followBottom()
       else syncStick()
     })
     ro.observe(col)
     return () => ro.disconnect()
-  }, [syncStick])
+  }, [syncStick, followBottom])
   // A new message (the user's own send, or a turn appearing) re-follows when
   // stuck; the length hook keeps the non-streamed reply path followed too.
   const lastMessageLen = messages.length > 0 ? messages[messages.length - 1].content.length : 0
@@ -899,6 +949,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
 
       <div
         ref={scrollRef}
+        data-testid="chat-scroll"
         onContextMenu={handleMessagesContextMenu}
         onScroll={syncStick}
         className={

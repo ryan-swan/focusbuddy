@@ -2572,6 +2572,24 @@ body {
   grid-template-rows: 0fr;
   opacity: 0;
 }
+/* A trace line landing mid-work opens by height (0fr -> 1fr) so the active
+   line and the prose below glide down instead of jumping a row's worth in
+   one frame; its source rows cascade inside the opening space. */
+@keyframes fb-trace-grow {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.fb-trace-grow {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: fb-trace-grow var(--dur-base) var(--ease-spring-glide) both;
+}
 .fb-trace-blink {
   animation: fb-trace-blink 1s step-end infinite;
 }
@@ -2585,6 +2603,9 @@ body {
      trace on screen underneath the collapsed summary. */
   .fb-trace-body {
     transition: none;
+  }
+  .fb-trace-grow {
+    animation: none;
   }
   .fb-trace-body.fb-trace-out {
     opacity: 0;

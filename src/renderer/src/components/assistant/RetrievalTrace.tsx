@@ -246,8 +246,13 @@ export default function RetrievalTrace({
         // final height in one commit and nothing below it moves again.
         const leadIndex = cascadeIndex
         cascadeIndex += line.leaves?.length ?? 0
+        // A line that lands while the work runs grows into place by height
+        // (fb-trace-grow) so whatever sits below it — the active line, the
+        // landing prose — glides rather than jumps; its rows then cascade
+        // inside the opened space.
         return (
-        <div key={line.key} data-trace-line={line.key} className="flex flex-col gap-0.5">
+        <div key={line.key} data-trace-line={line.key} className={enter ? 'fb-trace-grow' : ''}>
+        <div className="min-h-0 overflow-hidden flex flex-col gap-0.5">
           <div className={`${enter} flex items-center gap-1.5 text-[var(--ink-40)]`}>
             <Icon name="check_circle" size={12} className="text-emerald-500/80 shrink-0" filled />
             <Icon name={line.icon} size={11} className="shrink-0 opacity-70" />
@@ -322,6 +327,7 @@ export default function RetrievalTrace({
               })}
             </ul>
           )}
+        </div>
         </div>
         )
       })}
