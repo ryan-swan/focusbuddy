@@ -15,8 +15,9 @@ to the bottom. A top bar built around one ⌘K search, with help, settings,
 notifications and the user avatar to the right. Pages open with a "Good morning,
 Sarah 👋" greeting, then a row of stat tiles with trend deltas, then dense rounded
 panels — boards, tables with status pills, charts and sparklines — with a persistent
-right rail of Upcoming / Recent Activity / AI Insights. Everything is rounded, hairline
-bordered, and quietly glassy.
+right rail of Upcoming / Recent Activity / AI Insights. Everything is rounded and its
+edges come from light, not outlines; glass is reserved for the one floating layer
+that content moves behind (see "Edges and glass" below).
 
 ## What already exists (do not rebuild)
 
@@ -30,7 +31,8 @@ strong. Use it; do not invent parallel colours.
   `rgb(var(--accent) / <alpha>)` or the Tailwind `accent` colour (`text-accent`,
   `bg-accent`).
 - **Surfaces / glass**: `.fb-glass-chrome | -panel | -pillow | -soft` for the three
-  glass tiers plus the soft dashboard‑card highlight.
+  glass tiers plus the soft dashboard‑card highlight; `fb-card / fb-tile /
+  fb-btn-surface / fb-field` for opaque material (depth from light, no outline).
 - **Shape / motion**: `--radius-xs..2xl`, the `--ease-spring-*` curves and
   `--dur-*` durations, surfaced as `.fb-spring-*`, `.fb-lift`, `.fb-breathing`.
 - **Type**: Inter everywhere, with `.fb-display`, `.fb-display-hero`, `.fb-tabular`
@@ -38,6 +40,32 @@ strong. Use it; do not invent parallel colours.
 
 Status colours (consistent across the suite): online/success = emerald, away/warn =
 amber, focus/AI = violet, busy/error = rose, info = sky, accent = brand.
+
+## Edges and glass (the law, 2026-08-23)
+
+Ratified with Caleb for the Edges + Glass mission; the Apple research behind it is
+`APPLE-DOCTRINE.md` in the product node (R1.1 to R1.6, R2.2, R5.4, R6.3, R6.4).
+
+- **Borders are the last resort.** Separate surfaces with whitespace first, then a
+  luminance step (`--surface-raised` on `--surface-base`, `--surface-sunken` inside
+  a panel), and only then a hairline. The material card (`fb-card`) already does this:
+  a `--edge-hairline` ring in the box-shadow, `--shadow-soft`, and the inset top
+  highlight. A `border border-[var(--edge-soft)]` box on a filled surface is debt.
+- **Hairlines are alpha.** `--edge-soft` and `--edge-firm` are translucent (light:
+  black at 10% / 20%; dark: white at 10% / 19%; atelier 13% / 24%), so one line reads
+  the same weight on a panel and quieter on the floor. Never an opaque grey stroke.
+- **Two layers, one of them glass at most.** Content (cards, widgets, documents,
+  rows, anything read for more than a moment) is opaque. The floating layer may be
+  glass, and only where meaningful content moves behind it: `fb-glass-chrome` for the
+  titlebar and the toolbars and pills floating over the canvas, `fb-glass-panel` for
+  popovers, menus and sheets, `fb-glass-pillow` for modal dialogs. The side menus are
+  opaque material while the dock column reserves their width. Never glass on glass;
+  ad-hoc `backdrop-blur` outside the tiers is a defect.
+- **Corners rhyme.** Cards 16, rows and fields 10, chips 8 (`--radius-card / -row /
+  -chip / -field`); a nested element takes `outer minus padding`, never a fourth value.
+- **Feedback on every control, on nothing else.** Hover highlights or lifts, press
+  dips (`fb-press`), keyboard focus is the global concentric ring: restyle it, never
+  `outline-none` it away.
 
 ## The missing layer — shared dashboard primitives
 

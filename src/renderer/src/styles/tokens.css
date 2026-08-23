@@ -73,9 +73,15 @@
   --surface-sunken: oklch(95% 0.004 264);      /* recessed inputs */
   --surface-veil: oklch(97.2% 0.003 264 / 0.72); /* glass body fill */
 
-  /* ── Edge (borders) — hairlines, ~1px subpixel-aware ────────────────────── */
-  --edge-soft: oklch(92% 0.005 264);
-  --edge-firm: oklch(85% 0.006 264);
+  /* ── Edge (borders) — alpha hairlines (Edges + Glass, 2026-08-23) ───────
+     Apple separates surfaces with strokes at very low opacity, never with an
+     opaque grey (APPLE-DOCTRINE R1.5). These alphas are solved so the weight
+     on --surface-raised is identical to the opaque tokens they replace
+     (light 92% / 85% L on a 99.2% panel), and the same line reads QUIETER on
+     base and sunken instead of heavier. Borders remain the last resort
+     (R5.4): whitespace, then a luminance step, then one of these. */
+  --edge-soft: oklch(20% 0.010 264 / 0.10);
+  --edge-firm: oklch(20% 0.010 264 / 0.20);
   --edge-glow: oklch(100% 0 0 / 0.55); /* glass top highlight */
 
   /* ── Light-aware shadows ────────────────────────────────────────────────── */
@@ -131,7 +137,23 @@
   /* Three tiers: chrome (sidebar/dock), panel (popovers), pillow (modal cards).
      The two scale knobs below let the Theme studio tune translucency + blur
      across every glass surface at once. At scale 1 the values are identical to
-     the hand-tuned originals, so an uncustomised UI looks exactly as before. */
+     the hand-tuned originals, so an uncustomised UI looks exactly as before.
+
+     THE GLASS LAW (Edges + Glass mission, ratified with Caleb 2026-08-23;
+     APPLE-DOCTRINE R1.1 to R1.3). Two layers only: an opaque content layer
+     and ONE floating layer that may be glass. A surface earns a tier only when
+     meaningful content moves behind it, because translucency exists to keep
+     that context, not to decorate.
+       fb-glass-chrome  the titlebar, toolbars and pills floating over the
+                        canvas, a dock the canvas runs beneath
+       fb-glass-panel   popovers, menus, sheets (Settings) over the page
+       fb-glass-pillow  modal dialogs over everything
+       never            cards, widgets, documents, list rows, anything read
+                        for more than a moment; the side menus while the dock
+                        column reserves their width (nothing is behind them)
+     Never glass on glass: a panel over chrome temporarily owns the material,
+     chrome never sits on chrome. Ad-hoc backdrop-blur outside these tiers is
+     a defect to bring onto a tier or flatten. */
   --fb-glass-opacity-scale: 1;
   --fb-glass-blur-scale: 1;
 
@@ -193,8 +215,10 @@
   --surface-sunken: oklch(14.5% 0.010 264);
   --surface-veil: oklch(23% 0.014 264 / 0.72);
 
-  --edge-soft: oklch(31% 0.014 264);
-  --edge-firm: oklch(38.5% 0.016 264);
+  /* Alpha hairlines: same weight as the old opaque 31% / 38.5% L lines on
+     surface-raised (21.5% L), quieter on base and sunken. */
+  --edge-soft: oklch(100% 0 0 / 0.10);
+  --edge-firm: oklch(100% 0 0 / 0.19);
   --edge-glow: oklch(100% 0 0 / 0.08);
   --edge-hairline: oklch(100% 0 0 / 0.09);
 
@@ -274,9 +298,11 @@
   --surface-sunken: oklch(13% 0.025 250);    /* recessed */
   --surface-veil: oklch(22% 0.025 250 / 0.72);
 
-  /* Edges — hairlines in cool-warm so they catch the eye without screaming */
-  --edge-soft: oklch(32% 0.022 250);
-  --edge-firm: oklch(42% 0.024 250);
+  /* Edges — alpha hairlines matching the old opaque 32% / 42% L lines on
+     surface-raised (20% L). Translucent white over navy reads cool by itself;
+     --edge-hairline below stays the gold material edge. */
+  --edge-soft: oklch(100% 0 0 / 0.13);
+  --edge-firm: oklch(100% 0 0 / 0.24);
   --edge-glow: oklch(82% 0.11 80 / 0.18); /* gold-tinted top highlight */
 
   /* Shadows — depth via warm undertones rather than pure black; the gold

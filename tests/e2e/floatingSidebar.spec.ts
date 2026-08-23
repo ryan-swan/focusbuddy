@@ -28,11 +28,13 @@ test('Desk sidebar floats, resizes, and minimises to a restore pill', async () =
     await expect(dock).toBeVisible({ timeout: 6_000 })
     await expect(aside).toBeVisible()
 
-    // Floating card, not a docked panel: rounded on all corners, hairline edge,
-    // and no one-sided right border.
+    // Floating card, not a docked panel: rounded on all corners (the radius
+    // law's card radius), its edge from the material recipe rather than a
+    // border, and no one-sided right border.
     const asideClass = (await aside.getAttribute('class')) ?? ''
-    expect(asideClass).toContain('rounded-[14px]')
+    expect(asideClass).toContain('rounded-[var(--radius-card)]')
     expect(asideClass).not.toContain('border-r')
+    expect(asideClass).not.toContain('border-[var(--edge-soft)]')
 
     // ── Resize by dragging the grip ─────────────────────────────────────────
     const startWidth = (await dock.boundingBox())?.width ?? 0

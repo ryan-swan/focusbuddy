@@ -20,20 +20,29 @@ import Icon from '../Icon'
 // a hit-test hook: the canvas edge-pan (useEdgePan) suppresses panning when the
 // pointer is over any floating menu, so hovering a menu that overlays the canvas
 // no longer pushes the desk. Keep this class on every floating chrome surface.
+// Material, not outline (Edges + Glass, 2026-08-23): the card sits on the
+// radius law (--radius-card, like every other outer card) and its edge comes
+// from FLOATING_MENU_STYLE's light recipe, not a 1px border. The menus are
+// deliberately NOT glass: the dock column reserves their width, so nothing
+// ever moves behind them and translucency would have nothing to reveal
+// (APPLE-DOCTRINE R1.3; the glass law lives in tokens.css).
 export const FLOATING_MENU_ASIDE =
-  'fb-floating-chrome h-full w-full flex flex-col overflow-hidden rounded-[14px] border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-100)]'
+  'fb-floating-chrome h-full w-full flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-raised)] text-[var(--ink-100)]'
 
 // Same floating card, but the card itself scrolls. Used by the fixed-width
 // segment and office menus whose whole body scrolls as one column (the rounded
 // corners still clip the scrolled content because overflow is not visible).
 export const FLOATING_MENU_ASIDE_SCROLL =
-  'fb-floating-chrome h-full w-full flex flex-col overflow-auto rounded-[14px] border border-[var(--edge-soft)] bg-[var(--surface-raised)]'
+  'fb-floating-chrome h-full w-full flex flex-col overflow-auto rounded-[var(--radius-card)] bg-[var(--surface-raised)]'
 
-// The elevation and a hint of the inset highlight, applied inline because they
-// reference CSS custom properties that Tailwind arbitrary values can't compose
-// as a single box-shadow list.
+// The fb-card material recipe (globals.css): an alpha hairline ring so the
+// card never melts into a same-luminance surface, the cast shadow for
+// elevation, and the inset top highlight that reads as light striking the
+// material. Applied inline because Tailwind arbitrary values can't compose
+// a box-shadow list out of custom properties. Gemstone's own !important
+// aside treatment still wins over this, by design.
 export const FLOATING_MENU_STYLE: React.CSSProperties = {
-  boxShadow: 'var(--shadow-cast)'
+  boxShadow: '0 0 0 1px var(--edge-hairline), var(--shadow-cast), var(--shadow-inset-highlight)'
 }
 
 // The inset that detaches the card from the window edges. Used as padding on the

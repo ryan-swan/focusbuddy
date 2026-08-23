@@ -4,7 +4,8 @@
  * Verifies that the restyled global Desk Sidebar (Sidebar.tsx) matches the
  * canonical PlexiOffice OfficeSidebar (PlexiOfficeShell.tsx) visual system:
  *
- *   - aside bg-[var(--surface-raised)] + rounded-[14px] floating card, hairline border-[var(--edge-soft)]
+ *   - aside bg-[var(--surface-raised)] + rounded-[var(--radius-card)] floating card whose edge
+ *     comes from light (hairline ring + cast shadow + inset highlight), not a 1px border
  *   - 14-tall header with 15px bold tracking-[0.14em] wordmark
  *   - SegmentSwitcher present
  *   - Nav rows: rounded-lg, accent/0.12 tint + accent text when active
@@ -44,12 +45,15 @@ test('Desk Sidebar and OfficeSidebar share the same visual system', async () => 
 
     // ── 2. Assert Desk Sidebar chrome ───────────────────────────────────────
     // 2a. Outer aside: surface-raised bg + a full rounded floating card edge.
-    //     The menu is now a floating rounded panel (rounded-[14px] + hairline
-    //     border all round) rather than a docked panel with a right border.
+    //     The menu is a floating material card on the radius law (Edges +
+    //     Glass, 2026-08-23): rounded-[var(--radius-card)], NO 1px border;
+    //     its edge is the hairline ring inside the box-shadow recipe.
     const deskAsideClasses = await deskSidebar.getAttribute('class') ?? ''
     expect(deskAsideClasses).toContain('bg-[var(--surface-raised)]')
-    expect(deskAsideClasses).toContain('rounded-[14px]')
-    expect(deskAsideClasses).toContain('border-[var(--edge-soft)]')
+    expect(deskAsideClasses).toContain('rounded-[var(--radius-card)]')
+    expect(deskAsideClasses).not.toContain('border-[var(--edge-soft)]')
+    const deskAsideShadow = await deskSidebar.evaluate((el) => getComputedStyle(el).boxShadow)
+    expect(deskAsideShadow).toContain('0px 0px 0px 1px')
 
     // 2b. Brand mark in the header. The sidebar redesign replaced the text
     // wordmark with the PlexiiLogo component (an <img>), so assert the logo
@@ -106,8 +110,10 @@ test('Desk Sidebar and OfficeSidebar share the same visual system', async () => 
     // ── 4. Assert OfficeSidebar chrome (reference) ──────────────────────────
     const officeAsideClasses = await officeSidebar.getAttribute('class') ?? ''
     expect(officeAsideClasses).toContain('bg-[var(--surface-raised)]')
-    expect(officeAsideClasses).toContain('rounded-[14px]')
-    expect(officeAsideClasses).toContain('border-[var(--edge-soft)]')
+    expect(officeAsideClasses).toContain('rounded-[var(--radius-card)]')
+    expect(officeAsideClasses).not.toContain('border-[var(--edge-soft)]')
+    const officeAsideShadow = await officeSidebar.evaluate((el) => getComputedStyle(el).boxShadow)
+    expect(officeAsideShadow).toContain('0px 0px 0px 1px')
 
     const officeWordmark = officeSidebar.locator('span.text-\\[15px\\].font-bold.tracking-\\[0\\.14em\\]').first()
     await expect(officeWordmark).toBeVisible({ timeout: 3_000 })
