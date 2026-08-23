@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import PlexiiLogo from './components/PlexiiLogo'
-import {
-  FLOATING_MENU_INSET,
-  SIDEBAR_MIN,
-  SIDEBAR_MAX,
-  useMinimizable,
-  useSidebarWidth
-} from './components/chrome/floatingMenu'
+import { FLOATING_MENU_INSET, SIDEBAR_MIN, SIDEBAR_MAX } from './components/chrome/floatingMenuStyle'
+import { useMinimizable, useSidebarWidth } from './components/chrome/floatingMenu'
 import MainPane from './components/MainPane'
 import PlexiOfficeShell from './components/office/PlexiOfficeShell'
 import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/segment/segments'
