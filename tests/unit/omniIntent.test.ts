@@ -95,11 +95,15 @@ describe('composerOmniIntents — the mascot door is chat-first (AI-01)', () => 
     expect(intents[0]?.target?.id).toBe('d1')
   })
 
-  it('take-me-to naming nothing never diverts Enter from chat', () => {
-    const intents = composerOmniIntents('open a savings account', targets)
-    // No dead nav attempt: Enter chats; at most the web rides behind Tab.
-    expect(intents[0]?.kind ?? 'ask').toBe('ask')
-    expect(intents.some((i) => i.kind === 'goto' || i.kind === 'url')).toBe(false)
+  it('soft verbs that match nothing never fake navigation, and stay chat-led mid-conversation', () => {
+    // "open X" is advice-shaped, not a nav command: no dead goto/url ever.
+    for (const chatFirst of [true, false]) {
+      const intents = composerOmniIntents('open a savings account', targets, { chatFirst })
+      expect(intents.some((i) => i.kind === 'goto' || i.kind === 'url')).toBe(false)
+    }
+    // Mid-conversation it reads as a request to Plexii, so chat leads.
+    const mid = composerOmniIntents('open a savings account', targets, { chatFirst: true })
+    expect(mid[0]?.kind ?? 'ask').toBe('ask')
   })
 
   it('questions and work requests grow no chrome at all', () => {
@@ -107,10 +111,25 @@ describe('composerOmniIntents — the mascot door is chat-first (AI-01)', () => 
     expect(composerOmniIntents('draft an email to Michael about the launch', targets)).toEqual([])
   })
 
-  it('a short searchy phrase keeps Enter on chat and offers the web behind Tab', () => {
+  it('a fresh conversation is searchy: the web leads, Plexii one Tab away', () => {
     const intents = composerOmniIntents('best standing desk 2026', targets)
-    expect(intents[0]?.kind).toBe('ask')
-    expect(intents[1]?.kind).toBe('search')
+    expect(intents[0]?.kind).toBe('search')
+    expect(intents[1]?.kind).toBe('ask')
+  })
+
+  it('mid-conversation the same phrase stays chat-led — replies are never hijacked', () => {
+    const intents = composerOmniIntents('sounds good to me', targets, { chatFirst: true })
+    expect(intents[0]?.kind ?? 'ask').toBe('ask')
+  })
+
+  it("take-me-to naming nothing local searches the web instantly (Caleb's BWW case)", () => {
+    const intents = composerOmniIntents('take me to buffalo wild wings menu', targets, {
+      chatFirst: true
+    })
+    expect(intents[0]?.kind).toBe('search')
+    // The search carries the destination, not the command words.
+    expect(intents[0]?.url).toBe('buffalo wild wings menu')
+    expect(intents[1]?.kind).toBe('ask')
   })
 
   it('multiline or long input is a composed message, never a command', () => {

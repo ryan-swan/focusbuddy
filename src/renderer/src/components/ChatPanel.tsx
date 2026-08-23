@@ -584,8 +584,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     [nodes, docList]
   )
   const composerIntents = useMemo(
-    () => composerOmniIntents(draft, omniTargets),
-    [draft, omniTargets]
+    // Mid-conversation, short phrases are usually replies, so chat leads;
+    // on a fresh conversation the same phrase is searchy and the web leads
+    // (the instant ruling). Deterministic intents divert either way.
+    () => composerOmniIntents(draft, omniTargets, { chatFirst: messages.length > 0 }),
+    [draft, omniTargets, messages.length]
   )
   const pickedIntent: OmniIntent | null =
     composerIntents.length > 0

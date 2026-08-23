@@ -723,11 +723,24 @@ async function applyOpenUrl(
   p: Extract<ActionProposal, { kind: 'open-url' }>,
   ctx: { activeTaskId: string | null }
 ): Promise<ApplyResult> {
-  if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — the browser needs a canvas.' }
-  }
   if (!/^https?:\/\//i.test(p.url)) {
     return { ok: false, message: 'Skipped — URL must start with https://' }
+  }
+  // R4/R13: the web never leaves Plexi and never demands a canvas. With no
+  // desk open, the in-app browser panel is the destination — the old
+  // "Open a task first" refusal was the pre-panel behaviour and read as
+  // clunk the moment Caleb hit it from Home. With a desk open, the loved
+  // deploy-on-canvas behaviour stands: the site lands as a browser widget.
+  if (!ctx.activeTaskId) {
+    const { useWebPanel } = await import('../stores/webPanel')
+    useWebPanel.getState().openWeb(p.url)
+    let host = p.url
+    try {
+      host = new URL(p.url).hostname.replace(/^www\./, '')
+    } catch {
+      // ignore
+    }
+    return { ok: true, message: `Opened ${host} in the browser panel` }
   }
   const entry = catalogFor('webview')
   await useWidgetStore.getState().create({

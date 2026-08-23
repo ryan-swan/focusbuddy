@@ -134,14 +134,22 @@ export function classifyOmniInput(rawInput: string, targets: OmniTarget[]): Omni
 }
 
 // The composer's door (A2, AI-01 — the mascot side of "one door"; Caleb's
-// omni-aware-composer pick, 2026-08-23). A chat composer is a chat surface
-// FIRST, so this is deliberately stricter than classifyOmniInput: Enter is
-// diverted only on unambiguous non-chat input — a bare address, or a
-// take-me-to phrase naming something real — and a short, searchy phrase
-// merely OFFERS the web behind Tab while Enter still chats. Questions and
-// work requests grow no chrome at all: asking Plexii is what the box is for.
+// omni-aware-composer pick + the instant-web ruling, both 2026-08-23).
+// Deterministic intents NEVER wait on the model: a bare address opens, and a
+// navigation phrase ("take me to / go to X") whose X is not in the workspace
+// acts on the web IMMEDIATELY — that phrase always means "get me there", and
+// an 11-second AI turn ending in a proposal card is the clunk Caleb rejected.
+// Chat protection: questions and work requests grow no chrome; softer verbs
+// ("open/show X") that match nothing stay chat-led ("open a savings account"
+// is advice-seeking, not navigation); and mid-conversation, short phrases
+// stay chat-led too so "sounds good" is never hijacked into a web search —
+// on a FRESH conversation the same phrase is searchy and search leads.
 // Returns the ordered intents (first = what Enter does), or [] for pure chat.
-export function composerOmniIntents(rawInput: string, targets: OmniTarget[]): OmniIntent[] {
+export function composerOmniIntents(
+  rawInput: string,
+  targets: OmniTarget[],
+  opts: { chatFirst?: boolean } = {}
+): OmniIntent[] {
   const text = rawInput.trim()
   // Multiline or long input is a composed message, never a command.
   if (!text || /\n/.test(text) || text.length > 160) return []
@@ -159,13 +167,24 @@ export function composerOmniIntents(rawInput: string, targets: OmniTarget[]): Om
       out.push(askIntent())
       return out
     }
+    // Explicit navigation verbs that matched nothing local mean the WEB, now:
+    // "take me to buffalo wild wings menu" searches the named thing
+    // instantly. Softer verbs (open/show) fall through to the chat rules.
+    if (/^(take me to|go to|goto)\b/i.test(text)) {
+      return [searchIntent(go[2]), askIntent()]
+    }
   }
 
   if (/\?\s*$/.test(text) || QUESTION_START.test(text) || ASK_VERBS.test(text)) return []
 
-  // A short bare phrase reads searchy: offer the web one Tab away, Enter
-  // still chats (the chat's own grounding searches the web anyway).
-  if (text.split(/\s+/).length <= 6) return [askIntent(), searchIntent(text)]
+  // A short bare phrase reads searchy. On a fresh conversation the web leads
+  // (the instant ruling); mid-conversation chat leads, because short phrases
+  // there are usually replies — the web stays one Tab away either way.
+  if (text.split(/\s+/).length <= 6) {
+    return opts.chatFirst
+      ? [askIntent(), searchIntent(text)]
+      : [searchIntent(text), askIntent()]
+  }
   return []
 }
 
