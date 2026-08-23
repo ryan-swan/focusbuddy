@@ -14,6 +14,7 @@ import { deriveAssistantBlocks } from '../lib/chatBlocks'
 import ChatBlockView from './focus/ChatBlockView'
 import RetrievalTrace from './assistant/RetrievalTrace'
 import StreamingProse from './assistant/StreamingProse'
+import { cascadeDurationMs } from '../lib/traceView'
 import QuestionCard from './assistant/QuestionCard'
 import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
@@ -182,7 +183,50 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const streaming = sending && !!liveTrace
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null
   const streamingMsg = streaming && lastMsg?.role === 'assistant' ? lastMsg : null
-  const visibleMessages = streamingMsg ? messages.slice(0, -1) : messages
+  // The drain (AI-30, Caleb: "same pace to the end"). The store settles the
+  // instant the stream closes, but the waves still on their way must keep
+  // landing at reading pace — so the live turn stays mounted for the answer
+  // that just finished until its last wave is on screen, and only then does
+  // the turn render through the block pipeline (trace folded, cards in).
+  // The same StreamingProse instance carries across, so no reveal restarts.
+  // Derived at render time, not in an effect: the child's onDrained can fire
+  // in the very commit the stream closes, and an effect-set flag would miss
+  // it and leave the turn draining forever.
+  const lastStreamingTs = useRef<number | null>(null)
+  if (streamingMsg) lastStreamingTs.current = streamingMsg.ts
+  const [drainedTs, setDrainedTs] = useState<number | null>(null)
+  const drainingMsg =
+    !streaming &&
+    lastMsg?.role === 'assistant' &&
+    lastMsg.ts === lastStreamingTs.current &&
+    drainedTs !== lastMsg.ts
+      ? lastMsg
+      : null
+  // The turn whose drain just ended: its cards cascade in once (AI-12). The
+  // flag outlives the cascade by a beat and then clears, so a navigation
+  // back to this page never replays it.
+  const [enteringTs, setEnteringTs] = useState<number | null>(null)
+  useEffect(() => {
+    if (enteringTs === null) return
+    const id = window.setTimeout(() => setEnteringTs(null), 1500)
+    return () => window.clearTimeout(id)
+  }, [enteringTs])
+  const drainingTs = drainingMsg?.ts ?? null
+  const endDrain = useCallback((): void => {
+    if (drainingTs === null) return
+    setDrainedTs(drainingTs)
+    setEnteringTs(drainingTs)
+  }, [drainingTs])
+  const liveMsg = streamingMsg ?? drainingMsg
+  const liveTurnTrace = liveTrace ?? (drainingMsg ? traceByMessage[String(drainingMsg.ts)] : undefined)
+  // "Tree lands first": the first wave waits for the source cascade, timed
+  // from the moment retrieval actually landed — an answer that arrives after
+  // a long think never waits on a cascade that finished seconds ago.
+  const holdUntil =
+    liveTurnTrace && liveTurnTrace.retrievedAt !== null
+      ? liveTurnTrace.retrievedAt + cascadeDurationMs(liveTurnTrace.sources.length)
+      : 0
+  const visibleMessages = liveMsg ? messages.slice(0, -1) : messages
   // The follow-up question that is live for the displayed thread, if any —
   // attached to the last message and neither answered nor dismissed. Derived
   // by a pure, tested rule (lib/assistantQuestion).
@@ -998,6 +1042,8 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             if (a) appliedForMsg[p.id] = a
           }
           const finishedTrace = traceByMessage[String(m.ts)]
+          const entering = enteringTs === m.ts
+          let enteringIndex = 0
           return (
             <div key={i} className="group/turn flex flex-col gap-3" data-testid="assistant-turn">
               {/* No identity row (P2). The premium-chat convention is
@@ -1017,23 +1063,45 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   onOpenSource={(s) => void openSource(s)}
                 />
               )}
-              {blocks.map((block, bi) => (
-                <ChatBlockView
-                  key={bi}
-                  block={block}
-                  activeTaskId={applyTaskId}
-                  appliedProposals={appliedForMsg}
-                  onApplied={(id, applied) => markProposalApplied(m.ts, id, applied)}
-                  onConsumeProposal={(id) => consumeProposal(m.ts, id)}
-                  onOpenSource={(s) => void openSource(s)}
-                  citedSources={citedSources}
-                  uiEnabled={uiEnabled}
-                  onUiSubmit={(text) => {
-                    if (useChatStore.getState().sending) return
-                    void send(thread.serverTaskId, text, thread.key)
-                  }}
-                />
-              ))}
+              {blocks.map((block, bi) => {
+                const view = (
+                  <ChatBlockView
+                    block={block}
+                    activeTaskId={applyTaskId}
+                    appliedProposals={appliedForMsg}
+                    onApplied={(id, applied) => markProposalApplied(m.ts, id, applied)}
+                    onConsumeProposal={(id) => consumeProposal(m.ts, id)}
+                    onOpenSource={(s) => void openSource(s)}
+                    citedSources={citedSources}
+                    uiEnabled={uiEnabled}
+                    onUiSubmit={(text) => {
+                      if (useChatStore.getState().sending) return
+                      void send(thread.serverTaskId, text, thread.key)
+                    }}
+                  />
+                )
+                // The turn that just finished draining (AI-12, AI-30): its
+                // cards and blocks cascade in with the app's tile entrance,
+                // after the prose — the prose itself is already on screen
+                // and must not flinch at the handoff. History never animates.
+                if (entering && block.kind !== 'text') {
+                  const at = enteringIndex++
+                  return (
+                    <div
+                      key={bi}
+                      className="fb-fade-in-up empty:hidden"
+                      style={{ animationDelay: `${Math.min(at * 35, 350)}ms` }}
+                    >
+                      {view}
+                    </div>
+                  )
+                }
+                return (
+                  <div key={bi} className="empty:hidden">
+                    {view}
+                  </div>
+                )
+              })}
               {/* Per-turn actions (P2): completion is a state change. Nothing
                   but the answer exists while it streams; the actions
                   materialize when the turn is done and reveal on hover/focus —
@@ -1087,14 +1155,24 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             completion this container unmounts and the finished message
             renders through the block pipeline with its trace already folded
             to the summary line (the store closes it at settle). */}
-        {streaming && (
+        {(streaming || drainingMsg) && (
           <div className="flex flex-col gap-3" data-testid="assistant-turn">
-            <RetrievalTrace
-              trace={liveTrace}
-              settled={!!streamingMsg}
-              onOpenSource={(s) => void openSource(s)}
-            />
-            {streamingMsg && <StreamingProse markdown={streamingMsg.content} active />}
+            {liveTurnTrace && (
+              <RetrievalTrace
+                trace={liveTurnTrace}
+                settled={!!liveMsg}
+                holdOpen={!!drainingMsg}
+                onOpenSource={(s) => void openSource(s)}
+              />
+            )}
+            {liveMsg && (
+              <StreamingProse
+                markdown={liveMsg.content}
+                active={streaming}
+                holdUntil={holdUntil}
+                onDrained={endDrain}
+              />
+            )}
           </div>
         )}
         </div>

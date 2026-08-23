@@ -2,15 +2,96 @@
 // so the anti-jitter rules are unit-testable without React or markdown.
 
 // Constant reveal pace. ~220 chars/sec ≈ 260 wpm — the research band's fast
-// edge, so the app feels quick, never theatrical. When the buffer backs up
-// (a burst landed, or the tab was hidden), the pace triples until caught up:
-// smoothing must never turn into artificial lag.
+// edge, so the app feels quick, never theatrical. There is deliberately no
+// catch-up mode any more: Caleb's ruling is "same pace to the end" — a burst
+// or an early finish is never repaid as a flood (the bank clamp in
+// StreamingProse is the whole mechanism).
 export const REVEAL_CPS = 220
-export const CATCHUP_AT = 1200
-export const CATCHUP_FACTOR = 3
-// Commit to React at most ~22fps. Per-frame reparses buy nothing visually and
-// cost markdown parsing; the word fade carries the sense of continuous motion.
-export const COMMIT_MS = 45
+
+// ── Sentence waves (AI-30) ────────────────────────────────────────────────
+//
+// Caleb's third rejudge retired per-character typing: "I want it to populate
+// into sections… a few sentences at a time", with the same gentle rise the
+// Office inbox rows make. The answer is therefore revealed in WAVES — a wave
+// is up to WAVE_SENTENCES sentences of one paragraph, or one block row (a
+// list item, a heading, a table row, a whole fence). Each wave lands as a
+// unit; the pace clock below decides WHEN, these functions decide WHERE.
+
+// Sentences per wave inside a paragraph, and the length past which a single
+// long sentence is its own wave rather than waiting for a partner.
+export const WAVE_SENTENCES = 2
+export const WAVE_MAX_CHARS = 240
+// The floor between two waves, so short rows (list items) cascade at the
+// inbox rhythm rather than stacking up in one frame.
+export const WAVE_MIN_BEAT_MS = 140
+
+// Sentence-final punctuation followed by closers, then whitespace, then the
+// start of something new. Abbreviations and initials are the usual false
+// positives: a lone capital ("J. Smith"), common titles, "e.g."/"i.e.", and
+// decimals never end a sentence.
+const SENTENCE_END = /[.!?]["')\]*_~]*(?=\s)/g
+const NOT_A_SENTENCE_END = /(?:\b[A-Z]|\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|approx|dept|est|No|Inc|Ltd|Co)|\b(?:e\.g|i\.e)|\d)\.$/
+
+function isSentenceEnd(text: string, punctAt: number): boolean {
+  const head = text.slice(Math.max(0, punctAt - 12), punctAt + 1)
+  if (text[punctAt] === '.' && NOT_A_SENTENCE_END.test(head)) return false
+  return true
+}
+
+// Every offset where a wave may close: `end` is exclusive and always lands on
+// whitespace, so `text.slice(0, end)` ends on the sentence's last character.
+// A `line` boundary (any newline) always closes a wave; a `sentence` one
+// closes it once the wave has enough sentences or length.
+function waveCandidates(text: string): { end: number; kind: 'line' | 'sentence' }[] {
+  const out: { end: number; kind: 'line' | 'sentence' }[] = []
+  for (let i = 0; i < text.length; i++) if (text[i] === '\n') out.push({ end: i, kind: 'line' })
+  let m: RegExpExecArray | null
+  while ((m = SENTENCE_END.exec(text)) !== null) {
+    const end = m.index + m[0].length
+    if (isSentenceEnd(text, m.index)) out.push({ end, kind: 'sentence' })
+  }
+  out.sort((a, b) => a.end - b.end)
+  return out
+}
+
+// The exclusive end offsets of every wave that can be shown. A wave exists
+// only when the text after its boundary has arrived (or `final` says no more
+// is coming), and only where the prefix renders true — safeCut is the judge,
+// so a wave never closes inside an unfinished construct: a fence, a table
+// waiting for its delimiter row, an open **bold**. Pure and monotone in
+// `text` for an append-only stream, so wave k keeps its offset as later text
+// lands — the renderer relies on that to keep earlier waves' DOM stable.
+export function waveEnds(text: string, final: boolean): number[] {
+  const ends: number[] = []
+  let start = 0
+  let sentences = 0
+  let lastLineEnd = -1
+  for (const c of waveCandidates(text)) {
+    if (c.end <= start) continue
+    // A run of newlines is one boundary: collapse blank lines onto the first.
+    if (c.kind === 'line') {
+      if (c.end === lastLineEnd + 1) {
+        lastLineEnd = c.end
+        continue
+      }
+      lastLineEnd = c.end
+      if (text.slice(start, c.end).trim() === '') {
+        continue
+      }
+    }
+    if (safeCut(text, c.end).length !== c.end) continue
+    if (c.kind === 'sentence') {
+      sentences++
+      const len = c.end - start
+      if (sentences < WAVE_SENTENCES && len < WAVE_MAX_CHARS) continue
+    }
+    ends.push(c.end)
+    start = c.end
+    sentences = 0
+  }
+  if (final && text.length > start && text.slice(start).trim() !== '') ends.push(text.length)
+  return ends
+}
 
 // Cut a reveal position back to safe ground: never mid-word (the fade would
 // animate half-tokens), and never inside an UNFINISHED markdown construct.

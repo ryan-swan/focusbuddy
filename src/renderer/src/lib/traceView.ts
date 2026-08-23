@@ -84,9 +84,33 @@ export interface TraceView {
   error: TraceLine | null
 }
 
-// How long to wait between revealing one retrieved source and the next. Slow
-// enough to read, fast enough that six sources don't outlast the answer.
-export const SOURCE_REVEAL_INTERVAL_MS = 260
+// The found sources cascade in with the app's entrance convention (AI-30,
+// Caleb: the Office inbox's "graceful reveal… that's the fluidity I want").
+// Rows mount together and stagger by index, exactly the inbox's numbers, so
+// the panel takes its final height once and nothing below it is shoved row
+// by row. The phase line leads, its rows follow.
+export const CASCADE_LINE_LEAD_MS = 60
+export const CASCADE_STAGGER_MS = 25
+export const CASCADE_STAGGER_CAP_MS = 250
+// Must match --dur-base, the fb-fade-in-up duration.
+export const CASCADE_ROW_MS = 240
+
+export function cascadeDelayMs(index: number): number {
+  return CASCADE_LINE_LEAD_MS + Math.min(index * CASCADE_STAGGER_MS, CASCADE_STAGGER_CAP_MS)
+}
+
+// How long the whole cascade takes for `count` rows — the moment after which
+// the answer may begin ("tree lands first"). Zero when there is nothing to
+// cascade, so an answer with no sources is never made to wait.
+export function cascadeDurationMs(count: number): number {
+  if (count <= 0) return 0
+  return cascadeDelayMs(count - 1) + CASCADE_ROW_MS
+}
+
+// The "Reading X…" ticker walks the sources after they land, one label per
+// beat: it narrates the wait before the first token without moving anything
+// on screen, since the rows are already in place.
+export const SOURCE_READ_TICK_MS = 420
 
 // Rotating thinking verbs (AI-29 — Caleb: "phrases it says when something is
 // loading… watch the words rotate and know it's thinking"). The active line
@@ -221,8 +245,8 @@ function retrieveLabel(trace: AssistantTrace): string {
   return `Searched your workspace · ${plural(ws.length, 'source')}${timing}${how}`
 }
 
-function sourceLeaves(sources: ChatSource[], shown: number): TraceLeaf[] {
-  return sources.slice(0, Math.max(0, shown)).map((s) => ({
+function sourceLeaves(sources: ChatSource[]): TraceLeaf[] {
+  return sources.map((s) => ({
     key: `${s.n}-${s.docId}`,
     label: s.title,
     icon: s.docType === 'web' ? 'hub' : s.docType === 'knowledge' ? 'menu_book' : 'description',
@@ -240,9 +264,10 @@ function toolLeaves(trace: AssistantTrace): TraceLeaf[] {
 }
 
 // Walk the trace and return what to draw. `revealedCount` is how many retrieved
-// sources have been ticked in by the caller's reveal timer — the one piece of
-// presentation state, and it only ever gates how much of a completed fact is
-// on screen yet, never whether the fact is true.
+// sources the caller's read ticker has walked past — the one piece of
+// presentation state. It only ever picks which "Reading X…" label is live;
+// the leaves themselves are all drawn the moment retrieval lands (their
+// cascade is CSS), and nothing here gates whether a fact is true.
 export function getTraceView(trace: AssistantTrace, revealedCount: number): TraceView {
   const completed: TraceLine[] = []
   const failed = trace.status === 'error'
@@ -277,14 +302,14 @@ export function getTraceView(trace: AssistantTrace, revealedCount: number): Trac
     key: 'retrieve',
     label: retrieveLabel(trace),
     icon: 'search',
-    leaves: sourceLeaves(ws, Math.min(revealedCount, ws.length))
+    leaves: sourceLeaves(ws)
   })
   if (web.length > 0) {
     completed.push({
       key: 'web',
       label: `Searched the web · ${plural(web.length, 'result')}`,
       icon: 'hub',
-      leaves: sourceLeaves(web, revealedCount - ws.length)
+      leaves: sourceLeaves(web)
     })
   }
 

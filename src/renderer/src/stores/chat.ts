@@ -758,17 +758,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             completedAt: Date.now()
           }
         }
-        // Completion is a state change (A1): the audit folds to its one-line
-        // summary in the same commit the answer settles in, instead of
-        // re-expanding and folding itself 1.4s later — the post-completion
-        // layout jump Caleb read as glitch. A FAILED trace stays open: it is
-        // the only thing on screen explaining what went wrong.
-        if (resp.ok) {
-          updates.traceDisclosureByMessage = {
-            ...get().traceDisclosureByMessage,
-            [tsKey]: 'closed'
-          }
-        }
+        // The disclosure is deliberately NOT forced closed here (AI-30). The
+        // A1 version folded the trace in this same commit to dodge the
+        // post-completion jump; now the finished turn keeps draining its
+        // waves under the open tree, the handoff mounts the tree in place
+        // without replaying its cascade, and the auto-collapse folds it by
+        // height — the loved fold, made smooth. A FAILED trace stays open
+        // regardless: it is the only thing on screen explaining what went
+        // wrong.
       }
       set(updates)
 

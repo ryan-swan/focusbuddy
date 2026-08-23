@@ -2491,11 +2491,17 @@ body {
   }
 }
 
-/* Streaming text (Plexii P3). Each newly revealed word fades in over ~140ms —
-   the one continuous animation in the product while an answer writes itself.
-   Opacity only (compositor-thread rule); no movement, no layout. The caret is
-   a soft pulsing dot pinned after the last block of the streaming turn. */
-@keyframes fb-word-in {
+/* Streaming text (Plexii P3, reshaped by AI-30). Opacity and transform only
+   (compositor-thread rule); nothing here causes layout. The caret is a static
+   dot pinned after the last block of the streaming turn. */
+/* Sentence waves (AI-30). The answer lands a wave at a time: block rows rise
+   into place with the app's entrance motion (fb-fade-in-up's recipe, so a
+   paragraph arrives exactly like an inbox row), and text continuing inside an
+   already-landed block fades in — inline runs cannot transform, and a fade is
+   the right weight for a sentence joining its paragraph. Both use `both` so a
+   wave is invisible until its animation starts. Successor to the per-word
+   fade (fb-word-in), retired at Caleb's third rejudge. */
+@keyframes fb-wave-in {
   from {
     opacity: 0;
   }
@@ -2503,8 +2509,11 @@ body {
     opacity: 1;
   }
 }
-.fb-word-in {
-  animation: fb-word-in 140ms ease-out both;
+.fb-wave-in {
+  animation: fb-wave-in var(--dur-slow) var(--ease-spring-glide) both;
+}
+.fb-wave-rise {
+  animation: fb-fade-in-up var(--dur-base) var(--ease-spring-soft) both;
 }
 /* The caret is deliberately STATIC. It remounts on every reparse of the
    streaming markdown (positional keys), and an infinitely-animating element
@@ -2521,8 +2530,11 @@ body {
   vertical-align: baseline;
 }
 @media (prefers-reduced-motion: reduce) {
-  .fb-word-in {
+  .fb-wave-in,
+  .fb-wave-rise {
     animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -2536,14 +2548,6 @@ body {
     transform: translateY(0);
   }
 }
-@keyframes fb-trace-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
 @keyframes fb-trace-blink {
   50% {
     opacity: 0.15;
@@ -2552,10 +2556,21 @@ body {
 .fb-trace-in {
   animation: fb-trace-in 200ms ease-out;
 }
-.fb-trace-out {
-  /* Duration must match FADE_MS in components/assistant/RetrievalTrace.tsx —
-     the collapse timer fires when this finishes. */
-  animation: fb-trace-out 200ms ease-out forwards;
+/* The expanded trace folds by height (AI-30): a one-row grid whose row
+   transitions 1fr -> 0fr while the contents fade, so the answer underneath
+   glides up instead of jumping the tree's height when the summary line takes
+   over. Duration must match FADE_MS in components/assistant/RetrievalTrace.tsx —
+   the collapse timer fires when this finishes. */
+.fb-trace-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--dur-base) var(--ease-spring-glide),
+    opacity var(--dur-quick) ease-out;
+}
+.fb-trace-body.fb-trace-out {
+  grid-template-rows: 0fr;
+  opacity: 0;
 }
 .fb-trace-blink {
   animation: fb-trace-blink 1s step-end infinite;
@@ -2568,8 +2583,11 @@ body {
   /* The fade-out still has to end invisible: the collapse timer runs on a clock,
      not on the animation, so skipping the animation must not leave the expanded
      trace on screen underneath the collapsed summary. */
-  .fb-trace-out {
-    animation: none;
+  .fb-trace-body {
+    transition: none;
+  }
+  .fb-trace-body.fb-trace-out {
     opacity: 0;
+    grid-template-rows: 0fr;
   }
 }

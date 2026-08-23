@@ -5,6 +5,8 @@ import {
   hasTraceContent,
   traceSummary,
   toolIcon,
+  cascadeDelayMs,
+  cascadeDurationMs,
   type AssistantTrace
 } from '../../src/renderer/src/lib/traceView'
 
@@ -94,19 +96,30 @@ describe('getTraceView — phases only advance on real events', () => {
     expect(v.completed[0].label).toBe('Searched your workspace · nothing relevant · 12ms')
   })
 
-  it('walks the sources one at a time as they are revealed', () => {
+  it('draws every found source at once; the read ticker only picks the live label (AI-30)', () => {
     const t = done({ sources: [src(1, 'Release checklist'), src(2, 'updater-notes.md')] })
-    // Nothing revealed yet: the first source is the one being read.
+    // The rows land together (their cascade is CSS); the first is being read.
     expect(getTraceView(t, 0).active?.label).toBe('Reading Release checklist…')
-    expect(getTraceView(t, 0).completed[0].leaves).toEqual([])
-    // One revealed: it appears as a leaf, the second becomes active.
+    expect(labels(getTraceView(t, 0).completed[0].leaves ?? [])).toEqual([
+      'Release checklist',
+      'updater-notes.md'
+    ])
+    // The ticker walks on; the leaves do not change.
     const v1 = getTraceView(t, 1)
     expect(v1.active?.label).toBe('Reading updater-notes.md…')
-    expect(labels(v1.completed[0].leaves ?? [])).toEqual(['Release checklist'])
-    // All revealed: the reveal phase is over.
-    const v2 = getTraceView(t, 2)
-    expect(labels(v2.completed[0].leaves ?? [])).toEqual(['Release checklist', 'updater-notes.md'])
-    expect(v2.active).toBeNull()
+    expect(labels(v1.completed[0].leaves ?? [])).toEqual(['Release checklist', 'updater-notes.md'])
+    // All read: the read phase is over.
+    expect(getTraceView(t, 2).active).toBeNull()
+  })
+
+  it('cascade timing: the inbox numbers, zero when there is nothing to cascade', () => {
+    expect(cascadeDurationMs(0)).toBe(0)
+    expect(cascadeDelayMs(0)).toBe(60)
+    expect(cascadeDelayMs(4)).toBe(160)
+    // Capped: a long list never outlasts ~10 rows' worth of stagger.
+    expect(cascadeDelayMs(40)).toBe(310)
+    expect(cascadeDurationMs(1)).toBe(300)
+    expect(cascadeDurationMs(6)).toBe(60 + 125 + 240)
   })
 
   it('carries the source on each leaf so the trace can open it', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatSource } from '@shared/types'
 import Icon from '../Icon'
 import PlexiiThinking from './PlexiiThinking'
@@ -9,7 +9,8 @@ import {
   hasTraceContent,
   traceSummary,
   rotatedLabel,
-  SOURCE_REVEAL_INTERVAL_MS,
+  cascadeDelayMs,
+  SOURCE_READ_TICK_MS,
   type AssistantTrace
 } from '../../lib/traceView'
 
@@ -28,8 +29,11 @@ import {
 
 // How long a finished trace stays fully expanded before folding away.
 const HOLD_BEFORE_COLLAPSE_MS = 1400
-// Must match the .fb-trace-out animation duration in globals.css.
-const FADE_MS = 200
+// Must match the .fb-trace-body fold transition in globals.css (--dur-base).
+const FADE_MS = 240
+// Rows past this count need the panel to scroll; below it the panel clips,
+// so a row rising into place never flashes a scrollbar (AI-30 shot sweep).
+const SCROLL_PAST_ROWS = 7
 
 interface Props {
   trace: AssistantTrace
@@ -38,12 +42,16 @@ interface Props {
   // on every navigation — see onDisclosureChange.
   disclosure?: 'open' | 'closed'
   onDisclosureChange?: (state: 'open' | 'closed') => void
-  // The answer's prose has started arriving (A1). The staggered source reveal
-  // narrates work in progress; once the model is visibly WRITING, a ticker
-  // still claiming "Reading X…" is a re-enactment — and every late row shoves
-  // the streaming text down (the P3 law: nothing above the caret reflows).
-  // When settled, every remaining source snaps in within one commit.
+  // The answer's prose has started arriving (A1). Once the model is visibly
+  // WRITING, a ticker still claiming "Reading X…" is a re-enactment, so the
+  // read phase ends at once. (The rows themselves are already in place — the
+  // cascade is CSS over a panel that took its final height when retrieval
+  // landed, so nothing above the prose ever reflows: the P3 law.)
   settled?: boolean
+  // The finished answer is still landing below (AI-30's drain). Folding the
+  // expanded tree while the waves are still arriving would shove the text
+  // up; the auto-collapse waits until the caller lets go.
+  holdOpen?: boolean
   // Open a retrieved source. Every source leaf is a link, not just the ones the
   // answer cited — retrieved-but-uncited material appears nowhere else, so this
   // is the only route to it.
@@ -91,6 +99,7 @@ export default function RetrievalTrace({
   disclosure,
   onDisclosureChange,
   settled,
+  holdOpen,
   onOpenSource
 }: Props): JSX.Element | null {
   const sourceCount = trace.sources.length
@@ -111,6 +120,11 @@ export default function RetrievalTrace({
   const [revealedCount, setRevealedCount] = useState(() =>
     trace.status === 'running' ? 0 : trace.sources.length
   )
+  // Entrance motion belongs to work happening NOW. A trace mounted already
+  // finished — the handoff after the drain, a restored conversation, a
+  // disclosure the user reopened — draws its rows in place, quietly; the
+  // cascade played once, when the sources were actually found.
+  const animateEntrance = useRef(trace.status === 'running')
   const [collapsed, setCollapsed] = useState(disclosure === 'closed')
   const [exiting, setExiting] = useState(false)
   // True once the disclosure has an owner — either the user has toggled it, or a
@@ -119,10 +133,11 @@ export default function RetrievalTrace({
   // your back when you come back to the page.
   const [userControlled, setUserControlled] = useState(disclosure !== undefined)
 
-  // Reveal retrieved sources one at a time. Self-rescheduling rather than an
-  // interval, so a source list that grows mid-flight picks up seamlessly.
-  // Once the answer is settled (prose streaming below), the ceremony ends in
-  // one commit instead of pushing the living text down row by row.
+  // The read ticker walks the landed sources one label at a time — pure
+  // narration of the wait, never a layout change. Self-rescheduling rather
+  // than an interval, so a source list that grows mid-flight picks up
+  // seamlessly. Once the answer is settled (prose below), the read phase is
+  // over at once.
   useEffect(() => {
     if (revealedCount >= sourceCount) return
     if (settled) {
@@ -131,7 +146,7 @@ export default function RetrievalTrace({
     }
     const id = window.setTimeout(() => {
       setRevealedCount((c) => Math.min(c + 1, sourceCount))
-    }, SOURCE_REVEAL_INTERVAL_MS)
+    }, SOURCE_READ_TICK_MS)
     return () => window.clearTimeout(id)
   }, [sourceCount, revealedCount, settled])
 
@@ -141,7 +156,7 @@ export default function RetrievalTrace({
     trace.status === 'done' && revealedCount >= sourceCount && trace.completedAt !== null
 
   useEffect(() => {
-    if (!fullyDone || userControlled) return
+    if (!fullyDone || userControlled || holdOpen) return
     const fadeId = window.setTimeout(() => setExiting(true), HOLD_BEFORE_COLLAPSE_MS)
     const collapseId = window.setTimeout(() => {
       setCollapsed(true)
@@ -153,7 +168,7 @@ export default function RetrievalTrace({
       window.clearTimeout(fadeId)
       window.clearTimeout(collapseId)
     }
-  }, [fullyDone, userControlled, onDisclosureChange])
+  }, [fullyDone, userControlled, holdOpen, onDisclosureChange])
 
   // Nothing retrieved, nothing prepared, nothing failed — so nothing to say.
   if (!hasTraceContent(trace)) return null
@@ -193,12 +208,19 @@ export default function RetrievalTrace({
   // running there is nothing settled to collapse, and a trace that is about to
   // auto-collapse doesn't need a control that flashes up first.
   const showCollapseControl = userControlled || trace.status === 'error'
+  let cascadeIndex = 0
+  const enter = animateEntrance.current ? 'fb-fade-in-up' : ''
 
   return (
+    // The fold (AI-30): the expanded tree collapses by height, not by a cut.
+    // fb-trace-body is a one-row grid whose row goes 1fr -> 0fr while it
+    // fades, so the answer below glides up over --dur-base instead of
+    // jumping the tree's full height the instant the summary line replaces it.
     <div
       data-testid="assistant-trace"
-      className={`text-[11px] flex flex-col gap-0.5 ${exiting ? 'fb-trace-out pointer-events-none' : ''}`}
+      className={`fb-trace-body text-[11px] ${exiting ? 'fb-trace-out pointer-events-none' : ''}`}
     >
+    <div className="min-h-0 overflow-hidden flex flex-col gap-0.5">
       {showCollapseControl && (
         <button
           type="button"
@@ -216,9 +238,17 @@ export default function RetrievalTrace({
           </span>
         </button>
       )}
-      {completed.map((line) => (
+      {completed.map((line) => {
+        // Rows cascade in index order across the whole tree (AI-30): the
+        // workspace panel's rows lead and the web panel's continue the same
+        // stagger, so two panels landing together read as one reveal. Every
+        // row is mounted at once with `both` fill, so the panel takes its
+        // final height in one commit and nothing below it moves again.
+        const leadIndex = cascadeIndex
+        cascadeIndex += line.leaves?.length ?? 0
+        return (
         <div key={line.key} data-trace-line={line.key} className="flex flex-col gap-0.5">
-          <div className="fb-trace-in flex items-center gap-1.5 text-[var(--ink-40)]">
+          <div className={`${enter} flex items-center gap-1.5 text-[var(--ink-40)]`}>
             <Icon name="check_circle" size={12} className="text-emerald-500/80 shrink-0" filled />
             <Icon name={line.icon} size={11} className="shrink-0 opacity-70" />
             <span className="truncate">{line.label}</span>
@@ -229,8 +259,12 @@ export default function RetrievalTrace({
             // icon in the kind's sidebar colour, with a right-aligned
             // provenance slot naming where it lives, the way a web result
             // names its domain. Scrolls past six rows rather than growing.
-            <ul className="ml-[18px] mt-0.5 rounded-[var(--radius-row)] bg-[var(--surface-sunken)]/60 px-1.5 py-1 max-h-44 overflow-y-auto flex flex-col gap-px">
-              {line.leaves.map((leaf) => {
+            <ul
+              className={`ml-[18px] mt-0.5 rounded-[var(--radius-row)] bg-[var(--surface-sunken)]/60 px-1.5 py-1 max-h-44 flex flex-col gap-px ${
+                line.leaves.length > SCROLL_PAST_ROWS ? 'overflow-y-auto' : 'overflow-hidden'
+              }`}
+            >
+              {line.leaves.map((leaf, li) => {
                 const isWeb = leaf.source?.docType === 'web'
                 const domain = isWeb && leaf.source ? domainOf(leaf.source.docId) : null
                 const identity = !isWeb && leaf.source ? sourceIdentity(leaf.source.docType) : null
@@ -262,7 +296,12 @@ export default function RetrievalTrace({
                   'flex items-center gap-1.5 w-full text-left rounded-[var(--radius-chip)] px-1.5 py-1'
                 const openable = leaf.source && onOpenSource && isOpenable(leaf.source)
                 return (
-                  <li key={leaf.key} data-testid="trace-leaf" className="fb-trace-in">
+                  <li
+                    key={leaf.key}
+                    data-testid="trace-leaf"
+                    className={enter}
+                    style={enter ? { animationDelay: `${cascadeDelayMs(leadIndex + li)}ms` } : undefined}
+                  >
                     {openable ? (
                       <button
                         type="button"
@@ -284,7 +323,8 @@ export default function RetrievalTrace({
             </ul>
           )}
         </div>
-      ))}
+        )
+      })}
 
       {/* The live region is mounted unconditionally with only its contents
           swapping. A region created at the same moment as its content does not
@@ -305,7 +345,10 @@ export default function RetrievalTrace({
               const label = rotatedLabel(
                 active.key,
                 active.label,
-                trace.status === 'running' ? Math.floor(liveElapsedS / 2) : -1
+                // The verbs narrate the gap before the first wave; once the
+                // answer is visibly landing, "Thinking…" beside it would be
+                // a contradiction, so the line settles on its honest label.
+                trace.status === 'running' && !settled ? Math.floor(liveElapsedS / 2) : -1
               )
               return (
                 <span key={label} className="fb-trace-in text-[var(--ink-70)]">
@@ -329,6 +372,7 @@ export default function RetrievalTrace({
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }
