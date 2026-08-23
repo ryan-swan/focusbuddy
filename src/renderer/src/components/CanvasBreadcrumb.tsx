@@ -411,7 +411,7 @@ export default function CanvasBreadcrumb({
               y: { duration: 0.14, ease: 'easeOut' },
               x: { type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }
             }}
-            className="absolute top-full mt-2 w-[172px] max-h-[360px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
+            className="fb-glass-panel rounded-[var(--radius-row)] absolute top-full mt-2 w-[172px] max-h-[360px] overflow-hidden z-[60] flex flex-col"
             style={{ left: 0 }}
             onMouseEnter={handleEnter}
             onMouseLeave={handleLeave}
@@ -439,7 +439,7 @@ export default function CanvasBreadcrumb({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.14, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="absolute top-full mt-2 right-0 w-[200px] max-h-[280px] rounded-2xl overflow-hidden bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-[0_8px_40px_rgba(0,0,0,0.28)] ring-1 ring-black/[0.10] dark:ring-white/[0.10] z-[60] flex flex-col"
+              className="fb-glass-panel rounded-[var(--radius-row)] absolute top-full mt-2 right-0 w-[200px] max-h-[280px] overflow-hidden z-[60] flex flex-col"
             >
               <div className="px-3 pt-2.5 pb-1">
                 <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-40)] font-semibold">
