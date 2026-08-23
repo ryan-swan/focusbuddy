@@ -83,10 +83,10 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
   }
 
   return (
-    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-condformat-dialog"
-        className="w-[460px] max-w-[92%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        className="fb-card w-[460px] max-w-[92%] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -175,15 +175,15 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
         {style === 'colorScale' && (
           <div className="flex items-center gap-3 flex-wrap text-[11px] text-[var(--ink-60)]">
             <label className="inline-flex items-center gap-1">
-              Low <input type="color" value={minColor} onChange={(e) => setMinColor(e.target.value)} className="h-6 w-8 rounded border border-[var(--edge-soft)] bg-transparent" />
+              Low <input type="color" value={minColor} onChange={(e) => setMinColor(e.target.value)} className="fb-field h-6 w-8" />
             </label>
             {threeColor && (
               <label className="inline-flex items-center gap-1">
-                Mid <input type="color" value={midColor} onChange={(e) => setMidColor(e.target.value)} className="h-6 w-8 rounded border border-[var(--edge-soft)] bg-transparent" />
+                Mid <input type="color" value={midColor} onChange={(e) => setMidColor(e.target.value)} className="fb-field h-6 w-8" />
               </label>
             )}
             <label className="inline-flex items-center gap-1">
-              High <input type="color" value={maxColor} onChange={(e) => setMaxColor(e.target.value)} className="h-6 w-8 rounded border border-[var(--edge-soft)] bg-transparent" />
+              High <input type="color" value={maxColor} onChange={(e) => setMaxColor(e.target.value)} className="fb-field h-6 w-8" />
             </label>
             <label className="inline-flex items-center gap-1 ml-1">
               <input type="checkbox" checked={threeColor} onChange={(e) => setThreeColor(e.target.checked)} /> 3-colour
@@ -194,7 +194,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
         {style === 'dataBar' && (
           <label className="flex items-center gap-2 text-[11px] text-[var(--ink-60)]">
             Bar colour
-            <input type="color" value={barColor} onChange={(e) => setBarColor(e.target.value)} className="h-6 w-8 rounded border border-[var(--edge-soft)] bg-transparent" />
+            <input type="color" value={barColor} onChange={(e) => setBarColor(e.target.value)} className="fb-field h-6 w-8" />
           </label>
         )}
 

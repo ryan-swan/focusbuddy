@@ -316,7 +316,7 @@ function NodeLabel({
           }
           e.stopPropagation()
         }}
-        className="bg-white text-[var(--ink-100)] text-[12px] text-center rounded px-1 outline-none border border-accent w-[90%]"
+        className="bg-white text-[var(--ink-100)] text-[12px] text-center rounded px-1 border border-accent w-[90%]"
         onClick={(e) => e.stopPropagation()}
       />
     )
@@ -830,7 +830,7 @@ function TemplateMenu({ onPick }: { onPick: (id: MapTemplateId) => void }): JSX.
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute z-20 mt-1 w-40 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+          <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-20 mt-1 w-40 py-1">
             {items.map((it) => (
               <button
                 key={it.id}
@@ -873,7 +873,7 @@ function ExportMenu({ onExport }: { onExport: (f: 'svg' | 'png' | 'jpg' | 'pdf')
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-40 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+          <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 z-20 mt-1 w-40 py-1">
             {items.map((it) => (
               <button
                 key={it.id}
@@ -928,9 +928,9 @@ function AiMapPanel({
   }
 
   return (
-    <div className="absolute inset-0 z-30 bg-black/30 flex items-center justify-center" onClick={onClose}>
+    <div className="fb-scrim absolute inset-0 z-30 flex items-center justify-center" onClick={onClose}>
       <div
-        className="w-[440px] max-w-[90%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-2"
+        className="fb-card fb-press w-[440px] max-w-[90%] p-4 space-y-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -950,7 +950,7 @@ function AiMapPanel({
           }}
           rows={4}
           placeholder="e.g. The customer onboarding process from signup to first value, with an approval step"
-          className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+          className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
         />
         {error && <div className="text-[11px] text-red-600 dark:text-red-400">{error}</div>}
         <div className="flex items-center justify-end gap-2">

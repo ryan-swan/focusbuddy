@@ -82,7 +82,7 @@ export default function OfficeAccountBar(): JSX.Element {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
           />
           <input
             type="password"
@@ -92,7 +92,7 @@ export default function OfficeAccountBar(): JSX.Element {
             onKeyDown={(e) => {
               if (e.key === 'Enter') void submit()
             }}
-            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
           />
           {error && <div className="text-[11px] text-red-600 dark:text-red-400">{error}</div>}
           <button

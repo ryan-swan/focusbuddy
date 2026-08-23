@@ -1382,7 +1382,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             value={activeRaw}
             onChange={(e) => mutateTab((t) => setCell(t, focus.r, focus.c, e.target.value))}
             placeholder="Select a cell. Start with = for a formula, e.g. =SUM(A2:A9)"
-            className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-1.5 text-[13px] font-mono focus:outline-none focus:border-accent"
+            className="fb-field flex-1 px-3 py-1.5 text-[13px] font-mono"
           />
           <button
             onClick={() => setFormulaAiOpen((v) => !v)}
@@ -1424,7 +1424,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
 
         {namesOpen && (
           <div
-            className="mb-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2 space-y-1.5"
+            className="fb-card mb-2 p-2 space-y-1.5"
             data-testid="sheet-names-panel"
           >
             <div className="text-[11px] uppercase tracking-wide text-[var(--ink-40)]">Named ranges</div>
@@ -1453,7 +1453,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Name"
                 data-testid="sheet-name-input"
-                className="w-28 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+                className="fb-field w-28 px-2 py-1 text-[12px] font-mono"
               />
               <input
                 value={newRef}
@@ -1463,7 +1463,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
                 }}
                 placeholder="A1:B10"
                 data-testid="sheet-ref-input"
-                className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] font-mono focus:outline-none focus:border-accent"
+                className="fb-field flex-1 px-2 py-1 text-[12px] font-mono"
               />
               <button
                 onClick={addNamedRange}
@@ -1528,7 +1528,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
             copying the value and continuing the series. */}
         {lastFill && (
           <div
-            className="mb-2 inline-flex items-center gap-2 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
+            className="fb-card mb-2 inline-flex items-center gap-2 px-2 py-1 text-[12px]"
             data-testid="sheet-fill-options"
           >
             <Icon name="auto_awesome" size={13} className="text-accent" />
@@ -1556,7 +1556,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
           ref={gridWrapRef}
           tabIndex={0}
           onKeyDown={(e) => void onGridKeyDown(e)}
-          className="outline-none flex-1 min-h-0"
+          className="flex-1 min-h-0"
         >
           <SheetGrid
             tab={tab}
@@ -1834,7 +1834,7 @@ function ColumnHeaderMenu({
     <div
       ref={ref}
       data-testid="sheet-col-menu"
-      className="fixed z-[100] w-52 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[100] w-52 py-1 text-[var(--ink-70)]"
       style={{ left, top }}
     >
       <button className={item} onClick={onInsertLeft}>
@@ -1930,7 +1930,7 @@ function RowHeaderMenu({
     <div
       ref={ref}
       data-testid="sheet-row-menu"
-      className="fixed z-[100] w-52 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[100] w-52 py-1 text-[var(--ink-70)]"
       style={{ left, top }}
     >
       <button className={item} onClick={onInsertAbove}>
@@ -1993,10 +1993,10 @@ function MoveConfirmDialog({
     return () => document.removeEventListener('keydown', onKey)
   }, [onCancel])
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/30" onMouseDown={onCancel}>
+    <div className="fb-scrim fixed inset-0 z-[130] flex items-center justify-center" onMouseDown={onCancel}>
       <div
         data-testid="sheet-move-confirm"
-        className="w-[380px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+        className="fb-card w-[380px] p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-2">
@@ -2017,7 +2017,7 @@ function MoveConfirmDialog({
           </button>
           <button
             onClick={onMoveAnyway}
-            className="text-[12px] px-3 py-1.5 rounded-md border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)]"
+            className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
             data-testid="sheet-move-anyway"
           >
             Move without fixing
@@ -2057,12 +2057,12 @@ function LookupDialog({
   const [returnCol, setReturnCol] = useState('2')
   const [ifMissing, setIfMissing] = useState('')
   const field =
-    'text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 focus:outline-none focus:border-accent'
+    'fb-field text-[12px] px-2 py-1.5'
   return (
-    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-lookup-dialog"
-        className="w-[440px] max-w-[92%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        className="fb-card w-[440px] max-w-[92%] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -2146,10 +2146,10 @@ function MacrosPanel({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-macros-panel"
-        className="w-[560px] max-w-[94%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        className="fb-card w-[560px] max-w-[94%] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -2169,7 +2169,7 @@ function MacrosPanel({
           onChange={(e) => setCode(e.target.value)}
           spellCheck={false}
           data-testid="macros-code"
-          className="w-full h-56 font-mono text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded-md p-2.5 focus:outline-none focus:border-accent resize-none"
+          className="fb-field w-full h-56 font-mono text-[12px] p-2.5 resize-none"
         />
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 text-[12px] text-rose-500" data-testid="macros-error">
@@ -2177,7 +2177,7 @@ function MacrosPanel({
           </div>
         )}
         {ran && !error && (
-          <div className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] px-2.5 py-2 text-[12px] text-[var(--ink-70)]" data-testid="macros-logs">
+          <div className="rounded-md bg-[var(--surface-sunken)] px-2.5 py-2 text-[12px] text-[var(--ink-70)]" data-testid="macros-logs">
             {logs.length ? logs.map((l, i) => <div key={i} className="font-mono">{l}</div>) : 'Ran — no output logged.'}
           </div>
         )}
@@ -2326,13 +2326,13 @@ function QueryPanel({
   }
 
   const needsCol = kind === 'filter' || kind === 'sort' || kind === 'removeColumns' || kind === 'keepColumns' || kind === 'rename' || kind === 'trim' || kind === 'changeCase'
-  const sel = 'h-7 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[12px] px-1.5 text-[var(--ink-70)] focus:outline-none focus:border-accent'
+  const sel = 'fb-field h-7 text-[12px] px-1.5 text-[var(--ink-70)]'
 
   return (
-    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-query-panel"
-        className="w-[560px] max-w-[94%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        className="fb-card w-[560px] max-w-[94%] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -2366,7 +2366,7 @@ function QueryPanel({
               {preview.rows.length} rows.
             </p>
 
-            <div className="rounded-md border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)]" data-testid="query-steps">
+            <div className="rounded-md bg-[var(--surface-sunken)] divide-y divide-[var(--edge-soft)]" data-testid="query-steps">
               {q.steps.length === 0 && (
                 <div className="px-2.5 py-2 text-[12px] text-[var(--ink-40)]">No steps yet. Add one below.</div>
               )}
@@ -2387,7 +2387,7 @@ function QueryPanel({
               ))}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-2">
+            <div className="flex items-center gap-1.5 flex-wrap rounded-md bg-[var(--surface-sunken)] p-2">
               <select className={sel} data-testid="query-kind" value={kind} onChange={(e) => setKind(e.target.value as QueryStep['kind'])}>
                 {QUERY_KINDS.map((k) => (
                   <option key={k.v} value={k.v}>{k.label}</option>
@@ -2473,7 +2473,7 @@ function FormulaMenu({
   return (
     <div
       data-testid="sheet-formula-menu"
-      className="fixed z-[120] w-[268px] max-h-[230px] overflow-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[var(--ink-70)]"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[120] w-[268px] max-h-[230px] overflow-auto py-1 text-[var(--ink-70)]"
       style={{ top, left }}
     >
       {menu.items.map((f, i) => (
@@ -2515,7 +2515,7 @@ function SignatureHint({
   return (
     <div
       data-testid="sheet-signature"
-      className="fixed z-[120] max-w-[340px] rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl px-3 py-1.5 text-[12px] text-[var(--ink-60)]"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[120] max-w-[340px] px-3 py-1.5 text-[12px] text-[var(--ink-60)]"
       style={{ top, left }}
     >
       {m ? (

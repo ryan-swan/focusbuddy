@@ -55,7 +55,7 @@ export default function SlidesToolbar(props: Props): JSX.Element {
       <div className="relative">
         <button className={btn} onClick={() => setMenu(menu === 'shape' ? null : 'shape')}><Icon name="category" size={15} /> Shape</button>
         {menu === 'shape' && (
-          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+          <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 z-50 mt-1 w-36 py-1 text-[12px]">
             {([['rect', 'Rectangle'], ['roundRect', 'Rounded'], ['ellipse', 'Ellipse'], ['triangle', 'Triangle']] as const).map(([s, label]) => (
               <button key={s} onClick={() => { props.onInsertShape(s); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">{label}</button>
             ))}
@@ -68,7 +68,7 @@ export default function SlidesToolbar(props: Props): JSX.Element {
       <div className="relative">
         <button className={btn} onClick={() => setMenu(menu === 'layout' ? null : 'layout')}><Icon name="dashboard" size={15} /> Layout</button>
         {menu === 'layout' && (
-          <div className="absolute left-0 z-50 mt-1 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+          <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 z-50 mt-1 w-44 py-1 text-[12px]">
             {LAYOUTS.map((l) => (
               <button key={l.id} onClick={() => { props.onApplyLayout(l.id); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">{l.label}</button>
             ))}
@@ -80,7 +80,7 @@ export default function SlidesToolbar(props: Props): JSX.Element {
         <div className="relative">
           <button className={btn} onClick={() => setMenu(menu === 'io' ? null : 'io')}><Icon name="folder_open" size={15} /></button>
           {menu === 'io' && (
-            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+            <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 z-50 mt-1 w-44 py-1 text-[12px]">
               <button onClick={() => { props.onImport(); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]"><Icon name="upload_file" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Import .pptx</button>
               <button onClick={() => { props.onExport('pptx'); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]"><Icon name="slideshow" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Export .pptx</button>
               <button onClick={() => { props.onExport('pdf'); setMenu(null) }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]"><Icon name="picture_as_pdf" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Export PDF</button>

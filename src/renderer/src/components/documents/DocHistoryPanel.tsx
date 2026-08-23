@@ -67,7 +67,7 @@ export function DocHistoryPanelHost(): JSX.Element | null {
 
   return (
     <div
-      className="fixed inset-0 z-[280] flex justify-end bg-black/20"
+      className="fb-scrim fixed inset-0 z-[280] flex justify-end"
       onMouseDown={close}
       data-testid="doc-history-panel"
     >
@@ -106,7 +106,7 @@ export function DocHistoryPanelHost(): JSX.Element | null {
               {items.map((snap, i) => (
                 <li
                   key={snap.id}
-                  className="group flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] px-3 py-2"
+                  className="group flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] text-[var(--ink-90)]">

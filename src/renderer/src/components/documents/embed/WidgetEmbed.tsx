@@ -196,7 +196,7 @@ export default function WidgetEmbed({ widgetId }: Props): JSX.Element {
   }, [widgetId])
 
   const shell =
-    'h-full w-full flex flex-col rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden'
+    'fb-card h-full w-full flex flex-col overflow-hidden'
 
   if (state.phase === 'loading') {
     return (

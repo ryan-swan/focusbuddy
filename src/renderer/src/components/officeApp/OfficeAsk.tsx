@@ -119,12 +119,12 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
 
   return (
     <div
-      className="fixed inset-0 z-[300] bg-black/40 flex items-start justify-center pt-[10vh]"
+      className="fb-scrim fixed inset-0 z-[300] flex items-start justify-center pt-[10vh]"
       onMouseDown={onClose}
       data-testid="office-ask-modal"
     >
       <div
-        className="w-[600px] max-w-[92vw] max-h-[78vh] flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl"
+        className="fb-card w-[600px] max-w-[92vw] max-h-[78vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--edge-soft)]">
@@ -139,7 +139,7 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
             }}
             placeholder={hasThread ? 'Ask a follow-up…' : 'Ask your workspace… e.g. what did we agree on Acme pricing?'}
             data-testid="office-ask-input"
-            className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+            className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
           />
           <button
             onClick={() => void ask()}
@@ -173,7 +173,7 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
                     onClick={() => void makeDoc(turn)}
                     disabled={busy}
                     data-testid="office-ask-make-doc"
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-[var(--edge-soft)] hover:border-accent hover:text-accent disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-[var(--surface-sunken)] hover:text-accent disabled:opacity-50"
                   >
                     <Icon name="description" size={13} /> Document
                   </button>
@@ -181,7 +181,7 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
                     onClick={() => void makeDeck(turn)}
                     disabled={busy}
                     data-testid="office-ask-make-deck"
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-[var(--edge-soft)] hover:border-accent hover:text-accent disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-[var(--surface-sunken)] hover:text-accent disabled:opacity-50"
                   >
                     <Icon name="slideshow" size={13} /> Deck
                   </button>
@@ -196,7 +196,7 @@ export default function OfficeAsk({ onClose }: { onClose: () => void }): JSX.Ele
                         key={s.docId}
                         onClick={() => openSource(s.docId)}
                         data-testid={`office-ask-source-${s.title}`}
-                        className="w-full flex items-start gap-2 text-left rounded-lg border border-[var(--edge-soft)] px-2.5 py-1.5 hover:border-accent hover:bg-accent/[0.04]"
+                        className="fb-btn-surface w-full flex items-start gap-2 text-left px-2.5 py-1.5 hover:border-accent hover:bg-accent/[0.04]"
                       >
                         <Icon name={docIcon(s.docType)} size={14} className="text-accent shrink-0 mt-0.5" />
                         <span className="min-w-0">

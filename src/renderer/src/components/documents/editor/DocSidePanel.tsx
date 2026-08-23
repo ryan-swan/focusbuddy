@@ -103,7 +103,7 @@ function AiTab({ ai, userName, editor }: { ai: DocAi; userName?: string | null; 
   const greeting = userName && userName.trim() ? `Hi ${userName.trim()}, how can I help with this document?` : 'How can I help with this document?'
 
   const actionClass =
-    'flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-[12.5px] text-[var(--ink-80)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft'
+    'fb-card flex items-center gap-2 w-full text-left px-3 py-2 text-[12.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft'
 
   async function copyResult(): Promise<void> {
     if (!ai.previewHtml) return
@@ -171,7 +171,7 @@ function AiTab({ ai, userName, editor }: { ai: DocAi; userName?: string | null; 
                 if (e.key === 'Enter' && language.trim()) void ai.translate(language.trim())
               }}
               placeholder="Language, e.g. Spanish"
-              className="flex-1 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
+              className="fb-field flex-1 px-2.5 py-1.5 text-[12px]"
               data-testid="doc-ai-translate-language"
             />
             <button
@@ -198,7 +198,7 @@ function AiTab({ ai, userName, editor }: { ai: DocAi; userName?: string | null; 
               }}
               rows={2}
               placeholder="Tell the assistant what to do with this document or selection."
-              className="w-full resize-none rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
+              className="fb-field w-full resize-none px-2.5 py-1.5 text-[12px]"
               data-testid="doc-ai-more-prompt"
             />
             <button
@@ -230,7 +230,7 @@ function AiTab({ ai, userName, editor }: { ai: DocAi; userName?: string | null; 
         <div className="flex flex-col gap-2" data-testid="doc-ai-result">
           <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-40)] font-semibold">Result</div>
           <div
-            className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-72 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3 text-[13px]"
+            className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-72 overflow-auto rounded-lg bg-[var(--surface-base)] p-3 text-[13px]"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(ai.previewHtml) }}
           />
           <div className="flex items-center gap-2">
@@ -243,7 +243,7 @@ function AiTab({ ai, userName, editor }: { ai: DocAi; userName?: string | null; 
             </button>
             <button
               onClick={() => void copyResult()}
-              className="rounded-lg border border-[var(--edge-soft)] px-3 py-1.5 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface px-3 py-1.5 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
               data-testid="doc-ai-result-copy"
             >
               {copied ? 'Copied' : 'Copy'}
@@ -288,7 +288,7 @@ function MentionInput({
     <div className="relative mt-1.5">
       {open && (
         <div
-          className="absolute bottom-full left-0 mb-1 z-10 w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute bottom-full left-0 mb-1 z-10 w-48 py-1"
           data-testid={`${testId}-mentions`}
         >
           {candidates.map((h, i) => (
@@ -337,7 +337,7 @@ function MentionInput({
           }}
           placeholder={placeholder}
           data-testid={testId}
-          className="flex-1 rounded border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
+          className="fb-field flex-1 px-2 py-1 text-[12px]"
         />
         <button onClick={onSubmit} disabled={!value.trim()} className="icon-btn disabled:opacity-40" title="Reply">
           <Icon name="send" size={13} />
@@ -467,7 +467,7 @@ function CommentsTab({
           <button
             onClick={onAddComment}
             disabled={!onAddComment}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-3 py-2 text-[12.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50"
+            className="fb-btn-surface flex w-full items-center justify-center gap-1.5 px-3 py-2 text-[12.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50"
             data-testid="doc-comments-add"
           >
             <Icon name="add_comment" size={15} />

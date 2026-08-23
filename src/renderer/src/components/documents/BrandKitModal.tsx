@@ -35,9 +35,9 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center" onClick={onClose}>
       <div
-        className="w-[460px] max-h-[88vh] overflow-auto rounded-2xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-5"
+        className="fb-card fb-press w-[460px] max-h-[88vh] overflow-auto p-5"
         onClick={(e) => e.stopPropagation()}
         data-testid="brand-kit-modal"
       >
@@ -56,7 +56,7 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
         <div className="mb-4">
           <div className="text-[11px] uppercase tracking-wide text-[var(--ink-40)] mb-1.5">Logo</div>
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 rounded-lg border border-[var(--edge-soft)] flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)]">
+            <div className="w-16 h-16 rounded-lg flex items-center justify-center overflow-hidden bg-[var(--surface-sunken)]">
               {draft.logoUrl ? (
                 <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" data-testid="brand-logo-preview" />
               ) : (

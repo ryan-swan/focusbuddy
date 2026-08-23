@@ -208,7 +208,7 @@ export default function SheetGrid(props: Props): JSX.Element {
 
   return (
     <div
-      className="h-full overflow-auto border border-[var(--edge-soft)] rounded-xl bg-[var(--surface-raised)] shadow-sm"
+      className="fb-card h-full overflow-auto"
       data-testid="sheet-grid"
     >
       <table className="border-collapse text-[13px]" style={{ tableLayout: 'fixed', width: totalGridWidth }}>
@@ -277,7 +277,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                   <input
                     value={col}
                     onChange={(e) => props.onHeaderRename(c, e.target.value)}
-                    className="w-full bg-transparent px-1 py-1.5 text-[12px] font-semibold text-stone-700 dark:text-stone-200 focus:outline-none min-w-0"
+                    className="w-full bg-transparent px-1 py-1.5 text-[12px] font-semibold text-stone-700 dark:text-stone-200 min-w-0"
                   />
                 </div>
                 {/* Column resize handle. Drag to set the width (which drives the
@@ -551,7 +551,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                     {listValues && listOpen && (
                       <>
                         <div className="fixed inset-0 z-20" onMouseDown={() => setOpenList(null)} />
-                        <div className="absolute left-0 top-full z-30 min-w-full max-h-40 overflow-auto rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+                        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 top-full z-30 min-w-full max-h-40 overflow-auto py-1">
                           {listValues.map((v) => (
                             <button
                               key={v}
@@ -619,7 +619,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                           }
                         }}
                         onBlur={() => props.onCommitEdit('none')}
-                        className="w-full px-1.5 py-0.5 bg-white dark:bg-stone-900 outline-none text-stone-900 dark:text-stone-100 font-mono leading-[1.3]"
+                        className="w-full px-1.5 py-0.5 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 font-mono leading-[1.3]"
                       />
                     ) : sparkline ? (
                       <div
@@ -787,7 +787,7 @@ function FilterDropdown({
       <div className="fixed inset-0 z-30" onMouseDown={onClose} />
       <div
         data-testid="sheet-filter-dropdown"
-        className="absolute left-0 top-full z-40 mt-0.5 w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg"
+        className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 top-full z-40 mt-0.5 w-48"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--edge-soft)] text-[11px]">

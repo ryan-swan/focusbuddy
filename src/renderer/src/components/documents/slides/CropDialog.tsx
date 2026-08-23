@@ -58,7 +58,7 @@ export default function CropDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center"
+      className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center"
       data-testid="slides-crop-dialog"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()

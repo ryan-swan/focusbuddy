@@ -45,7 +45,7 @@ function FootnoteView({ node, updateAttributes, editor, getPos }: NodeViewProps)
       </sup>
       {open && (
         <span
-          className="absolute left-0 top-5 z-50 w-64 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 block"
+          className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 top-5 z-50 w-64 p-2 block"
           contentEditable={false}
           data-testid="doc-footnote-popover"
         >
@@ -56,7 +56,7 @@ function FootnoteView({ node, updateAttributes, editor, getPos }: NodeViewProps)
             onChange={(e) => updateAttributes({ text: e.target.value })}
             placeholder="Footnote text"
             data-testid="doc-footnote-input"
-            className="w-full h-16 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded p-1.5 focus:outline-none focus:border-accent resize-none"
+            className="fb-field w-full h-16 text-[12px] p-1.5 resize-none"
           />
           <span className="flex justify-end mt-1">
             <button type="button" className="text-[11px] px-2 py-0.5 rounded text-accent hover:bg-accent/10" onClick={() => setOpen(false)}>

@@ -38,7 +38,7 @@ export default function DocEmbed({ documentId }: { documentId: string }): JSX.El
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5">
+    <div className="fb-card flex items-center gap-3 px-3 py-2.5">
       <span className="h-9 w-9 rounded-lg bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))] inline-flex items-center justify-center shrink-0">
         <Icon name={meta ? TYPE_ICON[meta.docType] : 'description'} size={18} />
       </span>

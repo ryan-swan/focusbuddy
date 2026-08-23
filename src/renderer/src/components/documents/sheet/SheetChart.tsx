@@ -24,7 +24,7 @@ export default function SheetChart({ spec, tab, onRemove }: Props): JSX.Element 
   }
 
   return (
-    <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3" data-testid="sheet-chart">
+    <div className="fb-card p-3" data-testid="sheet-chart">
       <div className="flex items-center justify-between mb-1">
         <span className="text-[12px] font-semibold text-[var(--ink-70)]">
           {spec.title || `${spec.type[0].toUpperCase()}${spec.type.slice(1)} chart`}

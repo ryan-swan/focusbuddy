@@ -34,12 +34,12 @@ export default function ChartLinkDialog({ current, onApply, onClose }: Props): J
 
   const rangeOk = RANGE_RE.test(range.trim())
   const canApply = !!docId && rangeOk
-  const inputCls = 'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1.5 text-[13px] focus:outline-none focus:border-accent'
+  const inputCls = 'fb-field w-full px-2 py-1.5 text-[13px]'
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim absolute inset-0 z-50 flex items-center justify-center" onMouseDown={onClose}>
       <div
-        className="w-[420px] max-w-[94%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-3"
+        className="fb-card w-[420px] max-w-[94%] p-4 space-y-3"
         data-testid="chart-link-dialog"
         onMouseDown={(e) => e.stopPropagation()}
       >

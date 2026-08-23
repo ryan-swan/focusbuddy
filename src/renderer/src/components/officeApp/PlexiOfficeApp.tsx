@@ -177,7 +177,7 @@ export default function PlexiOfficeApp(): JSX.Element {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
                   }}
-                  className="text-[14px] font-semibold bg-transparent border-b border-accent focus:outline-none"
+                  className="text-[14px] font-semibold bg-transparent border-b border-accent"
                 />
               ) : (
                 <button
@@ -194,7 +194,7 @@ export default function PlexiOfficeApp(): JSX.Element {
               <button
                 onClick={() => void collaborate()}
                 data-testid="office-collaborate-btn"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                className="fb-btn-surface inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
                 title="Collaborate live on this document"
               >
                 <Icon name="group" size={14} />
@@ -203,7 +203,7 @@ export default function PlexiOfficeApp(): JSX.Element {
               <button
                 onClick={() => setShareTarget({ kind: 'document', doc: active })}
                 data-testid="office-share-btn"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+                className="fb-btn-surface inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
                 title="Share this document"
               >
                 <Icon name="share" size={14} />
@@ -248,12 +248,12 @@ export default function PlexiOfficeApp(): JSX.Element {
       {askOpen && <OfficeAsk onClose={() => setAskOpen(false)} />}
       {settingsOpen && (
         <div
-          className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center"
+          className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center"
           onMouseDown={() => setSettingsOpen(false)}
           data-testid="office-settings-modal"
         >
           <div
-            className="w-[480px] max-w-[92vw] max-h-[82vh] overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+            className="fb-card w-[480px] max-w-[92vw] max-h-[82vh] overflow-auto p-4"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 mb-2">

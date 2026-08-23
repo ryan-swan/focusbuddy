@@ -67,12 +67,12 @@ export default function WidgetPickerDialog({ onPick, onClose }: Props): JSX.Elem
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"
+      className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center"
       onMouseDown={onClose}
       data-testid="widget-picker"
     >
       <div
-        className="w-[460px] max-w-[92%] max-h-[76vh] flex flex-col rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl"
+        className="fb-card w-[460px] max-w-[92%] max-h-[76vh] flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 flex items-center gap-2 px-4 pt-3.5 pb-2.5">
@@ -89,7 +89,7 @@ export default function WidgetPickerDialog({ onPick, onClose }: Props): JSX.Elem
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search widgets or desks…"
             data-testid="widget-picker-search"
-            className="w-full rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[13px] focus:outline-none focus:border-accent"
+            className="w-full rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[13px] focus:border-accent"
           />
         </div>
 

@@ -24,7 +24,7 @@ export default function SheetTabStrip({ body, onSwitch, onAdd, onRename, onDelet
           key={s.id}
           className={`group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] cursor-pointer ${
             i === active
-              ? 'bg-[var(--surface-raised)] border border-[var(--edge-soft)] text-accent font-medium'
+              ? 'fb-card fb-press text-accent font-medium'
               : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]'
           }`}
           onClick={() => onSwitch(i)}
@@ -42,7 +42,7 @@ export default function SheetTabStrip({ body, onSwitch, onAdd, onRename, onDelet
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
                 if (e.key === 'Escape') setEditing(null)
               }}
-              className="w-20 bg-transparent border-b border-accent focus:outline-none"
+              className="w-20 bg-transparent border-b border-accent"
             />
           ) : (
             <span>{s.name}</span>

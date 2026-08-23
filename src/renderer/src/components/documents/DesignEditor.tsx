@@ -726,7 +726,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
           {exportOpen && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setExportOpen(false)} />
-              <div className="absolute left-0 mt-1 z-40 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-1" data-testid="design-export-menu">
+              <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 mt-1 z-40 w-36 p-1" data-testid="design-export-menu">
                 {EXPORT_FORMATS.map((f) => (
                   <button
                     key={f.id}
@@ -748,7 +748,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                     value={design.bleed ?? 0}
                     onChange={(e) => update({ bleed: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-14 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[11px] focus:outline-none"
+                    className="fb-field w-14 px-1 py-0.5 text-[11px]"
                   />
                 </label>
                 <button
@@ -790,7 +790,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                     key={t.id}
                     onClick={() => applyTemplate(t.id)}
                     data-testid={`design-template-${t.id}`}
-                    className="px-2.5 py-1.5 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 text-[12px]"
+                    className="fb-btn-surface px-2.5 py-1.5 hover:border-accent hover:bg-accent/5 text-[12px]"
                   >
                     {t.label}
                   </button>
@@ -811,7 +811,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                     key={s.id}
                     onClick={() => changeSize(s)}
                     data-testid={`design-size-${s.id}`}
-                    className="px-2.5 py-1.5 rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:bg-accent/5 text-[12px]"
+                    className="fb-btn-surface px-2.5 py-1.5 hover:border-accent hover:bg-accent/5 text-[12px]"
                   >
                     {s.label} <span className="text-[var(--ink-40)]">{s.w}×{s.h}</span>
                   </button>
@@ -833,7 +833,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   placeholder="e.g. a launch announcement for our new pricing"
                   data-testid="design-ai-prompt"
                   onKeyDown={(e) => e.key === 'Enter' && void generateVariations()}
-                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:border-accent"
                 />
                 <button onClick={() => void generateVariations()} disabled={!!busy} data-testid="design-ai-variations" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
                   Variations
@@ -852,7 +852,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   placeholder="e.g. a minimal abstract gradient background"
                   data-testid="design-image-prompt"
                   onKeyDown={(e) => e.key === 'Enter' && void generateImage()}
-                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:border-accent"
                 />
                 <button onClick={() => void generateImage()} disabled={!!busy} data-testid="design-image-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent disabled:opacity-50">
                   Image
@@ -871,7 +871,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
               placeholder="Search free photos (e.g. mountains, office, coffee)"
               data-testid="design-stock-query"
               onKeyDown={(e) => e.key === 'Enter' && void searchStock()}
-              className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+              className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:border-accent"
             />
             <button onClick={() => void searchStock()} disabled={!!busy} data-testid="design-stock-go" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
               Search
@@ -884,7 +884,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   key={p.id}
                   onClick={() => void insertStock(p)}
                   title={p.alt || `Photo by ${p.photographer}`}
-                  className="aspect-square rounded-md overflow-hidden border border-[var(--edge-soft)] hover:border-accent"
+                  className="fb-btn-surface aspect-square overflow-hidden hover:border-accent"
                 >
                   <img src={p.thumb} alt={p.alt} className="w-full h-full object-cover" />
                 </button>
@@ -1208,8 +1208,8 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
       )}
 
       {variations.length > 0 && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-6" onClick={() => setVariations([])} data-testid="design-variations-modal">
-          <div className="w-full max-w-4xl max-h-[88vh] overflow-auto rounded-2xl bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => setVariations([])} data-testid="design-variations-modal">
+          <div className="fb-card fb-press w-full max-w-4xl max-h-[88vh] overflow-auto p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <Icon name="auto_awesome" size={18} className="text-accent" />
               <h2 className="text-[15px] font-semibold text-[var(--ink-100)]">Pick a design</h2>
@@ -1224,7 +1224,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   key={i}
                   onClick={() => applyVariation(v)}
                   data-testid={`design-variation-${i}`}
-                  className="rounded-lg overflow-hidden border border-[var(--edge-soft)] hover:border-accent hover:ring-2 hover:ring-accent/30 transition"
+                  className="fb-btn-surface overflow-hidden hover:border-accent hover:ring-2 hover:ring-accent/30 transition"
                   title="Use this design"
                 >
                   <DesignThumb design={v} width={232} />

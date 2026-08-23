@@ -750,7 +750,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
               onChange={(e) => mutateSlide((s) => ({ ...s, notes: e.target.value }))}
               rows={2}
               placeholder="What to actually say on this slide"
-              className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+              className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
             />
           </div>
         </div>
@@ -855,9 +855,9 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
         })()}
 
       {a11yIssues !== null && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onMouseDown={() => setA11yIssues(null)}>
+        <div className="fb-scrim fixed inset-0 z-[60] flex items-center justify-center" onMouseDown={() => setA11yIssues(null)}>
           <div
-            className="w-[380px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+            className="fb-card w-[380px] p-4"
             data-testid="slides-a11y-modal"
             onMouseDown={(e) => e.stopPropagation()}
           >

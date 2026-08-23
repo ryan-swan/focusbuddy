@@ -42,7 +42,7 @@ export default function SheetPivot({ spec, tab, onRemove, onUpdateSpec }: Props)
 
   return (
     <div
-      className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3"
+      className="fb-card p-3"
       data-testid="sheet-pivot"
     >
       <div className="flex items-center justify-between mb-1.5">
@@ -139,7 +139,7 @@ function Slicer({
 }): JSX.Element {
   return (
     <div
-      className="rounded-md border border-[var(--edge-soft)] bg-[var(--surface-base)] p-1.5 min-w-[120px]"
+      className="rounded-md bg-[var(--surface-base)] p-1.5 min-w-[120px]"
       data-testid={`sheet-pivot-slicer-${field}`}
     >
       <div className="text-[10px] uppercase tracking-wide text-[var(--ink-40)] px-1 pb-1">{label}</div>

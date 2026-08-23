@@ -84,7 +84,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
               ? 'What slides to add…'
               : 'How to redesign this slide…'
         }
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
       />
       {mode === 'redesign' && (slideSummary?.trim().length ?? 0) > 0 && (
         <button

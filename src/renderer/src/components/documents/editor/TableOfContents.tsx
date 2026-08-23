@@ -50,7 +50,7 @@ function TocView({ node, updateAttributes, editor }: NodeViewProps): JSX.Element
   const items = (node.attrs.items as TocItem[]) ?? []
   return (
     <NodeViewWrapper
-      className="my-3 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 px-4 py-3"
+      className="my-3 rounded-md bg-[var(--surface-sunken)]/40 px-4 py-3"
       data-testid="doc-toc"
       contentEditable={false}
     >

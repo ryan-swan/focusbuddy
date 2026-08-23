@@ -66,10 +66,10 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
   }
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="office-teams-dialog"
-        className="w-[520px] max-w-[94vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+        className="fb-card w-[520px] max-w-[94vw] p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -95,7 +95,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                   }}
                   placeholder="New team name"
                   data-testid="office-team-name"
-                  className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
                 />
                 <button
                   onClick={() => void create()}
@@ -145,7 +145,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                         }}
                         placeholder="Add by handle, e.g. @alex"
                         data-testid="office-team-add-handle"
-                        className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                        className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
                       />
                       <button
                         onClick={() => void add()}

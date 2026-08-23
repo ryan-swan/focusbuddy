@@ -120,7 +120,7 @@ export default function WorkspaceAsk({
   if (!askEnt.enabled) {
     return (
       <div
-        className="flex flex-col gap-1.5 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-3"
+        className="flex flex-col gap-1.5 rounded-xl bg-[var(--surface-sunken)] p-3"
         data-testid="workspace-ask"
         data-capability="brain_workspace_ask"
         data-locked="true"
@@ -145,7 +145,7 @@ export default function WorkspaceAsk({
       </p>
 
       {getDocText && (
-        <div className="inline-flex self-start rounded-md border border-[var(--edge-soft)] overflow-hidden text-[10.5px]" data-testid="workspace-ask-scope">
+        <div className="inline-flex self-start rounded-md bg-[var(--surface-sunken)] overflow-hidden text-[10.5px]" data-testid="workspace-ask-scope">
           {(['workspace', 'doc'] as const).map((s) => (
             <button
               key={s}
@@ -160,7 +160,7 @@ export default function WorkspaceAsk({
       )}
 
       {thread.map((entry, i) => (
-        <div key={i} className="flex flex-col gap-1 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-2" data-testid="workspace-ask-answer">
+        <div key={i} className="flex flex-col gap-1 rounded-lg bg-[var(--surface-base)] p-2" data-testid="workspace-ask-answer">
           <div className="text-[11.5px] font-medium text-[var(--ink-70)]">{entry.question}</div>
           <div className="whitespace-pre-wrap text-[12.5px] text-[var(--ink-90)] leading-relaxed">{entry.answer}</div>
           {entry.sources.some((s) => s.cited) && (
@@ -227,7 +227,7 @@ export default function WorkspaceAsk({
       {thread.length === 0 && !busy && (
         <div className="flex flex-col gap-1">
           {STARTERS.map((s) => (
-            <button key={s} onClick={() => void ask(s)} className="text-left text-[11.5px] text-[var(--ink-70)] rounded-md border border-dashed border-[var(--edge-soft)] px-2 py-1 hover:border-[rgb(var(--accent)/0.5)] hover:text-[var(--ink-90)]">
+            <button key={s} onClick={() => void ask(s)} className="fb-btn-surface text-left text-[11.5px] text-[var(--ink-70)] border-dashed px-2 py-1 hover:border-[rgb(var(--accent)/0.5)] hover:text-[var(--ink-90)]">
               {s}
             </button>
           ))}
@@ -243,7 +243,7 @@ export default function WorkspaceAsk({
           }}
           placeholder="Ask anything about your work…"
           data-testid="workspace-ask-input"
-          className="flex-1 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
+          className="fb-field flex-1 px-2.5 py-1.5 text-[12px]"
         />
         <button onClick={() => void ask(q)} disabled={busy || !q.trim()} className="rounded-lg bg-[rgb(var(--accent))] px-2.5 py-1.5 text-white disabled:opacity-50" data-testid="workspace-ask-go" aria-label="Ask">
           <Icon name="send" size={13} />

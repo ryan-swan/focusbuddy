@@ -50,19 +50,19 @@ export default function FontPicker({ value, onChange, compact }: Props): JSX.Ele
         data-testid="font-picker-btn"
         onClick={() => setOpen((v) => !v)}
         title="Font"
-        className={`h-7 inline-flex items-center gap-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 text-[11px] text-[var(--ink-70)] ${compact ? 'w-20' : 'w-28'}`}
+        className={`fb-tile h-7 inline-flex items-center gap-1 px-1.5 text-[11px] text-[var(--ink-70)] ${compact ? 'w-20' : 'w-28'}`}
       >
         <span className="truncate flex-1 text-left" style={{ fontFamily: value || undefined }}>{current}</span>
         <Icon name="expand_more" size={12} />
       </button>
       {open && (
-        <div data-testid="font-picker-panel" className="absolute z-50 mt-1 left-0 w-56 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1.5">
+        <div data-testid="font-picker-panel" className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-50 mt-1 left-0 w-56 p-1.5">
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Google Fonts…"
-            className="w-full mb-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none"
+            className="fb-field w-full mb-1 px-2 py-1 text-[12px]"
           />
           <div className="max-h-64 overflow-auto">
             {GENERIC_FONTS.map((g) => (

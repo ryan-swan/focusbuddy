@@ -524,7 +524,7 @@ export default function DocEditor({
             <ReadingMeta editor={editor} />
 
             {/* Continuous vs Page, then orientation + paper when on a page. */}
-            <span className="inline-flex rounded-full border border-[var(--edge-soft)] overflow-hidden" data-testid="doc-layout-toggle">
+            <span className="inline-flex rounded-full bg-[var(--surface-sunken)] overflow-hidden" data-testid="doc-layout-toggle">
               <button
                 onClick={() => setPageView(false)}
                 className={`px-2 py-1 ${!pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
@@ -802,7 +802,7 @@ export default function DocEditor({
             }
             rows={2}
             autoFocus
-            className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+            className="fb-field w-full px-3 py-2 text-[13px] resize-none"
           />
 
           {ai.error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{ai.error}</div>}
@@ -811,7 +811,7 @@ export default function DocEditor({
             <div className="mt-2">
               <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)] mb-1">Preview</div>
               <div
-                className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-60 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3"
+                className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-60 overflow-auto rounded-lg bg-[var(--surface-base)] p-3"
                 data-testid="doc-ai-preview"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(ai.previewHtml) }}
               />
@@ -863,7 +863,7 @@ export default function DocEditor({
       {!showPanel && !focusMode && (
         <button
           onClick={() => setPanelOpen(true)}
-          className="absolute top-3 right-3 z-[55] inline-flex items-center gap-1 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] shadow-sm"
+          className="absolute top-3 right-3 z-[55] inline-flex items-center gap-1 rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shadow-sm"
           title="Show the assistant panel"
           data-testid="doc-side-panel-expand"
         >
@@ -933,12 +933,12 @@ function HeaderFooterMenu({
   onClose: () => void
 }): JSX.Element {
   const inputCls =
-    'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent'
+    'fb-field w-full px-2 py-1 text-[12px]'
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
-        className="absolute left-0 mt-1.5 z-40 w-64 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2.5 text-[var(--ink-70)] space-y-2.5"
+        className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 mt-1.5 z-40 w-64 p-2.5 text-[var(--ink-70)] space-y-2.5"
         data-testid="doc-headerfooter-menu"
       >
         <div>
@@ -1004,7 +1004,7 @@ function MarginMenu({
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
-        className="absolute left-0 mt-1.5 z-40 w-56 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-2 text-[var(--ink-70)]"
+        className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 mt-1.5 z-40 w-56 p-2 text-[var(--ink-70)]"
         data-testid="doc-margins-menu"
       >
         {MARGIN_PRESETS.map((p) => {

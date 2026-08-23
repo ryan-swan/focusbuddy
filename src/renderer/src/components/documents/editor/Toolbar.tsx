@@ -95,7 +95,7 @@ export default function Toolbar({
 
   const wordCount = editor.storage.characterCount?.words?.() ?? 0
 
-  const sel = 'h-7 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[11px] px-1 text-[var(--ink-70)] focus:outline-none'
+  const sel = 'fb-field h-7 text-[11px] px-1 text-[var(--ink-70)]'
 
   return (
     <div
@@ -306,7 +306,7 @@ export default function Toolbar({
             <Icon name="folder_open" size={15} />
           </button>
           {officeOpen && (
-            <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+            <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 z-50 mt-1 w-48 py-1 text-[12px]">
               <button onClick={() => { setOfficeOpen(false); onImportDocx() }} className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)]">
                 <Icon name="upload_file" size={14} className="text-[var(--ink-40)]" /> Import Word (.docx)
               </button>
@@ -374,7 +374,7 @@ function StylesPanel({
 
   const tiny = 'h-6 w-6 inline-flex items-center justify-center rounded text-[12px]'
   const numCls =
-    'w-11 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[11px] focus:outline-none'
+    'fb-field w-11 px-1 py-0.5 text-[11px]'
 
   function applyRow(active: boolean, label: string, icon: string, onClick: () => void, testid: string): JSX.Element {
     return (
@@ -415,7 +415,7 @@ function StylesPanel({
           <Icon name="format_italic" size={13} />
         </button>
         <input type="number" min={10} max={96} value={s.fontSize ?? ''} placeholder={String(h.preview)} title="Size" onChange={(e) => onSet(h.level, { fontSize: e.target.value === '' ? undefined : Number(e.target.value) })} className={numCls} />
-        <input type="color" value={s.color ?? '#1c1917'} title="Colour" onChange={(e) => onSet(h.level, { color: e.target.value })} className="h-6 w-6 rounded cursor-pointer p-0 border border-[var(--edge-soft)]" />
+        <input type="color" value={s.color ?? '#1c1917'} title="Colour" onChange={(e) => onSet(h.level, { color: e.target.value })} className="fb-field h-6 w-6 cursor-pointer p-0" />
       </div>
     )
   }
@@ -424,7 +424,7 @@ function StylesPanel({
     <div
       ref={ref}
       data-testid="doc-styles-panel"
-      className="absolute z-50 mt-1 left-0 w-[340px] max-h-[70vh] overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 font-normal"
+      className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in absolute z-50 mt-1 left-0 w-[340px] max-h-[70vh] overflow-auto p-2 font-normal"
     >
       {applyRow(currentHeadingLevel === null && !editor.isActive('blockquote') && !editor.isActive('codeBlock') && !editor.isActive('bulletList') && !editor.isActive('orderedList'), 'Normal text', 'notes', () => onApplyLevel(0), 'doc-style-row-0')}
       <div className="my-1 border-t border-[var(--edge-soft)]" />

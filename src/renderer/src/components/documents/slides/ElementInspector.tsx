@@ -29,12 +29,12 @@ interface Props {
 }
 
 const labelCls = 'text-[10px] uppercase tracking-wide text-[var(--ink-40)]'
-const inputCls = 'w-full bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[12px] focus:outline-none'
-const numCls = 'w-16 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[12px] focus:outline-none'
+const inputCls = 'fb-field w-full px-1.5 py-1 text-[12px]'
+const numCls = 'fb-field w-16 px-1.5 py-1 text-[12px]'
 
 export default function ElementInspector(props: Props): JSX.Element {
   const el = props.selected
-  const btn = 'h-7 min-w-7 px-1.5 inline-flex items-center justify-center rounded text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] border border-[var(--edge-soft)]'
+  const btn = 'fb-btn-surface h-7 min-w-7 px-1.5 inline-flex items-center justify-center text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
 
   if (!el) {
     return (
@@ -353,7 +353,7 @@ export default function ElementInspector(props: Props): JSX.Element {
                 {row.map((cell, c) => (
                   <input
                     key={c}
-                    className="min-w-0 flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-1 py-0.5 text-[11px] focus:outline-none focus:border-accent"
+                    className="fb-field min-w-0 flex-1 px-1 py-0.5 text-[11px]"
                     value={cell}
                     onChange={(e) => {
                       const next = el.cells.map((rr) => rr.slice())

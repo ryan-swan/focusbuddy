@@ -53,7 +53,7 @@ const SlashMenuList = forwardRef<SlashListHandle, Props>(function SlashMenuList(
 
   if (items.length === 0) {
     return (
-      <div className="w-64 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 text-[12px] text-[var(--ink-40)]">
+      <div className="fb-card w-64 p-2 text-[12px] text-[var(--ink-40)]">
         No matching command
       </div>
     )
@@ -62,7 +62,7 @@ const SlashMenuList = forwardRef<SlashListHandle, Props>(function SlashMenuList(
   return (
     <div
       data-testid="doc-slash-menu"
-      className="w-64 max-h-72 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
+      className="fb-card w-64 max-h-72 overflow-auto py-1"
     >
       {items.map((item, i) => (
         <button
@@ -73,7 +73,7 @@ const SlashMenuList = forwardRef<SlashListHandle, Props>(function SlashMenuList(
             i === selected ? 'bg-accent/10' : 'hover:bg-[var(--surface-sunken)]'
           }`}
         >
-          <span className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded border border-[var(--edge-soft)] text-[var(--ink-70)]">
+          <span className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded bg-[var(--surface-sunken)] text-[var(--ink-70)]">
             <Icon name={item.icon} size={15} />
           </span>
           <span className="min-w-0">

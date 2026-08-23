@@ -138,7 +138,7 @@ export default function SheetAiFill({
         placeholder={'Describe the data. e.g. "A project plan for a Loop ERP marketing launch with tasks, owners, start and end dates, and status"'}
         rows={2}
         autoFocus
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
       />
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
@@ -159,7 +159,7 @@ export default function SheetAiFill({
                       onChange={(e) =>
                         setCols((cur) => (cur ? cur.map((c, j) => (j === i ? e.target.value : c)) : cur))
                       }
-                      className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                      className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
                     />
                     <button
                       onClick={() => setCols((cur) => (cur ? cur.filter((_, j) => j !== i) : cur))}
@@ -267,7 +267,7 @@ export default function SheetAiFill({
                 min={1}
                 value={rowCount}
                 onChange={(e) => setRowCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-                className="w-20 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+                className="w-20 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
               />
             )}
             {rowMode === 'auto' && (

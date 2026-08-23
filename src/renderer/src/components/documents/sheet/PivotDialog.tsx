@@ -68,10 +68,10 @@ export default function PivotDialog({
   )
 
   return (
-    <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="sheet-pivot-dialog"
-        className="w-[420px] max-w-[92%] rounded-lg bg-[var(--surface-raised)] border border-[var(--edge-soft)] shadow-xl p-4 space-y-2.5"
+        className="fb-card w-[420px] max-w-[92%] p-4 space-y-2.5"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 text-[13px] font-semibold">

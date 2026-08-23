@@ -43,7 +43,7 @@ export default function OfficeRelated({ docId }: { docId: string }): JSX.Element
       <button
         onClick={() => void toggle()}
         data-testid="office-related-btn"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
+        className="fb-btn-surface inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] hover:border-accent hover:text-accent"
         title="Documents related to this one"
       >
         <Icon name="hub" size={14} />
@@ -53,7 +53,7 @@ export default function OfficeRelated({ docId }: { docId: string }): JSX.Element
         <>
           <div className="fixed inset-0 z-40" onClick={() => setPanel(false)} />
           <div
-            className="absolute right-0 mt-1 w-80 max-h-[60vh] overflow-auto z-50 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1"
+            className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in absolute right-0 mt-1 w-80 max-h-[60vh] overflow-auto z-50 p-1"
             data-testid="office-related-panel"
           >
             {busy ? (

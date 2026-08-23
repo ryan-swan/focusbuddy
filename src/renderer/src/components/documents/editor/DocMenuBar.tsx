@@ -330,7 +330,7 @@ function MenuDropdown({
 }): JSX.Element {
   return (
     <div
-      className="absolute left-0 top-full mt-0.5 z-40 min-w-[220px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1"
+      className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 top-full mt-0.5 z-40 min-w-[220px] py-1"
       data-testid={testid}
     >
       {items.map((it, i) => {
@@ -379,7 +379,7 @@ function SubmenuRow({
         <Icon name="chevron_right" size={15} className="text-[var(--ink-40)] shrink-0" />
       </button>
       {open && (
-        <div className="absolute left-full top-0 -mt-1 ml-0.5 z-50 min-w-[210px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1">
+        <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-full top-0 -mt-1 ml-0.5 z-50 min-w-[210px] py-1">
           {items.map((it, i) => {
             if (it.kind !== 'item') return null
             return (
@@ -478,9 +478,9 @@ function ShortcutsModal({ onClose }: { onClose: () => void }): JSX.Element {
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }): JSX.Element {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30" onMouseDown={onClose}>
+    <div className="fb-scrim fixed inset-0 z-[60] flex items-center justify-center" onMouseDown={onClose}>
       <div
-        className="w-[320px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+        className="fb-card w-[320px] p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">

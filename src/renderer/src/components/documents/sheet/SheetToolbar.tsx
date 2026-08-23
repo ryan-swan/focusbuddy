@@ -61,7 +61,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
   const btn =
     'h-7 min-w-7 px-1 inline-flex items-center justify-center rounded text-[13px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-40'
   const Divider = (): JSX.Element => <div className="w-px h-5 bg-[var(--edge-soft)] mx-0.5" />
-  const sel = 'h-7 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded text-[11px] px-1 text-[var(--ink-70)] focus:outline-none'
+  const sel = 'fb-field h-7 text-[11px] px-1 text-[var(--ink-70)]'
 
   return (
     <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--edge-soft)]" data-testid="sheet-toolbar">
@@ -222,7 +222,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
           <Icon name="bar_chart" size={15} />
         </button>
         {menu === 'chart' && (
-          <div className="absolute left-0 z-50 mt-1 w-36 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+          <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute left-0 z-50 mt-1 w-36 py-1 text-[12px]">
             {(['bar', 'line', 'area', 'pie', 'scatter'] as const).map((t) => (
               <button
                 key={t}
@@ -245,7 +245,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
             <Icon name="folder_open" size={15} />
           </button>
           {menu === 'io' && (
-            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl py-1 text-[12px]">
+            <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 z-50 mt-1 w-44 py-1 text-[12px]">
               <button onClick={() => { setMenu(null); props.onImport() }} className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)]">
                 <Icon name="upload_file" size={14} className="inline mr-1.5 text-[var(--ink-40)]" /> Import .xlsx / .csv
               </button>

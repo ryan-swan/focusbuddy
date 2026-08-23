@@ -68,7 +68,7 @@ export default function SheetAiPanel({ ai, onCollapse }: Props): JSX.Element {
               <button
                 onClick={() => void ai.generateInsights()}
                 disabled={ai.busy}
-                className="inline-flex items-center gap-1 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2 py-1 text-[11px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft"
+                className="fb-btn-surface inline-flex items-center gap-1 px-2 py-1 text-[11px] text-[var(--ink-80)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft"
                 data-testid="sheet-ai-insights-run"
               >
                 <Icon name="auto_awesome" size={13} className="text-[rgb(var(--accent))]" />
@@ -86,7 +86,7 @@ export default function SheetAiPanel({ ai, onCollapse }: Props): JSX.Element {
                 </div>
               ) : ai.insightsHtml != null ? (
                 <div
-                  className="prose prose-sm prose-stone dark:prose-invert max-w-none rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3 text-[12.5px]"
+                  className="prose prose-sm prose-stone dark:prose-invert max-w-none rounded-lg bg-[var(--surface-base)] p-3 text-[12.5px]"
                   data-testid="sheet-ai-insights-result"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(ai.insightsHtml) }}
                 />
@@ -109,7 +109,7 @@ export default function SheetAiPanel({ ai, onCollapse }: Props): JSX.Element {
                   if (e.key === 'Enter') submitQuestion()
                 }}
                 placeholder="What was the highest value in column B?"
-                className="flex-1 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1.5 text-[12px] focus:border-[rgb(var(--accent))] focus:outline-none"
+                className="fb-field flex-1 px-2.5 py-1.5 text-[12px]"
                 data-testid="sheet-ai-ask-input"
               />
               <button
@@ -145,7 +145,7 @@ export default function SheetAiPanel({ ai, onCollapse }: Props): JSX.Element {
                   <div className="text-[11px] text-[var(--ink-40)]">You asked: {ai.lastQuestion}</div>
                 )}
                 <div
-                  className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-72 overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3 text-[12.5px]"
+                  className="prose prose-sm prose-stone dark:prose-invert max-w-none max-h-72 overflow-auto rounded-lg bg-[var(--surface-base)] p-3 text-[12.5px]"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(ai.answerHtml) }}
                 />
               </div>
@@ -179,7 +179,7 @@ export default function SheetAiPanel({ ai, onCollapse }: Props): JSX.Element {
             <button
               disabled
               title="Connecting external data sources is coming soon."
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--edge-soft)] px-3 py-1.5 text-[12px] text-[var(--ink-50)] opacity-60"
+              className="fb-btn-surface inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-[12px] text-[var(--ink-50)] opacity-60"
               data-testid="sheet-ai-connect-source"
             >
               <Icon name="add_link" size={14} />

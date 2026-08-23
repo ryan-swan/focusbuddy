@@ -103,7 +103,7 @@ export default function SheetFormulaAssist({
         placeholder={`Describe the calculation for ${activeRef}. e.g. "gross margin: revenue minus cost, divided by revenue, as a percent"`}
         rows={2}
         autoFocus
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent resize-none"
+        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
       />
 
       {/* Quick-insert reference chips: the active cell and each named column. */}
@@ -130,7 +130,7 @@ export default function SheetFormulaAssist({
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
       {preview && (
-        <div className="mt-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-2.5" data-testid="sheet-formula-preview">
+        <div className="fb-card mt-2 p-2.5" data-testid="sheet-formula-preview">
           <div className="font-mono text-[13px] text-[var(--ink-100)] break-all">{preview.formula}</div>
           {preview.explanation && (
             <div className="text-[12px] text-[var(--ink-50)] mt-1">{preview.explanation}</div>

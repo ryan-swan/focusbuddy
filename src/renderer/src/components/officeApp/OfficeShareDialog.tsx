@@ -84,10 +84,10 @@ export default function OfficeShareDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="office-share-dialog"
-        className="w-[440px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4 space-y-3"
+        className="fb-card w-[440px] max-w-[92vw] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
@@ -128,12 +128,12 @@ export default function OfficeShareDialog({
           </button>
         ) : (
           <>
-            <div className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] px-2 py-1.5">
+            <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-2 py-1.5">
               <input
                 readOnly
                 value={link}
                 data-testid="office-share-link"
-                className="flex-1 min-w-0 bg-transparent text-[12px] font-mono text-[var(--ink-70)] focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent text-[12px] font-mono text-[var(--ink-70)]"
               />
               <button
                 onClick={() => void navigator.clipboard.writeText(link).then(() => setCopied(true))}
@@ -154,7 +154,7 @@ export default function OfficeShareDialog({
                     if (e.key === 'Enter') void sendInvite()
                   }}
                   placeholder="name@example.com"
-                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:outline-none focus:border-accent"
+                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
                 />
                 <button
                   onClick={() => void sendInvite()}

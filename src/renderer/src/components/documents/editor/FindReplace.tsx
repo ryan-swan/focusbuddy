@@ -72,7 +72,7 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
   return (
     <div
       data-testid="doc-find-replace"
-      className="absolute top-2 right-2 z-40 w-80 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 space-y-1.5"
+      className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in absolute top-2 right-2 z-40 w-80 p-2 space-y-1.5"
     >
       <div className="flex items-center gap-1">
         <input
@@ -85,7 +85,7 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
           }}
           placeholder={regex ? 'Find (regex)' : 'Find'}
           data-testid="doc-find-input"
-          className={`flex-1 bg-[var(--surface-sunken)] border rounded px-2 py-1 text-[12px] focus:outline-none ${
+          className={`flex-1 bg-[var(--surface-sunken)] border rounded px-2 py-1 text-[12px] ${
             regexBad
               ? 'border-red-400 focus:border-red-500'
               : 'border-[var(--edge-soft)] focus:border-accent'
@@ -133,7 +133,7 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
             onChange={(e) => setReplacement(e.target.value)}
             placeholder="Replace with"
             data-testid="doc-replace-input"
-            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-soft)] rounded px-2 py-1 text-[12px] focus:outline-none focus:border-accent"
+            className="fb-field flex-1 px-2 py-1 text-[12px]"
           />
           <button onClick={replaceOne} className="px-2 py-1 rounded text-[11px] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
             Replace

@@ -167,7 +167,7 @@ export default function DesignAiPanel({
   }
 
   const actionClass =
-    'flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-[12.5px] text-[var(--ink-80)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft'
+    'fb-card flex items-center gap-2 w-full text-left px-3 py-2 text-[12.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft'
 
   return (
     <aside
@@ -274,7 +274,7 @@ export default function DesignAiPanel({
               }}
               rows={2}
               placeholder="e.g. a bold tagline for a summer sale"
-              className="w-full resize-none rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1.5 text-[12px] focus:border-[rgb(var(--accent))] focus:outline-none"
+              className="fb-field w-full resize-none px-2.5 py-1.5 text-[12px]"
               data-testid="design-ai-ask-input"
             />
             <button
@@ -316,7 +316,7 @@ export default function DesignAiPanel({
             <div className="flex flex-col gap-2" data-testid="design-ai-result">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-40)]">Result</div>
               <div
-                className="prose prose-sm prose-stone dark:prose-invert max-h-72 max-w-none overflow-auto rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3 text-[13px]"
+                className="prose prose-sm prose-stone dark:prose-invert max-h-72 max-w-none overflow-auto rounded-lg bg-[var(--surface-base)] p-3 text-[13px]"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(resultHtml) }}
               />
               <div className="flex items-center gap-2">
@@ -329,7 +329,7 @@ export default function DesignAiPanel({
                 </button>
                 <button
                   onClick={() => void copyResult()}
-                  className="rounded-lg border border-[var(--edge-soft)] px-3 py-1.5 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+                  className="fb-btn-surface px-3 py-1.5 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
                   data-testid="design-ai-result-copy"
                 >
                   {copied ? 'Copied' : 'Copy'}

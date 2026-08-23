@@ -24,10 +24,10 @@ export default function SlideTemplateGallery({ theme, onPick, onClose }: Props):
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[250] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim fixed inset-0 z-[250] flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="slide-template-gallery"
-        className="w-[780px] max-w-[94vw] max-h-[86vh] overflow-auto rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4"
+        className="fb-card w-[780px] max-w-[94vw] max-h-[86vh] overflow-auto p-4"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -52,7 +52,7 @@ export default function SlideTemplateGallery({ theme, onPick, onClose }: Props):
                 key={tpl.id}
                 data-testid={`slide-template-${tpl.id}`}
                 onClick={() => onPick(tpl.id)}
-                className="text-left rounded-lg border border-[var(--edge-soft)] hover:border-accent hover:ring-2 hover:ring-accent/30 overflow-hidden transition"
+                className="fb-btn-surface text-left hover:border-accent hover:ring-2 hover:ring-accent/30 overflow-hidden transition"
               >
                 <div className="bg-[var(--surface-sunken)] flex items-center justify-center p-1">
                   <SlideFace slide={preview} theme={theme} width={232} />

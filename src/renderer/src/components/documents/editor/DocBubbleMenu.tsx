@@ -162,10 +162,10 @@ function ApplyAcrossConfirm({
 }): JSX.Element {
   const nothing = items.length === 0
   return (
-    <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center" onMouseDown={onClose}>
       <div
         data-testid="doc-apply-across-confirm"
-        className="w-[420px] max-w-[92vw] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-2xl p-4 space-y-3"
+        className="fb-card w-[420px] max-w-[92vw] p-4 space-y-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">

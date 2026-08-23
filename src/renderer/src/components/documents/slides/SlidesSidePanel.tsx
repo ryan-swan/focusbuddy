@@ -49,7 +49,7 @@ interface Props {
 }
 
 const actionClass =
-  'flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-[12.5px] text-[var(--ink-80)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft'
+  'fb-card flex items-center gap-2 w-full text-left px-3 py-2 text-[12.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)] disabled:opacity-50 fb-spring-soft'
 
 // The current slide's text, joined from its text elements, fed to the AI actions.
 function slideText(slide: Slide): string {
@@ -181,7 +181,7 @@ function AiAssistant({
               }}
               rows={2}
               placeholder="Tell the assistant what to do with this slide's content."
-              className="w-full resize-none rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[rgb(var(--accent))]"
+              className="fb-field w-full resize-none px-2.5 py-1.5 text-[12px]"
               data-testid="slides-ai-more-prompt"
             />
             <button
@@ -220,7 +220,7 @@ function AiAssistant({
           {ai.label && (
             <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-40)] font-semibold">{ai.label}</div>
           )}
-          <div className="max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] p-3 text-[13px] text-[var(--ink-80)]">
+          <div className="max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--surface-base)] p-3 text-[13px] text-[var(--ink-80)]">
             {ai.result}
           </div>
           <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ function AiAssistant({
             </button>
             <button
               onClick={() => void copyResult()}
-              className="rounded-lg border border-[var(--edge-soft)] px-3 py-1.5 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface px-3 py-1.5 text-[12px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
               data-testid="slides-ai-result-copy"
             >
               {copied ? 'Copied' : 'Copy'}
@@ -266,7 +266,7 @@ function PropRow({
         <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--ink-90)]">{value}</span>
         <button
           onClick={onAction}
-          className="shrink-0 rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[11.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)]"
+          className="fb-btn-surface shrink-0 px-2.5 py-1 text-[11.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)]"
         >
           {action}
         </button>
@@ -342,7 +342,7 @@ function SlideTab({
 
       <button
         onClick={onScrollToLayout}
-        className="self-start rounded-lg border border-[var(--edge-soft)] px-2.5 py-1 text-[11.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)]"
+        className="fb-btn-surface self-start px-2.5 py-1 text-[11.5px] text-[var(--ink-80)] hover:border-[rgb(var(--accent)/0.5)] hover:bg-[rgb(var(--accent)/0.06)]"
         data-testid="slides-prop-master"
       >
         Master slides
@@ -355,7 +355,7 @@ function SlideTab({
           onChange={(e) => onChangeNotes(e.target.value)}
           rows={4}
           placeholder="What to actually say on this slide"
-          className="w-full resize-none rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)] px-2.5 py-2 text-[13px] focus:outline-none focus:border-[rgb(var(--accent))]"
+          className="fb-field w-full resize-none px-2.5 py-2 text-[13px]"
           data-testid="slides-notes-editor"
         />
       </div>
