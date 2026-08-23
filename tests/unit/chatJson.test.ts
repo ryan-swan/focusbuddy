@@ -47,9 +47,13 @@ describe('salvageEnvelope', () => {
     expect(out!.actions).toHaveLength(2)
   })
 
-  it('returns null when there is not a single complete action', () => {
+  it('keeps the reply when not a single action completed (A1: prose is worth salvaging)', () => {
+    // Old contract returned null here, which turned a recoverable answer into
+    // an error bubble. The reply survives; the half-written action is dropped.
     const justOpened = '{"reply":"x","actions":[{"kind":"create-todo-list","items":["a"'
-    expect(salvageEnvelope(justOpened)).toBeNull()
+    const out = salvageEnvelope(justOpened)
+    expect(out?.reply).toBe('x')
+    expect(out?.actions).toEqual([])
   })
 
   it('recovers exactly 3 complete actions from the exact bug payload shape: two create-todo-list, one create-table, then add-table-row cut off mid-cells', () => {
@@ -118,9 +122,11 @@ describe('salvageEnvelope — question', () => {
     expect(out!.actions).toHaveLength(0)
   })
 
-  it('drops a question that was cut off mid-object', () => {
+  it('drops a question that was cut off mid-object but keeps the reply (A1)', () => {
     const truncated = '{"reply":"x","question":{"prompt":"cut","options":["a","b'
-    expect(salvageEnvelope(truncated)).toBeNull()
+    const out = salvageEnvelope(truncated)
+    expect(out?.reply).toBe('x')
+    expect(out && 'question' in out && out.question !== undefined).toBeFalsy()
   })
 
   it('omits the key entirely when the envelope had no question', () => {
@@ -142,5 +148,29 @@ describe('salvageEnvelope — question', () => {
     expect(out).not.toBeNull()
     expect('question' in out!).toBe(false)
     expect(out!.actions).toHaveLength(1)
+  })
+})
+
+describe('salvage of unescaped-quote and cut-off prose (the A1 drive defect)', () => {
+  it('recovers the full prose when the model forgot to escape its quotes', () => {
+    const raw =
+      '{"reply":"Send **fewer messages with a clearer "why"** and a sharper ask.","actions":[]}'
+    const s = salvageEnvelope(raw)
+    expect(s?.reply).toBe('Send **fewer messages with a clearer "why"** and a sharper ask.')
+    expect(s?.replyCut).toBeFalsy()
+    expect(s?.actions).toEqual([])
+  })
+
+  it('keeps a prose-only reply when the stream died mid-sentence, and marks the cut', () => {
+    const raw = '{"reply":"The SDR role has evolved into a strategic operator'
+    const s = salvageEnvelope(raw)
+    expect(s?.reply).toContain('strategic operator')
+    expect(s?.replyCut).toBe(true)
+    expect(s?.actions).toEqual([])
+  })
+
+  it('still returns null when nothing at all is recoverable', () => {
+    expect(salvageEnvelope('{"repl')).toBeNull()
+    expect(salvageEnvelope('total garbage')).toBeNull()
   })
 })

@@ -21,6 +21,56 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// The envelope keys that may legitimately follow the reply string. Voice uses
+// "proposals", chat uses "actions"; "question" and "blocks" sit between.
+const AFTER_REPLY_KEYS = ['"actions"', '"proposals"', '"question"', '"blocks"']
+
+// What does an UNESCAPED quote inside the reply string mean? 'close' when the
+// envelope genuinely continues after it (`,"actions":`, `,"question":`, or the
+// closing brace), 'content' when it is prose the model forgot to escape, and
+// 'unknown' when the buffer ends before the answer is knowable.
+//
+// This rule exists because long prose quotes things constantly and models drop
+// the backslash: a real drive was cut mid-word at `a clearer "why"` — the raw
+// quote closed the reply, the trace claimed the answer was written, and the
+// final parse failed on the rest. Exported so chatJson's salvage applies the
+// SAME rule and the live scanner and final parser can never disagree about
+// where a reply ends. `atEnd` marks a finished text (no more input is coming):
+// every ambiguity then resolves to 'close', because a stream that died at a
+// quote leaves the identical body either way.
+export function replyQuoteRole(
+  buf: string,
+  quoteAt: number,
+  atEnd = false
+): 'close' | 'content' | 'unknown' {
+  const unknown = atEnd ? 'close' : 'unknown'
+  let k = quoteAt + 1
+  while (k < buf.length && /\s/.test(buf[k])) k++
+  if (k >= buf.length) return unknown
+  const c = buf[k]
+  if (c === '}') {
+    // The envelope's end — unless more content follows the brace, which makes
+    // it a quote-then-brace inside the prose.
+    let j = k + 1
+    while (j < buf.length && /\s/.test(buf[j])) j++
+    return j >= buf.length ? 'close' : 'content'
+  }
+  if (c !== ',') return 'content'
+  let j = k + 1
+  while (j < buf.length && /\s/.test(buf[j])) j++
+  const rest = buf.slice(j)
+  for (const key of AFTER_REPLY_KEYS) {
+    if (rest.startsWith(key)) {
+      const after = rest.slice(key.length).replace(/^\s*/, '')
+      if (after === '') return unknown
+      return after[0] === ':' ? 'close' : 'content'
+    }
+    // The key itself may still be streaming in ("," then `"act`).
+    if (key.startsWith(rest)) return unknown
+  }
+  return 'content'
+}
+
 export class StreamingEnvelopeScanner {
   private buf = ''
   private replyEnd: number | null = null // index where the reply field's closing " sits
@@ -79,7 +129,16 @@ export class StreamingEnvelopeScanner {
         cut = i
         continue
       }
-      if (c === '"') break
+      if (c === '"') {
+        const role = replyQuoteRole(this.buf, i)
+        // 'close' ends the walk; 'unknown' holds the cut short of the quote
+        // until more input decides. Either way, stop here for now.
+        if (role !== 'content') break
+        // Prose quote the model forgot to escape — it IS the reply.
+        i += 1
+        cut = i
+        continue
+      }
       i += 1
       cut = i
     }
@@ -109,6 +168,14 @@ export class StreamingEnvelopeScanner {
         continue
       }
       if (c === '"') {
+        const role = replyQuoteRole(this.buf, i)
+        // Not knowable yet — wait for the next push rather than closing the
+        // reply mid-word on a quote the model forgot to escape.
+        if (role === 'unknown') return null
+        if (role === 'content') {
+          i += 1
+          continue
+        }
         this.replyEnd = i
         // Decode the JSON string fragment by reparsing it within a tiny envelope.
         try {

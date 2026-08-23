@@ -347,3 +347,38 @@ describe('StreamingEnvelopeScanner — fullText', () => {
     expect(s.fullText()).toBe('{"reply":"ab","actions":[]}')
   })
 })
+
+describe('unescaped quotes inside the reply (the A1 drive defect)', () => {
+  // A real drive cut an answer mid-word at `a clearer "why"`: the model forgot
+  // the backslashes, the raw quote closed the reply, and the parse failed on
+  // everything after. The quote rule: a quote closes the reply ONLY when the
+  // envelope genuinely continues after it.
+  it('reads through a prose quote and closes at the real terminator', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"Send **fewer messages with a clearer "why"** and a sharper ask.","actions":[]}')
+    expect(s.extractReply()).toBe('Send **fewer messages with a clearer "why"** and a sharper ask.')
+  })
+
+  it('peekReply streams through the prose quote without cutting mid-word', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"a clearer "wh')
+    expect(s.peekReply()).toBe('a clearer "wh')
+    s.push('y" matters","actions":[]}')
+    expect(s.peekReply()).toBe('a clearer "why" matters')
+  })
+
+  it('still closes correctly on properly escaped quotes and finds the actions', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"a clearer \\"why\\" matters","actions":[{"kind":"create-task","title":"t"}]}')
+    expect(s.extractReply()).toBe('a clearer "why" matters')
+    expect(s.nextItem()).toEqual({ kind: 'create-task', title: 't' })
+  })
+
+  it('holds (returns null) when the closing context has not streamed yet', () => {
+    const s = new StreamingEnvelopeScanner('actions')
+    s.push('{"reply":"done."')
+    expect(s.extractReply()).toBeNull()
+    s.push(',"actions":[]}')
+    expect(s.extractReply()).toBe('done.')
+  })
+})

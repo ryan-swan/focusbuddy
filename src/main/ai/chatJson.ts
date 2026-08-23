@@ -3,6 +3,8 @@
 // recovery logic can be unit tested in isolation (anthropic.ts pulls in the
 // SQLite layer and can't load under vitest).
 
+import { replyQuoteRole } from './streamingEnvelope'
+
 export function extractJson(text: string): string | null {
   // Allow Claude to wrap in markdown ```json ... ``` or just return raw JSON.
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
@@ -13,18 +15,22 @@ export function extractJson(text: string): string | null {
   return null
 }
 
-// Recover a truncated { "reply": ..., "question": {...}, "actions": [...] }
-// envelope. When the model runs out of output tokens mid-array, the whole
-// string will not parse, but each value that finished before the cutoff is
-// still valid JSON. We read the reply string tolerantly, keep the optional
-// question object only if it closed, then walk the actions array keeping every
-// element that parses on its own and dropping the half-written tail. Returns
-// null when there is neither one complete action nor a complete question.
+// Recover a broken { "reply": ..., "question": {...}, "actions": [...] }
+// envelope. Two failure shapes land here: the model ran out of tokens (or the
+// stream died) mid-envelope, and the model forgot to escape a quote inside its
+// own prose, which breaks strict JSON while every word of the answer is fine.
+// We read the reply string tolerantly (the same quote rule as the streaming
+// scanner), keep the optional question object only if it closed, then walk the
+// actions array keeping every element that parses on its own. Returns null
+// only when nothing at all was recoverable.
 export function salvageEnvelope(
   text: string
-): { reply: string; actions: unknown[]; question?: unknown } | null {
+): { reply: string; actions: unknown[]; question?: unknown; replyCut?: boolean } | null {
   // reply — read the JSON string that follows "reply":
   let reply = ''
+  // True when the reply ran to the end of the text without a genuine closing
+  // quote — the stream died mid-sentence, and the caller should say so.
+  let replyCut = false
   // Where the reply's string value ended. The question search starts here so a
   // question SPELLED INSIDE the reply prose can never be salvaged as if the
   // model had asked it — same honesty constraint the streaming scanner applies.
@@ -39,6 +45,7 @@ export function salvageEnvelope(
         i++
         let body = ''
         let esc = false
+        let closed = false
         for (; i < text.length; i++) {
           const ch = text[i]
           if (esc) {
@@ -51,14 +58,32 @@ export function salvageEnvelope(
             esc = true
             continue
           }
-          if (ch === '"') break
+          if (ch === '"') {
+            // An unescaped quote only closes the reply when the envelope
+            // genuinely continues after it (the drive defect: an answer cut
+            // mid-word at `a clearer "why"`). Same rule as the live scanner;
+            // atEnd because this text is final.
+            if (replyQuoteRole(text, i, true) === 'close') {
+              closed = true
+              break
+            }
+            body += ch
+            continue
+          }
           body += ch
         }
         replyEndIdx = i
+        replyCut = !closed && body.length > 0
         try {
           reply = JSON.parse(`"${body}"`) as string
         } catch {
-          reply = ''
+          // The body carries the model's unescaped quotes; decode the common
+          // escapes by hand rather than dropping a recovered answer whole.
+          reply = body
+            .replace(/\\n/g, '\n')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\')
         }
       }
     }
@@ -107,7 +132,9 @@ export function salvageEnvelope(
   // that no longer aborts the salvage, because a complete question above is a
   // recoverable result on its own.
   const actions: unknown[] = []
-  const actKey = text.indexOf('"actions"')
+  // Searched from the reply's true end, so "actions" spelled inside the prose
+  // can never seed a fabricated array (same rule the question search applies).
+  const actKey = text.indexOf('"actions"', replyEndIdx)
   let i = actKey >= 0 ? text.indexOf('[', actKey) : -1
   if (i >= 0) i++ // step past '['
   while (i > 0 && i < text.length) {
@@ -145,9 +172,15 @@ export function salvageEnvelope(
       // a malformed complete-looking object — skip it but keep going
     }
   }
-  // A complete question is worth salvaging even with zero finished actions — a
-  // turn that asks carries no actions by design, and dropping it would turn a
-  // recoverable ask into an error bubble.
-  if (actions.length === 0 && question === undefined) return null
-  return question === undefined ? { reply, actions } : { reply, actions, question }
+  // A recovered reply alone is worth keeping — prose answers carry no actions
+  // by design, and dropping one turned a single unescaped quote into an error
+  // bubble over a perfectly good answer. Null only when NOTHING came back.
+  if (reply.trim() === '' && actions.length === 0 && question === undefined) return null
+  const out: { reply: string; actions: unknown[]; question?: unknown; replyCut?: boolean } = {
+    reply,
+    actions
+  }
+  if (question !== undefined) out.question = question
+  if (replyCut) out.replyCut = true
+  return out
 }

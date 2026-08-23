@@ -559,6 +559,9 @@ export function parseChatJson(raw: string): {
   question?: ChatQuestion
   // Validated interactive UI blocks (Plexii P4), when the model emitted any.
   blocks?: ChatUiBlock[]
+  // The reply ran to the end of the text without genuinely closing — the
+  // stream died mid-sentence. The renderer's notice depends on it.
+  replyCut?: boolean
 } | null {
   let parsed: {
     reply?: unknown
@@ -567,6 +570,7 @@ export function parseChatJson(raw: string): {
     actions?: unknown
   } | null = null
   let truncated = false
+  let replyCutBySalvage = false
   const jsonStr = extractJson(raw)
   if (jsonStr) {
     try {
@@ -590,6 +594,7 @@ export function parseChatJson(raw: string): {
     if (!salv) return null
     parsed = salv
     truncated = true
+    replyCutBySalvage = salv.replyCut === true
   }
   const reply = typeof parsed.reply === 'string' ? parsed.reply : ''
   const question = validateChatQuestion(parsed.question) ?? undefined
@@ -974,7 +979,14 @@ export function parseChatJson(raw: string): {
       }
     }
   }
-  return { reply, proposals, truncated, question, blocks: blocks.length > 0 ? blocks : undefined }
+  return {
+    reply,
+    proposals,
+    truncated,
+    question,
+    blocks: blocks.length > 0 ? blocks : undefined,
+    replyCut: replyCutBySalvage || undefined
+  }
 }
 
 // Everything a chat call needs before it can be made: the assembled system
@@ -1160,6 +1172,11 @@ function buildChatResponse(
     const n = parsed.proposals.length
     content +=
       `${content ? '\n\n' : ''}Your request was large, so I set up the first ${n} item${n === 1 ? '' : 's'} that fit. Ask me to continue for the rest, or break the request into smaller parts.`
+  } else if (parsed.replyCut && content) {
+    // The stream died mid-prose (connection drop, provider hiccup, token
+    // cap). Everything that arrived is kept; say so instead of presenting a
+    // sentence that stops mid-word as the whole answer.
+    content += '\n\n*This answer was cut off before it finished — say "continue" and I will pick up where it stopped.*'
   }
   return {
     ok: true,
@@ -1244,7 +1261,7 @@ function unparseableChatResponse(
     return {
       ok: false,
       error:
-        "I couldn't read my own response that time. Try again, or ask for a smaller set of items."
+        'That answer came back in a shape I could not read, and none of it was recoverable. Ask again — the second attempt usually lands.'
     }
   }
   return {
