@@ -155,10 +155,29 @@ function markTree(node: HastNode): void {
 
 // The caret rides IN the hast tree as a sentinel span, appended inside the
 // last flowing element so it sits at the end of the last line. When the tree
-// ends in a pre/table/list (no sane inline position), it lands after that
-// block at the root instead — a dot on its own quiet line beats a dot glued
-// under a code block.
-const NO_INLINE_CARET = new Set(['pre', 'table', 'ul', 'ol'])
+// ends in a pre/table/list (no sane inline position) — or in a VOID element,
+// which React forbids children in — it lands after that block at the root
+// instead. The void set is load-bearing: an answer containing a `---`
+// divider put an <hr> at the streaming edge and the caret injected into it
+// crashed the whole renderer, every time, since P3 (Caleb: "crashing every
+// time it types"; crash_events: "hr is a void element tag…").
+const NO_INLINE_CARET = new Set([
+  'pre',
+  'table',
+  'ul',
+  'ol',
+  'hr',
+  'br',
+  'img',
+  'input',
+  'area',
+  'base',
+  'col',
+  'embed',
+  'source',
+  'track',
+  'wbr'
+])
 
 function caretNode(): HastNode {
   return {

@@ -18,6 +18,8 @@ const REPLY = [
   '',
   'The role has fundamentally shifted from high-volume activity to high-precision, signal-based execution [1][2]. Cold call counts don\'t win anymore; the best SDRs target buying moments — funding rounds, new hires, tech-stack changes — rather than blasting static persona lists [1].',
   '',
+  '---',
+  '',
   '### 1. Lead with buying signals, not volume',
   'Fewer, better-timed touches beat spray-and-pray every time [2]. The new definition: "a strategic operator — the critical human intelligence layer guiding an automated prospecting engine" [3].',
   '',
@@ -171,6 +173,9 @@ test('plexii A1 flow: the real stream reveals without a flash, a flood, or a jum
   expect(finalText).not.toContain('\\n')
   expect(finalText).not.toContain('###')
   await expect(window.locator('[data-testid="assistant-turn"] h3').first()).toBeVisible()
+  // The divider that crashed the renderer whenever it hit the streaming edge
+  // (caret injected into a void <hr>) renders as a rule, not a crash.
+  await expect(window.locator('[data-testid="assistant-turn"] hr').first()).toBeAttached()
   await expect(window.locator('[data-testid^="proposal-card-"]').first()).toBeVisible()
 
   await launched.dispose()
