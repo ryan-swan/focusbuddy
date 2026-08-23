@@ -36,7 +36,7 @@ export default function DeskSuggestionChip(): JSX.Element | null {
     <div
       data-floating-menu
       data-testid="desk-suggestion"
-      className="fb-floating-chrome absolute bottom-3 left-1/2 -translate-x-1/2 z-[44] max-w-[520px] flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-cast),var(--shadow-inset-highlight)]"
+      className="fb-floating-chrome absolute bottom-3 left-[calc(50%+var(--fb-dock-inset,0px)/2)] -translate-x-1/2 z-[44] max-w-[520px] flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-cast),var(--shadow-inset-highlight)]"
     >
       <Icon name="lightbulb" size={14} className="text-[rgb(var(--accent))] shrink-0" />
       <span className="text-[11.5px] text-[var(--ink-80)] truncate">{suggestion.text}</span>

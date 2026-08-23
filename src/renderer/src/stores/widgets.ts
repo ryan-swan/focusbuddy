@@ -75,6 +75,14 @@ interface WidgetStore {
   zoom: number
   panX: number
   panY: number
+  // Screen-space x of the VISIBLE canvas origin (Edges + Glass Phase 1b): the
+  // dock column's width while the desk runs full-bleed beneath it, 0 otherwise.
+  // panX is always the visual pan the DOM renders; persisted cameras are
+  // stored WITHOUT the inset so a desk opens in the same place whatever the
+  // dock is doing. Changing the inset shifts the pan by the delta so nothing
+  // on screen moves.
+  dockInset: number
+  setDockInset: (px: number) => void
   loadForTask: (taskId: string, opts?: { refresh?: boolean }) => Promise<void>
   clear: () => void
   create: (draft: WidgetDraft) => Promise<Widget>
@@ -151,6 +159,12 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   zoom: 1,
   panX: 0,
   panY: 0,
+  dockInset: 0,
+  setDockInset: (px) => {
+    const prev = get().dockInset
+    if (px === prev) return
+    set({ dockInset: px, panX: get().panX + (px - prev) })
+  },
   loadForTask: async (taskId, opts) => {
     if (opts?.refresh) {
       // In-place refresh (sync applied remote changes, etc.): keep the current
@@ -177,7 +191,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       groupDrag: null,
       groupStart: null,
       zoom: 1,
-      panX: 0,
+      panX: get().dockInset,
       panY: 0,
       layoutHydratedFor: null,
       customLayout: false
@@ -210,7 +224,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
               : get().widgets,
           customLayout: custom,
           zoom: clampZoom(typeof saved.zoom === 'number' ? saved.zoom : 1),
-          panX: saved.scroll?.x ?? 0,
+          panX: (saved.scroll?.x ?? 0) + get().dockInset,
           panY: saved.scroll?.y ?? 0,
           selectedIds: Array.isArray(saved.selectedObjectIds)
             ? saved.selectedObjectIds.filter((id) => present.has(id))
@@ -242,7 +256,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       groupDrag: null,
       groupStart: null,
       zoom: 1,
-      panX: 0,
+      panX: get().dockInset,
       panY: 0
     }),
   setFocused: (id) => set({ focusedWidgetId: id }),
@@ -340,7 +354,8 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       panY: screenY - canvasY * z
     })
   },
-  resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
+  // The origin is the VISIBLE origin: the dock's right edge while full-bleed.
+  resetView: () => set({ zoom: 1, panX: get().dockInset, panY: 0 }),
   createOptional: async (draft) => {
     const widget = await window.api.widgets.createOptional(draft)
     if (!widget) return null // task vanished before the create landed; clean no-op
@@ -546,7 +561,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       deviceClass: currentDeviceClass(),
       customLayout: enabled,
       objects: enabled ? serializeOverlayObjects(s.widgets) : [],
-      scroll: { x: s.panX, y: s.panY },
+      scroll: { x: s.panX - s.dockInset, y: s.panY },
       selectedObjectIds: s.selectedIds,
       zoom: s.zoom
     }

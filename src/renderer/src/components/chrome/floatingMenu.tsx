@@ -35,6 +35,16 @@ export const FLOATING_MENU_ASIDE =
 export const FLOATING_MENU_ASIDE_SCROLL =
   'fb-floating-chrome h-full w-full flex flex-col overflow-auto rounded-[var(--radius-card)] bg-[var(--surface-raised)]'
 
+// The glass variant (Edges + Glass Phase 1b, the full-bleed spike). Used ONLY
+// while the desk canvas runs beneath the dock column: then content really
+// does move behind the menu, which is the one condition under which the
+// chrome glass tier earns its blur (R1.3). The tier's own border is the rim.
+export const FLOATING_MENU_ASIDE_GLASS =
+  'fb-floating-chrome h-full w-full flex flex-col overflow-hidden rounded-[var(--radius-card)] fb-glass-chrome border text-[var(--ink-100)]'
+export const FLOATING_MENU_GLASS_STYLE: React.CSSProperties = {
+  boxShadow: 'var(--shadow-cast), var(--shadow-inset-highlight)'
+}
+
 // The fb-card material recipe (globals.css): an alpha hairline ring so the
 // card never melts into a same-luminance surface, the cast shadow for
 // elevation, and the inset top highlight that reads as light striking the

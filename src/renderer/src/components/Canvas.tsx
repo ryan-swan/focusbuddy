@@ -386,6 +386,7 @@ export default function Canvas(): JSX.Element {
     }
   }, [])
   const setPan = useWidgetStore((s) => s.setPan)
+  const dockInset = useWidgetStore((s) => s.dockInset)
   const [savingTemplate] = useState(false)
   // Controls the SaveTemplateDialog. context distinguishes the toolbar
   // entry point from the task-done auto-prompt so the dialog headline
@@ -534,13 +535,13 @@ export default function Canvas(): JSX.Element {
       deviceClass: currentDeviceClass(),
       customLayout,
       objects: overlayObjects,
-      scroll: { x: panX, y: panY },
+      scroll: { x: panX - dockInset, y: panY },
       selectedObjectIds: selectedIds,
       zoom
     }
     const t = window.setTimeout(() => void window.api.deskLayout.save(layout), 600)
     return () => window.clearTimeout(t)
-  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds, customLayout, overlayObjects])
+  }, [activeTaskId, layoutHydratedFor, accountId, panX, panY, zoom, selectedIds, customLayout, overlayObjects, dockInset])
 
   // PLX-APP-012 — world-space bounding boxes for every top-level Object the two
   // render maps iterate. Camera-independent, so this recomputes only when the
@@ -950,7 +951,7 @@ export default function Canvas(): JSX.Element {
     }
 
     const rect = dropRef.current.getBoundingClientRect()
-    const targetX = rect.width / 2 - (cx + cw / 2) * zoom
+    const targetX = dockInset + (rect.width - dockInset) / 2 - (cx + cw / 2) * zoom
     const targetY = rect.height / 2 - (cy + ch / 2) * zoom
     setAnimatingPan(true)
     setPan(targetX, targetY)
@@ -988,12 +989,13 @@ export default function Canvas(): JSX.Element {
     const bbH = Math.max(1, maxY - minY)
     const rect = dropRef.current.getBoundingClientRect()
     const PAD = 60
-    const zoomX = (rect.width - 2 * PAD) / bbW
+    const visibleW = rect.width - dockInset
+    const zoomX = (visibleW - 2 * PAD) / bbW
     const zoomY = (rect.height - 2 * PAD) / bbH
     const newZoom = Math.max(0.25, Math.min(zoomX, zoomY, 1))
     const bbCenterX = minX + bbW / 2
     const bbCenterY = minY + bbH / 2
-    const targetPanX = rect.width / 2 - bbCenterX * newZoom
+    const targetPanX = dockInset + visibleW / 2 - bbCenterX * newZoom
     const targetPanY = rect.height / 2 - bbCenterY * newZoom
     setAnimatingPan(true)
     setZoom(newZoom)
@@ -2376,7 +2378,7 @@ export default function Canvas(): JSX.Element {
 
           {/* Breadcrumb — floated top-left of the canvas surface so it
               sits on the desk itself rather than in a header bar above it. */}
-          <div data-floating-menu className="fb-floating-chrome absolute top-4 left-4 z-[45] flex items-center gap-2">
+          <div data-floating-menu className="fb-floating-chrome absolute top-4 left-[calc(var(--fb-dock-inset,0px)+1rem)] z-[45] flex items-center gap-2">
             <CanvasBreadcrumb
               activeTask={activeTask}
               trailing={activeTaskId && isCanvasMode ? <ViewSelector taskId={activeTaskId} /> : undefined}
@@ -2714,7 +2716,7 @@ export default function Canvas(): JSX.Element {
             <DeskPresenceBar taskId={activeTask.id} />
           </div>
           {activeId && !linkSourceId && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full fb-glass-chrome border text-[11px] text-[var(--ink-90)] shadow-[var(--shadow-soft)] flex items-center gap-1.5 pointer-events-none">
+            <div className="absolute bottom-3 left-[calc(50%+var(--fb-dock-inset,0px)/2)] -translate-x-1/2 px-2.5 py-1 rounded-full fb-glass-chrome border text-[11px] text-[var(--ink-90)] shadow-[var(--shadow-soft)] flex items-center gap-1.5 pointer-events-none">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
               <span>Widget active · click outside or press Esc to pan canvas</span>
             </div>
@@ -2749,7 +2751,7 @@ export default function Canvas(): JSX.Element {
             return (
               <div
                 data-link-skip
-                className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-[11px] shadow-lg flex items-center gap-2 z-40"
+                className="absolute top-3 left-[calc(50%+var(--fb-dock-inset,0px)/2)] -translate-x-1/2 px-3 py-1.5 rounded-full text-[11px] shadow-lg flex items-center gap-2 z-40"
                 style={{
                   backgroundColor: 'rgb(var(--accent))',
                   color: 'white'

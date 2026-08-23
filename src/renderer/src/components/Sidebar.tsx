@@ -22,7 +22,13 @@ import AddConnectedAppDialog from './AddConnectedAppDialog'
 import { useSharesStore } from '../stores/shares'
 import Icon from './Icon'
 import AppLogo from './AppLogo'
-import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE, MenuMinimizeButton } from './chrome/floatingMenu'
+import {
+  FLOATING_MENU_ASIDE,
+  FLOATING_MENU_ASIDE_GLASS,
+  FLOATING_MENU_GLASS_STYLE,
+  FLOATING_MENU_STYLE,
+  MenuMinimizeButton
+} from './chrome/floatingMenu'
 
 // MIME used when dragging a Connected App row from the sidebar onto the canvas.
 // The Canvas drop handler reads this to spawn a webview widget bound to the app.
@@ -100,9 +106,14 @@ function renderConnectedAppRow(
 interface Props {
   collapsed?: boolean
   onToggle?: () => void
+  // True while the desk canvas runs full-bleed beneath the dock column: the
+  // menu becomes chrome glass so the desk shows through it (Phase 1b spike).
+  glass?: boolean
 }
 
-export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Element {
+export default function Sidebar({ collapsed, onToggle, glass = false }: Props = {}): JSX.Element {
+  const asideClass = glass ? FLOATING_MENU_ASIDE_GLASS : FLOATING_MENU_ASIDE
+  const asideStyle = glass ? FLOATING_MENU_GLASS_STYLE : FLOATING_MENU_STYLE
   const setActive = useNodeStore((s) => s.setActive)
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
@@ -268,8 +279,8 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
 
     return (
       <aside
-        className={`${FLOATING_MENU_ASIDE} flex flex-col overflow-hidden`}
-        style={{ ...FLOATING_MENU_STYLE, width: '100%' }}
+        className={`${asideClass} flex flex-col overflow-hidden`}
+        style={{ ...asideStyle, width: '100%' }}
         data-testid="desk-sidebar-collapsed"
       >
         {/* Scrollable icon column */}
@@ -414,7 +425,7 @@ export default function Sidebar({ collapsed, onToggle }: Props = {}): JSX.Elemen
   }
 
   return (
-    <aside className={FLOATING_MENU_ASIDE} style={FLOATING_MENU_STYLE} data-testid="desk-sidebar">
+    <aside className={asideClass} style={asideStyle} data-testid="desk-sidebar">
       {/* Header — same silhouette as the PlexiOffice menu: the wordmark on the
           left, then the desk's own actions (New desk, hide) on the right. */}
       <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--edge-soft)]">

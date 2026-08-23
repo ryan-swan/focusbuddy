@@ -91,9 +91,19 @@ async function openTask(window: Page, taskTitleRe: RegExp): Promise<void> {
 // Right-clicks an empty patch of canvas and hovers into Auto-arrange > Tidy,
 // leaving the Tidy submenu open so the caller can click a mode (or hover one
 // more level for Columns.../Rows...).
+// "Empty patch of canvas" is measured from the VISIBLE left edge: since the
+// full-bleed desk (Edges + Glass Phase 1b) the canvas element starts beneath
+// the dock column, so x is offset by --fb-dock-inset.
+async function visibleOrigin(window: Page): Promise<number> {
+  return window.evaluate(
+    () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fb-dock-inset')) || 0
+  )
+}
+
 async function openTidyMenu(window: Page, at: { x: number; y: number } = { x: 200, y: 200 }): Promise<void> {
   const surface = window.locator('[data-canvas-surface="true"]')
-  await surface.click({ button: 'right', position: at })
+  const inset = await visibleOrigin(window)
+  await surface.click({ button: 'right', position: { x: at.x + inset, y: at.y } })
   await expect(window.locator('[data-canvas-ctx-menu]').first()).toBeVisible()
   const menu = window.locator('[data-canvas-ctx-menu]')
   await menu.getByText('Auto-arrange', { exact: true }).hover()
@@ -337,7 +347,7 @@ test('(f) Add object > Files > Document/Spreadsheet spawn at the new catalog def
   const menu = window.locator('[data-canvas-ctx-menu]')
 
   // --- Document ---
-  await surface.click({ button: 'right', position: { x: 200, y: 200 } })
+  await surface.click({ button: 'right', position: { x: 200 + (await visibleOrigin(window)), y: 200 } })
   await expect(menu.first()).toBeVisible()
   await menu.getByText('Add object', { exact: true }).hover()
   await window.waitForTimeout(200)
@@ -355,7 +365,7 @@ test('(f) Add object > Files > Document/Spreadsheet spawn at the new catalog def
   await window.waitForTimeout(300)
 
   // --- Spreadsheet (second right-click at a point clear of the just-placed doc) ---
-  await surface.click({ button: 'right', position: { x: 900, y: 500 } })
+  await surface.click({ button: 'right', position: { x: 900 + (await visibleOrigin(window)), y: 500 } })
   await expect(menu.first()).toBeVisible()
   await menu.getByText('Add object', { exact: true }).hover()
   await window.waitForTimeout(200)

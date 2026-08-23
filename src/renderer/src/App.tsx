@@ -102,6 +102,11 @@ export default function App(): JSX.Element {
   // PlexiOffice is a full-bleed segment with its own chrome: when active it takes
   // over the main area, replacing the global sidebar / desk panels.
   const currentView = useViewStore((s) => s.view)
+  // Phase 1b spike (Edges + Glass, Caleb 2026-08-23): on the desk canvas the
+  // main pane runs full-bleed BENEATH the dock column, so the desk moves
+  // behind the floating menu and the menu earns the chrome glass tier. Every
+  // other view keeps the dock beside the content so nothing is ever hidden.
+  const canvasFullBleed = currentView.kind === 'task'
   const segmentTakeover =
     currentView.kind === 'office' ||
     currentView.kind === 'plexidesk' ||
@@ -646,11 +651,18 @@ export default function App(): JSX.Element {
               behind it, while the inset margin lets the desk surface show around
               the card so it reads as floating above the surface. Minimising it
               collapses the column entirely, giving the content the full width. */}
-          <SidebarDock collapsed={sidebarMinimized} onToggle={toggleSidebar} />
+          <SidebarDock collapsed={sidebarMinimized} onToggle={toggleSidebar} fullBleed={canvasFullBleed} />
           {/* The assistant no longer lives in a desk-only split here — it is a
               global overlay (AssistantOverlay, mounted below) so it exists on
               every screen. Sidebar mode reserves its width via mainPad above. */}
-          <div className="flex-1 min-w-0 h-full">
+          <div
+            className={canvasFullBleed ? 'absolute inset-y-0' : 'flex-1 min-w-0 h-full'}
+            style={
+              canvasFullBleed
+                ? { left: mainPad.paddingLeft ?? 0, right: mainPad.paddingRight ?? 0 }
+                : undefined
+            }
+          >
             <MainPane />
           </div>
         </>
@@ -731,15 +743,52 @@ const SIDEBAR_COLLAPSED_DOCK_WIDTH = 58
 // the inset margin that detaches the card from the window edges, and hosts the
 // drag-to-resize grip on its right edge. When collapsed the dock narrows to an
 // icon-only strip; the resize grip hides in that state.
-function SidebarDock({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }): JSX.Element {
+function SidebarDock({
+  collapsed,
+  onToggle,
+  fullBleed = false
+}: {
+  collapsed: boolean
+  onToggle: () => void
+  fullBleed?: boolean
+}): JSX.Element {
   const { width, onResizeStart, nudge, resizing } = useSidebarWidth()
+  const dockRef = useRef<HTMLDivElement>(null)
+  // Publish the dock's live width as --fb-dock-inset while the canvas runs
+  // beneath it, so left-anchored and centred canvas chrome (breadcrumb, zoom,
+  // hint pills) and the edge-pan zone can treat the dock's right edge as the
+  // visible left edge. 0px everywhere else. ResizeObserver follows the
+  // collapse animation and the drag-to-resize grip.
+  useEffect(() => {
+    const root = document.documentElement
+    if (!fullBleed || !dockRef.current) {
+      root.style.setProperty('--fb-dock-inset', '0px')
+      useWidgetStore.getState().setDockInset(0)
+      return
+    }
+    const el = dockRef.current
+    const publish = (): void => {
+      const px = Math.round(el.offsetWidth)
+      root.style.setProperty('--fb-dock-inset', `${px}px`)
+      useWidgetStore.getState().setDockInset(px)
+    }
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.setProperty('--fb-dock-inset', '0px')
+      useWidgetStore.getState().setDockInset(0)
+    }
+  }, [fullBleed])
   return (
     <div
-      className={`relative shrink-0 h-full box-border ${FLOATING_MENU_INSET} transition-[width] duration-200`}
+      ref={dockRef}
+      className={`relative shrink-0 h-full box-border ${FLOATING_MENU_INSET} transition-[width] duration-200 ${fullBleed ? 'z-10' : ''}`}
       style={{ width: collapsed ? SIDEBAR_COLLAPSED_DOCK_WIDTH : width }}
       data-testid="sidebar-dock"
     >
-      <Sidebar collapsed={collapsed} onToggle={onToggle} />
+      <Sidebar collapsed={collapsed} onToggle={onToggle} glass={fullBleed} />
       {!collapsed && (
         <div
           onPointerDown={onResizeStart}

@@ -36,16 +36,23 @@ interface Cam {
   zoom: number
 }
 
+// The camera in PERSISTED space. Since the full-bleed desk (Edges + Glass
+// Phase 1b) the canvas runs beneath the dock column and the DOM transform
+// carries a visual pan = persisted pan + the dock's width (--fb-dock-inset);
+// the saved scroll never includes the inset, so a desk opens in the same place
+// whatever the dock is doing. readCam subtracts it so every assertion below
+// keeps talking about the persisted origin.
 async function readCam(window: Page): Promise<Cam> {
-  const t = await window.evaluate(() => {
+  const r = await window.evaluate(() => {
     const all = Array.from(document.querySelectorAll<HTMLElement>('[data-bare-canvas]'))
     const inner = all.find((el) => !el.hasAttribute('data-canvas-surface'))
-    return inner?.style.transform ?? null
+    const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fb-dock-inset')) || 0
+    return { t: inner?.style.transform ?? null, inset }
   })
-  if (!t) throw new Error('canvas transform layer not found')
-  const m = t.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([\d.]+)\)/)
-  if (!m) throw new Error(`unrecognized transform: ${t}`)
-  return { panX: parseFloat(m[1]), panY: parseFloat(m[2]), zoom: parseFloat(m[3]) }
+  if (!r.t) throw new Error('canvas transform layer not found')
+  const m = r.t.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([\d.]+)\)/)
+  if (!m) throw new Error(`unrecognized transform: ${r.t}`)
+  return { panX: parseFloat(m[1]) - r.inset, panY: parseFloat(m[2]), zoom: parseFloat(m[3]) }
 }
 
 function trackConsoleErrors(window: Page): string[] {
@@ -144,10 +151,14 @@ test('camera + selection overlay: round-trips on Desk switch, survives app reloa
     // Done at the origin/zoom=1 baseline so the canvas-space box is simple:
     // the widget sits at (300,200)-(540,380); a box from (250,150) to
     // (600,450) fully encloses it.
+    // Screen x is measured from the VISIBLE canvas origin: the element starts
+    // beneath the dock column (full-bleed desk), so its left edge is offset by
+    // --fb-dock-inset, exactly as the camera's visual pan is.
     const rect = await window.evaluate(() => {
       const el = document.querySelector('[data-canvas-surface="true"]')!
       const r = el.getBoundingClientRect()
-      return { left: r.left, top: r.top }
+      const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fb-dock-inset')) || 0
+      return { left: r.left + inset, top: r.top }
     })
     await window.mouse.move(rect.left + 250, rect.top + 150)
     await window.keyboard.down('Shift')

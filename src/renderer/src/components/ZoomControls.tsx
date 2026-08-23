@@ -11,13 +11,15 @@ const EASE_EXIT = [0.4, 0, 1, 1] as const
 export default function ZoomControls(): JSX.Element {
   const zoom = useWidgetStore((s) => s.zoom)
   const setZoom = useWidgetStore((s) => s.setZoom)
-  const setPan = useWidgetStore((s) => s.setPan)
+  const resetView = useWidgetStore((s) => s.resetView)
   const [hovered, setHovered] = useState(false)
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
+  // One reset for the whole app (the store's resetView): zoom 1 at the
+  // VISIBLE origin, which is the dock's right edge while the desk runs
+  // full-bleed beneath it.
   function reset(): void {
-    setZoom(1)
-    setPan(0, 0)
+    resetView()
   }
 
   function enter(): void {
@@ -33,7 +35,7 @@ export default function ZoomControls(): JSX.Element {
     <div
       onMouseEnter={enter}
       onMouseLeave={leave}
-      className="absolute bottom-3 left-3 z-30 fb-glass-chrome rounded-md border border-[color:var(--glass-chrome-border)] shadow-md flex items-stretch overflow-hidden"
+      className="absolute bottom-3 left-[calc(var(--fb-dock-inset,0px)+0.75rem)] z-30 fb-glass-chrome rounded-md border border-[color:var(--glass-chrome-border)] shadow-md flex items-stretch overflow-hidden"
     >
       {/* – slides in from the left on hover */}
       <AnimatePresence initial={false}>

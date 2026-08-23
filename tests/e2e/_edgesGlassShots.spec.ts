@@ -17,6 +17,8 @@ import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 
 const OUT = process.env.SHOT_DIR ?? '/tmp'
 const THEMES = (process.env.THEMES ?? 'light,dark,futuristic,atelier,gemstone').split(',')
+// "desk-panned" (Phase 1b): the desk panned 260px left so widgets slide
+// beneath the glass menu; the frame the full-bleed spike exists for.
 const FRAMES = (process.env.FRAMES ?? 'desk,index').split(',')
 const SCALE = process.env.SHOT_SCALE ?? '2'
 
@@ -79,7 +81,7 @@ for (const theme of THEMES) {
         BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z)
       }, scale)
       let taskId = ''
-      if (frame === 'desk') taskId = await seedDesk(window)
+      if (frame === 'desk' || frame === 'desk-panned') taskId = await seedDesk(window)
       else await seedIndex(window)
       await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), theme)
       await window.reload()
@@ -88,13 +90,20 @@ for (const theme of THEMES) {
         BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z)
       }, scale)
       await window.waitForTimeout(300)
-      if (frame === 'desk') {
+      if (frame === 'desk' || frame === 'desk-panned') {
         await window.evaluate((id) => {
           const w = window as unknown as { __fbView?: { getState: () => { goTask: (id: string) => void } } }
           w.__fbView!.getState().goTask(id)
         }, taskId)
         await window.waitForSelector('[data-canvas-surface="true"]', { timeout: 8_000 })
         await window.waitForTimeout(1200)
+        if (frame === 'desk-panned') {
+          await window.evaluate(() => {
+            const w = window as unknown as { __fbWidgets?: { getState: () => { panBy: (dx: number, dy: number) => void } } }
+            w.__fbWidgets!.getState().panBy(-260, 0)
+          })
+          await window.waitForTimeout(600)
+        }
       } else {
         await window.evaluate(() => {
           const w = window as unknown as { __fbView?: { getState: () => { goDesks: (r?: string) => void } } }

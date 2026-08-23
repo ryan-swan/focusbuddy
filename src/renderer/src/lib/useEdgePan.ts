@@ -104,9 +104,13 @@ export function useEdgePan({
     function refreshSize(): void {
       if (!el) return
       const rect = el.getBoundingClientRect()
-      sizeRef.current = { width: rect.width, height: rect.height }
+      sizeRef.current = { width: rect.width - dockInset(), height: rect.height }
     }
     refreshSize()
+    // The dock publishes --fb-dock-inset on <html>; the canvas element itself
+    // does not resize when the dock collapses, so watch that attribute too.
+    const mo = new MutationObserver(refreshSize)
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
     const ro = new ResizeObserver(refreshSize)
     ro.observe(el)
 
@@ -191,12 +195,22 @@ export function useEdgePan({
       return insideForm
     }
 
+    // While the canvas runs beneath the dock column (Edges + Glass Phase 1b)
+    // the visible left edge is the dock's right edge: --fb-dock-inset carries
+    // that width (0px otherwise), so the left zone starts where the user can
+    // actually see it instead of under the menu.
+    function dockInset(): number {
+      const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fb-dock-inset'))
+      return Number.isFinite(v) ? v : 0
+    }
+
     function readPositionFromEvent(clientX: number, clientY: number): void {
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const x = clientX - rect.left
+      const inset = dockInset()
+      const x = clientX - rect.left - inset
       const y = clientY - rect.top
-      if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+      if (x < 0 || y < 0 || x > rect.width - inset || y > rect.height) {
         // Outside the canvas — clear so the camera doesn't drift on
         // stale coordinates. Don't clear during drag mode though, so
         // the user can momentarily leave the canvas (e.g. while
@@ -345,6 +359,7 @@ export function useEdgePan({
       document.removeEventListener('drop', onHtmlDragEnd, true)
       classObserver.disconnect()
       ro.disconnect()
+      mo.disconnect()
     }
     // intensity is intentionally read via closure; we don't want to
     // re-bind the rAF loop every time it changes.
