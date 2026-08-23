@@ -67,6 +67,15 @@ describe('edges codemod', () => {
     expect(twice.log).toHaveLength(0)
   })
 
+  it('treats edge-firm as the same stroke in the second colour (Phase 4)', () => {
+    expect((rewriteString('rounded-lg border border-[var(--edge-firm)] bg-[var(--surface-raised)] p-3', '<div>') as { text: string }).text)
+      .toBe('fb-card p-3')
+    expect((rewriteString('w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 focus:outline-none', '<input />') as { text: string }).text)
+      .toBe('fb-field w-full px-2')
+    expect((rewriteString('fixed z-50 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-raised)] shadow-xl py-1', '<div>') as { text: string }).text)
+      .toBe('fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-50 py-1')
+  })
+
   it('rewrites only the exact idiom (no border word, no rewrite)', () => {
     expect(rewriteString('rounded-lg border-[var(--edge-soft)] bg-[var(--surface-raised)]', '<div>')).toBeNull()
     expect(rewriteString('rounded-lg border border-[var(--edge-soft)]', '<div>')).toBeNull()

@@ -55,7 +55,7 @@ export default function PivotDialog({
       <select
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+        className="fb-field flex-1 px-2 py-1.5"
       >
         {allowNone && <option value={-1}>(none)</option>}
         {columns.map((c) => (
@@ -93,7 +93,7 @@ export default function PivotDialog({
             value={agg}
             onChange={(e) => setAgg(e.target.value as SheetPivotAgg)}
             data-testid="pivot-agg"
-            className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+            className="fb-field flex-1 px-2 py-1.5"
           >
             {AGGS.map((a) => (
               <option key={a} value={a}>

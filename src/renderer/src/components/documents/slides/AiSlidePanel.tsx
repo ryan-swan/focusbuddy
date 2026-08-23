@@ -84,7 +84,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
               ? 'What slides to add…'
               : 'How to redesign this slide…'
         }
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
+        className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-none"
       />
       {mode === 'redesign' && (slideSummary?.trim().length ?? 0) > 0 && (
         <button
@@ -123,7 +123,7 @@ export default function AiSlidePanel({ theme, slideSummary, onApply, onClose }: 
             <button onClick={() => onApply(mode, preview)} data-testid="slides-ai-apply" className="btn-primary text-[12px] px-3 py-1.5">
               {mode === 'deck' ? 'Use deck' : mode === 'append' ? `Add ${preview.slides.length} slides` : 'Apply redesign'}
             </button>
-            <button onClick={() => void run()} disabled={busy} className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
+            <button onClick={() => void run()} disabled={busy} className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]">
               Regenerate
             </button>
           </>

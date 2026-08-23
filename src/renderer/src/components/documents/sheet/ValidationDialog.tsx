@@ -103,7 +103,7 @@ export default function ValidationDialog({
             value={kind}
             onChange={(e) => setKind(e.target.value as Kind)}
             data-testid="validation-kind"
-            className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+            className="fb-field text-[12px] px-2 py-1.5"
           >
             <option value="list">List of items (dropdown)</option>
             <option value="number">Number</option>
@@ -117,7 +117,7 @@ export default function ValidationDialog({
             onChange={(e) => setListText(e.target.value)}
             placeholder="Comma-separated, e.g. Open, In progress, Done"
             data-testid="validation-list"
-            className="w-full text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+            className="fb-field w-full text-[12px] px-2 py-1.5"
           />
         )}
         {kind === 'number' && (
@@ -125,7 +125,7 @@ export default function ValidationDialog({
             <select
               value={numOp}
               onChange={(e) => setNumOp(e.target.value as NumOp)}
-              className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+              className="fb-field text-[12px] px-2 py-1.5"
             >
               {NUM_OPS.map((o) => (
                 <option key={o.op} value={o.op}>
@@ -137,14 +137,14 @@ export default function ValidationDialog({
               value={num1}
               onChange={(e) => setNum1(e.target.value)}
               placeholder="value"
-              className="w-20 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+              className="fb-field w-20 text-[12px] px-2 py-1.5"
             />
             {numSpec.second && (
               <input
                 value={num2}
                 onChange={(e) => setNum2(e.target.value)}
                 placeholder="and"
-                className="w-20 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+                className="fb-field w-20 text-[12px] px-2 py-1.5"
               />
             )}
           </div>

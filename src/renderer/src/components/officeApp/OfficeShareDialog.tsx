@@ -154,7 +154,7 @@ export default function OfficeShareDialog({
                     if (e.key === 'Enter') void sendInvite()
                   }}
                   placeholder="name@example.com"
-                  className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
+                  className="fb-field flex-1 px-2 py-1.5 text-[12px]"
                 />
                 <button
                   onClick={() => void sendInvite()}

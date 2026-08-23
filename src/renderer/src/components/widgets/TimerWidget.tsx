@@ -184,7 +184,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="w-12 text-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-1 py-0.5"
+              className="fb-field w-12 text-center bg-[var(--surface-raised)] px-1 py-0.5"
             />
             <span>min</span>
             <input
@@ -199,7 +199,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="w-12 text-center bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-1 py-0.5"
+              className="fb-field w-12 text-center bg-[var(--surface-raised)] px-1 py-0.5"
             />
             <span>sec</span>
           </div>
@@ -214,7 +214,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
           </button>
         )}
         {data.state === 'running' && (
-          <button onClick={handlePause} className="btn-ghost border border-[var(--edge-firm)]">
+          <button onClick={handlePause} className="fb-btn-surface btn-ghost">
             <Icon name="pause" size={14} />
             <span>Pause</span>
           </button>

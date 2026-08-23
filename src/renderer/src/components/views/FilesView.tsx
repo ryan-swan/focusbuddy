@@ -693,7 +693,7 @@ function EmptyState({ onAddFiles, onNewFolder }: { onAddFiles: () => void; onNew
       <p className="text-[14px] text-[var(--ink-50)]">This folder is empty</p>
       <p className="text-[12px] mb-4">Drag files in, or use the buttons below.</p>
       <div className="flex gap-2">
-        <button onClick={onNewFolder} className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[var(--ink-70)]">New folder</button>
+        <button onClick={onNewFolder} className="fb-btn-surface text-[12px] px-3 py-1.5 text-[var(--ink-70)]">New folder</button>
         <button onClick={onAddFiles} className="btn-primary text-[12px] px-3 py-1.5">Add files</button>
       </div>
     </div>

@@ -128,7 +128,7 @@ export default function DeskGallery(): JSX.Element {
           <button
             onClick={newDesk}
             data-testid="desk-card-new"
-            className="rounded-[var(--radius-card)] border border-dashed border-[var(--edge-firm)] flex flex-col items-center justify-center gap-2 min-h-[180px] text-[var(--ink-50)] fb-lift fb-press fb-fade-in-up hover:border-[rgb(var(--accent)/0.5)] hover:text-[rgb(var(--accent))]"
+            className="fb-btn-surface rounded-[var(--radius-card)] border-dashed flex flex-col items-center justify-center gap-2 min-h-[180px] text-[var(--ink-50)] fb-lift fb-press fb-fade-in-up hover:border-[rgb(var(--accent)/0.5)] hover:text-[rgb(var(--accent))]"
           >
             <Icon name="add" size={22} />
             <span className="fb-t-body font-medium">New desk</span>

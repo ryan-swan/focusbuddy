@@ -247,7 +247,7 @@ export default function PlexiSuiteHome(): JSX.Element {
         <button
           onClick={() => v.goSearch()}
           data-testid="suite-search-bar"
-          className="w-full flex items-center gap-3 h-12 px-4 rounded-xl border border-[var(--edge-firm)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent)/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--accent)/0.40)] transition-colors mb-5 group"
+          className="fb-btn-surface w-full flex items-center gap-3 h-12 px-4 hover:border-[rgb(var(--accent)/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--accent)/0.40)] transition-colors mb-5 group"
         >
           <Icon name="search" size={18} className="text-[var(--ink-50)] group-hover:text-accent transition-colors" />
           <span className="flex-1 text-left text-[14px] text-[var(--ink-50)]">Search anything in Plexi</span>

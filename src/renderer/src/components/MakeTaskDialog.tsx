@@ -190,7 +190,7 @@ export default function MakeTaskDialog({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleSubmit()
               }}
-              className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:border-accent"
+              className="fb-field w-full text-sm px-2.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-100)]"
               placeholder="What is the task?"
             />
           </div>
@@ -208,7 +208,7 @@ export default function MakeTaskDialog({
                     if (e.key === 'Enter') void handleSubmit()
                   }}
                   placeholder="New folder name — e.g. Q3 outreach"
-                  className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:border-accent"
+                  className="fb-field w-full text-sm px-2.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-100)]"
                 />
                 <button
                   type="button"
@@ -224,7 +224,7 @@ export default function MakeTaskDialog({
                   value={folderQuery}
                   onChange={(e) => setFolderQuery(e.target.value)}
                   placeholder="Search folders…"
-                  className="w-full text-sm px-2.5 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)] text-[var(--ink-100)] focus:border-accent"
+                  className="fb-field w-full text-sm px-2.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-100)]"
                 />
                 <div className="mt-1 max-h-40 overflow-auto rounded bg-[var(--surface-sunken)]">
                   {folders

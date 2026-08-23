@@ -1379,7 +1379,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
                 <button
                   onClick={() => void runAi()}
                   disabled={!aiPrompt.trim() || aiBusy}
-                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                  className="fb-btn-surface text-[11px] px-3 py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                 >
                   {aiBusy ? 'Regenerating…' : 'Regenerate'}
                 </button>
@@ -1594,7 +1594,7 @@ function ColumnHeader({
             value={col.label}
             onChange={(e) => onRename(e.target.value)}
             placeholder="Column name"
-            className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
+            className="fb-field w-full text-[11px] px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
           />
           <div className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">
             Type
@@ -1602,7 +1602,7 @@ function ColumnHeader({
           <select
             value={col.type}
             onChange={(e) => onSetType(e.target.value as FieldType)}
-            className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
+            className="fb-field w-full text-[11px] px-2 py-1 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
             title="Change this column's field type"
           >
             {(Object.keys(FIELD_TYPE_LABELS) as FieldType[]).map((t) => (
@@ -1696,7 +1696,7 @@ function SelectOptionsMini({
             if (e.key === 'Enter') add()
           }}
           placeholder="New option…"
-          className="flex-1 text-[10px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-0.5 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
+          className="fb-field flex-1 text-[10px] px-1.5 py-0.5 text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
         />
         <button
           onClick={add}

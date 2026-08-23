@@ -151,12 +151,12 @@ export default function WidgetSetupPreview(): JSX.Element | null {
                 if (e.key === 'Enter') void run(prompt)
               }}
               placeholder="Optional: tell the AI what to focus on, then press Enter"
-              className="flex-1 rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-sm text-[var(--ink-100)] focus:border-accent"
+              className="fb-field flex-1 px-2 py-1.5 text-sm text-[var(--ink-100)]"
             />
             <button
               onClick={() => void run(prompt)}
               disabled={status === 'loading'}
-              className="px-3 py-1.5 rounded border border-[var(--edge-firm)] text-sm text-[var(--ink-90)] disabled:opacity-50"
+              className="fb-btn-surface px-3 py-1.5 text-sm text-[var(--ink-90)] disabled:opacity-50"
             >
               Redraft
             </button>

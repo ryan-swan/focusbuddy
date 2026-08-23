@@ -285,7 +285,7 @@ function SelectOptionsEditor({
             if (e.key === 'Enter') add()
           }}
           placeholder="New option…"
-          className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[11px]"
+          className="fb-field flex-1 bg-[var(--surface-raised)] px-2 py-1 text-[11px]"
         />
         <button
           onClick={add}
@@ -316,7 +316,7 @@ function ButtonConfigEditor({
         onChange={(e) =>
           onChange({ ...config, action: e.target.value as 'shell' | 'ai-prompt' })
         }
-        className="w-full text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1"
+        className="fb-field w-full text-[11px] bg-[var(--surface-raised)] px-2 py-1"
       >
         <option value="ai-prompt">AI prompt</option>
         <option value="shell">Shell command</option>
@@ -325,7 +325,7 @@ function ButtonConfigEditor({
         value={config.label ?? ''}
         onChange={(e) => onChange({ ...config, label: e.target.value })}
         placeholder="Button label"
-        className="w-full text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1"
+        className="fb-field w-full text-[11px] bg-[var(--surface-raised)] px-2 py-1"
       />
       <textarea
         value={config.payload}
@@ -336,7 +336,7 @@ function ButtonConfigEditor({
             : 'Shell command — e.g. say "hello"'
         }
         rows={3}
-        className="w-full text-[11px] bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 resize-y"
+        className="fb-field w-full text-[11px] bg-[var(--surface-raised)] px-2 py-1 resize-y"
       />
     </div>
   )

@@ -781,7 +781,7 @@ export default function DocEditor({
                   key={a}
                   onClick={() => void ai.run(a)}
                   disabled={ai.busy}
-                  className="text-[11px] px-2 py-1 rounded-full border border-[var(--edge-firm)] hover:bg-accent/10 hover:border-accent disabled:opacity-50"
+                  className="text-[11px] px-2 py-1 rounded-full bg-[var(--surface-sunken)] hover:bg-accent/10 disabled:opacity-50"
                 >
                   {a}
                 </button>
@@ -835,7 +835,7 @@ export default function DocEditor({
                 <button
                   onClick={() => void ai.run(aiInstruction || (ai.mode === 'rewrite' ? 'Improve writing' : ''))}
                   disabled={ai.busy}
-                  className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+                  className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
                 >
                   Regenerate
                 </button>
@@ -1037,7 +1037,7 @@ function MarginMenu({
                     const v = Number(e.target.value)
                     if (Number.isFinite(v)) onPick({ ...margin, [s.key]: Math.max(0, Math.min(4, v)) })
                   }}
-                  className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-0.5"
+                  className="fb-field w-full px-1.5 py-0.5"
                 />
               </label>
             ))}

@@ -147,7 +147,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
                 if (e.key === 'Enter' || e.key === 'Escape') setEditingLabel(false)
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="pointer-events-auto max-w-[90%] bg-[var(--surface-raised)]/80 text-center text-sm text-[var(--ink-100)] rounded px-2 py-0.5 border border-[var(--edge-firm)]"
+              className="fb-field pointer-events-auto max-w-[90%] bg-[var(--surface-raised)]/80 text-center text-sm text-[var(--ink-100)] px-2 py-0.5"
             />
           ) : (
             <span className="text-sm font-medium text-[var(--ink-100)] text-center break-words drop-shadow-sm">

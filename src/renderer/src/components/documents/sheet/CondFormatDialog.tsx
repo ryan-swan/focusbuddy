@@ -127,7 +127,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
                 value={op}
                 onChange={(e) => setOp(e.target.value as SheetCondOp)}
                 data-testid="condformat-op"
-                className="text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+                className="fb-field text-[12px] px-2 py-1.5"
               >
                 {OPS.map((o) => (
                   <option key={o.op} value={o.op}>
@@ -141,7 +141,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
                   onChange={(e) => setValue(e.target.value)}
                   placeholder="value"
                   data-testid="condformat-value"
-                  className="w-24 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+                  className="fb-field w-24 text-[12px] px-2 py-1.5"
                 />
               )}
               {spec.needsSecond && (
@@ -149,7 +149,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
                   value={value2}
                   onChange={(e) => setValue2(e.target.value)}
                   placeholder="and"
-                  className="w-24 text-[12px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5"
+                  className="fb-field w-24 text-[12px] px-2 py-1.5"
                 />
               )}
             </div>

@@ -189,7 +189,7 @@ export function PromptDialogHost(): JSX.Element | null {
               <button
                 key={c.value}
                 onClick={() => settle(c.value)}
-                className="w-full text-left px-3 py-2 rounded-lg border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface w-full text-left px-3 py-2 hover:bg-[var(--surface-sunken)]"
                 data-testid={`prompt-choice-${c.value}`}
               >
                 <div className="text-[13px] font-medium text-[var(--ink-100)]">{c.label}</div>
@@ -204,7 +204,7 @@ export function PromptDialogHost(): JSX.Element | null {
             onChange={(e) => setValue(e.target.value)}
             placeholder={req.placeholder}
             rows={6}
-            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] font-mono focus:border-accent resize-y"
+            className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] font-mono resize-y"
             data-testid="prompt-dialog-input"
           />
         ) : (
@@ -213,7 +213,7 @@ export function PromptDialogHost(): JSX.Element | null {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={req.placeholder}
-            className="mt-3 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent"
+            className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px]"
             data-testid="prompt-dialog-input"
           />
         )}

@@ -375,7 +375,7 @@ function ReportEditor({
         <button
           onClick={() => void emailReport()}
           data-testid="report-email"
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-[var(--edge-firm)] text-[13px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+          className="fb-btn-surface inline-flex items-center gap-1.5 h-9 px-4 text-[13px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
         >
           <Icon name="send" size={15} /> Email to recipients
         </button>

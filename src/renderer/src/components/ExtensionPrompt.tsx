@@ -56,7 +56,7 @@ export default function ExtensionPrompt({
             <Icon name="close" size={14} />
             <span>Snooze 5 min</span>
           </button>
-          <button onClick={onMarkDone} className="btn-ghost border border-[var(--edge-firm)]">
+          <button onClick={onMarkDone} className="fb-btn-surface btn-ghost">
             <Icon name="check" size={14} />
             <span>Mark done</span>
           </button>

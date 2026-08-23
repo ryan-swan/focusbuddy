@@ -191,7 +191,7 @@ function ApplyAcrossConfirm({
           </>
         )}
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[var(--ink-70)]">
+          <button onClick={onClose} className="fb-btn-surface text-[12px] px-3 py-1.5 text-[var(--ink-70)]">
             Cancel
           </button>
           {!nothing && (

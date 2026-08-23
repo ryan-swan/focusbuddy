@@ -208,7 +208,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Meeting"
-          className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+          className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm"
           data-testid="new-meeting-title"
         />
       </label>
@@ -221,7 +221,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+              className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm"
               data-testid="new-meeting-date"
             />
           </label>
@@ -231,7 +231,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+              className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm"
               data-testid="new-meeting-time"
             />
           </label>
@@ -243,7 +243,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
         <select
           value={durationMin}
           onChange={(e) => setDurationMin(Number(e.target.value))}
-          className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+          className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm"
           data-testid="new-meeting-duration"
         >
           {DURATIONS.map((d) => (
@@ -305,7 +305,7 @@ export default function NewMeetingDialog({ onClose }: { onClose: () => void }): 
           onChange={(e) => setInvitees(e.target.value)}
           placeholder="alex@acme.com, sam@example.com"
           rows={2}
-          className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm resize-none"
+          className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm resize-none"
           data-testid="new-meeting-invitees"
         />
         <span className="mt-0.5 block text-[11px] text-[var(--ink-50)]">

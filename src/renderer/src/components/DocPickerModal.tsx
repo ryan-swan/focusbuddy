@@ -119,7 +119,7 @@ export default function DocPickerModal({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search office files"
               data-testid="doc-picker-search"
-              className="w-full h-8 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12.5px] focus:border-[rgb(var(--accent)/0.6)]"
+              className="fb-field w-full h-8 pl-7 pr-2 text-[12.5px]"
             />
           </div>
           {!onlyType && (

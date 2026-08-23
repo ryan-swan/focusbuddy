@@ -72,13 +72,13 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
           type="color"
           value={color}
           onChange={(e) => setColor(e.target.value)}
-          className="h-8 w-12 border border-[var(--edge-firm)] rounded cursor-pointer"
+          className="fb-field h-8 w-12 cursor-pointer"
           aria-label="Pick color"
         />
         <input
           value={color}
           onChange={(e) => setColor(e.target.value)}
-          className={`flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 font-mono focus:border-[var(--edge-firm)] ${
+          className={`fb-field flex-1 bg-[var(--surface-raised)] px-2 py-1.5 font-mono ${
             inline ? 'text-base' : 'text-xs'
           }`}
         />

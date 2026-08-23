@@ -103,7 +103,7 @@ export default function SheetFormulaAssist({
         placeholder={`Describe the calculation for ${activeRef}. e.g. "gross margin: revenue minus cost, divided by revenue, as a percent"`}
         rows={2}
         autoFocus
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
+        className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-none"
       />
 
       {/* Quick-insert reference chips: the active cell and each named column. */}
@@ -180,7 +180,7 @@ export default function SheetFormulaAssist({
             <button
               onClick={() => void run()}
               disabled={busy}
-              className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
             >
               Re-suggest
             </button>

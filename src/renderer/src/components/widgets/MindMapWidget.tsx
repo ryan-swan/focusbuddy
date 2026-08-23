@@ -1531,7 +1531,7 @@ function SidePanel({
               </button>
               <button
                 onClick={onRejectAllPending}
-                className="text-[10px] px-1.5 py-1 rounded border border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface text-[10px] px-1.5 py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
                 data-testid="mindmap-reject-all-pending"
               >
                 Reject all

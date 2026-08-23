@@ -89,7 +89,7 @@ export default function SharedView(): JSX.Element {
             <button
               onClick={() => void pasteLink()}
               data-testid="shared-paste"
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--edge-firm)] text-[12.5px] text-[var(--ink-80)] hover:text-[var(--ink-100)]"
+              className="fb-btn-surface inline-flex items-center gap-1.5 h-9 px-3 text-[12.5px] text-[var(--ink-80)] hover:text-[var(--ink-100)]"
             >
               <Icon name="content_paste" size={15} /> Paste a share link
             </button>

@@ -135,7 +135,7 @@ export default function FindReplace({ editor, onClose }: Props): JSX.Element {
             data-testid="doc-replace-input"
             className="fb-field flex-1 px-2 py-1 text-[12px]"
           />
-          <button onClick={replaceOne} className="px-2 py-1 rounded text-[11px] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
+          <button onClick={replaceOne} className="fb-btn-surface px-2 py-1 text-[11px] hover:bg-[var(--surface-sunken)]">
             Replace
           </button>
           <button onClick={replaceAll} data-testid="doc-replace-all" className="px-2 py-1 rounded text-[11px] bg-accent text-white">

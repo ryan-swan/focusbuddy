@@ -52,7 +52,12 @@ const AI_LANE = [
   'components/views/chat/',
   'stores/chat',
   'lib/chat',
-  'lib/assistant'
+  'lib/assistant',
+  // Released to the AI lane during A2 (2026-08-23): the omnibar rows live in
+  // CommandCenter and the web panel rides with browser/.
+  'components/CommandCenter.tsx',
+  'components/browser/',
+  'stores/webPanel.ts'
 ]
 
 // Deferred until Caleb has talked to Michael (DESIGN_SYSTEM names these as the
@@ -242,8 +247,12 @@ export function matchRule(words, tag) {
   return allowed(matchAnyRule(words, tag))
 }
 
+// Phase 4: --edge-firm is the same debt in the second colour. The rewrite
+// path treats both tokens as the stroke; the census keeps them separate.
+const isStroke = (t) => t === SOFT || t === FIRM
+
 function matchAnyRule(words, tag) {
-  const boxed = words.includes('border') && words.includes(SOFT)
+  const boxed = words.includes('border') && words.some(isStroke)
   const floating = isFloating(words)
   if (words.some((t) => t === 'inset-0') && (words.includes('fixed') || words.includes('absolute'))
       && words.some(isDimBg) && words.some(isBlur)) return 'scrim'
@@ -283,38 +292,38 @@ export function rewriteString(text, tag) {
       added = ['fb-scrim']
       break
     case 'popover':
-      removed = words.filter((t) => t === 'border' || t === SOFT || /^dark:border-/.test(t) || t === RAISED || t === SUNKEN
+      removed = words.filter((t) => t === 'border' || isStroke(t) || /^dark:border-/.test(t) || t === RAISED || t === SUNKEN
         || isRaisedAlpha(t) || isRadius(t) || isShadow(t) || isBlur(t))
       added = ['fb-glass-panel', popoverRadius(words), ...(hasMotion(words) ? [] : ['fb-pop-in'])]
       break
     case 'raised-blur':
-      removed = words.filter((t) => t === 'border' || t === SOFT || isRaisedAlpha(t) || isBlur(t) || isRadius(t) || isShadow(t))
+      removed = words.filter((t) => t === 'border' || isStroke(t) || isRaisedAlpha(t) || isBlur(t) || isRadius(t) || isShadow(t))
       added = isButtonTag(tag) ? ['fb-btn-surface'] : isInteractive(tag) ? ['fb-card', 'fb-press'] : ['fb-card']
       break
     case 'raised':
-      removed = words.filter((t) => t === 'border' || t === SOFT || t === RAISED || isRadius(t) || isShadow(t))
+      removed = words.filter((t) => t === 'border' || isStroke(t) || t === RAISED || isRadius(t) || isShadow(t))
       added = isButtonTag(tag) ? ['fb-btn-surface'] : isInteractive(tag) ? ['fb-card', 'fb-press'] : ['fb-card']
       break
     case 'field':
       // .fb-field is a base skin in the components layer: width, padding and
       // text utilities on the element stay and win in the cascade, so only
       // the stroke, the fill, the radius and hand-rolled focus styling go.
-      removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN
+      removed = words.filter((t) => t === 'border' || isStroke(t) || t === SUNKEN
         || t === 'bg-[var(--surface-base)]' || t === 'bg-[var(--surface)]' || t === 'bg-transparent'
         || isRadius(t)
         || /^focus:(outline-none|border-|ring-)/.test(t) || t === 'outline-none')
       added = ['fb-field']
       break
     case 'ghost-button':
-      removed = words.filter((t) => t === 'border' || t === SOFT || isRadius(t) || isShadow(t))
+      removed = words.filter((t) => t === 'border' || isStroke(t) || isRadius(t) || isShadow(t))
       added = ['fb-btn-surface']
       break
     case 'sunken':
       if (isInteractive(tag)) {
-        removed = words.filter((t) => t === 'border' || t === SOFT || t === SUNKEN || isRadius(t))
+        removed = words.filter((t) => t === 'border' || isStroke(t) || t === SUNKEN || isRadius(t))
         added = ['fb-tile']
       } else {
-        removed = words.filter((t) => t === 'border' || t === SOFT)
+        removed = words.filter((t) => t === 'border' || isStroke(t))
         added = []
       }
       break

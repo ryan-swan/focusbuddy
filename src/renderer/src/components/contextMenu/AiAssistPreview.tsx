@@ -120,7 +120,7 @@ export default function AiAssistPreview(): JSX.Element | null {
             onChange={(e) => setInstr(e.target.value)}
             rows={2}
             placeholder="Describe what you want done with the text"
-            className="w-full resize-none rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-sm text-[var(--ink-100)] focus:border-accent"
+            className="fb-field w-full resize-none px-2 py-1.5 text-sm text-[var(--ink-100)]"
           />
 
           {status === 'loading' && (
@@ -170,13 +170,13 @@ export default function AiAssistPreview(): JSX.Element | null {
               </button>
               <button
                 onClick={() => void copy()}
-                className="px-3 py-1.5 rounded border border-[var(--edge-firm)] text-sm text-[var(--ink-90)]"
+                className="fb-btn-surface px-3 py-1.5 text-sm text-[var(--ink-90)]"
               >
                 Copy
               </button>
               <button
                 onClick={() => void run(instr)}
-                className="px-3 py-1.5 rounded border border-[var(--edge-firm)] text-sm text-[var(--ink-90)]"
+                className="fb-btn-surface px-3 py-1.5 text-sm text-[var(--ink-90)]"
               >
                 Regenerate
               </button>

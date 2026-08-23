@@ -509,7 +509,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
                 <button
                   onClick={() => void runAiPrompt()}
                   disabled={!aiPrompt.trim() || aiBusy}
-                  className="text-[11px] px-3 py-1 rounded text-[var(--ink-70)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                  className="fb-btn-surface text-[11px] px-3 py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                 >
                   {aiBusy ? 'Regenerating…' : 'Regenerate'}
                 </button>

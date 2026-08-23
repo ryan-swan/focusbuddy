@@ -95,7 +95,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                   }}
                   placeholder="New team name"
                   data-testid="office-team-name"
-                  className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
+                  className="fb-field flex-1 min-w-0 px-2 py-1.5 text-[12px]"
                 />
                 <button
                   onClick={() => void create()}
@@ -145,7 +145,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                         }}
                         placeholder="Add by handle, e.g. @alex"
                         data-testid="office-team-add-handle"
-                        className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
+                        className="fb-field flex-1 min-w-0 px-2 py-1.5 text-[12px]"
                       />
                       <button
                         onClick={() => void add()}

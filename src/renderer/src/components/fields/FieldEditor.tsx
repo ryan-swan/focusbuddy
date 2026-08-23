@@ -166,7 +166,7 @@ function DocRefField(props: FieldEditorProps & { value: string[] }): JSX.Element
             setPickerOpen(true)
           }}
           data-testid="doc-ref-add"
-          className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-[var(--edge-firm)] text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.5)] px-1.5 py-0.5 text-[11px]"
+          className="fb-btn-surface inline-flex items-center gap-0.5 border-dashed text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:border-[rgb(var(--accent)/0.5)] px-1.5 py-0.5 text-[11px]"
           title="Reference an office file"
         >
           <Icon name="add" size={12} /> {value.length === 0 ? 'Office file' : ''}
@@ -228,7 +228,7 @@ function ShortText({ def, value, variant, onCommit, autoFocus }: SubProps<string
       className={
         variant === 'cell'
           ? 'w-full bg-transparent px-2 py-1 fb-body focus:bg-[var(--surface-raised)]'
-          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)]'
+          : 'fb-field w-full bg-[var(--surface-raised)] px-2 py-1.5 fb-body'
       }
     />
   )
@@ -250,7 +250,7 @@ function LongText({ def, value, variant, onCommit }: SubProps<string>): JSX.Elem
       className={
         variant === 'cell'
           ? 'w-full bg-transparent px-2 py-1 fb-body resize-none focus:bg-[var(--surface-raised)]'
-          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)] resize-y'
+          : 'fb-field w-full bg-[var(--surface-raised)] px-2 py-1.5 fb-body resize-y'
       }
     />
   )
@@ -288,7 +288,7 @@ function NumberInput({
         className={
           variant === 'cell'
             ? 'flex-1 bg-transparent px-1 py-1 fb-body text-right focus:bg-[var(--surface-raised)]'
-            : 'flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)] text-right'
+            : 'fb-field flex-1 bg-[var(--surface-raised)] px-2 py-1.5 fb-body text-right'
         }
       />
       {config.suffix && (
@@ -488,7 +488,7 @@ function DateInput({ def, value, variant, onCommit }: SubProps<number | null>): 
       className={
         variant === 'cell'
           ? 'w-full bg-transparent px-1 py-1 fb-body focus:bg-[var(--surface-raised)]'
-          : 'w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1.5 fb-body focus:border-[var(--edge-firm)]'
+          : 'fb-field w-full bg-[var(--surface-raised)] px-2 py-1.5 fb-body'
       }
     />
   )
@@ -522,7 +522,7 @@ function Attachment({
       ))}
       <button
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+        className="fb-btn-surface inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 border-dashed text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
       >
         <Icon name="add" size={10} />
         attach
@@ -752,8 +752,8 @@ function RelationField({
           onClick={() => setOpen((v) => !v)}
           className={
             variant === 'cell'
-              ? 'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
-              : 'inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded border border-dashed border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+              ? 'fb-btn-surface inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 border-dashed text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+              : 'fb-btn-surface inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 border-dashed text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           }
         >
           <Icon name="add" size={10} />

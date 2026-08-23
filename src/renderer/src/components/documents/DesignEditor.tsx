@@ -833,12 +833,12 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   placeholder="e.g. a launch announcement for our new pricing"
                   data-testid="design-ai-prompt"
                   onKeyDown={(e) => e.key === 'Enter' && void generateVariations()}
-                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:border-accent"
+                  className="fb-field flex-1 px-2.5 py-1.5 text-[12px]"
                 />
                 <button onClick={() => void generateVariations()} disabled={!!busy} data-testid="design-ai-variations" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
                   Variations
                 </button>
-                <button onClick={() => void generateDesign()} disabled={!!busy} data-testid="design-ai-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent disabled:opacity-50">
+                <button onClick={() => void generateDesign()} disabled={!!busy} data-testid="design-ai-go" className="fb-btn-surface text-[12px] px-3 py-1.5 hover:border-accent disabled:opacity-50">
                   One
                 </button>
               </div>
@@ -852,9 +852,9 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   placeholder="e.g. a minimal abstract gradient background"
                   data-testid="design-image-prompt"
                   onKeyDown={(e) => e.key === 'Enter' && void generateImage()}
-                  className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:border-accent"
+                  className="fb-field flex-1 px-2.5 py-1.5 text-[12px]"
                 />
-                <button onClick={() => void generateImage()} disabled={!!busy} data-testid="design-image-go" className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent disabled:opacity-50">
+                <button onClick={() => void generateImage()} disabled={!!busy} data-testid="design-image-go" className="fb-btn-surface text-[12px] px-3 py-1.5 hover:border-accent disabled:opacity-50">
                   Image
                 </button>
               </div>
@@ -871,7 +871,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
               placeholder="Search free photos (e.g. mountains, office, coffee)"
               data-testid="design-stock-query"
               onKeyDown={(e) => e.key === 'Enter' && void searchStock()}
-              className="flex-1 rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[12px] focus:border-accent"
+              className="fb-field flex-1 px-2.5 py-1.5 text-[12px]"
             />
             <button onClick={() => void searchStock()} disabled={!!busy} data-testid="design-stock-go" className="btn-primary text-[12px] px-3 py-1.5 disabled:opacity-50">
               Search
@@ -986,7 +986,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                   data-testid="design-alt"
                   placeholder="Describe the image"
                   onChange={(e) => mutate((s) => updateElement(s, selected.id, { alt: e.target.value }))}
-                  className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
+                  className="fb-field w-full px-1.5 py-1"
                 />
               </Field>
             )}
@@ -1001,7 +1001,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                       loadGoogleFont(fam)
                       mutate((s) => updateElement(s, selected.id, { fontFamily: fontFamilyValue(fam) }))
                     }}
-                    className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
+                    className="fb-field w-full px-1.5 py-1"
                     style={{ fontFamily: selected.fontFamily }}
                   >
                     {!GOOGLE_FONTS.includes(familyLabel(selected.fontFamily)) && familyLabel(selected.fontFamily) !== 'Default' && (
@@ -1076,7 +1076,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                         paragraphs: selected.paragraphs.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r, fontSize: fs })) }))
                       }))
                     }}
-                    className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
+                    className="fb-field w-full px-1.5 py-1"
                   />
                 </Field>
               </>
@@ -1086,7 +1086,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                 onClick={() => void removeBgSelected()}
                 disabled={!!busy}
                 data-testid="design-remove-bg"
-                className="w-full mb-2 px-2 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[12px] hover:border-accent disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                className="fb-btn-surface w-full mb-2 px-2 py-1.5 text-[12px] hover:border-accent disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
               >
                 <Icon name="auto_awesome" size={14} /> Remove background
               </button>
@@ -1108,7 +1108,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                 value={Math.round(selected.rotation ?? 0)}
                 data-testid="design-rotation"
                 onChange={(e) => mutate((s) => updateElement(s, selected.id, { rotation: Math.round(Number(e.target.value) || 0) }))}
-                className="w-full rounded border border-[var(--edge-firm)] bg-transparent px-1.5 py-1"
+                className="fb-field w-full px-1.5 py-1"
               />
             </Field>
 
@@ -1124,24 +1124,24 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
                     ['vcenter', 'align_vertical_center'],
                     ['bottom', 'align_vertical_bottom']
                   ] as [AlignEdge, string][]).map(([edge, icon]) => (
-                    <button key={edge} onClick={() => align(edge)} data-testid={`design-align-${edge}`} title={`Align ${edge}`} className="px-1.5 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
+                    <button key={edge} onClick={() => align(edge)} data-testid={`design-align-${edge}`} title={`Align ${edge}`} className="fb-btn-surface px-1.5 py-1 hover:bg-[var(--surface-sunken)]">
                       <Icon name={icon} size={13} />
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-1 mt-1.5">
-                  <button onClick={() => distribute('h')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)] disabled:opacity-40">
+                  <button onClick={() => distribute('h')} disabled={selectedIds.length < 3} className="fb-btn-surface flex-1 px-2 py-1 text-[11px] hover:bg-[var(--surface-sunken)] disabled:opacity-40">
                     Distribute H
                   </button>
-                  <button onClick={() => distribute('v')} disabled={selectedIds.length < 3} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)] disabled:opacity-40">
+                  <button onClick={() => distribute('v')} disabled={selectedIds.length < 3} className="fb-btn-surface flex-1 px-2 py-1 text-[11px] hover:bg-[var(--surface-sunken)] disabled:opacity-40">
                     Distribute V
                   </button>
                 </div>
                 <div className="flex gap-1 mt-1.5">
-                  <button onClick={group} data-testid="design-group" className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)]">
+                  <button onClick={group} data-testid="design-group" className="fb-btn-surface flex-1 px-2 py-1 text-[11px] hover:bg-[var(--surface-sunken)]">
                     Group
                   </button>
-                  <button onClick={ungroup} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] text-[11px] hover:bg-[var(--surface-sunken)]">
+                  <button onClick={ungroup} className="fb-btn-surface flex-1 px-2 py-1 text-[11px] hover:bg-[var(--surface-sunken)]">
                     Ungroup
                   </button>
                 </div>
@@ -1149,13 +1149,13 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
             )}
 
             <div className="flex gap-1 mt-3">
-              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'forward'))} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]" title="Bring forward">
+              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'forward'))} className="fb-btn-surface flex-1 px-2 py-1 hover:bg-[var(--surface-sunken)]" title="Bring forward">
                 <Icon name="flip_to_front" size={14} />
               </button>
-              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'back'))} className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]" title="Send back">
+              <button onClick={() => mutate((s) => reorderZ(s, selected.id, 'back'))} className="fb-btn-surface flex-1 px-2 py-1 hover:bg-[var(--surface-sunken)]" title="Send back">
                 <Icon name="flip_to_back" size={14} />
               </button>
-              <button onClick={duplicateSelected} data-testid="design-duplicate" className="flex-1 px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]" title="Duplicate (Cmd/Ctrl+D)">
+              <button onClick={duplicateSelected} data-testid="design-duplicate" className="fb-btn-surface flex-1 px-2 py-1 hover:bg-[var(--surface-sunken)]" title="Duplicate (Cmd/Ctrl+D)">
                 <Icon name="content_copy" size={14} />
               </button>
               <button
@@ -1295,7 +1295,7 @@ function ColorInput({ value, onChange, testid }: { value: string; onChange: (c: 
       value={value.startsWith('#') ? value : '#000000'}
       data-testid={testid}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-7 rounded border border-[var(--edge-firm)] bg-transparent cursor-pointer"
+      className="fb-field w-full h-7 cursor-pointer"
     />
   )
 }

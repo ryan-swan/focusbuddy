@@ -284,7 +284,7 @@ export default function DocumentsView(): JSX.Element {
                 {trashed.map((d) => (
                   <div
                     key={d.id}
-                    className="flex items-center gap-3 rounded-[var(--radius-row)] border border-dashed border-[var(--edge-firm)] bg-[var(--surface-sunken)] px-3.5 py-3"
+                    className="flex items-center gap-3 rounded-[var(--radius-row)] border-dashed bg-[var(--surface-sunken)] px-3.5 py-3"
                   >
                     <div className="h-9 w-9 rounded-[var(--radius-chip)] bg-[var(--surface-base)] text-[var(--ink-40)] inline-flex items-center justify-center shrink-0">
                       <Icon name={typeIcon(d.docType)} size={17} />

@@ -255,7 +255,7 @@ export default function OfficeDrive({
         <button
           onClick={() => void newFolder()}
           data-testid="office-new-folder"
-          className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--edge-firm)] px-2 py-1.5 text-[11.5px] text-[var(--ink-70)] hover:border-accent hover:text-accent"
+          className="fb-btn-surface flex items-center gap-1.5 border-dashed px-2 py-1.5 text-[11.5px] text-[var(--ink-70)] hover:border-accent hover:text-accent"
         >
           <Icon name="create_new_folder" size={14} />
           New folder
@@ -289,7 +289,7 @@ export default function OfficeDrive({
                 }}
                 placeholder="Paste a share link"
                 data-testid="office-import-url"
-                className="flex-1 min-w-0 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[11.5px] focus:border-accent"
+                className="fb-field flex-1 min-w-0 px-2 py-1 text-[11.5px]"
               />
               <button
                 onClick={() => void importLink()}
@@ -872,7 +872,7 @@ function TagEditor({
           }}
           placeholder="Add a tag, e.g. Acme, Invoices, Q2"
           data-testid="office-tag-add-input"
-          className="flex-1 bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
+          className="fb-field flex-1 px-2 py-1 text-[12px]"
         />
         <button onClick={add} disabled={!value.trim()} data-testid="office-tag-add" className="btn-primary text-[12px] px-2.5 py-1 disabled:opacity-50">
           Add
@@ -986,14 +986,14 @@ function SmartFolderCreator({
         onChange={(e) => setName(e.target.value)}
         placeholder="Name (optional)"
         data-testid="office-smart-name"
-        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
+        className="fb-field w-full px-2 py-1 text-[12px]"
       />
       <input
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         placeholder="And/or a search term (optional)"
         data-testid="office-smart-search"
-        className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
+        className="fb-field w-full px-2 py-1 text-[12px]"
       />
       <div className="text-[10px] text-[var(--ink-40)]">Shows files matching ALL chosen tags and the search term.</div>
       <div className="flex items-center gap-1 flex-wrap">

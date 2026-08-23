@@ -898,7 +898,7 @@ export default function HomeDashboard(): JSX.Element {
                 <button
                   onClick={() => void onNewDesk()}
                   data-testid="home-desk-new"
-                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] px-2.5 py-2 fb-t-label text-[var(--ink-60)] hover:text-[rgb(var(--accent))] fb-press transition-colors"
+                  className="fb-btn-surface mt-2 flex w-full items-center justify-center gap-1.5 border-dashed px-2.5 py-2 fb-t-label text-[var(--ink-60)] hover:text-[rgb(var(--accent))] fb-press transition-colors"
                 >
                   <Icon name="add" size={15} />
                   New desk{navRoom !== TOP_LEVEL ? ' in this room' : ''}

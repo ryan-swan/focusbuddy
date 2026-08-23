@@ -89,7 +89,7 @@ export default function WidgetPickerDialog({ onPick, onClose }: Props): JSX.Elem
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search widgets or desks…"
             data-testid="widget-picker-search"
-            className="w-full rounded-lg border border-[var(--edge-firm)] bg-transparent px-2.5 py-1.5 text-[13px] focus:border-accent"
+            className="fb-field w-full px-2.5 py-1.5 text-[13px]"
           />
         </div>
 

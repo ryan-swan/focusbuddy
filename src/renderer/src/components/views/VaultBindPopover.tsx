@@ -161,7 +161,7 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
 
           <button
             onClick={() => setCreating(true)}
-            className="mt-2 w-full px-2 py-1.5 rounded border border-dashed border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] flex items-center justify-center gap-1"
+            className="fb-btn-surface mt-2 w-full px-2 py-1.5 border-dashed text-[12px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] flex items-center justify-center gap-1"
           >
             <Icon name="add" size={12} />
             <span>Save new credentials</span>
@@ -183,20 +183,20 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="username or email"
-            className="text-[12px] px-2 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)]"
+            className="fb-field text-[12px] px-2 py-1.5 bg-[var(--surface-raised)]"
           />
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="password"
-            className="text-[12px] px-2 py-1.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-raised)]"
+            className="fb-field text-[12px] px-2 py-1.5 bg-[var(--surface-raised)]"
           />
           <div className="flex gap-2 justify-end">
             <button
               type="button"
               onClick={() => setCreating(false)}
-              className="text-[11px] px-2 py-1 rounded border border-[var(--edge-firm)]"
+              className="fb-btn-surface text-[11px] px-2 py-1"
             >
               cancel
             </button>

@@ -323,7 +323,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
               {/* The panel's composer card: one container carrying the context
                   chip, the field and its actions, with the focus ring on the
                   whole box. */}
-              <div className="rounded-[13px] border border-[var(--edge-firm)] bg-[var(--surface-raised)] px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+              <div className="fb-card px-2.5 pt-2 pb-1.5 flex flex-col gap-2 transition-shadow focus-within:border-[rgb(var(--accent)/0.55)] focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
                 <div>
                   <span
                     data-testid="focus-chat-context-chip"

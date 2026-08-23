@@ -142,7 +142,7 @@ function CreateVaultPanel(): JSX.Element {
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
             placeholder="At least 8 characters"
-            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+            className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-3 py-2 text-sm"
           />
         </label>
         <label className="block mb-4">
@@ -154,7 +154,7 @@ function CreateVaultPanel(): JSX.Element {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
-            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+            className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-3 py-2 text-sm"
           />
         </label>
 
@@ -218,7 +218,7 @@ function UnlockVaultPanel(): JSX.Element {
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void submit()}
           placeholder="Master password"
-          className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+          className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm"
         />
         {error && (
           <div className="mt-3 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/40 rounded p-2">
@@ -668,7 +668,7 @@ function PasswordInput({
           if (e.key === 'Enter' && onEnter) void onEnter()
         }}
         placeholder={placeholder}
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+        className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm"
       />
     </div>
   )
@@ -761,7 +761,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
                 type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 pr-9 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+                className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 pr-9 text-sm"
               />
               <button
                 type="button"
@@ -787,7 +787,7 @@ function AddEntryDialog({ onClose }: { onClose: () => void }): JSX.Element {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)] resize-none"
+              className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm resize-none"
             />
           </div>
           {error && (
@@ -840,7 +840,7 @@ function Input({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)] ${
+        className={`fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm ${
           mono ? 'font-mono text-xs' : ''
         }`}
       />

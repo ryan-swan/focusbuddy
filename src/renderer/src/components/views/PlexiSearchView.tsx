@@ -198,7 +198,7 @@ export default function PlexiSearchView(): JSX.Element {
 
         {/* Hero search input + Ask button */}
         <div
-          className="flex items-center gap-2 h-12 rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-firm)] px-3 fb-spring-crisp focus-within:ring-2 focus-within:ring-[rgb(var(--accent)/0.35)] focus-within:border-[rgb(var(--accent)/0.55)]"
+          className="fb-card flex items-center gap-2 h-12 px-3 fb-spring-crisp focus-within:ring-2 focus-within:ring-[rgb(var(--accent)/0.35)] focus-within:border-[rgb(var(--accent)/0.55)]"
         >
           <Icon name="search" size={18} className="text-[var(--ink-70)] shrink-0" />
           <input

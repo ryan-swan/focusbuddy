@@ -138,7 +138,7 @@ export default function SheetAiFill({
         placeholder={'Describe the data. e.g. "A project plan for a Loop ERP marketing launch with tasks, owners, start and end dates, and status"'}
         rows={2}
         autoFocus
-        className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
+        className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-none"
       />
       {error && <div className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
 
@@ -159,7 +159,7 @@ export default function SheetAiFill({
                       onChange={(e) =>
                         setCols((cur) => (cur ? cur.map((c, j) => (j === i ? e.target.value : c)) : cur))
                       }
-                      className="flex-1 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
+                      className="fb-field flex-1 bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
                     />
                     <button
                       onClick={() => setCols((cur) => (cur ? cur.filter((_, j) => j !== i) : cur))}
@@ -201,7 +201,7 @@ export default function SheetAiFill({
                 <button
                   onClick={() => void suggestColumns()}
                   disabled={busy}
-                  className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+                  className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
                 >
                   Re-suggest
                 </button>
@@ -210,7 +210,7 @@ export default function SheetAiFill({
             {hasNamedColumns(headers) && (
               <button
                 onClick={() => commitColumns(headers.filter((h, i) => h.trim() && h.trim() !== defaultLabel(i)))}
-                className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
               >
                 Use existing columns
               </button>
@@ -246,7 +246,7 @@ export default function SheetAiFill({
 
           <div className="mt-2 flex items-center gap-2" data-testid="sheet-ai-row-mode">
             <label className="text-[12px] text-[var(--ink-50)]">Rows</label>
-            <div className="inline-flex rounded-md border border-[var(--edge-firm)] overflow-hidden text-[12px]">
+            <div className="inline-flex rounded-md bg-[var(--surface-sunken)] overflow-hidden text-[12px]">
               <button
                 onClick={() => setRowMode('auto')}
                 data-testid="sheet-ai-rowmode-auto"
@@ -267,7 +267,7 @@ export default function SheetAiFill({
                 min={1}
                 value={rowCount}
                 onChange={(e) => setRowCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-                className="w-20 bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-2 py-1 text-[12px] focus:border-accent"
+                className="fb-field w-20 bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
               />
             )}
             {rowMode === 'auto' && (
@@ -329,7 +329,7 @@ export default function SheetAiFill({
                 <button
                   onClick={() => void generateRows()}
                   disabled={busy}
-                  className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+                  className="fb-btn-surface text-[12px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]"
                 >
                   Regenerate
                 </button>

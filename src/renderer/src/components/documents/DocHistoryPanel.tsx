@@ -120,7 +120,7 @@ export function DocHistoryPanelHost(): JSX.Element | null {
                   <button
                     onClick={() => void restore(snap.id)}
                     disabled={busyId !== null}
-                    className="text-[11px] px-2 py-1 rounded border border-[var(--edge-firm)] text-[var(--ink-70)] hover:border-accent hover:text-accent disabled:opacity-50"
+                    className="fb-btn-surface text-[11px] px-2 py-1 text-[var(--ink-70)] hover:border-accent hover:text-accent disabled:opacity-50"
                     data-testid="doc-history-restore"
                   >
                     {busyId === snap.id ? 'Restoring…' : 'Restore'}

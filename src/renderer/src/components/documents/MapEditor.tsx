@@ -950,7 +950,7 @@ function AiMapPanel({
           }}
           rows={4}
           placeholder="e.g. The customer onboarding process from signup to first value, with an approval step"
-          className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-2 py-1.5 text-[12px] focus:border-accent"
+          className="fb-field w-full px-2 py-1.5 text-[12px]"
         />
         {error && <div className="text-[11px] text-red-600 dark:text-red-400">{error}</div>}
         <div className="flex items-center justify-end gap-2">

@@ -118,7 +118,7 @@ export function PinnedDeskWidget({
         <button
           onClick={onAddAnother}
           data-testid="home-pinned-desk-add"
-          className="mt-2 flex w-full items-center gap-3 rounded-[10px] border border-dashed border-[var(--edge-firm)] px-3 py-2.5 text-left text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+          className="fb-btn-surface mt-2 flex w-full items-center gap-3 border-dashed px-3 py-2.5 text-left text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-[var(--edge-soft)] shrink-0">
             <Icon name="add" size={16} />
@@ -226,7 +226,7 @@ export function AppLauncherWidget(): JSX.Element {
           title="Add app"
           aria-label="Add app"
           data-testid="home-app-launcher-add"
-          className="h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+          className="fb-btn-surface h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 border-dashed text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
         >
           <Icon name="add" size={18} />
           <span className="text-[9px] font-medium">Add app</span>
@@ -505,7 +505,7 @@ export function ShortcutsWidget({
         title="Add shortcut"
         aria-label="Add shortcut"
         data-testid="home-shortcuts-add"
-        className="h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+        className="fb-btn-surface h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 border-dashed text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
       >
         <Icon name="add" size={18} />
         <span className="text-[9px] font-medium">Add</span>
@@ -514,7 +514,7 @@ export function ShortcutsWidget({
       <button
         onClick={openComposer}
         data-testid="home-shortcuts-add"
-        className="flex items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[var(--edge-firm)] px-2.5 py-2 text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+        className="fb-btn-surface flex items-center justify-center gap-1.5 border-dashed px-2.5 py-2 text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
       >
         <Icon name="add" size={15} />
         <span className="text-[11.5px] font-medium">Add shortcut</span>

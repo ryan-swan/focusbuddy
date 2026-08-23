@@ -116,7 +116,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }): JSX.Element {
       <div className="space-y-1">
         {rows.map((r) => (
           <div key={r.keys + r.label} className="flex items-baseline gap-3">
-            <kbd className="shrink-0 min-w-[64px] text-center px-1.5 py-0.5 rounded border border-[var(--edge-firm)] bg-[var(--surface-sunken)] text-[11px] font-mono text-[var(--ink-70)]">
+            <kbd className="shrink-0 min-w-[64px] text-center px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[11px] font-mono text-[var(--ink-70)]">
               {r.keys}
             </kbd>
             <span className="text-[12.5px] text-[var(--ink-70)] leading-relaxed">{r.label}</span>

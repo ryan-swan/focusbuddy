@@ -57,7 +57,7 @@ export default function RelationConfigEditor({
         onChange={(e) =>
           onChange({ ...config, tableId: e.target.value || null, displayColumnId: null })
         }
-        className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1"
+        className="fb-field w-full text-[11px] px-1.5 py-1"
       >
         <option value="">— pick a table —</option>
         {candidates.map((t) => (
@@ -76,7 +76,7 @@ export default function RelationConfigEditor({
             onChange={(e) =>
               onChange({ ...config, displayColumnId: e.target.value || null })
             }
-            className="w-full text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1"
+            className="fb-field w-full text-[11px] px-1.5 py-1"
           >
             <option value="">(auto — first text column)</option>
             {target.schema.columns

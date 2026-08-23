@@ -95,13 +95,13 @@ export default function CropDialog({
         <div className="flex items-center gap-2 mt-3 justify-end">
           <button
             onClick={() => setWin({ x: 0, y: 0, w: boxW, h: boxH })}
-            className="text-[12px] px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+            className="fb-btn-surface text-[12px] px-2 py-1 hover:bg-[var(--surface-sunken)]"
           >
             Reset
           </button>
           <button
             onClick={onClose}
-            className="text-[12px] px-2 py-1 rounded border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]"
+            className="fb-btn-surface text-[12px] px-2 py-1 hover:bg-[var(--surface-sunken)]"
           >
             Cancel
           </button>

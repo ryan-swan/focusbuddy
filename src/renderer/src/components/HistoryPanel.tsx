@@ -211,7 +211,7 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
                 <button
                   onClick={() => void branch()}
                   disabled={busy}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-[var(--edge-firm)] text-[var(--ink-70)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-60"
+                  className="fb-btn-surface inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[var(--ink-70)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-60"
                   data-testid="history-branch"
                 >
                   <Icon name="alt_route" size={14} />

@@ -53,7 +53,7 @@ export default function ImageWidget({ widget, inline = false }: Props): JSX.Elem
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="https://…/image.png"
-            className="bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded px-3 py-2 text-sm focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-soft)]"
+            className="fb-field bg-[var(--surface-raised)] px-3 py-2 text-sm"
           />
           <div className="flex justify-end pt-1">
             <button type="submit" className="btn-primary">

@@ -330,7 +330,7 @@ export default function ColumnsView({ taskId, widgets }: { taskId: string; widge
           <button
             onClick={addColumn}
             data-testid="columns-add"
-            className="ml-2 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-dashed border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)]"
+            className="fb-btn-surface ml-2 inline-flex items-center gap-1 h-7 px-2.5 border-dashed text-[12px] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)]"
           >
             <Icon name="add" size={14} /> Add column
           </button>

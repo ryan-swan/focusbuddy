@@ -176,7 +176,7 @@ export default function EmailTaskDialog({ email, onClose, onCreated }: Props): J
         {error && <div className="text-[12px] text-red-600 dark:text-red-400">{error}</div>}
 
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] text-[var(--ink-70)]">
+          <button onClick={onClose} className="fb-btn-surface text-[12px] px-3 py-1.5 text-[var(--ink-70)]">
             Cancel
           </button>
           <button onClick={() => void submit()} disabled={busy} className="btn-primary text-[12px] px-3 py-1.5" data-testid="email-task-create">

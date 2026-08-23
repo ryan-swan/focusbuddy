@@ -63,7 +63,7 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
                 <Icon name="image" size={20} className="text-[var(--ink-30)]" />
               )}
             </div>
-            <button onClick={() => void pickLogo()} data-testid="brand-pick-logo" className="text-[12px] px-2.5 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:border-accent">
+            <button onClick={() => void pickLogo()} data-testid="brand-pick-logo" className="fb-btn-surface text-[12px] px-2.5 py-1.5 hover:border-accent">
               {draft.logoUrl ? 'Replace' : 'Upload'}
             </button>
             {draft.logoUrl && (
@@ -98,7 +98,7 @@ export default function BrandKitModal({ onClose }: { onClose: () => void }): JSX
         )}
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="text-[13px] px-3 py-1.5 rounded-lg border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)]">
+          <button onClick={onClose} className="fb-btn-surface text-[13px] px-3 py-1.5 hover:bg-[var(--surface-sunken)]">
             Cancel
           </button>
           <button onClick={() => void onSave()} disabled={saving} data-testid="brand-save" className="btn-primary text-[13px] px-4 py-1.5 disabled:opacity-50">
@@ -115,8 +115,8 @@ function ColorField({ label, value, onChange, testid }: { label: string; value: 
     <label className="block">
       <span className="text-[11px] text-[var(--ink-50)]">{label}</span>
       <div className="mt-1 flex items-center gap-2">
-        <input type="color" value={value.startsWith('#') ? value : '#000000'} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="w-9 h-8 rounded border border-[var(--edge-firm)] cursor-pointer" />
-        <input value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 min-w-0 rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1 text-[12px] fb-tabular" />
+        <input type="color" value={value.startsWith('#') ? value : '#000000'} data-testid={testid} onChange={(e) => onChange(e.target.value)} className="fb-field w-9 h-8 cursor-pointer" />
+        <input value={value} onChange={(e) => onChange(e.target.value)} className="fb-field flex-1 min-w-0 px-2 py-1 text-[12px] fb-tabular" />
       </div>
     </label>
   )
@@ -134,7 +134,7 @@ function FontField({ label, value, onChange, testid }: { label: string; value: s
           loadGoogleFont(e.target.value)
           onChange(fontFamilyValue(e.target.value))
         }}
-        className="mt-1 w-full rounded border border-[var(--edge-firm)] bg-transparent px-2 py-1.5 text-[12px]"
+        className="fb-field mt-1 w-full px-2 py-1.5 text-[12px]"
         style={{ fontFamily: value }}
       >
         {!GOOGLE_FONTS.includes(current) && current !== 'Default' && <option value={current}>{current}</option>}

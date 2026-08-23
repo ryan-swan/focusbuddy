@@ -118,7 +118,7 @@ export default function TaskLinkWidget({ widget, inline = false }: Props): JSX.E
             </button>
             <button
               onClick={openTarget}
-              className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-colors"
+              className="fb-btn-surface inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] transition-colors"
               title="Open this task"
             >
               <Icon name="arrow_forward" size={11} />

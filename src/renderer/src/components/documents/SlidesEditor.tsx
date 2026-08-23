@@ -750,7 +750,7 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
               onChange={(e) => mutateSlide((s) => ({ ...s, notes: e.target.value }))}
               rows={2}
               placeholder="What to actually say on this slide"
-              className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:border-accent resize-none"
+              className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-none"
             />
           </div>
         </div>

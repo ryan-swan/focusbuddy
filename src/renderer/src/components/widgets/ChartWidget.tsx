@@ -315,7 +315,7 @@ function ChartConfigPanel({
   onChange: (next: ChartConfig) => void
 }): JSX.Element {
   const selectCls =
-    'text-[11px] bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded px-1.5 py-1 text-[var(--ink-100)] focus:border-accent'
+    'text-[11px] bg-[var(--surface-sunken)] rounded px-1.5 py-1 text-[var(--ink-100)] focus:border-accent'
 
   return (
     <div className="shrink-0 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 px-2.5 py-2 space-y-2">
@@ -336,7 +336,7 @@ function ChartConfigPanel({
         </select>
 
         <label className="text-[10px] uppercase tracking-wider text-[var(--ink-40)] ml-1">Type</label>
-        <div className="inline-flex rounded-md border border-[var(--edge-firm)] overflow-hidden">
+        <div className="inline-flex rounded-md bg-[var(--surface-sunken)] overflow-hidden">
           {CHART_TYPES.map((t) => (
             <button
               key={t}

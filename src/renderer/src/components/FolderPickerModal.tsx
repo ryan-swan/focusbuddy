@@ -106,7 +106,7 @@ export default function FolderPickerModal({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search folders"
               data-testid="folder-picker-search"
-              className="w-full h-8 pl-7 pr-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12.5px] focus:border-[rgb(var(--accent)/0.6)]"
+              className="fb-field w-full h-8 pl-7 pr-2 text-[12.5px]"
             />
           </div>
         </div>
@@ -181,12 +181,12 @@ export default function FolderPickerModal({
                 if (e.key === 'Enter') void createHere()
               }}
               placeholder="New folder name"
-              className="flex-1 h-8 px-2 rounded-md border border-[var(--edge-firm)] bg-[var(--surface-base)] text-[12px] focus:border-[rgb(var(--accent)/0.6)]"
+              className="fb-field flex-1 h-8 px-2 text-[12px]"
             />
             <button
               onClick={() => void createHere()}
               disabled={!newName.trim() || creating}
-              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-[var(--edge-firm)] text-[12px] text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-40"
+              className="fb-btn-surface inline-flex items-center gap-1 h-8 px-2.5 text-[12px] text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-40"
             >
               <Icon name="create_new_folder" size={14} /> Create
             </button>

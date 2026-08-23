@@ -16,7 +16,7 @@ export default function KnockOverlay(): JSX.Element | null {
 
   return (
     <div
-      className="fixed top-4 right-4 z-[60] w-80 rounded-xl bg-[var(--surface-raised)] border border-[var(--edge-firm)] shadow-2xl overflow-hidden"
+      className="fb-glass-panel rounded-[var(--radius-card)] fb-pop-in fixed top-4 right-4 z-[60] w-80 overflow-hidden"
       data-testid="knock-incoming"
     >
       <div className="px-4 py-3 flex items-start gap-2.5">

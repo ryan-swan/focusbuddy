@@ -130,7 +130,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
             }}
             placeholder="e.g. Track my freelance clients with status and contact info, plus a notes page for each project"
             rows={3}
-            className="w-full bg-[var(--surface-sunken)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:border-accent resize-none"
+            className="fb-field w-full px-3 py-2 text-sm text-[var(--ink-100)] resize-none"
           />
           <div className="flex items-center justify-between mt-2">
             <span className="text-[10px] text-[var(--ink-40)]">
@@ -252,7 +252,7 @@ export default function AiBuilderDialog({ taskId, onClose, onAccept }: Props): J
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="text-[12px] px-3 py-1.5 rounded border border-[var(--edge-firm)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+                className="fb-btn-surface text-[12px] px-3 py-1.5 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
               >
                 Cancel
               </button>

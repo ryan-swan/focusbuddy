@@ -85,7 +85,7 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
             onChange={(e) => setAttendees(e.target.value)}
             placeholder="alex@acme.com, sam@acme.com"
             rows={2}
-            className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm resize-none"
+            className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm resize-none"
             data-testid="launch-attendees"
           />
         </label>
@@ -123,7 +123,7 @@ export default function MeetingLaunchDialog(): JSX.Element | null {
             <select
               value={afterAccess}
               onChange={(e) => setAfterAccess(e.target.value as MeetingAfterAccess)}
-              className="mt-1 w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-2 py-1.5 text-sm"
+              className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-2 py-1.5 text-sm"
               data-testid="launch-after-access"
             >
               <option value="downgrade-view">Make it read-only</option>

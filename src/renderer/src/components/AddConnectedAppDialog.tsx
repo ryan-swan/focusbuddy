@@ -204,7 +204,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search apps…"
-                  className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md pl-7 pr-3 py-1.5 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
+                  className="fb-field w-full bg-[var(--surface-raised)] pl-7 pr-3 py-1.5 text-sm text-[var(--ink-100)]"
                 />
               </div>
 
@@ -264,7 +264,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                   value={customUrl}
                   onChange={(e) => setCustomUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
+                  className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-100)]"
                 />
               </div>
               <div>
@@ -276,7 +276,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
                   placeholder={customUrl ? hostnameOf(ensureHttps(customUrl)) : 'My App'}
-                  className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
+                  className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-100)]"
                 />
               </div>
               <button
@@ -370,7 +370,7 @@ export default function AddConnectedAppDialog({ onClose, onAdded }: Props): JSX.
                       type="text"
                       value={localTitle}
                       onChange={(e) => setLocalTitle(e.target.value)}
-                      className="w-full bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-md px-3 py-2 text-sm text-[var(--ink-100)] focus:outline-none focus:border-[var(--edge-firm)] focus:ring-2 focus:ring-[var(--edge-firm)]"
+                      className="fb-field w-full bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-100)]"
                     />
                   </div>
                   <button
