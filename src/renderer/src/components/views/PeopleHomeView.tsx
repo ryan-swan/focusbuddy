@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from '../Icon'
-import { DashboardHeader, StatTile, RailCard } from '../plexi'
+import { DashboardHeader, ListRow, StatTile, StatusPill, RailCard } from '../plexi'
 import { useAccountStore } from '../../stores/account'
 import { useViewStore } from '../../stores/view'
 import { usePresenceStore, type PresenceStatus } from '../../stores/presence'
@@ -22,12 +22,14 @@ import { personDisplayName, personInitials, personFirstName } from '../../lib/pe
 // birthdate and no start date, so any such card would have to be fabricated.
 // Rather than show empty fake cards we leave them out entirely.
 
-const STATUS_META: Record<PresenceStatus, { label: string; dot: string; text: string }> = {
-  online: { label: 'Online', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
-  away: { label: 'Away', dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
-  focus: { label: 'In focus', dot: 'bg-violet-500', text: 'text-violet-600 dark:text-violet-400' },
-  busy: { label: 'Busy', dot: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400' },
-  offline: { label: 'Offline', dot: 'bg-stone-400', text: 'text-[var(--ink-50)]' }
+// Labels + avatar-dot colors only; the status chip itself is StatusPill, whose
+// PILL map is the one source of presence tones.
+const STATUS_META: Record<PresenceStatus, { label: string; dot: string }> = {
+  online: { label: 'Online', dot: 'bg-emerald-500' },
+  away: { label: 'Away', dot: 'bg-amber-500' },
+  focus: { label: 'In focus', dot: 'bg-violet-500' },
+  busy: { label: 'Busy', dot: 'bg-rose-500' },
+  offline: { label: 'Offline', dot: 'bg-stone-400' }
 }
 
 const AV_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
@@ -72,15 +74,16 @@ function statusRank(s: PresenceStatus): number {
 
 // One row in the directory. Real member only: handle, role/title/department, the
 // real live presence dot, and their office if one is set.
-function MemberRow({ person }: { person: MapPerson }): JSX.Element {
+function MemberRow({ person, enterDelay }: { person: MapPerson; enterDelay: number }): JSX.Element {
   const meta = STATUS_META[person.liveStatus]
   const sub =
     [person.title, person.department].filter(Boolean).join(' · ') ||
     (person.role === 'guest' ? 'Guest' : person.role)
   return (
-    <div
+    <ListRow
+      className="px-3 py-2 fb-fade-in-up"
+      style={{ animationDelay: `${enterDelay}ms` }}
       data-testid="people-member-row"
-      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--surface-sunken)] transition-colors"
     >
       <span className="relative shrink-0">
         <Avatar seed={person.handle} name={personDisplayName(person, person.handle)} photoUrl={person.photoUrl} />
@@ -89,20 +92,16 @@ function MemberRow({ person }: { person: MapPerson }): JSX.Element {
         />
       </span>
       <span className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-[var(--ink-100)] truncate">
+        <div className="fb-t-body font-medium text-[var(--ink-100)] truncate">
           {personDisplayName(person, person.handle)}
           {person.isSelf && <span className="text-[var(--ink-50)] font-normal"> (you)</span>}
         </div>
-        <div className="text-[11.5px] text-[var(--ink-50)] truncate">{sub}</div>
+        <div className="fb-t-caption truncate">{sub}</div>
       </span>
-      <span
-        data-testid="people-member-status"
-        className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-medium ${meta.text}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-        {meta.label}
+      <span className="shrink-0" data-testid="people-member-status">
+        <StatusPill tone={person.liveStatus} label={meta.label} />
       </span>
-    </div>
+    </ListRow>
   )
 }
 
@@ -188,7 +187,14 @@ export default function PeopleHomeView(): JSX.Element {
       />
     )
   } else if (loading && !data) {
-    emptyBody = <Empty title="Loading your team…" body="Fetching members and live presence." />
+    emptyBody = (
+      <div className="fb-card px-4 py-4 space-y-3" data-testid="people-loading">
+        <div className="fb-skeleton h-9 w-1/2" />
+        <div className="fb-skeleton h-9" />
+        <div className="fb-skeleton h-9" />
+        <div className="fb-skeleton h-9 w-3/4" />
+      </div>
+    )
   } else if (error) {
     emptyBody = <Empty title="Could not load your team" body={error} action={{ label: 'Try again', onClick: refresh }} />
   } else if (!data || data.people.length === 0) {
@@ -212,7 +218,7 @@ export default function PeopleHomeView(): JSX.Element {
             <>
               {orgs.filter((o) => !o.personal).length > 1 && (
                 <select
-                  className="text-[12px] bg-transparent text-[var(--ink-90)] border border-[var(--edge-soft)] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[rgb(var(--accent))]"
+                  className="fb-field fb-t-label !w-auto !py-1.5"
                   value={orgId ?? ''}
                   onChange={(e) => setOrgId(e.target.value || null)}
                   data-testid="people-org"
@@ -228,7 +234,7 @@ export default function PeopleHomeView(): JSX.Element {
                 <button
                   onClick={goPeopleMap}
                   data-testid="people-open-map"
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--edge-soft)] hover:border-[rgb(var(--accent)/0.5)] text-[12px] font-medium text-[var(--ink-90)] transition-colors"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-90)]"
                 >
                   <Icon name="travel_explore" size={15} />
                   Organisation map
@@ -241,7 +247,7 @@ export default function PeopleHomeView(): JSX.Element {
         {/* Team status — real presence counts only. Total People is the real
             member count. Each tile is computed from the live merge, so an empty
             org reads zero rather than a fabricated headcount. */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6" data-testid="people-status">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 fb-fade-in-up" data-testid="people-status">
           <StatTile icon="groups" label="Total people" value={counts.total} tone="accent" />
           <StatTile icon="bolt" label="Online" value={counts.online} tone="emerald" />
           <StatTile icon="schedule" label="Away or busy" value={counts.away} tone="amber" />
@@ -255,24 +261,24 @@ export default function PeopleHomeView(): JSX.Element {
             <div className="lg:col-span-2">
               <RailCard title="People directory" icon="badge" tone="accent">
                 <div className="mb-2">
-                  <div className="flex items-center gap-2 h-9 px-3 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-base)]">
+                  <div className="fb-field flex items-center gap-2 h-9 !py-0">
                     <Icon name="search" size={15} className="text-[var(--ink-50)]" />
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search people by name, role or team"
                       data-testid="people-directory-search"
-                      className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
+                      className="flex-1 bg-transparent fb-t-body text-[var(--ink-100)] placeholder:text-[var(--ink-40)] focus:outline-none"
                     />
                   </div>
                 </div>
                 <div data-testid="people-directory">
                   {directory.length === 0 ? (
-                    <div className="px-3 py-6 text-[12px] text-[var(--ink-50)] text-center">
+                    <div className="px-3 py-6 fb-t-label text-[var(--ink-50)] text-center">
                       No one matches that search.
                     </div>
                   ) : (
-                    directory.map((p) => <MemberRow key={p.accountId} person={p} />)
+                    directory.map((p, i) => <MemberRow key={p.accountId} person={p} enterDelay={Math.min(i * 25, 250)} />)
                   )}
                 </div>
               </RailCard>
@@ -281,7 +287,7 @@ export default function PeopleHomeView(): JSX.Element {
             <div className="flex flex-col gap-4">
               <RailCard title="Around right now" icon="bolt" tone="emerald">
                 {counts.online === 0 ? (
-                  <div className="text-[12px] text-[var(--ink-50)]">No one is online right now.</div>
+                  <div className="fb-t-label text-[var(--ink-50)]">No one is online right now.</div>
                 ) : (
                   <div className="flex flex-col gap-0.5">
                     {directory
@@ -295,7 +301,7 @@ export default function PeopleHomeView(): JSX.Element {
                               className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface-raised)] ${STATUS_META[p.liveStatus].dot}`}
                             />
                           </span>
-                          <span className="min-w-0 flex-1 text-[12px] text-[var(--ink-90)] truncate">
+                          <span className="min-w-0 flex-1 fb-t-label text-[var(--ink-90)] truncate">
                             {p.liveWorkingOn || personDisplayName(p, p.handle)}
                           </span>
                         </div>
@@ -306,13 +312,13 @@ export default function PeopleHomeView(): JSX.Element {
 
               {mapEnabled && (
                 <RailCard title="Organisation map" icon="account_tree" tone="violet">
-                  <p className="text-[12px] text-[var(--ink-70)] leading-snug mb-2.5">
+                  <p className="fb-t-label text-[var(--ink-70)] leading-snug mb-2.5">
                     See everyone by office and reporting line, with their local day and who is reachable now.
                   </p>
                   <button
                     onClick={goPeopleMap}
                     data-testid="people-orgmap"
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-accent hover:underline"
+                    className="inline-flex items-center gap-1.5 fb-t-label text-accent hover:underline fb-press"
                   >
                     Open the organisation map
                     <Icon name="arrow_forward" size={14} />
@@ -337,16 +343,16 @@ function Empty({
   action?: { label: string; onClick: () => void }
 }): JSX.Element {
   return (
-    <div className="rounded-2xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-6 py-10 text-center">
-      <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[rgb(var(--accent)/0.1)] text-[rgb(var(--accent))] mb-3">
+    <div className="fb-card px-6 py-10 text-center">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-[var(--radius-row)] bg-[rgb(var(--accent)/0.1)] text-[rgb(var(--accent))] mb-3">
         <Icon name="groups" size={24} />
       </div>
-      <h2 className="text-[16px] font-semibold text-[var(--ink-100)]">{title}</h2>
-      <p className="mt-1 text-[13px] text-[var(--ink-50)] max-w-md mx-auto leading-relaxed">{body}</p>
+      <h2 className="fb-t-title text-[var(--ink-100)]">{title}</h2>
+      <p className="mt-1 fb-t-body text-[var(--ink-50)] max-w-md mx-auto leading-relaxed">{body}</p>
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[rgb(var(--accent))] text-white text-[12.5px] font-medium"
+          className="mt-4 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] bg-accent !text-white fb-t-label fb-press hover:bg-[rgb(var(--accent-hover))]"
         >
           {action.label}
         </button>
