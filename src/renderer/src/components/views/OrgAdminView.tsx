@@ -401,7 +401,7 @@ export default function OrgAdminView(): JSX.Element {
                           value={m.role}
                           onChange={(e) => void doRole(m.accountId, e.target.value as OrgRole)}
                           data-testid={`org-role-${m.accountId}`}
-                          className="fb-field text-[12px] px-1.5 py-0.5"
+                          className="fb-field w-auto text-[12px] px-1.5 py-0.5"
                         >
                           {ROLE_OPTIONS.map((r) => (
                             <option key={r} value={r}>
@@ -503,7 +503,7 @@ export default function OrgAdminView(): JSX.Element {
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as OrgRole)}
-                  className="fb-field text-[12px] px-1.5 py-1"
+                  className="fb-field w-auto text-[12px] px-1.5 py-1"
                 >
                   <option value="admin">admin</option>
                   <option value="member">member</option>

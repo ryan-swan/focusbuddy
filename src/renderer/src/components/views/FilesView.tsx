@@ -362,7 +362,7 @@ function Toolbar({ onNewFolder, onAddFiles, onImportFolder, onAddDoc }: { onNewF
           <select
             value={sortKey}
             onChange={(e) => setSort(e.target.value as FileSortKey)}
-            className="fb-field h-8 text-[12px] px-2 text-[var(--ink-70)]"
+            className="fb-field w-auto h-8 text-[12px] px-2 text-[var(--ink-70)]"
             title="Sort by"
             data-testid="files-sort-select"
           >

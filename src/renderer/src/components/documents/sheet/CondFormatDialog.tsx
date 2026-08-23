@@ -127,7 +127,7 @@ export default function CondFormatDialog({ range, rules, onAdd, onRemove, onClos
                 value={op}
                 onChange={(e) => setOp(e.target.value as SheetCondOp)}
                 data-testid="condformat-op"
-                className="fb-field text-[12px] px-2 py-1.5"
+                className="fb-field w-auto text-[12px] px-2 py-1.5"
               >
                 {OPS.map((o) => (
                   <option key={o.op} value={o.op}>

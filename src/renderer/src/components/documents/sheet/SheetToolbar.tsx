@@ -61,7 +61,7 @@ export default function SheetToolbar(props: Props): JSX.Element {
   const btn =
     'h-7 min-w-7 px-1 inline-flex items-center justify-center rounded text-[13px] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-40'
   const Divider = (): JSX.Element => <div className="w-px h-5 bg-[var(--edge-soft)] mx-0.5" />
-  const sel = 'fb-field h-7 text-[11px] px-1 text-[var(--ink-70)]'
+  const sel = 'fb-field w-auto h-7 text-[11px] px-1 text-[var(--ink-70)]'
 
   return (
     <div ref={ref} className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--edge-soft)]" data-testid="sheet-toolbar">

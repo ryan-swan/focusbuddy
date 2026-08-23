@@ -861,7 +861,7 @@ export default function MessagesView(): JSX.Element {
                     onChange={(e) => setTranslateLang(e.target.value)}
                     title="Translate messages to"
                     data-testid="messages-translate-lang"
-                    className="fb-field h-8 text-[12px] text-[var(--ink-70)] px-1.5 hover:bg-[var(--surface-sunken)]"
+                    className="fb-field w-auto h-8 text-[12px] text-[var(--ink-70)] px-1.5 hover:bg-[var(--surface-sunken)]"
                   >
                     {['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Hindi', 'Arabic']
                       .concat(
@@ -1808,7 +1808,7 @@ export function SchedulesPanel({ conversationId, onClose }: { conversationId: st
               value={recurrence}
               onChange={(e) => setRecurrence(e.target.value as 'daily' | 'weekly' | 'monthly')}
               data-testid="schedule-recurrence"
-              className="fb-field px-2 py-1 text-[12px] text-[var(--ink-90)]"
+              className="fb-field w-auto px-2 py-1 text-[12px] text-[var(--ink-90)]"
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>

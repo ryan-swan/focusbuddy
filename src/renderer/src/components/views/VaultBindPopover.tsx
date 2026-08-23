@@ -183,14 +183,14 @@ export default function VaultBindPopover({ app, onClose }: Props): JSX.Element {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="username or email"
-            className="fb-field text-[12px] px-2 py-1.5 bg-[var(--surface-raised)]"
+            className="fb-field w-auto text-[12px] px-2 py-1.5 bg-[var(--surface-raised)]"
           />
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="password"
-            className="fb-field text-[12px] px-2 py-1.5 bg-[var(--surface-raised)]"
+            className="fb-field w-auto text-[12px] px-2 py-1.5 bg-[var(--surface-raised)]"
           />
           <div className="flex gap-2 justify-end">
             <button

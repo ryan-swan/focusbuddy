@@ -521,7 +521,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={placeholder}
-            className="fb-field bg-[var(--surface-raised)] px-3 py-2 text-sm"
+            className="fb-field w-auto bg-[var(--surface-raised)] px-3 py-2 text-sm"
           />
           <p className="text-[11px] text-[var(--ink-70)]">
             {entry?.hint ?? 'Renders inside a focused browser tab — no other tabs allowed.'}

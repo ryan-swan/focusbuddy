@@ -2057,7 +2057,7 @@ function LookupDialog({
   const [returnCol, setReturnCol] = useState('2')
   const [ifMissing, setIfMissing] = useState('')
   const field =
-    'fb-field text-[12px] px-2 py-1.5'
+    'fb-field w-auto text-[12px] px-2 py-1.5'
   return (
     <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
       <div
@@ -2326,7 +2326,7 @@ function QueryPanel({
   }
 
   const needsCol = kind === 'filter' || kind === 'sort' || kind === 'removeColumns' || kind === 'keepColumns' || kind === 'rename' || kind === 'trim' || kind === 'changeCase'
-  const sel = 'fb-field h-7 text-[12px] px-1.5 text-[var(--ink-70)]'
+  const sel = 'fb-field w-auto h-7 text-[12px] px-1.5 text-[var(--ink-70)]'
 
   return (
     <div className="fb-scrim absolute inset-0 z-40 flex items-center justify-center" onMouseDown={onClose}>
