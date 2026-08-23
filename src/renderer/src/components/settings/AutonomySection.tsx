@@ -38,17 +38,17 @@ function LevelPicker({
             key={o.label}
             onClick={() => onPick(o.v)}
             data-testid={`${testid}-${o.v ?? 'inherit'}`}
-            className={`text-left px-3 py-2 rounded-lg border text-[12px] transition-colors ${
+            className={`text-left px-3 py-2 rounded-[var(--radius-field)] border text-[12px] transition-colors ${
               active
-                ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
-                : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
+                : 'border-[var(--edge-hairline)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] fb-press'
             }`}
           >
             <div className="font-medium flex items-center gap-1.5">
               {active && <Icon name="check" size={13} className="text-accent" />}
               {o.label}
             </div>
-            {o.v && <div className="text-[11px] text-[var(--ink-50)] mt-0.5">{autonomyDescription(o.v)}</div>}
+            {o.v && <div className="fb-t-caption text-[var(--ink-50)] mt-0.5">{autonomyDescription(o.v)}</div>}
           </button>
         )
       })}
@@ -90,10 +90,10 @@ export default function AutonomySection(): JSX.Element {
       </div>
 
       {/* Effective level readout — makes the interaction of the scopes visible. */}
-      <div className="rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-3" data-testid="autonomy-effective">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold">In effect now</div>
+      <div className="rounded-[var(--radius-card)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)] p-3" data-testid="autonomy-effective">
+        <div className="fb-t-caption uppercase tracking-[0.14em] text-[var(--ink-50)] font-semibold">In effect now</div>
         <div className="text-[13px] text-[var(--ink-100)] mt-1 font-medium">{autonomyLabel(resolved.level)}</div>
-        <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
+        <div className="fb-t-caption text-[var(--ink-50)] mt-0.5">
           Set at the {resolved.source.replace('-', ' ')} level
           {resolved.cappedByOrg ? ', capped by your organisation.' : '.'}
         </div>
@@ -101,7 +101,7 @@ export default function AutonomySection(): JSX.Element {
 
       {/* System-wide choice (this user, all their assistants). */}
       <div>
-        <div className="text-[11px] text-[var(--ink-70)] mb-1.5 font-medium">Your default (all assistants)</div>
+        <div className="fb-t-caption text-[var(--ink-70)] mb-1.5 font-medium">Your default (all assistants)</div>
         <LevelPicker
           value={store.systemChoice}
           onPick={(v) => void store.setSystemChoice(v)}
@@ -114,10 +114,10 @@ export default function AutonomySection(): JSX.Element {
       {store.inSharedOrg ? (
         store.canEditOrg ? (
           <div>
-            <div className="text-[11px] text-[var(--ink-70)] mb-1.5 font-medium">
+            <div className="fb-t-caption text-[var(--ink-70)] mb-1.5 font-medium">
               Organisation ceiling (applies to everyone)
             </div>
-            <p className="text-[11px] text-[var(--ink-50)] mb-1.5">
+            <p className="fb-t-caption text-[var(--ink-50)] mb-1.5">
               No member's assistant may exceed this level.
             </p>
             <LevelPicker
@@ -125,11 +125,11 @@ export default function AutonomySection(): JSX.Element {
               onPick={(v) => void saveOrg({ ceiling: v })}
               testid="autonomy-org-ceiling"
             />
-            {orgMsg && <div className="text-[11px] text-red-500 mt-1.5">{orgMsg}</div>}
+            {orgMsg && <div className="fb-t-caption text-rose-500 mt-1.5">{orgMsg}</div>}
           </div>
         ) : (
-          <div className="rounded-lg border border-[var(--edge-soft)] p-3" data-testid="autonomy-org-readonly">
-            <div className="text-[11px] text-[var(--ink-70)] font-medium">Organisation policy</div>
+          <div className="rounded-[var(--radius-field)] border border-[var(--edge-soft)] p-3" data-testid="autonomy-org-readonly">
+            <div className="fb-t-caption text-[var(--ink-70)] font-medium">Organisation policy</div>
             <div className="text-[12px] text-[var(--ink-60)] mt-1">
               {store.orgPolicyPresent
                 ? `Your organisation caps autonomy at “${autonomyLabel(store.orgCeiling ?? 'auto')}”.`
@@ -138,7 +138,7 @@ export default function AutonomySection(): JSX.Element {
           </div>
         )
       ) : (
-        <div className="text-[11px] text-[var(--ink-40)]">
+        <div className="fb-t-caption text-[var(--ink-40)]">
           Join or switch to a shared organisation to see or set an organisation-wide policy.
         </div>
       )}

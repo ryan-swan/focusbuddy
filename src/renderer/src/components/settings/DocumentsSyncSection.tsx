@@ -17,7 +17,7 @@ export default function DocumentsSyncSection(): JSX.Element {
 
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
-      <div className="text-[11px] uppercase tracking-wider text-[var(--ink-40)]">Documents sync</div>
+      <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-40)]">Documents sync</div>
       <label className="flex items-center justify-between py-1 cursor-pointer">
         <span className="text-xs text-[var(--ink-70)]">
           Sync documents to your account <span className="text-[var(--ink-40)]">(on by default)</span>
@@ -27,10 +27,10 @@ export default function DocumentsSyncSection(): JSX.Element {
           data-testid="settings-clouddocs-toggle"
           checked={on}
           onChange={(e) => toggle(e.target.checked)}
-          className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
+          className="h-3.5 w-3.5 accent-accent cursor-pointer"
         />
       </label>
-      <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
+      <p className="fb-t-caption text-[var(--ink-50)] leading-relaxed">
         {on
           ? signedIn
             ? 'Your documents sync across PlexiDesk and PlexiOffice. Local copies stay on this device too.'

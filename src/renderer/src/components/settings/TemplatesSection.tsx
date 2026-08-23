@@ -42,10 +42,10 @@ export default function TemplatesSection(): JSX.Element {
       className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2"
       data-testid="settings-section-templates"
     >
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
         Templates
       </div>
-      <p className="text-[11px] text-[var(--ink-50)] leading-snug">
+      <p className="fb-t-caption text-[var(--ink-50)] leading-snug">
         {canApply
           ? 'Apply a template to spawn its widgets onto the task you have open.'
           : 'Open a task first — templates apply to the task you have open.'}
@@ -59,7 +59,7 @@ export default function TemplatesSection(): JSX.Element {
             disabled={!canApply || busyId === tpl.id}
             onClick={() => void apply(tpl.id)}
             data-testid={`settings-template-${tpl.id}`}
-            className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-[var(--surface-sunken)] text-left disabled:cursor-not-allowed"
+            className="group w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] hover:bg-[var(--surface-sunken)] text-left disabled:cursor-not-allowed"
             title={
               tpl.description
                 ? `${tpl.description}\n\nApply to the active task.`
@@ -71,12 +71,12 @@ export default function TemplatesSection(): JSX.Element {
               <div className="text-[12px] text-[var(--ink-90)] truncate">
                 {tpl.name}
               </div>
-              <div className="text-[9px] text-[var(--ink-50)]">
+              <div className="fb-t-caption text-[var(--ink-50)]">
                 {tpl.widgets.length} widget{tpl.widgets.length === 1 ? '' : 's'}
               </div>
             </div>
             {busyId === tpl.id && (
-              <span className="text-[9px] text-[var(--ink-50)]">Applying…</span>
+              <span className="fb-t-caption text-[var(--ink-50)]">Applying…</span>
             )}
           </button>
         ))}

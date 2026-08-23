@@ -29,13 +29,13 @@ function Toggle({
     <label className="flex items-start justify-between gap-3 py-1.5 cursor-pointer">
       <div className="min-w-0">
         <div className="text-xs text-[var(--ink-70)]">{label}</div>
-        <div className="text-[11px] text-[var(--ink-50)] leading-snug">{desc}</div>
+        <div className="fb-t-caption text-[var(--ink-50)] leading-snug">{desc}</div>
       </div>
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-3.5 w-3.5 accent-violet-600 cursor-pointer shrink-0"
+        className="mt-0.5 h-3.5 w-3.5 accent-accent cursor-pointer shrink-0"
       />
     </label>
   )
@@ -66,11 +66,11 @@ function Slider({
     <div className={`py-1.5 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs text-[var(--ink-70)]">{label}</span>
-        <span className="text-[11px] font-mono text-[var(--ink-50)]">
+        <span className="fb-t-caption font-mono text-[var(--ink-50)]">
           {format(value)}
         </span>
       </div>
-      <div className="text-[11px] text-[var(--ink-50)] leading-snug mb-1">{desc}</div>
+      <div className="fb-t-caption text-[var(--ink-50)] leading-snug mb-1">{desc}</div>
       <input
         type="range"
         min={min}
@@ -78,7 +78,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-1 accent-violet-600 cursor-pointer"
+        className="w-full h-1 accent-accent cursor-pointer"
       />
     </div>
   )
@@ -221,7 +221,7 @@ function NavPreview({ nav }: { nav: NavPrefs }): JSX.Element {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        className="relative h-[120px] w-full rounded-md overflow-hidden cursor-grab active:cursor-grabbing border border-[var(--edge-soft)] touch-none"
+        className="relative h-[120px] w-full rounded-[var(--radius-field)] overflow-hidden cursor-grab active:cursor-grabbing border border-[var(--edge-soft)] touch-none"
         style={{
           backgroundColor: 'rgb(var(--accent) / 0.04)',
           backgroundImage:
@@ -235,7 +235,7 @@ function NavPreview({ nav }: { nav: NavPrefs }): JSX.Element {
           style={{ willChange: 'transform' }}
         />
       </div>
-      <div className="text-[11px] text-[var(--ink-50)] mt-1 text-center">
+      <div className="fb-t-caption text-[var(--ink-50)] mt-1 text-center">
         Flick the dot — it slingshots and glides exactly like your canvas. (Auto-demos when idle.)
       </div>
     </div>
@@ -249,12 +249,12 @@ export default function NavigationSection(): JSX.Element {
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)]">
       <div className="flex items-center justify-between mb-1">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+        <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
           Canvas navigation
         </div>
         <button
           onClick={() => resetNavPrefs()}
-          className="text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-90)] inline-flex items-center gap-0.5"
+          className="fb-t-caption text-[var(--ink-50)] hover:text-[var(--ink-90)] inline-flex items-center gap-0.5"
           title="Reset all navigation settings to defaults"
         >
           <Icon name="restart_alt" size={12} />
@@ -265,7 +265,7 @@ export default function NavigationSection(): JSX.Element {
       <NavPreview nav={nav} />
 
       {/* Click-drag pan */}
-      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
+      <div className="mt-3 fb-t-caption uppercase tracking-wider text-[var(--ink-40)]">
         Click-drag pan
       </div>
       <Toggle
@@ -322,7 +322,7 @@ export default function NavigationSection(): JSX.Element {
       </div>
 
       {/* Edge pan */}
-      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
+      <div className="mt-3 fb-t-caption uppercase tracking-wider text-[var(--ink-40)]">
         Edge pan
       </div>
       <Toggle
@@ -344,7 +344,7 @@ export default function NavigationSection(): JSX.Element {
       />
 
       {/* Trackpad / wheel + zoom */}
-      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--ink-40)]">
+      <div className="mt-3 fb-t-caption uppercase tracking-wider text-[var(--ink-40)]">
         Trackpad &amp; zoom
       </div>
       <Slider

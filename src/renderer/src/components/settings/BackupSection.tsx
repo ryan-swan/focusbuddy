@@ -74,10 +74,10 @@ export default function BackupSection(): JSX.Element {
 
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
         Backup &amp; data
       </div>
-      <p className="text-[11px] text-[var(--ink-50)] leading-snug">
+      <p className="fb-t-caption text-[var(--ink-50)] leading-snug">
         Everything you make is stored in one local database. Export a portable snapshot to keep
         it safe or move it to another machine. The app also keeps automatic snapshots and rotates
         the last seven.
@@ -87,7 +87,7 @@ export default function BackupSection(): JSX.Element {
         <button
           onClick={() => void onExport()}
           disabled={busy !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
         >
           <Icon name="download" size={13} />
           <span>{busy === 'export' ? 'Exporting…' : 'Export a backup'}</span>
@@ -95,14 +95,14 @@ export default function BackupSection(): JSX.Element {
         <button
           onClick={() => void onRestore()}
           disabled={busy !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[11px] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
         >
           <Icon name="restore" size={13} />
           <span>{busy === 'restore' ? 'Restoring…' : 'Restore from backup…'}</span>
         </button>
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-[var(--ink-50)]">
+      <div className="flex items-center justify-between fb-t-caption text-[var(--ink-50)]">
         <span>
           {info ? `${info.count} snapshot${info.count === 1 ? '' : 's'} · last ${relativeTime(info.lastBackupMs)}` : 'Checking…'}
         </span>
@@ -116,17 +116,17 @@ export default function BackupSection(): JSX.Element {
 
       {message && (
         <div
-          className={`text-[10px] rounded p-1.5 ${
+          className={`fb-t-caption rounded-[var(--radius-chip)] p-1.5 ${
             message.kind === 'ok'
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
-              : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400'
+              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+              : 'bg-rose-500/15 text-rose-700 dark:text-rose-400'
           }`}
         >
           {message.text}
         </div>
       )}
 
-      <p className="text-[11px] text-[var(--ink-40)] leading-snug">
+      <p className="fb-t-caption text-[var(--ink-40)] leading-snug">
         Restoring replaces all current data. Your current data is snapshotted first, so a restore
         is itself reversible. API keys are stored in your system keychain and are not included in a
         backup, so re-enter them after restoring on a new machine.

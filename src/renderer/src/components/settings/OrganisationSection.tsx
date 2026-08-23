@@ -54,16 +54,16 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
       className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3"
       data-testid="settings-section-organisation"
     >
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
         Organisation
       </div>
 
       {orgs === null ? (
-        <p className="text-[11px] text-[var(--ink-50)]">Loading your organisation…</p>
+        <p className="fb-t-caption text-[var(--ink-50)]">Loading your organisation…</p>
       ) : org ? (
         <div className="space-y-3">
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-md inline-flex items-center justify-center bg-accent/15 text-accent shrink-0">
+            <div className="h-9 w-9 rounded-[var(--radius-field)] inline-flex items-center justify-center bg-accent/15 text-accent shrink-0">
               <Icon name="apartment" size={18} />
             </div>
             <div className="min-w-0 flex-1">
@@ -73,7 +73,7 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
               >
                 {org.name}
               </div>
-              <div className="text-[11px] text-[var(--ink-50)] truncate">
+              <div className="fb-t-caption text-[var(--ink-50)] truncate">
                 {org.memberCount} member{org.memberCount === 1 ? '' : 's'}
                 <span className="mx-1.5 text-[var(--ink-40)]">·</span>
                 <span className="capitalize">{org.role}</span>
@@ -83,7 +83,7 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
           <button
             onClick={onManage}
             data-testid="settings-org-manage"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="settings" size={13} />
             Manage organisation
@@ -91,13 +91,13 @@ export default function OrganisationSection({ onManage }: Props): JSX.Element {
         </div>
       ) : (
         <div className="space-y-2.5">
-          <p className="text-[11px] text-[var(--ink-70)] leading-relaxed">
+          <p className="fb-t-caption text-[var(--ink-70)] leading-relaxed">
             {error ?? 'You are not part of an organisation yet.'}
           </p>
           <button
             onClick={onManage}
             data-testid="settings-org-manage"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="apartment" size={13} />
             Manage organisation

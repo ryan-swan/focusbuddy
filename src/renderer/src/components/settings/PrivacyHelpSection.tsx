@@ -14,7 +14,7 @@ export default function PrivacyHelpSection(): JSX.Element {
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-4">
       <div>
-        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
+        <div className="fb-t-caption uppercase tracking-[0.12em] font-medium mb-2">
           Privacy
         </div>
         <label className="flex items-start gap-2.5 cursor-pointer">
@@ -33,40 +33,40 @@ export default function PrivacyHelpSection(): JSX.Element {
             your documents, messages, or files, and no third-party trackers. Turning this off stops it immediately.
           </span>
         </label>
-        <p className="mt-2 text-[11px] text-[var(--ink-50)] leading-relaxed">
+        <p className="mt-2 fb-t-caption text-[var(--ink-50)] leading-relaxed">
           Your work stays on this device. Only items you explicitly share, and your email address, are sent to our
           server. AI features send the text you ask them to act on to the AI provider when you use them.
         </p>
       </div>
 
       <div>
-        <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
+        <div className="fb-t-caption uppercase tracking-[0.12em] font-medium mb-2">
           Help &amp; support
         </div>
         <div className="space-y-1.5">
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('fb:onboarding-hub'))}
             data-testid="help-replay-onboarding"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="explore" size={14} /> Take a tour / replay onboarding
           </button>
           <button
             onClick={() => void window.api.files.openExternal(HELP_BASE)}
             data-testid="help-guides"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="help" size={14} /> Help &amp; guides
           </button>
           <button
             onClick={() => void window.api.files.openExternal(PRICING_URL)}
             data-testid="help-pricing"
-            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
+            className="w-full inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-field)] text-[12px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors"
           >
             <Icon name="sell" size={14} /> Plans &amp; pricing
           </button>
         </div>
-        <p className="mt-2 text-[11px] text-[var(--ink-50)] leading-relaxed">
+        <p className="mt-2 fb-t-caption text-[var(--ink-50)] leading-relaxed">
           Stuck on something? The guides cover the common questions.
         </p>
       </div>

@@ -173,13 +173,12 @@ export default function SettingsPanel({
     <div
       ref={ref}
       role="dialog"
-      aria-modal="true"
       aria-label="Settings"
-      className="fixed z-[200] w-[560px] max-w-[calc(100vw-1.5rem)] max-h-[82vh] flex flex-col rounded-lg bg-[var(--surface-sunken)] border border-[var(--edge-soft)] shadow-2xl backdrop-blur"
+      className="fixed z-[200] w-[560px] max-w-[calc(100vw-1.5rem)] max-h-[82vh] flex flex-col rounded-[var(--radius-card)] fb-glass-panel fb-pop-in"
       style={{ top: anchorY, right: window.innerWidth - anchorX }}
     >
       <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center justify-between shrink-0">
-        <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+        <span className="fb-t-caption uppercase tracking-[0.12em] font-medium">
           Settings
         </span>
         <button onClick={onClose} className="icon-btn" aria-label="Close settings">
@@ -203,9 +202,9 @@ export default function SettingsPanel({
               aria-selected={active}
               data-testid={`settings-tab-${t.id}`}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-[var(--radius-field)] fb-t-caption font-medium border transition-colors ${
                 active
-                  ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                  ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
                   : 'border-transparent text-[var(--ink-70)] hover:bg-[var(--surface-raised)]'
               }`}
             >
@@ -222,7 +221,7 @@ export default function SettingsPanel({
           <>
             <div className="px-3 py-3 space-y-3">
               <div>
-                <div className="text-[11px] text-[var(--ink-70)] mb-1.5">Theme</div>
+                <div className="fb-t-caption text-[var(--ink-70)] mb-1.5">Theme</div>
                 <div className="grid grid-cols-5 gap-1">
                   {THEME_OPTIONS.map((o) => (
                     <button
@@ -232,10 +231,10 @@ export default function SettingsPanel({
                         captureRitualOrigin(e)
                         playThemeRitual(() => onModeChange(o.value))
                       }}
-                      className={`flex flex-col items-center gap-1 py-2 rounded-md border text-[10px] transition-colors ${
+                      className={`flex flex-col items-center gap-1 py-2 rounded-[var(--radius-field)] border fb-t-caption transition-colors ${
                         mode === o.value
-                          ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
-                          : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                          ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
+                          : 'border-[var(--edge-hairline)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] fb-press'
                       }`}
                     >
                       <Icon
@@ -250,7 +249,7 @@ export default function SettingsPanel({
               </div>
 
               <div>
-                <div className="text-[11px] text-[var(--ink-70)] mb-1.5">Accent</div>
+                <div className="fb-t-caption text-[var(--ink-70)] mb-1.5">Accent</div>
                 <div className="grid grid-cols-5 gap-1">
                   {ACCENT_OPTIONS.map((o) => (
                     <button
@@ -261,17 +260,17 @@ export default function SettingsPanel({
                         playThemeRitual(() => onAccentChange(o.value))
                       }}
                       title={o.label}
-                      className={`flex flex-col items-center gap-1 py-2 rounded-md border transition-colors ${
+                      className={`flex flex-col items-center gap-1 py-2 rounded-[var(--radius-field)] border transition-colors ${
                         accent === o.value
-                          ? 'border-stone-700 dark:border-stone-300 bg-[var(--surface-sunken)]'
+                          ? 'border-accent bg-[var(--surface-sunken)]'
                           : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)]'
                       }`}
                     >
                       <span
-                        className="h-5 w-5 rounded-full border-2 border-white dark:border-stone-900 shadow"
+                        className="h-5 w-5 rounded-full border-2 border-[var(--surface-raised)] shadow-[var(--shadow-soft)]"
                         style={{ backgroundColor: o.preview }}
                       />
-                      <span className="text-[10px] text-[var(--ink-70)]">{o.label}</span>
+                      <span className="fb-t-caption text-[var(--ink-70)]">{o.label}</span>
                     </button>
                   ))}
                 </div>
@@ -281,13 +280,13 @@ export default function SettingsPanel({
             <div className="px-3 pb-3 -mt-1">
               <button
                 onClick={() => setStudioOpen(true)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md border border-accent/40 bg-accent/[0.06] hover:bg-accent/10 text-[var(--ink-90)] transition-colors"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-[var(--radius-field)] border border-accent/40 bg-accent/[0.06] hover:bg-accent/10 text-[var(--ink-90)] transition-colors"
                 data-testid="open-theme-studio"
               >
                 <Icon name="palette" size={15} className="text-accent" />
                 <div className="flex-1 text-left">
                   <div className="text-xs font-medium">Theme studio…</div>
-                  <div className="text-[10px] text-[var(--ink-50)]">
+                  <div className="fb-t-caption text-[var(--ink-50)]">
                     Custom accent colour and accessibility fonts. Free for everyone.
                   </div>
                 </div>
@@ -295,14 +294,14 @@ export default function SettingsPanel({
               </button>
 
               {import.meta.env.DEV && (
-                <div className="mt-2 rounded-md border border-amber-300/60 dark:border-amber-600/40 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-2">
+                <div className="mt-2 rounded-[var(--radius-field)] border border-amber-300/60 dark:border-amber-600/40 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-2">
                   <div className="flex items-center gap-1.5 mb-1">
                     <Icon name="construction" size={13} className="text-amber-600 dark:text-amber-400" />
-                    <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-amber-700 dark:text-amber-400">
+                    <span className="fb-t-caption uppercase tracking-[0.12em] font-semibold text-amber-700 dark:text-amber-400">
                       Developer
                     </span>
                   </div>
-                  <div className="text-[10px] text-[var(--ink-70)] mb-1.5 leading-snug">
+                  <div className="fb-t-caption text-[var(--ink-70)] mb-1.5 leading-snug">
                     Force a plan tier locally, no login needed. Dev builds only.
                   </div>
                   <div className="grid grid-cols-4 gap-1">
@@ -315,10 +314,10 @@ export default function SettingsPanel({
                             setDevForcedTier(t)
                             setDevTierState(t)
                           }}
-                          className={`px-1.5 py-1 rounded text-[10px] capitalize border transition-colors ${
+                          className={`px-1.5 py-1 rounded-[var(--radius-chip)] fb-t-caption capitalize border transition-colors ${
                             active
-                              ? 'border-accent bg-accent/10 text-[var(--ink-100)] font-medium'
-                              : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                              ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press font-medium'
+                              : 'border-[var(--edge-hairline)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] fb-press'
                           }`}
                           data-testid={`dev-tier-${t ?? 'off'}`}
                         >
@@ -364,7 +363,7 @@ export default function SettingsPanel({
         {tab === 'advanced' && (
           <>
             <div className="px-3 py-3 space-y-2">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1">
+              <div className="fb-t-caption uppercase tracking-[0.12em] font-medium mb-1">
                 Sounds
               </div>
 
@@ -374,7 +373,7 @@ export default function SettingsPanel({
                   type="checkbox"
                   checked={sound.enabled}
                   onChange={(e) => updateSound({ enabled: e.target.checked })}
-                  className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
+                  className="h-3.5 w-3.5 accent-accent cursor-pointer"
                 />
               </label>
 
@@ -382,7 +381,7 @@ export default function SettingsPanel({
                 <div className="py-1">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-[var(--ink-70)]">Volume</span>
-                    <span className="text-[10px] text-[var(--ink-50)] font-mono">
+                    <span className="fb-t-caption text-[var(--ink-50)] font-mono">
                       {Math.round(sound.volume * 100)}%
                     </span>
                   </div>
@@ -392,7 +391,7 @@ export default function SettingsPanel({
                     max={100}
                     value={Math.round(sound.volume * 100)}
                     onChange={(e) => updateSound({ volume: parseInt(e.target.value, 10) / 100 })}
-                    className="w-full h-1 accent-violet-600 cursor-pointer"
+                    className="w-full h-1 accent-accent cursor-pointer"
                   />
                 </div>
 
@@ -402,7 +401,7 @@ export default function SettingsPanel({
                     type="checkbox"
                     checked={sound.typingClick}
                     onChange={(e) => updateSound({ typingClick: e.target.checked })}
-                    className="h-3.5 w-3.5 accent-violet-600 cursor-pointer"
+                    className="h-3.5 w-3.5 accent-accent cursor-pointer"
                   />
                 </label>
 
@@ -418,10 +417,10 @@ export default function SettingsPanel({
                       return (
                         <div key={family} className="space-y-1">
                           <div className="flex items-baseline gap-1.5">
-                            <div className="text-[10px] text-[var(--ink-50)] uppercase tracking-wider">
+                            <div className="fb-t-caption text-[var(--ink-50)] uppercase tracking-wider">
                               {heading}
                             </div>
-                            <div className="text-[10px] text-[var(--ink-40)] truncate">
+                            <div className="fb-t-caption text-[var(--ink-40)] truncate">
                               {subhead}
                             </div>
                           </div>
@@ -436,7 +435,7 @@ export default function SettingsPanel({
                                     updateSound({ typingClickStyle: s.value as TypingClickStyle })
                                     previewTypingClick(s.value as TypingClickStyle)
                                   }}
-                                  className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                                  className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-[var(--radius-chip)] text-left transition-colors ${
                                     active
                                       ? 'bg-accent/10 border border-accent/40 text-[var(--ink-100)]'
                                       : 'border border-transparent hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]'
@@ -444,7 +443,7 @@ export default function SettingsPanel({
                                 >
                                   <div className="min-w-0">
                                     <div className="text-xs font-medium">{s.label}</div>
-                                    <div className="text-[10px] text-[var(--ink-50)] truncate">
+                                    <div className="fb-t-caption text-[var(--ink-50)] truncate">
                                       {s.blurb}
                                     </div>
                                   </div>
@@ -477,7 +476,7 @@ export default function SettingsPanel({
                     <span className="text-xs text-[var(--ink-70)] block">
                       Quiet while widget active
                     </span>
-                    <span className="text-[10px] text-[var(--ink-50)]">
+                    <span className="fb-t-caption text-[var(--ink-50)]">
                       Suppress sounds while you're interacting with a widget (browser, sticky, etc.)
                     </span>
                   </div>
@@ -485,7 +484,7 @@ export default function SettingsPanel({
                     type="checkbox"
                     checked={sound.quietWhileWidgetActive}
                     onChange={(e) => updateSound({ quietWhileWidgetActive: e.target.checked })}
-                    className="h-3.5 w-3.5 accent-violet-600 cursor-pointer mt-0.5"
+                    className="h-3.5 w-3.5 accent-accent cursor-pointer mt-0.5"
                   />
                 </label>
               </div>
@@ -493,22 +492,22 @@ export default function SettingsPanel({
 
             <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
               <div className="flex items-center justify-between mb-1">
-                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+                <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
                   Haptics
                 </div>
                 <span
-                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                  className={`fb-t-caption font-mono px-1.5 py-0.5 rounded-[var(--radius-chip)] ${
                     hapticsNative === null
                       ? 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
                       : hapticsNative
-                        ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                   }`}
                 >
                   {hapticsNative === null ? 'checking…' : hapticsNative ? 'native' : 'audio fallback'}
                 </span>
               </div>
-              <p className="text-[10px] text-[var(--ink-50)] leading-snug mb-1">
+              <p className="fb-t-caption text-[var(--ink-50)] leading-snug mb-1">
                 {hapticsNative
                   ? 'NSHapticFeedbackPerformer is loaded — trackpad pulses fire on supported MacBooks.'
                   : "Audio-tactile substitute (no native module). Run `npx electron-rebuild -f -w node-mac-haptics` and restart to activate native."}
@@ -518,7 +517,7 @@ export default function SettingsPanel({
                   <button
                     key={feel}
                     onClick={() => haptic(feel)}
-                    className="px-2 py-1.5 rounded text-[10px] border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors capitalize"
+                    className="px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption border border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors capitalize"
                   >
                     {feel}
                   </button>
@@ -530,11 +529,11 @@ export default function SettingsPanel({
 
             {voicePrefs && (
               <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
-                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+                <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
                   Voice command (mic button)
                 </div>
                 <div>
-                  <div className="text-[11px] text-[var(--ink-70)] mb-1.5">
+                  <div className="fb-t-caption text-[var(--ink-70)] mb-1.5">
                     Trigger mode
                   </div>
                   <div className="grid grid-cols-2 gap-1">
@@ -555,15 +554,15 @@ export default function SettingsPanel({
                       <button
                         key={o.value}
                         onClick={() => void patchVoicePrefs({ commandMode: o.value })}
-                        className={`text-left px-2.5 py-2 rounded-md border text-[11px] transition-colors ${
+                        className={`text-left px-2.5 py-2 rounded-[var(--radius-field)] border fb-t-caption transition-colors ${
                           voicePrefs.commandMode === o.value
-                            ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
-                            : 'border-[var(--edge-soft)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
+                            ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
+                            : 'border-[var(--edge-hairline)] bg-[var(--surface-raised)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] fb-press'
                         }`}
                         data-testid={`voice-mode-${o.value}`}
                       >
                         <div className="font-medium">{o.label}</div>
-                        <div className="text-[9px] text-[var(--ink-50)] mt-0.5">
+                        <div className="fb-t-caption text-[var(--ink-50)] mt-0.5">
                           {o.sub}
                         </div>
                       </button>
@@ -573,10 +572,10 @@ export default function SettingsPanel({
                 {voicePrefs.commandMode === 'click-toggle' && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] text-[var(--ink-70)]">
+                      <span className="fb-t-caption text-[var(--ink-70)]">
                         Auto-stop after silence
                       </span>
-                      <span className="text-[10px] font-mono text-[var(--ink-50)]">
+                      <span className="fb-t-caption font-mono text-[var(--ink-50)]">
                         {(voicePrefs.autoStopSilenceMs / 1000).toFixed(1)}s
                       </span>
                     </div>
@@ -602,11 +601,11 @@ export default function SettingsPanel({
                     className="accent-accent"
                     data-testid="voice-voiceback-checkbox"
                   />
-                  <span className="text-[11px] text-[var(--ink-70)]">
+                  <span className="fb-t-caption text-[var(--ink-70)]">
                     Speak the AI's reply aloud
                   </span>
                 </label>
-                <p className="text-[10px] text-[var(--ink-50)] leading-snug">
+                <p className="fb-t-caption text-[var(--ink-50)] leading-snug">
                   Press the floating mic at the bottom of the canvas to give the AI a
                   verbal command. It returns suggestions you can Apply or Dismiss —
                   just like AI-generated tasks.
@@ -617,7 +616,7 @@ export default function SettingsPanel({
             {/* AI model routing preferences live here too, alongside the AI tab's
                 key/credit setup. */}
             <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-2">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1">
+              <div className="fb-t-caption uppercase tracking-[0.12em] font-medium mb-1">
                 AI model
               </div>
               <div className="grid grid-cols-1 gap-0.5">
@@ -628,7 +627,7 @@ export default function SettingsPanel({
                       key={opt.value}
                       type="button"
                       onClick={() => setModelMode(opt.value)}
-                      className={`flex items-start gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                      className={`flex items-start gap-2 px-2 py-1.5 rounded-[var(--radius-chip)] text-left transition-colors ${
                         active
                           ? 'bg-accent/10 border border-accent/40 text-[var(--ink-100)]'
                           : 'border border-transparent hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]'
@@ -651,7 +650,7 @@ export default function SettingsPanel({
                         <div className="flex items-center gap-1.5 text-xs font-medium">
                           {opt.label}
                           <span
-                            className={`text-[9px] font-mono px-1 rounded ${
+                            className={`fb-t-caption font-mono px-1 rounded-[var(--radius-chip)] ${
                               active
                                 ? 'bg-accent/15 text-accent'
                                 : 'bg-[var(--surface-sunken)] text-[var(--ink-70)]'
@@ -660,7 +659,7 @@ export default function SettingsPanel({
                             {opt.costTier}
                           </span>
                         </div>
-                        <div className="text-[10px] text-[var(--ink-50)] leading-snug mt-0.5">
+                        <div className="fb-t-caption text-[var(--ink-50)] leading-snug mt-0.5">
                           {opt.blurb}
                         </div>
                       </div>
@@ -674,13 +673,13 @@ export default function SettingsPanel({
 
               {modelMode === 'auto' && (
                 <div className="mt-2 pl-3 border-l-2 border-[var(--edge-soft)] space-y-0.5">
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)]">
+                  <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-50)]">
                     Auto routing
                   </div>
                   {Object.entries(AUTO_ROUTING_DISPLAY).map(([purpose, info]) => (
                     <div
                       key={purpose}
-                      className="flex items-center justify-between text-[10px] py-0.5"
+                      className="flex items-center justify-between fb-t-caption py-0.5"
                     >
                       <span className="text-[var(--ink-70)] capitalize">
                         {purpose.replace('_', ' ')}
@@ -698,7 +697,7 @@ export default function SettingsPanel({
         )}
       </div>
 
-      <div className="px-3 py-2 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/50 text-[11px] text-[var(--ink-70)] shrink-0">
+      <div className="px-3 py-2 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/50 fb-t-caption text-[var(--ink-70)] shrink-0">
         Preferences saved locally.
       </div>
 

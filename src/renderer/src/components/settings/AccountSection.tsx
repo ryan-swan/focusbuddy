@@ -68,7 +68,7 @@ export default function AccountSection(): JSX.Element {
 
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
         Account
       </div>
 
@@ -85,7 +85,7 @@ export default function AccountSection(): JSX.Element {
               >
                 {personDisplayName(account)}
               </div>
-              <div className="text-[11px] text-[var(--ink-50)] truncate">
+              <div className="fb-t-caption text-[var(--ink-50)] truncate">
                 {account.email}
                 <span className="mx-1.5 text-[var(--ink-40)]">·</span>
                 <span data-testid="account-plan">{planLabel} plan</span>
@@ -95,7 +95,7 @@ export default function AccountSection(): JSX.Element {
               onClick={() => void handleSignOut()}
               disabled={busy}
               data-testid="account-signout"
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-field)] fb-t-caption border border-[var(--edge-soft)] text-[var(--ink-70)] hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
             >
               <Icon name="logout" size={13} />
               {busy ? 'Signing out…' : 'Sign out'}
@@ -104,7 +104,7 @@ export default function AccountSection(): JSX.Element {
 
           {/* Name editor — this is the identity shown across the product. */}
           <div className="space-y-1.5">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] font-medium">
+            <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-50)] font-medium">
               Your name
             </div>
             <div className="flex items-center gap-2">
@@ -114,7 +114,7 @@ export default function AccountSection(): JSX.Element {
                 placeholder="First name"
                 maxLength={40}
                 data-testid="account-first-name"
-                className="flex-1 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
+                className="flex-1 min-w-0 rounded-[var(--radius-field)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
               />
               <input
                 value={lastName}
@@ -122,13 +122,13 @@ export default function AccountSection(): JSX.Element {
                 placeholder="Last name"
                 maxLength={40}
                 data-testid="account-last-name"
-                className="flex-1 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
+                className="flex-1 min-w-0 rounded-[var(--radius-field)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px]"
               />
               <button
                 onClick={() => void handleSaveName()}
                 disabled={savingName || !nameDirty}
                 data-testid="account-save-name"
-                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-40"
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-field)] fb-t-caption bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-40"
               >
                 {savingName ? 'Saving…' : nameSaved ? 'Saved' : 'Save'}
               </button>
@@ -137,15 +137,15 @@ export default function AccountSection(): JSX.Element {
               This is how you appear in mentions, chat, meeting invites and to your team.
             </p>
           </div>
-          <p className="text-[11px] text-[var(--ink-50)] leading-relaxed">
+          <p className="fb-t-caption text-[var(--ink-50)] leading-relaxed">
             Your local data stays on this device. Signing out keeps it; it only
-            disconnects shared-item sync and your plan until you sign back in.
+            disconnects sharose-item sync and your plan until you sign back in.
           </p>
           <TwoFactorSettings />
         </div>
       ) : (
         <div className="space-y-2.5">
-          <p className="text-[11px] text-[var(--ink-70)] leading-relaxed">
+          <p className="fb-t-caption text-[var(--ink-70)] leading-relaxed">
             You are using PlexiDesk locally without an account. Sign in to sync
             shared folders and tasks across devices and to apply your plan.
           </p>

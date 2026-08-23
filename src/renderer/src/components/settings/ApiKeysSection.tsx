@@ -72,14 +72,14 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
 
   return (
     <div className="px-3 py-3 border-t border-[var(--edge-soft)] space-y-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium">
         AI · source
       </div>
 
       <AiSourceSection />
 
       {usage && usage.calls > 0 && (
-        <div className="rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 px-3 py-2 text-[11.5px] text-[var(--ink-70)]" data-testid="ai-usage-summary">
+        <div className="rounded-[var(--radius-field)] border border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 px-3 py-2 text-[11.5px] text-[var(--ink-70)]" data-testid="ai-usage-summary">
           <div className="flex items-center justify-between">
             <span>AI usage on this device</span>
             <span className="text-[var(--ink-90)] font-medium">~${usage.costUsd.toFixed(2)} est.</span>
@@ -90,7 +90,7 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
         </div>
       )}
 
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium pt-1">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium pt-1">
         AI · API keys
       </div>
 
@@ -205,13 +205,13 @@ export default function ApiKeysSection({ onKeySaved }: Props): JSX.Element {
         onKeySaved={onKeySaved}
       />
 
-      <div className="text-[11px] text-[var(--ink-50)] leading-relaxed">
+      <div className="fb-t-caption text-[var(--ink-50)] leading-relaxed">
         Each key is encrypted with the macOS Keychain and stored locally only.
         When you use your own key, prompts go direct from this Mac to Anthropic /
         OpenAI. On PlexiDesk credits, AI prompts route through PlexiDesk's server
         so we can meter usage against your balance.
         {encryption === false && (
-          <div className="text-red-600 dark:text-red-400 mt-1">
+          <div className="text-rose-600 dark:text-rose-400 mt-1">
             ⚠ System encryption isn't available — saving is disabled.
           </div>
         )}
@@ -309,14 +309,14 @@ function AiSourceSection(): JSX.Element {
             onClick={() => void pick(m.id)}
             disabled={busy || status === null}
             data-testid={`ai-mode-${m.id}`}
-            className={`text-[11px] px-2 py-1.5 rounded-md border text-left ${
+            className={`fb-t-caption px-2 py-1.5 rounded-[var(--radius-field)] border text-left ${
               status?.mode === m.id
-                ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+                ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
                 : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
             } disabled:opacity-50`}
           >
             <div className="font-medium">{m.label}</div>
-            <div className="text-[11px] text-[var(--ink-50)] mt-0.5 leading-snug">
+            <div className="fb-t-caption text-[var(--ink-50)] mt-0.5 leading-snug">
               {m.sub}
             </div>
           </button>
@@ -324,23 +324,23 @@ function AiSourceSection(): JSX.Element {
       </div>
 
       {status && status.mode !== 'byok' && (
-        <div className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-2.5 py-2 mb-2">
+        <div className="bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-[var(--radius-field)] px-2.5 py-2 mb-2">
           {!status.signedIn ? (
-            <div className="text-[11px] text-[var(--ink-50)] leading-snug">
+            <div className="fb-t-caption text-[var(--ink-50)] leading-snug">
               Sign in to your PlexiDesk account to use credits. New accounts start
               with $1 of free AI credits.
             </div>
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[var(--ink-70)]">
+                <span className="fb-t-caption text-[var(--ink-70)]">
                   Credit balance
                 </span>
                 <span
                   data-testid="ai-credit-balance"
                   className={`text-xs font-mono ${
                     status.outOfCredits
-                      ? 'text-red-600 dark:text-red-400'
+                      ? 'text-rose-600 dark:text-rose-400'
                       : 'text-[var(--ink-90)]'
                   }`}
                 >
@@ -348,7 +348,7 @@ function AiSourceSection(): JSX.Element {
                 </span>
               </div>
               {status.outOfCredits && (
-                <div className="text-[10px] text-red-600 dark:text-red-400 mt-1 leading-snug">
+                <div className="fb-t-caption text-rose-600 dark:text-rose-400 mt-1 leading-snug">
                   Credits used up.{' '}
                   {status.hasOwnKey
                     ? 'Add more below, or switch to your own key to keep going.'
@@ -362,7 +362,7 @@ function AiSourceSection(): JSX.Element {
                     onClick={() => void topUp(amt)}
                     disabled={busy}
                     data-testid={`ai-topup-${amt}`}
-                    className="flex-1 text-[11px] border border-[var(--edge-soft)] rounded-md py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                    className="flex-1 fb-t-caption border border-[var(--edge-soft)] rounded-[var(--radius-field)] py-1 text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
                   >
                     Add ${amt}
                   </button>
@@ -374,7 +374,7 @@ function AiSourceSection(): JSX.Element {
       )}
 
       {note && (
-        <div className="text-[11px] text-[var(--ink-50)] mb-2 leading-snug">
+        <div className="fb-t-caption text-[var(--ink-50)] mb-2 leading-snug">
           {note}
         </div>
       )}
@@ -440,43 +440,43 @@ function VoiceProviderToggle(): JSX.Element {
 
   return (
     <div className="pt-3 border-t border-[var(--edge-soft)]">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
+      <div className="fb-t-caption uppercase tracking-[0.12em] font-medium mb-2">
         Voice · transcription provider
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         <button
           onClick={() => void pick('cloud')}
           disabled={busy || provider === null || provider === 'unavailable'}
-          className={`text-[11px] px-2.5 py-1.5 rounded-md border ${
+          className={`fb-t-caption px-2.5 py-1.5 rounded-[var(--radius-field)] border ${
             provider === 'cloud'
-              ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+              ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
               : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           } disabled:opacity-50`}
           data-testid="voice-provider-cloud"
         >
           <div className="font-medium">Cloud</div>
-          <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
+          <div className="fb-t-caption text-[var(--ink-50)] mt-0.5">
             OpenAI Whisper · fastest · paid per minute
           </div>
         </button>
         <button
           onClick={() => void pick('local')}
           disabled={busy || provider === null || provider === 'unavailable'}
-          className={`text-[11px] px-2.5 py-1.5 rounded-md border ${
+          className={`fb-t-caption px-2.5 py-1.5 rounded-[var(--radius-field)] border ${
             provider === 'local'
-              ? 'border-accent bg-accent/10 text-[var(--ink-100)]'
+              ? 'border-accent bg-accent/10 text-[var(--ink-100)] fb-press'
               : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]'
           } disabled:opacity-50`}
           data-testid="voice-provider-local"
         >
           <div className="font-medium">Local</div>
-          <div className="text-[11px] text-[var(--ink-50)] mt-0.5">
+          <div className="fb-t-caption text-[var(--ink-50)] mt-0.5">
             Whisper tiny · offline · free · ~80MB
           </div>
         </button>
       </div>
       {status && (
-        <div className="text-[11px] text-[var(--ink-50)] mt-2 leading-snug">
+        <div className="fb-t-caption text-[var(--ink-50)] mt-2 leading-snug">
           {status}
         </div>
       )}
@@ -586,29 +586,29 @@ function ApiKeyRow({
           <span className="text-xs text-[var(--ink-70)]">
             {config.label}
           </span>
-          <span className="text-[11px] text-[var(--ink-50)] leading-snug">
+          <span className="fb-t-caption text-[var(--ink-50)] leading-snug">
             {config.purpose}
           </span>
         </div>
         {hint.hasKey && !editing && !unavailable && (
-          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+          <span className="fb-t-caption uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
             Set
           </span>
         )}
         {unavailable && (
-          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+          <span className="fb-t-caption uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
             Restart needed
           </span>
         )}
       </div>
       {unavailable && (
-        <div className="text-[11px] text-amber-700 dark:text-amber-300 mb-2 leading-snug bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1.5">
+        <div className="fb-t-caption text-amber-700 dark:text-amber-300 mb-2 leading-snug bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-chip)] px-2 py-1.5">
           Main process is missing this provider's IPC handler. Quit PlexiDesk (⌘Q) and reopen so it picks up the new code. Saving / testing this key won't work until you do.
         </div>
       )}
 
       {hint.hasKey && !editing && (
-        <div className="flex items-center justify-between bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-2.5 py-1.5 mb-2">
+        <div className="flex items-center justify-between bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-[var(--radius-field)] px-2.5 py-1.5 mb-2">
           <code className="text-xs font-mono text-[var(--ink-70)]">
             ••••••••{hint.last4 ?? '????'}
           </code>
@@ -618,20 +618,20 @@ function ApiKeyRow({
                 setEditing(true)
                 setStatus({ kind: 'idle' })
               }}
-              className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1.5"
+              className="fb-t-caption text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1.5"
             >
               Replace
             </button>
             <button
               onClick={onTest}
               disabled={isBusy}
-              className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1.5 disabled:opacity-50"
+              className="fb-t-caption text-[var(--ink-70)] hover:text-[var(--ink-100)] px-1.5 disabled:opacity-50"
             >
               {status.kind === 'testing' ? 'Testing…' : 'Test'}
             </button>
             <button
               onClick={onClear}
-              className="text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-1.5"
+              className="fb-t-caption text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 px-1.5"
             >
               Remove
             </button>
@@ -652,12 +652,12 @@ function ApiKeyRow({
               placeholder={config.placeholder}
               autoComplete="off"
               spellCheck={false}
-              className="w-full text-xs font-mono bg-[var(--surface-raised)] border border-[var(--edge-soft)] rounded-md px-2.5 py-1.5 pr-12 focus:outline-none focus:border-accent"
+              className="fb-field text-xs font-mono pr-12 focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setShow(!show)}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-70)] px-1.5 py-0.5"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 fb-t-caption uppercase tracking-wider text-[var(--ink-50)] hover:text-[var(--ink-70)] px-1.5 py-0.5"
             >
               {show ? 'Hide' : 'Show'}
             </button>
@@ -666,7 +666,7 @@ function ApiKeyRow({
             <button
               onClick={onSave}
               disabled={!pasted.trim() || isBusy || encryption === false}
-              className="flex-1 text-[11px] bg-accent text-white rounded-md py-1.5 hover:opacity-90 disabled:opacity-50"
+              className="flex-1 fb-t-caption bg-accent text-white rounded-[var(--radius-field)] py-1.5 hover:opacity-90 disabled:opacity-50"
             >
               {status.kind === 'saving' ? 'Saving…' : 'Save key'}
             </button>
@@ -677,7 +677,7 @@ function ApiKeyRow({
                   setPasted('')
                   setStatus({ kind: 'idle' })
                 }}
-                className="text-[11px] text-[var(--ink-70)] hover:text-[var(--ink-100)] px-2"
+                className="fb-t-caption text-[var(--ink-70)] hover:text-[var(--ink-100)] px-2"
               >
                 Cancel
               </button>
@@ -687,12 +687,12 @@ function ApiKeyRow({
       )}
 
       {status.kind === 'success' && (
-        <div className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-2">
+        <div className="fb-t-caption text-emerald-700 dark:text-emerald-300 mt-2">
           {status.message}
         </div>
       )}
       {status.kind === 'error' && (
-        <div className="text-[11px] text-red-600 dark:text-red-400 mt-2 break-words">
+        <div className="fb-t-caption text-rose-600 dark:text-rose-400 mt-2 break-words">
           {status.message}
         </div>
       )}
@@ -701,7 +701,7 @@ function ApiKeyRow({
         href={config.helpUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[11px] text-accent hover:underline inline-flex items-center gap-1 mt-1"
+        className="fb-t-caption text-accent hover:underline inline-flex items-center gap-1 mt-1"
       >
         {config.helpLabel}
       </a>
