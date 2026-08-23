@@ -860,25 +860,32 @@ export default function WidgetFrame({
           if (isPinned) setActive(widget.id)
           else setFocused(widget.id)
         }}
-        className={`relative h-full w-full flex flex-col rounded-[12px] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
+        className={`relative h-full w-full flex flex-col rounded-[var(--radius-card)] overflow-hidden border bg-[var(--surface-raised)] fb-spring-snap ${
+          // Edges + Glass (2026-08-23): the widget is a material card. At rest
+          // its edge comes from light (the hairline ring, cast shadow and inset
+          // top highlight in the box-shadow below), not from a 1px outline; the
+          // 1px border stays in the box as transparent so a state stroke never
+          // shifts the content. Colour means state (R5.2): one concentric accent
+          // ring when selected (R6.4, not a border plus a ring plus an offset),
+          // the glow when active, amber when pinned.
           selected
-            ? 'border-[rgb(var(--accent))] ring-2 ring-[rgb(var(--accent)/0.7)] ring-offset-2 ring-offset-transparent'
+            ? 'border-transparent ring-2 ring-[rgb(var(--accent)/0.75)] ring-offset-2 ring-offset-transparent'
             : isActive
-              ? 'border-[rgb(var(--accent)/0.5)] widget-glow'
+              ? 'border-transparent widget-glow'
               : isPinned
                 ? 'border-amber-400/60'
-                : isChildOfSection
-                  ? 'border-[color:var(--edge-soft)]'
-                  : 'border-[color:var(--edge-soft)]'
+                : 'border-transparent'
         }`}
         style={{
-          // Light-aware cast shadow + inset highlight on top edge. Tightens
-          // when active (focus brings the widget visually closer to the user).
+          // The fb-card recipe: hairline ring so the card never melts into a
+          // same-luminance surface, a light-aware cast shadow, and the inset
+          // highlight on the top edge. Softer inside a section (the section
+          // already lifts it), fuller on the open canvas.
           boxShadow: isActive
             ? undefined // .widget-glow owns the active state
             : isChildOfSection
-              ? 'var(--shadow-soft), var(--shadow-inset-highlight)'
-              : 'var(--shadow-cast), var(--shadow-inset-highlight)',
+              ? '0 0 0 1px var(--edge-hairline), var(--shadow-soft), var(--shadow-inset-highlight)'
+              : '0 0 0 1px var(--edge-hairline), var(--shadow-cast), var(--shadow-inset-highlight)',
           transitionProperty: 'box-shadow, transform, border-color'
         }}
       >
@@ -887,7 +894,7 @@ export default function WidgetFrame({
             (A11Y-004). Rendered above content but click-through. */}
         {healthStyle && (
           <div
-            className={`pointer-events-none absolute inset-0 z-[6] rounded-[12px] border-2 ${healthStyle.border}`}
+            className={`pointer-events-none absolute inset-0 z-[6] rounded-[var(--radius-card)] border-2 ${healthStyle.border}`}
             aria-hidden="true"
           />
         )}
@@ -1318,7 +1325,7 @@ function PinControl({
           // sits above pinned-layer (z-30), floating toolbar (z-20), and
           // anything else in the canvas chrome, but below modal dialogs
           // (typically z-[300]+).
-          className="fixed z-[200] w-44 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-2 cursor-default"
+          className="fixed z-[200] w-44 rounded-[var(--radius-row)] fb-glass-panel fb-pop-in p-2 cursor-default"
           style={{ top: popoverPos.top, right: popoverPos.right }}
         >
           <div className="text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1.5">
@@ -1454,7 +1461,7 @@ function ExpandControl({
         <div
           ref={popoverRef}
           onMouseDown={(e) => e.stopPropagation()}
-          className="fixed z-[200] w-48 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl p-1 cursor-default"
+          className="fixed z-[200] w-48 rounded-[var(--radius-row)] fb-glass-panel fb-pop-in p-1 cursor-default"
           style={{ top: popoverPos.top, right: popoverPos.right }}
         >
           <button
