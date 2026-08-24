@@ -467,7 +467,8 @@ import {
   renameConversation as renameAiChatConversation,
   deleteConversation as deleteAiChatConversation,
   linkDesk as linkAiChatDesk,
-  setConversationMode as setAiChatConversationMode
+  setConversationMode as setAiChatConversationMode,
+  setConversationWebSearch as setAiChatConversationWebSearch
 } from '../db/aiChat'
 import { getRecentActivity, recordActivity } from '../db/activity'
 import {
@@ -2728,12 +2729,17 @@ export function registerIpcHandlers(): void {
         title?: string
         context?: AiChatConversationContext | null
         mode?: import('@shared/types').AiChatMode
+        webSearch?: boolean
       }
     ) => createAiChatConversation(input)
   )
   ipcMain.handle(
     'aiChat:setConversationMode',
     (_e, id: string, mode: import('@shared/types').AiChatMode) => setAiChatConversationMode(id, mode)
+  )
+  ipcMain.handle(
+    'aiChat:setConversationWebSearch',
+    (_e, id: string, on: boolean) => setAiChatConversationWebSearch(id, !!on)
   )
   ipcMain.handle(
     'aiChat:appendMessage',

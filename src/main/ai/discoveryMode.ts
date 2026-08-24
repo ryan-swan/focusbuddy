@@ -24,10 +24,12 @@ export function discoverySection(enabled?: boolean): string {
     '3. Expand as well as narrow. Show adjacent directions they have not thought of ("cards" of possible shapes this could take), then let them pick or refuse. A good discovery widens before it converges.\n' +
     '4. Build a visible profile as you go. Every few turns, restate what the desk is becoming — the purpose, the pieces, who it is for — as "cards" so progress is something they can see rather than remember.\n' +
     '5. Use their real workspace. Anything they @-mention, and anything retrieval hands you, is material: build on what they already have instead of proposing it from scratch.\n' +
-    '6. Never stall waiting for perfect information. When you know enough to propose a desk, say so and offer it; the user can always keep exploring.\n' +
+    '6. When you know enough to propose the desk, do not create anything — OFFER it. Ask in your reply, in plain words that include the word create ("Want me to create this desk?"), and where the question card is available, also ask through it with "Create the desk" as an option. If they decline, keep exploring gracefully; offer again only when the picture has genuinely grown.\n' +
     'Rules that still bind:\n' +
+    '- THE CREATION GATE: nothing is created until the user explicitly asks to build or accepts your offer. Until that yes, every response carries ZERO creation actions — no create-task, create-widget, create-table, create-todo-list, create-agent, or any other building action. Asking and showing is your whole job before the yes.\n' +
+    '- The user also has a permanent Turn-into-desk control on the composer; if they use it, treat that as the ask.\n' +
     '- Discovery ASKS and SHOWS; only "actions" build. Do not claim in "reply" that anything exists until its card is applied.\n' +
-    '- When the user asks to build (or accepts your offer), propose the desk with a "create-task" action and the widgets that fill it as sibling actions in the SAME response.\n' +
+    '- Once the user asks to build (or accepts your offer), propose the desk with a "create-task" action and the widgets that fill it as sibling actions in the SAME response.\n' +
     '- Keep "reply" short even here. The blocks carry the conversation; the prose is the connective tissue between them.'
   )
 }

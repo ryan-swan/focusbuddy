@@ -39,6 +39,8 @@ interface ConversationRow {
   // Plexii P6: 'chat' | 'discovery'. Defaulted at the column, so a legacy row
   // reads as the normal assistant rather than as an unknown.
   mode: string | null
+  // Plexii A4 (R21): the web-search globe, 1 = on. Defaulted on at the column.
+  web_search: number | null
 }
 
 interface MessageRow {
@@ -74,7 +76,10 @@ function rowToMeta(
     messageCount: extras?.messageCount,
     preview: extras?.preview,
     linkedDesks: safeParse<string[]>(row.linked_desks_json, []),
-    mode: toChatMode(row.mode)
+    mode: toChatMode(row.mode),
+    // NULL (a pre-A4 row surviving a partial migration) reads as on — the
+    // default that has been true since web search shipped.
+    webSearch: row.web_search !== 0
   }
 }
 
@@ -146,7 +151,7 @@ export function listConversations(): AiChatConversationMeta[] {
   const rows = db
     .prepare(
       `SELECT id, org_id, task_id, title, created_at, updated_at, context_json,
-              linked_desks_json, mode
+              linked_desks_json, mode, web_search
        FROM ai_chat_conversations WHERE org_id = ? ORDER BY updated_at DESC`
     )
     .all(org) as ConversationRow[]
@@ -171,7 +176,7 @@ export function getConversation(id: string): AiChatConversation | null {
   const row = db
     .prepare(
       `SELECT id, org_id, task_id, title, created_at, updated_at, context_json,
-              linked_desks_json, mode
+              linked_desks_json, mode, web_search
        FROM ai_chat_conversations WHERE id = ? AND org_id = ?`
     )
     .get(id, org) as ConversationRow | undefined
@@ -196,15 +201,19 @@ export function createConversation(input: {
   context?: AiChatConversationContext | null
   // Plexii P6: the mode this conversation starts in. Omitted means normal chat.
   mode?: AiChatMode
+  // A4 (R21): the globe's state at creation, for a toggle flipped before the
+  // first word. Omitted means on.
+  webSearch?: boolean
 }): AiChatConversationMeta {
   const db = getDb()
   const id = randomUUID()
   const now = Date.now()
   const mode = toChatMode(input.mode ?? null)
+  const webSearch = input.webSearch !== false
   db.prepare(
     `INSERT INTO ai_chat_conversations
-      (id, org_id, task_id, title, created_at, updated_at, context_json, mode)
-     VALUES (@id, @org_id, @task_id, @title, @created_at, @updated_at, @context_json, @mode)`
+      (id, org_id, task_id, title, created_at, updated_at, context_json, mode, web_search)
+     VALUES (@id, @org_id, @task_id, @title, @created_at, @updated_at, @context_json, @mode, @web_search)`
   ).run({
     id,
     org_id: getActiveOrgId(),
@@ -213,7 +222,8 @@ export function createConversation(input: {
     created_at: now,
     updated_at: now,
     context_json: input.context ? JSON.stringify(input.context) : null,
-    mode
+    mode,
+    web_search: webSearch ? 1 : 0
   })
   return {
     id,
@@ -224,7 +234,8 @@ export function createConversation(input: {
     context: input.context ?? null,
     messageCount: 0,
     linkedDesks: [],
-    mode
+    mode,
+    webSearch
   }
 }
 
@@ -234,6 +245,17 @@ export function setConversationMode(id: string, mode: AiChatMode): void {
   if (!conversationOwnedByActiveOrg(id)) return
   db.prepare(`UPDATE ai_chat_conversations SET mode = ?, updated_at = ? WHERE id = ?`).run(
     toChatMode(mode),
+    Date.now(),
+    id
+  )
+}
+
+/** Flip a conversation's web-search globe (A4, R21). Org-scoped like every write. */
+export function setConversationWebSearch(id: string, on: boolean): void {
+  const db = getDb()
+  if (!conversationOwnedByActiveOrg(id)) return
+  db.prepare(`UPDATE ai_chat_conversations SET web_search = ?, updated_at = ? WHERE id = ?`).run(
+    on ? 1 : 0,
     Date.now(),
     id
   )

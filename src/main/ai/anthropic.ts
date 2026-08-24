@@ -26,6 +26,8 @@ import { extractJson, salvageEnvelope } from './chatJson'
 import { questionProtocolSection, validateChatQuestion } from './chatQuestion'
 import { uiBlocksSection, validateChatUiBlocks } from './chatUiBlocks'
 import { discoverySection } from './discoveryMode'
+import { turnRetrieval } from './retrievalIntent'
+import { buildGreenLit, gateCreation } from './creationGate'
 import { embeddingConfigured } from './embeddings'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
@@ -1022,6 +1024,10 @@ interface PreparedChatCall {
   // means literal keyword matching, and the trace discloses it. Null when
   // retrieval never ran.
   semantic: boolean | null
+  // What actually ran this turn (A4, AI-10): discovery ideation turns gate
+  // both pools, and the R21 globe gates the web. Reported to the renderer so
+  // the trace never claims a search that did not happen.
+  searched: { workspace: boolean; web: boolean }
 }
 
 async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
@@ -1056,10 +1062,23 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
   // Whether an embedding route existed for this search (defect #15). Null =
   // unknown (retrieval skipped or failed), and the trace discloses nothing.
   let semanticAvailable: boolean | null = null
+  // What actually ran, reported honestly to the trace (A4, AI-10).
+  let searched = { workspace: false, web: false }
   const t0 = Date.now()
   try {
     const lastUser = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
-    if (lastUser.trim()) {
+    // Turn-level gating (A4, AI-10): discovery ideation turns skip the whole
+    // ceremony; the R21 globe (webSearch: false) turns off just the web pool.
+    // Normal chat is untouched.
+    const gate = turnRetrieval({
+      mode: req.mode,
+      text: lastUser,
+      isFirstUserTurn: req.messages.filter((m) => m.role === 'user').length <= 1,
+      hasMentions: admittedRefs.length > 0,
+      webEnabled: req.webSearch !== false
+    })
+    if (lastUser.trim() && gate.workspace) {
+      searched = { workspace: true, web: gate.web }
       // Desk scope PRIORITISES the pools that carry a desk id — tasks, tables
       // and canvas content get demoted when off-scope, never excluded (#12).
       // Documents and PlexiBrain entries carry no desk affiliation in the data
@@ -1077,7 +1096,9 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
         retrieveSources(lastUser, undefined, scope.length ? scope : undefined, {
           excludeChatId: req.conversationId
         }),
-        searchWeb(lastUser, 5).catch(() => []),
+        // The R21 globe and ideation gating both land here: an off web pool
+        // resolves empty without ever making the request.
+        gate.web ? searchWeb(lastUser, 5).catch(() => []) : Promise.resolve([]),
         // Availability probe, in parallel so disclosure costs no latency.
         embeddingConfigured().catch(() => false)
       ])
@@ -1164,7 +1185,23 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
     mentions: mentionReport,
     sources: citedSources,
     retrievalMs: Date.now() - t0,
-    semantic: semanticAvailable
+    semantic: semanticAvailable,
+    searched
+  }
+}
+
+// The creation gate's read of one request (A4, AI-08). Derived from the
+// request alone so both chat paths compute it identically: discovery status
+// from the mode, the green light from the transcript.
+function chatGateContext(req: ChatRequest): {
+  discovery: boolean
+  greenLit: boolean
+  supportsQuestions?: boolean
+} {
+  return {
+    discovery: req.mode === 'discovery',
+    greenLit: buildGreenLit(req.messages),
+    supportsQuestions: req.supportsQuestions
   }
 }
 
@@ -1178,16 +1215,29 @@ function buildChatResponse(
   // What each @-mention produced (Phase 4.2). Threaded as a parameter rather
   // than attached at the call sites so a new caller cannot forget it and
   // silently drop the honest record of what the model was actually given.
-  mentions: ChatMentionResolved[] = []
+  mentions: ChatMentionResolved[] = [],
+  // The discovery creation gate's context (A4, AI-08 — R8). Absent for the
+  // callers that are not the two chat paths, which keeps them byte-identical.
+  gate?: { discovery: boolean; greenLit: boolean; supportsQuestions?: boolean }
 ): ChatResponse | null {
   const parsed = parseChatJson(rawText)
   if (!parsed) return null
-  let content = parsed.reply || (parsed.proposals.length > 0 ? "Here's what I can set up:" : '')
-  if (parsed.truncated && parsed.proposals.length > 0) {
+  // R8's deterministic backstop: a discovery response may not build before the
+  // transcript green-lights it. Held builds are stated in the reply and, where
+  // the surface renders question cards, replaced by an explicit offer.
+  const gated = gateCreation({
+    proposals: parsed.proposals,
+    question: parsed.question,
+    discovery: gate?.discovery ?? false,
+    greenLit: gate?.greenLit ?? true,
+    supportsQuestions: gate?.supportsQuestions
+  })
+  let content = parsed.reply || (gated.proposals.length > 0 ? "Here's what I can set up:" : '')
+  if (parsed.truncated && gated.proposals.length > 0) {
     // We recovered the actions that finished before the cutoff. Tell the
     // user the rest was dropped so they can ask for it rather than silently
     // getting a partial build.
-    const n = parsed.proposals.length
+    const n = gated.proposals.length
     content +=
       `${content ? '\n\n' : ''}Your request was large, so I set up the first ${n} item${n === 1 ? '' : 's'} that fit. Ask me to continue for the rest, or break the request into smaller parts.`
   } else if (parsed.replyCut && content) {
@@ -1196,12 +1246,15 @@ function buildChatResponse(
     // sentence that stops mid-word as the whole answer.
     content += '\n\n*This answer was cut off before it finished — say "continue" and I will pick up where it stopped.*'
   }
+  if (gated.notice) {
+    content += `${content ? '\n\n' : ''}${gated.notice}`
+  }
   return {
     ok: true,
     message: { role: 'assistant', content, ts: Date.now() },
-    proposals: parsed.proposals.length > 0 ? parsed.proposals : undefined,
+    proposals: gated.proposals.length > 0 ? gated.proposals : undefined,
     sources: sources.length > 0 ? sources : undefined,
-    question: parsed.question,
+    question: gated.question,
     mentions: mentions.length > 0 ? mentions : undefined,
     blocks: parsed.blocks
   }
@@ -1250,7 +1303,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       .join('\n')
       .trim()
 
-    const built = buildChatResponse(text, citedSources, mentionReport)
+    const built = buildChatResponse(text, citedSources, mentionReport, chatGateContext(req))
     if (built) return built
     return unparseableChatResponse(text, resp.stop_reason as string, citedSources, mentionReport)
   } catch (e) {
@@ -1377,7 +1430,8 @@ export async function sendChatStream(
   cb.onSources({
     sources: prepared.sources,
     elapsedMs: prepared.retrievalMs,
-    semantic: prepared.semantic ?? undefined
+    semantic: prepared.semantic ?? undefined,
+    searched: prepared.searched
   })
 
   // The delta → event loop lives in its own module so it can be tested without
@@ -1441,7 +1495,7 @@ export async function sendChatStream(
   // forever waiting for an event that is never coming.
   try {
     const text = consumer.text().trim()
-    const built = buildChatResponse(text, prepared.sources, prepared.mentions)
+    const built = buildChatResponse(text, prepared.sources, prepared.mentions, chatGateContext(req))
     if (built) {
       cb.onComplete(built)
       return

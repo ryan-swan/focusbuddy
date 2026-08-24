@@ -510,6 +510,10 @@ export interface ChatRequest {
   // pool (A2, #17) — its content is already the message history, and citing it
   // back as a discovered source would be theatre. Optional and additive.
   conversationId?: string
+  // The conversation's R21 globe toggle: false turns the live web search off
+  // for this turn. Optional and additive — absent means on, so every caller
+  // that predates the toggle behaves exactly as before.
+  webSearch?: boolean
 }
 
 // A retrieved workspace document the assistant was grounded on. Slimmed from
@@ -550,6 +554,11 @@ export interface ChatRetrievalTrace {
   // find "attrition" and nothing said so). Absent on an older main process
   // (version skew): read as unknown, disclose nothing.
   semantic?: boolean
+  // What actually ran this turn (A4, AI-10). A discovery ideation turn gates
+  // both pools and the trace must not claim a search that never happened;
+  // false here suppresses the corresponding trace line. Absent on an older
+  // main process: read as "everything ran", the pre-A4 truth.
+  searched?: { workspace: boolean; web: boolean }
 }
 
 // A structured follow-up the assistant asks instead of guessing — rendered as
@@ -2384,6 +2393,10 @@ export interface AiChatConversationMeta {
   // 'discovery' is the guided mode that drives with questions and blocks
   // toward a desk. Per-conversation and switchable at any time.
   mode: AiChatMode
+  // The R21 globe: whether substantive turns in this conversation run the live
+  // web search. Per-conversation and sticky, default on. Optional so rows read
+  // by an older renderer and legacy fixtures stay valid; absent reads as on.
+  webSearch?: boolean
 }
 
 // The conversation modes (Plexii P6). Persisted per conversation so reopening

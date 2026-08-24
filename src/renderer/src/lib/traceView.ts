@@ -43,6 +43,11 @@ export interface AssistantTrace {
   // null/absent = unknown (older main process, restored trace without the
   // field). Optional so existing fixtures and stored traces stay valid.
   semantic?: boolean | null
+  // What actually ran this turn (A4, AI-10): workspace false means the search
+  // was deliberately gated (discovery ideation) and the trace must not draw a
+  // search line at all. null/absent = unknown (older main process, restored
+  // trace) — read as "everything ran", the pre-A4 truth.
+  searched?: { workspace: boolean; web: boolean } | null
   tools: ChatToolTrace[]
   // The action the model is writing RIGHT NOW — announced the moment its
   // `"kind"` lands in the stream, before the object closes. Drawn as the
@@ -299,21 +304,27 @@ export function getTraceView(trace: AssistantTrace, revealedCount: number): Trac
   if (trace.retrievedAt === null) {
     return stop({ key: 'retrieve', label: 'Searching your workspace…', icon: 'search' })
   }
-  const ws = workspaceSources(trace)
-  const web = webSources(trace)
-  completed.push({
-    key: 'retrieve',
-    label: retrieveLabel(trace),
-    icon: 'search',
-    leaves: sourceLeaves(ws)
-  })
-  if (web.length > 0) {
+  // A4 gating (AI-10): a turn that deliberately did not search — discovery
+  // ideation — draws no search line at all. Claiming "searched, found nothing"
+  // over a search that never ran would be the exact ceremony being killed.
+  const gatedOff = trace.searched ? !trace.searched.workspace : false
+  if (!gatedOff) {
+    const ws = workspaceSources(trace)
+    const web = webSources(trace)
     completed.push({
-      key: 'web',
-      label: `Searched the web · ${plural(web.length, 'result')}`,
-      icon: 'hub',
-      leaves: sourceLeaves(web)
+      key: 'retrieve',
+      label: retrieveLabel(trace),
+      icon: 'search',
+      leaves: sourceLeaves(ws)
     })
+    if (web.length > 0) {
+      completed.push({
+        key: 'web',
+        label: `Searched the web · ${plural(web.length, 'result')}`,
+        icon: 'hub',
+        leaves: sourceLeaves(web)
+      })
+    }
   }
 
   // 2 — reading what came back, one source at a time.

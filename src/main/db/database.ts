@@ -1004,6 +1004,9 @@ export function getDb(): Database.Database {
   // Plexii P6 — how a conversation talks ('chat' | 'discovery'). Every existing
   // row is a normal chat, which the DEFAULT states rather than infers.
   ensureColumn(db, 'ai_chat_conversations', 'mode', "TEXT NOT NULL DEFAULT 'chat'")
+  // Plexii A4 (R21) — the conversation's web-search globe. Default on: web
+  // search has been default-on since F4, so every existing row keeps its truth.
+  ensureColumn(db, 'ai_chat_conversations', 'web_search', 'INTEGER NOT NULL DEFAULT 1')
   // What screen a conversation was started from, so it can say so later. The
   // assistant used to re-thread per screen; after unification a conversation
   // REMEMBERS its context instead of being replaced by it (plan D4).

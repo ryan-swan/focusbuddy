@@ -39,6 +39,7 @@ function newTrace(): AssistantTrace {
     mentions: [],
     sources: [],
     semantic: null,
+    searched: null,
     tools: [],
     activity: null,
     error: null
@@ -167,6 +168,15 @@ interface ChatStore {
   setMode: (mode: AiChatMode) => void
   // The mode in force right now: the active conversation's, or the pending one.
   activeMode: () => AiChatMode
+  // The web-search globe (A4, R21), exactly the mode pattern: a not-yet-saved
+  // chat holds the pending value; a saved conversation's lives on its meta.
+  // Default on.
+  pendingWebSearch: boolean
+  // Flip the active conversation's globe. Works before the conversation exists
+  // (sets pendingWebSearch) and after (persists on the row).
+  setWebSearch: (on: boolean) => void
+  // The globe in force right now: the active conversation's, or the pending one.
+  activeWebSearch: () => boolean
   sending: boolean
   // The in-flight stream's requestId, so Stop can abort exactly the request
   // it belongs to. Null whenever nothing is streaming.
@@ -322,6 +332,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       void window.api.aiChat.setConversationMode(id, mode).catch(() => {})
     }
   },
+  pendingWebSearch: true,
+  activeWebSearch: () => {
+    const id = get().activeConversationId
+    if (!id) return get().pendingWebSearch
+    return get().conversations.find((c) => c.id === id)?.webSearch ?? true
+  },
+  setWebSearch: (on) => {
+    const id = get().activeConversationId
+    if (!id) {
+      set({ pendingWebSearch: on })
+      return
+    }
+    // Optimistic on the meta so the globe flips instantly; persisted after.
+    set({
+      conversations: get().conversations.map((c) => (c.id === id ? { ...c, webSearch: on } : c))
+    })
+    if (typeof window.api?.aiChat?.setConversationWebSearch === 'function') {
+      void window.api.aiChat.setConversationWebSearch(id, on).catch(() => {})
+    }
+  },
   conversationKey: () => get().activeConversationId ?? NEW_CHAT_KEY,
   refreshConversations: async () => {
     const list = await window.api.aiChat.listConversations().catch(() => null)
@@ -348,8 +378,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       mentions: clearConversationMentions(get().mentions, key),
       pendingContext: null,
       // A fresh chat starts as a normal chat unless the caller (the Discover
-      // widget) asks for discovery straight after.
-      pendingMode: 'chat'
+      // widget) asks for discovery straight after. The globe resets to its
+      // default-on too (R21 stickiness is per conversation, never inherited).
+      pendingMode: 'chat',
+      pendingWebSearch: true
     })
   },
   openConversation: async (id) => {
@@ -573,7 +605,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           title: content.slice(0, 60),
           context: get().pendingContext,
           // The mode chosen before the first word carries into the row.
-          mode: get().pendingMode
+          mode: get().pendingMode,
+          // Likewise the globe flipped before the first word (R21).
+          webSearch: get().pendingWebSearch
         })
         convId = meta.id
         const carried = get().messagesByTask[NEW_CHAT_KEY] ?? []
@@ -610,8 +644,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
     }
     // Read AFTER any lazy conversation-create above, so a discovery chat is
-    // discovery from its very first request.
+    // discovery from its very first request. Same for the globe (R21).
     const mode = get().activeMode()
+    const webSearch = get().activeWebSearch()
     const current = get().messagesByTask[key] ?? []
     const userMsg: ChatMessage = { role: 'user', content, ts: Date.now() }
     const next = [...current, userMsg]
@@ -827,6 +862,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         pinnedWidgetId,
         mentions: wireMentions,
         mode,
+        // The conversation's globe (R21); false turns the web pool off.
+        webSearch,
         // Keeps this conversation out of its own chat-history retrieval pool.
         conversationId: persist ?? undefined
       })
@@ -855,6 +892,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           pinnedWidgetId,
           mentions: wireMentions,
           mode,
+          // The conversation's globe (R21); false turns the web pool off.
+          webSearch,
           // Keeps this conversation out of its own chat-history retrieval pool.
           conversationId: persist ?? undefined
         },
@@ -871,7 +910,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               retrievalMs: t.elapsedMs,
               sources: t.sources,
               // Absent on an older main process: stays unknown, discloses nothing.
-              semantic: t.semantic ?? null
+              semantic: t.semantic ?? null,
+              // What actually ran (A4 gating). Absent = everything, pre-A4 truth.
+              searched: t.searched ?? null
             }),
           // Token-by-token prose: the first delta creates the turn, later ones
           // grow it in place. Cumulative text, so each event simply replaces.

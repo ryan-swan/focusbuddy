@@ -1981,6 +1981,7 @@ const api = {
       title?: string
       context?: import('@shared/types').AiChatConversationContext | null
       mode?: import('@shared/types').AiChatMode
+      webSearch?: boolean
     }): Promise<import('@shared/types').AiChatConversationMeta> =>
       ipcRenderer.invoke('aiChat:createConversation', input),
     // Plexii P6: switch a conversation between normal chat and guided discovery.
@@ -1988,6 +1989,9 @@ const api = {
       id: string,
       mode: import('@shared/types').AiChatMode
     ): Promise<void> => ipcRenderer.invoke('aiChat:setConversationMode', id, mode),
+    // A4 (R21): flip the conversation's web-search globe.
+    setConversationWebSearch: (id: string, on: boolean): Promise<void> =>
+      ipcRenderer.invoke('aiChat:setConversationWebSearch', id, on),
     appendMessage: (
       conversationId: string,
       message: {
