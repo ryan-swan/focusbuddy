@@ -93,7 +93,22 @@ test('plexii A2 pills: Home bar and composer modes act and stick', async () => {
   // The lock survives: the bar is now a search bar with the engine choice
   // right beside the pills, and Enter searches.
   await expect(bar).toHaveAttribute('placeholder', /Search the web/)
-  await expect(window.locator('[data-testid="web-panel-engine-toggle"]')).toBeVisible()
+  const homeEngineToggle = window.locator('[data-testid="web-panel-engine-toggle"]')
+  await expect(homeEngineToggle).toBeVisible()
+  // The menu must rise ABOVE the Home cards (it was buried under the standup
+  // card before the portal): every engine row visible and clickable.
+  await homeEngineToggle.click()
+  const homeMenu = window.locator('[data-testid="web-panel-engine-menu"]')
+  await expect(homeMenu).toBeVisible()
+  for (const label of ['DuckDuckGo', 'Google', 'Bing', 'Brave Search', 'Perplexity']) {
+    await expect(homeMenu).toContainText(label)
+  }
+  const box = await homeMenu.boundingBox()
+  expect(box && box.height > 150).toBeTruthy() // not clipped to a sliver
+  await window.waitForTimeout(400)
+  await window.screenshot({ path: `${OUT}/pills-4-home-engine-menu.png` })
+  await homeMenu.locator('[data-testid="web-panel-engine-duckduckgo"]').click()
+  await expect(homeMenu).toHaveCount(0)
   await bar.fill('standing desk mats')
   await window.keyboard.press('Enter')
   await expect(panel).toBeVisible()
