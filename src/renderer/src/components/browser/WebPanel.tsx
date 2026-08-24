@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../Icon'
-import BrowserSurface, { hostnameOf, type BrowserNavState } from './BrowserSurface'
+import BrowserSurface, { hostnameOf, type BrowserNavState, type WebviewEl } from './BrowserSurface'
 import { useWebPanel } from '../../stores/webPanel'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
@@ -30,6 +30,33 @@ export default function WebPanel(): React.JSX.Element | null {
   // freely after src, so the store's url is only where the panel STARTED.
   const navRef = useRef<BrowserNavState | null>(null)
   const src = sanitizeWebviewUrl(url ?? '')
+
+  // The webview's webContents id, published to the store once attached —
+  // the agent runtime (A6) drives THIS page through main and can only act
+  // on a webContents it can address. getWebContentsId throws before attach,
+  // so poll briefly instead of racing the attach event.
+  const setWcId = useWebPanel((s) => s.setWcId)
+  const [wvEl, setWvEl] = useState<WebviewEl | null>(null)
+  useEffect(() => {
+    if (!wvEl) {
+      setWcId(null)
+      return
+    }
+    let stopped = false
+    const read = (): void => {
+      if (stopped) return
+      try {
+        setWcId(wvEl.getWebContentsId())
+      } catch {
+        setTimeout(read, 120)
+      }
+    }
+    read()
+    return () => {
+      stopped = true
+      setWcId(null)
+    }
+  }, [wvEl, setWcId])
 
   // Fullscreen means "like a connected app" (Caleb's ruling on the live
   // drive): the browser fills the CONTENT area — the nav rail stays visible
@@ -143,6 +170,7 @@ export default function WebPanel(): React.JSX.Element | null {
         partition="persist:webview-default"
         taskId={null}
         linkClicks="navigate"
+        onWebviewEl={setWvEl}
         showTitle={expanded}
         toolbarClassName={
           expanded

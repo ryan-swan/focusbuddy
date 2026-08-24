@@ -8,6 +8,7 @@ import { autoBackupOnLaunch } from './db/backup'
 import { registerIpcHandlers } from './ipc'
 import { registerMdExternal } from './mdExternal'
 import { decidePopup } from './popupRouter'
+import { isAgentDrivenWc } from './ai/browserActions'
 import { cleanWebviewUserAgent } from './userAgent'
 import { getFile } from './db/files'
 import { installFocusTracker } from './streamdeckActions'
@@ -392,6 +393,19 @@ app.on('web-contents-created', (_, contents) => {
   // can spawn a new canvas widget — keeping the click-link-as-widget UX while
   // letting OAuth popups go native.
   contents.setWindowOpenHandler((details) => {
+    // R29: while an agent run drives this webContents, nothing opens a
+    // window outside the panel — popups (OAuth included: logins are the
+    // human's) deny, and target=_blank forwards to navigate in place.
+    if (isAgentDrivenWc(contents.id)) {
+      const mainWin = BrowserWindow.getAllWindows()[0]
+      if (/^https?:\/\//i.test(details.url)) {
+        mainWin?.webContents.send('webview:link-clicked', {
+          sourceWebContentsId: contents.id,
+          url: details.url
+        })
+      }
+      return { action: 'deny' }
+    }
     const decision = decidePopup(details, {
       session: contents.session,
       parentWindow: BrowserWindow.getFocusedWindow() ?? undefined

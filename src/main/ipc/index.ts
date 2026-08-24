@@ -272,6 +272,13 @@ import {
 } from '../ai/voiceCommand'
 import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
 import {
+  createAgentRun,
+  stopAgentRun,
+  endAgentRun,
+  performAgentAction,
+  type AgentAction
+} from '../ai/browserActions'
+import {
   importFile,
   pickFileForImport,
   pickGridFileForImport,
@@ -2266,6 +2273,16 @@ export function registerIpcHandlers(): void {
     'voiceCommand:setPrefs',
     (_e, patch: Parameters<typeof setVoiceCommandPrefs>[0]) =>
       setVoiceCommandPrefs(patch)
+  )
+  // Agentic browsing (A6/B1) — the deterministic action bridge. Every page
+  // action funnels through agentBrowser:perform's single door; stop flips
+  // the run's kill switch and every later action refuses. B2's loop and the
+  // fake-site probe drive the same four handles.
+  ipcMain.handle('agentBrowser:createRun', (_e, wcId: number) => createAgentRun(wcId))
+  ipcMain.handle('agentBrowser:stopRun', (_e, runId: string) => stopAgentRun(runId))
+  ipcMain.handle('agentBrowser:endRun', (_e, runId: string) => endAgentRun(runId))
+  ipcMain.handle('agentBrowser:perform', (_e, runId: string, action: AgentAction) =>
+    performAgentAction(runId, action)
   )
   // File import — system file picker, plus a content-aware converter
   // that turns .txt/.md/.csv/.json into widget drafts.

@@ -1280,6 +1280,30 @@ const api = {
   // Voice command — floating mic interpreter. Takes a transcript plus a
   // pruned canvas snapshot and returns ActionProposal[] for the user to
   // review. Same Apply/Dismiss UX as the existing AI assistants.
+  // Agentic browsing (A6/B1) — the deterministic action bridge. The runtime
+  // (and the fake-site probe) drives a webview's webContents through one
+  // sanitised door; stopRun is the kill switch.
+  agentBrowser: {
+    createRun: (
+      wcId: number
+    ): Promise<{ id: string; wcId: number; aborted: boolean; steps: number; downloadsCancelled: number }> =>
+      ipcRenderer.invoke('agentBrowser:createRun', wcId),
+    stopRun: (runId: string): Promise<boolean> => ipcRenderer.invoke('agentBrowser:stopRun', runId),
+    endRun: (runId: string): Promise<void> => ipcRenderer.invoke('agentBrowser:endRun', runId),
+    perform: (
+      runId: string,
+      action: Record<string, unknown> & { kind: string }
+    ): Promise<{
+      ok: boolean
+      refused?: string
+      detail?: string
+      pageUrl?: string
+      text?: string
+      elements?: Array<Record<string, unknown>>
+      captchaPresent?: boolean
+      image?: { base64Png: string; width: number; height: number }
+    }> => ipcRenderer.invoke('agentBrowser:perform', runId, action)
+  },
   voiceCommand: {
     run: (input: {
       transcript: string

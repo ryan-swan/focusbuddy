@@ -21,10 +21,20 @@ interface WebPanelState {
   url: string | null
   // Pinned search-engine preference (AI-02 seed).
   engine: SearchEngineId
+  // The mounted webview's webContents id (null until attach / after close).
+  // The agent runtime (A6) drives the panel's page through this — main can
+  // only act on a webContents it can address.
+  wcId: number | null
+  // The agent run currently driving this panel, if any. Closing the panel is
+  // itself a kill switch (R26: actions happen where you can see them — no
+  // page, no run): close() stops the run before the webview unmounts.
+  activeRunId: string | null
   openWeb: (url: string, opts?: { expanded?: boolean }) => void
   close: () => void
   toggleExpanded: () => void
   setEngine: (engine: SearchEngineId) => void
+  setWcId: (wcId: number | null) => void
+  setActiveRun: (runId: string | null) => void
 }
 
 export const useWebPanel = create<WebPanelState>((set) => ({
@@ -44,7 +54,17 @@ export const useWebPanel = create<WebPanelState>((set) => ({
   // Caleb's default; a citation clicked beside an answer stays the compact
   // panel so the conversation remains in view. Callers say which they are.
   openWeb: (url, opts) => set((s) => ({ open: true, url, expanded: opts?.expanded ?? s.expanded })),
-  close: () => set({ open: false, expanded: false }),
+  close: () =>
+    set((s) => {
+      if (s.activeRunId) {
+        try {
+          void window.api.agentBrowser.stopRun(s.activeRunId)
+        } catch {
+          /* main gone — nothing left to stop */
+        }
+      }
+      return { open: false, expanded: false, wcId: null, activeRunId: null }
+    }),
   toggleExpanded: () => set((s) => ({ expanded: !s.expanded })),
   setEngine: (engine) => {
     try {
@@ -53,5 +73,14 @@ export const useWebPanel = create<WebPanelState>((set) => ({
       /* ignore */
     }
     set({ engine })
-  }
+  },
+  wcId: null,
+  setWcId: (wcId) => set({ wcId }),
+  activeRunId: null,
+  setActiveRun: (runId) => set({ activeRunId: runId })
 }))
+
+// Test handle (A6 probe): the bridge probe needs the live wcId to drive.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbWebPanel?: typeof useWebPanel }).__fbWebPanel = useWebPanel
+}
