@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '../Icon'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useChatStore, NEW_CHAT_KEY } from '../../stores/chat'
-import { composerOmniIntents, type OmniTarget } from '../../lib/omniIntent'
+import { composerOmniIntents, matchTargets, type OmniTarget } from '../../lib/omniIntent'
+import { useWidgetStore } from '../../stores/widgets'
+import type { SearchHit } from '@shared/types'
 import { performOmniIntent, loadOmniMode, saveOmniMode, type OmniMode } from '../../lib/omniPerform'
 import EnginePickerChip from '../browser/EnginePickerChip'
 
@@ -20,6 +23,51 @@ import EnginePickerChip from '../browser/EnginePickerChip'
 
 const EXAMPLES = ['Plan a wedding', 'Launch a product', 'Track job applications', 'Run a book club']
 const MODE_KEY = 'fb.omni.mode.home'
+
+// "@" on the bar is DIRECT navigation (AI-36, the remote control): mention a
+// desk, room, widget, document, file or knowledge entry and land on it. The
+// picker rides the global search backend (search:query — the same hits and
+// routing PlexiSearch uses), with desks/rooms/pages answering instantly from
+// the node store while the deeper search returns.
+interface PickItem {
+  key: string
+  type: SearchHit['type'] | 'page'
+  id: string
+  title: string
+  hint: string
+  icon: string
+  taskId?: string | null
+}
+
+const PICK_ICONS: Record<string, string> = {
+  task: 'desk',
+  folder: 'folder',
+  widget: 'widgets',
+  'table-row': 'table_chart',
+  document: 'description',
+  file: 'draft',
+  knowledge: 'neurology',
+  page: 'arrow_forward'
+}
+const PICK_HINTS: Record<string, string> = {
+  task: 'Desk',
+  folder: 'Room',
+  widget: 'Widget',
+  'table-row': 'Table',
+  document: 'Document',
+  file: 'File',
+  knowledge: 'PlexiBrain',
+  page: 'Page'
+}
+const PICKABLE = new Set(['task', 'folder', 'widget', 'table-row', 'document', 'file', 'knowledge'])
+
+// The active "@" query: the tail after the last standalone @, or null.
+function mentionQuery(text: string): string | null {
+  const i = text.lastIndexOf('@')
+  if (i === -1) return null
+  if (i > 0 && !/\s/.test(text[i - 1])) return null
+  return text.slice(i + 1)
+}
 
 export default function StartOrAskPlexi(): JSX.Element {
   const [goal, setGoal] = useState('')
@@ -92,11 +140,135 @@ export default function StartOrAskPlexi(): JSX.Element {
 
   const searching = mode === 'search'
 
+  // ── The "@" navigation picker ─────────────────────────────────────────────
+  const pillowRef = useRef<HTMLDivElement | null>(null)
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null)
+  const [apiHits, setApiHits] = useState<SearchHit[]>([])
+  const [highlight, setHighlight] = useState(0)
+  const atQuery = mentionQuery(goal)
+  const pickerOpen = atQuery !== null && dismissedFor !== goal
+
+  // Instant candidates from the stores; the search backend joins in ≥2 chars.
+  const localItems = useMemo<PickItem[]>(() => {
+    if (atQuery === null) return []
+    const pool: PickItem[] = [
+      ...nodes
+        .filter((n) => n.kind === 'task' || n.kind === 'folder')
+        .map((n) => ({
+          key: `${n.kind === 'task' ? 'task' : 'folder'}:${n.id}`,
+          type: (n.kind === 'task' ? 'task' : 'folder') as PickItem['type'],
+          id: n.id,
+          title: n.title || 'Untitled',
+          hint: n.kind === 'task' ? 'Desk' : 'Room',
+          icon: PICK_ICONS[n.kind === 'task' ? 'task' : 'folder']
+        })),
+      ...(['Tasks', 'Calendar', 'Files', 'Vault'] as const).map((t) => ({
+        key: `page:${t.toLowerCase()}`,
+        type: 'page' as const,
+        id: t.toLowerCase(),
+        title: t,
+        hint: 'Page',
+        icon: PICK_ICONS.page
+      }))
+    ]
+    const q = atQuery.trim()
+    if (!q) return pool.slice(0, 8)
+    // Rank with the same token-coverage matcher the take-me-to route uses.
+    const byId = new Map(pool.map((x) => [x.key, x]))
+    const ranked = matchTargets(
+      q,
+      pool.map((x) => ({ kind: 'page' as const, id: x.key, title: x.title })),
+      8
+    )
+    return ranked.map((r) => byId.get(r.id)).filter((x): x is PickItem => !!x)
+  }, [atQuery, nodes])
+
+  useEffect(() => {
+    const q = atQuery?.trim() ?? ''
+    if (!pickerOpen || q.length < 2) {
+      setApiHits([])
+      return
+    }
+    let live = true
+    const t = setTimeout(() => {
+      void window.api.search
+        .query(q)
+        .then((hits) => {
+          if (live) setApiHits(hits.filter((h) => PICKABLE.has(h.type)).slice(0, 10))
+        })
+        .catch(() => {})
+    }, 140)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [atQuery, pickerOpen])
+
+  const pickItems = useMemo<PickItem[]>(() => {
+    const seen = new Set<string>()
+    const out: PickItem[] = []
+    for (const x of localItems) {
+      if (!seen.has(x.key)) {
+        seen.add(x.key)
+        out.push(x)
+      }
+    }
+    for (const h of apiHits) {
+      const key = `${h.type}:${h.id}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({
+        key,
+        type: h.type,
+        id: h.id,
+        title: h.title || 'Untitled',
+        hint: PICK_HINTS[h.type] ?? h.type,
+        icon: PICK_ICONS[h.type] ?? 'search',
+        taskId: h.taskId
+      })
+    }
+    return out.slice(0, 8)
+  }, [localItems, apiHits])
+
+  useEffect(() => setHighlight(0), [atQuery])
+
+  // Same landings PlexiSearch gives these hit types; widgets arrive selected.
+  function goItem(it: PickItem): void {
+    const view = useViewStore.getState()
+    if (it.type === 'page') {
+      if (it.id === 'tasks') view.goAllTasks()
+      else if (it.id === 'calendar') view.goCalendar()
+      else if (it.id === 'files') view.goFiles()
+      else if (it.id === 'vault') view.goVault()
+    } else if (it.type === 'task') {
+      useNodeStore.getState().setActive(it.id)
+      view.goTask(it.id)
+    } else if (it.type === 'folder') {
+      view.goProject(it.id)
+    } else if (it.type === 'widget' || it.type === 'table-row') {
+      if (it.taskId) {
+        useNodeStore.getState().setActive(it.taskId)
+        view.goTask(it.taskId)
+        if (it.type === 'widget') useWidgetStore.getState().setSelection([it.id])
+      }
+    } else if (it.type === 'document') {
+      view.goDocument(it.id)
+    } else if (it.type === 'file') {
+      view.goFiles()
+    } else if (it.type === 'knowledge') {
+      view.goKnowledge(it.id)
+    }
+    setGoal('')
+    setApiHits([])
+  }
+
+  const pillowRect = pillowRef.current?.getBoundingClientRect()
+
   return (
     <div className="mb-6" data-testid="start-or-ask">
       {/* Glass chrome: the hero input floats above the desk-paper like a
           control, not a content card — the one Liquid Glass surface on Home. */}
-      <div className="fb-glass-pillow rounded-[16px] p-3">
+      <div className="fb-glass-pillow rounded-[16px] p-3" ref={pillowRef}>
         <div className="flex items-center gap-2.5">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent shrink-0">
             <Icon name={searching ? 'travel_explore' : 'auto_awesome'} size={17} />
@@ -105,6 +277,26 @@ export default function StartOrAskPlexi(): JSX.Element {
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             onKeyDown={(e) => {
+              if (pickerOpen && pickItems.length > 0) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setHighlight((h) => {
+                    const n = pickItems.length
+                    return (h + (e.key === 'ArrowDown' ? 1 : n - 1)) % n
+                  })
+                  return
+                }
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  goItem(pickItems[Math.min(highlight, pickItems.length - 1)])
+                  return
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setDismissedFor(goal)
+                  return
+                }
+              }
               if (e.key === 'Enter') {
                 e.preventDefault()
                 start()
@@ -115,7 +307,7 @@ export default function StartOrAskPlexi(): JSX.Element {
             placeholder={
               searching
                 ? 'Search the web — results open right here in Plexi'
-                : 'Ask Plexii, search the web, or open anything'
+                : 'Ask Plexii, search the web, or open anything — @ jumps to a desk, room or widget'
             }
             // No focus box (Caleb's ruling): the global :focus-visible outline
             // draws a hard accent rectangle around text inputs; this bar's
@@ -187,6 +379,43 @@ export default function StartOrAskPlexi(): JSX.Element {
             ))}
         </div>
       </div>
+      {pickerOpen && pickItems.length > 0 && pillowRect &&
+        createPortal(
+          <div
+            data-testid="start-or-ask-mentions"
+            className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in fixed z-[240] p-1"
+            style={{
+              top: pillowRect.bottom + 6,
+              left: pillowRect.left + 42,
+              width: Math.min(420, pillowRect.width - 42)
+            }}
+          >
+            {pickItems.map((it, i) => (
+              <button
+                key={it.key}
+                type="button"
+                data-testid="start-or-ask-mention-row"
+                onMouseEnter={() => setHighlight(i)}
+                onMouseDown={(e) => {
+                  // mousedown, not click: the input keeps focus and no blur
+                  // races the navigation.
+                  e.preventDefault()
+                  goItem(it)
+                }}
+                className={`w-full flex items-center gap-2 rounded-[var(--radius-chip)] px-2 py-1.5 text-left transition-colors ${
+                  i === highlight ? 'bg-[var(--surface-sunken)]' : ''
+                }`}
+              >
+                <Icon name={it.icon} size={13} className="shrink-0 text-[var(--ink-60)]" />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--ink-90)]">
+                  {it.title}
+                </span>
+                <span className="shrink-0 fb-t-caption text-[var(--ink-40)]">{it.hint}</span>
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

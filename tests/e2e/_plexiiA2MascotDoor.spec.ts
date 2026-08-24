@@ -139,3 +139,72 @@ test('plexii A2 pills: Home bar and composer modes act and stick', async () => {
 
   await launched.dispose()
 })
+
+test('plexii A2 @ mentions: the bar jumps straight to desks, rooms, and widgets', async () => {
+  const launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), process.env.SHOT_THEME ?? 'dark')
+  await window.evaluate(async () => {
+    const api = (
+      window as unknown as {
+        api: {
+          nodes: { create: (d: unknown) => Promise<{ id: string }> }
+          widgets: { create: (d: unknown) => Promise<unknown> }
+        }
+      }
+    ).api
+    const room = await api.nodes.create({ parentId: null, kind: 'folder', title: 'Client work' })
+    const desk = await api.nodes.create({ parentId: room.id, kind: 'task', title: 'Flamelit HQ' })
+    await api.widgets.create({
+      taskId: desk.id,
+      kind: 'sticky',
+      title: 'Budget tracker',
+      content: 'Q3 budget: 4,200 for the hydrofoil.'
+    })
+  })
+  await window.reload()
+  await waitForReady(window)
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => { goHome: () => void } } }
+    w.__fbView?.getState().goHome()
+  })
+
+  const bar = window.locator('[data-testid="start-or-ask-input"]')
+  await expect(bar).toBeVisible()
+
+  // "@flame" surfaces the desk instantly; Enter lands on it.
+  await bar.click()
+  await window.keyboard.type('@flame', { delay: 8 })
+  const menu = window.locator('[data-testid="start-or-ask-mentions"]')
+  await expect(menu).toBeVisible()
+  await expect(menu.locator('[data-testid="start-or-ask-mention-row"]').first()).toContainText(
+    'Flamelit HQ'
+  )
+  await window.waitForTimeout(400)
+  await window.screenshot({ path: `${OUT}/mention-1-desk.png` })
+  await window.keyboard.press('Enter')
+  // Landed on the desk (the Home bar unmounts with the navigation).
+  await expect(window.locator('text=Flamelit HQ').first()).toBeVisible({ timeout: 5000 })
+  await expect(bar).toHaveCount(0)
+
+  // A widget mention (via the search backend) lands on its desk, selected.
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => { goHome: () => void } } }
+    w.__fbView?.getState().goHome()
+  })
+  await bar.click()
+  await window.keyboard.type('@budget tracker', { delay: 8 })
+  const widgetRow = window
+    .locator('[data-testid="start-or-ask-mention-row"]')
+    .filter({ hasText: 'Budget tracker' })
+    .first()
+  await expect(widgetRow).toBeVisible({ timeout: 5000 })
+  await expect(widgetRow).toContainText('Widget')
+  await window.screenshot({ path: `${OUT}/mention-2-widget.png` })
+  await widgetRow.click()
+  await expect(window.locator('text=Budget tracker').first()).toBeVisible({ timeout: 5000 })
+
+  await launched.dispose()
+})
