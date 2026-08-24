@@ -92,10 +92,23 @@ export function deriveAssistantBlocks(
   // 4) Each proposal becomes an action block — or a connector-action block when
   //    it maps to a known connector, so email/calendar/chat read as first-class
   //    connector affordances instead of generic actions.
+  //
+  //    A4 (AI-09, R3): when a turn carries TWO OR MORE plain proposals — a
+  //    build batch — they ride as ONE action-group block, so the shared card
+  //    surface can offer Apply all and per-card checkboxes over the whole
+  //    group. Connector actions keep their own branded blocks and positions;
+  //    a single plain proposal keeps the original single-card block.
+  const plain = proposals.filter((p) => !connectorForProposal(p))
+  let groupEmitted = false
   for (const p of proposals) {
     const connector = connectorForProposal(p)
     if (connector) {
       blocks.push({ kind: 'connector-action', connector, label: p.kind, proposal: p })
+    } else if (plain.length >= 2) {
+      if (!groupEmitted) {
+        blocks.push({ kind: 'action-group', proposals: plain })
+        groupEmitted = true
+      }
     } else {
       blocks.push({ kind: 'action', proposal: p })
     }

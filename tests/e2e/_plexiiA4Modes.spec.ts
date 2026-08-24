@@ -52,3 +52,56 @@ test('plexii A4: the conversation-mode chip wears, switches, and sticks', async 
 
   await launched.dispose()
 })
+
+test('plexii A4: proposal checkboxes turn Apply all into Apply selected', async () => {
+  const launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), process.env.SHOT_THEME ?? 'dark')
+  await window.reload()
+  await waitForReady(window)
+
+  // Seed a settled assistant turn carrying a three-card build (AI-09).
+  await window.evaluate(() => {
+    const w = window as unknown as {
+      __fbView?: { getState: () => { goPlexii: () => void } }
+      __fbChat?: { setState: (s: Record<string, unknown>) => void }
+    }
+    w.__fbView?.getState().goPlexii()
+    const ts = 1_755_900_000_000
+    w.__fbChat?.setState({
+      activeConversationId: null,
+      sending: false,
+      messagesByTask: {
+        __new__: [
+          { role: 'user', content: 'Set up the launch workspace', ts: ts - 10_000 },
+          { role: 'assistant', content: 'Here is the launch setup — apply the cards below.', ts }
+        ]
+      },
+      proposalsByMessage: {
+        [String(ts)]: [
+          { id: 'p1', kind: 'create-todo-list', title: 'Launch checklist', items: ['Hosting', 'Pilot'] },
+          { id: 'p2', kind: 'create-table', title: 'Episodes', columns: [{ label: 'Title', type: 'text-short' }] },
+          { id: 'p3', kind: 'create-widget', widgetKind: 'markdown', title: 'Notes' }
+        ]
+      }
+    })
+  })
+
+  // All three pending: the batch button offers Apply all.
+  const batchBtn = window.locator('[data-testid="proposal-apply-batch"]')
+  await expect(batchBtn).toContainText('Apply all 3')
+
+  // Tick two — the button flips to Apply selected 2; untick back to all.
+  await window.locator('[data-testid="proposal-check-p1"]').click()
+  await window.locator('[data-testid="proposal-check-p3"]').click()
+  await expect(batchBtn).toContainText('Apply selected 2')
+  await window.waitForTimeout(250)
+  await window.screenshot({ path: `${OUT}/a4-apply-selected.png` })
+  await window.locator('[data-testid="proposal-check-p1"]').click()
+  await window.locator('[data-testid="proposal-check-p3"]').click()
+  await expect(batchBtn).toContainText('Apply all 3')
+
+  await launched.dispose()
+})

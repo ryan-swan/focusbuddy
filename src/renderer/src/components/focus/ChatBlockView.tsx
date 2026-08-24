@@ -188,6 +188,19 @@ export default function ChatBlockView({
         />
       )
 
+    case 'action-group':
+      // The turn's whole build batch through ONE card surface (A4, AI-09):
+      // Apply all and the per-card checkboxes work over the real group.
+      return (
+        <ProposalCards
+          proposals={block.proposals}
+          activeTaskId={activeTaskId}
+          appliedProposals={appliedProposals}
+          onApplied={onApplied}
+          onConsume={onConsumeProposal}
+        />
+      )
+
     case 'connector-action': {
       const meta = connectorMeta(block.connector)
       // Connector actions flow through the SAME apply pipeline as any action —

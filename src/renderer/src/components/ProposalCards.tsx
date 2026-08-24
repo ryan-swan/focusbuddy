@@ -106,6 +106,19 @@ export default function ProposalCards({
   const [toast, setToast] = useState<{ id: string; ok: boolean; message: string } | null>(
     null
   )
+  // Per-card checkboxes (A4, AI-09 — R3): ticking a subset turns "Apply all"
+  // into "Apply selected". Selection is presentation state on this group;
+  // applied cards fall out of it naturally because only pending cards are
+  // counted. Drag-box selection stays a canvas gesture, never a transcript one.
+  const [checked, setChecked] = useState<ReadonlySet<string>>(new Set())
+  function toggleChecked(id: string): void {
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
   // Run-lock: while an autonomous agent run is applying proposals into one shared
   // undo batch, a manual Apply here would fold into that batch (wrong attribution)
   // or race its applies. Disable manual apply for the duration of a run.
@@ -185,10 +198,12 @@ export default function ProposalCards({
     }
   }
 
-  async function applyAll(): Promise<void> {
+  // Apply a batch: the whole pending group ("Apply all") or the ticked subset
+  // ("Apply selected"). One undo entry either way.
+  async function applyBatch(batch: ActionProposal[]): Promise<void> {
     if (busy || agentRunning) return
     // Only apply the ones not already done (applied cards stay as green records).
-    const pending = proposals.filter((p) => !appliedProposals[p.id])
+    const pending = batch.filter((p) => !appliedProposals[p.id])
     if (pending.length === 0) return
     // Off a desk, gather the desk-kind proposals and offer a place for them first.
     if (!activeTaskId) {
@@ -203,7 +218,7 @@ export default function ProposalCards({
     const destructive = pending.filter((p) => p.kind === 'delete-widget')
     if (destructive.length > 0) {
       const ok = window.confirm(
-        `This will delete ${destructive.length} item${destructive.length > 1 ? 's' : ''} from your canvas. You can undo it afterwards. Apply all ${pending.length} change${pending.length > 1 ? 's' : ''}?`
+        `This will delete ${destructive.length} item${destructive.length > 1 ? 's' : ''} from your canvas. You can undo it afterwards. Apply ${pending.length} change${pending.length > 1 ? 's' : ''}?`
       )
       if (!ok) return
     }
@@ -221,7 +236,7 @@ export default function ProposalCards({
     } finally {
       useActionHistory
         .getState()
-        .endBatch(`Apply ${proposals.length} AI change${proposals.length > 1 ? 's' : ''}`)
+        .endBatch(`Apply ${pending.length} AI change${pending.length > 1 ? 's' : ''}`)
     }
   }
 
@@ -300,7 +315,11 @@ export default function ProposalCards({
   }
 
   // Only the not-yet-applied proposals are candidates for "Apply all".
-  const pendingCount = proposals.filter((p) => !appliedProposals[p.id]).length
+  const pendingProposals = proposals.filter((p) => !appliedProposals[p.id])
+  const pendingCount = pendingProposals.length
+  // The ticked subset (AI-09). Empty selection means the button applies all.
+  const selectedProposals = pendingProposals.filter((p) => checked.has(p.id))
+  const selectedCount = selectedProposals.length
 
   // Which destination options the current chooser should show, from the kinds of
   // the offered proposals. Desk options appear when any can live on a desk; the
@@ -454,12 +473,33 @@ export default function ProposalCards({
         // ── Pending card: clickable to apply, a "choose where" control for
         //    placeable kinds, and × to dismiss.
         return (
+          <div key={p.id} className="flex items-center gap-1.5">
+            {/* The subset checkbox (A4, AI-09) lives OUTSIDE the card button:
+                interactive content nested in a <button> is invalid HTML and
+                Chromium retargets real clicks to the button — the probe's
+                click toggled nothing until this moved out. */}
+            {pendingCount > 1 && (
+              <button
+                type="button"
+                onClick={() => toggleChecked(p.id)}
+                role="checkbox"
+                aria-checked={checked.has(p.id)}
+                title={checked.has(p.id) ? 'Remove from the selection' : 'Select for a partial apply'}
+                data-testid={`proposal-check-${p.id}`}
+                className={`h-4 w-4 rounded-[4px] border inline-flex items-center justify-center shrink-0 transition-colors ${
+                  checked.has(p.id)
+                    ? 'bg-[rgb(var(--accent))] border-[rgb(var(--accent))] text-white'
+                    : 'border-[var(--edge-soft)] bg-[var(--surface-base)] text-transparent hover:border-[rgb(var(--accent)/0.6)]'
+                }`}
+              >
+                <Icon name="check" size={11} />
+              </button>
+            )}
           <button
-            key={p.id}
             onClick={() => void applyOne(p)}
             disabled={isBusy || agentRunning}
             data-testid={`proposal-card-${p.id}`}
-            className="text-left fb-card fb-press hover:bg-accent/5 hover:outline hover:outline-1 hover:outline-[rgb(var(--accent)/0.5)] hover:-outline-offset-1 px-2.5 py-1.5 transition-colors group"
+            className="flex-1 min-w-0 text-left fb-card fb-press hover:bg-accent/5 hover:outline hover:outline-1 hover:outline-[rgb(var(--accent)/0.5)] hover:-outline-offset-1 px-2.5 py-1.5 transition-colors group"
           >
             <div className="flex items-center gap-2">
               <span className="h-6 w-6 rounded-[var(--radius-chip)] inline-flex items-center justify-center bg-accent/10 text-accent shrink-0">
@@ -523,15 +563,19 @@ export default function ProposalCards({
               </div>
             </div>
           </button>
+          </div>
         )
       })}
       {pendingCount > 1 && (
         <button
-          onClick={() => void applyAll()}
+          onClick={() =>
+            void applyBatch(selectedCount > 0 ? selectedProposals : pendingProposals)
+          }
           disabled={busy !== null || agentRunning}
+          data-testid="proposal-apply-batch"
           className="fb-t-caption text-accent self-start px-1.5 py-0.5 hover:underline disabled:opacity-50"
         >
-          Apply all {pendingCount}
+          {selectedCount > 0 ? `Apply selected ${selectedCount}` : `Apply all ${pendingCount}`}
         </button>
       )}
     </div>

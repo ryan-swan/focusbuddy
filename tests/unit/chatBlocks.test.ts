@@ -151,3 +151,42 @@ describe('connectorMeta', () => {
     expect(connectorMeta('slack')).toEqual({ icon: 'bolt', label: 'slack' })
   })
 })
+
+// A4 (AI-09, R3): a build batch rides as ONE action-group so Apply all and
+// the per-card checkboxes work over the real group.
+describe('deriveAssistantBlocks — the action group', () => {
+  it('two or more plain proposals become one action-group block', () => {
+    const proposals: ActionProposal[] = [
+      { id: 'a', kind: 'create-todo-list', title: 'Checklist', items: [] },
+      { id: 'b', kind: 'create-task', title: 'Hub' }
+    ]
+    const blocks = deriveAssistantBlocks(msg('Setting up.'), proposals)
+    expect(blocks).toEqual([
+      { kind: 'text', markdown: 'Setting up.' },
+      { kind: 'action-group', proposals }
+    ])
+  })
+
+  it('a single plain proposal keeps its single action block', () => {
+    const one: ActionProposal[] = [{ id: 'a', kind: 'create-task', title: 'Hub' }]
+    const blocks = deriveAssistantBlocks(msg(''), one)
+    expect(blocks).toEqual([{ kind: 'action', proposal: one[0] }])
+  })
+
+  it('connector proposals keep their branded blocks beside the group', () => {
+    const mail: ActionProposal = {
+      id: 'm',
+      kind: 'compose-mail',
+      to: ['a@b.co'],
+      subject: 's',
+      body: 'b'
+    }
+    const plainA: ActionProposal = { id: 'a', kind: 'create-task', title: 'Hub' }
+    const plainB: ActionProposal = { id: 'b', kind: 'create-todo-list', title: 'List', items: [] }
+    const blocks = deriveAssistantBlocks(msg(''), [plainA, mail, plainB])
+    expect(blocks).toEqual([
+      { kind: 'action-group', proposals: [plainA, plainB] },
+      { kind: 'connector-action', connector: 'gmail', label: 'compose-mail', proposal: mail }
+    ])
+  })
+})

@@ -2519,6 +2519,10 @@ export type ChatBlock =
   | { kind: 'widget-card'; widgetId?: string; documentId?: string; title: string; widgetKind?: WidgetKind }
   | { kind: 'link'; href: string; label: string; external?: boolean }
   | { kind: 'connector-action'; connector: string; label: string; proposal: ActionProposal }
+  // A turn's plain (non-connector) proposals as ONE group (A4, AI-09 — R3):
+  // the shared card surface renders them together so Apply all and the
+  // per-card checkboxes work over the whole build batch.
+  | { kind: 'action-group'; proposals: ActionProposal[] }
   // What the answer was grounded on. Rendered as a row of numbered chips under
   // the reply, matching the [n] markers inside it.
   | { kind: 'mentions'; mentions: ChatMentionResolved[] }
