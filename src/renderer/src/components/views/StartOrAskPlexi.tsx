@@ -116,7 +116,10 @@ export default function StartOrAskPlexi(): JSX.Element {
                 ? 'Search the web — results open right here in Plexi'
                 : 'Ask Plexii, search the web, or open anything'
             }
-            className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] disabled:opacity-60"
+            // No focus box (Caleb's ruling): the global :focus-visible outline
+            // draws a hard accent rectangle around text inputs; this bar's
+            // glass pillow IS the affordance, same precedent as the composer.
+            className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)] disabled:opacity-60 focus:outline-none"
           />
           {/* The power path, taught where the suite home teaches it (R6 note). */}
           <button

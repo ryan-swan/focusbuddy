@@ -80,6 +80,52 @@ export default function WebPanel(): React.JSX.Element | null {
     }
   }, [open, src])
 
+  // Fullscreen means "like a connected app" (Caleb's ruling on the live
+  // drive): the browser fills the CONTENT area — the nav rail stays visible
+  // and clickable, exactly like opening Claude or Slack. The panel is a
+  // fixed portal (so expanding never remounts the webview and never reloads
+  // the page), so the content rectangle is measured from the live layout —
+  // <main> minus the sidebar dock — and tracked per frame while expanded,
+  // which also follows sidebar resizes and collapses for free.
+  const [fullRect, setFullRect] = useState<{
+    top: number
+    left: number
+    width: number
+    height: number
+  } | null>(null)
+  useEffect(() => {
+    if (!open || !expanded) {
+      setFullRect(null)
+      return
+    }
+    let raf = 0
+    const tick = (): void => {
+      const main = document.querySelector('main')
+      if (main) {
+        const m = main.getBoundingClientRect()
+        const aside = document.querySelector(
+          '[data-testid="desk-sidebar"], [data-testid="desk-sidebar-collapsed"]'
+        )
+        const left = aside
+          ? Math.min(Math.max(aside.getBoundingClientRect().right + 6, m.left), m.right - 320)
+          : m.left
+        setFullRect((prev) => {
+          const next = { top: m.top, left, width: m.right - left, height: m.height }
+          return prev &&
+            prev.top === next.top &&
+            prev.left === next.left &&
+            prev.width === next.width &&
+            prev.height === next.height
+            ? prev
+            : next
+        })
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [open, expanded])
+
   // Esc steps DOWN: a fullscreen browser first returns to the panel, a
   // second Esc closes it. (The webview swallows its own keys; this catches
   // the chrome.)
@@ -100,16 +146,29 @@ export default function WebPanel(): React.JSX.Element | null {
     <aside
       data-testid="web-panel"
       data-expanded={expanded ? 'true' : 'false'}
-      className={`fixed z-[130] flex flex-col rounded-[var(--radius-card)] bg-[var(--surface-base)] fb-fade-in-up overflow-hidden transition-[inset,width] duration-200 ${
+      className={`fixed z-[130] flex flex-col bg-[var(--surface-raised)] overflow-hidden ${
         expanded
-          ? 'top-10 bottom-2 left-2 right-2 w-auto'
-          : 'top-10 bottom-7 right-[14px] w-[min(560px,calc(100vw-120px))]'
+          ? ''
+          : 'top-10 bottom-7 right-[14px] w-[min(560px,calc(100vw-120px))] rounded-[var(--radius-card)] fb-fade-in-up'
       }`}
-      style={{
-        boxShadow: '0 0 0 1px var(--edge-hairline), var(--shadow-cast), var(--shadow-inset-highlight)'
-      }}
+      style={
+        expanded && fullRect
+          ? { top: fullRect.top, left: fullRect.left, width: fullRect.width, height: fullRect.height }
+          : expanded
+            ? { top: 40, left: 90, right: 8, bottom: 28 }
+            : {
+                boxShadow:
+                  '0 0 0 1px var(--edge-hairline), var(--shadow-cast), var(--shadow-inset-highlight)'
+              }
+      }
     >
-      <div className="flex items-center gap-1 px-2 py-1.5 bg-[var(--surface-raised)]">
+      <div
+        className={`flex items-center gap-1 shrink-0 ${
+          expanded
+            ? 'px-3 py-2 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
+            : 'px-2 py-1.5 bg-[var(--surface-raised)]'
+        }`}
+      >
         <button
           className="icon-btn !h-6 !w-6"
           disabled={!canGoBack}
@@ -133,13 +192,24 @@ export default function WebPanel(): React.JSX.Element | null {
         >
           <Icon name={loading ? 'close' : 'refresh'} size={14} />
         </button>
-        <div
-          className="flex-1 min-w-0 px-2 py-1 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] fb-t-caption text-[var(--ink-60)] truncate"
-          title={currentUrl || src}
-        >
-          <span className="text-[var(--ink-90)]">{title || hostnameOf(currentUrl || src)}</span>
-          <span className="ml-2">{hostnameOf(currentUrl || src)}</span>
-        </div>
+        {expanded ? (
+          <div className="flex-1 min-w-0 pl-1" title={currentUrl || src}>
+            <div className="text-sm font-semibold text-[var(--ink-100)] truncate">
+              {title || hostnameOf(currentUrl || src)}
+            </div>
+            <div className="text-[10px] text-[var(--ink-50)] truncate font-mono">
+              {hostnameOf(currentUrl || src)}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="flex-1 min-w-0 px-2 py-1 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] fb-t-caption text-[var(--ink-60)] truncate"
+            title={currentUrl || src}
+          >
+            <span className="text-[var(--ink-90)]">{title || hostnameOf(currentUrl || src)}</span>
+            <span className="ml-2">{hostnameOf(currentUrl || src)}</span>
+          </div>
+        )}
         <EnginePickerChip />
         <button
           className="icon-btn !h-6 !w-6"
