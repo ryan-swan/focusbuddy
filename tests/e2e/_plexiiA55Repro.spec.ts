@@ -82,6 +82,15 @@ test('a5.5 repro: floating panel with a formatted answer', async () => {
   await expect(window.locator('[data-testid="chat-web-globe"]')).toBeVisible()
   await expect(window.locator('[data-testid="chat-turn-into-desk"]')).toBeVisible()
 
+  // AI-41 (the R25 amendment): heading emojis render as premium icons —
+  // the material glyph is there, the raw emoji is not.
+  const h2 = window.locator('[data-testid="chat-scroll"] h2', { hasText: 'Open Commitments' })
+  await expect(h2.locator('span.material-symbols-outlined')).toHaveText('rocket_launch')
+  await expect(h2).not.toContainText('🚀')
+  const h2b = window.locator('[data-testid="chat-scroll"] h2', { hasText: 'Other Context' })
+  await expect(h2b.locator('span.material-symbols-outlined')).toHaveText('lightbulb')
+  await expect(h2b).not.toContainText('💡')
+
   // The card wears a radius (AI-39): the overlay clips at radius-card.
   const radius = await window
     .locator('[data-testid="assistant-overlay"]')

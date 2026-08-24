@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
+import { MD_SECTION_COMPONENTS } from './mdSection'
 import remarkGfm from 'remark-gfm'
 import remarkCitations from '../../lib/remarkCitations'
 import { safeCut, REVEAL_CPS, COMMIT_MS } from '../../lib/streamReveal'
@@ -229,7 +230,7 @@ const StreamSpan: Components['span'] = ({ node, children, ...rest }) => {
   )
 }
 
-const COMPONENTS: Components = { a: StreamLink, span: StreamSpan }
+const COMPONENTS: Components = { a: StreamLink, span: StreamSpan, ...MD_SECTION_COMPONENTS }
 const REMARK_PLUGINS = [remarkGfm, remarkCitations]
 
 interface Props {

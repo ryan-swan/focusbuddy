@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown'
+import { MD_SECTION_COMPONENTS } from '../assistant/mdSection'
 import remarkGfm from 'remark-gfm'
 import type { AppliedProposal, ChatBlock, ChatSource } from '@shared/types'
 import ProposalCards from '../ProposalCards'
@@ -78,6 +79,7 @@ export default function ChatBlockView({
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkCitations]}
             components={{
+              ...MD_SECTION_COMPONENTS,
               a: ({ href, children, ...rest }) => (
                 <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
                   {children}
