@@ -792,6 +792,17 @@ export type ActionProposal =
       reason?: string
     }
   | {
+      // Agentic browsing (A6, AI-05): Plexii offers to drive the in-app
+      // browser through a multi-step task. The card ACTS (R5): applying
+      // opens the panel and starts a supervised run — visible, stoppable,
+      // consent-gated — that the AgentRunDock narrates.
+      id: string
+      kind: 'agent-browse'
+      task: string
+      url?: string
+      reason?: string
+    }
+  | {
       // System-wide navigation: jump to any area of the app. This is what lets the
       // voice assistant "open my calendar / go to Files / show the org chart" from
       // anywhere, regardless of the current context. Distinct from open-url, which

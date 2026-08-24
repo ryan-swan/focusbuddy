@@ -29,6 +29,7 @@ const KIND_TITLE: Record<string, string> = {
   'create-agent': 'Agent',
   'link-widgets': 'Wire',
   'open-url': 'Open link',
+  'agent-browse': 'Plexii browses',
   'create-todo-list': 'To-do list',
   'create-page': 'Page',
   'create-task': 'Task',
@@ -56,6 +57,7 @@ const KIND_ACTIVITY: Record<string, string> = {
   'create-agent': 'Setting up an agent',
   'link-widgets': 'Wiring widgets together',
   'open-url': 'Opening a link',
+  'agent-browse': 'Preparing a browsing run',
   'create-todo-list': 'Building a to-do list',
   'create-page': 'Creating a page',
   'create-document': 'Creating a document',
@@ -111,6 +113,7 @@ function subjectOf(kind: string, a: Record<string, unknown>): string {
   }
   if (kind === 'post-chat') return str(a.conversationLabel) || str(a.conversationId)
   if (kind === 'open-url') return str(a.url)
+  if (kind === 'agent-browse') return str(a.task).slice(0, 60)
   if (kind === 'link-widgets') {
     const from = str(a.sourceLabel)
     const to = str(a.targetLabel)

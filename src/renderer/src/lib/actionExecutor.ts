@@ -79,6 +79,8 @@ export async function applyProposal(
       return applyCreateAgent(proposal, ctx)
     case 'open-url':
       return applyOpenUrl(proposal, ctx)
+    case 'agent-browse':
+      return applyAgentBrowse(proposal)
     case 'create-todo-list':
       return applyCreateTodoList(proposal, ctx)
     case 'create-page':
@@ -762,6 +764,31 @@ async function applyOpenUrl(
   return { ok: true, message: `Opened ${host}` }
 }
 
+
+// Agentic browsing (A6, AI-05): the card ACTS — applying opens the in-app
+// browser (at the proposed start page, or on whatever is already open) and
+// starts a supervised run. The AgentRunDock takes the story from here:
+// consent, steps, cost, Stop.
+async function applyAgentBrowse(
+  p: Extract<ActionProposal, { kind: 'agent-browse' }>
+): Promise<ApplyResult> {
+  const { useWebPanel } = await import('../stores/webPanel')
+  const { useBrowserAgentRuns } = await import('../stores/browserAgentRuns')
+  const panel = useWebPanel.getState()
+  if (p.url) panel.openWeb(p.url)
+  else if (!panel.open) return { ok: false, message: 'Open a page in the browser first — Plexii drives the page you can see' }
+  // A fresh panel needs a beat for the webview to attach before main can act.
+  const t0 = Date.now()
+  while (useWebPanel.getState().wcId == null && Date.now() - t0 < 8000) {
+    await new Promise((r) => setTimeout(r, 120))
+  }
+  if (useWebPanel.getState().wcId == null) return { ok: false, message: 'The browser did not open' }
+  const runId = await useBrowserAgentRuns.getState().start({ task: p.task })
+  return runId
+    ? { ok: true, message: 'Plexii is browsing — watch and stop it in the panel' }
+    : { ok: false, message: 'Could not start the run' }
+}
+
 async function applyCreateTodoList(
   p: Extract<ActionProposal, { kind: 'create-todo-list' }>,
   ctx: { activeTaskId: string | null }
@@ -1394,6 +1421,8 @@ export function describeProposal(
       }
       return { icon: 'public', verb: 'Open', subject: p.title ? `${p.title} (${host})` : host }
     }
+    case 'agent-browse':
+      return { icon: 'travel_explore', verb: 'Let Plexii browse', subject: p.task.slice(0, 60) }
     case 'create-todo-list':
       return {
         icon: 'checklist',

@@ -352,6 +352,7 @@ const ACTION_KINDS_CATALOG =
   '\n' +
   '  { "kind": "create-todo-list", "title": "Launch checklist", "items": ["Buy hosting", "Record pilot"], "reason": "checklist for launch" }\n' +
   '  { "kind": "open-url", "url": "https://docs.google.com/...", "title": "Brief draft", "reason": "..." }\n' +
+  '  { "kind": "agent-browse", "task": "Search this site for a 2-bedroom under $2400 and open the best listing", "url": "https://...", "reason": "..." }  (Plexii drives the in-app browser step by step — visible, stoppable, consent-gated. Use when the user asks you to DO something on a website: search within it, fill a form, walk a flow. For simply showing a page, use open-url. It never signs in, pays, solves CAPTCHAs, or moves files — if the task needs that, say that part is theirs. "url" is where to start; omit it to act on the page already open.)\n' +
   '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
   '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "reason": "..." }\n' +
   '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }\n' +
@@ -400,6 +401,7 @@ function buildSystemPrompt(
     '3. For multi-widget setups: one action object per widget. A planning workspace with 3 things = 3 entries in actions.\n' +
     '4. For todo lists: ALWAYS use "create-todo-list" — never a "create-widget" of kind "markdown" with bullets.\n' +
     '5. For Google Docs/Sheets/Slides or any URL: use "open-url", not "create-widget".\n' +
+    '5b. When the user asks you to PERFORM steps on a website (not just open it), use "agent-browse" with a precise, self-contained task. One agent-browse per response.\n' +
     '6. For Airtable-style record collections (clients, episodes, contacts, ideas with columns): use "create-table". Define columns up-front. Use "add-table-row" to insert specific rows after the table exists.\n' +
     '7. For modifying existing widgets, use their id from the canvas summary (shown as `id=...`). Same for an existing tableId.\n' +
     '7a. To add rows to a table you are creating in the SAME response, the table does not have a real id yet. Give the create-table action an "id" field (e.g. "tbl-1"), then in sibling add-table-row actions set "tableId": "$tbl-1" (literal $ prefix + the matching id). The system resolves it at apply time. NEVER guess a uuid for a not-yet-created table.\n' +
@@ -689,6 +691,19 @@ export function parseChatJson(raw: string): {
           kind: 'open-url',
           url,
           title: typeof action.title === 'string' ? (action.title as string) : undefined,
+          reason
+        })
+        break
+      }
+      case 'agent-browse': {
+        const task = typeof action.task === 'string' ? action.task.trim() : ''
+        if (!task) break
+        const rawUrl = typeof action.url === 'string' ? action.url.trim() : ''
+        proposals.push({
+          id: makeProposalId('browse', i++),
+          kind: 'agent-browse',
+          task: task.slice(0, 500),
+          url: /^https?:\/\//i.test(rawUrl) ? rawUrl : undefined,
           reason
         })
         break

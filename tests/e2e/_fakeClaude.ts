@@ -24,6 +24,10 @@ export interface FakeClaudeOptions {
   // lets a spec script a multi-round agent loop (A6) — round 1 gets the
   // first canned envelope, round 2 the second, and so on.
   shortTexts?: string[]
+  // When set, only non-stream requests whose system prompt contains this
+  // marker consume the queue — so stray non-stream calls (titles, memory
+  // extraction) can never eat a scripted agent turn.
+  shortTextsMatch?: string
 }
 
 export interface FakeClaude {
@@ -58,7 +62,10 @@ export async function startFakeClaude(opts: FakeClaudeOptions): Promise<FakeClau
       }
       requests.push(parsed)
       if (!parsed.stream) {
-        const queued = shortQueue.length > 0 ? shortQueue.shift() : undefined
+        const wantsQueue =
+          !opts.shortTextsMatch ||
+          JSON.stringify((parsed as { system?: unknown }).system ?? '').includes(opts.shortTextsMatch)
+        const queued = wantsQueue && shortQueue.length > 0 ? shortQueue.shift() : undefined
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(
           JSON.stringify({
