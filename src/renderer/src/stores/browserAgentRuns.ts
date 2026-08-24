@@ -94,6 +94,7 @@ window.api.browserAgent.onEvent((ev) => {
       events: [...prev.events, ev as BrowserAgentEventLite]
     }
     if (ev.kind === 'consent_required' && typeof ev.host === 'string') next.pendingConsentHost = ev.host
+    if (ev.kind === 'acted' && ev.cost) next.cost = ev.cost as BrowserAgentRunState['cost']
     if (ev.kind === 'finished') {
       next.outcome = typeof ev.outcome === 'string' ? ev.outcome : 'finished'
       next.summary = typeof ev.summary === 'string' ? ev.summary : ''

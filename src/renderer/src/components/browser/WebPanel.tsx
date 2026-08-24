@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../Icon'
 import BrowserSurface, { hostnameOf, type BrowserNavState, type WebviewEl } from './BrowserSurface'
+import AgentRunDock from './AgentRunDock'
 import { useWebPanel } from '../../stores/webPanel'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
@@ -33,6 +34,8 @@ export default function WebPanel(): React.JSX.Element | null {
   // freely after src, so the store's url is only where the panel STARTED.
   const navRef = useRef<BrowserNavState | null>(null)
   const src = sanitizeWebviewUrl(url ?? '')
+  // The A6 door on the panel itself: "let Plexii drive this page".
+  const [askOpen, setAskOpen] = useState(false)
 
   // The webview's webContents id, published to the store once attached —
   // the agent runtime (A6) drives THIS page through main and can only act
@@ -185,6 +188,14 @@ export default function WebPanel(): React.JSX.Element | null {
         }}
         toolbarTrailing={
           <>
+            <button
+              className="icon-btn !h-6 !w-6"
+              onClick={() => setAskOpen((v) => !v)}
+              title="Let Plexii do something on this page"
+              data-testid="web-panel-agent"
+            >
+              <Icon name="plexii:ai" size={14} />
+            </button>
             {activeTaskId && (
               <button
                 className="icon-btn !h-6 !w-6"
@@ -214,6 +225,7 @@ export default function WebPanel(): React.JSX.Element | null {
           </>
         }
       />
+      <AgentRunDock askOpen={askOpen} onCloseAsk={() => setAskOpen(false)} />
     </aside>,
     document.body
   )

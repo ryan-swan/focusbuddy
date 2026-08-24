@@ -51,6 +51,9 @@ export type BrowserAgentEvent =
       refused?: string
       detail?: string
       url: string
+      // Running totals so the visible run's cost ticker stays live (B4's
+      // surface reads the same numbers).
+      cost: BrowserRunCost
     }
   | { kind: 'needs_human'; runId: string; reason: string }
   | {
@@ -303,7 +306,8 @@ async function drive(
       ok: result.ok,
       refused: result.refused,
       detail: result.detail,
-      url: result.pageUrl ?? url
+      url: result.pageUrl ?? url,
+      cost: { ...cost }
     })
     if (result.refused === 'run_stopped') return finish('stopped', 'Stopped by the user.')
     if (result.refused === 'step_ceiling') return finish('budget', 'The bridge step ceiling was reached.')

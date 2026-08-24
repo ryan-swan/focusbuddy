@@ -297,6 +297,29 @@ function resolveJs(idx: number, scrollTo: boolean): string {
 })()`
 }
 
+// The visible-run flash (B3): a brief ring on the element about to be
+// acted on, so the human can follow the run with their eyes. Purely
+// decorative in-page animation; failures are ignored.
+function flashJs(idx: number): string {
+  return `(() => {
+  var el = document.querySelector('[data-fba="${idx}"]');
+  if (el && el.animate) el.animate(
+    [{ boxShadow: '0 0 0 3px rgba(124,108,255,0.9)' }, { boxShadow: '0 0 0 6px rgba(124,108,255,0)' }],
+    { duration: 600, easing: 'ease-out' }
+  );
+})()`
+}
+
+function flashAtJs(x: number, y: number): string {
+  return `(() => {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;left:${x - 12}px;top:${y - 12}px;width:24px;height:24px;border-radius:50%;border:3px solid rgba(124,108,255,0.9);pointer-events:none;z-index:2147483647';
+  document.body.appendChild(d);
+  if (d.animate) d.animate([{ opacity: 1, transform: 'scale(0.7)' }, { opacity: 0, transform: 'scale(1.4)' }], { duration: 600, easing: 'ease-out' });
+  setTimeout(function () { d.remove(); }, 620);
+})()`
+}
+
 function hitTestJs(x: number, y: number): string {
   return `(() => {${IN_PAGE_LIB}
   var el = document.elementFromPoint(${x}, ${y});
@@ -437,6 +460,7 @@ export async function performAgentAction(runId: string, action: AgentAction): Pr
       const refused = refusalFor('click', el)
       if (refused) return done({ ok: false, refused, detail: el.label })
       const { x, y } = centerOf(el)
+      await runJs(wc, flashJs(action.elementIndex))
       await trustedClick(wc, x, y)
       return done({ ok: true, detail: el.label })
     }
@@ -447,6 +471,7 @@ export async function performAgentAction(runId: string, action: AgentAction): Pr
       if (!el.editable) return done({ ok: false, refused: 'bad_input', detail: 'not editable' })
       const refused = refusalFor('type', el)
       if (refused) return done({ ok: false, refused, detail: el.label })
+      await runJs(wc, flashJs(action.elementIndex))
       await runJs(
         wc,
         `(() => { var el = document.querySelector('[data-fba="${action.elementIndex}"]'); if (el) { el.focus(); ${
@@ -463,6 +488,7 @@ export async function performAgentAction(runId: string, action: AgentAction): Pr
       if (el.tag !== 'select') return done({ ok: false, refused: 'bad_input', detail: 'not a select' })
       const refused = refusalFor('select', el)
       if (refused) return done({ ok: false, refused, detail: el.label })
+      await runJs(wc, flashJs(action.elementIndex))
       const okSet = await runJs<boolean>(
         wc,
         `(() => {
@@ -520,6 +546,7 @@ export async function performAgentAction(runId: string, action: AgentAction): Pr
         const refused = refusalFor('click', el)
         if (refused) return done({ ok: false, refused, detail: el.label })
       }
+      await runJs(wc, flashAtJs(x, y))
       await trustedClick(wc, x, y)
       return done({ ok: true, detail: el?.label })
     }
