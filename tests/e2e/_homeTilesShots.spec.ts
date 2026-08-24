@@ -36,7 +36,14 @@ const LAYOUT = {
     { key: 'focus-timer:shot', widget: 'focus-timer', size: 'icon' },
     { key: 'transcribe:shot', widget: 'transcribe', size: 'icon' },
     { key: 'discover:shot', widget: 'discover', size: 'icon' },
-    { key: 'new-desk:shot', widget: 'new-desk', size: 'icon' }
+    { key: 'new-desk:shot', widget: 'new-desk', size: 'icon' },
+    // Phase 3R additions: the widgets Caleb flagged as still-black wells.
+    // All render meaningfully from the seeded e2e profile without config.
+    { key: 'continue:shot', widget: 'continue', size: 'lg' },
+    { key: 'pulse:shot', widget: 'pulse', size: 'sm' },
+    { key: 'navigator:shot', widget: 'navigator', size: 'lg' },
+    { key: 'agenda:shot', widget: 'agenda', size: 'sm' },
+    { key: 'activity:shot', widget: 'activity', size: 'sm' }
   ]
 }
 
@@ -75,5 +82,12 @@ for (const theme of THEMES) {
     // Let the one-time widget cascade-in stagger finish before the frame.
     await window.waitForTimeout(2_000)
     await window.screenshot({ path: `${OUT}/ht-home-${theme}.png` })
+    // Second frame: home scrolls in an inner container (fullPage sees one
+    // viewport), so bring the below-fold Phase 3R widgets into view.
+    await window.evaluate(() => {
+      document.querySelector('[data-testid="home-insights"]')?.scrollIntoView({ block: 'center' })
+    })
+    await window.waitForTimeout(600)
+    await window.screenshot({ path: `${OUT}/ht-homelow-${theme}.png` })
   })
 }

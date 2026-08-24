@@ -878,7 +878,7 @@ export default function HomeDashboard(): JSX.Element {
                         key={n.id}
                         onClick={() => openDesk(n)}
                         data-testid={`home-desk-${n.id}`}
-                        className="flex items-center gap-2.5 fb-tile fb-press px-2.5 py-2 text-left"
+                        className="flex items-center gap-2.5 fb-tile-lit fb-press px-2.5 py-2 text-left"
                       >
                         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500 shrink-0">
                           <Icon name="desk" size={16} />
@@ -931,7 +931,7 @@ export default function HomeDashboard(): JSX.Element {
                       key={d.id}
                       onClick={() => v.goDocument(d.id)}
                       data-testid={`home-continue-item-${d.id}`}
-                      className="flex items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+                      className="flex items-center gap-3 fb-tile-lit fb-press px-3 py-2.5 text-left"
                     >
                       <Icon name={ti.icon} size={20} className={`${ti.tint} shrink-0`} />
                       <span className="min-w-0 flex-1">
@@ -992,7 +992,7 @@ export default function HomeDashboard(): JSX.Element {
               {insights.map((s) => (
                 <div
                   key={s.id}
-                  className="flex items-center gap-2 fb-tile px-2.5 py-2"
+                  className="flex items-center gap-2 fb-tile-lit px-2.5 py-2"
                 >
                   <span
                     className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
@@ -1858,7 +1858,7 @@ function WidgetPickerOverlay({
                       className={`rounded-xl border p-3 text-left transition-colors ${
                         blocked
                           ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 cursor-default'
-                          : 'border-transparent fb-tile fb-press'
+                          : 'border-transparent fb-tile-lit fb-press'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
@@ -2142,7 +2142,7 @@ function QuickAction({
     <button
       onClick={onClick}
       data-testid={testid}
-      className="flex items-center gap-2.5 fb-tile fb-press px-2.5 py-2 text-left"
+      className="flex items-center gap-2.5 fb-tile-lit fb-press px-2.5 py-2 text-left"
     >
       <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg shrink-0 ${chip}`}>
         <Icon name={icon} size={15} />

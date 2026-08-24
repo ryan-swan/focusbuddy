@@ -99,7 +99,7 @@ export function PinnedDeskWidget({
         <button
           onClick={() => openDesk(node)}
           data-testid={`home-pinned-desk-${node.id}`}
-          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="flex w-full items-center gap-3 fb-tile-lit fb-press px-3 py-2.5 text-left"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500 shrink-0">
             <Icon name={node.kind === 'folder' ? 'folder' : 'desk'} size={18} />
@@ -161,7 +161,7 @@ export function RoomPortalWidget({ roomId, size = 'lg' }: { roomId?: string; siz
             <button
               key={n.id}
               onClick={() => openDesk(n)}
-              className="flex items-center gap-2.5 fb-tile fb-press px-2.5 py-2 text-left"
+              className="flex items-center gap-2.5 fb-tile-lit fb-press px-2.5 py-2 text-left"
             >
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500/10 text-teal-500 shrink-0">
                 <Icon name="desk" size={16} />
@@ -1136,7 +1136,7 @@ function ActionHeroCard({
         <button
           onClick={onPress}
           data-testid={buttonTestId}
-          className="flex-1 flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="flex-1 flex w-full items-center gap-3 fb-tile-lit fb-press px-3 py-2.5 text-left"
         >
           <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0 ${chipClass}`}>
             <Icon name={icon} size={21} />
@@ -1331,7 +1331,7 @@ export function PinnedConversationWidget({
         <button
           onClick={() => void open()}
           data-testid="home-pinned-conversation"
-          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="flex w-full items-center gap-3 fb-tile-lit fb-press px-3 py-2.5 text-left"
         >
           <span className="relative shrink-0">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 text-[12px] font-semibold">
@@ -1717,7 +1717,7 @@ function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
                   onClick={() => setPickDesk(true)}
                   disabled={saving}
                   data-testid="home-transcribe-to-desk"
-                  className="flex items-center gap-2.5 fb-tile fb-press px-3 py-2.5 text-left"
+                  className="flex items-center gap-2.5 fb-tile-lit fb-press px-3 py-2.5 text-left"
                 >
                   <Icon name="desk" size={17} className="text-violet-500 shrink-0" />
                   <span className="min-w-0 flex-1">
@@ -1729,7 +1729,7 @@ function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
                   onClick={() => void landInDocuments()}
                   disabled={saving}
                   data-testid="home-transcribe-to-documents"
-                  className="flex items-center gap-2.5 fb-tile fb-press px-3 py-2.5 text-left"
+                  className="flex items-center gap-2.5 fb-tile-lit fb-press px-3 py-2.5 text-left"
                 >
                   <Icon name="description" size={17} className="text-sky-500 shrink-0" />
                   <span className="min-w-0 flex-1">
@@ -2094,7 +2094,7 @@ export function StalledDeskWidget(): JSX.Element {
         <button
           onClick={() => openDesk(stalled)}
           data-testid="home-stalled-open"
-          className="flex w-full items-center gap-3 fb-tile fb-press px-3 py-2.5 text-left"
+          className="flex w-full items-center gap-3 fb-tile-lit fb-press px-3 py-2.5 text-left"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500 shrink-0">
             <Icon name="hourglass_bottom" size={17} />
