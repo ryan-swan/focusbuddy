@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { conversationForDesk } from '../lib/deskConversation'
+import { useAssistantChrome } from './assistantChrome'
 import type { JSONContent } from '@tiptap/core'
 import type {
   ActionProposal,
@@ -177,6 +179,14 @@ interface ChatStore {
   setWebSearch: (on: boolean) => void
   // The globe in force right now: the active conversation's, or the pending one.
   activeWebSearch: () => boolean
+  // AI-04 (R24): open the conversation that built a desk, in the assistant
+  // panel. False when the desk has no linked conversation.
+  openDeskConversation: (deskId: string) => Promise<boolean>
+  // Door 2 of R24: land in the desk's conversation when the assistant opens
+  // over that desk — unless the user is already in one of the desk's own
+  // conversations, or an unsaved chat already has words in it. False when
+  // nothing changed.
+  defaultToDeskConversation: (deskId: string) => Promise<boolean>
   sending: boolean
   // The in-flight stream's requestId, so Stop can abort exactly the request
   // it belongs to. Null whenever nothing is streaming.
@@ -351,6 +361,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (typeof window.api?.aiChat?.setConversationWebSearch === 'function') {
       void window.api.aiChat.setConversationWebSearch(id, on).catch(() => {})
     }
+  },
+  openDeskConversation: async (deskId) => {
+    if (get().conversations.length === 0) await get().refreshConversations()
+    const meta = conversationForDesk(get().conversations, deskId)
+    if (!meta) return false
+    if (get().activeConversationId !== meta.id) await get().openConversation(meta.id)
+    const chrome = useAssistantChrome.getState()
+    chrome.setTab('chat')
+    chrome.openPanel()
+    return true
+  },
+  defaultToDeskConversation: async (deskId) => {
+    if (get().conversations.length === 0) await get().refreshConversations()
+    const linked = conversationForDesk(get().conversations, deskId)
+    if (!linked || get().activeConversationId === linked.id) return false
+    const currentId = get().activeConversationId
+    const current = currentId ? get().conversations.find((c) => c.id === currentId) : null
+    // Already in one of this desk's conversations: never hijack.
+    if (current?.linkedDesks.includes(deskId)) return false
+    // An unsaved chat with words in it is live work: never bury it.
+    if (!currentId && (get().messagesByTask[NEW_CHAT_KEY]?.length ?? 0) > 0) return false
+    await get().openConversation(linked.id)
+    return true
   },
   conversationKey: () => get().activeConversationId ?? NEW_CHAT_KEY,
   refreshConversations: async () => {

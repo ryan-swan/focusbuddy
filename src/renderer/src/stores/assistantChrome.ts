@@ -128,3 +128,10 @@ export const useAssistantChrome = create<AssistantChromeStore>((set, get) => ({
   setWidth: (px) => set({ width: clampAssistantWidth(px) }),
   persistWidth: () => persist(WIDTH_KEY, String(get().width))
 }))
+
+// Thin handle for debugging + e2e (same convention as __fbView/__fbChat): the
+// A5 continuity probe drives panel open/close through the real store.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __fbAssistantChrome?: typeof useAssistantChrome }).__fbAssistantChrome =
+    useAssistantChrome
+}

@@ -4,6 +4,8 @@ import type { FbNode } from '@shared/types'
 import Icon from './Icon'
 import StageManagerStrip from './StageManagerStrip'
 import { useViewStore } from '../stores/view'
+import { useChatStore } from '../stores/chat'
+import { conversationForDesk } from '../lib/deskConversation'
 import ShareDialog from './ShareDialog'
 
 interface Props {
@@ -52,6 +54,16 @@ export default function CanvasBreadcrumb({
   const goRoom = useViewStore((s) => s.goRoom)
   // Share dialog for the current room or desk, opened from the breadcrumb.
   const [shareOpen, setShareOpen] = useState(false)
+  // Desk-to-chat continuity, door 1 (A5, AI-04 — R24): a desk whose AI
+  // conversation exists wears a quiet chip that reopens it in the panel.
+  // Additive on 75's file (recorded in their inbox note); chip laws per the
+  // edges census: filled capsule, accent marks the live AI link, no border.
+  const conversations = useChatStore((s) => s.conversations)
+  useEffect(() => {
+    if (useChatStore.getState().conversations.length === 0) {
+      void useChatStore.getState().refreshConversations()
+    }
+  }, [])
   // `expanded` drives both pill breadcrumb visibility AND dropdown presence.
   // It is set true on any mouseEnter into the system (pill or dropdown) and
   // scheduled false by a shared timer on any mouseLeave — cancelled if the
@@ -148,6 +160,10 @@ export default function CanvasBreadcrumb({
 
   const ancestors = chain.slice(0, -1)
   const current = chain[chain.length - 1] ?? activeTask
+  const deskConvo = useMemo(
+    () => (current.kind === 'folder' ? null : conversationForDesk(conversations, current.id)),
+    [conversations, current.id, current.kind]
+  )
   // hasAncestors is true if we found ancestors in the chain OR if the current
   // node has a parentId that didn't resolve into nodes yet (timing / load order).
   // This ensures the depth hint and expand always fire when a parent exists.
@@ -339,6 +355,23 @@ export default function CanvasBreadcrumb({
             </button>
           )}
         </span>
+
+        {/* The conversation that built this desk (A5, AI-04 — R24 door 1). */}
+        {deskConvo && (
+          <button
+            type="button"
+            data-testid="desk-conversation-chip"
+            onClick={(e) => {
+              e.stopPropagation()
+              void useChatStore.getState().openDeskConversation(current.id)
+            }}
+            onMouseEnter={handleLeave}
+            title={`Open the conversation that built this desk${deskConvo.title ? ` — ${deskConvo.title}` : ''}`}
+            className="fb-press inline-flex items-center justify-center ml-1 h-[20px] w-[20px] rounded-full bg-accent/10 text-[rgb(var(--accent))] hover:bg-accent/20 transition-colors shrink-0"
+          >
+            <Icon name="forum" size={12} />
+          </button>
+        )}
 
         {/* "Add to room…" button — only for free desks */}
         {isFreeDesk && (

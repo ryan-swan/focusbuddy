@@ -172,6 +172,23 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     window.addEventListener('pointerdown', onPointerDown)
     return () => window.removeEventListener('pointerdown', onPointerDown)
   }, [deskMenuOpen])
+  // Desk-to-chat continuity, door 2 (A5, AI-04 — R24): the assistant OPENING
+  // over a desk lands in the conversation that built it, by default. The panel
+  // unmounts while closed, so "opening" is observed two ways: this panel
+  // mounting while the chrome is already open (the pill/shortcut path), and
+  // the closed→open transition for any mode that keeps it mounted. Guards
+  // (never hijack the desk's own conversations or a live unsaved chat) live in
+  // the store action so both observers behave identically.
+  const chromeOpen = useAssistantChrome((s) => s.open)
+  const prevChromeOpenRef = useRef(false)
+  useEffect(() => {
+    const was = prevChromeOpenRef.current
+    prevChromeOpenRef.current = chromeOpen
+    if (was || !chromeOpen) return
+    if (ctx.kind !== 'desk' || !ctx.serverTaskId) return
+    void useChatStore.getState().defaultToDeskConversation(ctx.serverTaskId)
+  }, [chromeOpen, ctx])
+
   // The conversation-mode chip's menu (A4, R19). Body portal, the
   // EnginePickerChip idiom: the chip lives inside glass (backdrop-filter =
   // its own stacking context) where an absolute child gets buried under
