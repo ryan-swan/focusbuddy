@@ -137,3 +137,34 @@ describe('composerOmniIntents — the mascot door is chat-first (AI-01)', () => 
     expect(composerOmniIntents(`${'very long phrase '.repeat(12)}`, targets)).toEqual([])
   })
 })
+
+describe("matchTargets as a remote control (Caleb's flamelit miss)", () => {
+  const targets = [
+    { kind: 'desk' as const, id: 'fl', title: 'Flamelit HQ' },
+    { kind: 'desk' as const, id: 'wed', title: 'Wedding desk' },
+    { kind: 'page' as const, id: 'files', title: 'Files' }
+  ]
+
+  it('"my flamelit desk" finds the desk titled Flamelit HQ', () => {
+    expect(matchTargets('my flamelit desk', targets)[0]?.id).toBe('fl')
+  })
+
+  it('the full take-me-to phrase routes instead of searching', () => {
+    const intents = composerOmniIntents('take me to my flamelit desk', targets, {
+      chatFirst: true
+    })
+    expect(intents[0]?.kind).toBe('goto')
+    expect(intents[0]?.target?.id).toBe('fl')
+  })
+
+  it('type nouns are query filler but never stripped from titles', () => {
+    expect(matchTargets('the wedding desk', targets)[0]?.id).toBe('wed')
+  })
+
+  it('partial token overlap never fakes a destination', () => {
+    const intents = composerOmniIntents('take me to buffalo wild wings menu', targets, {
+      chatFirst: true
+    })
+    expect(intents[0]?.kind).toBe('search')
+  })
+})

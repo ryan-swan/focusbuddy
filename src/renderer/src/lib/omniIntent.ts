@@ -39,20 +39,44 @@ export function normalizeUrl(raw: string): string {
   return /^https?:\/\//i.test(t) ? t : `https://${t}`
 }
 
-// Case-insensitive containment match against the target titles, best first:
-// exact > starts-with > contains. Ties break toward shorter titles (the
-// tighter name is the likelier destination).
+// Filler that carries no identity in a navigation phrase: "take me to MY
+// flamelit DESK" means the desk whose name says flamelit. Type nouns (desk,
+// page, doc…) are filler in the QUERY only — titles keep all their tokens,
+// so "wedding desk" still matches the desk titled "Wedding desk".
+const NAV_FILLER = new Set([
+  'my', 'the', 'a', 'an', 'our', 'your', 'that', 'this', 'please',
+  'desk', 'page', 'file', 'doc', 'document', 'room', 'plan', 'view', 'tab'
+])
+
+function navTokens(text: string): string[] {
+  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((t) => !NAV_FILLER.has(t))
+}
+
+// Match a phrase against the target titles, best first: exact > prefix >
+// containment > token coverage. Token coverage is what makes the bar a
+// remote control (Caleb's miss: "my flamelit desk" must find the desk
+// titled "Flamelit HQ") — every meaningful query token must appear among
+// the title's tokens, so partial overlap never fakes a destination. Ties
+// break toward shorter titles (the tighter name is the likelier one).
 export function matchTargets(text: string, targets: OmniTarget[], limit = 3): OmniTarget[] {
   const q = text.trim().toLowerCase()
   if (!q) return []
+  const qTokens = navTokens(q)
   const scored = targets
     .map((t) => {
       const title = t.title.trim().toLowerCase()
       if (!title) return null
       let score = 0
-      if (title === q) score = 3
-      else if (title.startsWith(q) || q.startsWith(title)) score = 2
-      else if (title.includes(q) || q.includes(title)) score = 1
+      if (title === q) score = 4
+      else if (title.startsWith(q) || q.startsWith(title)) score = 3
+      else if (title.includes(q) || q.includes(title)) score = 2
+      else if (qTokens.length > 0) {
+        const titleTokens = title.match(/[a-z0-9]+/g) ?? []
+        const covered = qTokens.every((qt) =>
+          titleTokens.some((tt) => tt === qt || tt.startsWith(qt) || qt.startsWith(tt))
+        )
+        if (covered) score = 1
+      }
       if (score === 0) return null
       return { t, score, len: title.length }
     })
