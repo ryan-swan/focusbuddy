@@ -42,8 +42,10 @@ test('1. Home renders all sections with a real greeting name', async () => {
   // falls back to the stable, non-invented "there" — never a fabricated identity.
   await expect(greeting).toContainText(/Good (morning|afternoon|evening), \S+/)
 
-  // Core surfaces present.
-  await expect(window.locator('[data-testid="home-ask-brain"]')).toBeVisible()
+  // Core surfaces present. The header's Ask Plexii door is gone by ruling
+  // (2026-08-24) — the omnibar pill is the one door — so its absence is
+  // asserted, guarding against the duplicate coming back.
+  await expect(window.locator('[data-testid="home-ask-brain"]')).toHaveCount(0)
   await expect(window.locator('[data-testid="home-insights"]')).toBeVisible()
   await expect(window.locator('[data-testid="home-focus-toggle"]')).toBeVisible()
   await expect(window.locator('[data-testid="home-quick-create"]')).toBeVisible()

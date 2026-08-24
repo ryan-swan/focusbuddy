@@ -282,10 +282,17 @@ test.describe('Plexii hub (Phase 1)', () => {
     await expect(window.getByText('Ask PlexiBrain')).toHaveCount(0)
   })
 
-  test('home Ask button opens the hub, and leaving restores the pill', async () => {
+  test('the hub opens, and leaving restores the pill', async () => {
+    // The home header's Ask Plexii button was removed by ruling (2026-08-24);
+    // the omnibar pill is the one door from home. This test's subject is the
+    // hub's open/leave behaviour, so it now enters through the store the way
+    // every remaining door does.
     const { window } = launched
     await gotoHome()
-    await window.locator('[data-testid="home-ask-brain"]').click()
+    await window.evaluate(() => {
+      const w = window as unknown as { __fbView?: { getState: () => { goPlexii: () => void } } }
+      w.__fbView?.getState().goPlexii()
+    })
     await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
     // Leave the hub: the overlay pill comes back exactly as it was.
     await window.evaluate(() => {

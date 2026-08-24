@@ -1477,22 +1477,9 @@ export default function HomeDashboard(): JSX.Element {
               transition={{ duration: 0.25 }}
               className={`flex items-center gap-2 ${customize ? 'pointer-events-none select-none' : ''}`}
             >
-            {/* A door into the Plexii hub (consolidation ruling, 2026-08-21).
-                The ⌘⇧K chip left with the command bar hand-off: until Phase 2
-                repoints the shortcut, showing it here would promise the wrong
-                destination. */}
-            <button
-              onClick={() => {
-                setActive(null)
-                v.goPlexii()
-              }}
-              data-testid="home-ask-brain"
-              title="Ask Plexii — opens the AI hub"
-              className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
-            >
-              <Icon name="auto_awesome" size={16} className="text-accent" />
-              Ask Plexii
-            </button>
+            {/* The header's Ask Plexii door was removed on Caleb's ruling
+                (2026-08-24): the omnibar's Ask Plexii pill is the one door
+                from home, and a second button beside Customize duplicated it. */}
             <button
               onClick={() => void toggleFocus()}
               data-testid="home-focus-toggle"
