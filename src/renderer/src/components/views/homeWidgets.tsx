@@ -246,20 +246,6 @@ export function AppLauncherWidget(): JSX.Element {
 
 type ConnectedApp = ReturnType<typeof useConnectedAppsStore.getState>['apps'][number]
 
-// Tinted chip wash per target tone, so every tile carries a colored identity
-// block instead of a bare glyph floating on glass.
-const TONE_CHIP: Record<string, string> = {
-  'text-indigo-500': 'bg-indigo-500/12',
-  'text-sky-500': 'bg-sky-500/12',
-  'text-violet-500': 'bg-violet-500/12',
-  'text-teal-500': 'bg-teal-500/12',
-  'text-emerald-500': 'bg-emerald-500/12',
-  'text-rose-500': 'bg-rose-500/12',
-  'text-orange-500': 'bg-orange-500/12',
-  'text-amber-500': 'bg-amber-500/12',
-  'text-fuchsia-500': 'bg-fuchsia-500/12'
-}
-
 // The visual for one shortcut: favicon for websites (globe fallback), the real
 // app logo for connected apps, a toned Plexii icon for everything else.
 function ShortcutGlyph({
@@ -308,15 +294,16 @@ function ShortcutGlyph({
 }
 
 // The glyph in its tinted chip: the standard identity block for shortcut
-// tiles and composer rows.
+// tiles and composer rows. The wash derives from currentColor (fb-chip-lit),
+// so the tone class rides the chip itself and one recipe serves every tone
+// at the themed alpha — any text colour class works, no per-tone map.
 function ShortcutChip({
   target,
   icon,
   tone,
   apps,
   chip,
-  glyph,
-  lit
+  glyph
 }: {
   target: ShortcutTarget
   icon: string
@@ -324,18 +311,10 @@ function ShortcutChip({
   apps: ConnectedApp[]
   chip: number
   glyph: number
-  // Lit tiles (home-tiles mission): the chip wears fb-chip-lit, whose wash
-  // derives from currentColor — so the tone class rides the chip itself and
-  // one recipe serves every tone at the themed alpha.
-  lit?: boolean
 }): JSX.Element {
   return (
     <span
-      className={
-        lit
-          ? `inline-flex items-center justify-center shrink-0 fb-chip-lit ${tone}`
-          : `inline-flex items-center justify-center rounded-[10px] shrink-0 ${TONE_CHIP[tone] ?? 'bg-[var(--surface-sunken)]'}`
-      }
+      className={`inline-flex items-center justify-center shrink-0 fb-chip-lit ${tone}`}
       style={{ width: chip, height: chip }}
     >
       <ShortcutGlyph target={target} icon={icon} tone={tone} apps={apps} size={glyph} />
@@ -538,7 +517,7 @@ export function ShortcutsWidget({
       className={
         compact
           ? 'w-16 h-[72px] shrink-0 flex items-center justify-center fb-tile-lit fb-press text-[12px] font-semibold text-[var(--ink-60)]'
-          : 'flex items-center justify-center fb-tile fb-press px-2.5 py-2 text-[11.5px] font-semibold text-[var(--ink-60)]'
+          : 'flex items-center justify-center fb-tile-lit fb-press px-2.5 py-2 text-[11.5px] font-semibold text-[var(--ink-60)]'
       }
     >
       +{overflow}
@@ -565,9 +544,9 @@ export function ShortcutsWidget({
                 title={view.alive ? `${view.label} · ${view.caption}` : `${view.label} (gone)`}
                 aria-label={view.label}
                 data-testid={`home-shortcut-${i}`}
-                className={`w-16 h-[72px] shrink-0 flex flex-col items-center justify-center gap-1.5 fb-tile-lit fb-press px-1 ${view.alive ? '' : 'opacity-40'}`}
+                className={`w-16 h-[72px] shrink-0 flex flex-col items-center justify-center gap-1.5 fb-tile-lit fb-press px-0.5 ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={36} glyph={22} lit />
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={36} glyph={22} />
                 <span className="max-w-full truncate text-[11px] font-medium leading-none text-[var(--ink-100)]">
                   {view.label}
                 </span>
@@ -587,12 +566,12 @@ export function ShortcutsWidget({
                 onClick={() => invoke(t)}
                 title={view.alive ? undefined : `${view.label} (gone)`}
                 data-testid={`home-shortcut-${i}`}
-                className={`flex items-center gap-2.5 fb-tile fb-press px-2.5 py-2 text-left ${view.alive ? '' : 'opacity-40'}`}
+                className={`flex items-center gap-2.5 fb-tile-lit fb-press px-2.5 py-2 text-left ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={32} glyph={17} />
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={36} glyph={22} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-medium text-[var(--ink-100)]">{view.label}</span>
-                  <span className="block truncate text-[10px] text-[var(--ink-50)]">
+                  <span className="block truncate text-[12.5px] font-medium text-[var(--ink-100)]">{view.label}</span>
+                  <span className="block truncate text-[11px] text-[var(--ink-50)]">
                     {view.alive ? view.caption : 'Gone. Click to fix.'}
                   </span>
                 </span>
@@ -614,9 +593,11 @@ export function ShortcutsWidget({
                 key={targetKey(t)}
                 onClick={() => invoke(t)}
                 data-testid={`home-shortcut-${i}`}
-                className={`flex items-center gap-2.5 fb-tile fb-press px-2.5 py-1.5 text-left min-h-0 ${view.alive ? '' : 'opacity-40'}`}
+                className={`flex items-center gap-2.5 fb-tile-lit fb-press px-2.5 py-1.5 text-left min-h-0 ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={32} glyph={17} />
+                {/* Dense list register: chip 32/20 — 36 does not clear the
+                    stack size's ~42px auto-fr rows. Tiles are 36/22. */}
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={32} glyph={20} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-medium text-[var(--ink-100)]">{view.label}</span>
                   <span className="block truncate text-[10.5px] text-[var(--ink-50)]">

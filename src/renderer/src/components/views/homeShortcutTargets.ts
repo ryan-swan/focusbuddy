@@ -28,10 +28,12 @@ export interface ShortcutView {
 
 // Slot budget per widget size, the add tile included. Derived from the real
 // cell geometry (GRID cellH 200, RailCard header ~40px): sm fits two rows of
-// four icon tiles; md fits two rows of three labeled tiles; stack fits eight
-// list rows; lg fits two columns of seven rows.
+// THREE 64x72 lit tiles (the old two-rows-of-four assumption never held at
+// the ~215px card interior — it produced a clipped third row); md fits two
+// rows of three labeled tiles; stack fits eight list rows; lg fits two
+// columns of seven rows.
 // (icon is never a Shortcuts size; the entry only satisfies the Record.)
-export const SHORTCUT_SLOTS: Record<WidgetSize, number> = { icon: 2, sm: 8, md: 6, stack: 8, lg: 14 }
+export const SHORTCUT_SLOTS: Record<WidgetSize, number> = { icon: 2, sm: 6, md: 6, stack: 8, lg: 14 }
 
 // How many targets render at a size. The add tile always takes one slot; when
 // targets overflow the rest, the final visible slot becomes a "+N" spillover
@@ -131,9 +133,12 @@ export function migrateQuickLinks<T extends { widget: HomeWidgetId; config?: Hom
   return { ...inst, widget: 'shortcuts' as HomeWidgetId, config: { title: 'Quick links', targets } }
 }
 
+// Document tiles carry their product's suite accent (plexiSuite.ts: Docs
+// #3b82f6, Sheets #22c55e, Slides #f97316) so a Q3 budget reads as a Sheets
+// object at a glance — identity in the chip, distinct from colour-is-state.
 const DOC_VISUALS: Record<string, { icon: string; tone: string; caption: string }> = {
-  doc: { icon: 'description', tone: 'text-sky-500', caption: 'Document' },
-  sheet: { icon: 'table_chart', tone: 'text-emerald-500', caption: 'Spreadsheet' },
+  doc: { icon: 'description', tone: 'text-blue-500', caption: 'Document' },
+  sheet: { icon: 'table_chart', tone: 'text-green-500', caption: 'Spreadsheet' },
   slides: { icon: 'slideshow', tone: 'text-orange-500', caption: 'Deck' }
 }
 
