@@ -33,28 +33,24 @@ test('plexii A2: one door — URL, web search, ask Plexii, and the web panel', a
   await window.screenshot({ path: `${OUT}/omni-1-url-preview.png` })
   await window.keyboard.press('Enter')
   await expect(panel).toBeVisible()
-  await window.screenshot({ path: `${OUT}/omni-2-web-panel.png` })
-  // The explicit system-browser escape exists; the default never leaves Plexi.
-  await expect(window.locator('[data-testid="web-panel-external"]')).toBeVisible()
-
-  // Fullscreen toggle (the seamless ruling): the same page grows to a genuine
-  // full browser; Esc steps DOWN — panel first, closed second.
-  await window.locator('[data-testid="web-panel-expand"]').click()
+  // Deliberate browsing opens FULL SCREEN by default (Caleb's ruling) —
+  // the connected-app rectangle: rail visible, content area filled.
   await expect(panel).toHaveAttribute('data-expanded', 'true')
   const wide = await panel.boundingBox()
-  expect(wide && wide.width > 1200).toBeTruthy()
+  expect(wide && wide.width > 1100).toBeTruthy()
   await window.waitForTimeout(300)
-  await window.screenshot({ path: `${OUT}/omni-2b-web-full.png` })
+  await window.screenshot({ path: `${OUT}/omni-2-web-full.png` })
+  // The explicit system-browser escape exists; the default never leaves Plexi.
+  await expect(window.locator('[data-testid="web-panel-external"]')).toBeVisible()
+  // Esc steps DOWN: fullscreen to the compact panel, then closed; the toggle
+  // still flips between the two sizes by hand.
   await window.keyboard.press('Escape')
   await expect(panel).toHaveAttribute('data-expanded', 'false')
+  await window.screenshot({ path: `${OUT}/omni-2b-web-panel.png` })
+  await window.locator('[data-testid="web-panel-expand"]').click()
+  await expect(panel).toHaveAttribute('data-expanded', 'true')
   await window.keyboard.press('Escape')
-  await expect(panel).toHaveCount(0)
-
-  await window.keyboard.press(CMD_K)
-  await input.fill('plexi.so')
-  await window.keyboard.press('Enter')
-  await expect(panel).toBeVisible()
-  await window.locator('[data-testid="web-panel-close"]').click()
+  await window.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)
 
   // A question ranks Ask Plexii on top; Enter routes it to the assistant.

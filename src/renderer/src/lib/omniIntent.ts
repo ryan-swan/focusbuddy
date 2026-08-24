@@ -193,7 +193,9 @@ export function composerOmniIntents(
 export const SEARCH_ENGINES = [
   { id: 'duckduckgo', label: 'DuckDuckGo', url: (q: string) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}` },
   { id: 'google', label: 'Google', url: (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}` },
-  { id: 'bing', label: 'Bing', url: (q: string) => `https://www.bing.com/search?q=${encodeURIComponent(q)}` }
+  { id: 'bing', label: 'Bing', url: (q: string) => `https://www.bing.com/search?q=${encodeURIComponent(q)}` },
+  { id: 'brave', label: 'Brave Search', url: (q: string) => `https://search.brave.com/search?q=${encodeURIComponent(q)}` },
+  { id: 'perplexity', label: 'Perplexity', url: (q: string) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}` }
 ] as const
 
 export type SearchEngineId = (typeof SEARCH_ENGINES)[number]['id']

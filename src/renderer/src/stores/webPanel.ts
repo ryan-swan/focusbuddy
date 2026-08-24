@@ -5,7 +5,7 @@
 // tiny so any surface can send a URL here without knowing the panel.
 
 import { create } from 'zustand'
-import type { SearchEngineId } from '../lib/omniIntent'
+import { SEARCH_ENGINES, type SearchEngineId } from '../lib/omniIntent'
 
 const ENGINE_KEY = 'fb.webpanel.engine'
 
@@ -21,7 +21,7 @@ interface WebPanelState {
   url: string | null
   // Pinned search-engine preference (AI-02 seed).
   engine: SearchEngineId
-  openWeb: (url: string) => void
+  openWeb: (url: string, opts?: { expanded?: boolean }) => void
   close: () => void
   toggleExpanded: () => void
   setEngine: (engine: SearchEngineId) => void
@@ -34,13 +34,16 @@ export const useWebPanel = create<WebPanelState>((set) => ({
   engine: ((): SearchEngineId => {
     try {
       const v = localStorage.getItem(ENGINE_KEY)
-      if (v === 'duckduckgo' || v === 'google' || v === 'bing') return v
+      if (SEARCH_ENGINES.some((e) => e.id === v)) return v as SearchEngineId
     } catch {
       /* fresh profile */
     }
     return 'duckduckgo'
   })(),
-  openWeb: (url) => set({ open: true, url }),
+  // Browsing you ASKED for (a search, an omnibar open) starts full screen —
+  // Caleb's default; a citation clicked beside an answer stays the compact
+  // panel so the conversation remains in view. Callers say which they are.
+  openWeb: (url, opts) => set((s) => ({ open: true, url, expanded: opts?.expanded ?? s.expanded })),
   close: () => set({ open: false, expanded: false }),
   toggleExpanded: () => set((s) => ({ expanded: !s.expanded })),
   setEngine: (engine) => {

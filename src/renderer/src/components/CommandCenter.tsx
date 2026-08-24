@@ -669,9 +669,11 @@ export default function CommandCenter({
           run: () => {
             const text = query.trim()
             if (intent.kind === 'url' && intent.url) {
-              useWebPanel.getState().openWeb(intent.url)
+              useWebPanel.getState().openWeb(intent.url, { expanded: true })
             } else if (intent.kind === 'search') {
-              useWebPanel.getState().openWeb(searchUrl(useWebPanel.getState().engine, text))
+              useWebPanel
+                .getState()
+                .openWeb(searchUrl(useWebPanel.getState().engine, text), { expanded: true })
             } else {
               useAssistantChrome.getState().openPanel()
               void useChatStore.getState().send(null, text, NEW_CHAT_KEY)

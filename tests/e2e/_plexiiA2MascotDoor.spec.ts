@@ -86,10 +86,14 @@ test('plexii A2 pills: Home bar and composer modes act and stick', async () => {
   await window.locator('[data-testid="start-or-ask-mode-search"]').click()
   const panel = window.locator('[data-testid="web-panel"]')
   await expect(panel).toBeVisible()
+  // A search opens FULL SCREEN by default (Caleb's ruling).
+  await expect(panel).toHaveAttribute('data-expanded', 'true')
   await window.screenshot({ path: `${OUT}/pills-2-home-search.png` })
   await window.locator('[data-testid="web-panel-close"]').click()
-  // The lock survives: the bar is now a search bar, Enter searches.
+  // The lock survives: the bar is now a search bar with the engine choice
+  // right beside the pills, and Enter searches.
   await expect(bar).toHaveAttribute('placeholder', /Search the web/)
+  await expect(window.locator('[data-testid="web-panel-engine-toggle"]')).toBeVisible()
   await bar.fill('standing desk mats')
   await window.keyboard.press('Enter')
   await expect(panel).toBeVisible()

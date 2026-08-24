@@ -11,9 +11,12 @@ import { searchUrl, type OmniIntent } from './omniIntent'
 export function performOmniIntent(intent: OmniIntent): void {
   const view = useViewStore.getState()
   if (intent.kind === 'url' && intent.url) {
-    useWebPanel.getState().openWeb(intent.url)
+    // Deliberate browsing starts full screen (Caleb's default).
+    useWebPanel.getState().openWeb(intent.url, { expanded: true })
   } else if (intent.kind === 'search' && intent.url) {
-    useWebPanel.getState().openWeb(searchUrl(useWebPanel.getState().engine, intent.url))
+    useWebPanel
+      .getState()
+      .openWeb(searchUrl(useWebPanel.getState().engine, intent.url), { expanded: true })
   } else if (intent.kind === 'goto' && intent.target) {
     const t = intent.target
     if (t.kind === 'desk') {

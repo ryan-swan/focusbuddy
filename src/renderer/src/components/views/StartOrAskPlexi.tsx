@@ -5,6 +5,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useChatStore, NEW_CHAT_KEY } from '../../stores/chat'
 import { composerOmniIntents, type OmniTarget } from '../../lib/omniIntent'
 import { performOmniIntent, loadOmniMode, saveOmniMode, type OmniMode } from '../../lib/omniPerform'
+import EnginePickerChip from '../browser/EnginePickerChip'
 
 // The top-of-Home input is the front door to everything (A2, AI-01 + Caleb's
 // seamless ruling, 2026-08-23): mode pills under the bar make intent a tap,
@@ -170,6 +171,9 @@ export default function StartOrAskPlexi(): JSX.Element {
               </button>
             ))}
           </div>
+          {/* In Search mode the pinned engine is right here — the same
+              preference the browser toolbar pins (AI-02, one store). */}
+          {searching && <EnginePickerChip />}
           {!searching &&
             EXAMPLES.map((ex) => (
               <button
