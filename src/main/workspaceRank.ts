@@ -209,6 +209,36 @@ export function selectPassages(query: string, text: string, maxChars = 6000): st
   return passages.join('\n…\n').slice(0, maxChars)
 }
 
+// The citation snippet, anchored honestly (defect #27): the old rule anchored
+// on the FIRST query term — stopwords included — so the chip you click to
+// verify a claim centred on "what". This one anchors on the EARLIEST
+// occurrence in the text of any CONTENT term (inflection-aware via
+// termVariants), falls back to any raw token, and only then to the head.
+export function snippetFor(text: string, query: string, span = 200): string {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  const hay = clean.toLowerCase()
+  let anchor = -1
+  for (const t of queryTerms(query)) {
+    for (const v of termVariants(t)) {
+      const at = hay.indexOf(v)
+      if (at >= 0 && (anchor < 0 || at < anchor)) anchor = at
+    }
+  }
+  if (anchor < 0) {
+    for (const raw of query.toLowerCase().split(/\s+/).filter(Boolean)) {
+      const at = hay.indexOf(raw)
+      if (at >= 0 && (anchor < 0 || at < anchor)) anchor = at
+    }
+  }
+  if (anchor < 0) return clean.slice(0, span).trim()
+  const start = Math.max(0, anchor - 60)
+  return (
+    (start > 0 ? '… ' : '') +
+    clean.slice(start, start + span).trim() +
+    (clean.length > start + span ? ' …' : '')
+  )
+}
+
 // Score each document, title matches weighted higher AND the body scored per
 // chunk so a mid-document match counts. The returned source text is the top
 // matching chunk(s), not the document head, so the model is grounded on the

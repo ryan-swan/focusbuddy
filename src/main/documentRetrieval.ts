@@ -7,7 +7,7 @@
 // zero and drops out.
 
 import { listDocuments, getDocument } from './db/documents'
-import { extractDocText, selectPassages, type WorkspaceSource } from './workspaceRank'
+import { extractDocText, selectPassages, snippetFor, type WorkspaceSource } from './workspaceRank'
 import { embedTexts, embedQueryTagged } from './ai/embeddings'
 import { setEmbedding, listEmbeddings, listEmbeddingsTagged, hasEmbedding } from './db/embeddings'
 import { listDocMetadata, getDocMetadata, type DocMetadata } from './db/docMetadata'
@@ -79,14 +79,8 @@ function keywordScore(item: DocItem, query: string): number {
   return s
 }
 
-function snippet(text: string, query: string): string {
-  const clean = text.replace(/\s+/g, ' ').trim()
-  const q = query.trim().toLowerCase()
-  const i = q ? clean.toLowerCase().indexOf(q.split(/\s+/)[0]) : -1
-  if (i < 0) return clean.slice(0, 200).trim()
-  const start = Math.max(0, i - 60)
-  return (start > 0 ? '… ' : '') + clean.slice(start, start + 200).trim() + (clean.length > start + 200 ? ' …' : '')
-}
+// Snippet anchoring is the shared rule (workspaceRank.snippetFor, defect #27):
+// earliest CONTENT-term hit, never a stopword.
 
 // Embed one document and store its vector. Best-effort: no key is a silent no-op
 // so saving a document never blocks or errors on a missing key.
@@ -155,7 +149,7 @@ export async function semanticSearchDocuments(query: string, limit = 6): Promise
     docId: d.docId,
     title: d.title || 'Untitled',
     docType: d.docType,
-    snippet: snippet(d.text, query),
+    snippet: snippetFor(d.text, query),
     // The best-matching passage(s), not the head (M1 defect #2): tasks and
     // notes already got passage extraction via rankSources; documents — the
     // richest content — were shipped as their opening 6000 chars, so a match

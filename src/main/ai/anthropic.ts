@@ -281,7 +281,14 @@ function summarizeWidgets(widgets: Widget[]): string {
       }
     }
   }
-  if (widgets.length > 14) lines.push(`- (+${widgets.length - 14} more widgets)`)
+  // Defect #21's tail: the disclosure must use the REAL cap. The stale
+  // literal 14 (the old cap) made a 30-widget desk claim "+16 more" while
+  // every one of the 30 was in fact listed — a lie in the other direction.
+  if (widgets.length > DESK_INDEX_WIDGET_CAP) {
+    lines.push(
+      `- (+${widgets.length - DESK_INDEX_WIDGET_CAP} more widgets not listed — the desk index caps at ${DESK_INDEX_WIDGET_CAP})`
+    )
+  }
   return lines.join('\n')
 }
 

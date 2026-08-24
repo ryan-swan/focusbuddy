@@ -6,7 +6,14 @@
 // semanticRetrieval.ts. Both are unit-testable without the database.
 
 import { listDocuments, getDocument } from './db/documents'
-import { extractDocText, rankSources, relevanceGate, type WorkspaceSource } from './workspaceRank'
+import {
+  extractDocText,
+  rankSources,
+  relevanceGate,
+  selectPassages,
+  snippetFor,
+  type WorkspaceSource
+} from './workspaceRank'
 import { semanticSearchKnowledge } from './semanticRetrieval'
 import { semanticSearchDocuments } from './documentRetrieval'
 import {
@@ -44,9 +51,15 @@ export async function retrieveSources(
         docId: e.id,
         title: e.title,
         docType: 'knowledge',
-        snippet: text.replace(/\s+/g, ' ').trim().slice(0, 200),
-        text,
-        // Descending by the semantic rank so curated knowledge leads the sources.
+        // Defect #29: knowledge used to ship its head slice with a blind
+        // 200-char snippet. It now gets the same passage treatment as every
+        // other pool — the snippet anchors on the earliest content-term hit,
+        // and the grounding text is the passage(s) that actually match, so a
+        // long entry answers from the paragraph that answers, not its opening.
+        snippet: snippetFor(text, query),
+        text: selectPassages(query, text),
+        // An explicit rank ordinal, not a relevance claim: it only preserves
+        // the blend's ordering so curated knowledge leads the source list.
         score: 1 - i * 0.01
       }
     })

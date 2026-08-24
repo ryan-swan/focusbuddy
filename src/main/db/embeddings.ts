@@ -37,10 +37,16 @@ export function setEmbedding(itemType: string, itemId: string, vector: number[],
   })
 }
 
+// Defect #26: reads are org-scoped like listEmbeddings, so a row written under
+// another org is invisible here too — which makes hasEmbedding() honestly say
+// "absent" and the reindex sweep re-embed it for the active org, instead of a
+// mismatched row being invisible to search yet skipped by reindex forever.
 export function getEmbedding(itemType: string, itemId: string): number[] | null {
   const row = getDb()
-    .prepare('SELECT vector_json FROM fb_embeddings WHERE item_type = ? AND item_id = ?')
-    .get(itemType, itemId) as { vector_json: string } | undefined
+    .prepare(
+      'SELECT vector_json FROM fb_embeddings WHERE item_type = ? AND item_id = ? AND org_id = ?'
+    )
+    .get(itemType, itemId, getActiveOrgId()) as { vector_json: string } | undefined
   if (!row) return null
   try {
     const v = JSON.parse(row.vector_json)
@@ -89,8 +95,8 @@ export function listEmbeddingsTagged(
 
 export function hasEmbedding(itemType: string, itemId: string): boolean {
   const row = getDb()
-    .prepare('SELECT 1 FROM fb_embeddings WHERE item_type = ? AND item_id = ?')
-    .get(itemType, itemId)
+    .prepare('SELECT 1 FROM fb_embeddings WHERE item_type = ? AND item_id = ? AND org_id = ?')
+    .get(itemType, itemId, getActiveOrgId())
   return !!row
 }
 

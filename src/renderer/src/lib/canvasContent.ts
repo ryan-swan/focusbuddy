@@ -141,9 +141,24 @@ export async function gatherCanvasAttachments(
 
   const out: ChatAttachment[] = []
   for (const w of chosen) {
-    // A browser with no readable live page contributes nothing useful; skip
-    // rather than attach a bare URL.
-    if (WEBVIEW_KINDS.has(w.kind) && !liveText.has(w.id)) continue
+    // Defect #20: a browser/PDF whose live page could not be read used to
+    // VANISH from context entirely — "you have a PDF open, ask about its
+    // deadline, and Plexii does not know a PDF is open." It now rides as an
+    // honest one-liner (kind + URL + the fact it is unread), matching the
+    // mention path's honesty rule (#6): disclose, never guess, never omit.
+    if (WEBVIEW_KINDS.has(w.kind) && !liveText.has(w.id)) {
+      const url = (w.content || '').trim()
+      out.push({
+        widgetId: w.id,
+        kind: labelForKind(w.kind),
+        title: w.title || '',
+        source: url || undefined,
+        text: `(This ${labelForKind(w.kind)} widget is open on the desk${
+          url ? ` at ${url}` : ''
+        }, but its page text could not be read. If asked about its contents, say so rather than guessing.)`
+      })
+      continue
+    }
     const r = widgetToText(w, resolvers)
     let text = (r.text ?? '').trim()
     // Skip empty widgets and pure placeholders like "(empty document)".

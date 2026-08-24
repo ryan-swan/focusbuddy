@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rankSources, extractDocText, chunkText, relevanceGate, mergeScopedPools, termVariants, termMatches } from '../../src/main/workspaceRank'
+import { rankSources, extractDocText, chunkText, relevanceGate, mergeScopedPools, snippetFor, termVariants, termMatches } from '../../src/main/workspaceRank'
 import type { WorkspaceSource } from '../../src/main/workspaceRank'
 
 describe('extractDocText', () => {
@@ -178,5 +178,29 @@ describe('termVariants / termMatches (#28) and the recall query', () => {
     }
     const kept = relevanceGate('What did we decide about pricing last week?', [src])
     expect(kept).toHaveLength(1)
+  })
+})
+
+describe('snippetFor — citation snippet anchoring (#27)', () => {
+  it('anchors on the earliest content term, never a stopword', () => {
+    const text =
+      'What this document covers is broad. ' +
+      'Filler sentence. '.repeat(30) +
+      'The renewal deadline is March 12, agreed with the vendor.'
+    const s = snippetFor(text, 'what is the renewal deadline')
+    // The old rule anchored on "what" (the first query term) and showed the
+    // opening; the honest snippet centres the claim being verified.
+    expect(s).toContain('renewal deadline')
+  })
+
+  it('matches inflections when anchoring', () => {
+    const text = 'Filler sentence. '.repeat(30) + 'Contract renewals happen quarterly.'
+    expect(snippetFor(text, 'renewal')).toContain('renewals happen')
+  })
+
+  it('falls back to any raw token, then the head', () => {
+    expect(snippetFor('Plain text with nothing matching at all.', 'zebra quantum')).toContain(
+      'Plain text'
+    )
   })
 })
