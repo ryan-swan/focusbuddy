@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
-import { MD_SECTION_COMPONENTS } from './mdSection'
+import rehypeSectionIcons from '../../lib/rehypeSectionIcons'
 import remarkGfm from 'remark-gfm'
 import remarkCitations from '../../lib/remarkCitations'
 import { safeCut, REVEAL_CPS, COMMIT_MS } from '../../lib/streamReveal'
@@ -230,7 +230,7 @@ const StreamSpan: Components['span'] = ({ node, children, ...rest }) => {
   )
 }
 
-const COMPONENTS: Components = { a: StreamLink, span: StreamSpan, ...MD_SECTION_COMPONENTS }
+const COMPONENTS: Components = { a: StreamLink, span: StreamSpan }
 const REMARK_PLUGINS = [remarkGfm, remarkCitations]
 
 interface Props {
@@ -254,7 +254,10 @@ export default function StreamingProse({ markdown, active, holdUntil = 0, onDrai
   }, [drained, onDrained])
   // unified calls each entry as a plugin factory. The caret marks the
   // growing edge until the last word has landed.
-  const plugins = useMemo(() => [() => rehypeFlow(!drained)], [drained])
+  // Section icons run BEFORE the word-wrapping so a heading emoji is swapped
+  // for its icon the moment the cluster completes — never painted raw
+  // mid-stream (AI-41 glitch fix).
+  const plugins = useMemo(() => [rehypeSectionIcons, () => rehypeFlow(!drained)], [drained])
   return (
     <div
       data-testid="streaming-prose"

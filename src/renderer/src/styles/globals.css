@@ -2705,3 +2705,22 @@ body {
     display: none;
   }
 }
+
+/* AI-41: the section icon the rehypeSectionIcons plugin injects in place of
+   a heading/bullet emoji. The material class supplies the font; this carries
+   what the Icon component would have set inline — sized to the heading via
+   em, accent-tinted, seated on the text baseline. */
+.fb-md-icon {
+  font-size: 0.95em;
+  line-height: 1;
+  vertical-align: -0.14em;
+  margin-right: 0.45em;
+  color: rgb(var(--accent));
+  font-variation-settings:
+    'FILL' var(--fb-icon-fill, 1),
+    'wght' var(--fb-icon-wght, 500),
+    'GRAD' 0,
+    'opsz' 24;
+  user-select: none;
+  display: inline-block;
+}

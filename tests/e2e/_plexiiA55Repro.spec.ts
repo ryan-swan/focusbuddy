@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { launchApp, waitForReady } from './_helpers'
+import { startFakeClaude } from './_fakeClaude'
 
 // A5.5 verification: the floating panel with a screenshot-shaped answer.
 // Asserts the container scale engages (13.5px prose in the ~420px panel),
@@ -99,4 +100,74 @@ test('a5.5 repro: floating panel with a formatted answer', async () => {
 
   await window.screenshot({ path: `${OUT}/a55-after.png`, clip: { x: 940, y: 100, width: 500, height: 800 } })
   await launched.dispose()
+})
+
+
+// The AI-41 glitch fix, verified the honest way: a MutationObserver watches
+// EVERY DOM commit while an emoji-headed answer streams through the REAL
+// path — a raw emoji painting even once fails the test. The icon must stand
+// in the settled heading.
+const EMOJI_ENVELOPE = JSON.stringify({
+  reply: [
+    'Here is where things stand.',
+    '',
+    '## 🚀 Next steps',
+    '- Book the venue walkthrough',
+    '- Send the deposit',
+    '',
+    '## ⚠️ Risks',
+    'The caterer has not confirmed the date yet.'
+  ].join('\n'),
+  actions: []
+})
+
+test('a5.5 stream: a heading emoji never paints raw, the icon lands live', async () => {
+  const fake = await startFakeClaude({ text: EMOJI_ENVELOPE, charsPerDelta: 6, deltaMs: 25 })
+  const launched = await launchApp({
+    env: { ANTHROPIC_API_KEY: 'sk-ant-fake-e2e', ANTHROPIC_BASE_URL: fake.url }
+  })
+  const { window } = launched
+  await waitForReady(window)
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => { goPlexii: () => void } } }
+    w.__fbView?.getState().goPlexii()
+  })
+  await window.waitForTimeout(400)
+
+  // Watch every DOM commit for a raw emoji before sending.
+  await window.evaluate(() => {
+    const flag = { rawEmojiSeen: 0 }
+    ;(window as unknown as { __emojiProbe: typeof flag }).__emojiProbe = flag
+    const check = (root: Node): void => {
+      const text = root.textContent ?? ''
+      if (text.includes('\u{1F680}') || text.includes('\u26A0')) flag.rawEmojiSeen++
+    }
+    const obs = new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (m.type === 'characterData') check(m.target)
+        for (const n of Array.from(m.addedNodes)) check(n)
+      }
+    })
+    obs.observe(document.body, { subtree: true, childList: true, characterData: true })
+  })
+
+  const composer = window.locator('[data-testid="chat-composer"]')
+  await composer.click()
+  await window.keyboard.type('Give me a status briefing with clear sections please.', { delay: 3 })
+  await window.keyboard.press('Enter')
+
+  // The streamed headings settle with icons in place.
+  const h2 = window.locator('[data-testid="chat-scroll"] h2', { hasText: 'Next steps' })
+  await expect(h2.locator('span.fb-md-icon')).toHaveText('rocket_launch', { timeout: 20_000 })
+  const h2b = window.locator('[data-testid="chat-scroll"] h2', { hasText: 'Risks' })
+  await expect(h2b.locator('span.fb-md-icon')).toHaveText('warning')
+
+  // The whole point: not one DOM commit ever contained the raw emoji.
+  const seen = await window.evaluate(
+    () => (window as unknown as { __emojiProbe: { rawEmojiSeen: number } }).__emojiProbe.rawEmojiSeen
+  )
+  expect(seen).toBe(0)
+
+  await launched.dispose()
+  await fake.close()
 })

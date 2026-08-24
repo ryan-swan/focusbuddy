@@ -1,8 +1,10 @@
 import ReactMarkdown from 'react-markdown'
-import { MD_SECTION_COMPONENTS } from '../assistant/mdSection'
+import rehypeSectionIcons from '../../lib/rehypeSectionIcons'
 import remarkGfm from 'remark-gfm'
 import type { AppliedProposal, ChatBlock, ChatSource } from '@shared/types'
 import ProposalCards from '../ProposalCards'
+
+const REHYPE_PLUGINS = [rehypeSectionIcons]
 import remarkCitations from '../../lib/remarkCitations'
 import { connectorMeta } from '../../lib/chatBlocks'
 import { isOpenable } from '../../lib/sourceTarget'
@@ -78,8 +80,8 @@ export default function ChatBlockView({
         <div className="fb-chat-prose text-[var(--ink-90)] md-rendered">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkCitations]}
+            rehypePlugins={REHYPE_PLUGINS}
             components={{
-              ...MD_SECTION_COMPONENTS,
               a: ({ href, children, ...rest }) => (
                 <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
                   {children}
