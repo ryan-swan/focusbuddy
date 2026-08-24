@@ -216,9 +216,11 @@ export function AppLauncherWidget(): JSX.Element {
             title={a.title}
             aria-label={a.title}
             data-testid={`home-app-launch-${a.id}`}
-            className="h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press"
+            className="h-16 w-16 shrink-0 flex items-center justify-center fb-tile-lit fb-press"
           >
-            <AppLogo app={a} size={38} glyphSize={22} />
+            {/* Logos were never small (38px) — the dark well made them read
+                that way. The lit ground is the fix; fallback glyph up to 24. */}
+            <AppLogo app={a} size={38} glyphSize={24} />
           </button>
         ))}
         <button
@@ -1819,11 +1821,14 @@ export function CreateWidget(): JSX.Element {
       /* the desk-limit prompt already told the user what happened */
     }
   }
+  // Tones are the suite accents (Docs blue, Sheets green, Slides orange per
+  // plexiSuite.ts; Desk teal, matching the desks section and hero): what you
+  // create is a product object, and the chip says which one.
   const items = [
-    { id: 'doc', label: 'Document', icon: 'description', tone: 'text-sky-500', onClick: () => void newDoc('doc') },
-    { id: 'sheet', label: 'Spreadsheet', icon: 'table_chart', tone: 'text-emerald-500', onClick: () => void newDoc('sheet') },
+    { id: 'doc', label: 'Document', icon: 'description', tone: 'text-blue-500', onClick: () => void newDoc('doc') },
+    { id: 'sheet', label: 'Spreadsheet', icon: 'table_chart', tone: 'text-green-500', onClick: () => void newDoc('sheet') },
     { id: 'slides', label: 'Deck', icon: 'slideshow', tone: 'text-orange-500', onClick: () => void newDoc('slides') },
-    { id: 'desk', label: 'Desk', icon: 'desk', tone: 'text-violet-500', onClick: () => void newDesk() }
+    { id: 'desk', label: 'Desk', icon: 'desk', tone: 'text-teal-500', onClick: () => void newDesk() }
   ]
   return (
     <RailCard title="Create new" icon="add_circle" tone="accent">
@@ -1833,10 +1838,19 @@ export function CreateWidget(): JSX.Element {
             key={it.id}
             onClick={it.onClick}
             data-testid={`home-create-${it.id}`}
-            className="flex items-center gap-2 fb-tile fb-press px-2.5 py-2 text-left"
+            className="flex flex-col items-center justify-center gap-1.5 fb-tile-lit fb-press px-1 py-2"
           >
-            <Icon name={it.icon} size={17} className={`${it.tone} shrink-0`} />
-            <span className="text-[12px] font-medium text-[var(--ink-90)] truncate">{it.label}</span>
+            {/* Chip-over-label, the sm shortcut tile grammar: the ~95px-wide
+                cols-2 cells cannot fit Document beside a chip, but fit it
+                centred under one. */}
+            <span
+              className={`inline-flex h-8 w-8 items-center justify-center shrink-0 fb-chip-lit ${it.tone}`}
+            >
+              <Icon name={it.icon} size={20} />
+            </span>
+            <span className="max-w-full truncate text-[11px] font-medium leading-none text-[var(--ink-100)]">
+              {it.label}
+            </span>
           </button>
         ))}
       </div>
