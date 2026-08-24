@@ -245,17 +245,25 @@ test.describe('Plexii hub (Phase 1)', () => {
   })
 
   test('discovery is a mode you can enter and leave in any conversation', async () => {
+    // A4 (R19): the control is the conversation-mode chip on the composer —
+    // a deliberate pick from its menu, sticky on the conversation. The header
+    // keeps only the informational badge.
     const { window } = launched
     await window.locator('[data-testid="sidebar-plexii"]').click()
     await expect(window.locator('[data-testid="plexii-hub"]')).toBeVisible()
-    // A normal chat carries no badge.
+    // A normal chat carries no badge, and the chip wears the default mode.
     await expect(window.locator('[data-testid="chat-mode-badge"]')).toHaveCount(0)
-    const toggle = window.locator('[data-testid="chat-mode-toggle"]')
-    await toggle.click()
+    const chip = window.locator('[data-testid="chat-mode-chip"]')
+    await expect(chip).toContainText('Chat')
+    await chip.click()
+    await window.locator('[data-testid="chat-mode-option-discovery"]').click()
     await expect(window.locator('[data-testid="chat-mode-badge"]')).toBeVisible()
+    await expect(chip).toContainText('Discovery')
     // And out again — the mode is never a one-way door.
-    await toggle.click()
+    await chip.click()
+    await window.locator('[data-testid="chat-mode-option-chat"]').click()
     await expect(window.locator('[data-testid="chat-mode-badge"]')).toHaveCount(0)
+    await expect(chip).toContainText('Chat')
   })
 
   // ── Phase 2: consolidation + the Plexii name ─────────────────────────────

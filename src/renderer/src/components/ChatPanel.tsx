@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AppliedProposal, ChatMessage, ChatSource } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
@@ -28,6 +29,7 @@ import { chimeIn } from '../lib/audioBeep'
 import CanvasContextMenu, { type CtxMenuItem } from './CanvasContextMenu'
 import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
 import ModelPickerChip from './assistant/ModelPickerChip'
+import { CHAT_MODES, chatModeDef } from '../lib/chatModes'
 import { ASSISTANT_CAPABILITIES } from '../lib/assistantCapabilities'
 import { useBodyDouble } from '../lib/bodyDouble'
 import { useAssistantChrome, type AssistantMode } from '../stores/assistantChrome'
@@ -165,6 +167,41 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     window.addEventListener('pointerdown', onPointerDown)
     return () => window.removeEventListener('pointerdown', onPointerDown)
   }, [deskMenuOpen])
+  // The conversation-mode chip's menu (A4, R19). Body portal, the
+  // EnginePickerChip idiom: the chip lives inside glass (backdrop-filter =
+  // its own stacking context) where an absolute child gets buried under
+  // sibling cards — the probe's first shot caught exactly that ghosting.
+  // ("conv" because modeMenu* further down already names the CHROME mode menu.)
+  const [convModeMenuOpen, setConvModeMenuOpen] = useState(false)
+  const convModeMenuRef = useRef<HTMLDivElement | null>(null)
+  const convModeMenuPopRef = useRef<HTMLDivElement | null>(null)
+  const [convModeMenuPos, setConvModeMenuPos] = useState<{ bottom: number; left: number } | null>(
+    null
+  )
+  useEffect(() => {
+    if (!convModeMenuOpen) return
+    const place = (): void => {
+      const r = convModeMenuRef.current?.getBoundingClientRect()
+      if (!r) return
+      setConvModeMenuPos({
+        bottom: window.innerHeight - r.top + 6,
+        left: Math.max(8, Math.min(r.left, window.innerWidth - 258))
+      })
+    }
+    place()
+    window.addEventListener('resize', place)
+    function onPointerDown(e: PointerEvent): void {
+      const t = e.target as Node
+      if (!convModeMenuRef.current?.contains(t) && !convModeMenuPopRef.current?.contains(t)) {
+        setConvModeMenuOpen(false)
+      }
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [convModeMenuOpen])
   const openLinkedDesk = useCallback((taskId: string): void => {
     useNodeStore.getState().setActive(taskId)
     useViewStore.getState().goTask(taskId)
@@ -911,20 +948,8 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           )}
         </div>
         <div className="flex items-center gap-1">
-          {/* Enter or leave discovery at any point in any conversation. */}
-          <button
-            onClick={() => setChatMode(discovering ? 'chat' : 'discovery')}
-            className={`icon-btn ${discovering ? '!text-accent' : ''}`}
-            data-testid="chat-mode-toggle"
-            aria-pressed={discovering}
-            title={
-              discovering
-                ? 'Discovery mode is ON — Plexii leads with questions toward a desk. Click to return to normal chat.'
-                : 'Discovery mode — let Plexii lead: guided questions and options that build toward a desk'
-            }
-          >
-            <Icon name="plexii:discover" size={16} filled={discovering} />
-          </button>
+          {/* The mode control lives on the composer as the R19 chip; the
+              header keeps only the informational badge above. */}
           <button
             onClick={() => {
               newConversation()
@@ -1491,6 +1516,70 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             />
           </div>
           <div className="flex items-center gap-1.5">
+            {/* The conversation-mode chip (A4, R19): a mode is a property of
+                the conversation, worn here and switched deliberately — sticky
+                on the row, never auto-detected. Discovery is the first of
+                several; the menu is driven by the CHAT_MODES registry. */}
+            <div className="relative flex items-center" ref={convModeMenuRef}>
+              <button
+                type="button"
+                data-testid="chat-mode-chip"
+                aria-expanded={convModeMenuOpen}
+                onClick={() => setConvModeMenuOpen((v) => !v)}
+                title={`${chatModeDef(mode).label} mode — ${chatModeDef(mode).blurb} Click to switch.`}
+                className={`fb-press inline-flex items-center gap-1 h-[26px] px-2 rounded-full border fb-t-caption font-medium transition-colors ${
+                  discovering
+                    ? 'border-[rgb(var(--accent)/0.45)] bg-accent/10 text-[rgb(var(--accent))]'
+                    : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.45)]'
+                }`}
+              >
+                <Icon name={chatModeDef(mode).icon} size={12} className="shrink-0" filled={discovering} />
+                {chatModeDef(mode).label}
+                <Icon name="expand_more" size={11} className="shrink-0 opacity-70" />
+              </button>
+              {convModeMenuOpen &&
+                convModeMenuPos &&
+                createPortal(
+                <div
+                  ref={convModeMenuPopRef}
+                  data-testid="chat-mode-menu"
+                  className="fb-pop-in fixed z-[240] w-[250px] rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
+                  style={{
+                    boxShadow: 'var(--shadow-cast)',
+                    bottom: convModeMenuPos.bottom,
+                    left: convModeMenuPos.left
+                  }}
+                >
+                  {CHAT_MODES.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      data-testid={`chat-mode-option-${m.id}`}
+                      onClick={() => {
+                        setChatMode(m.id)
+                        setConvModeMenuOpen(false)
+                      }}
+                      className="w-full flex items-start gap-2 rounded-[var(--radius-chip)] px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
+                    >
+                      <Icon
+                        name={m.icon}
+                        size={14}
+                        className={`shrink-0 mt-px ${mode === m.id ? 'text-accent' : 'text-[var(--ink-60)]'}`}
+                        filled={mode === m.id}
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block fb-t-label text-[var(--ink-90)]">{m.label}</span>
+                        <span className="block fb-t-caption text-[var(--ink-50)]">{m.blurb}</span>
+                      </span>
+                      {mode === m.id && (
+                        <Icon name="check" size={13} className="text-accent shrink-0 mt-px" />
+                      )}
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
+            </div>
             {/* The mode pills (Caleb's seamless ruling): tapping acts on the
                 current text AND locks the mode until switched (sticky). */}
             <div
