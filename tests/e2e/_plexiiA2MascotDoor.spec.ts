@@ -60,3 +60,63 @@ test('plexii A2 mascot door: the composer previews, diverts, and stays chat-firs
 
   await launched.dispose()
 })
+
+test('plexii A2 pills: Home bar and composer modes act and stick', async () => {
+  const launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate((t) => localStorage.setItem('fb.theme.mode', t), process.env.SHOT_THEME ?? 'dark')
+  await window.reload()
+  await waitForReady(window)
+
+  // The Home bar: trinity placeholder, cmdK chip, mode pills.
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => { goHome: () => void } } }
+    w.__fbView?.getState().goHome()
+  })
+  const bar = window.locator('[data-testid="start-or-ask-input"]')
+  await expect(bar).toBeVisible()
+  await expect(bar).toHaveAttribute('placeholder', /search the web, or open anything/i)
+  await expect(window.locator('[data-testid="start-or-ask-cmdk"]')).toBeVisible()
+  await window.screenshot({ path: `${OUT}/pills-1-home-bar.png` })
+
+  // Both semantics: typing then tapping Search acts immediately AND locks.
+  await bar.fill('best sit stand desk 2026')
+  await window.locator('[data-testid="start-or-ask-mode-search"]').click()
+  const panel = window.locator('[data-testid="web-panel"]')
+  await expect(panel).toBeVisible()
+  await window.screenshot({ path: `${OUT}/pills-2-home-search.png` })
+  await window.locator('[data-testid="web-panel-close"]').click()
+  // The lock survives: the bar is now a search bar, Enter searches.
+  await expect(bar).toHaveAttribute('placeholder', /Search the web/)
+  await bar.fill('standing desk mats')
+  await window.keyboard.press('Enter')
+  await expect(panel).toBeVisible()
+  await window.locator('[data-testid="web-panel-close"]').click()
+
+  // Back to Ask: the instant rule still opens a bare URL without the model.
+  await window.locator('[data-testid="start-or-ask-mode-ask"]').click()
+  await bar.fill('plexi.so')
+  await window.keyboard.press('Enter')
+  await expect(panel).toBeVisible()
+  await window.locator('[data-testid="web-panel-close"]').click()
+
+  // The composer's pills: Search locks the chat box into a literal search bar.
+  await window.locator('[data-testid="assistant-pill"]').click()
+  await window.locator('[data-testid="assistant-tab-chat"]').click()
+  const composer = window.locator('[data-testid="chat-composer"]')
+  await expect(composer).toBeVisible()
+  await window.locator('[data-testid="composer-mode-search"]').click()
+  await composer.click()
+  await window.keyboard.type('wedding venues austin', { delay: 5 })
+  await window.screenshot({ path: `${OUT}/pills-3-composer-search.png` })
+  await window.keyboard.press('Enter')
+  await expect(panel).toBeVisible()
+  await expect(composer).toHaveText('')
+  await window.locator('[data-testid="web-panel-close"]').click()
+  // Back to Auto for the next person in this profile.
+  await window.locator('[data-testid="composer-mode-auto"]').click()
+
+  await launched.dispose()
+})

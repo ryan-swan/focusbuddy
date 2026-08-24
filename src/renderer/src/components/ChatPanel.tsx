@@ -18,7 +18,8 @@ import StreamingProse from './assistant/StreamingProse'
 import { cascadeDurationMs } from '../lib/traceView'
 import { useWebPanel } from '../stores/webPanel'
 import { useDocumentsStore } from '../stores/documents'
-import { composerOmniIntents, searchUrl, type OmniIntent, type OmniTarget } from '../lib/omniIntent'
+import { composerOmniIntents, type OmniIntent, type OmniTarget } from '../lib/omniIntent'
+import { performOmniIntent as performOmniIntentAct } from '../lib/omniPerform'
 import QuestionCard from './assistant/QuestionCard'
 import { activeQuestionFor } from '../lib/assistantQuestion'
 import { useAssistantContext } from '../lib/assistantContext'
@@ -272,6 +273,25 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   // The composer as the mascot's omnibar door (A2, AI-01, R11): what Enter
   // will do is previewed, Tab flips the pick, and it never guesses silently.
   const [omniPick, setOmniPick] = useState(0)
+  // The mode pills (Caleb's seamless ruling): Auto = smart preview; Search
+  // and Ask lock the composer to one behaviour, sticky across sessions.
+  const [composerMode, setComposerModeState] = useState<'auto' | 'search' | 'ask'>(() => {
+    try {
+      const v = localStorage.getItem('fb.omni.mode.composer')
+      if (v === 'search' || v === 'ask') return v
+    } catch {
+      /* fresh profile */
+    }
+    return 'auto'
+  })
+  const setComposerMode = (m: 'auto' | 'search' | 'ask'): void => {
+    setComposerModeState(m)
+    try {
+      localStorage.setItem('fb.omni.mode.composer', m)
+    } catch {
+      /* ignore */
+    }
+  }
   const editorRef = useRef<import('@tiptap/core').Editor | null>(null)
   // Draft persistence (A1, defect AI-16): the panel unmounts when you walk to
   // a desk or collapse to the pill, and the draft used to live only in the
@@ -595,37 +615,15 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       ? composerIntents[Math.min(omniPick, composerIntents.length - 1)]
       : null
 
-  // Perform a non-chat intent and clear the box — the same acts the palette
-  // rows perform, so the three doors stay one door.
-  const performOmniIntent = useCallback(
-    (intent: OmniIntent): void => {
-      const view = useViewStore.getState()
-      if (intent.kind === 'url' && intent.url) {
-        useWebPanel.getState().openWeb(intent.url)
-      } else if (intent.kind === 'search' && intent.url) {
-        useWebPanel.getState().openWeb(searchUrl(useWebPanel.getState().engine, intent.url))
-      } else if (intent.kind === 'goto' && intent.target) {
-        const t = intent.target
-        if (t.kind === 'desk') {
-          useNodeStore.getState().setActive(t.id)
-          view.goTask(t.id)
-        } else if (t.kind === 'document') {
-          view.goDocument(t.id)
-        } else {
-          if (t.id === 'home') view.goHome()
-          else if (t.id === 'tasks') view.goAllTasks()
-          else if (t.id === 'calendar') view.goCalendar()
-          else if (t.id === 'files') view.goFiles()
-          else if (t.id === 'vault') view.goVault()
-        }
-      }
-      editorRef.current?.commands.clearContent()
-      setDraft('')
-      setOmniPick(0)
-      useChatStore.getState().setThreadDraft(draftKeyRef.current, null)
-    },
-    []
-  )
+  // Perform a non-chat intent and clear the box — the shared act every door
+  // uses (lib/omniPerform), so the three doors stay one door.
+  const performOmniIntent = useCallback((intent: OmniIntent): void => {
+    performOmniIntentAct(intent)
+    editorRef.current?.commands.clearContent()
+    setDraft('')
+    setOmniPick(0)
+    useChatStore.getState().setThreadDraft(draftKeyRef.current, null)
+  }, [])
 
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current
@@ -634,16 +632,22 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     // sticky to the conversation, not to this message).
     const content = ed ? docToInput(ed.getJSON()).text.trim() : draft.trim()
     if (!content || useChatStore.getState().sending) return
-    // The omni door (AI-01): when the previewed pick is a non-chat intent,
-    // Enter performs it instead of sending — exactly what the strip said.
-    if (pickedIntent && pickedIntent.kind !== 'ask') {
+    // A locked mode is literal: Search always searches, Ask always chats.
+    if (composerMode === 'search') {
+      performOmniIntent({ kind: 'search', label: 'Search the web', url: content })
+      return
+    }
+    // Auto (the omni door, AI-01): when the previewed pick is a non-chat
+    // intent, Enter performs it instead of sending — exactly what the strip
+    // said it would do.
+    if (composerMode === 'auto' && pickedIntent && pickedIntent.kind !== 'ask') {
       performOmniIntent(pickedIntent)
       return
     }
     ed?.commands.clearContent()
     setDraft('')
     await send(thread.serverTaskId, content, thread.key)
-  }, [draft, send, thread.serverTaskId, thread.key, pickedIntent, performOmniIntent])
+  }, [draft, send, thread.serverTaskId, thread.key, pickedIntent, performOmniIntent, composerMode])
 
   async function handleSend(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -1402,7 +1406,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               </span>
             )}
           </div>
-          {composerIntents.length > 0 && !sending && (
+          {composerMode === 'auto' && composerIntents.length > 0 && !sending && (
             /* The intent preview (R11): the composer says what Enter will do
                before it does it. Tab steps the pick; clicking a chip acts. */
             <div
@@ -1449,7 +1453,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             onKeyDownCapture={(e) => {
               // Tab flips the previewed intent (R11) — only while the strip
               // is showing, so normal focus travel is untouched otherwise.
-              if (e.key === 'Tab' && !e.shiftKey && composerIntents.length > 1) {
+              if (e.key === 'Tab' && !e.shiftKey && composerMode === 'auto' && composerIntents.length > 1) {
                 e.preventDefault()
                 e.stopPropagation()
                 setOmniPick((p) => (p + 1) % composerIntents.length)
@@ -1457,7 +1461,13 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             }}
           >
             <MentionComposer
-              placeholder={discovering ? 'Start anywhere — an idea, a question, a hunch…' : ctx.placeholder}
+              placeholder={
+                composerMode === 'search'
+                  ? 'Search the web — results open in Plexi'
+                  : discovering
+                    ? 'Start anywhere — an idea, a question, a hunch…'
+                    : ctx.placeholder
+              }
               disabled={sending}
               hooks={mentionHooks}
               onTextChange={handleComposerChange}
@@ -1469,6 +1479,55 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             />
           </div>
           <div className="flex items-center gap-1.5">
+            {/* The mode pills (Caleb's seamless ruling): tapping acts on the
+                current text AND locks the mode until switched (sticky). */}
+            <div
+              data-testid="composer-modes"
+              className="inline-flex items-center gap-0.5 rounded-full bg-[var(--surface-sunken)] p-0.5"
+            >
+              {(
+                [
+                  { id: 'auto', label: 'Auto', icon: 'auto_awesome' },
+                  { id: 'search', label: 'Search', icon: 'travel_explore' },
+                  { id: 'ask', label: 'Ask', icon: 'forum' }
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  data-testid={`composer-mode-${m.id}`}
+                  aria-pressed={composerMode === m.id}
+                  title={
+                    m.id === 'auto'
+                      ? 'Smart: URLs open, take-me-to navigates, everything else asks'
+                      : m.id === 'search'
+                        ? 'Type straight into your search engine — results open in Plexi'
+                        : 'Everything goes to Plexii'
+                  }
+                  onClick={() => {
+                    setComposerMode(m.id)
+                    // Both semantics: a pill tap acts on what is typed.
+                    const text = draft.trim()
+                    if (!text || sending) return
+                    if (m.id === 'search') {
+                      performOmniIntent({ kind: 'search', label: 'Search the web', url: text })
+                    } else if (m.id === 'ask') {
+                      editorRef.current?.commands.clearContent()
+                      setDraft('')
+                      void send(thread.serverTaskId, text, thread.key)
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full fb-t-caption transition-colors ${
+                    composerMode === m.id
+                      ? 'bg-[var(--surface-raised)] text-[rgb(var(--accent))]'
+                      : 'text-[var(--ink-50)] hover:text-[var(--ink-80)]'
+                  }`}
+                >
+                  <Icon name={m.icon} size={11} className="shrink-0" />
+                  {m.label}
+                </button>
+              ))}
+            </div>
             {/* Real model picker (P7) — shared with the focus AI Chat. */}
             <ModelPickerChip />
             {/* The persistent out (Plexii P5): any conversation with substance
