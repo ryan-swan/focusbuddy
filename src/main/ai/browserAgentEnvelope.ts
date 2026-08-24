@@ -156,7 +156,7 @@ export function buildBrowserAgentSystemPrompt(): string {
     '  {"kind":"click","elementIndex":N} — click element N from the observation',
     '  {"kind":"type","elementIndex":N,"text":"...","replace":true|false}',
     '  {"kind":"select","elementIndex":N,"value":"..."}',
-    '  {"kind":"scroll","dy":pixels} — positive scrolls down',
+    '  {"kind":"scroll","dy":pixels} — positive scrolls down. The page-text excerpt follows your scroll position: on a long page, scroll to read further before concluding you have seen everything.',
     '  {"kind":"wait","ms":500} — let a page settle',
     '  {"kind":"press_key","key":"Enter"|"Tab"|"Escape"|"Backspace"}',
     'In screenshot mode only: {"kind":"click_at","x":N,"y":N} and {"kind":"type_text","text":"..."}.',

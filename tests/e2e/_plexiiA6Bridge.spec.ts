@@ -53,6 +53,13 @@ test.beforeAll(async () => {
       res.end('<!doctype html><title>Other</title><h1 id="other">The other page</h1>')
       return
     }
+    if (req.url === '/long') {
+      // AI-42's repro surface: a page far longer than one read window.
+      const lines = Array.from({ length: 900 }, (_, i) => `<p>LINE ${String(i + 1).padStart(4, '0')} — the quick brown fox jumps over the lazy dog.</p>`)
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end(`<!doctype html><title>Long</title><body>${lines.join('')}</body>`)
+      return
+    }
     res.writeHead(200, { 'content-type': 'text/html' })
     res.end(FAKE_SITE)
   })
@@ -212,6 +219,31 @@ test('the action bridge: snapshot, act, refuse, fall back, stop', async () => {
   await window.evaluate(([rid]) => window.api.agentBrowser.endRun(rid as string), [run.id] as const)
 
   await window.screenshot({ path: `${OUT}/a6-bridge-1-fake-site.png` })
+
+  // ── AI-42: reads ADVANCE with the scroll on a long page ───────────────
+  // (its own run — the kill-switch leg above ended the first one)
+  const runB = await window.evaluate((id) => window.api.agentBrowser.createRun(id), wcId)
+  const performB = (action: Record<string, unknown> & { kind: string }) =>
+    window.evaluate(
+      ([rid, a]) => window.api.agentBrowser.perform(rid as string, a as never),
+      [runB.id, action] as const
+    )
+  expect((await performB({ kind: 'open_url', url: `${base}/long` })).ok).toBe(true)
+  await window.waitForTimeout(600)
+  const read1 = await performB({ kind: 'read_page' })
+  expect(read1.ok).toBe(true)
+  expect(read1.text).toContain('LINE 0001')
+  expect((read1 as { textStart?: number }).textStart).toBe(0)
+  const total = (read1 as { textTotal?: number }).textTotal ?? 0
+  expect(total).toBeGreaterThan(20000)
+  for (let i = 0; i < 6; i++) expect((await performB({ kind: 'scroll', dy: 4000 })).ok).toBe(true)
+  await window.waitForTimeout(300)
+  const read2 = await performB({ kind: 'read_page' })
+  expect(read2.ok).toBe(true)
+  expect((read2 as { textStart?: number }).textStart!).toBeGreaterThan(0)
+  expect(read2.text).not.toContain('LINE 0001')
+  expect((read2 as { textTotal?: number }).textTotal).toBe(total)
+  await window.evaluate(([rid]) => window.api.agentBrowser.endRun(rid as string), [runB.id] as const)
 
   // ── Closing the panel is itself a kill switch: no page, no run ────────
   const run2 = await window.evaluate((id) => window.api.agentBrowser.createRun(id), wcId)

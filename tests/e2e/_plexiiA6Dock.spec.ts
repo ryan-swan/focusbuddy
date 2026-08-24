@@ -104,8 +104,10 @@ test('the visible run: ask door, consent, ledger, cost, stop, dismiss', async ()
   await window.waitForFunction(() => window.__fbWebPanel.getState().wcId != null)
   await window.waitForTimeout(800)
 
-  // ── The ask door on the panel toolbar ──────────────────────────────────
-  await window.locator('[data-testid="web-panel-agent"]').click()
+  // ── The ask door announces itself (AI-44): the idle pill opens it ──────
+  const pill = window.locator('[data-testid="agent-ask-pill"]')
+  await expect(pill).toBeVisible()
+  await pill.click()
   const ask = window.locator('[data-testid="agent-ask-input"]')
   await expect(ask).toBeVisible()
   await window.screenshot({ path: `${OUT}/a6-dock-1-ask.png` })
@@ -125,8 +127,15 @@ test('the visible run: ask door, consent, ledger, cost, stop, dismiss', async ()
   await expect(dock).toHaveAttribute('data-outcome', 'done', { timeout: 30000 })
   await expect(window.locator('[data-testid="agent-run-line"]')).toContainText('count is now 1')
   await expect(window.locator('[data-testid="agent-run-cost"]')).toHaveText(/\$/)
+  // While a run's story is docked, the pill stands aside.
+  await expect(pill).toHaveCount(0)
   await openSteps(window)
   await expect(window.locator('[data-testid="agent-run-steps"]')).toContainText('Clicked')
+  // AI-43: a step drills into its full detail — what was seen, where.
+  await window.locator('[data-testid="agent-run-step-0"]').click()
+  const detail = window.locator('[data-testid="agent-run-step-detail-0"]')
+  await expect(detail).toContainText('Saw chars')
+  await expect(detail).toContainText('On: http')
   await window.screenshot({ path: `${OUT}/a6-dock-3-done.png` })
 
   // ── Dismiss clears it ──────────────────────────────────────────────────

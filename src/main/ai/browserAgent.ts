@@ -54,6 +54,9 @@ export type BrowserAgentEvent =
       // Running totals so the visible run's cost ticker stays live (B4's
       // surface reads the same numbers).
       cost: BrowserRunCost
+      // What the agent could see when it chose this action (AI-43): the
+      // page-text window of this round, for the step drill-in.
+      readWindow?: { start: number; end: number; total: number }
     }
   | { kind: 'needs_human'; runId: string; reason: string }
   | {
@@ -102,6 +105,19 @@ export function stopBrowserAgent(runId: string): boolean {
     w(false)
   }
   return stopped
+}
+
+// The honest coverage line (AI-42): the excerpt names WHICH slice of the
+// page it is, and says so when there is more below — the model's cue that
+// scrolling advances the window.
+function pageTextLine(read: ActionResult): string {
+  const text = (read.text ?? '').slice(0, 2500)
+  if (!text) return 'PAGE TEXT: (no readable text)'
+  const start = read.textStart ?? 0
+  const total = read.textTotal ?? text.length
+  const end = start + text.length
+  const more = end < total ? ` — the page continues (${total} chars in all); scroll down to read further` : ''
+  return `PAGE TEXT (chars ${start}–${end} of ${total}${more}):\n${text}`
 }
 
 function elementLine(el: PageElement): string {
@@ -212,7 +228,7 @@ async function drive(
       snap.captchaPresent
         ? 'A CAPTCHA is present on this page — you cannot solve it; if it blocks the task, report need_input.'
         : '',
-      `PAGE TEXT (excerpt):\n${(read.text ?? '').slice(0, 2500) || '(no readable text)'}`
+      pageTextLine(read)
     ].filter(Boolean)
 
     let content: BrowserStepContent
@@ -307,7 +323,12 @@ async function drive(
       refused: result.refused,
       detail: result.detail,
       url: result.pageUrl ?? url,
-      cost: { ...cost }
+      cost: { ...cost },
+      readWindow: {
+        start: read.textStart ?? 0,
+        end: (read.textStart ?? 0) + Math.min(2500, (read.text ?? '').length),
+        total: read.textTotal ?? (read.text ?? '').length
+      }
     })
     if (result.refused === 'run_stopped') return finish('stopped', 'Stopped by the user.')
     if (result.refused === 'step_ceiling') return finish('budget', 'The bridge step ceiling was reached.')

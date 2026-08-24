@@ -76,6 +76,7 @@ const OUTCOME_LINES: Record<string, string> = {
 export default function AgentRunDock(props: {
   askOpen: boolean
   onCloseAsk: () => void
+  onOpenAsk: () => void
 }): React.JSX.Element | null {
   const runs = useBrowserAgentRuns((s) => s.runs)
   const start = useBrowserAgentRuns((s) => s.start)
@@ -85,6 +86,9 @@ export default function AgentRunDock(props: {
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
   const [task, setTask] = useState('')
   const [stepsOpen, setStepsOpen] = useState(false)
+  // AI-43: which step is expanded to its full detail (what was seen, what
+  // was touched, what came back). One at a time keeps the ledger calm.
+  const [expandedStep, setExpandedStep] = useState<number | null>(null)
 
   // The run this dock shows: the live one, else the newest finished run not
   // yet dismissed (its outcome deserves to be read, not to vanish).
@@ -232,25 +236,60 @@ export default function AgentRunDock(props: {
                   {acted.length} {acted.length === 1 ? 'step' : 'steps'}
                 </button>
                 {stepsOpen && (
-                  <ol data-testid="agent-run-steps" className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
-                    {acted.map((e, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-[12px]">
-                        <Icon
-                          name={e.ok ? 'plexii:check' : 'close'}
-                          size={13}
-                          className={
-                            e.ok ? 'mt-px text-[var(--ink-70)]' : 'mt-px text-[var(--ink-70)] opacity-70'
-                          }
-                        />
-                        <span className="min-w-0 flex-1 text-[var(--ink-70)]">
-                          {e.ok
-                            ? actionLabel(e)
-                            : `${REFUSAL_LINES[String(e.refused)] ?? `Refused (${String(e.refused)})`}${
-                                typeof e.detail === 'string' && e.detail ? ` (“${e.detail}”)` : ''
-                              }`}
-                        </span>
-                      </li>
-                    ))}
+                  <ol data-testid="agent-run-steps" className="mt-1.5 max-h-44 space-y-1 overflow-y-auto">
+                    {acted.map((e, i) => {
+                      const rw = e.readWindow as { start: number; end: number; total: number } | undefined
+                      const open = expandedStep === i
+                      return (
+                        <li key={i} className="text-[12px]">
+                          <button
+                            type="button"
+                            className="flex w-full items-start gap-1.5 text-left hover:text-[var(--ink-100)]"
+                            data-testid={`agent-run-step-${i}`}
+                            onClick={() => setExpandedStep(open ? null : i)}
+                          >
+                            <Icon
+                              name={e.ok ? 'plexii:check' : 'close'}
+                              size={13}
+                              className={
+                                e.ok ? 'mt-px text-[var(--ink-70)]' : 'mt-px text-[var(--ink-70)] opacity-70'
+                              }
+                            />
+                            <span className="min-w-0 flex-1 text-[var(--ink-70)]">
+                              {e.ok
+                                ? actionLabel(e)
+                                : `${REFUSAL_LINES[String(e.refused)] ?? `Refused (${String(e.refused)})`}${
+                                    typeof e.detail === 'string' && e.detail ? ` (“${e.detail}”)` : ''
+                                  }`}
+                            </span>
+                          </button>
+                          {open && (
+                            <div
+                              data-testid={`agent-run-step-detail-${i}`}
+                              className="ml-5 mt-1 space-y-0.5 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-2 py-1.5 text-[11px] text-[var(--ink-70)]"
+                            >
+                              {typeof e.narration === 'string' && e.narration && (
+                                <div>“{e.narration}”</div>
+                              )}
+                              {typeof e.detail === 'string' && e.detail && (
+                                <div>Target: “{e.detail}”</div>
+                              )}
+                              {typeof e.url === 'string' && e.url && (
+                                <div className="truncate">On: {e.url}</div>
+                              )}
+                              {rw && rw.total > 0 && (
+                                <div>
+                                  Saw chars {rw.start.toLocaleString()}–{rw.end.toLocaleString()} of{' '}
+                                  {rw.total.toLocaleString()}
+                                  {rw.end < rw.total ? ' (more below its scroll)' : ' (the whole page)'}
+                                </div>
+                              )}
+                              {!e.ok && typeof e.refused === 'string' && <div>Refused: {e.refused}</div>}
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ol>
                 )}
               </div>
@@ -261,7 +300,24 @@ export default function AgentRunDock(props: {
     )
   }
 
-  if (!props.askOpen) return null
+  if (!props.askOpen) {
+    // AI-44 (Caleb's B5 drive): the ask door must announce itself — a
+    // quiet pill on the idle browser, not a hidden toolbar glyph.
+    return (
+      <button
+        type="button"
+        data-testid="agent-ask-pill"
+        onClick={props.onOpenAsk}
+        className="absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-[12px] text-[var(--ink-70)] hover:text-[var(--ink-100)] fb-press"
+        style={{
+          boxShadow: '0 0 0 1px var(--edge-hairline), var(--shadow-cast), var(--shadow-inset-highlight)'
+        }}
+      >
+        <Icon name="plexii:ai" size={14} />
+        Let Plexii do something here
+      </button>
+    )
+  }
 
   return (
     <div

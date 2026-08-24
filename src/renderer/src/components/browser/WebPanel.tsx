@@ -225,7 +225,7 @@ export default function WebPanel(): React.JSX.Element | null {
           </>
         }
       />
-      <AgentRunDock askOpen={askOpen} onCloseAsk={() => setAskOpen(false)} />
+      <AgentRunDock askOpen={askOpen} onCloseAsk={() => setAskOpen(false)} onOpenAsk={() => setAskOpen(true)} />
     </aside>,
     document.body
   )

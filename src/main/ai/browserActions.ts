@@ -132,6 +132,11 @@ export interface ActionResult {
   pageUrl?: string
   // read_page / extract text, snapshot elements, screenshot image.
   text?: string
+  // read_page windowing (AI-42): which slice of the page's full text this
+  // is, so the loop can tell the model honestly how much it has seen and
+  // that scrolling advances the window.
+  textStart?: number
+  textTotal?: number
   elements?: PageElement[]
   captchaPresent?: boolean
   image?: { base64Png: string; width: number; height: number }
@@ -434,14 +439,30 @@ export async function performAgentAction(runId: string, action: AgentAction): Pr
     }
 
     case 'read_page': {
+      // AI-42 (Caleb's B5 drive): the old read re-served the FIRST slice
+      // of a long page every time — "truncated to the same excerpt every
+      // time". The window now anchors to the scroll position, so a scroll
+      // action genuinely advances what the next read sees; start/total
+      // ride along so the loop can be honest about coverage.
       const sel = action.selector ? JSON.stringify(action.selector) : 'null'
-      const text = await runJs<string>(
+      const r = await runJs<{ text: string; start: number; total: number } | null>(
         wc,
-        `(() => { var root = ${sel} ? document.querySelector(${sel}) : document.body; return root ? root.innerText : ''; })()`
+        `(() => {
+          var root = ${sel} ? document.querySelector(${sel}) : document.body;
+          if (!root) return { text: '', start: 0, total: 0 };
+          var full = (root.innerText || '').replace(/\\n{3,}/g, '\\n\\n');
+          var W = 9000;
+          var maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+          var frac = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+          var start = ${sel} ? 0 : Math.round(frac * Math.max(0, full.length - W));
+          return { text: full.slice(start, start + W), start: start, total: full.length };
+        })()`
       )
       return done({
         ok: true,
-        text: (text ?? '').replace(/\n{3,}/g, '\n\n').slice(0, 9000)
+        text: r?.text ?? '',
+        textStart: r?.start ?? 0,
+        textTotal: r?.total ?? 0
       })
     }
 
