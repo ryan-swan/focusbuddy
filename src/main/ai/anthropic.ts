@@ -47,6 +47,7 @@ import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './cre
 import { groundingBlock, retrievalSourceLine, type GroundingSource } from './grounding'
 import { cachedSystem, cachedUserContent, cacheTokens, type CacheTextBlock } from './cacheControl'
 import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus, parseVerifyResult, type VerifyVerdict } from './agentEnvelope'
+import { parseBrowserEnvelope, buildBrowserAgentSystemPrompt, type BrowserEnvelope } from './browserAgentEnvelope'
 import type { AgentStatus, AgentStepResult } from '@shared/types'
 import type {
   ActionProposal,
@@ -1895,6 +1896,70 @@ export async function verifyAgentGoal(input: { goal: string; applied: string }):
     return parseVerifyResult(raw)
   } catch (e) {
     return { met: false, score: 0, gaps: [`Verification failed: ${(e as Error).message}`] }
+  }
+}
+
+// One round of the agentic-browsing loop (A6/B2). Mirrors runAgentStep's
+// shape — cached system prefix echoed back for byte-identical reuse, the
+// full transcript in `messages`, usage recorded — but the envelope is the
+// browser contract (ONE action or none) and observations may carry a
+// screenshot image block when the round runs in the R27 fallback mode.
+export interface BrowserStepResult {
+  ok: boolean
+  needsApiKey?: boolean
+  error?: string
+  envelope: BrowserEnvelope | null
+  rawAssistant: string
+  systemPrompt: string
+  usage: { inputTokens: number; outputTokens: number }
+}
+
+export type BrowserStepContent =
+  | string
+  | Array<
+      | { type: 'text'; text: string }
+      | { type: 'image'; source: { type: 'base64'; media_type: 'image/png'; data: string } }
+    >
+
+export async function runBrowserAgentStep(input: {
+  systemPrompt?: string
+  messages: Array<{ role: 'user' | 'assistant'; content: BrowserStepContent }>
+}): Promise<BrowserStepResult> {
+  const systemPrompt = input.systemPrompt ?? buildBrowserAgentSystemPrompt()
+  const fail = (error: string): BrowserStepResult => ({
+    ok: false,
+    error,
+    envelope: null,
+    rawAssistant: '',
+    systemPrompt,
+    usage: { inputTokens: 0, outputTokens: 0 }
+  })
+  const c = getClient()
+  if (!c) return { ...fail('No Anthropic API key set. Open Settings → AI → API keys.'), needsApiKey: true }
+  try {
+    const resp = await c.messages.create({
+      model: resolveModel('browser_agent'),
+      max_tokens: 1500,
+      system: cachedSystem(systemPrompt) as never,
+      messages: input.messages as never
+    })
+    const ct = cacheTokens(resp.usage)
+    const usage = {
+      inputTokens: resp.usage?.input_tokens ?? 0,
+      outputTokens: resp.usage?.output_tokens ?? 0
+    }
+    recordAiUsage(resolveModel('browser_agent'), usage.inputTokens, usage.outputTokens, ct.read, ct.write)
+    if ((resp.stop_reason as string) === 'refusal') return fail('Claude declined this request.')
+    const rawAssistant = resp.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+      .trim()
+    const envelope = parseBrowserEnvelope(rawAssistant)
+    if (!envelope) return { ...fail('The browsing step did not return usable JSON.'), rawAssistant, usage }
+    return { ok: true, envelope, rawAssistant, systemPrompt, usage }
+  } catch (e) {
+    return fail((e as Error).message)
   }
 }
 

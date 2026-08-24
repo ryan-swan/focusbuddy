@@ -35,9 +35,11 @@ export interface AgentRun {
   downloadsCancelled: number
 }
 
-// Bridge-level hard ceiling — defence in depth under B2's tighter loop
-// budget. A runaway loop dies here even if its own accounting is wrong.
-export const HARD_STEP_CEILING = 40
+// Bridge-level hard ceiling — defence in depth under B2's tighter round
+// budget (every observe step counts here too, so this sits well above
+// MODEL_ROUND_BUDGET x steps-per-round). A runaway loop dies here even if
+// its own accounting is wrong.
+export const HARD_STEP_CEILING = 120
 
 // Longest a single wait action may hold, in ms. The loop waits in small
 // slices so Stop lands within ~100ms regardless of the requested wait.

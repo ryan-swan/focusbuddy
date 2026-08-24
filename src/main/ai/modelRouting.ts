@@ -65,7 +65,12 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // Settle-time memory extraction (A5, R22): a small grounded distillation
   // that fires in the background after conversational answers — cheap matters
   // and Haiku's extraction discipline is plenty.
-  memory_extract: HAIKU
+  memory_extract: HAIKU,
+  // One round of the agentic-browsing loop (A6): read the page observation,
+  // pick ONE bridge action or finish. Planning under real page state wants
+  // Sonnet; kept as its own purpose (not reused agent_step) so per-round
+  // browsing cost rolls up separately for the B4 cost surface.
+  browser_agent: SONNET
 }
 
 let currentMode: ModelMode = 'auto'

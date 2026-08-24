@@ -19,6 +19,11 @@ export interface FakeClaudeOptions {
   deltaMs?: number
   // Text returned by non-streaming calls.
   shortText?: string
+  // Sequenced non-stream responses: each non-stream call consumes the next
+  // entry, falling back to shortText when the queue drains. This is what
+  // lets a spec script a multi-round agent loop (A6) — round 1 gets the
+  // first canned envelope, round 2 the second, and so on.
+  shortTexts?: string[]
 }
 
 export interface FakeClaude {
@@ -36,6 +41,7 @@ export async function startFakeClaude(opts: FakeClaudeOptions): Promise<FakeClau
   const charsPerDelta = opts.charsPerDelta ?? 9
   const deltaMs = opts.deltaMs ?? 30
   const requests: unknown[] = []
+  const shortQueue = [...(opts.shortTexts ?? [])]
   const server = http.createServer((req, res) => {
     if (req.method !== 'POST' || !req.url?.includes('/v1/messages')) {
       res.writeHead(404).end()
@@ -52,6 +58,7 @@ export async function startFakeClaude(opts: FakeClaudeOptions): Promise<FakeClau
       }
       requests.push(parsed)
       if (!parsed.stream) {
+        const queued = shortQueue.length > 0 ? shortQueue.shift() : undefined
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(
           JSON.stringify({
@@ -59,7 +66,7 @@ export async function startFakeClaude(opts: FakeClaudeOptions): Promise<FakeClau
             type: 'message',
             role: 'assistant',
             model: 'fake-claude',
-            content: [{ type: 'text', text: opts.shortText ?? 'Launch options' }],
+            content: [{ type: 'text', text: queued ?? opts.shortText ?? 'Launch options' }],
             stop_reason: 'end_turn',
             stop_sequence: null,
             usage: { input_tokens: 10, output_tokens: 3 }

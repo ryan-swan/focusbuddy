@@ -264,12 +264,6 @@ import {
   type TranscriptionProvider
 } from '../ai/voiceNote'
 import { preloadLocalWhisper } from '../ai/localWhisper'
-import {
-  runVoiceCommand,
-  runVoiceCommandStreaming,
-  type CanvasSnapshotWidget,
-  type VoiceCommandInput
-} from '../ai/voiceCommand'
 import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
 import {
   createAgentRun,
@@ -278,6 +272,8 @@ import {
   performAgentAction,
   type AgentAction
 } from '../ai/browserActions'
+import { runBrowserAgent, stopBrowserAgent, resolveBrowserConsent } from '../ai/browserAgent'
+import { listConsent, revokeConsent } from '../browserConsent'
 import {
   importFile,
   pickFileForImport,
@@ -2254,20 +2250,9 @@ export function registerIpcHandlers(): void {
     return { ok: true }
   })
 
-  // Voice command — floating mic interpreter. Sonnet receives the
-  // transcript + a pruned canvas snapshot and returns ActionProposals.
-  ipcMain.handle(
-    'voiceCommand:run',
-    (
-      _e,
-      input: {
-        transcript: string
-        activeTaskId: string | null
-        selectedWidgetId: string | null
-        widgets: CanvasSnapshotWidget[]
-      }
-    ) => runVoiceCommand(input as VoiceCommandInput)
-  )
+  // Voice prefs (the mascot hold + dictation UX). The voiceCommand
+  // proposals ENGINE is retired (A6/B0, R30) — its sanitiser discipline
+  // lives on in ai/browserAgentEnvelope.ts.
   ipcMain.handle('voiceCommand:getPrefs', () => getVoiceCommandPrefs())
   ipcMain.handle(
     'voiceCommand:setPrefs',
@@ -2284,6 +2269,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('agentBrowser:perform', (_e, runId: string, action: AgentAction) =>
     performAgentAction(runId, action)
   )
+  // The agentic-browsing loop (A6/B2): start returns the runId immediately;
+  // progress arrives as browserAgent:event pushes. consent answers the R26
+  // pause; the grant list is reviewable and revocable (settings, B3/B4).
+  ipcMain.handle(
+    'browserAgent:start',
+    (_e, input: { wcId: number; task: string; startUrl?: string }) => runBrowserAgent(input)
+  )
+  ipcMain.handle('browserAgent:stop', (_e, runId: string) => stopBrowserAgent(runId))
+  ipcMain.handle(
+    'browserAgent:consent',
+    (_e, runId: string, granted: boolean, remember: boolean) =>
+      resolveBrowserConsent(runId, granted, remember)
+  )
+  ipcMain.handle('browserConsent:list', () => listConsent())
+  ipcMain.handle('browserConsent:revoke', (_e, host: string) => revokeConsent(host))
   // File import — system file picker, plus a content-aware converter
   // that turns .txt/.md/.csv/.json into widget drafts.
   ipcMain.handle('fileImport:pick', () => pickFileForImport())
@@ -2299,42 +2299,6 @@ export function registerIpcHandlers(): void {
     const { parseGridFromFile } = await import('../gridImport')
     return parseGridFromFile(path)
   })
-
-  // Streaming variant — proposals + reply text arrive on a per-request
-  // channel `voiceCommand:stream:<reqId>` so the renderer can correlate
-  // multiple in-flight invocations. Caller mints the reqId; we just
-  // shovel events at it. The handler returns synchronously once the
-  // stream completes (success OR error) so the renderer's await
-  // resolves cleanly.
-  ipcMain.handle(
-    'voiceCommand:runStream',
-    async (
-      e,
-      input: VoiceCommandInput & { requestId: string }
-    ): Promise<{ ok: boolean }> => {
-      const channel = `voiceCommand:stream:${input.requestId}`
-      const sender = e.sender
-      const send = (type: string, payload?: unknown): void => {
-        if (sender.isDestroyed()) return
-        sender.send(channel, { type, payload })
-      }
-      await runVoiceCommandStreaming(
-        {
-          transcript: input.transcript,
-          activeTaskId: input.activeTaskId,
-          selectedWidgetId: input.selectedWidgetId,
-          widgets: input.widgets
-        },
-        {
-          onReply: (text) => send('reply', text),
-          onProposal: (p) => send('proposal', p),
-          onError: (err) => send('error', err),
-          onComplete: (sum) => send('complete', sum)
-        }
-      )
-      return { ok: true }
-    }
-  )
 
   // ── Tables (Notion/Airtable-style databases) ──────────────────────────────
   ipcMain.handle('tables:list', () => listTables())

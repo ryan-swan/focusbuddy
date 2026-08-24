@@ -1,13 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { launchApp, type LaunchedApp } from './_helpers'
 
-// VoiceCommandFAB E2E.
-//
-// We can't drive the actual mic / Whisper / Claude path in CI (no audio,
-// no API key, would burn tokens). Coverage is the structural plumbing
-// that ensures the FAB lands on-screen, the settings round-trip works,
-// the prefs persist, and the IPC contract for voiceCommand:run is callable
-// from the renderer.
+// Voice prefs E2E. What remains of the original VoiceCommandFAB spec:
+// the FAB itself was deleted in A3 (voice moved into the mascot, d055f25)
+// and the voiceCommand proposals engine retired in A6/B0 (R30) — the prefs
+// (hold mode, silence stop, voiceback) still drive the mascot voice UX and
+// their persistence contract is what this covers.
 
 let launched: LaunchedApp | null = null
 
@@ -33,26 +31,6 @@ async function boot(): Promise<LaunchedApp> {
   return app
 }
 
-test('FAB renders bottom-middle with idle mic icon', async () => {
-  launched = await boot()
-  const { window } = launched
-  const fab = window.locator('[data-testid="voice-command-fab"]')
-  await expect(fab).toBeVisible()
-  await expect(fab).toHaveAttribute('data-phase', 'idle')
-
-  // Horizontally centered: button's x-center within ±60px of viewport
-  // center. The +/- band accounts for the chrome (sidebar / AI rail)
-  // offsetting the canvas area but the FAB itself lives at left-1/2.
-  const box = await fab.boundingBox()
-  const viewport = window.viewportSize()
-  expect(box).toBeTruthy()
-  if (box && viewport) {
-    const center = box.x + box.width / 2
-    expect(Math.abs(center - viewport.width / 2)).toBeLessThan(80)
-    // Bottom-anchored: under 200px from the bottom of viewport
-    expect(viewport.height - (box.y + box.height)).toBeLessThan(200)
-  }
-})
 
 test('voiceCommand prefs round-trip through IPC', async () => {
   launched = await boot()
@@ -96,55 +74,4 @@ test('voiceCommand prefs round-trip through IPC', async () => {
   )
 })
 
-test('voiceCommand:run rejects empty transcript with empty_transcript reason', async () => {
-  launched = await boot()
-  const { window } = launched
-  const res = await window.evaluate(() =>
-    window.api.voiceCommand.run({
-      transcript: '   ',
-      activeTaskId: null,
-      selectedWidgetId: null,
-      widgets: []
-    })
-  )
-  expect(res.ok).toBe(false)
-  if (!res.ok) {
-    expect(res.reason).toBe('empty_transcript')
-  }
-})
 
-test('FAB tooltip reflects the current trigger mode', async () => {
-  launched = await boot()
-  const { window } = launched
-  // Default mode is press-hold.
-  const fab = window.locator('[data-testid="voice-command-fab"]')
-  // The tooltip text lives in the FAB's title attribute, which is set regardless
-  // of hover, so we assert it directly. We do not hover: the FAB carries a
-  // continuous idle animation that never settles to Playwright's actionability
-  // check, so hover hangs.
-  await expect(fab).toBeVisible()
-  await expect(fab).toHaveAttribute('title', 'Hold to speak')
-
-  // Switch to click-toggle and reload — fab should now read "Click to speak".
-  await window.evaluate(() =>
-    window.api.voiceCommand.setPrefs({ commandMode: 'click-toggle' })
-  )
-  await window.reload()
-  await window.waitForFunction(
-    () => typeof (window as unknown as { api?: unknown }).api === 'object',
-    null,
-    { timeout: 10_000 }
-  )
-  const skip = window.getByRole('button', {
-    name: /Continue without account|Skip|Not now/i
-  })
-  if (await skip.isVisible().catch(() => false)) await skip.click().catch(() => {})
-  const fab2 = window.locator('[data-testid="voice-command-fab"]')
-  await expect(fab2).toBeVisible()
-  await expect(fab2).toHaveAttribute('title', 'Click to speak')
-
-  // Restore default.
-  await window.evaluate(() =>
-    window.api.voiceCommand.setPrefs({ commandMode: 'press-hold' })
-  )
-})

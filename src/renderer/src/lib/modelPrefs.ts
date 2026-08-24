@@ -61,7 +61,8 @@ export const AUTO_ROUTING_DISPLAY: Record<AIPurpose, { model: string; cost: stri
   file_tag: { model: 'Haiku', cost: '$' },
   meeting_end: { model: 'Sonnet', cost: '$$' },
   agent_step: { model: 'Sonnet', cost: '$$' },
-  memory_extract: { model: 'Haiku', cost: '$' }
+  memory_extract: { model: 'Haiku', cost: '$' },
+  browser_agent: { model: 'Sonnet', cost: '$$' }
 }
 
 function readFromStorage(): ModelMode {

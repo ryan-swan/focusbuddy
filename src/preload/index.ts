@@ -1304,28 +1304,29 @@ const api = {
       image?: { base64Png: string; width: number; height: number }
     }> => ipcRenderer.invoke('agentBrowser:perform', runId, action)
   },
+  // The agentic-browsing loop (A6/B2): start a supervised run, answer its
+  // consent pauses, stop it, watch its events, review the standing grants.
+  browserAgent: {
+    start: (input: { wcId: number; task: string; startUrl?: string }): Promise<{ runId: string }> =>
+      ipcRenderer.invoke('browserAgent:start', input),
+    stop: (runId: string): Promise<boolean> => ipcRenderer.invoke('browserAgent:stop', runId),
+    consent: (runId: string, granted: boolean, remember: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('browserAgent:consent', runId, granted, remember),
+    onEvent: (cb: (ev: Record<string, unknown> & { kind: string; runId: string }) => void): (() => void) => {
+      const handler = (
+        _e: Electron.IpcRendererEvent,
+        ev: Record<string, unknown> & { kind: string; runId: string }
+      ): void => cb(ev)
+      ipcRenderer.on('browserAgent:event', handler)
+      return () => ipcRenderer.removeListener('browserAgent:event', handler)
+    },
+    listConsent: (): Promise<Array<{ host: string; grantedAt: string }>> =>
+      ipcRenderer.invoke('browserConsent:list'),
+    revokeConsent: (host: string): Promise<void> => ipcRenderer.invoke('browserConsent:revoke', host)
+  },
+  // Voice prefs only — the voiceCommand proposals engine retired with
+  // A6/B0's R30 ruling (harvested into the browser-agent sanitiser).
   voiceCommand: {
-    run: (input: {
-      transcript: string
-      activeTaskId: string | null
-      selectedWidgetId: string | null
-      widgets: Array<{
-        id: string
-        kind: string
-        title: string
-        contentPreview: string
-        selected?: boolean
-        recentlyTouched?: boolean
-        visible?: boolean
-      }>
-    }): Promise<
-      | { ok: true; reply: string; proposals: ActionProposal[] }
-      | {
-          ok: false
-          error: string
-          reason?: 'no_key' | 'empty_transcript' | 'no_proposals' | 'api' | 'parse'
-        }
-    > => ipcRenderer.invoke('voiceCommand:run', input),
     getPrefs: (): Promise<{
       commandMode: 'press-hold' | 'click-toggle'
       autoStopSilenceMs: number
@@ -1341,66 +1342,7 @@ const api = {
       commandMode: 'press-hold' | 'click-toggle'
       autoStopSilenceMs: number
       voiceback: boolean
-    }> => ipcRenderer.invoke('voiceCommand:setPrefs', patch),
-    // Streaming variant — caller mints a requestId and listens on the
-    // per-request channel. Returns a cleanup function to unsubscribe.
-    runStream: (
-      input: {
-        requestId: string
-        transcript: string
-        activeTaskId: string | null
-        selectedWidgetId: string | null
-        widgets: Array<{
-          id: string
-          kind: string
-          title: string
-          contentPreview: string
-          selected?: boolean
-          recentlyTouched?: boolean
-          visible?: boolean
-        }>
-      },
-      callbacks: {
-        onReply?: (text: string) => void
-        onProposal?: (proposal: ActionProposal) => void
-        onError?: (error: { ok: false; error: string; reason?: string }) => void
-        onComplete?: (summary: { totalProposals: number; replyText: string }) => void
-      }
-    ): (() => void) => {
-      const channel = `voiceCommand:stream:${input.requestId}`
-      type Event =
-        | { type: 'reply'; payload: string }
-        | { type: 'proposal'; payload: ActionProposal }
-        | { type: 'error'; payload: { ok: false; error: string; reason?: string } }
-        | { type: 'complete'; payload: { totalProposals: number; replyText: string } }
-      const handler = (_: unknown, ev: Event): void => {
-        switch (ev.type) {
-          case 'reply':
-            callbacks.onReply?.(ev.payload)
-            break
-          case 'proposal':
-            callbacks.onProposal?.(ev.payload)
-            break
-          case 'error':
-            callbacks.onError?.(ev.payload)
-            break
-          case 'complete':
-            callbacks.onComplete?.(ev.payload)
-            break
-        }
-      }
-      ipcRenderer.on(channel, handler)
-      // Kick off the stream. We deliberately fire-and-forget — the
-      // events handle the result; the invoke promise just keeps the
-      // request alive on the main side until it resolves.
-      void ipcRenderer.invoke('voiceCommand:runStream', input)
-      // Braces so the cleanup arrow returns void — ipcRenderer.removeListener
-      // returns the IpcRenderer instance, which a `(): void =>` concise body
-      // would otherwise try (and fail) to return.
-      return (): void => {
-        ipcRenderer.removeListener(channel, handler)
-      }
-    }
+    }> => ipcRenderer.invoke('voiceCommand:setPrefs', patch)
   },
   // Phase 2A — agent creation wizard. Writes a brand-new agent .md
   // file to .claude/agents/ with a Claude-generated body following

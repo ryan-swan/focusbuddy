@@ -9,6 +9,9 @@ import { useWidgetStore } from '../../stores/widgets'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { spawnPositionFor } from '../../lib/spawnPosition'
 import { sanitizeWebviewUrl } from '../../lib/browserUrl'
+// Side-effect: the agent-run store subscribes to main's browserAgent events
+// for the window's lifetime — the panel is the surface those runs drive.
+import '../../stores/browserAgentRuns'
 
 // The in-app browser panel (A2, AI-03, R4/R13): the web never leaves Plexi.
 // One right-side panel serves citations, omnibar URLs, and search results —

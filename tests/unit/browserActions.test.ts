@@ -150,7 +150,7 @@ describe('the kill switch and the run registry', () => {
     expect(isAgentDrivenWc(9)).toBe(false)
     endAgentRun(run.id)
   })
-  test('the hard step ceiling refuses the 41st action', async () => {
+  test('the hard step ceiling refuses the action past it', async () => {
     makeWc(10)
     const run = createAgentRun(10)
     getAgentRun(run.id)!.steps = HARD_STEP_CEILING
