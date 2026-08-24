@@ -186,10 +186,13 @@ export async function stopHold(): Promise<void> {
     // addressed → type the words in verbatim and finish.
     if (!hasWake && dictationTarget && dictateInto(dictationTarget, text)) {
       setState('idle')
+      // Heard-you (AI-18): one wink from the mascot — the words landed.
+      window.dispatchEvent(new Event('fb:plexii-moment'))
       return
     }
     stageInComposer(hasWake ? text.replace(WAKE, '').trim() || text : text)
     setState('idle')
+    window.dispatchEvent(new Event('fb:plexii-moment'))
   } catch (err) {
     setState('idle', (err as Error)?.message || 'Transcription failed.')
   } finally {

@@ -155,6 +155,30 @@ function AssistantOverlayChrome(): JSX.Element {
   const pillHoldTimer = useRef<number | null>(null)
   const pillHeldRef = useRef(false)
   const pillJustHeldRef = useRef(false)
+  // Personality moments (AI-18, Caleb's four picks): a moment replays ONE
+  // blink cycle by remounting the mark (mount = one cycle, then frozen — the
+  // brand machine's own law). Guarded by the collision law: no moment while
+  // an answer is in flight (breathe) or a capture is live (ring). The boot
+  // greeting is the standing mount blink itself — the pill mounts once per
+  // boot, so no extra wiring exists for it, by design.
+  const [momentToken, setMomentToken] = useState(0)
+  const playMoment = useCallback((): void => {
+    if (useChatStore.getState().sending) return
+    if (useVoiceHold.getState().phase !== 'idle') return
+    setMomentToken((t) => t + 1)
+  }, [])
+  // Heard-you: voiceHold announces a landed transcript (dictation or staging).
+  useEffect(() => {
+    window.addEventListener('fb:plexii-moment', playMoment)
+    return () => window.removeEventListener('fb:plexii-moment', playMoment)
+  }, [playMoment])
+  // Done blink: the sending edge falling — a long task just finished; one
+  // contented blink as the ping dot leaves.
+  const prevSending = useRef(sending)
+  useEffect(() => {
+    if (prevSending.current && !sending) playMoment()
+    prevSending.current = sending
+  }, [sending, playMoment])
   // Click-to-pin lifecycle (3a.1): watches the widget-activation signal and
   // the pin's clearing conditions. Lives here because this component never
   // unmounts, so the rules keep running even while the panel is closed.
@@ -291,16 +315,20 @@ function AssistantOverlayChrome(): JSX.Element {
         title="Plexii — click to open, hold to talk"
         aria-label="Open Plexii (hold to talk)"
         data-testid="assistant-pill"
-        className="fb-floating-chrome fixed right-[14px] bottom-[42px] z-[120] h-10 w-10 rounded-full grid place-items-center border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-accent hover:border-[rgb(var(--accent)/0.5)] transition-colors"
+        className="fb-floating-chrome fixed right-[14px] bottom-[42px] z-[120] h-10 w-10 rounded-full grid place-items-center border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-accent hover:border-[rgb(var(--accent)/0.5)] transition-all duration-200 motion-safe:hover:-translate-y-[2px] motion-safe:active:translate-y-0"
         style={FLOATING_MENU_STYLE}
       >
-        {/* Brand motion Phase 1: the pill wears the ii mark — one blink on
-            mount, a wink on hover. Collision law: blink = alive, breathe =
+        {/* Brand motion Phase 1 + AI-18: the pill wears the ii mark — one
+            blink on mount (the boot greeting), a wink on hover, and one
+            replayed cycle per personality moment (the key remount). The
+            hover lift above is the "hover play" pick — a 2px rise, gone
+            under reduced motion. Collision law: blink = alive, breathe =
             thinking, never both on one surface, so while an answer is in
             flight (the ping dot below) OR a capture is live (the ring), the
             mark holds still. Decorative (title null): the button's
             aria-label already names it. */}
         <PlexiiMark
+          key={`moment-${momentToken}`}
           height={18}
           motion={sending || voicePhase !== 'idle' ? 'off' : 'once+hover'}
           title={null}

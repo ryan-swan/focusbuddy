@@ -218,6 +218,16 @@ test('mascot voice chrome: the bar is gone, the pill holds to talk, staging fill
   await expect(pill).toBeVisible()
   await expect(pill).toHaveAttribute('title', 'Plexii — click to open, hold to talk')
 
+  // AI-18: the boot greeting is the mount blink — it settles to the static
+  // mark (the animated branch's .pm-mark leaves the DOM at the cycle end)…
+  const animatedMark = pill.locator('.pm-mark')
+  await expect(animatedMark).toHaveCount(0, { timeout: 8_000 })
+  // …and a personality moment replays exactly ONE cycle: animating right
+  // after the signal, frozen again at the boundary.
+  await window.evaluate(() => window.dispatchEvent(new Event('fb:plexii-moment')))
+  await expect(animatedMark).toHaveCount(1)
+  await expect(animatedMark).toHaveCount(0, { timeout: 6_000 })
+
   // Feed the capture a REAL audio stream with no microphone: an oscillator
   // into a MediaStream destination — MediaRecorder records genuine webm.
   await window.evaluate(() => {
