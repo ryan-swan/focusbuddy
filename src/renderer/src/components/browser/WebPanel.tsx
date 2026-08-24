@@ -36,6 +36,8 @@ export default function WebPanel(): React.JSX.Element | null {
   const open = useWebPanel((s) => s.open)
   const url = useWebPanel((s) => s.url)
   const close = useWebPanel((s) => s.close)
+  const expanded = useWebPanel((s) => s.expanded)
+  const toggleExpanded = useWebPanel((s) => s.toggleExpanded)
   const webviewRef = useRef<WebviewEl | null>(null)
   const [canGoBack, setCanGoBack] = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
@@ -78,23 +80,31 @@ export default function WebPanel(): React.JSX.Element | null {
     }
   }, [open, src])
 
-  // Esc closes the panel — but only when the focus is not inside the page
-  // itself (the webview swallows its own keys; this catches the chrome).
+  // Esc steps DOWN: a fullscreen browser first returns to the panel, a
+  // second Esc closes it. (The webview swallows its own keys; this catches
+  // the chrome.)
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') close()
+      if (e.key !== 'Escape') return
+      if (useWebPanel.getState().expanded) toggleExpanded()
+      else close()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, close])
+  }, [open, close, toggleExpanded])
 
   if (!open || !src) return null
 
   return createPortal(
     <aside
       data-testid="web-panel"
-      className="fixed top-10 bottom-7 right-[14px] z-[130] w-[min(560px,calc(100vw-120px))] flex flex-col rounded-[var(--radius-card)] bg-[var(--surface-base)] fb-fade-in-up overflow-hidden"
+      data-expanded={expanded ? 'true' : 'false'}
+      className={`fixed z-[130] flex flex-col rounded-[var(--radius-card)] bg-[var(--surface-base)] fb-fade-in-up overflow-hidden transition-[inset,width] duration-200 ${
+        expanded
+          ? 'top-10 bottom-2 left-2 right-2 w-auto'
+          : 'top-10 bottom-7 right-[14px] w-[min(560px,calc(100vw-120px))]'
+      }`}
       style={{
         boxShadow: '0 0 0 1px var(--edge-hairline), var(--shadow-cast), var(--shadow-inset-highlight)'
       }}
@@ -131,6 +141,14 @@ export default function WebPanel(): React.JSX.Element | null {
           <span className="ml-2">{hostnameOf(currentUrl || src)}</span>
         </div>
         <EnginePickerChip />
+        <button
+          className="icon-btn !h-6 !w-6"
+          onClick={toggleExpanded}
+          title={expanded ? 'Back to the side panel (Esc)' : 'Full screen'}
+          data-testid="web-panel-expand"
+        >
+          <Icon name={expanded ? 'fullscreen_exit' : 'fullscreen'} size={14} />
+        </button>
         <button
           className="icon-btn !h-6 !w-6"
           onClick={() => void window.api.files.openExternal(currentUrl || src)}

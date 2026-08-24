@@ -11,6 +11,10 @@ const ENGINE_KEY = 'fb.webpanel.engine'
 
 interface WebPanelState {
   open: boolean
+  // Fullscreen (Caleb's seamless ruling, 2026-08-23): the half panel is the
+  // fast default, one toggle makes the same page a genuine full-screen
+  // browser inside Plexi. Per-open state: the panel always reopens compact.
+  expanded: boolean
   // The address the panel was asked to show. The webview navigates freely
   // afterwards; this changes only on a new openWeb call (it is the webview's
   // `src`, and rewriting src on every did-navigate would reload the page).
@@ -19,11 +23,13 @@ interface WebPanelState {
   engine: SearchEngineId
   openWeb: (url: string) => void
   close: () => void
+  toggleExpanded: () => void
   setEngine: (engine: SearchEngineId) => void
 }
 
 export const useWebPanel = create<WebPanelState>((set) => ({
   open: false,
+  expanded: false,
   url: null,
   engine: ((): SearchEngineId => {
     try {
@@ -35,7 +41,8 @@ export const useWebPanel = create<WebPanelState>((set) => ({
     return 'duckduckgo'
   })(),
   openWeb: (url) => set({ open: true, url }),
-  close: () => set({ open: false }),
+  close: () => set({ open: false, expanded: false }),
+  toggleExpanded: () => set((s) => ({ expanded: !s.expanded })),
   setEngine: (engine) => {
     try {
       localStorage.setItem(ENGINE_KEY, engine)

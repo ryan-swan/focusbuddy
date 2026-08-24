@@ -36,6 +36,24 @@ test('plexii A2: one door — URL, web search, ask Plexii, and the web panel', a
   await window.screenshot({ path: `${OUT}/omni-2-web-panel.png` })
   // The explicit system-browser escape exists; the default never leaves Plexi.
   await expect(window.locator('[data-testid="web-panel-external"]')).toBeVisible()
+
+  // Fullscreen toggle (the seamless ruling): the same page grows to a genuine
+  // full browser; Esc steps DOWN — panel first, closed second.
+  await window.locator('[data-testid="web-panel-expand"]').click()
+  await expect(panel).toHaveAttribute('data-expanded', 'true')
+  const wide = await panel.boundingBox()
+  expect(wide && wide.width > 1200).toBeTruthy()
+  await window.waitForTimeout(300)
+  await window.screenshot({ path: `${OUT}/omni-2b-web-full.png` })
+  await window.keyboard.press('Escape')
+  await expect(panel).toHaveAttribute('data-expanded', 'false')
+  await window.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+
+  await window.keyboard.press(CMD_K)
+  await input.fill('plexi.so')
+  await window.keyboard.press('Enter')
+  await expect(panel).toBeVisible()
   await window.locator('[data-testid="web-panel-close"]').click()
   await expect(panel).toHaveCount(0)
 
