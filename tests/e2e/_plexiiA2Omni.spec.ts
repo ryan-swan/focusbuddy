@@ -41,7 +41,7 @@ test('plexii A2: one door — URL, web search, ask Plexii, and the web panel', a
   await window.waitForTimeout(300)
   await window.screenshot({ path: `${OUT}/omni-2-web-full.png` })
   // The explicit system-browser escape exists; the default never leaves Plexi.
-  await expect(window.locator('[data-testid="web-panel-external"]')).toBeVisible()
+  await expect(window.locator('[data-testid="browser-external"]')).toBeVisible()
   // Esc steps DOWN: fullscreen to the compact panel, then closed; the toggle
   // still flips between the two sizes by hand.
   await window.keyboard.press('Escape')
@@ -97,7 +97,9 @@ test('plexii A2: the engine picker pins a choice and the next search honours it'
   await input.fill('standing desk setups')
   await window.locator('[data-testid="palette-row-omni-search"]').click()
   await expect(panel).toBeVisible()
-  await expect(panel.locator('div[title]').first()).toContainText('duckduckgo.com', { timeout: 15000 })
+  await expect(panel.locator('[data-testid="browser-address"]')).toHaveValue(/duckduckgo\.com/, {
+    timeout: 15000
+  })
 
   // The toolbar chip opens the model-picker-style menu; picking Google pins it.
   await window.locator('[data-testid="web-panel-engine-toggle"]').click()
@@ -115,7 +117,9 @@ test('plexii A2: the engine picker pins a choice and the next search honours it'
   await input.fill('standing desk setups')
   await window.locator('[data-testid="palette-row-omni-search"]').click()
   await expect(panel).toBeVisible()
-  await expect(panel.locator('div[title]').first()).toContainText('google.com', { timeout: 15000 })
+  await expect(panel.locator('[data-testid="browser-address"]')).toHaveValue(/google\.com/, {
+    timeout: 15000
+  })
   await window.screenshot({ path: `${OUT}/omni-8-engine-pinned.png` })
 
   // Pinned = survives a reload (localStorage preference).
@@ -126,7 +130,9 @@ test('plexii A2: the engine picker pins a choice and the next search honours it'
   const row = window.locator('[data-testid="palette-row-omni-search"]')
   await expect(row).toBeVisible()
   await row.click()
-  await expect(panel.locator('div[title]').first()).toContainText('google.com', { timeout: 15000 })
+  await expect(panel.locator('[data-testid="browser-address"]')).toHaveValue(/google\.com/, {
+    timeout: 15000
+  })
 
   await launched.dispose()
 })

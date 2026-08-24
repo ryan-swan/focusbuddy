@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeUrl, sanitizeWebviewUrl } from '../../src/renderer/src/lib/browserUrl'
+import { normalizeUrl, resolveAddressInput, sanitizeWebviewUrl } from '../../src/renderer/src/lib/browserUrl'
 
 describe('normalizeUrl — address bar input', () => {
   it('returns null only for empty input', () => {
@@ -82,5 +82,32 @@ describe('sanitizeWebviewUrl — guard for <webview src> and stored webview cont
   it('turns free-text AI prose (the observed corruption) into a safe search', () => {
     const out = sanitizeWebviewUrl('Origin of the Name Michael Etymology derives from Hebrew')
     expect(out.startsWith('https://www.google.com/search?q=')).toBe(true)
+  })
+})
+
+describe('resolveAddressInput — the unified surface, engine-aware (A2 unification)', () => {
+  const brave = (q: string): string => `https://search.brave.com/search?q=${encodeURIComponent(q)}`
+
+  it('navigates a real address without consulting the engine', () => {
+    expect(resolveAddressInput('github.com', brave)).toBe('https://github.com/')
+    expect(resolveAddressInput('https://example.com/a?b=1', brave)).toBe('https://example.com/a?b=1')
+  })
+
+  it("hands searchy input to the CALLER'S engine, not a hard-coded one", () => {
+    expect(resolveAddressInput('best pizza recipes', brave)).toBe(
+      'https://search.brave.com/search?q=best%20pizza%20recipes'
+    )
+    expect(resolveAddressInput('weather', brave)).toBe('https://search.brave.com/search?q=weather')
+  })
+
+  it('returns null only for empty input', () => {
+    expect(resolveAddressInput('', brave)).toBeNull()
+    expect(resolveAddressInput('   ', brave)).toBeNull()
+  })
+
+  it('normalizeUrl stays the fixed-Google special case of the same logic', () => {
+    expect(normalizeUrl('best pizza recipes')).toBe(
+      resolveAddressInput('best pizza recipes', (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`)
+    )
   })
 })

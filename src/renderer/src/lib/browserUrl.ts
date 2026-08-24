@@ -28,25 +28,35 @@ export function looksLikeHost(input: string): boolean {
 // Turn whatever the user typed into a URL to load. Returns null only for empty
 // input; every other input resolves either to a real address or to a search.
 export function normalizeUrl(input: string): string | null {
+  return resolveAddressInput(input, searchUrl)
+}
+
+// Address-bar resolution for the unified browser surface: a real address
+// navigates, anything searchy goes to the CALLER'S search engine — the pinned
+// preference the omnibar and the engine chip share (AI-02), so the address bar
+// can never disagree with the rest of the app. normalizeUrl above keeps its
+// fixed-Google fallback for callers with no engine in reach (sanitization).
+export function resolveAddressInput(
+  input: string,
+  searchFor: (query: string) => string
+): string | null {
   const raw = input.trim()
   if (!raw) return null
-  // Respect an explicit scheme. If it is a valid URL, use it; if the user typed
-  // a scheme but then something unparseable, fall back to a search.
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || /^(about|data|view-source|mailto):/i.test(raw)) {
     try {
       return new URL(raw).toString()
     } catch {
-      return searchUrl(raw)
+      return searchFor(raw)
     }
   }
   if (looksLikeHost(raw)) {
     try {
       return new URL(`https://${raw}`).toString()
     } catch {
-      // Looked host-like but would not parse; treat it as a search.
+      // looked host-like but would not parse; treat it as a search
     }
   }
-  return searchUrl(raw)
+  return searchFor(raw)
 }
 
 // Sanitize a value before it is loaded as a <webview src> or stored as a webview

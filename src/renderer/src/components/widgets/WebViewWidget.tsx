@@ -4,21 +4,26 @@ import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
 import { useConnectedAppsStore } from '../../stores/connectedApps'
 import { useVaultStore } from '../../stores/vault'
+import { useWebPanel } from '../../stores/webPanel'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
 import { normalizeUrl, sanitizeWebviewUrl } from '../../lib/browserUrl'
+import BrowserSurface, {
+  hostnameOf,
+  type BrowserNavState,
+  type WebviewEl
+} from '../browser/BrowserSurface'
 import Icon from '../Icon'
 import ConnectedToolMenu from '../contextMenu/UnifiedConnectedMenu'
 
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
-
+// The desk's browser widget. Since the A2 desk-browser unification it renders
+// the SAME BrowserSurface core as the panel/fullscreen browser — one toolbar
+// grammar, one cookie jar for freeform widgets (persist:webview-default), one
+// browsing history. This wrapper owns only what makes it a CANVAS widget:
+// the frame, the click-to-interact overlay, Connected-App sessions + vault
+// autofill, pin-to-apps, resolution presets, the target=_blank spawn, and
+// persisting the live URL back into widget.content.
 
 // Stored viewport presets the user can snap a browser window to. Sizes are
 // the common device classes (CSS px) so a page renders the way it would on
@@ -47,27 +52,14 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // marks the widget active in place.
   const setActive = useWidgetStore((s) => s.setActive)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
-  const webviewRef = useRef<HTMLElement | null>(null)
+  // The live webview element, handed up by BrowserSurface once attached.
+  // State (not a ref) so the registry/autofill/popup effects re-run when the
+  // element genuinely appears or is torn down.
+  const [wvEl, setWvEl] = useState<WebviewEl | null>(null)
   const entry = catalogFor(widget.kind)
   const placeholder = entry?.urlPlaceholder ?? 'https://…'
   const [editing, setEditing] = useState(!widget.content)
   const [draft, setDraft] = useState(widget.content)
-  // ── Browser-toolbar state ─────────────────────────────────────────────────
-  // canGoBack / canGoForward feed the back+forward button enabled state.
-  // We update them from the webview's `did-navigate*` events because
-  // canGoBack()/canGoForward() are imperative calls that have to be re-
-  // queried after every navigation.
-  const [canGoBack, setCanGoBack] = useState(false)
-  const [canGoForward, setCanGoForward] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  // currentUrl is the address shown in the toolbar's URL bar. It tracks
-  // the LIVE webview URL (updated from `did-navigate*`) so it always
-  // reflects where the user actually is — including in-page hash changes.
-  const [currentUrl, setCurrentUrl] = useState(widget.content)
-  // urlDraft is the inline edit buffer for the URL bar. We only commit
-  // (call loadURL) on Enter or blur, so transient typing doesn't navigate.
-  const [urlDraft, setUrlDraft] = useState('')
-  const [urlEditing, setUrlEditing] = useState(false)
   // Resolution-preset dropdown (snap the browser window to a stored viewport).
   const [resMenuOpen, setResMenuOpen] = useState(false)
   // Right-click on the widget frame (NOT the inner webview — webviews
@@ -79,12 +71,12 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   const [livePreview, setLivePreview] = useState<{ url: string; title: string } | null>(null)
   // Last URL we persisted into widget.content — avoids redundant DB writes on rapid navs
   const lastPersistedUrl = useRef<string>(widget.content)
-  // ── webviewSrc — the URL we tell the <webview> element to load ─────────────
+  // ── webviewSrc — the URL we hand BrowserSurface as its load target ────────
   // CRITICAL: this is intentionally NOT derived from widget.content. Binding
   // src={widget.content} causes the webview to reload on every navigation,
   // because persistNavUrl writes the post-nav URL back to widget.content →
-  // React re-renders the <webview> with a new src attribute → Electron
-  // treats that as a load request → reload kills mid-sign-in POSTs.
+  // React re-renders with a new src → the core's loadURL sync treats it as a
+  // load request → reload kills mid-sign-in POSTs.
   //
   // Instead, webviewSrc is only updated when the URL change is EXTERNAL to
   // this webview: the user typed a new URL in the edit form, or a sibling
@@ -127,21 +119,16 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     setDraft(widget.content)
   }, [widget.content])
 
-  // Safety-net flush on unmount: if the last nav event didn't fire (rare) or the user
-  // closes focus mode mid-load, read the webview's getURL() and commit it.
+  // Safety-net flush on unmount: if the last nav event didn't fire (rare) or
+  // the user closes focus mode mid-load, read the webview's getURL() and
+  // commit it. Keyed on the element so the cleanup always sees the live one.
   useEffect(() => {
-    const wvAtMount = webviewRef.current
+    if (!wvEl) return
     return () => {
       try {
-        const finalUrl =
-          (wvAtMount as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
-        const finalTitle =
-          (wvAtMount as unknown as { getTitle?: () => string } | null)?.getTitle?.() ?? ''
-        if (
-          finalUrl &&
-          /^https?:\/\//i.test(finalUrl) &&
-          finalUrl !== lastPersistedUrl.current
-        ) {
+        const finalUrl = wvEl.getURL?.() ?? ''
+        const finalTitle = wvEl.getTitle?.() ?? ''
+        if (finalUrl && /^https?:\/\//i.test(finalUrl) && finalUrl !== lastPersistedUrl.current) {
           lastPersistedUrl.current = finalUrl
           void update(widget.id, {
             content: finalUrl,
@@ -153,7 +140,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widget.id])
+  }, [wvEl, widget.id])
 
   // Persist the latest URL into widget.content so the next mount (incl. focus-mode
   // expand) loads where you left off. NO debounce — saves are tiny and racing the user
@@ -169,32 +156,28 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     })
   }
 
-  // Allow popups (OAuth, window.open). We do NOT intercept new-window in the
-  // renderer because doing so kills `window.opener`, which OAuth providers use
-  // to post the auth callback back to the parent page. The main process owns
-  // popup routing via setWindowOpenHandler:
-  //   - disposition='new-window' / has features → open as a real native popup
-  //     window sharing this webview's session (OAuth flows work).
-  //   - target=_blank link clicks → main forwards the URL via IPC, we spawn a
-  //     new canvas widget below.
-  useEffect(() => {
-    if (editing) return
-    const wv = webviewRef.current
-    if (!wv) return
-    wv.setAttribute('allowpopups', '')
-  }, [editing])
+  // Every main-frame navigation, from the shared core: record the trail and
+  // persist where the user actually is. (History recording lives in the core.)
+  function handleNav({ url, title }: BrowserNavState): void {
+    void window.api.trail.record({
+      taskId: widget.taskId,
+      kind: 'browser_nav',
+      payload: { url, title, host: hostnameOf(url), widgetId: widget.id }
+    })
+    persistNavUrl(url, title)
+  }
 
   // Spawn a canvas widget for target=_blank links that originated from this
   // webview's webContents. We compare webContentsId so a link click in one
   // browser widget doesn't spawn duplicates across every other browser widget.
+  // (Popups themselves — OAuth, window.open — are routed by the main process;
+  // intercepting new-window in the renderer would kill window.opener.)
   useEffect(() => {
-    if (editing) return
+    if (!wvEl) return
     const off = window.api.webview.onLinkClicked(({ sourceWebContentsId, url }) => {
-      const wv = webviewRef.current
-      if (!wv) return
       let myId = -1
       try {
-        myId = (wv as unknown as { getWebContentsId: () => number }).getWebContentsId()
+        myId = wvEl.getWebContentsId()
       } catch {
         return
       }
@@ -214,118 +197,29 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
       })
     })
     return off
-  }, [editing, widget.id, widget.taskId, widget.x, widget.y, widget.sourceAppId, create])
+  }, [wvEl, widget.id, widget.taskId, widget.x, widget.y, widget.sourceAppId, create])
 
   // Register this webview's webContentsId so the host renderer can look it up
   // when the main process forwards a context-menu action.
   useEffect(() => {
-    if (editing) return
-    const wv = webviewRef.current
-    if (!wv) return
-
+    if (!wvEl) return
     function handleDomReady(): void {
       try {
-        const id = (wv as unknown as { getWebContentsId: () => number }).getWebContentsId()
-        registerWebview(id, widget.id, wv as HTMLElement)
+        registerWebview(wvEl!.getWebContentsId(), widget.id, wvEl!)
       } catch {
         // webview not yet attached
       }
     }
-
-    wv.addEventListener('dom-ready', handleDomReady as EventListener)
+    wvEl.addEventListener('dom-ready', handleDomReady as EventListener)
+    // The element may already be past dom-ready by the time this effect runs
+    // (the core hands it up on attach) — register eagerly too; the registry
+    // call is idempotent per widget id.
+    handleDomReady()
     return () => {
-      wv.removeEventListener('dom-ready', handleDomReady as EventListener)
+      wvEl.removeEventListener('dom-ready', handleDomReady as EventListener)
       unregisterWebviewByWidgetId(widget.id)
     }
-  }, [editing, widget.id])
-
-  // Record navigation events into the browsing history so the create/edit dialog
-  // can suggest "Recent pages" the user has actually used for similar tasks.
-  useEffect(() => {
-    if (editing) return
-    const wv = webviewRef.current
-    if (!wv) return
-
-    function handleNav(e: Event): void {
-      const ev = e as Event & { url?: string; isMainFrame?: boolean }
-      if (ev.isMainFrame === false) return
-      const url = ev.url ?? (wv as unknown as { getURL?: () => string }).getURL?.()
-      if (!url || !/^https?:\/\//i.test(url)) return
-      let title = ''
-      try {
-        title = (wv as unknown as { getTitle?: () => string }).getTitle?.() ?? ''
-      } catch {
-        // pre-attach race — title fills in via did-finish-load
-      }
-      void window.api.history.record(url, title, widget.taskId)
-      let host = ''
-      try {
-        host = new URL(url).hostname.replace(/^www\./, '')
-      } catch {
-        // ignore
-      }
-      void window.api.trail.record({
-        taskId: widget.taskId,
-        kind: 'browser_nav',
-        payload: { url, title, host, widgetId: widget.id }
-      })
-      // Persist the latest URL back to the widget so re-opening goes to where the user
-      // actually was, not the original URL.
-      persistNavUrl(url, title)
-      // Drive the toolbar's URL bar + back/forward enabled state. We re-
-      // query the imperative canGoBack/canGoForward after every nav
-      // because they're only meaningful relative to the current history.
-      setCurrentUrl(url)
-      try {
-        type NavQuery = { canGoBack?: () => boolean; canGoForward?: () => boolean }
-        const q = wv as unknown as NavQuery
-        setCanGoBack(q.canGoBack?.() ?? false)
-        setCanGoForward(q.canGoForward?.() ?? false)
-      } catch {
-        // ignore
-      }
-    }
-    function handleLoadStart(): void {
-      setIsLoading(true)
-    }
-    function handleLoadStop(): void {
-      setIsLoading(false)
-    }
-
-    wv.addEventListener('did-navigate', handleNav as EventListener)
-    wv.addEventListener('did-navigate-in-page', handleNav as EventListener)
-    wv.addEventListener('did-finish-load', handleNav as EventListener)
-    wv.addEventListener('did-redirect-navigation', handleNav as EventListener)
-    wv.addEventListener('did-start-loading', handleLoadStart as EventListener)
-    wv.addEventListener('did-stop-loading', handleLoadStop as EventListener)
-    return () => {
-      wv.removeEventListener('did-navigate', handleNav as EventListener)
-      wv.removeEventListener('did-navigate-in-page', handleNav as EventListener)
-      wv.removeEventListener('did-finish-load', handleNav as EventListener)
-      wv.removeEventListener('did-redirect-navigation', handleNav as EventListener)
-      wv.removeEventListener('did-start-loading', handleLoadStart as EventListener)
-      wv.removeEventListener('did-stop-loading', handleLoadStop as EventListener)
-    }
-  }, [editing, widget.id, widget.taskId])
-
-  // When webviewSrc actually changes (via commit() or external sync), call
-  // loadURL explicitly. Just updating the src attribute on a mounted <webview>
-  // isn't always sufficient in Electron — loadURL is the reliable trigger.
-  // This effect ONLY fires on the deliberate sync points, never on internal
-  // navigation, so no refresh loop is possible.
-  useEffect(() => {
-    if (editing) return
-    const wv = webviewRef.current
-    if (!wv) return
-    if (!webviewSrc || !/^https?:\/\//i.test(webviewSrc)) return
-    try {
-      const current = (wv as unknown as { getURL?: () => string }).getURL?.() ?? ''
-      if (current === webviewSrc) return
-      ;(wv as unknown as { loadURL: (url: string) => void }).loadURL(webviewSrc)
-    } catch {
-      // Webview not yet attached — initial render's src attribute will load.
-    }
-  }, [webviewSrc, editing])
+  }, [wvEl, widget.id])
 
   function commit(): void {
     const url = normalizeUrl(draft)
@@ -359,6 +253,8 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // persist:connectedapp-<id>. Keying off widget.sourceAppId removes that race so
   // the session survives desk switches and cold boots alike. (sourceApp is still
   // looked up above for the vault/autofill logic that needs the full object.)
+  // Freeform widgets share persist:webview-default with the panel/fullscreen
+  // browser — the unification's one cookie jar.
   const partition = widget.sourceAppId
     ? `persist:connectedapp-${widget.sourceAppId}`
     : 'persist:webview-default'
@@ -379,34 +275,31 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // we don't refill a half-submitted form on every sub-frame did-finish-load.
   const autofilledForUrl = useRef<string>('')
   useEffect(() => {
-    if (editing) return
+    if (!wvEl) return
     if (!sourceApp) return
     if (!sourceApp.autofillEnabled) return
     if (!sourceApp.vaultEntryId) return
     if (!vaultUnlocked) return
-    const wv = webviewRef.current
-    if (!wv) return
-    const entry = vaultEntries.find((e) => e.id === sourceApp.vaultEntryId) ?? null
-    if (!entry) return
+    const vaultEntry = vaultEntries.find((e) => e.id === sourceApp.vaultEntryId) ?? null
+    if (!vaultEntry) return
     // Origin gate: only auto-fill on the host this Connected App is bound to.
     const boundHost = hostnameOf(sourceApp.url)
 
     function onFinish(): void {
       try {
-        const url =
-          (wv as unknown as { getURL?: () => string } | null)?.getURL?.() ?? ''
+        const url = wvEl?.getURL?.() ?? ''
         if (!url || url === autofilledForUrl.current) return
         autofilledForUrl.current = url
-        void autofillWebview(wv as HTMLElement | null, entry, boundHost)
+        void autofillWebview(wvEl, vaultEntry, boundHost)
       } catch {
         // ignore
       }
     }
-    wv.addEventListener('did-finish-load', onFinish as EventListener)
+    wvEl.addEventListener('did-finish-load', onFinish as EventListener)
     return () => {
-      wv.removeEventListener('did-finish-load', onFinish as EventListener)
+      wvEl.removeEventListener('did-finish-load', onFinish as EventListener)
     }
-  }, [editing, sourceApp, vaultEntries, vaultUnlocked])
+  }, [wvEl, sourceApp, vaultEntries, vaultUnlocked])
 
   // ── "Pin this site" handler ───────────────────────────────────────────────
   // One-click promotion from a freeform browser widget to a Connected App.
@@ -430,11 +323,9 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
         void touchApp(existing.id)
         return
       }
-      const wv = webviewRef.current
       let title = ''
       try {
-        title =
-          (wv as unknown as { getTitle?: () => string } | null)?.getTitle?.() ?? ''
+        title = wvEl?.getTitle?.() ?? ''
       } catch {
         // ignore
       }
@@ -454,35 +345,155 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // In inline (focus modal) mode the modal already provides isolation, so always interactive.
   const showOverlay = !inline && !editing && !isActive
 
-  function navBack(): void {
-    const wv = webviewRef.current as unknown as { goBack?: () => void } | null
-    wv?.goBack?.()
+  // Hand-off to the fullscreen connected-app browser (unification, Caleb's
+  // pick): the same page — shared cookie jar, logins ride along — opens
+  // edge-to-edge; Esc steps back down to the panel, then away.
+  function openFullScreen(): void {
+    const url = livePreview?.url || widget.content
+    if (!url) return
+    useWebPanel.getState().openWeb(url, { expanded: true })
   }
-  function navForward(): void {
-    const wv = webviewRef.current as unknown as { goForward?: () => void } | null
-    wv?.goForward?.()
-  }
-  function navReload(): void {
-    const wv = webviewRef.current as unknown as { reload?: () => void } | null
-    wv?.reload?.()
-  }
-  function navStop(): void {
-    const wv = webviewRef.current as unknown as { stop?: () => void } | null
-    wv?.stop?.()
-  }
-  function commitUrlBar(): void {
-    setUrlEditing(false)
-    const next = normalizeUrl(urlDraft.trim())
-    if (!next || next === currentUrl) return
-    const wv = webviewRef.current as unknown as { loadURL?: (u: string) => void } | null
-    if (wv?.loadURL) {
-      try {
-        wv.loadURL(next)
-      } catch {
-        // bad URL, give up silently — input keeps the user's text via urlDraft
-      }
-    }
-  }
+
+  // The widget's HUD chips over web content (pin-to-apps / linked / edit) are
+  // a deliberate edges-census keep: containment hairlines over arbitrary
+  // media, the video-stage-chrome family.
+  const overlay = (
+    <>
+      {showOverlay && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation()
+            // ⌘/Ctrl-click while zoomed out dives into this browser: jump
+            // to 100% with it centred. The overlay swallows the event
+            // (stopPropagation) so it never reaches WidgetFrame — we have
+            // to honour the gesture here too, or browsers would be the
+            // one widget kind that can't be dived into.
+            const store = useWidgetStore.getState()
+            if ((e.metaKey || e.ctrlKey) && store.zoom < 0.8) {
+              store.zoomToWidget(widget.id)
+              return
+            }
+            setActive(widget.id)
+          }}
+          className="absolute inset-0 cursor-pointer group bg-transparent"
+          title="Click to interact — scroll pans the canvas while not active"
+        >
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full fb-glass-chrome border text-[11px] text-[var(--ink-90)] shadow-[var(--shadow-soft)] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            <Icon name="touch_app" size={12} />
+            <span>Click to interact</span>
+          </div>
+        </div>
+      )}
+      {!editing && (
+        <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
+          {!sourceApp && widget.content && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                void handlePinToApps()
+              }}
+              disabled={pinning}
+              title="Pin this site to Connected Apps (shares session + enables vault auto-fill)"
+              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] disabled:opacity-60"
+            >
+              <Icon name="push_pin" size={11} />
+              <span>{pinning ? 'pinning…' : 'pin to apps'}</span>
+            </button>
+          )}
+          {sourceApp && (
+            <span
+              title={`Linked to "${sourceApp.title}" — session + auto-fill shared`}
+              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-70)]"
+            >
+              <Icon name="link" size={11} />
+              <span className="truncate max-w-[120px]">{sourceApp.title}</span>
+            </span>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditing(true)
+            }}
+            title="Change URL (full form)"
+            className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
+          >
+            <Icon name="edit" size={11} />
+            <span>edit</span>
+          </button>
+        </div>
+      )}
+    </>
+  )
+
+  const toolbarTrailing = (
+    <>
+      <button
+        className="icon-btn !h-6 !w-6"
+        onClick={openFullScreen}
+        title="Open full screen"
+        aria-label="Open this page full screen"
+        data-testid="widget-browser-fullscreen"
+      >
+        <Icon name="fullscreen" size={14} />
+      </button>
+      <div className="relative shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setResMenuOpen((v) => !v)
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          className={`icon-btn !h-6 !w-6 ${resMenuOpen ? 'bg-[var(--surface-sunken)]' : ''}`}
+          title="Resize to a stored resolution"
+          aria-label="Resize to a stored resolution"
+        >
+          <Icon name="aspect_ratio" size={14} />
+        </button>
+        {resMenuOpen && (
+          <>
+            {/* click-away backdrop */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={(e) => {
+                e.stopPropagation()
+                setResMenuOpen(false)
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            />
+            <div
+              className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-7 z-50 w-44 py-1"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--ink-40)]">
+                Window size
+              </div>
+              {BROWSER_RESOLUTIONS.map((r) => {
+                const active =
+                  Math.round(widget.width) === r.width && Math.round(widget.height) === r.height
+                return (
+                  <button
+                    key={r.label}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      update(widget.id, { width: r.width, height: r.height })
+                      setResMenuOpen(false)
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-[var(--surface-sunken)] ${active ? 'text-[var(--ink-100)] font-medium' : 'text-[var(--ink-70)]'}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      {active && <Icon name="check" size={12} />}
+                      <span className={active ? '' : 'pl-[18px]'}>{r.label}</span>
+                    </span>
+                    <span className="text-[10px] text-[var(--ink-40)] tabular-nums">{r.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )
 
   const body = (
     <div
@@ -534,207 +545,17 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           </div>
         </form>
       ) : (
-        <>
-          {/* Browser-chrome toolbar — back/forward/reload/stop + URL bar.
-              Lives above the webview content in a flex column so the
-              webview area shrinks to the remaining height. */}
-          <div className="shrink-0 flex items-center gap-1 px-1.5 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
-            <button
-              onClick={navBack}
-              disabled={!canGoBack}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:text-[var(--ink-30)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
-              title="Back"
-              aria-label="Go back"
-            >
-              <Icon name="arrow_back" size={14} />
-            </button>
-            <button
-              onClick={navForward}
-              disabled={!canGoForward}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] disabled:text-[var(--ink-30)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
-              title="Forward"
-              aria-label="Go forward"
-            >
-              <Icon name="arrow_forward" size={14} />
-            </button>
-            <button
-              onClick={isLoading ? navStop : navReload}
-              className="h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
-              title={isLoading ? 'Stop loading' : 'Reload'}
-              aria-label={isLoading ? 'Stop loading' : 'Reload'}
-            >
-              <Icon name={isLoading ? 'close' : 'refresh'} size={14} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <input
-                value={urlEditing ? urlDraft : currentUrl}
-                onFocus={(e) => {
-                  setUrlDraft(currentUrl)
-                  setUrlEditing(true)
-                  // Select all so the user can type a fresh URL without
-                  // first deleting the old one.
-                  e.currentTarget.select()
-                }}
-                onChange={(e) => setUrlDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    commitUrlBar()
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault()
-                    setUrlEditing(false)
-                    setUrlDraft('')
-                    ;(e.target as HTMLInputElement).blur()
-                  }
-                }}
-                onBlur={() => {
-                  if (urlEditing) commitUrlBar()
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                spellCheck={false}
-                placeholder="https://…"
-                className="fb-field w-full h-6 px-2 text-[11px] bg-[var(--surface-raised)] text-[var(--ink-90)] truncate"
-                title={currentUrl}
-              />
-            </div>
-            <div className="relative shrink-0">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setResMenuOpen((v) => !v)
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                className={`h-6 w-6 inline-flex items-center justify-center rounded text-[var(--ink-70)] hover:bg-[var(--surface-sunken)] ${resMenuOpen ? 'bg-[var(--surface-sunken)]' : ''}`}
-                title="Resize to a stored resolution"
-                aria-label="Resize to a stored resolution"
-              >
-                <Icon name="aspect_ratio" size={14} />
-              </button>
-              {resMenuOpen && (
-                <>
-                  {/* click-away backdrop */}
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setResMenuOpen(false)
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute right-0 top-7 z-50 w-44 py-1"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--ink-40)]">
-                      Window size
-                    </div>
-                    {BROWSER_RESOLUTIONS.map((r) => {
-                      const active =
-                        Math.round(widget.width) === r.width &&
-                        Math.round(widget.height) === r.height
-                      return (
-                        <button
-                          key={r.label}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            update(widget.id, { width: r.width, height: r.height })
-                            setResMenuOpen(false)
-                          }}
-                          className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-[var(--surface-sunken)] ${active ? 'text-[var(--ink-100)] font-medium' : 'text-[var(--ink-70)]'}`}
-                        >
-                          <span className="flex items-center gap-2">
-                            {active && <Icon name="check" size={12} />}
-                            <span className={active ? '' : 'pl-[18px]'}>{r.label}</span>
-                          </span>
-                          <span className="text-[10px] text-[var(--ink-40)] tabular-nums">{r.sub}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="flex-1 relative min-h-0">
-          <webview
-            ref={webviewRef}
-            src={webviewSrc}
-            partition={partition}
-            // allowpopups MUST be present at attach time — Electron reads it when
-            // the guest webContents is created. Setting it later via setAttribute
-            // (the old approach, kept below as a belt-and-braces no-op) does not
-            // reliably enable window.open for the already-attached contents, which
-            // is why site menus and OAuth "sign in" popups silently did nothing.
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore — allowpopups is a valid <webview> attribute
-            allowpopups="true"
-            style={{ width: '100%', height: '100%', display: 'inline-flex' }}
-          />
-          {showOverlay && (
-            <div
-              onClick={(e) => {
-                e.stopPropagation()
-                // ⌘/Ctrl-click while zoomed out dives into this browser: jump
-                // to 100% with it centred. The overlay swallows the event
-                // (stopPropagation) so it never reaches WidgetFrame — we have
-                // to honour the gesture here too, or browsers would be the
-                // one widget kind that can't be dived into.
-                const store = useWidgetStore.getState()
-                if ((e.metaKey || e.ctrlKey) && store.zoom < 0.8) {
-                  store.zoomToWidget(widget.id)
-                  return
-                }
-                setActive(widget.id)
-              }}
-              className="absolute inset-0 cursor-pointer group bg-transparent"
-              title="Click to interact — scroll pans the canvas while not active"
-            >
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full fb-glass-chrome border text-[11px] text-[var(--ink-90)] shadow-[var(--shadow-soft)] flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                <Icon name="touch_app" size={12} />
-                <span>Click to interact</span>
-              </div>
-            </div>
-          )}
-          {!editing && (
-            <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
-              {!sourceApp && widget.content && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void handlePinToApps()
-                  }}
-                  disabled={pinning}
-                  title="Pin this site to Connected Apps (shares session + enables vault auto-fill)"
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] disabled:opacity-60"
-                >
-                  <Icon name="push_pin" size={11} />
-                  <span>{pinning ? 'pinning…' : 'pin to apps'}</span>
-                </button>
-              )}
-              {sourceApp && (
-                <span
-                  title={`Linked to "${sourceApp.title}" — session + auto-fill shared`}
-                  className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-70)]"
-                >
-                  <Icon name="link" size={11} />
-                  <span className="truncate max-w-[120px]">{sourceApp.title}</span>
-                </span>
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setEditing(true)
-                }}
-                title="Change URL (full form)"
-                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
-              >
-                <Icon name="edit" size={11} />
-                <span>edit</span>
-              </button>
-            </div>
-          )}
-          </div>
-        </>
+        <BrowserSurface
+          src={webviewSrc}
+          partition={partition}
+          taskId={widget.taskId}
+          onNav={handleNav}
+          onWebviewEl={setWvEl}
+          linkClicks="ignore"
+          toolbarClassName="border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80 !px-1.5 !py-1"
+          toolbarTrailing={toolbarTrailing}
+          overlay={overlay}
+        />
       )}
       {ctxMenu && (
         <ConnectedToolMenu
@@ -771,10 +592,21 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     label: 'Reload',
     icon: 'refresh',
     onClick: () => {
-      const wv = webviewRef.current as unknown as { reload?: () => void } | null
-      wv?.reload?.()
+      try {
+        wvEl?.reload?.()
+      } catch {
+        // ignore
+      }
     }
   })
+  // Open full screen — the unification hand-off, also reachable by right-click.
+  if (widget.content) {
+    headerMenuExtras.push({
+      label: 'Open full screen',
+      icon: 'fullscreen',
+      onClick: openFullScreen
+    })
+  }
   // Change URL (full form) — same path as the existing "edit" button in
   // the top-right cluster. Useful when the user wants the hint-rich form
   // instead of the inline URL bar.
