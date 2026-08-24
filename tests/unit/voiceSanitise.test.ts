@@ -72,4 +72,36 @@ describe('voice sanitiser — system-wide kinds', () => {
     // create-widget needs an active task; with none it must be dropped.
     expect(s({ kind: 'create-widget', widgetKind: 'sticky', title: 'x' })).toBeNull()
   })
+
+  // R16 harmonisation (A3 build 1): the web never demands a canvas. A webview
+  // create-widget with no desk open converts to open-url — the in-app browser
+  // panel is its destination — instead of being silently dropped (voice that
+  // talks but never acts was the live symptom).
+  it('converts a no-canvas webview create-widget into open-url (R16)', () => {
+    const p = s({
+      kind: 'create-widget',
+      widgetKind: 'webview',
+      title: 'The Knot',
+      content: 'https://www.theknot.com'
+    })
+    expect(p?.kind).toBe('open-url')
+    expect(p && 'url' in p && p.url).toBe('https://www.theknot.com')
+    expect(p && 'title' in p && p.title).toBe('The Knot')
+  })
+
+  it('still drops a no-canvas webview whose content is not a real address', () => {
+    expect(
+      s({ kind: 'create-widget', widgetKind: 'webview', title: 'x', content: 'wedding stuff' })
+    ).toBeNull()
+  })
+
+  it('keeps create-widget as create-widget when a desk IS open', () => {
+    const p = sanitiseProposal(
+      { kind: 'create-widget', widgetKind: 'webview', title: 'The Knot', content: 'https://www.theknot.com' },
+      NONE,
+      'task_1',
+      0
+    )
+    expect(p?.kind).toBe('create-widget')
+  })
 })

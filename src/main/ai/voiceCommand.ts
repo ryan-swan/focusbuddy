@@ -353,7 +353,25 @@ export function sanitiseProposal(
 
   switch (kind) {
     case 'create-widget': {
-      if (!activeTaskId) return null
+      if (!activeTaskId) {
+        // R16: the web never demands a canvas. A webview the model proposed
+        // with no desk open becomes an open-url — the in-app browser panel is
+        // its destination — instead of being silently dropped (the drop was
+        // the pre-panel behaviour, and it read as voice that talks but never
+        // acts). Every other widget kind still genuinely needs a canvas.
+        const wk = typeof o.widgetKind === 'string' ? o.widgetKind : ''
+        const content = typeof o.content === 'string' ? o.content.trim() : ''
+        if (wk === 'webview' && /^https?:\/\//i.test(content)) {
+          return {
+            id,
+            kind: 'open-url',
+            url: content,
+            title: typeof o.title === 'string' ? o.title : undefined,
+            reason
+          }
+        }
+        return null
+      }
       const wk = typeof o.widgetKind === 'string' ? (o.widgetKind as WidgetKind) : null
       if (!wk || !VALID_KINDS.includes(wk)) return null
       return {
