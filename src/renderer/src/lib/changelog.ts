@@ -36,6 +36,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.1.0',
+    date: '2026-08-25T12:00:00Z',
+    title: 'PlexiDesk 4.1.0 — meet Plexii, a new Home, and a system-wide design pass',
+    tag: 'feature',
+    summary:
+      'The assistant is now Plexii, and it does far more than answer. It streams its replies as readable prose, shows its work as a trace you can trust with live web search and citations, and hands you each change as a preview card you can apply all at once or tick through one at a time. Plexii can now run real multi-step work on your behalf behind a consent gate, with a live run in the dock, a Stop button and a hard kill switch, and it remembers the conversation that built a desk so reopening it picks up where you left off. Alongside Plexii, the app gets a new canvas Home with a widget grid you arrange yourself, a true Back button and a clear way out of every full-screen view, and a system-wide design pass that moves the whole interface onto one consistent material and type system.',
+    highlights: [
+      'The assistant is now Plexii, with streaming prose answers and a trace that shows its sources.',
+      'Plexii can run multi-step work behind a consent gate, with a live run, a Stop button and a kill switch.',
+      'Proposal cards preview the real change, so you apply them all at once or pick per card.',
+      'Live web search with citations, conversation modes, and a memory that reopens the conversation that built a desk.',
+      'A new canvas Home with an arrangeable widget grid for shortcuts, focus, transcribe and meetings.',
+      'A true Back button and a clear exit from every full-screen area, plus a system-wide material and type refresh.'
+    ]
+  },
+  {
     version: '4.0.16',
     date: '2026-08-18T22:00:00Z',
     title: 'PlexiDesk 4.0.16 — share with several people at once',
