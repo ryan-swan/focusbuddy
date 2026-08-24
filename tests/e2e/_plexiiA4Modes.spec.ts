@@ -50,6 +50,17 @@ test('plexii A4: the conversation-mode chip wears, switches, and sticks', async 
   await expect(chip).toContainText('Chat')
   await expect(window.locator('[data-testid="chat-mode-badge"]')).toHaveCount(0)
 
+  // The globe (R21): lit by default, a tap turns the conversation's web
+  // search off, another turns it back on.
+  const globe = window.locator('[data-testid="chat-web-globe"]')
+  await expect(globe).toHaveAttribute('aria-pressed', 'true')
+  await globe.click()
+  await expect(globe).toHaveAttribute('aria-pressed', 'false')
+  await window.waitForTimeout(250)
+  await window.screenshot({ path: `${OUT}/a4-globe-off.png` })
+  await globe.click()
+  await expect(globe).toHaveAttribute('aria-pressed', 'true')
+
   await launched.dispose()
 })
 

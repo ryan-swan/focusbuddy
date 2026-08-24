@@ -139,6 +139,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const setChatMode = useChatStore((s) => s.setMode)
   const mode = activeConversationId ? (activeMeta?.mode ?? 'chat') : pendingMode
   const discovering = mode === 'discovery'
+  // The web-search globe (A4, R21): per-conversation and sticky, default on.
+  // Same derivation pattern as the mode above.
+  const pendingWebSearch = useChatStore((s) => s.pendingWebSearch)
+  const setWebSearch = useChatStore((s) => s.setWebSearch)
+  const webSearchOn = activeConversationId ? (activeMeta?.webSearch ?? true) : pendingWebSearch
   const thread = {
     key: conversationKey,
     label: startedIn?.label ?? ctx.label,
@@ -1580,6 +1585,28 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                 document.body
               )}
             </div>
+            {/* The globe (A4, R21): web search's visible control. Lit when the
+                conversation's turns run the live web search; a tap toggles and
+                sticks on the row. The trace stays honest either way — an off
+                turn never claims a search (retrievalIntent + searched). */}
+            <button
+              type="button"
+              onClick={() => setWebSearch(!webSearchOn)}
+              aria-pressed={webSearchOn}
+              data-testid="chat-web-globe"
+              title={
+                webSearchOn
+                  ? 'Web search is ON for this conversation — substantive turns search the live web. Click to turn off.'
+                  : 'Web search is OFF for this conversation — answers use only your workspace. Click to turn on.'
+              }
+              className={`fb-press inline-flex items-center justify-center h-[26px] w-[26px] rounded-full border transition-colors ${
+                webSearchOn
+                  ? 'border-[rgb(var(--accent)/0.45)] bg-accent/10 text-[rgb(var(--accent))]'
+                  : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)] text-[var(--ink-40)] hover:text-[var(--ink-70)]'
+              }`}
+            >
+              <Icon name={webSearchOn ? 'language' : 'public_off'} size={13} />
+            </button>
             {/* The mode pills (Caleb's seamless ruling): tapping acts on the
                 current text AND locks the mode until switched (sticky). */}
             <div
