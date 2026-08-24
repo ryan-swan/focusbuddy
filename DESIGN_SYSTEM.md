@@ -32,7 +32,11 @@ strong. Use it; do not invent parallel colours.
   `bg-accent`).
 - **Surfaces / glass**: `.fb-glass-chrome | -panel | -pillow | -soft` for the three
   glass tiers plus the soft dashboard‑card highlight; `fb-card / fb-tile /
-  fb-btn-surface / fb-field` for opaque material (depth from light, no outline).
+  fb-btn-surface / fb-field` for opaque material (depth from light, no outline);
+  `fb-tile-lit / fb-chip-lit` for a lit tile INSIDE a card (a raised luminance
+  step up, where `fb-tile` steps down) and its toned icon chip (wash from
+  currentColor at the themed `--fb-chip-wash` alpha — pass the tone as a text
+  colour class on the chip).
 - **Shape / motion**: `--radius-xs..2xl`, the `--ease-spring-*` curves and
   `--dur-*` durations, surfaced as `.fb-spring-*`, `.fb-lift`, `.fb-breathing`.
 - **Type**: Inter everywhere, with `.fb-display`, `.fb-display-hero`, `.fb-tabular`

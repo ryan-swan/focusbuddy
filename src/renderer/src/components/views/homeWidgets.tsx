@@ -315,7 +315,8 @@ function ShortcutChip({
   tone,
   apps,
   chip,
-  glyph
+  glyph,
+  lit
 }: {
   target: ShortcutTarget
   icon: string
@@ -323,10 +324,18 @@ function ShortcutChip({
   apps: ConnectedApp[]
   chip: number
   glyph: number
+  // Lit tiles (home-tiles mission): the chip wears fb-chip-lit, whose wash
+  // derives from currentColor — so the tone class rides the chip itself and
+  // one recipe serves every tone at the themed alpha.
+  lit?: boolean
 }): JSX.Element {
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-[10px] shrink-0 ${TONE_CHIP[tone] ?? 'bg-[var(--surface-sunken)]'}`}
+      className={
+        lit
+          ? `inline-flex items-center justify-center shrink-0 fb-chip-lit ${tone}`
+          : `inline-flex items-center justify-center rounded-[10px] shrink-0 ${TONE_CHIP[tone] ?? 'bg-[var(--surface-sunken)]'}`
+      }
       style={{ width: chip, height: chip }}
     >
       <ShortcutGlyph target={target} icon={icon} tone={tone} apps={apps} size={glyph} />
@@ -505,7 +514,7 @@ export function ShortcutsWidget({
         title="Add shortcut"
         aria-label="Add shortcut"
         data-testid="home-shortcuts-add"
-        className="fb-btn-surface h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-0.5 border-dashed text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
+        className="fb-btn-surface w-16 h-[72px] shrink-0 flex flex-col items-center justify-center gap-0.5 border-dashed text-[var(--ink-40)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.5)] fb-press transition-colors"
       >
         <Icon name="add" size={18} />
         <span className="text-[9px] font-medium">Add</span>
@@ -528,7 +537,7 @@ export function ShortcutsWidget({
       data-testid="home-shortcuts-more"
       className={
         compact
-          ? 'h-16 w-16 shrink-0 flex items-center justify-center fb-tile fb-press text-[12px] font-semibold text-[var(--ink-60)]'
+          ? 'w-16 h-[72px] shrink-0 flex items-center justify-center fb-tile-lit fb-press text-[12px] font-semibold text-[var(--ink-60)]'
           : 'flex items-center justify-center fb-tile fb-press px-2.5 py-2 text-[11.5px] font-semibold text-[var(--ink-60)]'
       }
     >
@@ -556,10 +565,10 @@ export function ShortcutsWidget({
                 title={view.alive ? `${view.label} · ${view.caption}` : `${view.label} (gone)`}
                 aria-label={view.label}
                 data-testid={`home-shortcut-${i}`}
-                className={`h-16 w-16 shrink-0 flex flex-col items-center justify-center gap-1 fb-tile fb-press px-1 ${view.alive ? '' : 'opacity-40'}`}
+                className={`w-16 h-[72px] shrink-0 flex flex-col items-center justify-center gap-1.5 fb-tile-lit fb-press px-1 ${view.alive ? '' : 'opacity-40'}`}
               >
-                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={30} glyph={17} />
-                <span className="max-w-full truncate text-[9px] font-medium leading-none text-[var(--ink-70)]">
+                <ShortcutChip target={t} icon={view.icon} tone={view.tone} apps={apps} chip={36} glyph={22} lit />
+                <span className="max-w-full truncate text-[11px] font-medium leading-none text-[var(--ink-100)]">
                   {view.label}
                 </span>
               </button>

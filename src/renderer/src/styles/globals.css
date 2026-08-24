@@ -112,6 +112,50 @@ body {
       var(--shadow-cast),
       var(--shadow-inset-highlight);
   }
+  /* Home-tiles mission (Caleb ratified 2026-08-23, sheet 1 Option 2; steward
+     1e approved): a lit tile INSIDE a card. fb-tile steps DOWN to sunken —
+     right for recessed rows, wrong for touchable objects on a dark card,
+     where it reads as a hole. fb-tile-lit steps UP: dark ~26% on the 21.5%
+     card; in light the mix degenerates to ~white and the shadows carry the
+     separation, same as fb-btn-surface. Composes with fb-press. */
+  .fb-tile-lit {
+    background: color-mix(in oklab, var(--surface-raised) 94%, white 6%);
+    border-radius: var(--radius-row);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      var(--shadow-soft),
+      var(--shadow-inset-highlight);
+    transition:
+      transform var(--dur-base) var(--ease-spring-crisp),
+      box-shadow var(--dur-base) var(--ease-spring-crisp),
+      background-color var(--dur-base) var(--ease-spring-crisp);
+  }
+  .fb-tile-lit:hover {
+    background: color-mix(in oklab, var(--surface-raised) 88%, white 12%);
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      var(--shadow-cast),
+      var(--shadow-inset-highlight);
+    transition-duration: var(--dur-quick);
+  }
+  /* The lit tile's icon chip: wash from currentColor so the call site passes
+     one tone class; alpha is themed (light pastel, dark lit) via
+     --fb-chip-wash below. Radius from the chip token, per the corner ramp. */
+  .fb-chip-lit {
+    border-radius: var(--radius-chip);
+    background: color-mix(in srgb, currentColor var(--fb-chip-wash, 15%), transparent);
+  }
+  :root {
+    --fb-chip-wash: 11%;
+  }
+  .dark,
+  .futuristic {
+    --fb-chip-wash: 18%;
+  }
+  .atelier {
+    --fb-chip-wash: 16%;
+  }
   .fb-press:active {
     transform: scale(0.97);
     transition-duration: var(--dur-instant);
