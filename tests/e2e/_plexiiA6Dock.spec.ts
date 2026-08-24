@@ -51,7 +51,7 @@ const TURNS = [
     blocker: 'The sign-in is yours to do.',
     action: null
   }),
-  // Run 3: a long wait for the Stop leg.
+  // The retry run (started from "Try again"): a long wait for the Stop leg.
   JSON.stringify({
     narration: 'Waiting for the page.',
     status: 'working',
@@ -142,17 +142,25 @@ test('the visible run: ask door, consent, ledger, cost, stop, dismiss', async ()
   await openSteps(window)
   await expect(window.locator('[data-testid="agent-run-steps"]')).toContainText('Held back')
   await window.screenshot({ path: `${OUT}/a6-dock-4-needs-you.png` })
-  await window.locator('[data-testid="agent-run-dismiss"]').click()
 
-  // ── Run 3: Stop ends a live run from the dock ──────────────────────────
-  await window.locator('[data-testid="web-panel-agent"]').click()
-  await ask.fill('Wait around.')
-  await ask.press('Enter')
+  // ── "Try again" (the sign-in-then-retry story) starts a fresh run;
+  //    Stop ends it from the dock ─────────────────────────────────────────
+  await window.locator('[data-testid="agent-run-retry"]').click()
   const stopBtn = window.locator('[data-testid="agent-run-stop"]')
   await expect(stopBtn).toBeVisible({ timeout: 20000 })
   await window.screenshot({ path: `${OUT}/a6-dock-5-running.png` })
   await stopBtn.click()
   await expect(dock).toHaveAttribute('data-outcome', 'stopped', { timeout: 15000 })
+
+  // ── Settings → AI: the standing grant is reviewable and revocable ──────
+  await window.getByRole('button', { name: 'Appearance settings' }).click()
+  await window.locator('[data-testid="settings-tab-ai"]').click()
+  const row = window.locator('[data-testid="browsing-consent-row-127.0.0.1"]')
+  await row.scrollIntoViewIfNeeded()
+  await expect(row).toBeVisible()
+  await window.screenshot({ path: `${OUT}/a6-dock-6-settings.png` })
+  await window.locator('[data-testid="browsing-consent-revoke-127.0.0.1"]').click()
+  await expect(window.locator('[data-testid="browsing-consent-empty"]')).toBeVisible()
 
   await fake.close()
   await launched.dispose()

@@ -35,6 +35,7 @@ import TemplatesSection from './settings/TemplatesSection'
 import DocumentsSyncSection from './settings/DocumentsSyncSection'
 import ApiKeysSection from './settings/ApiKeysSection'
 import AutonomySection from './settings/AutonomySection'
+import BrowsingConsentSection from './settings/BrowsingConsentSection'
 import BackupSection from './settings/BackupSection'
 import NavigationSection from './settings/NavigationSection'
 import PrivacyHelpSection from './settings/PrivacyHelpSection'
@@ -347,6 +348,7 @@ export default function SettingsPanel({
           <>
             <ApiKeysSection />
             <AutonomySection />
+            <BrowsingConsentSection />
           </>
         )}
 

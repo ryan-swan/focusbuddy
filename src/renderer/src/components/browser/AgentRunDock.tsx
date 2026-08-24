@@ -185,14 +185,28 @@ export default function AgentRunDock(props: {
                   Stop
                 </button>
               ) : (
-                <button
-                  className="icon-btn !h-6 !w-6"
-                  data-testid="agent-run-dismiss"
-                  title="Dismiss"
-                  onClick={() => setDismissed(new Set([...dismissed, run.runId]))}
-                >
-                  <Icon name="close" size={14} />
-                </button>
+                <>
+                  {(run.outcome === 'need_input' || run.outcome === 'blocked') && (
+                    /* The auth story's second half: sign in right here (the
+                       panel shares the app's one cookie jar), then let the
+                       same task run again — now authenticated. */
+                    <button
+                      className="btn-ghost !px-2.5 !py-1 !text-[12px]"
+                      data-testid="agent-run-retry"
+                      onClick={() => void start({ task: run.task })}
+                    >
+                      Try again
+                    </button>
+                  )}
+                  <button
+                    className="icon-btn !h-6 !w-6"
+                    data-testid="agent-run-dismiss"
+                    title="Dismiss"
+                    onClick={() => setDismissed(new Set([...dismissed, run.runId]))}
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </>
               )}
             </div>
 
