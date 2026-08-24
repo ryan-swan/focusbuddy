@@ -334,6 +334,18 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     ed.chain().focus().clearContent().insertContent(text).run()
     setDraft(text)
   }, [])
+  // Voice staging (A3, R17): a held-mascot transcript lands HERE for review —
+  // filled and focused under the R11 preview strip, never sent. The store
+  // draft covers the closed-panel path (restoreDraft on mount); this event
+  // covers a panel that is already open, whose editor fills live.
+  useEffect(() => {
+    function onStage(e: Event): void {
+      const text = (e as CustomEvent<string>).detail
+      if (typeof text === 'string' && text.trim()) fillComposer(text)
+    }
+    window.addEventListener('fb:composer-stage', onStage)
+    return () => window.removeEventListener('fb:composer-stage', onStage)
+  }, [fillComposer])
   // Insert an answer into the document currently open in the editor (the doc
   // exposes itself as window.__docEditor). This gives the one assistant the
   // "drop the answer into my doc" capability the old in-doc panel had, so the

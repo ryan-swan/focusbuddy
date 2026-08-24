@@ -5,6 +5,7 @@ import WebPanel from '../browser/WebPanel'
 import PlexiiMark from '../brand/PlexiiMark'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
+import { useVoiceHold, useVoiceHoldKeys, startHold, stopHold } from '../../lib/voiceHold'
 import StandupHome from '../views/StandupHome'
 import AssistantTasksTab from './tabs/AssistantTasksTab'
 import AssistantActivityTab from './tabs/AssistantActivityTab'
@@ -74,11 +75,63 @@ const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
 // early-returns), so the default export mounts it unconditionally beside
 // the chrome. The omnibar routes live in CommandCenter — one door.
 export default function AssistantOverlay(): JSX.Element {
+  // Hold-to-talk (A3, R7/R17/R18) rides this always-mounted component: the
+  // Cmd+Shift+Space chord and the listening/transcribing indicator must work
+  // on every screen, panel open or closed.
+  useVoiceHoldKeys()
   return (
     <>
       <WebPanel />
+      <VoiceHoldIndicator />
       <AssistantOverlayChrome />
     </>
+  )
+}
+
+// The one voice status surface: a chip above the mascot's corner while a
+// capture is live or a transcript is forming, and the error, when there is
+// one, as a dismissible chip in the same spot. Replaces the retired
+// bottom-center bar's overlay; motion is earned (listening is state).
+function VoiceHoldIndicator(): JSX.Element | null {
+  const phase = useVoiceHold((s) => s.phase)
+  const error = useVoiceHold((s) => s.error)
+  const clearError = useVoiceHold((s) => s.clearError)
+  if (phase === 'idle' && !error) return null
+  return (
+    <div
+      className="fixed right-[14px] bottom-[92px] z-[150] flex flex-col items-end gap-1.5"
+      data-testid="voice-hold-indicator"
+    >
+      {phase !== 'idle' && (
+        <div className="fb-glass-chrome border rounded-full pl-2.5 pr-3 py-1.5 flex items-center gap-2 shadow-[var(--shadow-soft)]">
+          {phase === 'listening' ? (
+            <>
+              <span className="relative inline-flex h-2 w-2" aria-hidden>
+                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-70 motion-safe:animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+              </span>
+              <span className="text-[12px] text-[var(--ink-90)]">Listening — release to review</span>
+            </>
+          ) : (
+            <>
+              <Icon name="mic" size={13} className="text-[var(--ink-60)]" />
+              <span className="text-[12px] text-[var(--ink-70)]">Transcribing…</span>
+            </>
+          )}
+        </div>
+      )}
+      {error && (
+        <button
+          type="button"
+          onClick={clearError}
+          title="Dismiss"
+          data-testid="voice-hold-error"
+          className="fb-glass-chrome border rounded-[var(--radius-row)] px-3 py-1.5 max-w-[300px] text-left text-[12px] text-[var(--ink-90)]"
+        >
+          {error}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -95,6 +148,13 @@ function AssistantOverlayChrome(): JSX.Element {
   // The pill pulses while a request is genuinely in flight — the one honest
   // "something is happening" signal we have. No invented unread badges.
   const sending = useChatStore((s) => s.sending)
+  // Hold-to-talk gesture state for the pill (A3, R7): a 250ms press
+  // threshold separates a click (open the panel) from a hold (listen);
+  // pillJustHeldRef swallows the click event a hold-release still fires.
+  const voicePhase = useVoiceHold((s) => s.phase)
+  const pillHoldTimer = useRef<number | null>(null)
+  const pillHeldRef = useRef(false)
+  const pillJustHeldRef = useRef(false)
   // Click-to-pin lifecycle (3a.1): watches the widget-activation signal and
   // the pin's clearing conditions. Lives here because this component never
   // unmounts, so the rules keep running even while the panel is closed.
@@ -180,9 +240,56 @@ function AssistantOverlayChrome(): JSX.Element {
     return (
       <button
         type="button"
-        onClick={openPanel}
-        title="Plexii — ask, plan, act (opens in your last view)"
-        aria-label="Open Plexii"
+        // Hold-to-talk (A3, R7): press and hold the mascot to speak; release
+        // stages the transcript in the composer (R17). A plain click still
+        // opens the panel. The pointerdown preventDefault keeps focus where
+        // it is, so dictation can capture the editable the user was in.
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          e.preventDefault()
+          pillHeldRef.current = false
+          pillHoldTimer.current = window.setTimeout(() => {
+            pillHeldRef.current = true
+            void startHold()
+          }, 250)
+        }}
+        onPointerUp={() => {
+          if (pillHoldTimer.current !== null) {
+            window.clearTimeout(pillHoldTimer.current)
+            pillHoldTimer.current = null
+          }
+          if (pillHeldRef.current) {
+            pillHeldRef.current = false
+            pillJustHeldRef.current = true
+            window.setTimeout(() => {
+              pillJustHeldRef.current = false
+            }, 250)
+            void stopHold()
+          }
+        }}
+        onPointerLeave={() => {
+          if (pillHoldTimer.current !== null) {
+            window.clearTimeout(pillHoldTimer.current)
+            pillHoldTimer.current = null
+          }
+          // Released (or dragged) off the pill mid-hold: still stage — the
+          // words were spoken; losing them to a 2px slide would be cruel.
+          if (pillHeldRef.current) {
+            pillHeldRef.current = false
+            pillJustHeldRef.current = true
+            window.setTimeout(() => {
+              pillJustHeldRef.current = false
+            }, 250)
+            void stopHold()
+          }
+        }}
+        onClick={() => {
+          // A click that was really a hold-release already staged; swallow it.
+          if (pillJustHeldRef.current) return
+          openPanel()
+        }}
+        title="Plexii — click to open, hold to talk"
+        aria-label="Open Plexii (hold to talk)"
         data-testid="assistant-pill"
         className="fb-floating-chrome fixed right-[14px] bottom-[42px] z-[120] h-10 w-10 rounded-full grid place-items-center border border-[var(--edge-soft)] bg-[var(--surface-raised)] text-accent hover:border-[rgb(var(--accent)/0.5)] transition-colors"
         style={FLOATING_MENU_STYLE}
@@ -190,9 +297,29 @@ function AssistantOverlayChrome(): JSX.Element {
         {/* Brand motion Phase 1: the pill wears the ii mark — one blink on
             mount, a wink on hover. Collision law: blink = alive, breathe =
             thinking, never both on one surface, so while an answer is in
-            flight (the ping dot below) the mark holds still. Decorative
-            (title null): the button's aria-label already names it. */}
-        <PlexiiMark height={18} motion={sending ? 'off' : 'once+hover'} title={null} />
+            flight (the ping dot below) OR a capture is live (the ring), the
+            mark holds still. Decorative (title null): the button's
+            aria-label already names it. */}
+        <PlexiiMark
+          height={18}
+          motion={sending || voicePhase !== 'idle' ? 'off' : 'once+hover'}
+          title={null}
+        />
+        {/* The listening ring (R7): a live arc around the mascot while the
+            mic is open — state, never decoration; static under reduced
+            motion (the arc still shows, it just doesn't sweep). */}
+        {voicePhase === 'listening' && (
+          <svg
+            className="absolute inset-[-4px] motion-safe:animate-spin text-accent pointer-events-none"
+            viewBox="0 0 48 48"
+            fill="none"
+            aria-hidden
+            data-testid="assistant-pill-ring"
+          >
+            <circle cx="24" cy="24" r="22" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+            <path d="M24 2 a22 22 0 0 1 22 22" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        )}
         {sending && (
           <span className="absolute -top-0.5 -right-0.5 inline-flex h-2 w-2" aria-label="working">
             <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-70 animate-ping" />

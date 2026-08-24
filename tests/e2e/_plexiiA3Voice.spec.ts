@@ -186,3 +186,103 @@ test('voice engine: real speech through local Whisper, transcript through the co
   await launched.dispose()
   await fake.close()
 })
+
+test('mascot voice chrome: the bar is gone, the pill holds to talk, staging fills the composer', async () => {
+  test.setTimeout(180_000)
+  const userDataDir = mkdtempSync(join(tmpdir(), 'focusbuddy-e2e-voice2-'))
+  const liveCache = join(
+    process.env.HOME ?? '',
+    'Library/Application Support/focusbuddy/whisper-cache'
+  )
+  if (existsSync(liveCache)) {
+    cpSync(liveCache, join(userDataDir, 'whisper-cache'), { recursive: true })
+  }
+  const launched = await launchApp({ userDataDir })
+  const { window } = launched
+  await waitForReady(window)
+  window.on('pageerror', (e) => console.log('PAGEERROR', e.message))
+  await window.setViewportSize({ width: 1440, height: 900 })
+  await window.evaluate(
+    (t) => localStorage.setItem('fb.theme.mode', t),
+    process.env.SHOT_THEME ?? 'dark'
+  )
+  await window.reload()
+  await waitForReady(window)
+  await window.evaluate(() => window.api.voiceNote.setProvider('local'))
+
+  // R7: the bottom-center voice bar is RETIRED — no mic strip anywhere.
+  await expect(window.locator('button[aria-label="Toggle voice mic"]')).toHaveCount(0)
+
+  // The pill teaches both gestures.
+  const pill = window.locator('[data-testid="assistant-pill"]')
+  await expect(pill).toBeVisible()
+  await expect(pill).toHaveAttribute('title', 'Plexii — click to open, hold to talk')
+
+  // Feed the capture a REAL audio stream with no microphone: an oscillator
+  // into a MediaStream destination — MediaRecorder records genuine webm.
+  await window.evaluate(() => {
+    const ctx = new AudioContext()
+    const dest = ctx.createMediaStreamDestination()
+    const osc = ctx.createOscillator()
+    osc.frequency.value = 440
+    osc.connect(dest)
+    osc.start()
+    navigator.mediaDevices.getUserMedia = async () => dest.stream
+  })
+
+  // Hold Cmd+Shift+Space (R18): the listening chip and the pill ring appear.
+  await window.keyboard.down('Meta')
+  await window.keyboard.down('Shift')
+  await window.keyboard.down('Space')
+  const indicator = window.locator('[data-testid="voice-hold-indicator"]')
+  await expect(indicator).toBeVisible()
+  await expect(indicator).toContainText('Listening')
+  await expect(window.locator('[data-testid="assistant-pill-ring"]')).toBeVisible()
+  await window.waitForTimeout(900)
+  await window.screenshot({ path: `${OUT}/voice-2-listening.png` })
+  await window.keyboard.up('Space')
+  await window.keyboard.up('Shift')
+  await window.keyboard.up('Meta')
+  // Release: a pure tone transcribes to nothing (the honest error chip) or a
+  // hallucinated word (stages in the composer) — whisper-tiny decides; both
+  // are valid ends of the pipeline. What must NOT remain is the live chip.
+  await expect(indicator.getByText('Listening — release to review')).toHaveCount(0, {
+    timeout: 60_000
+  })
+  const errorChip = window.locator('[data-testid="voice-hold-error"]')
+  const overlay = window.locator('[data-testid="assistant-overlay"]')
+  const outcome = (await errorChip.count()) > 0 ? 'error-chip' : (await overlay.count()) > 0 ? 'staged' : 'none'
+  console.log('[probe] tone outcome:', outcome)
+  expect(outcome === 'error-chip' || outcome === 'staged').toBe(true)
+  await window.screenshot({ path: `${OUT}/voice-3-after-release.png` })
+
+  // Staging (R17), deterministic leg: the composer-stage event fills the OPEN
+  // panel's composer for review — never sends.
+  if (outcome === 'error-chip') {
+    await errorChip.click()
+  }
+  if ((await overlay.count()) === 0) {
+    await pill.click()
+  }
+  await expect(overlay).toBeVisible()
+  await window.evaluate(() => {
+    window.dispatchEvent(
+      new CustomEvent('fb:composer-stage', { detail: 'open a tie the knot site for this wedding' })
+    )
+  })
+  await expect(overlay).toContainText('open a tie the knot site for this wedding')
+  // Mirrored into the store draft (AI-16's survival law applies to voice too).
+  const draftHeld = await window.evaluate(() => {
+    const chat = (
+      window as unknown as {
+        __fbChat: { getState: () => { draftDocByThread: Record<string, unknown> } }
+      }
+    ).__fbChat
+    return JSON.stringify(chat.getState().draftDocByThread).includes('tie the knot')
+  })
+  expect(draftHeld).toBe(true)
+  await window.waitForTimeout(300)
+  await window.screenshot({ path: `${OUT}/voice-4-staged.png` })
+
+  await launched.dispose()
+})

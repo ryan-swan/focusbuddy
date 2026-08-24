@@ -36,7 +36,6 @@ import CursorSpotlight from './components/CursorSpotlight'
 import PeerBodyDoubleDialog from './components/PeerBodyDoubleDialog'
 import CommandCenter from './components/CommandCenter'
 import MetricsOverlay from './components/MetricsOverlay'
-import UnifiedBottomBar from './components/UnifiedBottomBar'
 import LaunchSignInModal from './components/LaunchSignInModal'
 import UpgradePromptModal from './components/UpgradePromptModal'
 import FirstRunOnboarding from './components/FirstRunOnboarding'
@@ -697,10 +696,8 @@ export default function App(): JSX.Element {
       {/* The universal pin layer (spec §7): a persistent tray of globally pinned
           items, reachable on every surface, droppable onto the current desk. */}
       <PinTray />
-      {/* Hover mic bar — collapses to accent strip, expands to voice FAB */}
-      <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-auto">
-        <UnifiedBottomBar />
-      </div>
+      {/* The bottom-center voice bar retired with A3 (R7): voice lives in the
+          mascot now — hold the pill or Cmd+Shift+Space (AssistantOverlay). */}
       {smartStackOpen && <SmartStackModal onClose={() => setSmartStackOpen(false)} />}
       <RelatedDesksModal />
       {bodyDoubleOpen && (
