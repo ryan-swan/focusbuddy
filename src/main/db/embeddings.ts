@@ -66,6 +66,27 @@ export function listEmbeddings(itemType: string): Map<string, number[]> {
   return out
 }
 
+// Vectors WITH their model tag, for the per-route model guard (#5 family):
+// a stored vector is only comparable to a query vector from the SAME model —
+// the tag is the truth, the dimension is just a coincidence-prone proxy.
+export function listEmbeddingsTagged(
+  itemType: string
+): Map<string, { vector: number[]; model: string }> {
+  const rows = getDb()
+    .prepare('SELECT item_id, vector_json, model FROM fb_embeddings WHERE item_type = ? AND org_id = ?')
+    .all(itemType, getActiveOrgId()) as Pick<EmbeddingRow, 'item_id' | 'vector_json' | 'model'>[]
+  const out = new Map<string, { vector: number[]; model: string }>()
+  for (const r of rows) {
+    try {
+      const v = JSON.parse(r.vector_json)
+      if (Array.isArray(v)) out.set(r.item_id, { vector: v as number[], model: r.model })
+    } catch {
+      /* skip malformed */
+    }
+  }
+  return out
+}
+
 export function hasEmbedding(itemType: string, itemId: string): boolean {
   const row = getDb()
     .prepare('SELECT 1 FROM fb_embeddings WHERE item_type = ? AND item_id = ?')

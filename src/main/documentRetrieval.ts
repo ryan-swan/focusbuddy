@@ -8,11 +8,11 @@
 
 import { listDocuments, getDocument } from './db/documents'
 import { extractDocText, selectPassages, type WorkspaceSource } from './workspaceRank'
-import { embedTexts, embedQuery } from './ai/embeddings'
-import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
+import { embedTexts, embedQueryTagged } from './ai/embeddings'
+import { setEmbedding, listEmbeddings, listEmbeddingsTagged, hasEmbedding } from './db/embeddings'
 import { listDocMetadata, getDocMetadata, type DocMetadata } from './db/docMetadata'
 import { bumpAnswerCacheVersion } from './ai/answerCache'
-import { cosineSim, blendSemantic, type ScoredItem } from '@shared/semantic'
+import { cosineSim, blendSemantic, gateSemantic, type ScoredItem } from '@shared/semantic'
 import { reindexDocumentChunks } from './chunkIndex'
 
 const KIND = 'document'
@@ -129,21 +129,29 @@ export async function semanticSearchDocuments(query: string, limit = 6): Promise
   if (!query.trim()) return []
   const items = loadDocItems()
   if (items.length === 0) return []
-  const qvec = await embedQuery(query)
-  const vectors = qvec ? listEmbeddings(KIND) : new Map<string, number[]>()
+  const q = await embedQueryTagged(query)
+  const vectors = q
+    ? listEmbeddingsTagged(KIND)
+    : new Map<string, { vector: number[]; model: string }>()
   const scored: ScoredItem<DocItem>[] = items.map((d) => {
-    const vec = vectors.get(d.docId)
+    const rec = vectors.get(d.docId)
     return {
       item: d,
       keyword: keywordScore(d, query),
-      // Guard the dimension: a stored vector from a different embedding model
-      // (e.g. after switching to a local embedder) must not be compared against a
-      // query vector of another size, which would score garbage. Mismatches fall
-      // back to keyword-only for that item until it's reindexed.
-      semantic: qvec && vec && vec.length === qvec.length ? cosineSim(qvec, vec) : null
+      // Model-tag guard: a stored vector is only comparable to a query vector
+      // from the SAME embedding model (384-dim local and 1536-dim OpenAI never
+      // mix, and two different same-dim models would score garbage silently).
+      // Mismatches fall back to keyword-only for that item until reindexed.
+      semantic:
+        q && rec && rec.model === q.model && rec.vector.length === q.vector.length
+          ? cosineSim(q.vector, rec.vector)
+          : null
     }
   })
-  return blendSemantic(scored, { limit }).map((d, i) => ({
+  // The #5 gate runs BEFORE the blend: relative band + keyword corroboration
+  // (see gateSemantic) — an uncorroborated cosine field admits nothing, so
+  // enabling embeddings can no longer inject six unrelated documents.
+  return blendSemantic(gateSemantic(scored), { limit }).map((d, i) => ({
     docId: d.docId,
     title: d.title || 'Untitled',
     docType: d.docType,

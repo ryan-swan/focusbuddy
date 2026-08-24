@@ -31,6 +31,7 @@ vi.mock('../../src/main/db/knowledge', () => ({
 vi.mock('../../src/main/db/embeddings', () => ({
   setEmbedding: () => undefined,
   listEmbeddings: () => new Map<string, number[]>(),
+  listEmbeddingsTagged: () => new Map<string, { vector: number[]; model: string }>(),
   hasEmbedding: () => false
 }))
 vi.mock('../../src/main/db/docMetadata', () => ({
@@ -51,6 +52,7 @@ vi.mock('../../src/main/db/widgets', () => ({
 // audit was measured on: embedQuery yields null and everything is keyword.
 vi.mock('../../src/main/ai/embeddings', () => ({
   embedQuery: async () => null,
+  embedQueryTagged: async () => null,
   embedTexts: async () => ({ ok: false as const, reason: 'no_key' })
 }))
 vi.mock('../../src/main/ai/answerCache', () => ({

@@ -49,6 +49,17 @@ export async function embedQuery(text: string): Promise<number[] | null> {
   return r.ok && r.vectors[0] ? r.vectors[0] : null
 }
 
+// The query vector WITH its model tag, for retrieval routes that must never
+// compare vectors across embedding models (384-dim local and 1536-dim OpenAI
+// never mix; the stored row's model tag is the guard, not just the dimension —
+// two different 384-dim local models would otherwise collide silently).
+export async function embedQueryTagged(
+  text: string
+): Promise<{ vector: number[]; model: string } | null> {
+  const r = await embedTexts([text])
+  return r.ok && r.vectors[0] ? { vector: r.vectors[0], model: r.model } : null
+}
+
 // Whether ANY embedding route is configured — a local embed model, or an
 // OpenAI key. An availability probe for honest disclosure (defect #15: with
 // neither, retrieval is literal keyword matching and nothing ever said so).

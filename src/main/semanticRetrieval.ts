@@ -5,9 +5,9 @@
 
 import { listKnowledge } from './db/knowledge'
 import type { KnowledgeEntry } from '@shared/knowledge'
-import { embedTexts, embedQuery } from './ai/embeddings'
-import { setEmbedding, listEmbeddings, hasEmbedding } from './db/embeddings'
-import { cosineSim, blendSemantic, type ScoredItem } from '@shared/semantic'
+import { embedTexts, embedQueryTagged } from './ai/embeddings'
+import { setEmbedding, listEmbeddings, listEmbeddingsTagged, hasEmbedding } from './db/embeddings'
+import { cosineSim, blendSemantic, gateSemantic, type ScoredItem } from '@shared/semantic'
 
 const KIND = 'knowledge'
 
@@ -56,21 +56,28 @@ export async function reindexKnowledge(force = false): Promise<{ embedded: numbe
 export async function semanticSearchKnowledge(query: string, limit = 20): Promise<KnowledgeEntry[]> {
   const entries = listKnowledge()
   if (!query.trim()) return entries.slice(0, limit)
-  const qvec = await embedQuery(query)
-  const vectors = qvec ? listEmbeddings(KIND) : new Map<string, number[]>()
+  const q = await embedQueryTagged(query)
+  const vectors = q
+    ? listEmbeddingsTagged(KIND)
+    : new Map<string, { vector: number[]; model: string }>()
   const scored: ScoredItem<KnowledgeEntry>[] = entries.map((e) => {
-    const vec = vectors.get(e.id)
+    const rec = vectors.get(e.id)
     return {
       item: e,
       keyword: keywordScore(knowledgeText(e), e.title, query),
-      // Dimension guard: a stored vector from a different embedding model (e.g.
-      // after switching to a local embedder) must not be compared against a query
-      // vector of another size. Mismatches fall back to keyword-only until
+      // Model-tag guard: only vectors from the SAME embedding model as the
+      // query are comparable (the tag is the truth; matching dimensions alone
+      // can be a coincidence). Mismatches fall back to keyword-only until
       // reindexed, rather than scoring garbage.
-      semantic: qvec && vec && vec.length === qvec.length ? cosineSim(qvec, vec) : null
+      semantic:
+        q && rec && rec.model === q.model && rec.vector.length === q.vector.length
+          ? cosineSim(q.vector, rec.vector)
+          : null
     }
   })
-  return blendSemantic(scored, { limit })
+  // The #5 gate before the blend: an uncorroborated cosine field admits
+  // nothing (see gateSemantic), so semantic search can only help, never hurt.
+  return blendSemantic(gateSemantic(scored), { limit })
 }
 
 // True when there is at least one stored knowledge vector, i.e. semantic search

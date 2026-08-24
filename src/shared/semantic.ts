@@ -32,6 +32,62 @@ export interface ScoredItem<T> {
   semantic: number | null
 }
 
+export interface GateOpts {
+  // How far below the pool's best semantic score the admission band reaches.
+  relFrac?: number
+  // Hard cap on how many items may keep a semantic score per pool.
+  maxKeep?: number
+  // An UNCORROBORATED item (no keyword overlap) must sit this close to the
+  // best corroborated item to ride along as a probable paraphrase.
+  paraphraseFrac?: number
+}
+
+// The #5 gate (fix before any embeddings enable — the standing law since the
+// 2026-08-21 audit). The defect: blendSemantic's absolute floor filters
+// nothing once a query vector exists — any two English texts score ≈0.07+,
+// so six irrelevant documents get injected and cited. The 2026-08-22
+// measurement on the real corpus proved an absolute threshold can NEVER
+// work: random cross-doc pairs score median 0.361 / p99 0.629 / max 0.797
+// while adjacent same-doc chunks score median 0.680 — noise and signal
+// distributions overlap. So admission is relative and corroborated instead:
+//
+// 1. Only items within relFrac of the pool's best semantic score are
+//    considered at all (a relative-rank band, never an absolute floor).
+// 2. The band needs an ANCHOR: its best item that ALSO has keyword overlap.
+//    No anchor means the query has no independent evidence in this pool, and
+//    a high cosine alone is indistinguishable from noise — nothing is
+//    admitted on semantics (keyword pools still run; nothing is lost).
+// 3. With an anchor: corroborated band items keep their semantic score, and
+//    uncorroborated ones ride along only within paraphraseFrac of the
+//    anchor (a paraphrase sits near a proven match; noise rarely does).
+//
+// Items that fail keep their keyword standing — semantic is set to null, the
+// item is not removed — so composing gateSemantic → blendSemantic demotes
+// noise to its (usually zero) keyword score and the blend's floor finally
+// has teeth. Pure and deterministic; runs per pool, per route.
+export function gateSemantic<T>(scored: ScoredItem<T>[], opts: GateOpts = {}): ScoredItem<T>[] {
+  const relFrac = opts.relFrac ?? 0.85
+  const maxKeep = opts.maxKeep ?? 6
+  const paraphraseFrac = opts.paraphraseFrac ?? 0.92
+  // Non-positive similarity is no signal at all — such scores never survive
+  // the gate (the blend would clamp them to zero anyway; nulling is honest).
+  const cands = scored.filter((s) => s.semantic !== null && s.semantic > 0)
+  const top = cands.length ? Math.max(...cands.map((s) => s.semantic as number)) : 0
+  const band = cands
+    .filter((s) => (s.semantic as number) >= top * relFrac)
+    .sort((a, b) => (b.semantic as number) - (a.semantic as number))
+    .slice(0, maxKeep)
+  const anchor = band.find((s) => s.keyword > 0) ?? null
+  const keep = new Set<ScoredItem<T>>()
+  if (anchor) {
+    for (const s of band) {
+      if (s.keyword > 0) keep.add(s)
+      else if ((s.semantic as number) >= (anchor.semantic as number) * paraphraseFrac) keep.add(s)
+    }
+  }
+  return scored.map((s) => (s.semantic === null || keep.has(s) ? s : { ...s, semantic: null }))
+}
+
 export interface BlendOpts {
   semWeight?: number
   kwWeight?: number
