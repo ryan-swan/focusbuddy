@@ -50,8 +50,12 @@ import { useSidebarDockInset } from '../../lib/useSidebarDockInset'
 // its own nav, so fullscreen stays full-bleed.
 const WRAPPER_BY_MODE = {
   sidebar: 'fixed top-10 bottom-7 right-0 z-[120]',
+  // A5.5 (AI-39): the floating wrapper IS the rounded card — tab strip and
+  // panel clipped inside one radius-card surface with the floating-menu
+  // material (Caleb: the old square composite read "very boxy"). ChatPanel
+  // drops its own inner card in this mode so no outline sits inside.
   floating:
-    'fixed right-[14px] bottom-[42px] z-[120] w-[min(420px,calc(100vw-28px))] h-[min(680px,calc(100vh-96px))]'
+    'fb-floating-chrome fixed right-[14px] bottom-[42px] z-[120] w-[min(420px,calc(100vw-28px))] h-[min(680px,calc(100vh-96px))] rounded-[var(--radius-card)] overflow-hidden bg-[var(--surface-raised)] text-[var(--ink-100)]'
 } as const
 const FULLSCREEN_TAKEOVER = 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
 const FULLSCREEN_PAGE =
@@ -372,7 +376,9 @@ function AssistantOverlayChrome(): JSX.Element {
           ? { width }
           : mode === 'fullscreen' && !segmentTakeover
             ? { left: dockInset }
-            : undefined
+            : mode === 'floating'
+              ? FLOATING_MENU_STYLE
+              : undefined
       }
       data-testid="assistant-overlay"
       data-mode={mode}

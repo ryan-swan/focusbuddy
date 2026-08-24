@@ -2674,3 +2674,34 @@ body {
     grid-template-rows: 0fr;
   }
 }
+
+/* ── Plexii A5.5 (AI-37/38): the chat panel scales to its container ──────────
+   The floating panel is ~420px; one fixed 15px measure that reads right
+   fullscreen reads oversized there (Caleb's screenshot verdict). The panel
+   declares an inline-size container and the prose + composer labels respond
+   to the CONTAINER, not the viewport — so the resizable sidebar gets the
+   same treatment for free at narrow widths. overflow-wrap keeps any token
+   (URLs, compound words) from running off the panel edge. Defined after the
+   .md-rendered base so the size wins by order at equal specificity. */
+.fb-chat-container {
+  container-type: inline-size;
+  container-name: chat;
+}
+.fb-chat-prose {
+  font-size: 15px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+@container chat (max-width: 520px) {
+  .fb-chat-prose {
+    /* 13px on the steward's advisory: it sits ON the five-size ramp
+       (fb-t-body) and is md-rendered's own base — no sixth size invented. */
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  /* Composer chips drop their text labels in the narrow measure; icons and
+     tooltips carry the meaning (the R14 pill labels deliberately stay). */
+  .fb-cq-label {
+    display: none;
+  }
+}

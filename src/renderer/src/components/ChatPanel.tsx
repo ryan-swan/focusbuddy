@@ -864,10 +864,15 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     <aside
       className={
         isFullscreen
-          ? 'h-full w-full flex flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--ink-100)]'
-          : FLOATING_MENU_ASIDE
+          ? 'fb-chat-container h-full w-full flex flex-col overflow-hidden bg-[var(--surface-base)] text-[var(--ink-100)]'
+          : chromeMode === 'floating'
+            ? // A5.5 (AI-39): in floating mode the OVERLAY wrapper is the
+              // rounded card (tab strip included) — a card inside a card read
+              // as a box with an inner outline, which is what Caleb saw.
+              'fb-chat-container h-full w-full flex flex-col overflow-hidden bg-[var(--surface-raised)] text-[var(--ink-100)]'
+            : `fb-chat-container ${FLOATING_MENU_ASIDE}`
       }
-      style={isFullscreen ? undefined : FLOATING_MENU_STYLE}
+      style={isFullscreen || chromeMode === 'floating' ? undefined : FLOATING_MENU_STYLE}
       data-testid="assistant-panel"
     >
       {/* Fullscreen is the AI home, so it carries a permanent conversation rail
@@ -1198,7 +1203,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
               <div
                 key={i}
                 data-testid="user-turn"
-                className="ml-auto w-fit max-w-[70%] mt-8 first:mt-0 rounded-[var(--radius-card)] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
+                className="ml-auto w-fit max-w-[70%] mt-8 first:mt-0 rounded-[var(--radius-card)] px-4 py-2.5 fb-chat-prose whitespace-pre-wrap bg-[rgb(var(--accent)/0.10)] text-[var(--ink-100)]"
               >
                 {segments.length <= 1
                   ? m.content
@@ -1556,7 +1561,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                 }`}
               >
                 <Icon name={chatModeDef(mode).icon} size={12} className="shrink-0" filled={discovering} />
-                {chatModeDef(mode).label}
+                <span className="fb-cq-label">{chatModeDef(mode).label}</span>
                 <Icon name="expand_more" size={11} className="shrink-0 opacity-70" />
               </button>
               {convModeMenuOpen &&
@@ -1701,7 +1706,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   className="fb-press inline-flex items-center gap-1 h-[26px] px-2 rounded-full border border-[var(--edge-soft)] bg-[var(--surface-sunken)] fb-t-caption font-medium text-[var(--ink-70)] hover:text-[rgb(var(--accent))] hover:border-[rgb(var(--accent)/0.45)] transition-colors disabled:opacity-50"
                 >
                   <Icon name="desk" size={12} className="shrink-0" />
-                  {primaryDeskId ? 'Push to desk' : 'Turn into desk'}
+                  <span className="fb-cq-label">{primaryDeskId ? 'Push to desk' : 'Turn into desk'}</span>
                 </button>
                 {linkedDesks.length > 1 && (
                   <>

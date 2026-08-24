@@ -258,7 +258,7 @@ export default function StreamingProse({ markdown, active, holdUntil = 0, onDrai
     <div
       data-testid="streaming-prose"
       data-drained={drained ? 'true' : 'false'}
-      className="fb-streaming !text-[15px] !leading-[1.75] text-[var(--ink-90)] md-rendered"
+      className="fb-streaming fb-chat-prose text-[var(--ink-90)] md-rendered"
     >
       <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={plugins} components={COMPONENTS}>
         {visible}
