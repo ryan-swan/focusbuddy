@@ -200,11 +200,11 @@ const WORDMARK_CSS = `
       animation-iteration-count: infinite;
       animation-timing-function: linear;
     }
-    .pw-mark  { transform-origin: 1793.56px 613.51px;  animation-name: pwBody;   }
-    .pw-stemR { transform-origin: 1879.06px 613.51px; animation-name: pwStemR;  }
-    .pw-eyes  { transform-origin: 1793.56px 126.01px; animation-name: pwEyes;   }
-    .pw-eyeL  { transform-origin: 1708.06px 126.01px; animation-name: pwBlinkL; }
-    .pw-eyeR  { transform-origin: 1879.06px 126.01px; animation-name: pwBlinkR; }
+    .pw-mark  { transform-origin: 1793.56px 652.11px;  animation-name: pwBody;   }
+    .pw-stemR { transform-origin: 1879.06px 652.11px; animation-name: pwStemR;  }
+    .pw-eyes  { transform-origin: 1793.56px 164.61px; animation-name: pwEyes;   }
+    .pw-eyeL  { transform-origin: 1708.06px 164.61px; animation-name: pwBlinkL; }
+    .pw-eyeR  { transform-origin: 1879.06px 164.61px; animation-name: pwBlinkR; }
 
   @keyframes pwBody {
     0% { transform: translate(0,0.00px) scale(1.0000,1.0000); }
@@ -322,11 +322,11 @@ const WORDMARK_GRADIENT_CSS = `
       animation-iteration-count: infinite;
       animation-timing-function: linear;
     }
-    .pwg-mark  { transform-origin: 1793.56px 613.51px;  animation-name: pwgBody;   }
-    .pwg-stemR { transform-origin: 1879.06px 613.51px; animation-name: pwgStemR;  }
-    .pwg-eyes  { transform-origin: 1793.56px 126.01px; animation-name: pwgEyes;   }
-    .pwg-eyeL  { transform-origin: 1708.06px 126.01px; animation-name: pwgBlinkL; }
-    .pwg-eyeR  { transform-origin: 1879.06px 126.01px; animation-name: pwgBlinkR; }
+    .pwg-mark  { transform-origin: 1793.56px 652.11px;  animation-name: pwgBody;   }
+    .pwg-stemR { transform-origin: 1879.06px 652.11px; animation-name: pwgStemR;  }
+    .pwg-eyes  { transform-origin: 1793.56px 164.61px; animation-name: pwgEyes;   }
+    .pwg-eyeL  { transform-origin: 1708.06px 164.61px; animation-name: pwgBlinkL; }
+    .pwg-eyeR  { transform-origin: 1879.06px 164.61px; animation-name: pwgBlinkR; }
 
   @keyframes pwgBody {
     0% { transform: translate(0,0.00px) scale(1.0000,1.0000); }
@@ -490,7 +490,7 @@ export function PlexiWordmark({
             <style dangerouslySetInnerHTML={{ __html: WORDMARK_GRADIENT_CSS }} />
             <defs>
                 <linearGradient id="plexi-ii-grad-pwg" gradientUnits="userSpaceOnUse"
-                                x1="0" y1="88.5" x2="0" y2="613.5">
+                                x1="0" y1="127.1" x2="0" y2="652.1">
                   <stop offset="0" stopColor="#4383F4"/>
                   <stop offset="1" stopColor="#3068EA"/>
                 </linearGradient>
@@ -502,11 +502,11 @@ export function PlexiWordmark({
                   <path d="M1322.23,424.01C1269.73,369.65,1217.23,315.28,1164.72,260.91C1150.14,245.82,1150.56,221.76,1165.66,207.18C1180.76,192.60,1204.81,193.02,1219.39,208.12C1271.28,261.85,1323.17,315.58,1375.06,369.31C1426.95,315.58,1478.83,261.85,1530.72,208.12C1545.30,193.02,1569.36,192.60,1584.45,207.18C1599.55,221.76,1599.97,245.82,1585.39,260.91C1532.89,315.28,1480.39,369.65,1427.88,424.01C1480.39,478.38,1532.89,532.75,1585.39,587.12C1599.97,602.21,1599.55,626.27,1584.45,640.85C1569.36,655.43,1545.30,655.01,1530.72,639.91C1478.83,586.18,1426.95,532.45,1375.06,478.72C1323.17,532.45,1271.28,586.18,1219.39,639.91C1204.81,655.01,1180.76,655.43,1165.66,640.85C1150.56,626.27,1150.14,602.21,1164.72,587.12C1217.23,532.75,1269.73,478.38,1322.23,424.01Z"/>
               </g>
               <g className="pwg-mark">
-                <rect x="1670.06" y="234.51" width="76.00" height="380.00" rx="38.00"/>
-                <rect className="pwg-stemR" x="1841.06" y="234.51" width="76.00" height="380.00" rx="38.00"/>
+                <rect x="1670.06" y="273.11" width="76.00" height="380.00" rx="38.00"/>
+                <rect className="pwg-stemR" x="1841.06" y="273.11" width="76.00" height="380.00" rx="38.00"/>
                 <g className="pwg-eyes">
-                  <rect className="pwg-eyeL" x="1670.06" y="88.51" width="76.00" height="75.00" rx="24.19"/>
-                  <rect className="pwg-eyeR" x="1841.06" y="88.51" width="76.00" height="75.00" rx="24.19"/>
+                  <rect className="pwg-eyeL" x="1670.06" y="127.11" width="76.00" height="75.00" rx="24.19"/>
+                  <rect className="pwg-eyeR" x="1841.06" y="127.11" width="76.00" height="75.00" rx="24.19"/>
                 </g>
               </g>
           </>
@@ -520,11 +520,11 @@ export function PlexiWordmark({
                   <path d="M1322.23,424.01C1269.73,369.65,1217.23,315.28,1164.72,260.91C1150.14,245.82,1150.56,221.76,1165.66,207.18C1180.76,192.60,1204.81,193.02,1219.39,208.12C1271.28,261.85,1323.17,315.58,1375.06,369.31C1426.95,315.58,1478.83,261.85,1530.72,208.12C1545.30,193.02,1569.36,192.60,1584.45,207.18C1599.55,221.76,1599.97,245.82,1585.39,260.91C1532.89,315.28,1480.39,369.65,1427.88,424.01C1480.39,478.38,1532.89,532.75,1585.39,587.12C1599.97,602.21,1599.55,626.27,1584.45,640.85C1569.36,655.43,1545.30,655.01,1530.72,639.91C1478.83,586.18,1426.95,532.45,1375.06,478.72C1323.17,532.45,1271.28,586.18,1219.39,639.91C1204.81,655.01,1180.76,655.43,1165.66,640.85C1150.56,626.27,1150.14,602.21,1164.72,587.12C1217.23,532.75,1269.73,478.38,1322.23,424.01Z"/>
               </g>
               <g className="pw-mark">
-                <rect x="1670.06" y="234.51" width="76.00" height="380.00" rx="38.00"/>
-                <rect className="pw-stemR" x="1841.06" y="234.51" width="76.00" height="380.00" rx="38.00"/>
+                <rect x="1670.06" y="273.11" width="76.00" height="380.00" rx="38.00"/>
+                <rect className="pw-stemR" x="1841.06" y="273.11" width="76.00" height="380.00" rx="38.00"/>
                 <g className="pw-eyes">
-                  <rect className="pw-eyeL" x="1670.06" y="88.51" width="76.00" height="75.00" rx="24.19"/>
-                  <rect className="pw-eyeR" x="1841.06" y="88.51" width="76.00" height="75.00" rx="24.19"/>
+                  <rect className="pw-eyeL" x="1670.06" y="127.11" width="76.00" height="75.00" rx="24.19"/>
+                  <rect className="pw-eyeR" x="1841.06" y="127.11" width="76.00" height="75.00" rx="24.19"/>
                 </g>
               </g>
           </>
@@ -538,10 +538,10 @@ export function PlexiWordmark({
             <path d="M1322.23,424.01C1269.73,369.65,1217.23,315.28,1164.72,260.91C1150.14,245.82,1150.56,221.76,1165.66,207.18C1180.76,192.60,1204.81,193.02,1219.39,208.12C1271.28,261.85,1323.17,315.58,1375.06,369.31C1426.95,315.58,1478.83,261.85,1530.72,208.12C1545.30,193.02,1569.36,192.60,1584.45,207.18C1599.55,221.76,1599.97,245.82,1585.39,260.91C1532.89,315.28,1480.39,369.65,1427.88,424.01C1480.39,478.38,1532.89,532.75,1585.39,587.12C1599.97,602.21,1599.55,626.27,1584.45,640.85C1569.36,655.43,1545.30,655.01,1530.72,639.91C1478.83,586.18,1426.95,532.45,1375.06,478.72C1323.17,532.45,1271.28,586.18,1219.39,639.91C1204.81,655.01,1180.76,655.43,1165.66,640.85C1150.56,626.27,1150.14,602.21,1164.72,587.12C1217.23,532.75,1269.73,478.38,1322.23,424.01Z"/>
           </g>
           <g fill="var(--plexi-mark, #0B64E8)">
-            <rect x="1670.06" y="234.51" width="76.00" height="380.00" rx="38.00"/>
-            <rect x="1841.06" y="234.51" width="76.00" height="380.00" rx="38.00"/>
-            <rect x="1670.06" y="88.51" width="76.00" height="75.00" rx="24.19"/>
-            <rect x="1841.06" y="88.51" width="76.00" height="75.00" rx="24.19"/>
+            <rect x="1670.06" y="273.11" width="76.00" height="380.00" rx="38.00"/>
+            <rect x="1841.06" y="273.11" width="76.00" height="380.00" rx="38.00"/>
+            <rect x="1670.06" y="127.11" width="76.00" height="75.00" rx="24.19"/>
+            <rect x="1841.06" y="127.11" width="76.00" height="75.00" rx="24.19"/>
           </g>
         </>
       )}
