@@ -28,6 +28,26 @@ export function buildMemoryPrompt(title: string, text: string): string {
   )
 }
 
+// The chat-shaped variant (A5, R22): the settle-time pass reads ONE exchange —
+// the user's message and the assistant's answer — and distils only what the
+// USER stated or agreed to. The assistant's own suggestions are not memories.
+export function buildChatMemoryPrompt(userText: string, assistantText: string): string {
+  const clip = (s: string, n: number): string => s.replace(/\s+/g, ' ').trim().slice(0, n)
+  return (
+    'This is one exchange from a live conversation with the user.\n\n' +
+    `User said:\n${clip(userText, 2000)}\n\n` +
+    `Assistant answered:\n${clip(assistantText, 2000)}\n\n` +
+    'Extract only durable things the USER stated, decided, or agreed to — never the ' +
+    "assistant's suggestions, and never small talk or one-off task details. " +
+    'Return ONLY a JSON object with exactly these arrays (each item one sentence, grounded in the exchange):\n' +
+    '{\n' +
+    '  "facts": [{"text": "a durable fact about the user, their work, or a named entity", "subject": "the person/org/project it concerns, or \\"\\""}],\n' +
+    '  "preferences": [{"text": "a standing preference or rule the user holds"}],\n' +
+    '  "commitments": [{"text": "who will do what for whom", "subject": "who owes it", "due": "the deadline phrase verbatim, or \\"\\""}]\n' +
+    '}'
+  )
+}
+
 export interface ExtractedMemory {
   kind: MemoryKind
   text: string

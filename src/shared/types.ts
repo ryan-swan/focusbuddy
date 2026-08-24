@@ -1097,6 +1097,7 @@ export type AIPurpose =
   | 'file_tag'
   | 'meeting_end'
   | 'agent_step'
+  | 'memory_extract'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /

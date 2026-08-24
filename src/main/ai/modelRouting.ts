@@ -61,7 +61,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // is planning + tool selection under real results, so Sonnet is the right
   // default; kept as its own purpose (not reused 'chat') so per-round cost rolls
   // up separately in telemetry and can be tuned independently later.
-  agent_step: SONNET
+  agent_step: SONNET,
+  // Settle-time memory extraction (A5, R22): a small grounded distillation
+  // that fires in the background after conversational answers — cheap matters
+  // and Haiku's extraction discipline is plenty.
+  memory_extract: HAIKU
 }
 
 let currentMode: ModelMode = 'auto'

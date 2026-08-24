@@ -2,7 +2,6 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { getModelClient, invalidateModelClients } from './modelClient'
 import { BROWSER_TOOLS, runBrowserTool } from './agentBrowser'
 import { getNode, listNodes } from '../db/nodes'
-import { listMemories } from '../db/memory'
 import { getWidget, listWidgetsByTask } from '../db/widgets'
 import { listLinksByTask } from '../db/widgetLinks'
 import { getTable, listRows } from '../db/tables'
@@ -28,6 +27,8 @@ import { uiBlocksSection, validateChatUiBlocks } from './chatUiBlocks'
 import { discoverySection } from './discoveryMode'
 import { turnRetrieval } from './retrievalIntent'
 import { buildGreenLit, gateCreation } from './creationGate'
+import { MEMORY_SYSTEM, buildChatMemoryPrompt, parseMemoryResponse } from './memoryExtract'
+import { addMemory, listMemoriesBalanced } from '../db/memory'
 import { embeddingConfigured } from './embeddings'
 import { createChatStreamConsumer } from './chatStreamConsumer'
 import { renderAttachments } from './chatAttachments'
@@ -476,7 +477,9 @@ function clockBlock(): string {
 // user's current message asks. Empty memory → empty string (honest omission, no
 // filler). Capped small so it never crowds the action protocol.
 function memoryBlock(): string {
-  const items = listMemories(12)
+  // #24: balanced injection — commitments no longer starve facts and
+  // preferences out of the prompt (quota per kind, spare slots flow over).
+  const items = listMemoriesBalanced(12)
   if (items.length === 0) return ''
   const clip = (s: string): string => (s.length > 120 ? s.slice(0, 117) + '…' : s)
   const commitments = items.filter((m) => m.kind === 'commitment')
@@ -1190,6 +1193,63 @@ async function prepareChatCall(req: ChatRequest): Promise<PreparedChatCall> {
   }
 }
 
+// Settle-time memory extraction (A5, R22 — the #22 fix). Fired in the
+// background AFTER an answer settles, only for conversational surfaces
+// (includeMemory), never blocking or failing the chat. One exchange — the
+// user's message and the assistant's answer — goes through the cheap route
+// and only what the USER stated lands in the store, org-scoped at write
+// (#23 lands in db/memory.ts in the same change, M4's law). A per-
+// conversation cooldown keeps rapid-fire turns from stacking passes.
+const memoryExtractLastRun = new Map<string, number>()
+const MEMORY_EXTRACT_COOLDOWN_MS = 60_000
+// Turns shorter than this carry no durable statement worth a model call.
+const MEMORY_EXTRACT_MIN_CHARS = 40
+
+async function maybeExtractChatMemory(req: ChatRequest, resp: ChatResponse): Promise<void> {
+  try {
+    if (!req.includeMemory || !resp.ok) return
+    const userText = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
+    if (userText.trim().length < MEMORY_EXTRACT_MIN_CHARS) return
+    const convKey = req.conversationId ?? 'unsaved'
+    const last = memoryExtractLastRun.get(convKey) ?? 0
+    const now = Date.now()
+    if (now - last < MEMORY_EXTRACT_COOLDOWN_MS) return
+    memoryExtractLastRun.set(convKey, now)
+    const c = getClient()
+    if (!c) return
+    const model = resolveModel('memory_extract')
+    const r = await c.messages.create({
+      model,
+      max_tokens: 1024,
+      system: MEMORY_SYSTEM,
+      messages: [
+        { role: 'user', content: buildChatMemoryPrompt(userText, resp.message?.content ?? '') }
+      ]
+    })
+    {
+      const ct = cacheTokens(r.usage)
+      recordAiUsage(model, r.usage?.input_tokens ?? 0, r.usage?.output_tokens ?? 0, ct.read, ct.write)
+    }
+    const raw = r.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+    for (const d of parseMemoryResponse(raw)) {
+      addMemory({
+        kind: d.kind,
+        text: d.text,
+        subject: d.subject,
+        due: d.due,
+        source: 'extracted',
+        sourceRef: req.conversationId ? `chat:${req.conversationId}` : 'chat',
+        confidence: 0.75
+      })
+    }
+  } catch {
+    // Best-effort by design: a failed extraction must never surface in chat.
+  }
+}
+
 // The creation gate's read of one request (A4, AI-08). Derived from the
 // request alone so both chat paths compute it identically: discovery status
 // from the mode, the green light from the transcript.
@@ -1304,7 +1364,10 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
       .trim()
 
     const built = buildChatResponse(text, citedSources, mentionReport, chatGateContext(req))
-    if (built) return built
+    if (built) {
+      void maybeExtractChatMemory(req, built)
+      return built
+    }
     return unparseableChatResponse(text, resp.stop_reason as string, citedSources, mentionReport)
   } catch (e) {
     return { ok: false, error: (e as Error).message }
@@ -1498,6 +1561,7 @@ export async function sendChatStream(
     const built = buildChatResponse(text, prepared.sources, prepared.mentions, chatGateContext(req))
     if (built) {
       cb.onComplete(built)
+      void maybeExtractChatMemory(req, built)
       return
     }
     const fallback = unparseableChatResponse(text, stopReason, prepared.sources, prepared.mentions)

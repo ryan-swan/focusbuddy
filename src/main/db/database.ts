@@ -315,7 +315,6 @@ CREATE TABLE IF NOT EXISTS fb_memory (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_fb_memory_active ON fb_memory(active, updated_at DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_fb_memory_dedup ON fb_memory(dedup_key);
 
 -- ── PlexiProjects task dependencies ──────────────────────────────────────────
 -- Finish-to-start links between task nodes that drive the Gantt schedule and the
@@ -1007,6 +1006,19 @@ export function getDb(): Database.Database {
   // Plexii A4 (R21) — the conversation's web-search globe. Default on: web
   // search has been default-on since F4, so every existing row keeps its truth.
   ensureColumn(db, 'ai_chat_conversations', 'web_search', 'INTEGER NOT NULL DEFAULT 1')
+  // Plexii A5 (M4) — memory becomes org-scoped (#23, the privacy defect) in
+  // the SAME change that turns automatic extraction on, per the audit's law.
+  // Existing rows backfill to the reserved 'personal' org via the DEFAULT
+  // (fb_memory is empty on real profiles today, per the 2026-08-21 audit).
+  // superseded_by records which newer memory replaced an archived one (#25,
+  // R23: newest wins, history kept). The dedup key becomes per-org so the
+  // same stated fact may exist independently in two orgs.
+  ensureColumn(db, 'fb_memory', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  ensureColumn(db, 'fb_memory', 'superseded_by', 'TEXT')
+  db.exec('DROP INDEX IF EXISTS idx_fb_memory_dedup')
+  db.exec(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_fb_memory_dedup_org ON fb_memory(org_id, dedup_key)'
+  )
   // What screen a conversation was started from, so it can say so later. The
   // assistant used to re-thread per screen; after unification a conversation
   // REMEMBERS its context instead of being replaced by it (plan D4).
