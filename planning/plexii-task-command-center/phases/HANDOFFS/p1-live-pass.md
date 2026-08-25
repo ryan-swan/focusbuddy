@@ -72,6 +72,13 @@ Residual cosmetic note: those writes skip `updated_at` (June timestamp on a row
 churning in August), which mildly skews L3 stale-desk math for desks whose only
 activity is webview navigation.
 
+Closing data point (17:22): a further ~7.5-minute idle watch after the fresh
+boot showed ZERO sync cycles — no [sync-mark]/[sync-409]/[sync-apply] lines,
+both rows frozen at `needs_sync=1`, revs 1093/2834 unchanged. The wake
+coalescer idles deeply with no user activity (expected post-`fix/sync-wake-
+coalescing` behavior); the two rows will push-clean on the operator's next
+interaction, and the [sync-mark] lines will record it.
+
 ## Merge-preconditions delta
 Precondition 2 ("defensive branches observed firing") now has its structured
 trail lines in place ([sync-409]/[sync-apply]); the mixed-peer observation still
