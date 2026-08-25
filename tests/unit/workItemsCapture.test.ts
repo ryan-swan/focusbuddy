@@ -124,9 +124,11 @@ describe('S5 wiring locks (file-level)', () => {
     expect(read('src/renderer/src/components/CaptureConsole.tsx')).toContain(
       'window.api.workItems.classify'
     )
-    expect(read('src/renderer/src/components/Sidebar.tsx')).toContain('openConsole()')
+    expect(read('src/renderer/src/components/Sidebar.tsx')).toContain('openConsole(')
     expect(read('src/main/ipc/index.ts')).toContain("'workItems:classify'")
-    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('capture-work-item')
+    // DEC-019(b): ONE universal entry, @attention prefix captures directly.
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('attention-capture')
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('@?attention')
     // The decay sweep rides the scheduler cadence.
     expect(read('src/main/notifications/scheduler.ts')).toContain('decayLooseThoughts(nowMs)')
   })

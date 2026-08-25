@@ -201,6 +201,175 @@ export function AttentionSystemWidget({ size = 'sm' }: { size?: WidgetSize }): J
   )
 }
 
+// ── The unified Attention widget (DEC-019c) ─────────────────────────────────
+// One widget, a section slider: All · Tasks · Reviews · Coming up · Ack ·
+// Completed · Stale desks · System. Replaces the seven separates (retired in
+// the registry; stored placements keep rendering their old cases).
+
+const SECTIONS = [
+  { key: 'all', icon: 'notifications', label: 'All' },
+  { key: 'action', icon: 'check_circle', label: 'Tasks' },
+  { key: 'review', icon: 'rate_review', label: 'Reviews' },
+  { key: 'upcoming', icon: 'event', label: 'Coming up' },
+  { key: 'acknowledgment', icon: 'mark_email_read', label: 'Acknowledgments' },
+  { key: 'completed', icon: 'task_alt', label: 'Completed' },
+  { key: 'stale', icon: 'bedtime', label: 'Stale desks' },
+  { key: 'system', icon: 'settings_suggest', label: 'System' }
+] as const
+
+export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Element {
+  const items = useAttentionItems()
+  const goAttention = useViewStore((s) => s.goAttention)
+  const setActive = useNodeStore((s) => s.setActive)
+  const goTask = useViewStore((s) => s.goTask)
+  const [section, setSection] = useState<string>(
+    () => localStorage.getItem('attention.widget.section') || 'all'
+  )
+  const pick = (k: string): void => {
+    localStorage.setItem('attention.widget.section', k)
+    setSection(k)
+  }
+  const [stale, setStale] = useState<Array<{ id: string; title: string; daysQuiet: number }>>([])
+  useEffect(() => {
+    let alive = true
+    void window.api.nodes
+      .staleDesks()
+      .then((rows) => {
+        if (alive) setStale(rows)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const now = Date.now()
+  const max = size === 'lg' ? 7 : size === 'md' ? 4 : 2
+  const active = (q: string): FbNode[] => activeOf(items, q)
+  const allActive = useMemo(
+    () =>
+      items
+        .filter(
+          (i) =>
+            !isTerminalState(i.workItemState) &&
+            !(i.snoozeUntil != null && i.snoozeUntil > now) &&
+            i.detachedFromId == null &&
+            i.wiOrigin !== 'system'
+        )
+        .sort((a, b) => (b.dueAt ? 1 : 0) - (a.dueAt ? 1 : 0) || b.createdAt - a.createdAt),
+    [items, now]
+  )
+  const upcoming = useMemo(
+    () =>
+      items
+        .filter(
+          (i) =>
+            !isTerminalState(i.workItemState) &&
+            i.detachedFromId == null &&
+            (i.dueAt != null || (i.intentClass ?? '') === 'scheduling')
+        )
+        .sort((a, b) => {
+          const da = a.dueAt ? Date.parse(a.dueAt) : now + 365 * DAY
+          const db = b.dueAt ? Date.parse(b.dueAt) : now + 365 * DAY
+          return da - db
+        }),
+    [items, now]
+  )
+  const completed = useMemo(() => {
+    const cutoff = now - 7 * DAY
+    return items
+      .filter(
+        (i) =>
+          isTerminalState(i.workItemState) &&
+          i.workItemState !== 'dismissed' &&
+          i.workItemState !== 'reclassified' &&
+          i.updatedAt > cutoff
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  }, [items, now])
+  const system = useMemo(
+    () => items.filter((i) => i.wiOrigin === 'system' && !isTerminalState(i.workItemState)),
+    [items]
+  )
+
+  const listFor = (): { list: FbNode[]; empty: string } => {
+    switch (section) {
+      case 'action':
+        return { list: active('action'), empty: 'No open tasks. Capture with ⌘K.' }
+      case 'review':
+        return { list: active('review'), empty: 'No reviews waiting.' }
+      case 'upcoming':
+        return { list: upcoming, empty: 'Nothing dated. Clear runway.' }
+      case 'acknowledgment':
+        return { list: active('acknowledgment'), empty: 'Nothing to acknowledge.' }
+      case 'completed':
+        return { list: completed, empty: 'Loops close here as you finish things.' }
+      case 'system':
+        return { list: system, empty: 'No system signals. All quiet.' }
+      default:
+        return { list: allActive, empty: 'Nothing needs you. Capture with ⌘K.' }
+    }
+  }
+
+  const current = SECTIONS.find((s) => s.key === section) ?? SECTIONS[0]
+  const { list, empty } = listFor()
+  const count = section === 'stale' ? stale.length : list.length
+
+  return (
+    <div className="w-full h-full flex flex-col p-3">
+      <div className="flex items-center gap-1.5">
+        {SECTIONS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => pick(s.key)}
+            title={s.label}
+            className={`inline-flex items-center justify-center h-6 w-6 rounded-full fb-press ${
+              section === s.key
+                ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
+                : 'text-[var(--ink-30)] hover:text-[var(--ink-70)]'
+            }`}
+          >
+            <Icon name={s.icon} size={13} />
+          </button>
+        ))}
+      </div>
+      <button onClick={goAttention} className="mt-2 flex items-center gap-2 fb-press text-left">
+        <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{current.label}</span>
+        <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
+      </button>
+      <div className="mt-1.5 flex-1 min-h-0 overflow-hidden">
+        {section === 'stale' ? (
+          stale.length === 0 ? (
+            <div className="text-[11px] text-[var(--ink-30)]">Every open desk has a pulse.</div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {stale.slice(0, max).map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => {
+                    setActive(d.id)
+                    goTask(d.id)
+                  }}
+                  className="text-left min-w-0 fb-press"
+                >
+                  <div className="text-[12px] text-[var(--ink-90)] truncate">{d.title}</div>
+                  <div className="text-[10px] text-[var(--ink-40)]">
+                    Quiet for {d.daysQuiet} day{d.daysQuiet === 1 ? '' : 's'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        ) : count === 0 ? (
+          <div className="text-[11px] text-[var(--ink-30)]">{empty}</div>
+        ) : (
+          <ItemLines items={list} max={max} />
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** Lifecycle L3's only consumer (F006): desks gone quiet while still open. */
 export function StaleDesksWidget({ size = 'sm' }: { size?: WidgetSize }): JSX.Element {
   const [stale, setStale] = useState<

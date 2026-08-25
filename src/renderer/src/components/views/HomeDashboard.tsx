@@ -52,6 +52,7 @@ import {
   conversationName
 } from './homeWidgets'
 import {
+  AttentionWidget,
   AttentionQueueWidget,
   AttentionCalendarWidget,
   AttentionCompletedWidget,
@@ -777,6 +778,10 @@ export default function HomeDashboard(): JSX.Element {
       case 'app-launcher':
         return <AppLauncherWidget />
       // The Attention family (S6, SPEC-014).
+      // DEC-019c: 'attention' is the one offered widget (section slider
+      // inside); the att-* cases below keep any stored placements rendering.
+      case 'attention':
+        return <AttentionWidget size={size} />
       case 'att-tasks':
         return <AttentionQueueWidget queue="action" title="Tasks" emptyLine="Nothing needs you. Capture with ⌘K." size={size} />
       case 'att-reviews':

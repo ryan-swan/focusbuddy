@@ -315,4 +315,30 @@ with every S5+ caller; the rest are documentation-weight now.
 no-hard-delete → DEC at D1; C-2 monitor/Attention composition → D1 design; C-4 pre-S6
 main-diff checkpoint scheduled.
 
+## DEC-019 — CR-08 ratified + the unified Attention capture model
+
+**Date:** 2026-08-25 · **Made by:** Operator
+**Decision (three parts):**
+**(a) CR-08 phasing ADOPTED as pressure-tested** — adopt the semantics, phase the
+navigation; the anti-goals (aggregate-by-reference, no second silo, restraint) stand;
+S7 feeders absorb the flat Tasks tab before it retires; Calendar-tab fate = DEC with
+Caleb; Plans stay (DEC-010) and feed Attention.
+**(b) One capture model, "Attention" at the top of the hierarchy.** The separate
+"Capture a work item" / "Open Attention" entries merge into ONE universal entry:
+@attention (or the single palette action, the assistant, the page's own button)
+opens the same console everywhere, with Routed/Unrouted/Expand intact. ROUTED
+CHANGES: the classifier's pick is no longer silently filed — the console ALWAYS
+shows the classification selection with the inferred class PRE-HIGHLIGHTED, so
+Enter confirms in one keystroke and a different chip is one click/arrow away
+(the deadline question joins the same screen when triggered — still one stop).
+User-facing language says "Attention"; the internal work_item schema name is
+unchanged (DEC-011).
+**(c) One Attention widget** replaces the seven: a single home-canvas widget with a
+section slider (All/Tasks/Reviews/Coming up/Acknowledgments/Completed/Stale desks/
+System). The seven att-* ids retire via the registry's retired flag (stored
+layouts keep loading; the gallery stops offering them).
+**Alternatives:** silent-file with post-hoc reclassify (rejected by live QA: first-
+touch accuracy is the trust surface); seven separate widgets (rejected: canvas
+sprawl — the synthesis's own widget-bloat warning).
+
 <!-- Append below; increment DEC-NNN. -->

@@ -60,7 +60,9 @@ const WORK_ITEM_RULES =
   'an idle idea = "loose_thought". Context decides — an item born from a scheduling conversation ' +
   'is "scheduling", not "action".\n' +
   '- create-todo-list remains correct ONLY for a static multi-line checklist living on the ' +
-  'current desk’s canvas; individual tracked to-dos are work items (this refines rule 4).\n'
+  'current desk’s canvas; individual tracked to-dos are work items (this refines rule 4).\n' +
+  '- When the user mentions "@attention" (or says to put/route/add something to their Attention), ' +
+  'that IS the instruction to emit create-work-item for it, with intentClass chosen from context.\n'
 
 /** The gated addendum. Callers pass the live capability flag; '' while OFF so
  *  the model is never taught a verb that would no-op. */

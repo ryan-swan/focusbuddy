@@ -425,29 +425,26 @@ export default function CommandCenter({
         closePalette()
       }
     })
-    // Attention S5/S6: capture + the surface — present only while work items are on.
+    // DEC-019(b): ONE universal Attention entry. Typing "@attention <text>"
+    // (or "attention <text>") captures that text directly — the console opens
+    // prefilled at the classify step; the bare entry opens it empty. The page
+    // itself is one click inside the console ("Open page →") or via nav/badge.
     if (workItemsOn) {
+      const attnPrefix = /^@?attention\b[:,]?\s*(.*)$/i.exec(q)
+      const prefill = attnPrefix?.[1]?.trim() ?? ''
       items.push({
-        id: 'capture-work-item',
-        label: 'Capture a work item',
-        hint: 'Routed, unrouted, or expand — files to Attention',
-        icon: 'check_circle',
-        kind: 'action',
-        score: q === '' ? 57 : matchScore('capture work item remind todo attention', q),
-        run: () => {
-          window.dispatchEvent(new CustomEvent('fb:command-new-work-item'))
-          closePalette()
-        }
-      })
-      items.push({
-        id: 'open-attention',
-        label: 'Open Attention',
-        hint: 'Everything that needs you, in queues',
+        id: 'attention-capture',
+        label: prefill ? `Attention — capture “${prefill.slice(0, 40)}${prefill.length > 40 ? '…' : ''}”` : 'Attention — capture anything',
+        hint: 'Routed, unrouted, or expand · @attention from anywhere',
         icon: 'notifications',
-        kind: 'jump',
-        score: q === '' ? 56 : matchScore('attention queue tasks reviews what needs me', q),
+        kind: 'action',
+        score: attnPrefix ? 95 : q === '' ? 57 : matchScore('attention capture work item remind todo queue', q),
         run: () => {
-          useViewStore.getState().goAttention()
+          window.dispatchEvent(
+            new CustomEvent('fb:command-new-work-item', {
+              detail: prefill ? { captureText: prefill } : undefined
+            })
+          )
           closePalette()
         }
       })

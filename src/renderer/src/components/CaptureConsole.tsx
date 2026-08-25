@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useCaptureConsole } from '../stores/captureConsole'
 import { useWorkItemStore } from '../stores/workItems'
 import { useAssistantChrome } from '../stores/assistantChrome'
+import { useViewStore } from '../stores/view'
 import { promptText } from './plexi/PromptDialog'
 import Icon from './Icon'
 
@@ -52,12 +53,19 @@ export default function CaptureConsole(): JSX.Element | null {
   const [error, setError] = useState<string | null>(null)
   const [filed, setFiled] = useState<string | null>(null)
   const [filedId, setFiledId] = useState<string | null>(null)
-  // The at-most-one Q1 question, held between classify and create.
-  const [clarify, setClarify] = useState<{
-    phrase: string
-    pending: { intentClass: string; confidence: number; title: string }
+  // DEC-019(b): routed capture ALWAYS stops at ONE confirmation screen — the
+  // classifier's pick pre-highlighted (Enter = confirm), any other class one
+  // click or arrow away, and the deadline question inline on the same screen
+  // when an unanchored phrase triggered it. One stop, never more.
+  const [confirm, setConfirm] = useState<{
+    picked: string
+    confidence: number
+    title: string
+    dueAt: string | null
+    needsDate: boolean
+    phrase: string | null
   } | null>(null)
-  const [clarifyDate, setClarifyDate] = useState('')
+  const [confirmDate, setConfirmDate] = useState('')
   const fieldRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -67,8 +75,8 @@ export default function CaptureConsole(): JSX.Element | null {
       setError(null)
       setFiled(null)
       setFiledId(null)
-      setClarify(null)
-      setClarifyDate('')
+      setConfirm(null)
+      setConfirmDate('')
       setTimeout(() => fieldRef.current?.focus(), 0)
     }
   }, [open, initialText])
@@ -94,10 +102,10 @@ export default function CaptureConsole(): JSX.Element | null {
     setFiled(`${CLASS_LABEL[intentClass] ?? intentClass} — “${item.title}”`)
     setFiledId(item.id)
     setText('')
-    setClarify(null)
-    // Long enough to read the class and hit "Wrong?" — corrections are the
-    // trust mechanism, so the window stays open a beat.
-    setTimeout(close, 4000)
+    setConfirm(null)
+    // The class was confirmed on-screen; a short beat to see it land, plus the
+    // belt-and-braces reclassify link.
+    setTimeout(close, 2500)
   }
 
   async function reclassifyFiled(): Promise<void> {
@@ -136,16 +144,20 @@ export default function CaptureConsole(): JSX.Element | null {
         return
       }
       if (mode === 'unrouted') {
+        // No AI touch by contract — verbatim, no confirmation stop.
         await file('loose_thought', 1, t.length > 120 ? `${t.slice(0, 117)}…` : t, null)
         return
       }
+      // DEC-019(b): classify, then ALWAYS confirm — pre-highlighted, one Enter.
       const c = await window.api.workItems.classify(t)
-      if (c.clarify) {
-        // DEC-016 Q1: the one question — anchor the deadline or skip.
-        setClarify({ phrase: c.clarify.phrase, pending: c })
-        return
-      }
-      await file(c.intentClass, c.confidence, c.title, c.dueAt)
+      setConfirm({
+        picked: c.intentClass,
+        confidence: c.confidence,
+        title: c.title,
+        dueAt: c.dueAt,
+        needsDate: c.clarify != null,
+        phrase: c.clarify?.phrase ?? null
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
     } finally {
@@ -153,17 +165,28 @@ export default function CaptureConsole(): JSX.Element | null {
     }
   }
 
-  async function resolveClarify(skip: boolean): Promise<void> {
-    if (!clarify) return
+  async function fileConfirmed(): Promise<void> {
+    if (!confirm || busy) return
     setBusy(true)
     try {
-      const dueAt = !skip && clarifyDate ? new Date(`${clarifyDate}T17:00:00`).toISOString() : null
-      await file(clarify.pending.intentClass, clarify.pending.confidence, clarify.pending.title, dueAt)
+      const dueAt = confirm.needsDate
+        ? confirmDate
+          ? new Date(`${confirmDate}T17:00:00`).toISOString()
+          : null
+        : confirm.dueAt
+      await file(confirm.picked, confirm.confidence, confirm.title, dueAt)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
     } finally {
       setBusy(false)
     }
+  }
+
+  function cycleClass(dir: 1 | -1): void {
+    if (!confirm) return
+    const idx = CLASS_CHOICES.findIndex((c) => c.value === confirm.picked)
+    const next = CLASS_CHOICES[(idx + dir + CLASS_CHOICES.length) % CLASS_CHOICES.length]
+    setConfirm({ ...confirm, picked: next.value })
   }
 
   const modeBtn = (m: Mode, label: string, hint: string): JSX.Element => (
@@ -194,7 +217,19 @@ export default function CaptureConsole(): JSX.Element | null {
         className="fb-card w-[min(560px,92vw)] p-4"
       >
         <div className="flex items-center justify-between">
-          <div className="text-[14px] font-semibold text-[var(--ink-100)]">Capture</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[14px] font-semibold text-[var(--ink-100)]">Attention</div>
+            <button
+              onClick={() => {
+                useViewStore.getState().goAttention()
+                close()
+              }}
+              className="text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+              title="Open the Attention page"
+            >
+              Open page →
+            </button>
+          </div>
           <div className="flex items-center gap-1">
             {modeBtn('routed', 'Routed', 'Plexii files it as the right work object')}
             {modeBtn('unrouted', 'Unrouted', 'No AI touch — saved verbatim as a loose thought')}
@@ -217,31 +252,61 @@ export default function CaptureConsole(): JSX.Element | null {
           rows={3}
           className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-y"
         />
-        {clarify && (
-          <div className="mt-3 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2.5">
+        {confirm && (
+          <div
+            className="mt-3 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2.5"
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight') cycleClass(1)
+              if (e.key === 'ArrowLeft') cycleClass(-1)
+              if (e.key === 'Enter') void fileConfirmed()
+            }}
+          >
             <div className="text-[12px] text-[var(--ink-70)]">
-              When is “{clarify.phrase}”? One question, then it files.
+              File as <strong>{CLASS_LABEL[confirm.picked]}</strong>? Enter confirms — or pick
+              another.
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="date"
-                value={clarifyDate}
-                onChange={(e) => setClarifyDate(e.target.value)}
-                className="fb-field bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
-              />
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              {CLASS_CHOICES.map((c) => (
+                <button
+                  key={c.value}
+                  autoFocus={c.value === confirm.picked}
+                  onClick={() => setConfirm({ ...confirm, picked: c.value })}
+                  title={c.hint}
+                  className={`px-2.5 h-7 fb-t-label fb-press rounded-full ${
+                    confirm.picked === c.value
+                      ? 'bg-[rgb(var(--accent))] text-white'
+                      : 'bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            {confirm.needsDate && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-[12px] text-[var(--ink-70)]">When is “{confirm.phrase}”?</span>
+                <input
+                  type="date"
+                  value={confirmDate}
+                  onChange={(e) => setConfirmDate(e.target.value)}
+                  className="fb-field bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
+                />
+                <span className="text-[11px] text-[var(--ink-40)]">leave empty for no date</span>
+              </div>
+            )}
+            <div className="mt-2.5 flex items-center justify-between">
               <button
-                onClick={() => void resolveClarify(false)}
-                disabled={busy || !clarifyDate}
-                className="h-7 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
+                onClick={() => setConfirm(null)}
+                className="text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
               >
-                Set date
+                ← Edit text
               </button>
               <button
-                onClick={() => void resolveClarify(true)}
+                onClick={() => void fileConfirmed()}
                 disabled={busy}
-                className="h-7 px-3 fb-t-label text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
+                className="inline-flex items-center gap-1.5 h-8 px-3.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
               >
-                No date
+                {busy ? 'Filing…' : 'File it ↵'}
               </button>
             </div>
           </div>
@@ -262,7 +327,7 @@ export default function CaptureConsole(): JSX.Element | null {
             )}
           </div>
         )}
-        {!clarify && (
+        {!confirm && (
           <div className="mt-3 flex items-center justify-between">
             <div className="text-[11px] text-[var(--ink-30)]">⌘↵ to file · Esc to close</div>
             <button
@@ -270,7 +335,13 @@ export default function CaptureConsole(): JSX.Element | null {
               disabled={busy || !text.trim()}
               className="inline-flex items-center gap-1.5 h-8 px-3.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
             >
-              {busy ? 'Filing…' : mode === 'expand' ? 'Open in assistant' : 'File it'}
+              {busy
+                ? 'Working…'
+                : mode === 'expand'
+                  ? 'Open in assistant'
+                  : mode === 'unrouted'
+                    ? 'File it'
+                    : 'Classify'}
             </button>
           </div>
         )}

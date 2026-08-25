@@ -214,14 +214,16 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
       })
     }
     window.addEventListener('fb:command-new-task', onCmd)
-    // The work_item creation seam (Attention S3/S5): a dispatch WITH a title
-    // creates directly (the programmatic path); a bare dispatch opens the
-    // capture console — one box, three modes, the classifier behind it.
+    // The Attention capture seam (S3/S5, DEC-019): a dispatch WITH a title
+    // creates directly (the programmatic path); `captureText` opens the
+    // console PREFILLED (the @attention path); a bare dispatch opens it empty.
     function onNewWorkItem(e: Event): void {
-      const detail = (e as CustomEvent).detail as { title?: string } | undefined
+      const detail = (e as CustomEvent).detail as
+        | { title?: string; captureText?: string }
+        | undefined
       const title = detail?.title?.trim()
       if (!title) {
-        useCaptureConsole.getState().openConsole()
+        useCaptureConsole.getState().openConsole(detail?.captureText?.trim() || '')
         return
       }
       void useWorkItemStore

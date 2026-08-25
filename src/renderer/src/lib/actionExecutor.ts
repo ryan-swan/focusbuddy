@@ -1459,7 +1459,7 @@ export function describeProposal(
     case 'create-task':
       return { icon: 'task_alt', verb: 'New desk', subject: p.title }
     case 'create-work-item':
-      return { icon: 'check_circle', verb: 'Work item', subject: p.title }
+      return { icon: 'notifications', verb: 'To Attention', subject: p.title }
     case 'start-focus-session':
       return {
         icon: 'timer',
