@@ -5,7 +5,22 @@
 
 **Last updated:** 2026-08-25 (S5 SHIPPED — **THE ATTENTION LAYER IS LIVE**) · **State:**
 IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
-→ **S6 IN PROGRESS — core surface LIVE (s6a, 57ff0403)**)
+→ **S6 ✔ COMPLETE (9320c6b3) → S7 next**)
+
+**S6 CLOSED (2026-08-25):** widgets ×7 + L3 staleDesks + ranker v1 +
+attentionPrecision wiring + lenses (Queue/Due/Origin + Recently closed) + CR-04(b)
+renames complete (GAP-006 closed) + L1-deferred menus via one shared definition +
+Attention top-level nav. Operator's three live-QA bugs fixed in-stage (idea trigger,
+intentClass end-to-end, Expand via fb:composer-stage) + the year-off schedule-event
+bug registered for Caleb. 2741/2741 tests. Ledger:
+[phases/HANDOFFS/s6-close.md](phases/HANDOFFS/s6-close.md).
+
+**CR-08 REGISTERED (awaiting ruling):** operator proposes Tasks tab + Plans + Calendar
+consolidate into Attention. Pressure-test: adopt the semantics, phase the navigation —
+(a) lenses/nav DONE; (b) S7 feeders make desks/plans surface AS attention items, then
+the flat tab retires by DEC; (c) Calendar tab's fate = DEC with Caleb (DEC-009 engine
+stays); (d) Plans stay per DEC-010, feeding Attention. Attention aggregates by
+reference — it must never become the container (the synthesis's own #1 anti-goal).
 
 **S6a SHIPPED (2026-08-25):** C-4 checkpoint PASSED (main drift = 2 commits, zero hot-file
 overlap; ipc/index.ts noted for the eventual merge). The Attention page is live: queues
