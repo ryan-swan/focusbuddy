@@ -7,6 +7,19 @@
 Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ → **S5 HELD pending
 full-product-features-list intake**)
 
+**L1 SHIPPED (2026-08-25, commit 34acf80f):** the desk lifecycle surfaced — Trash view
+(roots + days-remaining + lossless subtree restore), sidebar entry both rail states,
+Archive/Trash in the All Desks + All Rooms native action menus, archived shelf chips.
+Shared desks/rooms hold lifecycle actions pending D1. Deferred to S6: menus on
+StageManagerStrip/DeskGallery/CanvasBreadcrumb (no native affordance exists there).
+2702/2702 tests. CR-07's before-Phase-5 direction satisfied for the approval-free half;
+L2 still needs D1/D2.
+
+**Synthesis intake part 1/2 DONE (analysis/20):** 12 exact confirmations, 13 detail
+deltas queued for S5–S7 prompt enrichment, 0 conflicts, 5 synthesis-open questions
+already closed by DECs. **Waiting: part 2 (the current-landscape map) → then enrich
+S5/S6/S7 prompts → resume autopilot.**
+
 **S5 HOLD (2026-08-25, operator checkpoint):** the operator flagged that SPEC-001+A1 was
 the compiled OUTLINE (scope, 44 items) — the FULL comprehensive product features list
 lives in the spec-drafting chat session and has never been intaken here. S0–S4 were
