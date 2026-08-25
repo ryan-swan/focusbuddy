@@ -8,6 +8,7 @@
 import { Notification, BrowserWindow } from 'electron'
 import { getDb } from '../db/database'
 import { listBlocksInRange } from '../db/timeBlocks'
+import { decayLooseThoughts } from '../db/workItems'
 import { sweepDeliveries, scheduleBlockReminders, BLOCK_REMINDER_LEAD_MS } from './substrate'
 
 export const SWEEP_INTERVAL_MS = 30 * 1000
@@ -47,6 +48,13 @@ export function runSweepOnce(nowMs = Date.now()): number {
     )
   } catch {
     /* calendar unavailable — sweep still delivers what is due */
+  }
+  // Δ3: the loose-thought decay tier rides the same cadence (cheap query;
+  // dismissals carry reason 'decayed' and never notify — decay is quiet).
+  try {
+    decayLooseThoughts(nowMs)
+  } catch {
+    /* decay is best-effort */
   }
   const deliveries = sweepDeliveries(db, nowMs)
   for (const d of deliveries) showBanner(d.title, d.body, d.ref)

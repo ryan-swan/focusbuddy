@@ -66,6 +66,7 @@ import UndoToast from './components/UndoToast'
 import { PromptDialogHost, confirmDialog } from './components/plexi/PromptDialog'
 import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
+import CaptureConsole from './components/CaptureConsole'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
 // Block reminders moved to the main-process notification substrate (Attention
 // S4): durable rows + the 30s sweep replace the renderer setInterval engine,
@@ -686,6 +687,7 @@ export default function App(): JSX.Element {
       <FeatureSpotlightPopup />
       <OnboardingHub />
       <UndoToast />
+      <CaptureConsole />
       <PromptDialogHost />
       <DocHistoryPanelHost />
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}

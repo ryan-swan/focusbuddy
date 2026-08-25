@@ -70,8 +70,10 @@ describe('prompt sites import the shared definitions (no local redefinitions)', 
     expect(anthropic).not.toContain('short task title')
   })
 
-  it('the meeting-wrapup rule defines create-task as a desk', () => {
-    expect(anthropic).toContain('it creates a DESK')
+  it('the meeting-wrapup rule defines create-task as a desk (assembled from vocabulary since S5)', () => {
+    const vocab = readFileSync(join(ROOT, 'src/main/ai/vocabulary.ts'), 'utf-8')
+    expect(vocab).toContain('it creates a DESK')
+    expect(anthropic).toContain('meetingCaptureRule(workItemsOn)')
     expect(anthropic).not.toContain('(each task opens its own workspace)')
   })
 
@@ -115,10 +117,12 @@ describe('create-work-item is reserved end-to-end', () => {
     expect(gated.notice).toBeTruthy()
   })
 
-  it('the executor no-ops it honestly instead of silently dropping it', () => {
+  it('the executor routes it through the one code path (real since S5)', () => {
     const executor = read('src/renderer/src/lib/actionExecutor.ts')
     expect(executor).toContain("case 'create-work-item':")
-    expect(executor).toContain("Work items aren't enabled yet.")
+    // S5 replaced the S0 no-op with the real apply; the typed refusals from
+    // the db module still surface honestly through the catch.
+    expect(executor).toContain('applyCreateWorkItem')
   })
 
   it('the gated addendum reaches both catalog consumers, flag-checked', () => {

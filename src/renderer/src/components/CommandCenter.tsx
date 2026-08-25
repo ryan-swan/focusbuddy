@@ -65,6 +65,14 @@ export default function CommandCenter({
 }: Props): JSX.Element {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [query, setQuery] = useState('')
+  // Attention S5: one boot-time capability probe gates the capture entry.
+  const [workItemsOn, setWorkItemsOn] = useState(false)
+  useEffect(() => {
+    window.api.workItems
+      .enabled()
+      .then(setWorkItemsOn)
+      .catch(() => {})
+  }, [])
   const [highlightIdx, setHighlightIdx] = useState(0)
   // Deep content search results (notes, doc bodies, table cells, files) from the
   // main process, fetched async + debounced as the query changes.
@@ -417,6 +425,21 @@ export default function CommandCenter({
         closePalette()
       }
     })
+    // Attention S5: the capture console — present only while work items are on.
+    if (workItemsOn) {
+      items.push({
+        id: 'capture-work-item',
+        label: 'Capture a work item',
+        hint: 'Routed, unrouted, or expand — files to Attention',
+        icon: 'check_circle',
+        kind: 'action',
+        score: q === '' ? 57 : matchScore('capture work item remind todo attention', q),
+        run: () => {
+          window.dispatchEvent(new CustomEvent('fb:command-new-work-item'))
+          closePalette()
+        }
+      })
+    }
     // New design: open the PlexiDesign hub to pick a size or template.
     items.push({
       id: 'new-design',
@@ -696,6 +719,7 @@ export default function CommandCenter({
   }, [
     query,
     nodes,
+    workItemsOn,
     canSmartStack,
     activeTaskId,
     onOpenBodyDouble,

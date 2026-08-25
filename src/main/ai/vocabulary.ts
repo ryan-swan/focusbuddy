@@ -63,3 +63,33 @@ export function workItemCatalogAddendum(enabled: boolean): string {
   if (!enabled) return ''
   return WORK_ITEM_CATALOG_ENTRY + '\n' + WORK_ITEM_RULES + '\n'
 }
+
+/** Meeting-wrapup deliverable line for create-work-item, injected only while
+ *  the capability is ON (S5): the meeting is the surface most likely to
+ *  produce action items, so its routing flips the moment work items exist. */
+export const MEETING_WORK_ITEM_DELIVERABLE =
+  '  { "kind": "create-work-item", "title": "short action item", "notes": "optional detail", "reason": "what in the transcript calls for this" }\n'
+
+/** The capture-routing rule for meeting wrapups. OFF: the S0 legacy phrasing
+ *  (create-task still carries action items, correctly defined as desk-
+ *  creating). ON: action items become work items; desks are reserved for work
+ *  streams that need their own space. */
+export function meetingCaptureRule(enabled: boolean): string {
+  if (!enabled) {
+    return (
+      '- Use create-task for an action item someone needs to do — it creates a DESK: a whole workspace ' +
+      'opens for that item, so the user can work it to completion there.'
+    )
+  }
+  return (
+    '- Use create-work-item for an action item someone needs to do (a single tracked to-do in their ' +
+    'Attention queues). Use create-task ONLY when a work stream deserves its own DESK — a whole ' +
+    'workspace, not a line item.'
+  )
+}
+
+/** Voice-note action shape for create-work-item, injected while ON (Δ13):
+ *  "remind me to call Bob" is the canonical work-item utterance. */
+export const VOICE_WORK_ITEM_SHAPE =
+  '{"kind":"create-work-item","title":"…","notes":"…","reason":"…"}  (a single tracked to-do — ' +
+  'use this for reminders and action items; create-task creates a whole DESK)\n'

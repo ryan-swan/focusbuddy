@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useWorkItemStore } from '../stores/workItems'
+import { useCaptureConsole } from '../stores/captureConsole'
 import PlexiiLogo from './PlexiiLogo'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
@@ -212,16 +213,19 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
       })
     }
     window.addEventListener('fb:command-new-task', onCmd)
-    // The work_item creation seam (Attention S3): sibling event, own store —
-    // work items never travel the desk dialog or nodes:*. The palette (S6)
-    // supplies detail.title; a bare dispatch gets an honest placeholder. The
-    // typed refusals (flag off / un-migrated) surface as a console warning
-    // until the S6 surfaces render them.
+    // The work_item creation seam (Attention S3/S5): a dispatch WITH a title
+    // creates directly (the programmatic path); a bare dispatch opens the
+    // capture console — one box, three modes, the classifier behind it.
     function onNewWorkItem(e: Event): void {
       const detail = (e as CustomEvent).detail as { title?: string } | undefined
+      const title = detail?.title?.trim()
+      if (!title) {
+        useCaptureConsole.getState().openConsole()
+        return
+      }
       void useWorkItemStore
         .getState()
-        .create({ title: detail?.title?.trim() || 'Untitled work item' })
+        .create({ title })
         .catch((err: unknown) => {
           // eslint-disable-next-line no-console
           console.warn('[workItems] create refused:', err instanceof Error ? err.message : err)

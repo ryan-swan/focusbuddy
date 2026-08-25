@@ -21,6 +21,7 @@ import { getActiveOrgId, PERSONAL_ORG_ID } from './activeOrg'
 import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
 import { isWorkItemsEnabled } from '../workItemsPref'
 import { mapNodeRow, type NodeRow } from './nodes'
+import { postNotification } from '../notifications/substrate'
 import type { FbNode } from '@shared/types'
 import type { LifecycleDb } from './nodeLifecycle'
 import {
@@ -281,8 +282,87 @@ export function createWorkItem(draft: WorkItemDraft, actor?: WorkItemActor): FbN
   return item
 }
 
+const TERMINAL_STATES: ReadonlySet<string> = new Set([
+  'acknowledged',
+  'answered',
+  'scheduled',
+  'delivered',
+  'reviewed',
+  'completed',
+  'discussed',
+  'dismissed',
+  'reclassified'
+])
+
+const CLOSURE_VERB: Record<string, string> = {
+  acknowledged: 'acknowledged',
+  answered: 'answered',
+  scheduled: 'scheduled',
+  delivered: 'delivered',
+  reviewed: 'reviewed',
+  completed: 'completed',
+  discussed: 'discussed',
+  dismissed: 'dismissed',
+  reclassified: 'reclassified'
+}
+
 export function setWorkItemState(id: string, state: WorkItemState, actor?: WorkItemActor): boolean {
-  return setWorkItemStateCore(getDb(), id, state, actor)
+  const db = getDb()
+  const ok = setWorkItemStateCore(db, id, state, actor)
+  // The CLOSED LOOP (S5, §6): a terminal transition posts through the S4
+  // substrate — durable, deduped (item+transition = once ever), rate-capped.
+  // At P0 self-routing this is the originator's own receipt; at P1 the same
+  // post reaches the routed originator.
+  if (ok && TERMINAL_STATES.has(state)) {
+    try {
+      const row = db
+        .prepare('SELECT title, intent_class, wi_origin FROM nodes WHERE id = ?')
+        .get(id) as { title: string; intent_class: string | null; wi_origin: string | null } | undefined
+      if (row) {
+        postNotification(db, {
+          ref: id,
+          queue: row.intent_class ?? 'action',
+          title: `${row.title || 'Work item'} — ${CLOSURE_VERB[state] ?? state}`,
+          body: 'Loop closed.',
+          dedupeKey: `wi-close:${id}:${state}`,
+          category: 'attention',
+          layer: 'inbox',
+          trigger: 'loop-closure',
+          origin: (row.wi_origin as 'human' | 'ai' | 'system' | null) ?? 'system'
+        })
+      }
+    } catch {
+      // Closure notification is best-effort; the state change already landed.
+    }
+  }
+  return ok
+}
+
+/** Δ3 (analysis/20, v1-simple decay): untouched loose thoughts dismiss after
+ *  LOOSE_THOUGHT_DECAY_DAYS with reason 'decayed' — the decay tier that keeps
+ *  idle captures from polluting queues or memory. Promotion (reclassify) or
+ *  any touch (updated_at moves) resets the clock. Run from the scheduler sweep. */
+export const LOOSE_THOUGHT_DECAY_DAYS = 14
+
+export function decayLooseThoughtsCore(d: LifecycleDb, nowMs: number): number {
+  const cutoff = nowMs - LOOSE_THOUGHT_DECAY_DAYS * 24 * 60 * 60 * 1000
+  const stale = d
+    .prepare(
+      `SELECT id FROM nodes WHERE kind = 'work_item' AND intent_class = 'loose_thought'
+         AND trashed_at IS NULL AND updated_at < ?
+         AND work_item_state NOT IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed','reclassified')`
+    )
+    .all(cutoff) as Array<{ id: string }>
+  for (const row of stale) {
+    d.prepare(
+      `UPDATE nodes SET work_item_state = 'dismissed', status = 'parked', reason_code = 'decayed', updated_at = ? WHERE id = ?`
+    ).run(nowMs, row.id)
+  }
+  return stale.length
+}
+
+export function decayLooseThoughts(nowMs = Date.now()): number {
+  return decayLooseThoughtsCore(getDb(), nowMs)
 }
 
 export function listWorkItems(): FbNode[] {

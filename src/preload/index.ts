@@ -1710,6 +1710,8 @@ const api = {
       wiUrgency?: string | null
       sourceRef?: string | null
       sourceType?: string | null
+      confidence?: number | null
+      approvalState?: string
       wiOrigin?: 'human' | 'ai' | 'system'
     }): Promise<FbNode> => ipcRenderer.invoke('workItems:create', draft),
     updateFields: (id: string, patch: Record<string, unknown>): Promise<FbNode | null> =>
@@ -1724,6 +1726,17 @@ const api = {
     counts: (): Promise<Record<string, number>> => ipcRenderer.invoke('workItems:counts'),
     badgeCounts: (): Promise<{ headline: number; byIntent: Record<string, number> }> =>
       ipcRenderer.invoke('workItems:badgeCounts'),
+    classify: (
+      text: string
+    ): Promise<{
+      intentClass: string
+      confidence: number
+      title: string
+      dueAt: string | null
+      clarify: { kind: 'deadline'; phrase: string } | null
+      via: 'rules' | 'model' | 'fallback'
+    }> => ipcRenderer.invoke('workItems:classify', text),
+    enabled: (): Promise<boolean> => ipcRenderer.invoke('workItems:enabled'),
     // Internal (S2): the arrival router's seam.
     kindOf: (id: string): Promise<string | null> => ipcRenderer.invoke('workItems:kindOf', id),
     applySyncEvent: (

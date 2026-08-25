@@ -92,6 +92,8 @@ import {
   type WorkItemActor
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
+import { classifyCapture } from '../ai/intentClassify'
+import { isWorkItemsEnabled } from '../workItemsPref'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
@@ -715,6 +717,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workItems:markRead', (_e, id: string) => markWorkItemRead(id))
   ipcMain.handle('workItems:counts', () => workItemCounts())
   ipcMain.handle('workItems:badgeCounts', () => attentionBadgeCounts())
+  // S5: the capture classifier (hard rules first — zero model latency on the
+  // common cases; Haiku fallback; loose_thought floor) and the capability
+  // probe surfaces can gate on.
+  ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
   // The notification substrate (S4, §5): the one posting door. The renderer's
   // live banners post records-of-record through it; scheduled deliveries are
   // swept by the main scheduler.

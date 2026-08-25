@@ -32,6 +32,10 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // returning a small JSON object. Haiku is fast and plenty for classification,
   // and this fires on every command-bar submit, so cheap matters.
   command_route: HAIKU,
+  // The capture console's intent classifier (Attention S5) — same shape as
+  // command_route: tiny classify, fires per capture, deterministic hard
+  // triggers run FIRST so most captures never reach the model at all.
+  intent_classify: HAIKU,
   // Office-document generation (the "Create with AI" flow for docs, sheets and
   // slides). The user reads and then edits the result, so quality matters;
   // Sonnet is the right default, with the global model-mode override available.

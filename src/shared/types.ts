@@ -1141,6 +1141,9 @@ export type AIPurpose =
   | 'agent_step'
   | 'memory_extract'
   | 'browser_agent'
+  // Attention S5: the capture console's intent classifier — a tight classify
+  // into one of the eight intent classes, small JSON out, fires per capture.
+  | 'intent_classify'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /

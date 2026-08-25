@@ -25,6 +25,10 @@ interface WorkItemStore {
     parentId?: string | null
     intentClass?: string
     dueAt?: string | null
+    confidence?: number | null
+    approvalState?: string
+    sourceRef?: string | null
+    sourceType?: string | null
     wiOrigin?: 'human' | 'ai' | 'system'
   }) => Promise<FbNode>
   updateFields: (id: string, patch: Record<string, unknown>) => Promise<FbNode | null>

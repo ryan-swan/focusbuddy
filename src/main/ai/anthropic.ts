@@ -31,7 +31,9 @@ import {
   CREATE_TASK_DEFINITION,
   UPDATE_TASK_DEFINITION,
   PROTOCOL_VOCAB_NOTE,
-  workItemCatalogAddendum
+  workItemCatalogAddendum,
+  MEETING_WORK_ITEM_DELIVERABLE,
+  meetingCaptureRule
 } from './vocabulary'
 import { isWorkItemsEnabled } from '../workItemsPref'
 import { MEMORY_SYSTEM, buildChatMemoryPrompt, parseMemoryResponse } from './memoryExtract'
@@ -5155,7 +5157,12 @@ export interface MeetingEndResult {
   reason?: 'no_key' | 'api' | 'parse'
 }
 
-const MEETING_END_SYSTEM = `You process the transcript of a meeting or call and return a JSON object with a summary and the concrete deliverables that came out of the conversation.
+// Assembled at call time: the deliverable set and the capture-routing rule flip
+// with the work-items capability (S5) — the meeting is the surface most likely
+// to produce action items, so it teaches create-work-item the moment it exists.
+function meetingEndSystem(): string {
+  const workItemsOn = isWorkItemsEnabled()
+  return `You process the transcript of a meeting or call and return a JSON object with a summary and the concrete deliverables that came out of the conversation.
 
 Return ONLY a single JSON object. No prose, no markdown fences. The first character must be { and the last must be }.
 
@@ -5166,16 +5173,17 @@ Shape:
 }
 
 Each deliverable is exactly one of:
-  { "kind": "create-task", "title": "short desk title", "notes": "optional detail", "reason": "what in the transcript calls for this" }
+${workItemsOn ? MEETING_WORK_ITEM_DELIVERABLE : ''}  { "kind": "create-task", "title": "short desk title", "notes": "optional detail", "reason": "what in the transcript calls for this" }
   { "kind": "create-knowledge-entry", "title": "fact or decision title", "body": "the real content from the conversation", "tags": ["optional"], "reason": "..." }
   { "kind": "create-document", "docType": "doc", "title": "document title", "reason": "..." }   // docType is one of doc (a written document), sheet (a spreadsheet), slides (a deck), map (a diagram / flowchart), design (a design canvas)
 
 HARD RULES:
 - The summary and every deliverable MUST be grounded in the transcript. Never invent facts, names, numbers, owners, dates, or decisions that were not stated.
 - Each deliverable's "reason" must cite something specific that was actually said.
-- Use create-task for an action item someone needs to do — it creates a DESK: a whole workspace opens for that item, so the user can work it to completion there. Use create-document for a written deliverable (doc), structured or tabular data like an action register or budget (sheet), or a presentation (slides). Use create-knowledge-entry for a decision, fact, or research finding worth keeping.
+${meetingCaptureRule(workItemsOn)} Use create-document for a written deliverable (doc), structured or tabular data like an action register or budget (sheet), or a presentation (slides). Use create-knowledge-entry for a decision, fact, or research finding worth keeping.
 - If the conversation produced no clear deliverables, return "deliverables": [].
 - Never exceed 10 deliverables.`
+}
 
 // Validate the model's deliverables array into real ActionProposals, dropping
 // anything malformed. Mirrors the per-kind discipline of parseChatJson but reads
@@ -5244,7 +5252,7 @@ export async function processMeetingEnd(input: {
     const resp = await c.messages.create({
       model: resolveModel('meeting_end'),
       max_tokens: 4096,
-      system: MEETING_END_SYSTEM,
+      system: meetingEndSystem(),
       messages: [{ role: 'user', content: `${header}Transcript:\n${input.transcript}` }]
     })
     if ((resp.stop_reason as string) === 'refusal') {

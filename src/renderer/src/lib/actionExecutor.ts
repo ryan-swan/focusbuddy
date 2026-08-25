@@ -88,9 +88,7 @@ export async function applyProposal(
     case 'create-task':
       return applyCreateTask(proposal, ctx)
     case 'create-work-item':
-      // Reserved Attention-layer kind (S0): the executor no-ops honestly until
-      // the work-items capability ships (S3). Never silently drop it.
-      return { ok: false, message: "Work items aren't enabled yet." }
+      return applyCreateWorkItem(proposal)
     case 'start-focus-session':
       return applyStartFocusSession(proposal, ctx)
     case 'delete-widget':
@@ -873,6 +871,28 @@ async function applyStartFocusSession(
     .getState()
     .start(ctx.activeTaskId, Math.max(60, p.minutes * 60), `${p.minutes}min`)
   return { ok: true, message: `Started ${p.minutes}-minute focus session` }
+}
+
+// S5: an AI-proposed work item, approved by the user's card tap — the one
+// code path (the store → workItems module), origin 'ai', approval recorded.
+// The typed refusals (capability off / un-migrated device) surface honestly.
+async function applyCreateWorkItem(
+  p: Extract<ActionProposal, { kind: 'create-work-item' }>
+): Promise<ApplyResult> {
+  try {
+    const { useWorkItemStore } = await import('../stores/workItems')
+    const item = await useWorkItemStore.getState().create({
+      title: p.title,
+      notes: p.notes,
+      wiOrigin: 'ai',
+      approvalState: 'approved',
+      sourceType: 'chat'
+    })
+    return { ok: true, message: `Filed "${item.title}" to Attention` }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Could not create the work item.'
+    return { ok: false, message: msg }
+  }
 }
 
 async function applyDeleteWidget(
