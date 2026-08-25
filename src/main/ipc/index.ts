@@ -51,7 +51,11 @@ import {
   listInbox,
   getMessage,
   markSeen,
-  resetConnection as resetMailConnection, archiveMessage } from '../mail/imap'
+  resetConnection as resetMailConnection, archiveMessage,
+  explainImapError } from '../mail/imap'
+import { authorize as authorizeMailOAuth } from '../mail/oauth'
+import { allAvailability as mailOAuthAvailability, availability as mailProviderAvailability,
+  type MailOAuthProvider } from '../mail/oauthProviders'
 import {
   listDocuments,
   listTrashedDocuments,
@@ -1714,9 +1718,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('backup:export', async () => {
     const parent = BrowserWindow.getFocusedWindow()
     const opts = {
-      title: 'Export a FocusBuddy backup',
+      title: 'Export a PlexiDesk backup',
       defaultPath: defaultExportName(),
-      filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup'] }]
+      filters: [{ name: 'PlexiDesk backup', extensions: ['fbbackup'] }]
     }
     const { canceled, filePath } = parent
       ? await dialog.showSaveDialog(parent, opts)
@@ -1733,14 +1737,14 @@ export function registerIpcHandlers(): void {
     const parent = BrowserWindow.getFocusedWindow()
     const open = parent
       ? await dialog.showOpenDialog(parent, {
-          title: 'Restore from a FocusBuddy backup',
+          title: 'Restore from a PlexiDesk backup',
           properties: ['openFile'],
-          filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup', 'db'] }]
+          filters: [{ name: 'PlexiDesk backup', extensions: ['fbbackup', 'db'] }]
         })
       : await dialog.showOpenDialog({
-          title: 'Restore from a FocusBuddy backup',
+          title: 'Restore from a PlexiDesk backup',
           properties: ['openFile'],
-          filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup', 'db'] }]
+          filters: [{ name: 'PlexiDesk backup', extensions: ['fbbackup', 'db'] }]
         })
     if (open.canceled || open.filePaths.length === 0) {
       return { ok: false as const, canceled: true as const }
@@ -1758,7 +1762,7 @@ export function registerIpcHandlers(): void {
       title: 'Restore from backup',
       message: 'Replace all your current data with this backup?',
       detail:
-        'Your current data will be snapshotted first (you can recover it from the backups folder), then replaced. FocusBuddy will reload when done.'
+        'Your current data will be snapshotted first (you can recover it from the backups folder), then replaced. PlexiDesk will reload when done.'
     }
     const { response } = parent
       ? await dialog.showMessageBox(parent, confirmOpts)
@@ -2459,7 +2463,63 @@ export function registerIpcHandlers(): void {
   // The user's own mailbox, connected directly from the desktop. The renderer
   // only ever sees host/port/user (never the password), proposes a config to
   // save+test, and asks for the message list / one full message on demand.
+  // Resolve the connected account, renewing an expiring OAuth access token
+  // first. Every handler below goes through this rather than getFull(), because
+  // an access token only lasts about an hour and a stale one comes back from
+  // the server as a bare authentication failure.
+  type MailConfigResult =
+    | { ok: true; config: MailAccountConfig }
+    | { ok: false; error: string }
+
+  async function currentMailAccount(): Promise<MailConfigResult> {
+    try {
+      const config = await mailAccount.getFullFresh()
+      if (!config) return { ok: false, error: 'No mail account connected.' }
+      return { ok: true, config }
+    } catch (err) {
+      // A failed refresh means the grant is genuinely gone. Say so plainly
+      // instead of reporting an empty inbox as if the mailbox were fine.
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
   ipcMain.handle('mail:getAccount', () => mailAccount.getPublic())
+
+  // Which provider sign-ins this build can actually offer. The renderer shows
+  // the unavailable ones with their reason rather than hiding them, so an
+  // operator can see what registration is missing.
+  ipcMain.handle('mail:oauthProviders', () => mailOAuthAvailability())
+
+  ipcMain.handle('mail:oauthConnect', async (_e, provider: MailOAuthProvider) => {
+    const avail = mailProviderAvailability(provider)
+    if (!avail.available) {
+      return { ok: false as const, error: avail.reason ?? 'That sign-in is not available.' }
+    }
+    try {
+      const result = await authorizeMailOAuth(provider)
+      const account = mailAccount.accountFromOAuth(result)
+      // Prove the tokens actually open the mailbox before saving them, the
+      // same gate the password path uses. A grant that consents but cannot
+      // IMAP (a tenant with IMAP disabled, most often) fails here rather than
+      // looking connected and returning nothing.
+      const probe = await testMailConnection({
+        host: account.host,
+        port: account.port,
+        secure: account.secure,
+        user: account.user,
+        email: account.email,
+        password: '',
+        oauth: account.tokens
+      })
+      if (!probe.ok) return probe
+      mailAccount.saveOAuth(account)
+      resetMailConnection()
+      resetToneCache()
+      return { ok: true as const, account: mailAccount.getPublic() }
+    } catch (err) {
+      return { ok: false as const, error: (err as Error).message }
+    }
+  })
 
   ipcMain.handle('mail:saveAccount', async (_e, config: MailAccountConfig) => {
     try {
@@ -2493,8 +2553,9 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('mail:list', async (e, limit?: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
+    const config = acc.config
     try {
       const items = await listInbox(config, limit ?? 40)
       // New-mail detection: any unseen uid we have not announced yet fires one
@@ -2515,50 +2576,50 @@ export function registerIpcHandlers(): void {
       setMailSearchCache(items)
       return { ok: true as const, items }
     } catch (err) {
-      return { ok: false as const, error: (err as Error).message }
+      return { ok: false as const, error: explainImapError(err, config) }
     }
   })
 
   ipcMain.handle('mail:get', async (_e, uid: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     try {
-      const message = await getMessage(config, uid)
+      const message = await getMessage(acc.config, uid)
       if (!message) return { ok: false as const, error: 'Message not found.' }
       return { ok: true as const, message }
     } catch (err) {
-      return { ok: false as const, error: (err as Error).message }
+      return { ok: false as const, error: explainImapError(err, acc.config) }
     }
   })
 
   ipcMain.handle('mail:archive', async (_e, uid: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     try {
-      await archiveMessage(config, uid)
+      await archiveMessage(acc.config, uid)
       return { ok: true as const }
     } catch (err) {
-      return { ok: false as const, error: (err as Error).message }
+      return { ok: false as const, error: explainImapError(err, acc.config) }
     }
   })
   ipcMain.handle('mail:markSeen', async (_e, uid: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     try {
-      await markSeen(config, uid)
+      await markSeen(acc.config, uid)
       return { ok: true as const }
     } catch (err) {
-      return { ok: false as const, error: (err as Error).message }
+      return { ok: false as const, error: explainImapError(err, acc.config) }
     }
   })
 
   ipcMain.handle(
     'mail:suggestReply',
     async (_e, incoming: { subject: string; from: string; body: string }) => {
-      const config = mailAccount.getFull()
-      if (!config) return { ok: false as const, error: 'No mail account connected.' }
+      const acc = await currentMailAccount()
+      if (!acc.ok) return { ok: false as const, error: acc.error }
       try {
-        return await suggestReply(config, {
+        return await suggestReply(acc.config, {
           subject: incoming?.subject ?? '',
           from: incoming?.from ?? '',
           body: incoming?.body ?? ''
@@ -2570,14 +2631,14 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('mail:send', async (_e, input: MailSendInput) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     const to = (input.to ?? []).map((a) => a.trim()).filter(Boolean)
     if (to.length === 0) {
       return { ok: false as const, error: 'Add at least one recipient.' }
     }
     try {
-      await sendMail(config, {
+      await sendMail(acc.config, {
         to,
         cc: (input.cc ?? []).map((a) => a.trim()).filter(Boolean),
         bcc: (input.bcc ?? []).map((a) => a.trim()).filter(Boolean),
