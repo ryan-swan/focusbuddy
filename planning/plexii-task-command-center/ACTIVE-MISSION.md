@@ -3,8 +3,20 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (architecture gate MET) · **State:** IN_PROGRESS — Phase 5
-(build-prompt authoring; ARCHITECTURE v2.3 APPROVED)
+**Last updated:** 2026-08-25 (S0 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
+(operator green light given 2026-08-25; DEC-017. S0 ✔ → S1 next)
+
+**S0 CLOSED (2026-08-25, commit 09e129d9):** vocabulary quarantine executed — shared
+vocabulary module + workItems.enabled flag (default OFF, voiceProviderPref pattern);
+create-task defined as desk at every model-visible site incl. the meeting-wrapup rule;
+`create-work-item` reserved end-to-end (union type, five parser arms, creation gate,
+labels, honest executor no-op); gated catalog addendum injected flag-checked at both
+consumers; label worklist landed (desk language in action cards, toasts, refusals, Flow
+editor); Flow engine honest-default arm. 18 new grep-lock tests; suite 2628 green,
+typecheck clean. Renderer half live via HMR; main-process prompt half compiled+tested,
+takes effect on next app launch (dev server runs without --watch — normal). Deferred to
+S6 per CR-04(b): AllTasksView/segments/Pulse/MakeTaskDialog surface renames. Orphaned
+dashboard portlet strings skipped (unreachable UI).
 
 **G2 MET — Phase 2 complete, all seven items:** matrix adversarially verified (12
 CONFIRMED / 4 PARTIALLY / 0 REFUTED; two class disputes upheld + corrected; six misses
