@@ -19,6 +19,7 @@ import {
 import { useAccountStore } from '../stores/account'
 import { useWidgetStore } from '../stores/widgets'
 import { useNodeStore } from '../stores/nodes'
+import { useWorkItemStore } from '../stores/workItems'
 import { useTablesStore } from '../stores/tables'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useFileManagerStore } from '../stores/fileManager'
@@ -228,7 +229,13 @@ function send(ev: ChangeEvent): void {
 // helpers resolve the shared root per type (nodes carry it directly; widgets and
 // other task-bound objects inherit it from their task node).
 function nodeSharedRoot(nodeId: string): string | null {
-  return useNodeStore.getState().nodes.find((n) => n.id === nodeId)?.sharedRootId ?? null
+  const n = useNodeStore.getState().nodes.find((x) => x.id === nodeId)
+  if (n) return n.sharedRootId ?? null
+  // P1 partition fix (ARCHITECTURE §3 note): work_items never enter
+  // useNodeStore, so a shared desk's items resolved null here and their
+  // attr/delete emits misrouted to the personal partition. Fall through to
+  // the work-item store so they ride the same desk partition as their desk.
+  return useWorkItemStore.getState().items.find((x) => x.id === nodeId)?.sharedRootId ?? null
 }
 function widgetSharedRoot(widgetId: string): string | null {
   const w = useWidgetStore.getState().widgets.find((x) => x.id === widgetId)

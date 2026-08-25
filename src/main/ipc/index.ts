@@ -95,7 +95,13 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
-import { isWorkItemsEnabled } from '../workItemsPref'
+import {
+  isWorkItemsEnabled,
+  workItemsOrgEnabled,
+  orgMigrationAttested,
+  attestOrgMigrated,
+  revokeOrgAttestation
+} from '../workItemsPref'
 import { staleDesks } from '../db/nodeActivity'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
@@ -726,6 +732,16 @@ export function registerIpcHandlers(): void {
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
   ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
+  // P1 migrated-peer confirmation (§2.6/§8): the per-org gate the SPEC-027
+  // org-carry branch will consult. Record/revoke are operator actions.
+  ipcMain.handle('workItems:orgEnabled', (_e, orgId: string) => workItemsOrgEnabled(String(orgId ?? '')))
+  ipcMain.handle('workItems:orgAttestation', (_e, orgId: string) => orgMigrationAttested(String(orgId ?? '')))
+  ipcMain.handle('workItems:attestOrgMigrated', (_e, orgId: string, note: string) =>
+    attestOrgMigrated(String(orgId ?? ''), String(note ?? ''))
+  )
+  ipcMain.handle('workItems:revokeOrgAttestation', (_e, orgId: string) =>
+    revokeOrgAttestation(String(orgId ?? ''))
+  )
   // Lifecycle L3: computed desk staleness — the Stale Desks widget's feed.
   ipcMain.handle('nodes:staleDesks', () => staleDesks())
   // Attention precision (MET-006 wiring): acted vs dismissed over recent
@@ -3109,9 +3125,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:advanceBaseRev', (_e, itemType: string, id: string, rev: number) =>
     advanceBaseRev(itemType, id, rev)
   )
-  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) =>
-    markPushed(itemType, id, rev)
-  )
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) => {
+    // P1 diagnostics, widget-only trail: paired with "[sync-409]" this tells
+    // a live churn loop apart from a permanent-conflict loop at a glance.
+    // eslint-disable-next-line no-console
+    if (itemType === 'widget') console.log(`[sync-mark] pushed widget/${id} @ rev ${rev}`)
+    return markPushed(itemType, id, rev)
+  })
   ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>
     applyRemote(Array.isArray(items) ? items : [])
   )

@@ -338,6 +338,9 @@ export function moveNodeToOrg(rootId: string, orgId: string, teamId: string | nu
   // are unconfirmed — the org sweep refuses to carry them. They are detached
   // (park-local) so the moved subtree never carries a cross-org parent link;
   // the count is surfaced by the caller's toast (S6) via the detached return.
+  // P1: the confirmation gate exists (workItemsPref.workItemsOrgEnabled) —
+  // the org-carry branch that consults it lands with the SPEC-027 pass, so
+  // parking stays unconditional here until that architecture is ruled.
   const all = collectActiveSubtree(db, rootId)
   const kindOf = db.prepare('SELECT kind FROM nodes WHERE id = ?')
   const ids = all.filter((i) => (kindOf.get(i) as { kind: string } | undefined)?.kind !== 'work_item')

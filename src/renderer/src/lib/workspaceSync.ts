@@ -394,6 +394,9 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   // cached tables/rows are re-fetched here explicitly.
   if (applied > 0) {
     await useNodeStore.getState().refresh()
+    // P1 shared-refresh widening (15 §6 #5): work_items ride org pulls too —
+    // the Attention surface reads its own store, so reload it alongside.
+    await useWorkItemStore.getState().refresh()
     const activeTaskId = useNodeStore.getState().activeTaskId
     if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
     await useTimeBlockStore.getState().reload()
@@ -581,6 +584,10 @@ async function syncSharedWorkspaceOnce(token: string): Promise<number> {
 
   if (applied > 0 || pruned > 0) {
     await useNodeStore.getState().refresh()
+    // P1 shared-refresh widening (15 §6 #5): a shared desk can carry
+    // work_items — Attention reads its own store, so a shared pull (or a
+    // prune's detach-and-revive) must reload it or the page shows stale.
+    await useWorkItemStore.getState().refresh()
     const activeTaskId = useNodeStore.getState().activeTaskId
     if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
     await refreshCachedTables()

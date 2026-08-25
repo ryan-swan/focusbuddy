@@ -87,6 +87,11 @@ export function advanceBaseRevCore(
 export function advanceBaseRev(itemType: string, id: string, rev: number): void {
   const table = TABLE[itemType as ItemType]
   if (!table) return
+  // Structured 409 trail (P1 diagnostics): this path fires ONLY on push
+  // conflicts, so a row appearing here repeatedly is a live 409 loop — the
+  // exact signature the F010 fix exists to break. Greppable: "[sync-409]".
+  // eslint-disable-next-line no-console
+  console.warn(`[sync-409] conflict-floor ${itemType}/${id} -> rev ${rev}`)
   advanceBaseRevCore(getDb(), table, id, rev)
 }
 
@@ -676,6 +681,16 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
     }
   })
   tx()
+  // P1 diagnostics: pull + 409 conflict-applies both funnel through here.
+  // Paired with [sync-mark]/[sync-409] this completes the trail of every
+  // sync_rev writer in the personal loop. Greppable: "[sync-apply]".
+  const widgetApplies = changes.filter((c) => c.itemType === 'widget')
+  if (widgetApplies.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[sync-apply] widgets: ${widgetApplies.map((c) => `${c.id}${c.deleted ? ' (del)' : ''}`).join(', ')}`
+    )
+  }
   emitRemoteChangeEvents(changes)
   return { applied }
 }
