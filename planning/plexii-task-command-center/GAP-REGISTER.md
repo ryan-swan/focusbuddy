@@ -122,6 +122,19 @@ tolerate `'task-item'` (recommend: CHECK admits all four kinds; the TS union car
 optionally cleaned later); (3) the migration's pinning test needs a second fixture: the
 already-widened legacy-migrated DB shape.
 
+## GAP-015 — The CRDT live path's field allowlists would silently drop routing columns
+**Severity:** HIGH · **Closes in:** Phase 4 design + the SPEC-002 build stage · **Status:** OPEN
+The live transport (path A) emits node fields through two explicit allowlists:
+`NODE_ATTR_KEYS` (`renderer/lib/crdtSync.ts:57-75`) and the `emitNodeCreate` snapshot
+(`:404-416`). Neither would carry SPEC-002's new columns — a routed work_item would arrive
+on the live path with **blank routing fields**, self-correcting only when the 20s poll
+catches up: the worst failure shape for acknowledgment/loop-closure. The SPEC-002 stage
+must add every replicating work_item column to BOTH lists (and the stage's adversarial test
+must prove a live-path arrival carries them). Related: personal scope has NO receiver wake
+(`personalWorkspaceChanged` doesn't exist) — second-device self-routing worst-cases at 20s
+on the poll unless the fields ride the live path. (Found by the reliability agent,
+analysis/15 §6; allowlists spot-verified.)
+
 ## Open questions
 
 ### GAP-008 — What can the sync/org layer carry for shared collaboration?

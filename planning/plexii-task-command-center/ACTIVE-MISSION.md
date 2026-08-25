@@ -26,11 +26,14 @@ trim); ambiguities Q1–Q4, Q6–Q8 scheduled for Phase 2/3 proposals returned f
 5. ~~ACL semantics~~ ✔ **DONE** → analysis/14: three scopes, server-side membership,
    per-person addressing absent → v1 routing = scope-carried + client-filtered with a
    stated visibility contract; four G4 consequences named.
-6. Sync reliability assessment → **background agent in flight** (mechanism map, per-widget
-   sync paths, 7–8s latency budget, dirty-row causes) → analysis/15. Own DB inspection
-   found **GAP-014**: live DB already CHECK-widened by the legacy migration (task-item rows
-   exist, server revved them → kind acceptance proven, A-003 → 0.99; migration needs
-   dual-start-state redesign).
+6. ~~Sync reliability~~ ✔ **DONE** (spot-verified 4/4) → analysis/15: THREE transports
+   (CRDT-WS live + HTTP poll + Yjs docs, dual-write); **7–8s root-caused** — the
+   running-guard silently drops receiver wakes, cycles lengthened by serial PUTs (~6-line
+   coalescing-re-arm fix; ownership note: Caleb's subsystem); slide decks non-replicating
+   by construction in three places; **GAP-015** — CRDT field allowlists would silently
+   drop SPEC-002's routing columns on the live path; 409-loop + version-gate + shared
+   refresh named as ranked P1 preconditions. Plus GAP-014 (own DB inspection): live DB
+   already CHECK-widened; kind acceptance proven; A-003 → 0.99.
 7. Gap matrix DRAFTED → analysis/02 (all 44 + amendments classified with evidence);
    **adversarial verifier agent in flight** (refute-mode, all E/CR claims + ≥30% sample).
    G2 closes when 6+7 return clean. Also delivered: **Q1/Q7 concrete proposals →
