@@ -3,8 +3,18 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S1 SHIPPED — live migration LANDED) · **State:**
-IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ → S2 next)
+**Last updated:** 2026-08-25 (S2 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
+(DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ → S3 next)
+
+**S2 CLOSED (2026-08-25, commit 2c133165):** the sync contract. Column manifest (one
+source, 13 cols) + status projection (never-done pinned) + satellites with orphan sweep +
+detach-hook wiring + the ARRIVAL ROUTER (live-path work_item events route to the one db
+code path; deletes soft-trash, never tombstone) + allowlist/emit parity by spread + poll-
+arm recompute ×3 + the 409 baseRev fix [PLEXI-UPSTREAM]. 2686/2686 tests. **Live:**
+schema landed on the real DB (13 cols + wi_local/wi_deliveries, 112/112 rows, FK clean);
+**the 409 fix cured the perma-dirty demo rows live** (settle window observed; revs
+advance). New P1 lead: a local periodic writer re-touches those demo rows each cycle
+(pre-existing). Full ledger: [phases/HANDOFFS/s2-close.md](phases/HANDOFFS/s2-close.md).
 
 **S1 CLOSED (2026-08-25, commits ae0f071e/63b0fc0b/bfaf00ba):** the FOUNDATIONAL stage.
 `migrateNodesKindCheckV2` **fired on the live DB and passed every assertion** (112/112
