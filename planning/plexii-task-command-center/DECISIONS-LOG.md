@@ -287,4 +287,32 @@ events may still push OS notifications (analysis/16 §Q7 verbatim).
 **Consumed by:** Phase 3 architecture (SPEC-009 rule, SPEC-014 widget set, SPEC-015 count
 semantics).
 
+## DEC-017 — Phase 6 green light
+
+**Date:** 2026-08-25 · **Made by:** Operator ("Green light — start S0")
+**Decision:** Build execution (ROADMAP Phase 5→6 gate) is authorized. DEC-015's autopilot
+covers stage-to-stage execution S0–S7 without per-gate sign-off; new scope still stops.
+
+## DEC-018 — Dispatch alignment: all six adoptions
+
+**Date:** 2026-08-25 · **Made by:** Operator ("Adopt all six and continue into S4")
+**Context:** analysis/19 — the Dispatch brief (A6 built / A7 planned, paused for this
+build) compared against the Attention layer. Verdict: convergent; we are D4's named
+critical path.
+**Decision:** adopt A-1..A-6 verbatim from analysis/19 §2:
+**A-1** per-change attribution reserved in the three work_item write cores (optional
+`actor` param — kind/agentRef/missionRef; threaded now, storage decided at D4). This is
+a v2.3 §2.3 amendment (recorded there). **A-2** S4's notification substrate is the
+Dispatch rail (doc contract; queues `mission-needs-you`/`mission-done` reserved; no
+"dispatch/dispatcher" naming in S4). **A-3** `source_type='mission'` reserved (S5 enum).
+**A-4** "Dispatch" + "mission" join the vocabulary quarantine; S6 must not use them;
+`agentDispatcher.ts` name collision noted for Caleb. **A-5** S6 ships a "By origin"
+lens. **A-6** D4 integration doctrine joins the merge-readiness preconditions: agents
+write work items ONLY through the workItems module.
+**Alternatives:** defer all six to D-phase time — rejected: A-1 retrofit cost multiplies
+with every S5+ caller; the rest are documentation-weight now.
+**Conflicts registered, not resolved** (analysis/19 §3): C-1 mission-undo vs
+no-hard-delete → DEC at D1; C-2 monitor/Attention composition → D1 design; C-4 pre-S6
+main-diff checkpoint scheduled.
+
 <!-- Append below; increment DEC-NNN. -->

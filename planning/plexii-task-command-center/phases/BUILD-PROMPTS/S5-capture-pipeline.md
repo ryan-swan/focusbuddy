@@ -1,5 +1,9 @@
 # S5 — Capture Console, Classifier, Self-Routing Closure
 
+> **DEC-018 rider (A-3):** `source_type` gains the reserved value `'mission'` in the
+> classifier's enum — Dispatch missions will stamp `source_ref=<mission id>` +
+> `source_type='mission'` for provenance with zero schema work.
+
 **Class:** ADDITIVE (new pipeline on the standup AI pattern) · **Needs:** S0 (vocabulary),
 S4 (closure notification) · **Risk:** MED (AI-path latency + misclassification UX).
 

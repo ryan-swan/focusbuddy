@@ -1,5 +1,11 @@
 # S6 — Surfaces: Widgets, WorkItemsView, Counts, Palette, Reasons
 
+> **DEC-018 riders:** (A-4) "Dispatch" and "mission" are RESERVED for Caleb's A7 — no
+> S6 surface, nav item, or label uses them. (A-5) WorkItemsView's saved lenses include
+> a **"By origin"** lens (human/ai/system) — free now, anticipates mission filtering.
+> (C-4) run the **pre-S6 main-diff checkpoint** before starting: size Caleb's A6
+> refinement drift in anthropic.ts and absorb deliberately.
+
 **Class:** ADDITIVE UI + two label RESHAPEs (CR-04(b)) · **Needs:** S3 · **Risk:** MED —
 this is the stage the operator's design-fidelity directive bears on hardest.
 

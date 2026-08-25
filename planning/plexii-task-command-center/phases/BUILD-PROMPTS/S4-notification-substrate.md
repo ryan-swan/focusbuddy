@@ -1,5 +1,11 @@
 # S4 — Notification Substrate, Rate Caps, Re-pointing
 
+> **DEC-018 riders:** (A-2) this substrate IS the future Dispatch notification rail —
+> `ref`+`queue` stay fully generic, queues `mission-needs-you`/`mission-done` are
+> reserved for D1, and the words "dispatch/dispatcher" appear NOWHERE in S4 naming
+> (house words: scheduler, delivery, sweep). (A-1) the `actor` attribution parameter
+> lands on the three workItems write cores in this stage.
+
 **Class:** RESHAPE (touches existing notify paths — regression guard applies) ·
 **Blocks:** S5's closure, S7's nudges · **Risk:** MED (the decoy retirement + seven-caller
 migration is where existing behavior can break).

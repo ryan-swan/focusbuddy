@@ -15,6 +15,8 @@ surfaced to the operator before proceeding. If the CODE and the architecture dis
 | `CommandCenter.tsx` | the ⌘K palette | the new surface |
 | `work_item` | the ONLY new kind; the new entity everywhere | "task" in code/copy for the new entity |
 | "Attention" | the surface name (DEC-012) | "Signal" / "Inbox" / "Flow" |
+| "Dispatch" | Caleb's A7 nav section (DEC-018) — RESERVED | any of our surfaces, modules, or scheduler names |
+| "mission" | a Dispatch run (DEC-018) — RESERVED | any of our run/job concepts |
 
 ## Per-stage loop (§7)
 

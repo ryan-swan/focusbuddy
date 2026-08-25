@@ -174,6 +174,13 @@ un-honorable re-attach. §2.4's satellite split exists for exactly this; it move
 - **Semantics annotation (F013):** the coarse `open` bucket is a **legacy-compatibility
   value only, never a "needs me" signal** — waiting/blocked project there but do not need
   the person; every Attention count and badge derives from `work_item_state` exclusively.
+- **Amendment (DEC-018 A-1, 2026-08-25):** the three write cores (`createWorkItemCore`,
+  `setWorkItemStateCore`, `updateWorkItemFieldsCore`) accept an optional
+  `actor?: { kind: 'human'|'agent'|'system'; agentRef?; missionRef? }` — the per-change
+  attribution seam Dispatch D4 names ("a person or an agent acting on their behalf").
+  v1 threads it through IPC and logs it; persistent storage (columns vs event log) is a
+  D4-time DEC. Reserved now because F008 makes these the only write path: the parameter
+  costs minutes today and a caller sweep later.
 
 ### 2.4 Satellite local tables (SPEC-003)
 

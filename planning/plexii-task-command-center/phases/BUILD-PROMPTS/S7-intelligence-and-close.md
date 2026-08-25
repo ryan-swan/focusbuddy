@@ -1,5 +1,10 @@
 # S7 — Intelligence-Light, Regression Guard, G6 Close
 
+> **DEC-018 rider (A-6):** the G6 merge-readiness preconditions gain the D4 integration
+> doctrine: agents write work items ONLY through the workItems module (F008) — a
+> parallel write path silently breaks every invariant (projection, leaf, scope, C2,
+> CI locks). One paragraph, handed to Caleb with the §8 R016 preconditions.
+
 **Class:** ADDITIVE + system-wide verification · **Needs:** S4 (nudges) · **Risk:** LOW
 build, HIGH judgment — this stage decides whether the whole layer feels helpful or naggy.
 
