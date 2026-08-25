@@ -39,7 +39,19 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const setActive = useNodeStore((s) => s.setActive)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
+  const remove = useNodeStore((s) => s.remove)
   const moveToOrg = useNodeStore((s) => s.moveToOrg)
+  // Lifecycle L1: the archived shelf. Off = the live index (archived hidden,
+  // as always); on = archived desks only. Persisted like the index's own modes.
+  const [showArchived, setShowArchived] = useState(
+    () => localStorage.getItem('desks-index.archived') === '1'
+  )
+  const toggleArchived = (): void => {
+    setShowArchived((v) => {
+      localStorage.setItem('desks-index.archived', v ? '0' : '1')
+      return !v
+    })
+  }
   const activeOrgId = useOrgStore((s) => s.activeOrgId)
   // Select the stable orgs array and derive with useMemo — filtering inside the
   // selector returns a fresh array every render, which Zustand treats as a change
@@ -86,9 +98,19 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
       nodes.filter(
         (n) =>
           n.kind === 'task' &&
-          !n.archived &&
+          (showArchived ? n.archived : !n.archived) &&
           (!scopeRoomIds || (n.parentId != null && scopeRoomIds.has(n.parentId)))
       ),
+    [nodes, scopeRoomIds, showArchived]
+  )
+  const archivedCount = useMemo(
+    () =>
+      nodes.filter(
+        (n) =>
+          n.kind === 'task' &&
+          n.archived &&
+          (!scopeRoomIds || (n.parentId != null && scopeRoomIds.has(n.parentId)))
+      ).length,
     [nodes, scopeRoomIds]
   )
 
@@ -106,7 +128,13 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
 
   const config: IndexConfig<FbNode> = {
     storageKey: 'desks-index',
-    title: scopeTitle ? `Desks in ${scopeTitle}` : 'All desks',
+    title: showArchived
+      ? scopeTitle
+        ? `Archived desks in ${scopeTitle}`
+        : 'Archived desks'
+      : scopeTitle
+        ? `Desks in ${scopeTitle}`
+        : 'All desks',
     subtitle: scopeTitle
       ? 'Every canvas that lives in this room. Open one to bring its notes, files and tools to the surface.'
       : 'Every canvas across your rooms. Open one to bring its notes, files and tools to the surface.',
@@ -260,16 +288,59 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
           setActive(d.id)
           goTask(d.id)
         }
-      }
+      },
+      // Lifecycle L1 (menu-only): archive puts a desk away without ending it;
+      // trash starts the 7-day clock with the standard undo toast. Shared
+      // desks keep both actions held back until the sharing rules land (D1).
+      ...(!d.sharedRootId
+        ? [
+            {
+              key: 'archive',
+              icon: d.archived ? 'unarchive' : 'archive',
+              label: d.archived ? 'Unarchive desk' : 'Archive desk',
+              inStrip: false,
+              onClick: () => {
+                void update(d.id, { archived: !d.archived })
+              }
+            },
+            {
+              key: 'trash',
+              icon: 'delete',
+              label: 'Move to Trash',
+              inStrip: false,
+              onClick: () => {
+                void remove(d.id)
+              }
+            }
+          ]
+        : [])
     ],
-    headerActions: roomId ? (
-      <button
-        onClick={() => goRooms()}
-        className="inline-flex items-center gap-1 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
-      >
-        <Icon name="arrow_back" size={15} /> All rooms
-      </button>
-    ) : undefined
+    headerActions: (
+      <>
+        {roomId ? (
+          <button
+            onClick={() => goRooms()}
+            className="inline-flex items-center gap-1 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+          >
+            <Icon name="arrow_back" size={15} /> All rooms
+          </button>
+        ) : null}
+        {(archivedCount > 0 || showArchived) && (
+          <button
+            onClick={toggleArchived}
+            title={showArchived ? 'Back to live desks' : 'Show archived desks'}
+            className={`inline-flex items-center gap-1 h-9 px-3 fb-btn-surface fb-press fb-t-label ${
+              showArchived
+                ? 'text-[var(--ink-100)]'
+                : 'text-[var(--ink-70)] hover:text-[var(--ink-100)]'
+            }`}
+          >
+            <Icon name={showArchived ? 'arrow_back' : 'archive'} size={15} />
+            {showArchived ? 'Live desks' : `Archived${archivedCount ? ` (${archivedCount})` : ''}`}
+          </button>
+        )}
+      </>
+    )
   }
 
   return (

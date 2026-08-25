@@ -6,8 +6,10 @@ import {
   assertParentAcceptsChildren,
   collectActiveSubtree,
   detachAndReviveWorkItemDescendants,
+  listTrashedRoots,
   pruneSharedRows,
   purgeExpiredTrash,
+  restoreTrashedTree,
   WorkItemDeleteRefusedError,
   WorkItemParentRefusedError,
   type LifecycleDb
@@ -175,6 +177,33 @@ describe('§2.5.5 — the leaf invariant at parent_id writers', () => {
     expect(() => assertParentAcceptsChildren(db, 'wi')).toThrow(WorkItemParentRefusedError)
     expect(() => assertParentAcceptsChildren(db, 'desk')).not.toThrow()
     expect(() => assertParentAcceptsChildren(db, null)).not.toThrow()
+  })
+})
+
+describe('trash surfacing (lifecycle L1)', () => {
+  it('lists trashed ROOTS only; children travel with their parent; work_items excluded', () => {
+    const { raw, db } = freshDb()
+    raw.exec("ALTER TABLE nodes ADD COLUMN org_id TEXT NOT NULL DEFAULT 'personal'")
+    node(raw, 'room', 'folder', null, { trashed_at: 100 })
+    node(raw, 'desk', 'task', 'room', { trashed_at: 100 }) // child — not a root
+    node(raw, 'live-parent-desk', 'task')
+    node(raw, 'orphan-child', 'task', 'live-parent-desk', { trashed_at: 200 }) // parent live → root
+    node(raw, 'wi', 'work_item', 'room', { trashed_at: 100 }) // never listed
+    const roots = listTrashedRoots(db, 'personal').map((r) => r.id)
+    expect(roots.sort()).toEqual(['orphan-child', 'room'])
+  })
+
+  it('restoreTrashedTree restores the root and its whole trashed subtree, work_items included', () => {
+    const { raw, db } = freshDb()
+    node(raw, 'room', 'folder', null, { trashed_at: 100 })
+    node(raw, 'desk', 'task', 'room', { trashed_at: 100 })
+    node(raw, 'wi', 'work_item', 'desk', { trashed_at: 100 })
+    node(raw, 'untouched', 'task', null, { trashed_at: 500 }) // different root — stays trashed
+    const ids = restoreTrashedTree(db, 'room')
+    expect(ids.sort()).toEqual(['desk', 'room', 'wi'])
+    expect(row(raw, 'wi')).toEqual({ parent_id: 'desk', trashed_at: null }) // lossless, §2.5.1
+    expect(row(raw, 'untouched')?.trashed_at).toBe(500)
+    expect(restoreTrashedTree(db, 'room')).toEqual([]) // already live — no-op
   })
 })
 

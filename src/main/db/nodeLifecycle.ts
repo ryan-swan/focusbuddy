@@ -135,6 +135,53 @@ export function detachAndReviveWorkItemDescendants(
   return count
 }
 
+// ── Trash surfacing (lifecycle track L1) ────────────────────────────────────
+
+export interface TrashedRoot {
+  id: string
+  kind: string
+  title: string
+  trashed_at: number
+  parent_id: string | null
+}
+
+/** Trashed ROOTS: trashed rows whose parent is missing, live, or itself not
+ *  trashed — the entries a Trash surface lists (their subtrees restore with
+ *  them). Work_items are excluded from the listing: they are never trashed
+ *  directly (C2) and travel with their desk. */
+export function listTrashedRoots(d: LifecycleDb, orgId: string): TrashedRoot[] {
+  return d
+    .prepare(
+      `SELECT n.id, n.kind, n.title, n.trashed_at, n.parent_id FROM nodes n
+       LEFT JOIN nodes p ON p.id = n.parent_id
+       WHERE n.trashed_at IS NOT NULL AND n.org_id = ? AND n.kind != 'work_item'
+         AND (n.parent_id IS NULL OR p.id IS NULL OR p.trashed_at IS NULL)
+       ORDER BY n.trashed_at DESC`
+    )
+    .all(orgId) as TrashedRoot[]
+}
+
+/** Restore a trashed root AND its trashed subtree (bit-lossless, §2.5.1 —
+ *  work_item children included). Returns the restored ids. */
+export function restoreTrashedTree(d: LifecycleDb, rootId: string): string[] {
+  const root = d
+    .prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NOT NULL')
+    .get(rootId) as { id: string } | undefined
+  if (!root) return []
+  const ids: string[] = [rootId]
+  const kids = d.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NOT NULL')
+  const walk = (nid: string): void => {
+    for (const k of kids.all(nid) as Array<{ id: string }>) {
+      ids.push(k.id)
+      walk(k.id)
+    }
+  }
+  walk(rootId)
+  const restore = d.prepare('UPDATE nodes SET trashed_at = NULL WHERE id = ?')
+  for (const id of ids) restore.run(id)
+  return ids
+}
+
 // ── Purge (§2.5.2 — F-C1″ target-vs-victim fix) ─────────────────────────────
 
 /**

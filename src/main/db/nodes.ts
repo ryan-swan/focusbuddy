@@ -7,7 +7,10 @@ import {
   assertParentAcceptsChildren,
   collectActiveSubtree,
   detachAndReviveWorkItemDescendants,
-  purgeExpiredTrash
+  listTrashedRoots,
+  purgeExpiredTrash,
+  restoreTrashedTree,
+  type TrashedRoot
 } from './nodeLifecycle'
 import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
 import { workItemDetachHook } from './workItems'
@@ -399,6 +402,36 @@ export function purgeTrashedNodes(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
     // eslint-disable-next-line no-console
     console.warn(`[purgeTrashedNodes] revived ${result.revived} work item(s) at purge (detached)`)
   }
+}
+
+// ── Trash surfacing (lifecycle track L1) ────────────────────────────────────
+
+export interface TrashEntry {
+  id: string
+  kind: string
+  title: string
+  trashedAt: number
+  /** Epoch ms when the 7-day purge claims it. */
+  purgeAt: number
+}
+
+const PURGE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
+export function listTrash(): TrashEntry[] {
+  const db = getDb()
+  return listTrashedRoots(db, getActiveOrgId()).map((r: TrashedRoot) => ({
+    id: r.id,
+    kind: r.kind,
+    title: r.title,
+    trashedAt: r.trashed_at,
+    purgeAt: r.trashed_at + PURGE_WINDOW_MS
+  }))
+}
+
+/** Restore a trashed root and its whole trashed subtree (lossless, §2.5.1). */
+export function restoreTree(rootId: string): string[] {
+  const db = getDb()
+  return db.transaction(() => restoreTrashedTree(db, rootId))()
 }
 
 // Returns true if `candidateId` is a descendant of `ancestorId` (or equal). Used to prevent

@@ -115,6 +115,8 @@ import {
   restoreNodes,
   getNode,
   listNodes,
+  listTrash,
+  restoreTree,
   moveNode,
   updateNode,
   ensureSharedContainer
@@ -782,6 +784,9 @@ export function registerIpcHandlers(): void {
     }
     return node
   })
+  // Trash surfacing (lifecycle L1): the Trash view's list + subtree restore.
+  ipcMain.handle('nodes:listTrash', () => listTrash())
+  ipcMain.handle('nodes:restoreTree', (_e, rootId: string) => restoreTree(rootId))
   ipcMain.handle('nodes:delete', (_e, id: string) => {
     const before = getNode(id)
     const removed = deleteNode(id)

@@ -7,6 +7,7 @@ import { useMessagingStore } from '../../stores/messaging'
 import { useDeskWidgets } from '../../lib/useDeskWidgets'
 import { formatRelativeTime } from '../../lib/changelog'
 import RoomThumb from '../RoomThumb'
+import Icon from '../Icon'
 import SharedBadge from '../SharedBadge'
 import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
@@ -26,7 +27,18 @@ export default function RoomsView(): JSX.Element {
   const move = useNodeStore((s) => s.move)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
+  const remove = useNodeStore((s) => s.remove)
   const moveToOrg = useNodeStore((s) => s.moveToOrg)
+  // Lifecycle L1: the archived shelf (same mechanics as All Desks).
+  const [showArchived, setShowArchived] = useState(
+    () => localStorage.getItem('rooms-index.archived') === '1'
+  )
+  const toggleArchived = (): void => {
+    setShowArchived((v) => {
+      localStorage.setItem('rooms-index.archived', v ? '0' : '1')
+      return !v
+    })
+  }
   const activeOrgId = useOrgStore((s) => s.activeOrgId)
   // Stable selector + useMemo: filtering inside the selector returns a new array
   // each render, which sends Zustand into an infinite re-render (React #185).
@@ -43,7 +55,11 @@ export default function RoomsView(): JSX.Element {
   const [linkTarget, setLinkTarget] = useState<{ id: string; title: string } | null>(null)
 
   const rooms = useMemo(
-    () => nodes.filter((n) => n.kind === 'folder' && !n.archived),
+    () => nodes.filter((n) => n.kind === 'folder' && (showArchived ? n.archived : !n.archived)),
+    [nodes, showArchived]
+  )
+  const archivedCount = useMemo(
+    () => nodes.filter((n) => n.kind === 'folder' && n.archived).length,
     [nodes]
   )
   const roomTitleById = useMemo(() => {
@@ -95,7 +111,7 @@ export default function RoomsView(): JSX.Element {
 
   const config: IndexConfig<FbNode> = {
     storageKey: 'rooms-index',
-    title: 'All rooms',
+    title: showArchived ? 'Archived rooms' : 'All rooms',
     subtitle: 'Rooms are where your desks live. Open a room to see the desks inside it.',
     items: rooms,
     idOf: (r) => r.id,
@@ -261,8 +277,48 @@ export default function RoomsView(): JSX.Element {
         icon: 'chevron_right',
         label: 'Open room',
         onClick: () => goRoom(r.id)
-      }
-    ]
+      },
+      // Lifecycle L1 (menu-only): archive shelves a room; trash starts the
+      // 7-day clock (its desks travel with it — the undo toast restores all).
+      // Shared rooms hold both back until the sharing rules land (D1).
+      ...(!r.sharedRootId
+        ? [
+            {
+              key: 'archive',
+              icon: r.archived ? 'unarchive' : 'archive',
+              label: r.archived ? 'Unarchive room' : 'Archive room',
+              inStrip: false,
+              onClick: () => {
+                void update(r.id, { archived: !r.archived })
+              }
+            },
+            {
+              key: 'trash',
+              icon: 'delete',
+              label: 'Move to Trash',
+              inStrip: false,
+              onClick: () => {
+                void remove(r.id)
+              }
+            }
+          ]
+        : [])
+    ],
+    headerActions:
+      archivedCount > 0 || showArchived ? (
+        <button
+          onClick={toggleArchived}
+          title={showArchived ? 'Back to live rooms' : 'Show archived rooms'}
+          className={`inline-flex items-center gap-1 h-9 px-3 fb-btn-surface fb-press fb-t-label ${
+            showArchived
+              ? 'text-[var(--ink-100)]'
+              : 'text-[var(--ink-70)] hover:text-[var(--ink-100)]'
+          }`}
+        >
+          <Icon name={showArchived ? 'arrow_back' : 'archive'} size={15} />
+          {showArchived ? 'Live rooms' : `Archived${archivedCount ? ` (${archivedCount})` : ''}`}
+        </button>
+      ) : undefined
   }
 
   return (

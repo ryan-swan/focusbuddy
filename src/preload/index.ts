@@ -121,6 +121,13 @@ const api = {
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
+    // Trash surfacing (lifecycle L1): trashed roots + days-remaining, and
+    // lossless subtree restore.
+    listTrash: (): Promise<
+      Array<{ id: string; kind: string; title: string; trashedAt: number; purgeAt: number }>
+    > => ipcRenderer.invoke('nodes:listTrash'),
+    restoreTree: (rootId: string): Promise<string[]> =>
+      ipcRenderer.invoke('nodes:restoreTree', rootId),
     moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
       ipcRenderer.invoke('nodes:moveToOrg', id, orgId, teamId ?? null),
     move: (
