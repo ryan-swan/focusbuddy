@@ -3,8 +3,21 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S4 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
-(DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ → S5 next)
+**Last updated:** 2026-08-25 (S4 SHIPPED; **S5 ON HOLD**) · **State:** IN_PROGRESS —
+Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ → **S5 HELD pending
+full-product-features-list intake**)
+
+**S5 HOLD (2026-08-25, operator checkpoint):** the operator flagged that SPEC-001+A1 was
+the compiled OUTLINE (scope, 44 items) — the FULL comprehensive product features list
+lives in the spec-drafting chat session and has never been intaken here. S0–S4 were
+foundation stages built to the approved v2.3 architecture (scope-level items sufficed);
+S5–S7 are the product-detail stages where the full list matters. Recommendation
+delivered: the list is pasted HERE and the prompts are authored/enriched in this session
+(against v2.3 + the as-built code); the other session's role is cross-check, not author.
+Process on intake: diff vs SPEC-001+A1 (map the 44, extract detail deltas + new items,
+check v2.3 conflicts → crossroads for any) → enrich S5/S6/S7 prompts → resume autopilot.
+Meanwhile: lifecycle L1 (approval-free) is buildable and satisfies the CR-07
+before-Phase-5 direction; D1/D2/R008/R012 grouped rulings re-surfaced (now timely).
 
 **S4 CLOSED (2026-08-25, commit 235a016e):** the notification substrate — durable
 wi_notifications store (UNIQUE dedupe), per-queue hourly caps with one-summary collapse,
