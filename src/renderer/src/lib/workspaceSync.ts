@@ -11,6 +11,7 @@ import { useFileManagerStore } from '../stores/fileManager'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 import { setOrgWorkspaceChangedHandler, setSharedWorkspaceChangedHandler } from './messagingSocket'
 import { registerSyncNudge } from './syncNudge'
+import { syncWakeCoalescer } from './syncWakeCoalescer'
 
 // Every item type carried over the sync transport. The personal loop has always
 // carried node and widget; rung 2 added document, table and row alongside the
@@ -592,7 +593,6 @@ export function orgSyncOrder(activeOrgId: string, memberOrgIds: string[]): strin
   return [...active, ...members.filter((id) => id !== activeOrgId)]
 }
 
-let running = false
 
 // Per-cycle transport outcome, so the status store can tell "could not reach
 // the server" (offline, transient, keep retrying quietly) from "the server
@@ -616,11 +616,15 @@ function currentCycleFailure(): 'none' | 'offline' | 'server' {
 // One full push+pull cycle. Returns the number of remote items applied locally.
 export async function syncWorkspaceOnce(): Promise<number> {
   const token = useAccountStore.getState().sessionToken
-  if (!enabled() || !token || running) {
+  if (!enabled() || !token) {
     if (!token || previewSyncBlocked()) useSyncStatus.getState().setDisabled()
     return 0
   }
-  running = true
+  if (!syncWakeCoalescer.enter()) {
+    // A cycle is in flight. The wake is recorded; one coalesced follow-up runs
+    // from the finally below — it is no longer silently dropped.
+    return 0
+  }
   cycleFailure = 'none'
   useSyncStatus.getState().setSyncing()
   try {
@@ -694,7 +698,10 @@ export async function syncWorkspaceOnce(): Promise<number> {
     }
     return applied + orgApplied + sharedApplied
   } finally {
-    running = false
+    if (syncWakeCoalescer.exit()) {
+      // At least one wake landed while this cycle ran. One follow-up, not N.
+      void syncWorkspaceOnce()
+    }
   }
 }
 
