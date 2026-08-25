@@ -13,9 +13,21 @@ Phase 3 — strategy + logic-audited architecture** (the real build plan: schema
 dual-start migration, SPEC-002 columns + mapping table + assignee reconciliation +
 allowlist additions, IPC/preload signatures, notification substrate design, component
 decomposition, stage breakdown with verify-commands, then per-stage build prompts).
-Architecture drafts next; logic-auditor + risk pressure test follow before G3 closes.
-Still awaiting operator (non-blocking for architecture): Q1/Q7 rulings (analysis/16);
-shared-desk delete v1 default (DEC-013).
+**Phase 3/4 state (2026-08-25):** ARCHITECTURE v1 drafted → logic audit **REJECTED** (2
+CRITICAL, 9 MAJOR, 3 MINOR — gates working) → **v2 written repairing all 14** → re-gate in
+flight (fresh logic audit + independent second validator for §2/§3 dual validation).
+Risk war-game COMPLETE → analysis/17 (18 risks; top-3: R016 GAP-013-at-fleet-scale if
+merged, R001 sync-engine collision with Caleb's churn, R008 work_item delete semantics
+undefined). **v2.1 revision after re-gate verdicts** folds in the adoptable risk repairs:
+work_items as LEAF nodes at v1 (kills R009), no-hard-delete-at-v1 pending a DEC (R008
+fallback), version-stamp column + same-device migration guard (R005/R006), satellite
+orphan reconciliation (R017), S5 latency target (R011), config-flag shared-desk guard
+(R015), merge-readiness preconditions (R016). Lifecycle track PLAN drafted
+(phases/TRACK-LIFECYCLE; deletion bug = pure UI-exposure gap).
+**Awaiting operator (grouped for one pass):** D1 shared-desk delete v1 default · D2 purge
+semantics · R008 work_item delete contract (or accept the v1 no-hard-delete fallback) ·
+R012 the "lifecycle before Phase 5" reading (strict vs. content-only). Sync-fix branch
+shipped + cherry-picked; PR command handed to operator.
 
 **G1 MET (DEC-014):** spec captured + inventoried (44 items + SPEC-042/043/044); primary
 objective confirmed as drafted; all crossroads ruled (CR-01..07 = standing recommendations;
