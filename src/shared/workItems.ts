@@ -63,6 +63,24 @@ export const WORK_ITEM_STATES = [
 ] as const
 export type WorkItemState = (typeof WORK_ITEM_STATES)[number]
 
+export const INTENT_CLASSES = [
+  'action',
+  'review',
+  'scheduling',
+  'fyi',
+  'acknowledgment',
+  'discussion',
+  'loose_thought',
+  'direct'
+] as const
+
+/** Validate a model-supplied intent class; undefined for anything else (the
+ *  db default 'action' then applies). Used by every proposal parser. */
+export function normalizeIntentClass(v: unknown): string | undefined {
+  const s = String(v)
+  return (INTENT_CLASSES as readonly string[]).includes(s) ? s : undefined
+}
+
 /** §2.3 (A-02): the derived coarse projection. Computed at every write and
  *  recomputed at every sync apply — never authoritative, never written from
  *  the wire. Dismissed/reclassified → 'parked', NEVER 'done'. The 'open'

@@ -7,6 +7,8 @@ import { useViewStore } from '../stores/view'
 import { useChatStore } from '../stores/chat'
 import { conversationForDesk } from '../lib/deskConversation'
 import ShareDialog from './ShareDialog'
+import CanvasContextMenu from './CanvasContextMenu'
+import { deskLifecycleMenuItems } from '../lib/deskLifecycleMenu'
 
 interface Props {
   activeTask: FbNode
@@ -54,6 +56,7 @@ export default function CanvasBreadcrumb({
   const goRoom = useViewStore((s) => s.goRoom)
   // Share dialog for the current room or desk, opened from the breadcrumb.
   const [shareOpen, setShareOpen] = useState(false)
+  const [lifecycleMenu, setLifecycleMenu] = useState<{ x: number; y: number } | null>(null)
   // Desk-to-chat continuity, door 1 (A5, AI-04 — R24): a desk whose AI
   // conversation exists wears a quiet chip that reopens it in the panel.
   // Additive on 75's file (recorded in their inbox note); chip laws per the
@@ -406,6 +409,21 @@ export default function CanvasBreadcrumb({
           <Icon name="ios_share" size={12} />
           <span className="text-[11px] font-medium">Share</span>
         </button>
+        <button
+          onClick={(e) => {
+            // L1/S6: the shared lifecycle menu on the CURRENT node — anchored
+            // to the button so it reads as its menu, not a stray popover.
+            e.stopPropagation()
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setLifecycleMenu({ x: r.left, y: r.bottom + 4 })
+          }}
+          onMouseEnter={handleLeave}
+          aria-label="Desk options"
+          title="Archive, trash, and more"
+          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors shrink-0"
+        >
+          <Icon name="more_horiz" size={14} />
+        </button>
 
         {trailing && (
           <>
@@ -521,6 +539,14 @@ export default function CanvasBreadcrumb({
           entityId={current.id}
           label={current.title || 'Untitled'}
           onClose={() => setShareOpen(false)}
+        />
+      )}
+      {lifecycleMenu && (
+        <CanvasContextMenu
+          x={lifecycleMenu.x}
+          y={lifecycleMenu.y}
+          items={deskLifecycleMenuItems(current, { includeOpen: false })}
+          onClose={() => setLifecycleMenu(null)}
         />
       )}
     </div>

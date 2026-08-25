@@ -819,6 +819,9 @@ export type ActionProposal =
       kind: 'create-work-item'
       title: string
       notes?: string
+      // Which Attention queue this belongs to (action/review/scheduling/fyi/
+      // acknowledgment/discussion/loose_thought). Omitted → action.
+      intentClass?: string
       reason?: string
     }
   | {

@@ -26,6 +26,14 @@ export type HomeWidgetId =
   | 'transcribe'
   | 'new-desk'
   | 'discover'
+  // The Attention widget family (S6, SPEC-014) — the command center's face.
+  | 'att-tasks'
+  | 'att-reviews'
+  | 'att-calendar'
+  | 'att-ack'
+  | 'att-completed'
+  | 'att-stale'
+  | 'att-system'
 
 // One tile in a Shortcuts box. Every kind carries an optional label snapshot
 // taken when the target was added: live store titles win while the subject
@@ -133,7 +141,16 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   // Smart
   { id: 'one-thing', name: 'One thing now', blurb: 'The single most pressing task. No list, just the one', icon: 'target', tint: 'bg-amber-500/10 text-amber-600', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
   { id: 'where-was-i', name: 'Where was I', blurb: 'Your last working context, with one button: Resume', icon: 'undo', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'md' },
-  { id: 'stalled', name: 'Stalled desk', blurb: 'The in-progress desk that has waited longest for you', icon: 'hourglass_bottom', tint: 'bg-orange-500/10 text-orange-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' }
+  { id: 'stalled', name: 'Stalled desk', blurb: 'The in-progress desk that has waited longest for you', icon: 'hourglass_bottom', tint: 'bg-orange-500/10 text-orange-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  // The Attention family (S6): each references items that live with their
+  // desks — counts + a top slice, click-through to the Attention page.
+  { id: 'att-tasks', name: 'Attention · Tasks', blurb: 'Your open to-dos, soonest due first', icon: 'check_circle', tint: 'bg-accent/10 text-accent', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'att-reviews', name: 'Attention · Reviews', blurb: 'Everything waiting on your judgment or sign-off', icon: 'rate_review', tint: 'bg-violet-500/10 text-violet-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'att-calendar', name: 'Attention · Coming up', blurb: 'Dated work and scheduling items, soonest first', icon: 'event', tint: 'bg-sky-500/10 text-sky-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'att-ack', name: 'Attention · Acknowledgments', blurb: 'Items needing only your receipt — one tap closes the loop', icon: 'mark_email_read', tint: 'bg-teal-500/10 text-teal-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'att-completed', name: 'Attention · Completed', blurb: 'Loops you closed this week', icon: 'task_alt', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'att-stale', name: 'Stale desks', blurb: 'Open desks gone quiet — object permanence, restored', icon: 'bedtime', tint: 'bg-orange-500/10 text-orange-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'att-system', name: 'Attention · System', blurb: 'Agent escalations and system signals, out of your headline count', icon: 'settings_suggest', tint: 'bg-slate-500/10 text-slate-500', category: 'Smart', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' }
 ]
 
 export function widgetDef(id: HomeWidgetId): HomeWidgetDef {

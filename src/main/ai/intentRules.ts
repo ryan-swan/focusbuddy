@@ -70,6 +70,15 @@ const HARD_TRIGGERS: ReadonlyArray<{ trigger: string; re: RegExp; intentClass: I
     re: /\b(remind me|need to|have to|must|don'?t forget|make sure (i|we|to)|follow up|todo|to-do|task:)\b/i,
     intentClass: 'action'
   },
+  // Idea-capture language files lightly (the decay tier), even when it wears
+  // a verb like "flesh out": an idea is a thought to keep, not yet a task.
+  // Ordered AFTER the explicit action verbs so "need to flesh out the pricing
+  // idea by Friday" still routes as the action it states.
+  {
+    trigger: 'idea-signal',
+    re: /\b(idea|brainstorm|concept|what if|shower thought|random thought)\b/i,
+    intentClass: 'loose_thought'
+  },
   // A direct question the assistant is not answering inline becomes a
   // needs-answer ACTION (the synthesis's own merge of the question route).
   { trigger: 'question-mark', re: /\?\s*$/, intentClass: 'action' }

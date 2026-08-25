@@ -87,6 +87,7 @@ import {
   markWorkItemRead,
   clearWorkItemDetached,
   workItemCounts,
+  workItemAttentionPrecision,
   attentionBadgeCounts,
   type WorkItemDraft,
   type WorkItemState,
@@ -95,6 +96,7 @@ import {
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
 import { isWorkItemsEnabled } from '../workItemsPref'
+import { staleDesks } from '../db/nodeActivity'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
@@ -724,6 +726,11 @@ export function registerIpcHandlers(): void {
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
   ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
+  // Lifecycle L3: computed desk staleness — the Stale Desks widget's feed.
+  ipcMain.handle('nodes:staleDesks', () => staleDesks())
+  // Attention precision (MET-006 wiring): acted vs dismissed over recent
+  // terminal transitions — the metric Q1's threshold recalibrates against.
+  ipcMain.handle('workItems:precision', () => workItemAttentionPrecision())
   // The notification substrate (S4, §5): the one posting door. The renderer's
   // live banners post records-of-record through it; scheduled deliveries are
   // swept by the main scheduler.

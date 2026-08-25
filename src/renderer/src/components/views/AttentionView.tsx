@@ -8,6 +8,9 @@ import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
 import {
   groupIntoQueues,
+  groupByDue,
+  groupByOrigin,
+  recentlyClosed,
   detachedItems,
   itemReason,
   PRIMARY_ACTION,
@@ -38,7 +41,7 @@ function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
     <span
       className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[11px] ${
         overdue
-          ? 'bg-[color-mix(in_srgb,var(--danger,#c0392b)_14%,transparent)] text-[var(--danger,#c0392b)]'
+          ? 'bg-red-500/10 text-red-600 dark:text-red-400'
           : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
       }`}
     >
@@ -59,6 +62,15 @@ export default function AttentionView(): JSX.Element {
   const goTask = useViewStore((s) => s.goTask)
   const openConsole = useCaptureConsole((s) => s.openConsole)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  // SPEC-017 lenses: the same active set through three groupings, persisted.
+  const [lens, setLens] = useState<'queue' | 'due' | 'origin'>(
+    () => (localStorage.getItem('attention.lens') as 'queue' | 'due' | 'origin') || 'queue'
+  )
+  const pickLens = (l: 'queue' | 'due' | 'origin'): void => {
+    localStorage.setItem('attention.lens', l)
+    setLens(l)
+  }
+  const [showClosed, setShowClosed] = useState(false)
 
   useEffect(() => {
     void refresh()
@@ -66,8 +78,17 @@ export default function AttentionView(): JSX.Element {
     return () => clearInterval(t)
   }, [refresh])
 
-  const queues = useMemo(() => groupIntoQueues(items, nowMs), [items, nowMs])
+  const queues = useMemo(
+    () =>
+      lens === 'due'
+        ? groupByDue(items, nowMs)
+        : lens === 'origin'
+          ? groupByOrigin(items, nowMs)
+          : groupIntoQueues(items, nowMs),
+    [items, nowMs, lens]
+  )
   const detached = useMemo(() => detachedItems(items), [items])
+  const closed = useMemo(() => recentlyClosed(items, nowMs), [items, nowMs])
   const total = queues.reduce((n, q) => n + q.items.length, 0)
 
   async function snoozeTomorrow(id: string): Promise<void> {
@@ -194,6 +215,28 @@ export default function AttentionView(): JSX.Element {
             <Icon name="add" size={15} /> Capture
           </button>
         </div>
+        <div className="mb-4 flex items-center gap-1">
+          <span className="fb-t-label text-[var(--ink-40)] mr-1">Group by</span>
+          {(
+            [
+              ['queue', 'Queue'],
+              ['due', 'Due'],
+              ['origin', 'Origin']
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => pickLens(key)}
+              className={`px-2.5 h-7 fb-t-label fb-press rounded-[var(--radius-field)] ${
+                lens === key
+                  ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
+                  : 'text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {loaded && total === 0 && detached.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Icon name="check_circle" size={28} className="text-[var(--ink-30)] mb-3" />
@@ -229,6 +272,33 @@ export default function AttentionView(): JSX.Element {
                 <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
                   {detached.map((i) => row(i, true))}
                 </div>
+              </section>
+            )}
+            {closed.length > 0 && (
+              <section>
+                <button
+                  onClick={() => setShowClosed((v) => !v)}
+                  className="flex items-center gap-2 mb-2 fb-press"
+                >
+                  <Icon
+                    name={showClosed ? 'expand_more' : 'chevron_right'}
+                    size={14}
+                    className="text-[var(--ink-40)]"
+                  />
+                  <span className="fb-t-label text-[var(--ink-70)]">Recently closed</span>
+                  <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{closed.length}</span>
+                </button>
+                {showClosed && (
+                  <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden opacity-80">
+                    {closed.map((i) => (
+                      <div key={i.id} className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-raised)]">
+                        <Icon name="task_alt" size={14} className="text-[var(--ink-30)] shrink-0" />
+                        <span className="fb-t-body text-[var(--ink-50)] truncate flex-1">{i.title}</span>
+                        <span className="text-[11px] text-[var(--ink-30)]">{i.workItemState}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             )}
           </div>

@@ -229,7 +229,7 @@ export default function AllTasksView(): JSX.Element {
     <div className="h-full overflow-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-3">
         {/* Header */}
-        <DashboardHeader title="All Tasks" subtitle="Every task across every project, flat." />
+        <DashboardHeader title="All Desks" subtitle="Every desk across every room, flat." />
 
         {/* Filter chips */}
         <div className="flex flex-wrap items-center gap-1.5">
@@ -274,7 +274,7 @@ export default function AllTasksView(): JSX.Element {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tasks…"
+              placeholder="Search desks…"
               className={`${fieldInputClass()} pl-7`}
             />
           </div>
@@ -346,7 +346,7 @@ function EmptyState({
           ? 'Nothing in the next 7 days.'
           : filter === 'done'
             ? 'Nothing completed yet. When you finish tasks they show up here.'
-            : 'No open tasks yet.'
+            : 'No open desks yet.'
   const showCreate = !hasSearch && filter !== 'done'
   return (
     <div className="py-10 text-center">

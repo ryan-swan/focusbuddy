@@ -884,6 +884,7 @@ async function applyCreateWorkItem(
     const item = await useWorkItemStore.getState().create({
       title: p.title,
       notes: p.notes,
+      intentClass: p.intentClass,
       wiOrigin: 'ai',
       approvalState: 'approved',
       sourceType: 'chat'

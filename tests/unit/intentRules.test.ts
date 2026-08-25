@@ -37,6 +37,20 @@ describe('hard triggers — every class, deterministically', () => {
     expect(r?.confidence).toBeGreaterThanOrEqual(Q1_CONFIDENCE_THRESHOLD)
   })
 
+  it('idea language files lightly — unless an explicit action verb outranks it', () => {
+    // The live-QA case: an idea capture must not become a task.
+    expect(classifyByRules('Flesh out LakeDash idea — DoorDash but on lakes')?.intentClass).toBe(
+      'loose_thought'
+    )
+    expect(classifyByRules('what if we bundled the onboarding into one desk')?.intentClass).toBe(
+      'loose_thought'
+    )
+    // An explicit commitment keeps its action routing even when it says "idea".
+    expect(classifyByRules('need to flesh out the pricing idea by friday')?.intentClass).toBe(
+      'action'
+    )
+  })
+
   it('short idle fragments become loose thoughts; long ambiguous prose goes to the model', () => {
     expect(classifyByRules('mountain cabin idea')?.intentClass).toBe('loose_thought')
     expect(classifyByRules('')?.intentClass).toBe('loose_thought')

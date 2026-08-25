@@ -4,6 +4,8 @@ import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import DeskMiniature from './DeskMiniature'
 import Icon from './Icon'
+import CanvasContextMenu from './CanvasContextMenu'
+import { deskLifecycleMenuItems } from '../lib/deskLifecycleMenu'
 import { DashboardHeader, PLEXI_CARD } from './plexi'
 
 // Shown when no desk is open (Canvas has no active node). A "desk" is a canvas —
@@ -18,6 +20,7 @@ export default function DeskGallery(): JSX.Element {
   const goProject = useViewStore((s) => s.goProject)
   const goTask = useViewStore((s) => s.goTask)
   const [widgetsByDesk, setWidgetsByDesk] = useState<Record<string, Widget[]>>({})
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; desk: FbNode } | null>(null)
 
   const desks = useMemo(
     () =>
@@ -101,6 +104,12 @@ export default function DeskGallery(): JSX.Element {
               <button
                 key={d.id}
                 onClick={() => openDesk(d)}
+                onContextMenu={(e) => {
+                  // Lifecycle L1/S6: the same Archive/Trash set the index pages
+                  // carry, on right-click. Shared desks hold both (D1 pending).
+                  e.preventDefault()
+                  setCtxMenu({ x: e.clientX, y: e.clientY, desk: d })
+                }}
                 data-testid={`desk-card-${d.id}`}
                 style={{ animationDelay: `${Math.min(i * 35, 350)}ms` }}
                 className={`group text-left ${PLEXI_CARD} overflow-hidden fb-lift fb-press fb-fade-in-up hover:border-[rgb(var(--accent)/0.5)]`}
@@ -134,6 +143,14 @@ export default function DeskGallery(): JSX.Element {
             <span className="fb-t-body font-medium">New desk</span>
           </button>
         </div>
+        {ctxMenu && (
+          <CanvasContextMenu
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            items={deskLifecycleMenuItems(ctxMenu.desk)}
+            onClose={() => setCtxMenu(null)}
+          />
+        )}
       </div>
     </div>
   )

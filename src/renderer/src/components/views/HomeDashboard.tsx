@@ -51,6 +51,13 @@ import {
   DiscoverWidget,
   conversationName
 } from './homeWidgets'
+import {
+  AttentionQueueWidget,
+  AttentionCalendarWidget,
+  AttentionCompletedWidget,
+  AttentionSystemWidget,
+  StaleDesksWidget
+} from './attentionWidgets'
 import { useMessagingStore } from '../../stores/messaging'
 import { usePresenceStore } from '../../stores/presence'
 import { useCapabilityEnabled } from '../../stores/capabilities'
@@ -555,7 +562,7 @@ export default function HomeDashboard(): JSX.Element {
     const overdue = openTasks.filter((n) => n.dueDate != null && n.dueDate < dayStart).length
     const eventsToday = (agenda ?? []).length
     return [
-      { id: 'open-tasks', icon: 'check_circle', label: openTasks.length === 1 ? 'open task' : 'open tasks', value: openTasks.length, tone: 'accent' as const },
+      { id: 'open-tasks', icon: 'check_circle', label: openTasks.length === 1 ? 'open desk' : 'open desks', value: openTasks.length, tone: 'accent' as const },
       { id: 'due-today', icon: 'event', label: 'due today', value: dueToday, tone: dueToday > 0 ? ('amber' as const) : ('stone' as const) },
       { id: 'overdue', icon: 'priority_high', label: overdue === 1 ? 'overdue task' : 'overdue tasks', value: overdue, tone: overdue > 0 ? ('rose' as const) : ('stone' as const) },
       { id: 'events-today', icon: 'calendar_today', label: eventsToday === 1 ? 'event today' : 'events today', value: eventsToday, tone: 'sky' as const }
@@ -769,6 +776,21 @@ export default function HomeDashboard(): JSX.Element {
         )
       case 'app-launcher':
         return <AppLauncherWidget />
+      // The Attention family (S6, SPEC-014).
+      case 'att-tasks':
+        return <AttentionQueueWidget queue="action" title="Tasks" emptyLine="Nothing needs you. Capture with ⌘K." size={size} />
+      case 'att-reviews':
+        return <AttentionQueueWidget queue="review" title="Reviews" emptyLine="No reviews waiting." size={size} />
+      case 'att-calendar':
+        return <AttentionCalendarWidget size={size} />
+      case 'att-ack':
+        return <AttentionQueueWidget queue="acknowledgment" title="Acknowledgments" emptyLine="Nothing to acknowledge." size={size} />
+      case 'att-completed':
+        return <AttentionCompletedWidget size={size} />
+      case 'att-stale':
+        return <StaleDesksWidget size={size} />
+      case 'att-system':
+        return <AttentionSystemWidget size={size} />
       case 'create':
         return <CreateWidget />
       case 'focus-timer':

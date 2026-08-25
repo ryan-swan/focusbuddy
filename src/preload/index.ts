@@ -128,6 +128,10 @@ const api = {
     > => ipcRenderer.invoke('nodes:listTrash'),
     restoreTree: (rootId: string): Promise<string[]> =>
       ipcRenderer.invoke('nodes:restoreTree', rootId),
+    // Lifecycle L3: computed desk staleness (Stale Desks widget's only feed).
+    staleDesks: (): Promise<
+      Array<{ id: string; title: string; lastActivityMs: number; daysQuiet: number }>
+    > => ipcRenderer.invoke('nodes:staleDesks'),
     moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
       ipcRenderer.invoke('nodes:moveToOrg', id, orgId, teamId ?? null),
     move: (
@@ -1738,6 +1742,7 @@ const api = {
       via: 'rules' | 'model' | 'fallback'
     }> => ipcRenderer.invoke('workItems:classify', text),
     enabled: (): Promise<boolean> => ipcRenderer.invoke('workItems:enabled'),
+    precision: (): Promise<number | null> => ipcRenderer.invoke('workItems:precision'),
     // Internal (S2): the arrival router's seam.
     kindOf: (id: string): Promise<string | null> => ipcRenderer.invoke('workItems:kindOf', id),
     applySyncEvent: (

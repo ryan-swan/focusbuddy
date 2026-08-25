@@ -31,6 +31,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { getModelClient } from './modelClient'
 import { randomUUID } from 'crypto'
 import { CREATE_TASK_DEFINITION } from './vocabulary'
+import { normalizeIntentClass } from '@shared/workItems'
 import type { ActionProposal } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
 import { recordInvocation } from './agentHistory'
@@ -380,6 +381,7 @@ function parseInvokeResult(raw: string): ParseOk | ParseErr {
         kind: 'create-work-item',
         title: pp.title,
         notes: typeof pp.notes === 'string' ? pp.notes : undefined,
+        intentClass: normalizeIntentClass(pp.intentClass),
         reason: typeof pp.reason === 'string' ? pp.reason : undefined
       })
     } else if (kind === 'create-task' && typeof pp.title === 'string') {

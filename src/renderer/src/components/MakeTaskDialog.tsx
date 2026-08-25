@@ -55,7 +55,7 @@ export default function MakeTaskDialog({
     return pid && folders.some((f) => f.id === pid) ? pid : null
   }, [nodes, activeTaskId, folders])
 
-  const [taskTitle, setTaskTitle] = useState(seedTitle.trim() || 'Untitled task')
+  const [taskTitle, setTaskTitle] = useState(seedTitle.trim() || 'Untitled desk')
   const [folderQuery, setFolderQuery] = useState('')
   // Default to ON when a source widget was passed — almost always what the
   // user wants from a right-click "make this a task" flow. They can untick
@@ -160,7 +160,7 @@ export default function MakeTaskDialog({
       }
       onClose()
     } catch (e) {
-      setError((e as Error).message ?? 'Failed to create task')
+      setError((e as Error).message ?? 'Failed to create desk')
       setBusy(false)
     }
   }
@@ -168,14 +168,14 @@ export default function MakeTaskDialog({
   return createPortal(
     <Modal
       onClose={onClose}
-      label="Make this a task"
+      label="Make this a desk"
       z={250}
       className="fb-card w-[380px] p-4"
     >
         <div className="flex items-center gap-1.5 mb-3">
           <Icon name="task_alt" size={16} className="text-accent" />
           <h2 className="text-sm font-semibold text-[var(--ink-100)]">
-            Make this a task
+            Make this a desk
           </h2>
         </div>
         <div className="space-y-3">
@@ -191,7 +191,7 @@ export default function MakeTaskDialog({
                 if (e.key === 'Enter') void handleSubmit()
               }}
               className="fb-field w-full text-sm px-2.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-100)]"
-              placeholder="What is the task?"
+              placeholder="What is the desk for?"
             />
           </div>
           <div>
@@ -280,10 +280,10 @@ export default function MakeTaskDialog({
                 />
                 <div className="flex-1">
                   <div className="text-[12px] text-[var(--ink-90)]">
-                    Copy this widget into the new task
+                    Copy this widget into the new desk
                   </div>
                   <div className="text-[10px] text-[var(--ink-50)] leading-tight">
-                    Bring this widget onto the new task. Choose whether it stays in sync or becomes its own copy.
+                    Bring this widget onto the new desk. Choose whether it stays in sync or becomes its own copy.
                   </div>
                 </div>
               </label>
@@ -334,7 +334,7 @@ export default function MakeTaskDialog({
                 />
                 <div className="flex-1">
                   <div className="text-[12px] text-[var(--ink-90)]">
-                    Switch to the new task
+                    Switch to the new desk
                   </div>
                   <div className="text-[10px] text-[var(--ink-50)] leading-tight">
                     Otherwise it just appears in your sidebar — you'll stay on the current desk.

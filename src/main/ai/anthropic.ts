@@ -36,6 +36,7 @@ import {
   meetingCaptureRule
 } from './vocabulary'
 import { isWorkItemsEnabled } from '../workItemsPref'
+import { normalizeIntentClass } from '@shared/workItems'
 import { MEMORY_SYSTEM, buildChatMemoryPrompt, parseMemoryResponse } from './memoryExtract'
 import { addMemory, listMemoriesBalanced } from '../db/memory'
 import { embeddingConfigured } from './embeddings'
@@ -753,8 +754,6 @@ export function parseChatJson(raw: string): {
         break
       }
       case 'create-work-item': {
-        // Reserved Attention-layer kind (S0): parsed so nothing can squat on
-        // the name; the executor no-ops it until the capability ships.
         const title = action.title as string
         if (!title) break
         proposals.push({
@@ -762,6 +761,7 @@ export function parseChatJson(raw: string): {
           kind: 'create-work-item',
           title,
           notes: typeof action.notes === 'string' ? (action.notes as string) : undefined,
+          intentClass: normalizeIntentClass(action.intentClass),
           reason
         })
         break
@@ -2228,7 +2228,7 @@ export async function suggestWorkspaceActions(
           if (title) proposals.push({ id, kind: 'create-task', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
           break
         case 'create-work-item':
-          if (title) proposals.push({ id, kind: 'create-work-item', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
+          if (title) proposals.push({ id, kind: 'create-work-item', title, notes: typeof d.notes === 'string' ? d.notes : undefined, intentClass: normalizeIntentClass(d.intentClass), reason })
           break
         case 'create-knowledge-entry': {
           const body = typeof d.body === 'string' ? d.body.trim() : ''
@@ -5201,7 +5201,7 @@ function parseMeetingDeliverables(arr: unknown[]): ActionProposal[] {
         if (title) out.push({ id, kind: 'create-task', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
         break
       case 'create-work-item':
-        if (title) out.push({ id, kind: 'create-work-item', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
+        if (title) out.push({ id, kind: 'create-work-item', title, notes: typeof d.notes === 'string' ? d.notes : undefined, intentClass: normalizeIntentClass(d.intentClass), reason })
         break
       case 'create-knowledge-entry': {
         const body = typeof d.body === 'string' ? d.body.trim() : ''

@@ -2,7 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { useCaptureConsole } from '../stores/captureConsole'
 import { useWorkItemStore } from '../stores/workItems'
 import { useAssistantChrome } from '../stores/assistantChrome'
+import { promptText } from './plexi/PromptDialog'
 import Icon from './Icon'
+
+const CLASS_CHOICES = [
+  { value: 'action', label: 'Task', hint: 'Something to do' },
+  { value: 'review', label: 'Review', hint: 'Needs judgment or sign-off' },
+  { value: 'scheduling', label: 'Scheduling', hint: 'Time and calendar' },
+  { value: 'fyi', label: 'FYI', hint: 'Worth knowing' },
+  { value: 'acknowledgment', label: 'Acknowledgment', hint: 'Needs only receipt' },
+  { value: 'discussion', label: 'Discussion', hint: 'Talk it through live' },
+  { value: 'loose_thought', label: 'Loose thought', hint: 'Idle capture, may fade' }
+]
 
 // The capture console (Attention S5, SPEC-007–013). One box, three modes:
 //   Routed   — the classifier files the text as the right work object
@@ -40,6 +51,7 @@ export default function CaptureConsole(): JSX.Element | null {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filed, setFiled] = useState<string | null>(null)
+  const [filedId, setFiledId] = useState<string | null>(null)
   // The at-most-one Q1 question, held between classify and create.
   const [clarify, setClarify] = useState<{
     phrase: string
@@ -54,6 +66,7 @@ export default function CaptureConsole(): JSX.Element | null {
       setMode('routed')
       setError(null)
       setFiled(null)
+      setFiledId(null)
       setClarify(null)
       setClarifyDate('')
       setTimeout(() => fieldRef.current?.focus(), 0)
@@ -78,10 +91,27 @@ export default function CaptureConsole(): JSX.Element | null {
       sourceType: 'note',
       wiOrigin: 'human'
     })
-    setFiled(`Filed to Attention · ${CLASS_LABEL[intentClass] ?? intentClass} — “${item.title}”`)
+    setFiled(`${CLASS_LABEL[intentClass] ?? intentClass} — “${item.title}”`)
+    setFiledId(item.id)
     setText('')
     setClarify(null)
-    setTimeout(close, 1200)
+    // Long enough to read the class and hit "Wrong?" — corrections are the
+    // trust mechanism, so the window stays open a beat.
+    setTimeout(close, 4000)
+  }
+
+  async function reclassifyFiled(): Promise<void> {
+    if (!filedId) return
+    const next = await promptText({
+      title: 'Reclassify',
+      label: 'Where does it belong?',
+      choices: CLASS_CHOICES
+    })
+    if (next) {
+      await useWorkItemStore.getState().reclassify(filedId, next)
+      setFiled(`${CLASS_LABEL[next] ?? next} — moved`)
+      setTimeout(close, 900)
+    }
   }
 
   async function submit(): Promise<void> {
@@ -91,9 +121,17 @@ export default function CaptureConsole(): JSX.Element | null {
     setError(null)
     try {
       if (mode === 'expand') {
-        // Formalized chat-to-desk promotion: the assistant develops it.
+        // Formalized chat-to-desk promotion — the house path the suggestion
+        // rows use: land on the CHAT tab, open the panel, stage the text in
+        // the composer WITHOUT sending (fb:composer-stage). The second
+        // dispatch covers a panel that had to mount first.
+        useAssistantChrome.getState().setTab('chat')
         openAssistant()
-        window.dispatchEvent(new CustomEvent('fb:assistant-prefill', { detail: { text: t } }))
+        window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: t }))
+        setTimeout(
+          () => window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: t })),
+          400
+        )
         close()
         return
       }
@@ -208,10 +246,20 @@ export default function CaptureConsole(): JSX.Element | null {
             </div>
           </div>
         )}
-        {error && <div className="mt-2 text-[12px] text-[var(--danger,#c0392b)]">{error}</div>}
+        {error && <div className="mt-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
         {filed && (
-          <div className="mt-2 flex items-center gap-1.5 text-[12px] text-[var(--ink-70)]">
-            <Icon name="check_circle" size={14} /> {filed}
+          <div className="mt-2 flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="check_circle" size={14} /> Filed to Attention · {filed}
+            </span>
+            {filedId && (
+              <button
+                onClick={() => void reclassifyFiled()}
+                className="text-[var(--ink-40)] hover:text-[var(--ink-100)] underline underline-offset-2 fb-press"
+              >
+                Wrong? Reclassify
+              </button>
+            )}
           </div>
         )}
         {!clarify && (

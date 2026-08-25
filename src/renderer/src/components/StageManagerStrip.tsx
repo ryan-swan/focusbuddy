@@ -5,6 +5,8 @@ import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import DeskMiniature from './DeskMiniature'
 import Icon from './Icon'
+import CanvasContextMenu from './CanvasContextMenu'
+import { deskLifecycleMenuItems } from '../lib/deskLifecycleMenu'
 
 // Apple WWDC23 Stage Manager spring — measured from Archeon research
 const SPRING = { type: 'spring' as const, stiffness: 158, damping: 25, mass: 1 }
@@ -38,6 +40,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
   const goHome = useViewStore((s) => s.goHome)
   const [widgetsByDesk, setWidgetsByDesk] = useState<Record<string, Widget[]>>({})
   const [transitioning, setTransitioning] = useState(false)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; desk: FbNode } | null>(null)
 
   const desks = useMemo(() => {
     const candidates = nodes.filter(
@@ -146,6 +149,11 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
               >
                 <motion.button
                   onClick={() => openDesk(desk)}
+                  onContextMenu={(e) => {
+                    // L1/S6: the shared lifecycle menu, on right-click.
+                    e.preventDefault()
+                    setCtxMenu({ x: e.clientX, y: e.clientY, desk })
+                  }}
                   title={desk.title || 'Untitled desk'}
                   data-testid={`stage-desk-${desk.id}`}
                   initial={false}
@@ -229,6 +237,14 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
           </span>
         </button>
       </div>
+      {ctxMenu && (
+        <CanvasContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={deskLifecycleMenuItems(ctxMenu.desk)}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
     </div>
   )
 }

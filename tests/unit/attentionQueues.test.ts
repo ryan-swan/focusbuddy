@@ -2,9 +2,13 @@ import { describe, it, expect } from 'vitest'
 import type { FbNode } from '../../src/shared/types'
 import {
   groupIntoQueues,
+  groupByDue,
+  groupByOrigin,
+  recentlyClosed,
   detachedItems,
   itemReason,
   isTerminalState,
+  rankScore,
   PRIMARY_ACTION,
   QUEUE_ORDER
 } from '../../src/renderer/src/lib/attentionQueues'
@@ -68,15 +72,55 @@ describe('groupIntoQueues', () => {
     )
   })
 
-  it('orders within a queue: soonest due first, undated last, then newest', () => {
+  it('orders within a queue by rank: due proximity dominates, then staleness', () => {
     const items = [
-      wi({ id: 'later', dueAt: new Date(NOW + 5 * DAY).toISOString() }),
-      wi({ id: 'undated-old', createdAt: NOW - 3 * DAY }),
-      wi({ id: 'soon', dueAt: new Date(NOW + DAY).toISOString() }),
-      wi({ id: 'undated-new', createdAt: NOW })
+      wi({ id: 'later', dueAt: new Date(NOW + 5 * DAY).toISOString(), updatedAt: NOW }),
+      wi({ id: 'stale-undated', updatedAt: NOW - 9 * DAY }),
+      wi({ id: 'soon', dueAt: new Date(NOW + DAY).toISOString(), updatedAt: NOW }),
+      wi({ id: 'fresh-undated', updatedAt: NOW })
     ]
     const action = groupIntoQueues(items, NOW).find((q) => q.queue === 'action')!
-    expect(action.items.map((i) => i.id)).toEqual(['soon', 'later', 'undated-new', 'undated-old'])
+    // Ranker v1 (SPEC-019): due-soon beats due-later; among undated, the item
+    // that has waited longest for the eye ranks HIGHER (staleness signal).
+    expect(action.items.map((i) => i.id)).toEqual(['soon', 'later', 'stale-undated', 'fresh-undated'])
+  })
+
+  it('rankScore: past due dominates; explicit human actionable gets the light thumb', () => {
+    const pastDue = wi({ dueAt: new Date(NOW - DAY).toISOString(), updatedAt: NOW })
+    const aiUndated = wi({ wiOrigin: 'ai', updatedAt: NOW })
+    const humanUndated = wi({ wiOrigin: 'human', updatedAt: NOW })
+    expect(rankScore(pastDue, NOW)).toBeGreaterThan(100 - 1)
+    expect(rankScore(humanUndated, NOW)).toBeGreaterThan(rankScore(aiUndated, NOW))
+  })
+})
+
+describe('lenses (SPEC-017 v1)', () => {
+  it('groupByDue buckets in urgency order with the same visibility rules', () => {
+    const items = [
+      wi({ id: 'od', dueAt: new Date(NOW - DAY).toISOString() }),
+      wi({ id: 'today', dueAt: new Date(NOW + 60 * 60 * 1000).toISOString() }),
+      wi({ id: 'none' }),
+      wi({ id: 'snoozed', snoozeUntil: NOW + DAY }),
+      wi({ id: 'week', dueAt: new Date(NOW + 4 * DAY).toISOString() })
+    ]
+    const groups = groupByDue(items, NOW)
+    expect(groups.map((g) => g.queue)).toEqual(['overdue', 'today', 'week', 'none'])
+    expect(groups.flatMap((g) => g.items.map((i) => i.id))).not.toContain('snoozed')
+  })
+
+  it('groupByOrigin splits You / Plexii / System', () => {
+    const items = [wi({ id: 'h' }), wi({ id: 'a', wiOrigin: 'ai' }), wi({ id: 's', wiOrigin: 'system' })]
+    expect(groupByOrigin(items, NOW).map((g) => g.label)).toEqual(['You', 'Plexii', 'System'])
+  })
+
+  it('recentlyClosed keeps finished loops, excludes dismissals and old items', () => {
+    const items = [
+      wi({ id: 'done', workItemState: 'completed', updatedAt: NOW - DAY }),
+      wi({ id: 'dismissed', workItemState: 'dismissed', updatedAt: NOW - DAY }),
+      wi({ id: 'old', workItemState: 'completed', updatedAt: NOW - 10 * DAY }),
+      wi({ id: 'open' })
+    ]
+    expect(recentlyClosed(items, NOW).map((i) => i.id)).toEqual(['done'])
   })
 })
 

@@ -363,13 +363,13 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
           <CollapsedNavIcon icon="plexii:home"  label="Home"         tone={AREA_TONES.home}  active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
           {/* Monochrome by plexidesk-75's rail rule: no tone, accent only when active. */}
           <CollapsedNavIcon icon="plexii:ai"     label="Plexii"       active={viewIsActive({ kind: 'plexii' })}     onClick={() => { setActive(null); goPlexii() }} />
+          <CollapsedNavIcon icon="notifications" label="Attention"    tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'attention' })} onClick={() => { setActive(null); goAttention() }} />
           <CollapsedNavIcon icon="meeting_room"  label="Rooms"        tone={AREA_TONES.rooms}     active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
           <CollapsedNavIcon icon="desk"          label="Desks"        tone={AREA_TONES.desks}    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
           <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone={AREA_TONES.shared} active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
           <CollapsedNavIcon icon="delete"        label="Trash"        tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'trash' })}     onClick={() => { setActive(null); goTrash() }} />
-          <CollapsedNavIcon icon="notifications" label="Attention"    tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'attention' })} onClick={() => { setActive(null); goAttention() }} />
           <CollapsedNavIcon icon="account_tree"  label="Plans"        tone={AREA_TONES.plans}  active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
-          <CollapsedNavIcon icon="checklist"     label="Tasks"        tone={AREA_TONES.tasks} active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
+          <CollapsedNavIcon icon="checklist"     label="Desks (flat)" tone={AREA_TONES.tasks} active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
           {viewEnabled('calendar') && (
             <CollapsedNavIcon icon="calendar_month" label="Calendar" tone={AREA_TONES.calendar} active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
           )}
@@ -500,6 +500,18 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
               goHome()
             }}
           />
+          {/* Attention — what needs you, top-level by design (S6): the
+              surface's whole job is being one glance away. */}
+          <NavRow
+            icon="notifications"
+            label="Attention"
+            tone={AREA_TONES.desks}
+            active={viewIsActive({ kind: 'attention' })}
+            onClick={() => {
+              setActive(null)
+              goAttention()
+            }}
+          />
           {/* Plexii — the AI hub. Clicking opens the hub page; the chevron
               expands to the 3 most recent conversations (Rooms sublist
               pattern). AI carries the accent hue per the destination-hue
@@ -603,16 +615,6 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
                   goTrash()
                 }}
               />
-              <NavRow
-                icon="notifications"
-                label="Attention"
-                tone={AREA_TONES.desks}
-                active={viewIsActive({ kind: 'attention' })}
-                onClick={() => {
-                  setActive(null)
-                  goAttention()
-                }}
-              />
             </div>
           )}
           <NavRow
@@ -627,7 +629,7 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
           />
           <NavRow
             icon="checklist"
-            label="Tasks"
+            label="Desks (flat)"
             tone={AREA_TONES.tasks}
             active={viewIsActive({ kind: 'all-tasks' })}
             onClick={() => {

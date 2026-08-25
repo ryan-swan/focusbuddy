@@ -35,6 +35,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { getModelClient } from './modelClient'
 import type { ActionProposal } from '@shared/types'
 import { CREATE_TASK_DEFINITION, VOICE_WORK_ITEM_SHAPE } from './vocabulary'
+import { normalizeIntentClass } from '@shared/workItems'
 import { isWorkItemsEnabled } from '../workItemsPref'
 import { resolveAnthropicKey, resolveOpenAIKey } from '../settingsStore'
 import { transcribeLocal } from './localWhisper'
@@ -450,6 +451,7 @@ function safeParseProposals(raw: string): ParseOk | ParseErr {
         kind: 'create-work-item',
         title: obj.title,
         notes: typeof obj.notes === 'string' ? obj.notes : undefined,
+        intentClass: normalizeIntentClass(obj.intentClass),
         reason: typeof obj.reason === 'string' ? obj.reason : undefined
       })
     } else if (kind === 'create-task' && typeof obj.title === 'string') {

@@ -22,6 +22,7 @@ import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
 import { isWorkItemsEnabled } from '../workItemsPref'
 import { mapNodeRow, type NodeRow } from './nodes'
 import { postNotification } from '../notifications/substrate'
+import { attentionPrecision } from '../meta/metrics'
 import type { FbNode } from '@shared/types'
 import type { LifecycleDb } from './nodeLifecycle'
 import {
@@ -440,6 +441,30 @@ export function markWorkItemRead(id: string): void {
  *  F-M8″: moving IS the resolution — the marker must not linger). */
 export function clearWorkItemDetached(id: string): void {
   setDetachedFrom(getDb(), id, null)
+}
+
+/** MET-006 wiring: attention precision over recent terminal transitions.
+ *  acted = the item was closed with its class verb; dismissed = it was noise.
+ *  'reclassified' is neutral (a re-bin, not a verdict) and decayed dismissals
+ *  are the system's own act — both excluded. Q1's 0.70 threshold recalibrates
+ *  against this number (S7). */
+export function workItemAttentionPrecision(windowDays = 30): number | null {
+  const db = getDb()
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000
+  const rows = db
+    .prepare(
+      `SELECT work_item_state AS state, reason_code FROM nodes
+       WHERE kind = 'work_item' AND org_id = ? AND updated_at > ?
+         AND work_item_state IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed')`
+    )
+    .all(getActiveOrgId(), cutoff) as Array<{ state: string; reason_code: string | null }>
+  const transitions = rows
+    .filter((r) => !(r.state === 'dismissed' && r.reason_code === 'decayed'))
+    .map((r) => ({
+      state: 'attention-required' as const,
+      outcome: r.state === 'dismissed' ? ('dismissed' as const) : ('acted' as const)
+    }))
+  return attentionPrecision(transitions)
 }
 
 export function workItemCounts(): Record<string, number> {
