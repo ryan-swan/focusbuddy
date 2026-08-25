@@ -369,11 +369,18 @@ export function listWorkItems(): FbNode[] {
   const db = getDb()
   const rows = db
     .prepare(
-      `SELECT * FROM nodes WHERE kind = 'work_item' AND trashed_at IS NULL AND org_id = ?
-       ORDER BY created_at DESC`
+      `SELECT n.*, l.detached_from_id AS _detached_from_id, l.snooze_until AS _snooze_until
+       FROM nodes n LEFT JOIN wi_local l ON l.item_id = n.id
+       WHERE n.kind = 'work_item' AND n.trashed_at IS NULL AND n.org_id = ?
+       ORDER BY n.created_at DESC`
     )
-    .all(getActiveOrgId()) as NodeRow[]
-  return rows.map(mapNodeRow)
+    .all(getActiveOrgId()) as Array<NodeRow & { _detached_from_id: string | null; _snooze_until: number | null }>
+  return rows.map((r) => ({
+    ...mapNodeRow(r),
+    // Device-local satellite fields ride the read model only (§2.4).
+    detachedFromId: r._detached_from_id ?? null,
+    snoozeUntil: r._snooze_until ?? null
+  }))
 }
 
 export function getWorkItem(id: string): FbNode | null {
@@ -427,6 +434,12 @@ export function snoozeWorkItem(id: string, until: number | null): void {
 
 export function markWorkItemRead(id: string): void {
   markWorkItemReadCore(getDb(), id)
+}
+
+/** Clear the Detached marker after the item is re-homed (the MOVE recovery,
+ *  F-M8″: moving IS the resolution — the marker must not linger). */
+export function clearWorkItemDetached(id: string): void {
+  setDetachedFrom(getDb(), id, null)
 }
 
 export function workItemCounts(): Record<string, number> {

@@ -1,0 +1,239 @@
+import { useEffect, useMemo, useState } from 'react'
+import type { FbNode } from '@shared/types'
+import { useWorkItemStore } from '../../stores/workItems'
+import { useNodeStore } from '../../stores/nodes'
+import { useViewStore } from '../../stores/view'
+import { useCaptureConsole } from '../../stores/captureConsole'
+import { promptText } from '../plexi/PromptDialog'
+import Icon from '../Icon'
+import {
+  groupIntoQueues,
+  detachedItems,
+  itemReason,
+  PRIMARY_ACTION,
+  QUEUE_ICON
+} from '../../lib/attentionQueues'
+
+// The Attention surface (S6, SPEC-017). Every work item that needs the person,
+// in purpose-built queues with the class-appropriate closing verb — a LENS
+// over items that live with their desks, never a second workspace. Snoozed
+// items hide until they return; the Detached shelf (F-M6) holds park-local
+// items whose desk was purged or moved, with MOVE as the recovery.
+
+const CLASS_CHOICES = [
+  { value: 'action', label: 'Task', hint: 'Something to do' },
+  { value: 'review', label: 'Review', hint: 'Needs judgment or sign-off' },
+  { value: 'scheduling', label: 'Scheduling', hint: 'Time and calendar' },
+  { value: 'fyi', label: 'FYI', hint: 'Worth knowing' },
+  { value: 'acknowledgment', label: 'Acknowledgment', hint: 'Needs only receipt' },
+  { value: 'discussion', label: 'Discussion', hint: 'Talk it through live' },
+  { value: 'loose_thought', label: 'Loose thought', hint: 'Idle capture, may fade' }
+]
+
+function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
+  if (!i.dueAt) return null
+  const overdue = Date.parse(i.dueAt) < nowMs
+  const label = new Date(i.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[11px] ${
+        overdue
+          ? 'bg-[color-mix(in_srgb,var(--danger,#c0392b)_14%,transparent)] text-[var(--danger,#c0392b)]'
+          : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
+      }`}
+    >
+      <Icon name="schedule" size={11} /> {label}
+    </span>
+  )
+}
+
+export default function AttentionView(): JSX.Element {
+  const items = useWorkItemStore((s) => s.items)
+  const loaded = useWorkItemStore((s) => s.loaded)
+  const refresh = useWorkItemStore((s) => s.refresh)
+  const setState = useWorkItemStore((s) => s.setState)
+  const reclassify = useWorkItemStore((s) => s.reclassify)
+  const snooze = useWorkItemStore((s) => s.snooze)
+  const nodes = useNodeStore((s) => s.nodes)
+  const setActive = useNodeStore((s) => s.setActive)
+  const goTask = useViewStore((s) => s.goTask)
+  const openConsole = useCaptureConsole((s) => s.openConsole)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    void refresh()
+    const t = setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [refresh])
+
+  const queues = useMemo(() => groupIntoQueues(items, nowMs), [items, nowMs])
+  const detached = useMemo(() => detachedItems(items), [items])
+  const total = queues.reduce((n, q) => n + q.items.length, 0)
+
+  async function snoozeTomorrow(id: string): Promise<void> {
+    const d = new Date(nowMs)
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+    await snooze(id, d.getTime())
+    await refresh()
+  }
+
+  async function reclassifyItem(i: FbNode): Promise<void> {
+    const next = await promptText({
+      title: 'Reclassify',
+      label: `Where does “${i.title}” belong?`,
+      choices: CLASS_CHOICES.filter((c) => c.value !== i.intentClass)
+    })
+    if (next) await reclassify(i.id, next)
+  }
+
+  async function moveDetached(i: FbNode): Promise<void> {
+    const desks = nodes.filter((n) => n.kind === 'task' && !n.archived).slice(0, 12)
+    if (!desks.length) return
+    const target = await promptText({
+      title: 'Move to a desk',
+      label: `Pick a new home for “${i.title}”`,
+      choices: desks.map((d) => ({ value: d.id, label: d.title || 'Untitled desk' }))
+    })
+    if (target) {
+      await window.api.nodes.move(i.id, target, null)
+      await window.api.workItems.clearDetached(i.id)
+      await refresh()
+    }
+  }
+
+  function openSource(i: FbNode): void {
+    if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
+      setActive(i.parentId)
+      goTask(i.parentId)
+    }
+  }
+
+  function row(i: FbNode, inDetached: boolean): JSX.Element {
+    const primary = PRIMARY_ACTION[i.intentClass ?? 'action'] ?? PRIMARY_ACTION.action
+    const reason = itemReason(i, nowMs)
+    const hasDesk = !!(i.parentId && nodes.some((n) => n.id === i.parentId))
+    return (
+      <div
+        key={i.id}
+        className="group flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
+      >
+        <Icon
+          name={QUEUE_ICON[i.intentClass ?? 'action'] ?? 'check_circle'}
+          size={16}
+          className="text-[var(--ink-30)] shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="fb-t-body font-medium text-[var(--ink-100)] truncate">{i.title}</span>
+            {dueChip(i, nowMs)}
+          </div>
+          {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {inDetached ? (
+            <button
+              onClick={() => void moveDetached(i)}
+              className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)]"
+            >
+              Move…
+            </button>
+          ) : (
+            <>
+              {hasDesk && (
+                <button
+                  onClick={() => openSource(i)}
+                  title="Open its desk"
+                  className="icon-btn !h-7 !w-7"
+                >
+                  <Icon name="desk" size={14} />
+                </button>
+              )}
+              <button
+                onClick={() => void snoozeTomorrow(i.id)}
+                title="Snooze until tomorrow morning"
+                className="icon-btn !h-7 !w-7"
+              >
+                <Icon name="snooze" size={14} />
+              </button>
+              <button
+                onClick={() => void reclassifyItem(i)}
+                title="This isn’t right — reclassify"
+                className="icon-btn !h-7 !w-7"
+              >
+                <Icon name="swap_horiz" size={14} />
+              </button>
+              <button
+                onClick={() => void setState(i.id, primary.state)}
+                className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)]"
+              >
+                {primary.label}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="fb-t-title text-[var(--ink-90)]">Attention</h1>
+            <p className="fb-t-body text-[var(--ink-50)] mt-1">
+              Everything that needs you, filed by what it’s trying to do. Items live with their
+              desks — this is the lens, not the drawer.
+            </p>
+          </div>
+          <button
+            onClick={() => openConsole()}
+            className="inline-flex items-center gap-1.5 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)] shrink-0"
+          >
+            <Icon name="add" size={15} /> Capture
+          </button>
+        </div>
+        {loaded && total === 0 && detached.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Icon name="check_circle" size={28} className="text-[var(--ink-30)] mb-3" />
+            <div className="fb-t-label text-[var(--ink-50)]">Nothing needs you</div>
+            <div className="fb-t-body text-[var(--ink-30)] mt-1">
+              Capture anything with ⌘K → “Capture a work item”.
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {queues.map((q) => (
+              <section key={q.queue}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon name={QUEUE_ICON[q.queue] ?? 'label'} size={14} className="text-[var(--ink-40)]" />
+                  <span className="fb-t-label text-[var(--ink-70)]">{q.label}</span>
+                  <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{q.items.length}</span>
+                </div>
+                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                  {q.items.map((i) => row(i, false))}
+                </div>
+              </section>
+            ))}
+            {detached.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon name="link_off" size={14} className="text-[var(--ink-40)]" />
+                  <span className="fb-t-label text-[var(--ink-70)]">Detached</span>
+                  <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{detached.length}</span>
+                </div>
+                <p className="text-[11px] text-[var(--ink-40)] mb-2">
+                  Their desks were removed or moved — the items were kept. Give each a new home.
+                </p>
+                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                  {detached.map((i) => row(i, true))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

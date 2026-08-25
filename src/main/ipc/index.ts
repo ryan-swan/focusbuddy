@@ -85,6 +85,7 @@ import {
   reclassifyWorkItem,
   snoozeWorkItem,
   markWorkItemRead,
+  clearWorkItemDetached,
   workItemCounts,
   attentionBadgeCounts,
   type WorkItemDraft,
@@ -715,6 +716,7 @@ export function registerIpcHandlers(): void {
     snoozeWorkItem(id, until)
   )
   ipcMain.handle('workItems:markRead', (_e, id: string) => markWorkItemRead(id))
+  ipcMain.handle('workItems:clearDetached', (_e, id: string) => clearWorkItemDetached(id))
   ipcMain.handle('workItems:counts', () => workItemCounts())
   ipcMain.handle('workItems:badgeCounts', () => attentionBadgeCounts())
   // S5: the capture classifier (hard rules first — zero model latency on the

@@ -128,6 +128,7 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
   const goDesks = useViewStore((s) => s.goDesks)
   const goShared = useViewStore((s) => s.goShared)
   const goTrash = useViewStore((s) => s.goTrash)
+  const goAttention = useViewStore((s) => s.goAttention)
   const goFiles = useViewStore((s) => s.goFiles)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
@@ -366,6 +367,7 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
           <CollapsedNavIcon icon="desk"          label="Desks"        tone={AREA_TONES.desks}    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
           <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone={AREA_TONES.shared} active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
           <CollapsedNavIcon icon="delete"        label="Trash"        tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'trash' })}     onClick={() => { setActive(null); goTrash() }} />
+          <CollapsedNavIcon icon="notifications" label="Attention"    tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'attention' })} onClick={() => { setActive(null); goAttention() }} />
           <CollapsedNavIcon icon="account_tree"  label="Plans"        tone={AREA_TONES.plans}  active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
           <CollapsedNavIcon icon="checklist"     label="Tasks"        tone={AREA_TONES.tasks} active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
           {viewEnabled('calendar') && (
@@ -599,6 +601,16 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
                 onClick={() => {
                   setActive(null)
                   goTrash()
+                }}
+              />
+              <NavRow
+                icon="notifications"
+                label="Attention"
+                tone={AREA_TONES.desks}
+                active={viewIsActive({ kind: 'attention' })}
+                onClick={() => {
+                  setActive(null)
+                  goAttention()
                 }}
               />
             </div>

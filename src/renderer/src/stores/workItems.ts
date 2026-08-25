@@ -57,6 +57,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     // Live-path producer contract (§3): the create snapshot carries the full
     // renderer-emitted manifest (emitNodeCreate spreads it for work_items).
     crdtEmitNodeCreate(item)
+    window.dispatchEvent(new CustomEvent('fb:workitems-changed'))
     return item
   },
   updateFields: async (id, patch) => {
@@ -78,6 +79,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
       // Only workItemState rides the wire — the receiver recomputes its own
       // status projection (§2.3 F012); status itself is never emitted.
       crdtEmitNodeAttrs(id, { workItemState: state })
+      window.dispatchEvent(new CustomEvent('fb:workitems-changed'))
     }
     return ok
   },
@@ -86,6 +88,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     if (item) {
       set({ items: get().items.map((i) => (i.id === id ? item : i)) })
       crdtEmitNodeAttrs(id, { intentClass })
+      window.dispatchEvent(new CustomEvent('fb:workitems-changed'))
     }
     return item
   },

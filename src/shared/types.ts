@@ -187,6 +187,12 @@ export interface FbNode {
   reasonCode?: string | null
   wiOrigin?: string | null
   schemaEpoch?: number | null
+  // Device-local satellite fields (wi_local), joined at read by listWorkItems
+  // ONLY — never synced, never in bodies (§2.4). detachedFromId marks the
+  // Detached shelf (the desk this item was park-local'd from, F-M6″);
+  // snoozeUntil hides an item from queues until it passes.
+  detachedFromId?: string | null
+  snoozeUntil?: number | null
   priority: AxisValue
   interest: AxisValue
   importance: AxisValue

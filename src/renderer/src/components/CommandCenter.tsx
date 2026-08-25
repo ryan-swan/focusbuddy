@@ -425,7 +425,7 @@ export default function CommandCenter({
         closePalette()
       }
     })
-    // Attention S5: the capture console — present only while work items are on.
+    // Attention S5/S6: capture + the surface — present only while work items are on.
     if (workItemsOn) {
       items.push({
         id: 'capture-work-item',
@@ -436,6 +436,18 @@ export default function CommandCenter({
         score: q === '' ? 57 : matchScore('capture work item remind todo attention', q),
         run: () => {
           window.dispatchEvent(new CustomEvent('fb:command-new-work-item'))
+          closePalette()
+        }
+      })
+      items.push({
+        id: 'open-attention',
+        label: 'Open Attention',
+        hint: 'Everything that needs you, in queues',
+        icon: 'notifications',
+        kind: 'jump',
+        score: q === '' ? 56 : matchScore('attention queue tasks reviews what needs me', q),
+        run: () => {
+          useViewStore.getState().goAttention()
           closePalette()
         }
       })

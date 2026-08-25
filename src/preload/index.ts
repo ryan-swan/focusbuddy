@@ -1723,6 +1723,7 @@ const api = {
     snooze: (id: string, until: number | null): Promise<void> =>
       ipcRenderer.invoke('workItems:snooze', id, until),
     markRead: (id: string): Promise<void> => ipcRenderer.invoke('workItems:markRead', id),
+    clearDetached: (id: string): Promise<void> => ipcRenderer.invoke('workItems:clearDetached', id),
     counts: (): Promise<Record<string, number>> => ipcRenderer.invoke('workItems:counts'),
     badgeCounts: (): Promise<{ headline: number; byIntent: Record<string, number> }> =>
       ipcRenderer.invoke('workItems:badgeCounts'),
