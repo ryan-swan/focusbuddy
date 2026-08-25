@@ -10,7 +10,12 @@ register. Verbatim captures: analysis/00, 06, 07. Verification pass done: analys
 C1-05 confirmed with smoking gun (`create-task` = desk in agent prompts), C1-02 premise
 shrunk (status/archived exist), trashNode recursive sweep = confirmed Class-C danger for
 SPEC-043. **Blocking on operator: confirm primary objective; rule CR-01..07 in one batch;
-IQ-1 (missing bug sections).**
+IQ-1 (missing bug sections).** Q5's shape is now ruled (DEC-013: archive first-class;
+delete = explicit memory choice; shared desks protected). Round-2 verification (analysis/09):
+GAP-012 status-collision registered with recommended shape; SPEC-044 approach revised to
+protocol-quarantine (no rename — `create-task` stays desk-creation on the wire; new action
+gets a distinct name; labels fixed); CR-02 archived-view dependency defused; Phase 2 sync
+proof split into server-passthrough AND client-stamping.
 
 ## Right now
 

@@ -73,6 +73,14 @@ Phase 2 classifies all 305 into safe-by-construction vs. must-touch; the must-to
 becomes its own SPEC item + build stage. (Raised by the spec-drafting session; census by
 this session.)
 
+## GAP-012 — `status` semantics collision on the shared nodes row
+**Severity:** HIGH · **Closes in:** Phase 4 (SPEC-002 design) · **Status:** OPEN
+Work_items inherit `nodes.status` (`TaskStatus`: open/in_progress/done/parked, ~53 renderer
+comparison sites, no DB CHECK) but spec §1.5 defines a richer state machine the column can't
+hold. Recommended shape (analysis/09 V1): `status` stays a coarse mapped projection for
+legacy consumers; new `work_item_state` column carries the fine machine; mapping table is
+part of SPEC-002. (Raised by the spec session; verified + shaped by this session.)
+
 ## Open questions
 
 ### GAP-008 — What can the sync/org layer carry for shared collaboration?

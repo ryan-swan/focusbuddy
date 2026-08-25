@@ -183,4 +183,29 @@ render surfaces.
 **Editorial bonus:** anything that doesn't earn a person's attention doesn't belong in it —
 the name is its own feature-creep counterweight.
 
+## DEC-013 — The memory contract's shape (Q5 direction)
+
+**Date:** 2026-08-24 (night) · **Made by:** Operator (direction; detailed design lands at
+SPEC-042/043 within the CR-07 lifecycle track)
+**Decision:** (1) **Archive is first-class and must ship** — visual cleanup with memory
+intact; the default "get this out of my way" action. (2) **Deletion presents an explicit
+memory choice**: "preserve this desk's information in your memory" vs. "delete all
+information permanently" — the user decides, per desk. (3) **The choice applies to personal
+desks.** Shared desks are protected: unilateral deletion is off the table — either all
+participants approve, or shared desks cannot be hard-deleted (v1 default pending design;
+archive-for-me / leave-share remain available either way).
+**Context:** Michael's position — never delete, memory is the value — vs. operator's:
+memory value is real AND users need cleanup + genuine deletion agency. The choice dialog
+honors both. Repo verification (analysis/09): archive flag + live consumers exist;
+trash/restore exists and is already separate from memory; `PERSONAL_ORG_ID` makes the
+personal/shared scoping expressible; shared-delete guards don't exist yet and building them
+also closes the SPEC-043 trashNode danger for shared desks; memory-purge is new brain-layer
+machinery.
+**Alternatives:** Michael's never-delete — rejected as sole policy: users without deletion
+agency distrust the memory layer ("deletion did not really delete," bug synthesis §3);
+always-purge-on-delete — rejected: silently destroys valuable context.
+**Note:** this sets the CONTRACT'S SHAPE. Copy, exact flows, purge semantics (what "all
+information" includes — brain entries, document content, summaries), and the shared-desk
+v1 default are SPEC-042/043 design work, presented for approval before build.
+
 <!-- Append below; increment DEC-NNN. -->
