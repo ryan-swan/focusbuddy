@@ -3,7 +3,14 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-24 · **State:** PLANNING
+**Last updated:** 2026-08-24 (night) · **State:** IN_PROGRESS — Phase 1 (spec intake)
+
+**Phase 1 state:** Spec received (44 items + 3 amendments) with bug synthesis + conflict
+register. Verbatim captures: analysis/00, 06, 07. Verification pass done: analysis/08 —
+C1-05 confirmed with smoking gun (`create-task` = desk in agent prompts), C1-02 premise
+shrunk (status/archived exist), trashNode recursive sweep = confirmed Class-C danger for
+SPEC-043. **Blocking on operator: confirm primary objective; rule CR-01..07 in one batch;
+IQ-1 (missing bug sections).**
 
 ## Right now
 

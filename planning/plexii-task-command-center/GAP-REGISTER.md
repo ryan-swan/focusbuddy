@@ -85,8 +85,11 @@ tables/rows/files), org/team/per-desk ACL scopes, triggers-set dirty flags, full
 document ACL semantics precisely enough to architect receiver queues on them.
 
 ### GAP-009 — The product spec itself
-**Severity:** HIGH · **Closes in:** Phase 1 (operator supplies; intake runs) · **Status:** OPEN
-Everything downstream sharpens on arrival. Until then, phases 1+ are structure, not content.
+**Severity:** HIGH · **Closes in:** Phase 1 · **Status:** CLOSED (2026-08-24)
+Spec received: 44 SPEC items + amendments 042–044 → analysis/00-SPEC-RAW.md, with companion
+bug synthesis (06) and conflict register (07). Intake verification: 08. Remaining Phase 1
+work: completeness re-read, operator confirmation of the primary objective, batched
+crossroads ruling CR-01..07, IQ-1 (missing bug-report sections 7/8/13/14/17).
 
 ## How gaps close
 
