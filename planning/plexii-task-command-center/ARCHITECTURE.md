@@ -1,10 +1,13 @@
-# Attention Layer — Technical Architecture (v2.1)
+# Attention Layer — Technical Architecture (v2.2 — consolidation)
 
-**Status:** DRAFT v2.1 — v2 repaired all 14 v1 findings (12 verified closed at re-audit);
-the re-audit found the two v1-CRITICAL repairs **jointly** unsound (F-C1: `pruneSharedDesk`
-is a third hard-delete the stamp-refusal exposes) plus 6 MAJOR / 4 MINOR — all repaired
-below, together with the risk war-game's adoptable items (analysis/17). Pending: focused
-final re-gate on the changed sections + the independent second validation + G4 acid test.
+**Status:** DRAFT v2.2 — consolidates the focused re-gate's 14 findings on v2.1 (headline
+F-C1″: trashed work_items are direct PURGE TARGETS, a hole the v2.1 repair itself created)
+and the independent second validation's six conditions (A1–A3, C1–C2, D1) + guess list.
+**Convergence note:** the blind validator's condition C1 and the re-gate's F-C1″ are the
+same defect found independently — dual validation working. Three audit rounds: 14 → 11 →
+14 findings, each round narrower and each catching defects the prior repair introduced;
+all repaired. Pending: one NARROW verification pass on the v2.2 blocking repairs, then the
+gate closes with both signatures.
 **Phase numbering note (audit F011):** ROADMAP.md's numbering governs. This document serves
 ROADMAP Phases 3+4 combined (strategy + technical architecture) — so BOTH G3 and G4
 obligations apply to it: logic audit, dual validation of FOUNDATIONAL sections, acid test.
@@ -33,10 +36,17 @@ Non-negotiables inherited into every section: **reference-not-own** · the **qua
 - **`park-inbound`** — the receiver declines to materialize an inbound sync row (unknown
   kind / missing columns): no local row exists; surfaced as a sync-status warning with
   retry, and as an `origin='system'` entry in the System queue.
-- **`park-local`** — an existing local work_item is detached from a scope-crossing sweep
-  (`parent_id → NULL`, `detached_from_id` set): the row exists, renders in the **Parked
-  section of WorkItemsView** (§6) with one recovery action — *re-attach* (restores
-  `parent_id` from `detached_from_id` when legal) or *move*.
+- **`park-local`** — an existing local work_item is detached by a lifecycle sweep
+  (`parent_id → NULL`, local `detached_from_id` set): the row exists and renders in the
+  **DETACHED section of WorkItemsView** (§6 — renamed from "Parked" per F-M7″: the legacy
+  `status='parked'` projection value is a third sense we cannot rename, so the surface
+  moves). **Primary recovery action: MOVE** (pick a new desk/room). *Re-attach* is offered
+  only when its predicate holds (F-M8″): `detached_from_id` resolves to a live node whose
+  kind is a legal parent AND whose scope the item may enter under §2.6 — which excludes
+  both designed populations (purged parent = gone; org-moved parent = scope-blocked while
+  OFF), so move is the working affordance and re-attach appears only in the edge cases.
+  Park-inbound rows auto-reapply on the next pull after the local schema gains the
+  kind/columns (boot-time reapply sweep keyed on the parked set), deduped by item id.
 
 **Vocabulary addition (F006):** "stale" is three different things and is never used bare:
 - `work_item_state='stale'` — **item-level**, derived from the work_item's own inactivity
@@ -62,12 +72,28 @@ FK on), with:
 - **Registration order, pinned TWO-SIDED (F-M1):** the migration runs in `getDb()`
   **after `db.exec(SCHEMA)` and before the `nodes_mark_dirty` trigger creation
   (`database.ts:740`)** — and before any work_item `ensureColumn` call. The rebuild
-  reconstructs **DDL, columns, indexes AND TRIGGERS** from live schema (SQLite drops a
-  table's triggers with the table; `nodes_mark_dirty` is the poll fallback every
-  main-process lifecycle write depends on — losing it silently kills sync for all
-  subsequent edits). All three fixtures assert trigger survival:
-  `SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='nodes'` returns
-  `nodes_mark_dirty` post-migration.
+  reconstructs **DDL, columns, indexes AND TRIGGERS** from live schema, and **the schema
+  harvest reads `sqlite_master` BEFORE any rename** (so a SQLite-rewritten trigger body
+  can never be what gets recreated). Rebuild mechanics follow the house pattern verbatim
+  (`migrateShareKindChecks`, database.ts:1247+): **`PRAGMA foreign_keys=off` OUTSIDE the
+  transaction** (inside a txn the pragma is a silent no-op — empirically catastrophic:
+  the rename direction rewrites child FKs to `nodes_old`), create-new → copy → DROP old →
+  rename into place.
+- **MIGRATION_VERSION bumps to 2 (validator A1):** the pre-migration `VACUUM INTO` backup
+  is gated on `user_version < MIGRATION_VERSION` — without the bump it silently never
+  fires for exactly the DBs this migration rebuilds.
+- **No-match semantics (validator A2):** if no `CHECK (kind IN (…))` clause can be
+  extracted from the nodes DDL (unanticipated shape), the migration **skips and surfaces
+  loudly** (sync-status + log) — it never fires vacuously and re-adds a CHECK that unknown
+  data could violate into a boot-loop.
+- **Fixture assertions, full set (F-M4″/A3/F-m3″):** all three fixtures assert
+  (a) data preservation, index recreation, idempotency; (b) trigger survival — fixture 3
+  **pre-creates** `nodes_mark_dirty` so the assertion tests preservation on the
+  legacy-upgrade path, where it is meaningful (on fresh installs the `IF NOT EXISTS`
+  creation at :740 makes it vacuous); (c) **`PRAGMA foreign_key_check` returns empty**;
+  (d) every one of the **eleven inbound `REFERENCES nodes(id)` declarations** still names
+  `nodes` (not `nodes_old`) in `sqlite_master`; (e) a live cascade probe — insert desk +
+  widget child, delete desk, assert the widget cascades.
 - **The base `SCHEMA` constant is widened in the same stage (F014)** — fresh installs are
   born wide; the migration exists for pre-existing DBs and is a no-op after.
 - **Test fixtures (pinned, three):** (1) factory-narrow legacy DB w/ accreted columns;
@@ -83,11 +109,14 @@ FK on), with:
   park-inbound + surface). P0-required on `applyRemote` (personal); P1-required on the
   other two before the exposure switch flips. Small isolated diffs in Caleb's subsystem —
   own commit, flagged to him like the wake fix.
-- **Version stamp + same-device guard (R005/R006):** a `schema_epoch` column (unknown
-  columns round-trip opaquely — proven) stamps every pushed work_item row, giving P1's
-  "peers confirmed migrated" a real mechanism instead of attestation-only; and local
-  work_item creation checks the local DDL for `'work_item'` (the migration's own guard
-  condition, zero network) so an un-migrated same-account device can never author one.
+- **`schema_epoch` — a FORWARD-COMPATIBILITY RECEIVER GUARD, not peer confirmation
+  (F-M5″ reframing):** the column stamps the WRITER's schema version, letting a device at
+  epoch N detect and park-inbound a row stamped N+1 instead of mis-applying it. It cannot
+  confirm a peer is migrated (an un-migrated peer never authors a work_item to observe) —
+  **P1's migrated-peer confirmation is the org presence/version surface where available,
+  else operator attestation**, stated as such in §8's merge row. Same-device guard
+  (R006): local work_item creation checks the local DDL for `'work_item'` (zero network)
+  so an un-migrated same-account device can never author one.
 - **CR-05(a) residue reconciliation (F-m1):** S1 sweeps the remaining live legacy
   `task-item` rows (5 after the 2026-08-25 cleanup; JSON-backup first, same discipline) so
   deleting `'task-item'` from the TS union leaves the union HONEST about runtime data —
@@ -107,8 +136,12 @@ added to the CRDT allowlists AND emitted (§3):
 | `due_at` | ISO-8601 string | collision-proof vs numeric desk `due_date` |
 | `wi_urgency` | `high medium low` | separate from 1–5 priority axes |
 | `source_ref` / `source_type` | id + `desk room doc message mail file selection browser calendar note widget` | click-through target ONLY (capture provenance); resolution failure renders orphan-graceful ("source no longer exists") |
-| `detached_from_id` (F-M3) | node id, nullable | Set when a lifecycle sweep detaches the item (park-local / revive-at-purge); read by the Parked surface and the re-attach action. Never overloads `source_ref` |
-| `schema_epoch` (R005) | INTEGER | Version stamp for the P1 migrated-peer check |
+| `schema_epoch` (R005/F-M5″) | INTEGER | Writer's schema version — forward-compat receiver guard (park-inbound rows from a newer epoch). Replicated-but-not-renderer-emitted: written by main-process lifecycle code, excluded from the emit-fires assertion (F-m2″) |
+
+**`detached_from_id` lives in `wi_local`, NOT here (F-M6″):** it names a row hard-deleted
+*on the purging device* — a device-local fact. Replicating it would show peers (whose copy
+of the parent may still be alive) a Detached entry pointing at a living desk with an
+un-honorable re-attach. §2.4's satellite split exists for exactly this; it moves there.
 | `confidence` | 0–1 REAL | AI-created items |
 | `approval_state` | `auto approved suggested dismissed merged` | SPEC-025 substrate from birth |
 | `reason_code` | machine token behind the one rendered reason | SPEC-018 |
@@ -147,32 +180,52 @@ children, and **a cascade cannot be kind-filtered**. v2's detach-at-trash silent
 the lossless-undo contract (`deleteNode` returns trashed ids; `restoreNodes` restores
 exactly those). v2.1 adopts the third option:
 
-1. **Trash sweeps normally (undo stays lossless).** `deleteNode` trashes work_item
-   children with their desk exactly as today — the undo set is complete, restore
-   round-trips bit-identically. UX copy on the trash toast notes work items travel with
-   the desk and revive if it purges.
-2. **Detach-and-revive at every hard-delete — a CLOSED, DERIVED, LOCKED enumeration
-   (F-C1).** The sites issuing unguarded `DELETE`s against `nodes` — established by
-   grepping BOTH literal and template-interpolated forms — are exactly three:
-   `purgeTrashedNodes` (nodes.ts:307), `agentHistory`'s ref-parse delete (:325), and
-   **`pruneSharedDesk` (workspaceSync.ts:882 — templated `DELETE FROM ${table}`, the one
-   both prior passes missed)**. Each detaches work_item children first
-   (`parent_id = NULL`, `trashed_at = NULL` to revive, `detached_from_id` set) before
-   deleting the target. **A CI grep-assertion fails the build on any new `DELETE`
-   targeting `nodes` (literal or templated) outside these three sites** — the enumeration
-   is mechanically locked, not memory-dependent. `pruneSharedDesk`'s line-880 comment
-   ("can never delete personal content") is updated — it becomes false under §2.6's
-   stamp-refusal, which is precisely how F-C1 arose. The detach step is written
-   throw-safe and logs+surfaces its own failures (F-m3 — the purge's production caller
-   swallows exceptions).
-3. **The S1 adversarial tests (mandatory, three cases):** (a) trash desk+work_item →
-   undo → **bit-identical restore incl. parent**; (b) trash → +7 days →
-   `purgeTrashedNodes` → **work_item alive, revived, orphan-graceful, `detached_from_id`
-   set**; (c) shared desk + un-stamped work_item child → `pruneSharedDesk(root)` →
-   **work_item alive** (the F-C1 case).
-4. **Work_items are LEAF nodes at v1 (R009):** `createNode`/`moveNode` reject a parent of
-   `kind='work_item'` — nothing can nest under one, so no sweep starting AT a work_item
-   can cascade anything. Sub-items are a designed-around P2.
+1. **Trash sweeps normally (undo stays lossless — DEVICE-SCOPED, F-M9″).** `deleteNode`
+   trashes work_item children with their desk exactly as today; undo restores
+   bit-identically **on the device that trashed**. Cross-device: a purge on device A
+   propagates the revive upsert; if device B then restores its still-trashed desk,
+   `restoreNodes` does not re-attach — the item stays detached on B. Accepted and named
+   in §8; adversarial case (a) gains a device-B arm asserting exactly this outcome.
+2. **The purge NEVER targets work_items (F-C1″ — the target-vs-victim fix, found
+   independently by both final auditors):** `purgeTrashedNodes`' SELECT gains
+   **`AND kind != 'work_item'`** — a trashed work_item is never a direct purge target,
+   only ever reachable through its parent's deletion, which the detach step intercepts.
+   The delete loop additionally **re-checks liveness per id** (skips rows whose
+   `trashed_at` became NULL mid-loop) so ordering within the snapshotted set can never
+   matter. With this filter, §2.5.9's "no hard-delete at v1" becomes true — and its
+   **enforcement site (validator C2)** is `deleteNode`/`nodes:delete` refusing
+   `kind='work_item'` ROOTS with a typed error (items are dismissed/reclassified, never
+   trashed directly).
+3. **Detach-and-revive at the CLOSED three-site enumeration (F-C1), LOCKED by an
+   INVERSE call-site allowlist (F-M2″):** the sites issuing unguarded `DELETE`s against
+   `nodes` are exactly three — `src/main/db/nodes.ts` :314 (`purgeTrashedNodes`),
+   **`src/main/ai/agentHistory.ts` :325** (full path per F-m1″), and
+   `src/main/db/workspaceSync.ts` :888 (`pruneSharedDesk`, templated). Each detaches
+   work_item children (`parent_id = NULL`, revive, `wi_local.detached_from_id` set)
+   before deleting its targets; **at `pruneSharedDesk` the DELETE additionally excludes
+   `kind='work_item'` rows outright** — at P1 routed items are STAMPED and match the
+   `shared_root_id` predicate directly, where child-detach is inert (F-M1″); the
+   exclusion covers both exposure states and joins the P1 switch checklist. The CI lock
+   matches **every** `DELETE FROM` (literal or `${…}`) under `src/main/**` against the
+   three-entry file:symbol allowlist, and additionally fails on new `DROP TABLE nodes`,
+   any `INSERT OR REPLACE INTO nodes`, and any NEW table declaring
+   `REFERENCES nodes(id) ON DELETE CASCADE`. Detach steps are throw-safe and
+   log+surface (F-m3).
+4. **The S1 adversarial tests (five cases):** (a) trash desk+work_item → undo →
+   bit-identical incl. parent, **plus the device-B arm** (purge on A → restore on B →
+   item detached on B, surfaced in Detached); (b) trash → +7 days → purge →
+   **work_item alive, revived, never selected as a target** (the F-C1″ case); (c) shared
+   desk + un-stamped work_item child → `pruneSharedDesk` → alive (F-C1);
+   (d) STAMPED work_item + `pruneSharedDesk` → alive (the F-M1″ P1 case);
+   (e) direct `nodes:delete(workItemRoot)` → typed refusal (C2).
+5. **Work_items are LEAF nodes at v1 (R009; F-M3″ — enforced at ALL parent_id write
+   points, not two):** the writers of `nodes.parent_id` are five — `createNode`,
+   `moveNode`, **`updateNode`'s `parentId` patch column** (nodes.ts:174), and the three
+   sync apply arms (parent_id rides the body). The first three assert the target parent's
+   kind ≠ `work_item` in the db module; replicated rows are validated by the
+   **work_item arrival router (§3 D1)** and, belt-and-braces, S1's blast-radius smoke
+   asserts no child under a work_item after a sync cycle. Sub-items are a designed-around
+   P2 (the invariant lifts by widening these named points, no schema change).
 5. `moveNodeToOrg` carries work_items with their desk — **guarded by §2.6**.
 6. **Shared-desk guard (DEC-013, lifecycle track):** unilateral trash of a shared-root
    desk refused ahead of all of this. *(P1 note: routed items on non-shared org desks —
@@ -197,10 +250,10 @@ migrated.** Enforced at every scope-crossing site, not at creation:
 | Crossing | Guard while the P1 exposure switch is OFF |
 |---|---|
 | Creation | capability-gated (`workItems.enabled`), personal scope only |
-| `moveNodeToOrg` sweep | **refuses to carry `kind='work_item'`** — parks the item (detach + log + user-visible note), desk moves without it |
+| `moveNodeToOrg` sweep | **refuses to carry `kind='work_item'`** — **park-local**: detach + `wi_local.detached_from_id` + a typed IPC return the move toast renders ("N work items stayed personal — see Detached"), desk moves without it |
 | `stampSharedDesk` + propagation | same refusal (self-routed items additionally exempt forever, §2.5.7) |
 | `collectDeskSubtree` (shared push) | kind-guard per its Class-C disposition — cannot collect work_items while OFF |
-| **Own second device** | the apply-site defensive branches (§2.1) turn the un-migrated-peer failure from silent swallow into parked-with-warning; the P0 release notes state both devices must update. This is detection + containment — full prevention requires the server-side version gate we cannot build from the fork, explicitly accepted as residual risk in §8 |
+| **Own second device** | the apply-site defensive branches (§2.1) turn the un-migrated-peer failure from silent swallow into **park-inbound**-with-warning; the P0 release notes state both devices must update. Detection + containment — full prevention requires server work we cannot do from the fork; accepted residual in §8 |
 
 The P1 switch flips per-org only after a migrated-peer confirmation step (P1 rollout
 checklist: all org members' app versions ≥ the migration release — verified via the org
@@ -219,6 +272,19 @@ presence/version surface if available, else operator attestation for the two-per
   trigger-survival pin is load-bearing. S2's adversarial tests assert (a) the renderer
   emit fires and a live-path arrival carries routing fields (poll disabled during the
   window), and (b) a main-process detach reaches the second device via the poll.
+- **The ARRIVAL ROUTER (validator D1 — the live path's receive side):** the CRDT apply
+  plumbing today would DESTROY inbound work_item events — `tryCreateNode` inserts a fixed
+  column list and hard-forces `status='open'`, `applyNodeAttr` drops non-allowlisted
+  columns, and both refresh `useNodeStore`, which excludes work_items. S2/S3 therefore add
+  a kind branch at the CRDT apply layer: `kind==='work_item'` events route to the S2
+  db-module functions (full column set, projection recomputed) and refresh
+  `useWorkItemStore`. Same branch at the poll apply arms validates the leaf invariant
+  (F-M3″). P1 note: `nodeSharedRoot` resolves partitions from `useNodeStore` — shared
+  work_item emits would misroute to the personal partition; owed at the P1 pass,
+  non-foreclosing.
+- **The column manifest is a single exported const** (`WORK_ITEM_COLUMNS`, S2): consumed
+  by the ensureColumns, both allowlists, the arrival router, and the CI parity test —
+  one source, drift impossible (guess-list #9).
 - **The 409-loop fix is adopted as an S2 precondition (analysis/15 blocker #4; F010):** on
   conflict-apply-no-op, force `sync_rev = serverRev` so baseRev advances — without it a
   routed item that 409s is permanently unroutable with no signal **at P0** (personal
@@ -268,9 +334,10 @@ presence/version surface if available, else operator attestation for the two-per
   **Stale Desks is the only surface consuming external `desk_stale`** — renders
   gracefully-empty until the lifecycle track lands.
 - **SPEC-015** top-bar count: counts only, system-excluded, `.fb-tabular`.
-- **SPEC-017 WorkItemsView** + saved lenses + **the Parked section (F-M6)**: park-local
-  items render here with `detached_from_id` context and one recovery action (re-attach /
-  move); park-inbound events surface in the System queue per their `origin`. Registered
+- **SPEC-017 WorkItemsView** + saved lenses + **the DETACHED section (F-M6/F-M7″/F-M8″)**:
+  park-local items render here with `wi_local.detached_from_id` context; **primary action
+  MOVE**, re-attach only when its §1 predicate holds; park-inbound events surface in the
+  System queue per their `origin`. Registered
   through all seams. **CR-04(b) in full (F007): AllTasksView → "All Desks" AND the Pulse
   card's labels → "open desks / due today"** (HomeDashboard insights copy) — GAP-006 owned
   and closed by S6.
@@ -316,7 +383,9 @@ after this document passes the final re-gate + dual validation.
 | Missed Class-B/C consumer leaks phantoms | S1 classification-complete + live smoke + post-S1 census re-grep expecting zero |
 | Allowlist/emitter drift | S2 CI parity test (column manifest ↔ allowlists) + emit-fires assertion |
 | Notification duplicates / storms | `UNIQUE(dedupe_key)` + S4 per-queue rate caps + backlog-collapse (all S4) |
-| **Un-migrated peer meets a work_item** | §2.6 scope invariant at every crossing; apply-site park+surface branches; **residual accepted at P0: the user's own second device between updates — detected and contained (parked+warned), not preventable without server work; release note states both devices must update** |
+| **Un-migrated peer meets a work_item** | §2.6 scope invariant at every crossing; apply-site **park-inbound**+surface branches; **residual accepted at P0: the user's own second device between updates — detected and contained (park-inbound+warned), not preventable without server work; release note states both devices must update.** P1 migrated-peer confirmation = presence/version surface else operator attestation (F-M5″) |
+| Cross-device undo divergence (F-M9″) | Accepted + surfaced: purge-on-A then restore-on-B leaves the item detached on B (Detached section); case (a)'s device-B arm pins it |
+| Revived-clutter accumulation (F-m4″) | Accepted + named: desk-trashed items revive at day 7 into their queues (dismiss = one tap; disclosed in trash-toast copy). S1 pre-flight checks `src/main/privacy/erasure.ts` node handling for interaction |
 | Work_item lost via desk deletion | **Revive-at-purge at the CLOSED three-site enumeration (purge, agentHistory, pruneSharedDesk) + CI delete-site grep-lock + the three adversarial cases (F001/F-C1/F-M2)** |
 | Fourth hard-delete site added later | The CI grep-assertion fails on any new literal/templated `DELETE` against `nodes` outside the sanctioned three |
 | P1 routed-item trash propagation (sender trash → recipient delete via sync) | Named P1 architecture item: recipient-side retention rule owed before SPEC-027 freezes (§2.5.6 note) |
