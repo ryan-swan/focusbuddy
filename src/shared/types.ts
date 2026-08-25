@@ -4,11 +4,14 @@ import type { DesignBody } from './design'
 import type { ChartCore } from './chart'
 
 export type AxisValue = 1 | 2 | 3 | 4 | 5
-// 'task-item' is Caleb's lightweight sub-task kind (delivered as its own slice
-// with the node-table migration + task-list widget). Declared here so the
-// Focus-Mode workspace snapshot can classify it; no node of this kind is created
-// until the task-item slice lands.
-export type NodeKind = 'folder' | 'task' | 'task-item'
+// 'work_item' is the Attention layer's routable to-do-like entity (S1+): a
+// LEAF node, excluded from listNodes and every desk/room surface, listed only
+// by its own workItems queries. NOT a desk — see the vocabulary quarantine
+// (src/main/ai/vocabulary.ts). The retired declared-but-unbuilt 'task-item'
+// kind is gone from this union (CR-05a); legacy rows of that kind remain
+// tolerated at the DB layer (the CHECK keeps the literal) but no code creates
+// or types them.
+export type NodeKind = 'folder' | 'task' | 'work_item'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'parked'
 export type SectionLayout = 'free' | 'grid' | 'stacks' | 'icons' | 'list'
 

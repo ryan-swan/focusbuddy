@@ -152,7 +152,7 @@ export default function CanvasBreadcrumb({
     let cur: FbNode | undefined = byId.get(activeTask.id) ?? activeTask
     let guard = 0
     while (cur && guard++ < 50) {
-      out.unshift(cur)
+      if (cur.kind !== 'work_item') out.unshift(cur) // never a breadcrumb segment (S1)
       cur = cur.parentId ? byId.get(cur.parentId) : undefined
     }
     return out

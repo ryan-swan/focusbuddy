@@ -51,9 +51,10 @@ function bucketFor(folderId: string, allNodes: FbNode[]): Tab {
         if (kid.status !== 'done') {
           anyActiveTask = true
         }
-      } else {
+      } else if (kid.kind === 'folder') {
         stack.push(kid.id)
       }
+      // work_item: not a desk and not a room — never bucketed here (S1)
     }
   }
   if (!anyTaskAtAll) return 'closed'

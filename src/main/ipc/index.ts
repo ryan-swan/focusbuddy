@@ -671,8 +671,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
   ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => {
+    // Work_items never travel the nodes:* namespace (F008 one-code-path):
+    // their creator is workItems:create (S3), which wraps the dedicated
+    // db-module function. This protocol-boundary refusal is additional to
+    // createNode's own capability/migration/scope gates.
+    if (draft.kind === 'work_item') {
+      throw new Error('work_item creation goes through workItems:create, not nodes:create')
+    }
     const node = createNode(draft)
     // Live projection: a real ObjectCreated Event on a real user action.
+    // (Binary ternary is safe: work_item was refused above.)
     emitObjectEvent({
       eventType: node.kind === 'folder' ? 'RoomCreated' : 'DeskCreated',
       category: 'user',

@@ -22,7 +22,8 @@ export function descendantTaskIds(nodes: FbNode[], projectId: string): string[] 
     const children = byParent.get(id) ?? []
     for (const c of children) {
       if (c.kind === 'task') out.push(c.id)
-      else walk(c.id) // sub-project — recurse
+      else if (c.kind === 'folder') walk(c.id) // sub-project — recurse
+      // work_item: neither a task nor a sub-project — never scoped here (S1)
     }
   }
   walk(projectId)

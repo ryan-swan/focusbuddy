@@ -41,7 +41,8 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
 
   const desks = useMemo(() => {
     const candidates = nodes.filter(
-      (n) => !n.archived && (roomId ? n.parentId === roomId : n.parentId === null)
+      (n) =>
+        n.kind !== 'work_item' && !n.archived && (roomId ? n.parentId === roomId : n.parentId === null)
     )
     return candidates.sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
   }, [nodes, roomId])

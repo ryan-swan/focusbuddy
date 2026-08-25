@@ -22,7 +22,7 @@ export default function DeskGallery(): JSX.Element {
   const desks = useMemo(
     () =>
       nodes
-        .filter((n) => n.parentId === null && !n.archived)
+        .filter((n) => n.parentId === null && !n.archived && n.kind !== 'work_item')
         .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt),
     [nodes]
   )

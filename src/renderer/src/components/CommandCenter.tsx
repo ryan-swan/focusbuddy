@@ -581,6 +581,7 @@ export default function CommandCenter({
       let added = 0
       for (const n of nodes) {
         if (n.archived) continue
+        if (n.kind === 'work_item') continue // never browsable as a desk (S1)
         if (added >= 60) break
         const isFolder = n.kind === 'folder'
         items.push({
