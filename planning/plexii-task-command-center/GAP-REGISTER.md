@@ -80,6 +80,10 @@ comparison sites, no DB CHECK) but spec §1.5 defines a richer state machine the
 hold. Recommended shape (analysis/09 V1): `status` stays a coarse mapped projection for
 legacy consumers; new `work_item_state` column carries the fine machine; mapping table is
 part of SPEC-002. (Raised by the spec session; verified + shaped by this session.)
+**Ruled constraint (DEC-014):** the projection is DERIVED — `work_item_state` is the single
+source of truth, `status` computed at write, never independently writable (drift = phantom
+completions in Pulse/lenses). Mapping table explicit in SPEC-002; `dismissed`/`reclassified`
+never project to `done`.
 
 ## Open questions
 

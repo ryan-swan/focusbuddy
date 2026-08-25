@@ -1,6 +1,10 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-24 · Phase 0 (Foundation) shipped; waiting on the product spec.
+**Last updated:** 2026-08-24 night · G1 CLOSED (spec in, all crossroads ruled, DEC-013/014);
+Phase 2 open — two analysis agents dispatched (node-consumer classification → analysis/10,
+AI vocab audit → analysis/11); next supervised work = the split sync proof (server
+passthrough + client stamping) against the live dev app, then the gap matrix + adversarial
+pass toward G2.
 
 ## <<<PROMPT BEGIN>>>
 
@@ -18,11 +22,13 @@ cd ~/focusbuddy-plexi && git fetch origin --prune && git status --short --branch
 ```
 (Drift from origin/main is information, not a problem — log it; merging is a DEC-NNN.)
 
-Next task: whatever [ACTIVE-MISSION.md](ACTIVE-MISSION.md) → "Right now" says. As of this
-prompt: **receive the operator's product spec and execute
-[phases/PHASE-1-spec-intake/PLAN.md](phases/PHASE-1-spec-intake/PLAN.md) per
-[SPEC-INTAKE.md](SPEC-INTAKE.md)** — verbatim capture, SPEC-NNN inventory, ambiguities as
-questions, gate G1. If ACTIVE-MISSION differs, trust it (it's newer than this prompt).
+Next task: whatever [ACTIVE-MISSION.md](ACTIVE-MISSION.md) → "Phase 2 scope" says. As of
+this prompt: **collect the two agent drafts (analysis/10 node-consumer classification,
+analysis/11 AI vocab audit), verify them, then run the split sync proof against the live
+dev app — (a) do new node columns/kinds pass the server opaquely, (b) does the client stamp
+and preserve them on arrival — then assemble analysis/02-GAP-MATRIX.md (all 44 SPEC items,
+evidence-classified, ≥30% adversarially re-verified) toward G2.** If ACTIVE-MISSION
+differs, trust it (it's newer than this prompt).
 
 Before writing code: none is authorized until gates G1→G5 pass (DEC-004). Phases 3+ that are
 only ROADMAP rows get a PLAN.md + operator approval before execution.

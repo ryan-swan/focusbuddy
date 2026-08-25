@@ -208,4 +208,36 @@ always-purge-on-delete — rejected: silently destroys valuable context.
 information" includes — brain entries, document content, summaries), and the shared-desk
 v1 default are SPEC-042/043 design work, presented for approval before build.
 
+## DEC-014 — G1 batch ruling: crossroads CR-01..07, objective confirmed, IQ-1 resolved
+
+**Date:** 2026-08-24 (night) · **Made by:** Operator ("take your strongest recommendation")
+**Decision — all standing recommendations approved:**
+- **CR-01 (a):** calendar engine stays; holds render in Attention at v1; surface revisited
+  after SPEC-032 ships.
+- **CR-02 (a):** Home widget registry is the canonical dashboard; the orphaned portlet
+  engine and `ModuleDashboard` are formally deprecated for new work; the dead
+  `shared/dashboardRegistry.ts` scaffold is deleted (verified zero importers; the feared
+  archived-view dependency was defused in analysis/09 V3).
+- **CR-03 (a):** notification substrate lands in main; renderer callers re-pointed; the
+  decoy module retired.
+- **CR-04 (b):** Pulse and AllTasksView renamed to say "desks" honestly at v1; re-pointing
+  at work_items reconsidered at G5.
+- **CR-05 (a):** the dead `task-item` declaration is deleted; `work_item` is the only new kind.
+- **CR-06 (a):** loose thoughts = classification-only at v1; decay tier P2.
+- **CR-07 (B):** desk lifecycle ships as a parallel prerequisite on the fork (resized:
+  fix-ratify-expose per analysis/08–09), gated to complete before Phase 5; desks own desk
+  state, Attention reads it. DEC-013's memory contract designs within this track.
+**Also settled at G1:**
+- **Primary objective CONFIRMED as drafted** ("one honest answer to 'what needs me right
+  now,' assembled from work that lives where it was created") — operator adopted the
+  drafting session's every-word-load-bearing defense without amendment. All triage binds to it.
+- **IQ-1 RESOLVED:** bug-synthesis sections 7/8/13/14/17 were deliberately trimmed by the
+  operator as redundant — they covered the tasks/calendar/notifications pains whose solution
+  IS this build's core objective. The conflict register may claim completeness.
+- **GAP-012 refinement adopted (from the drafting session):** the `status` coarse projection
+  is DERIVED, never independently writable — single source of truth is `work_item_state`,
+  `status` computed at write; SPEC-002 carries the explicit fine→coarse mapping table,
+  including that `dismissed` and `reclassified` are NOT completions (never project to `done`).
+**Alternatives:** itemized per CR in 00-SPEC-RAW §7 and 07-BUG-CONFLICT-REGISTER §3.
+
 <!-- Append below; increment DEC-NNN. -->

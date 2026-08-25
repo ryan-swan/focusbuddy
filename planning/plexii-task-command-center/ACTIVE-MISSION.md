@@ -3,19 +3,25 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-24 (night) · **State:** IN_PROGRESS — Phase 1 (spec intake)
+**Last updated:** 2026-08-24 (night, G1 closed) · **State:** IN_PROGRESS — Phase 2
 
-**Phase 1 state:** Spec received (44 items + 3 amendments) with bug synthesis + conflict
-register. Verbatim captures: analysis/00, 06, 07. Verification pass done: analysis/08 —
-C1-05 confirmed with smoking gun (`create-task` = desk in agent prompts), C1-02 premise
-shrunk (status/archived exist), trashNode recursive sweep = confirmed Class-C danger for
-SPEC-043. **Blocking on operator: confirm primary objective; rule CR-01..07 in one batch;
-IQ-1 (missing bug sections).** Q5's shape is now ruled (DEC-013: archive first-class;
-delete = explicit memory choice; shared desks protected). Round-2 verification (analysis/09):
-GAP-012 status-collision registered with recommended shape; SPEC-044 approach revised to
-protocol-quarantine (no rename — `create-task` stays desk-creation on the wire; new action
-gets a distinct name; labels fixed); CR-02 archived-view dependency defused; Phase 2 sync
-proof split into server-passthrough AND client-stamping.
+**G1 MET (DEC-014):** spec captured + inventoried (44 items + SPEC-042/043/044); primary
+objective confirmed as drafted; all crossroads ruled (CR-01..07 = standing recommendations;
+CR-07 = Option B parallel prerequisite); Q5 shaped (DEC-013); IQ-1 resolved (deliberate
+trim); ambiguities Q1–Q4, Q6–Q8 scheduled for Phase 2/3 proposals returned for approval.
+
+**Phase 2 scope (widened per register §5 + analysis/09):**
+1. SPEC-004 — 305-site node-consumer classification → **background agent running**,
+   draft lands in analysis/10.
+2. SPEC-044 — AI vocabulary audit (protocol-quarantine approach) → **background agent
+   running**, draft lands in analysis/11.
+3. Sync proof, SPLIT: (a) server passes new node columns/kinds opaquely; (b) client stamps
+   and preserves them on arrival. Live experiment — needs the dev app + supervised session.
+4. ACL semantics documentation (org / team / per-desk) for SPEC-030.
+5. C1-03 shared-tab triage (enumeration vs. metadata) — folded into workstream 1.
+6. Sync reliability assessment (BUG-C2-01: partial widget sync, 7–8s latency).
+7. The gap matrix itself (analysis/02): all 44 items EXISTS/PARTIAL/MISSING/CONFLICTS with
+   evidence + ≥30% adversarial re-verification (G2 dual validation).
 
 ## Right now
 
