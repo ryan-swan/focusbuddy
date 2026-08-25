@@ -4,6 +4,23 @@
 > classifier's enum — Dispatch missions will stamp `source_ref=<mission id>` +
 > `source_type='mission'` for provenance with zero schema work.
 
+> **Synthesis-intake riders (analysis/20, Δ1–Δ13):** source_type also gains
+> `app, sheet, slide, chat` (Δ1). Loose-thought DECAY v1-simple (Δ3): a sweep dismisses
+> untouched `loose_thought` items after 14 days (`reason_code='decayed'`); promotion =
+> reclassify. Scheduling = tentative holds ONLY, riding the existing proposal-card flow —
+> no new calendar machinery (Δ5). Cleanup is opt-in propose-and-approve; priority phrases
+> ("no rush") preserved verbatim (Δ6). Multi-intent: primary routes, secondary intents
+> surface as additional suggested cards via the existing multi-card pattern (Δ7). FYI
+> with durable value also offers create-knowledge-entry (Δ8). The composer carries the
+> ONE Q1 question (DEC-016): unanchored-deadline-on-actionable is the P0 trigger
+> (named-recipient ambiguity cannot fire while self-routing). Δ12: the six deterministic
+> scenarios (mixed-intent review · opt-in cleanup · unrouted banter · scheduling hold ·
+> reclassification · voice split) become NAMED end-to-end tests. Δ13: voice notes route
+> through the classifier (the S0 parser arm activates). **Flag flip:** this stage turns
+> `workItems.enabled` ON — the S0 catalog addendum goes live, and the executor's
+> create-work-item no-op is replaced by the real apply path (origin='ai',
+> approval-by-card = 'approved').
+
 **Class:** ADDITIVE (new pipeline on the standup AI pattern) · **Needs:** S0 (vocabulary),
 S4 (closure notification) · **Risk:** MED (AI-path latency + misclassification UX).
 

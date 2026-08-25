@@ -6,6 +6,13 @@
 > (C-4) run the **pre-S6 main-diff checkpoint** before starting: size Caleb's A6
 > refinement drift in anthropic.ts and absorb deliberately.
 
+> **Synthesis-intake riders (analysis/20):** Δ4 — the Awaiting-Ack card's ONE-TAP
+> acknowledge (received/understood/accepted → `acknowledged` + closure notify). Δ9 —
+> the "what do I need to do today?" conversational entry: a gated work-items context
+> block in chat prompt assembly; answers derive from queue DATA, never narration.
+> Also: L1 deferred menus land here (StageManagerStrip / DeskGallery / CanvasBreadcrumb
+> lifecycle affordances — designed, not bolted).
+
 **Class:** ADDITIVE UI + two label RESHAPEs (CR-04(b)) · **Needs:** S3 · **Risk:** MED —
 this is the stage the operator's design-fidelity directive bears on hardest.
 

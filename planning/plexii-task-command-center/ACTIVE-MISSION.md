@@ -3,9 +3,15 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S4 SHIPPED; **S5 ON HOLD**) · **State:** IN_PROGRESS —
-Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ → **S5 HELD pending
-full-product-features-list intake**)
+**Last updated:** 2026-08-25 (S5 HOLD LIFTED — intake complete) · **State:**
+IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ →
+**S5 EXECUTING**)
+
+**Intake CLOSED (operator, 2026-08-25):** "part 2 landscape map" was an accidental
+cross-thread paste — struck; the synthesis (analysis/20) IS the full list. S5/S6/S7
+prompts enriched with Δ1–Δ13. Δ3's v1-simple loose-thought decay proceeds as the
+standing strongest-recommendation (14-day dismiss, reason 'decayed') — flagged for veto
+in the S5 close.
 
 **L1 SHIPPED (2026-08-25, commit 34acf80f):** the desk lifecycle surfaced — Trash view
 (roots + days-remaining + lossless subtree restore), sidebar entry both rail states,

@@ -3,7 +3,15 @@
 > **DEC-018 rider (A-6):** the G6 merge-readiness preconditions gain the D4 integration
 > doctrine: agents write work items ONLY through the workItems module (F008) — a
 > parallel write path silently breaks every invariant (projection, leaf, scope, C2,
-> CI locks). One paragraph, handed to Caleb with the §8 R016 preconditions.
+> CI locks). One paragraph, handed to Caleb with the §8 R016 preconditions. **The MCP
+> contract line joins it: external MCP writes route through the same module.**
+
+> **Synthesis-intake riders (analysis/20):** Δ10 — suppression learning v1-simple:
+> repeated dismissals quiet the SOURCE TYPE (per-source-type counter gating
+> suggestions), not just the item. Δ11 — the FYI deadline backstop goes to the V2
+> register (v1 nudges cover actionable classes only). V2 register additions from the
+> intake: work_item archival-as-flag (Δ2), anomaly detection, living table, invisible
+> tasks (full), desk meta-brain, existing-artifact check (full version).
 
 **Class:** ADDITIVE + system-wide verification · **Needs:** S4 (nudges) · **Risk:** LOW
 build, HIGH judgment — this stage decides whether the whole layer feels helpful or naggy.
