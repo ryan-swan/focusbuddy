@@ -5,7 +5,15 @@
 
 **Last updated:** 2026-08-25 (S5 SHIPPED — **THE ATTENTION LAYER IS LIVE**) · **State:**
 IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
-→ S6 next, after its C-4 main-diff checkpoint)
+→ **S6 IN PROGRESS — core surface LIVE (s6a, 57ff0403)**)
+
+**S6a SHIPPED (2026-08-25):** C-4 checkpoint PASSED (main drift = 2 commits, zero hot-file
+overlap; ipc/index.ts noted for the eventual merge). The Attention page is live: queues
+by intent class with per-class closing verbs, due chips, one-line reasons, snooze,
+reclassify, open-its-desk, the Detached shelf with MOVE recovery, top-bar headline count
+(SPEC-015, zero-silent), sidebar + palette entries. 2736/2736 tests. Remaining for S6
+close: seven Home widgets, CR-04(b) renames, ranker+attentionPrecision, L1-deferred
+menus, cleanup composer, four-theme pass + native-fit rubric.
 
 **S5 CLOSED (2026-08-25, commit 7554ce86):** capture console (Routed/Unrouted/Expand,
 composer-owned Q1 question), deterministic-first classifier (Haiku fallback,
