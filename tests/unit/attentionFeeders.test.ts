@@ -69,6 +69,29 @@ describe('feeders — desks surface AS attention, computed and one-directional',
     expect(s[1].line).toBe('Due tomorrow')
   })
 
+  it('DEC-020 — plan due dates join the feeders: roots and plan items, distinct kind', () => {
+    const nodes = [
+      desk({ id: 'plan', kind: 'folder', isPlan: true, title: 'Launch', dueDate: NOW + DAY }),
+      desk({ id: 'sub', kind: 'folder', parentId: 'plan', title: 'Phase 2' }),
+      desk({ id: 'inPlan', parentId: 'sub', title: 'Ship it', dueDate: NOW + 2 * DAY }),
+      desk({ id: 'plain', title: 'Solo desk', dueDate: NOW + 3 * DAY }),
+      desk({ id: 'planFar', kind: 'folder', isPlan: true, dueDate: NOW + 20 * DAY }),
+      desk({ id: 'planDone', kind: 'folder', isPlan: true, dueDate: NOW + DAY, status: 'done' }),
+      desk({ id: 'plainFolder', kind: 'folder', dueDate: NOW + DAY }) // non-plan folder: no signal
+    ]
+    const s = deskDueSignals(nodes, NOW)
+    expect(s.map((x) => `${x.kind}:${x.id}`)).toEqual(['plan-due:plan', 'plan-due:inPlan', 'desk-due:plain'])
+    const root = s[0]
+    expect(root.line).toBe('Plan due tomorrow')
+    expect(root.target).toBe('plan')
+    const item = s[1]
+    expect(item.line).toBe('Due in 2 days · Launch') // plan name resolved through the nested folder
+    expect(item.target).toBe('desk')
+    // Whole-kind mutes stay independent: plan-due silenced, desk-due untouched.
+    const muted = feederSignals(nodes, [], NOW, new Set(['kind:plan-due']))
+    expect(muted.map((x) => x.id)).toEqual(['plain'])
+  })
+
   it('mutes silence one signal or a whole kind; counts drive the Δ10 offer', () => {
     const nodes = [desk({ id: 'a', dueDate: NOW + DAY }), desk({ id: 'b', dueDate: NOW + 2 * DAY })]
     const stale = [{ id: 's1', title: 'Quiet', daysQuiet: 9 }]

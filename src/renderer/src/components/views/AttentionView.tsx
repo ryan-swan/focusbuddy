@@ -68,6 +68,7 @@ export default function AttentionView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
+  const goProject = useViewStore((s) => s.goProject)
   const openConsole = useCaptureConsole((s) => s.openConsole)
   const [nowMs, setNowMs] = useState(() => Date.now())
   // SPEC-017 lenses: the same active set through three groupings, persisted.
@@ -125,7 +126,9 @@ export default function AttentionView(): JSX.Element {
     if (mutedCountOfKind(next, s.kind) >= KIND_MUTE_OFFER_THRESHOLD) {
       void promptText({
         title: 'Quiet this whole source?',
-        label: `You've muted several ${s.kind === 'desk-due' ? 'due-desk' : 'stale-desk'} nudges.`,
+        label: `You've muted several ${
+          s.kind === 'desk-due' ? 'due-desk' : s.kind === 'plan-due' ? 'plan-due' : 'stale-desk'
+        } nudges.`,
         choices: [
           { value: 'kind', label: 'Mute all of these', hint: 'This source stays quiet until you clear mutes' },
           { value: 'one', label: 'Just this one' }
@@ -323,14 +326,18 @@ export default function AttentionView(): JSX.Element {
                       className="group flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
                     >
                       <Icon
-                        name={s.kind === 'desk-due' ? 'schedule' : 'bedtime'}
+                        name={s.kind === 'desk-due' ? 'schedule' : s.kind === 'plan-due' ? 'account_tree' : 'bedtime'}
                         size={16}
                         className="text-[var(--ink-30)] shrink-0"
                       />
                       <button
                         onClick={() => {
-                          setActive(s.id)
-                          goTask(s.id)
+                          if (s.target === 'plan') {
+                            goProject(s.id)
+                          } else {
+                            setActive(s.id)
+                            goTask(s.id)
+                          }
                         }}
                         className="flex-1 min-w-0 text-left fb-press"
                       >

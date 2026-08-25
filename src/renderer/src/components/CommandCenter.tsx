@@ -85,6 +85,7 @@ export default function CommandCenter({
   const setActive = useNodeStore((s) => s.setActive)
   const goHome = useViewStore((s) => s.goHome)
   const goAllTasks = useViewStore((s) => s.goAllTasks)
+  const goProjects = useViewStore((s) => s.goProjects)
   const goCalendar = useViewStore((s) => s.goCalendar)
   const goVault = useViewStore((s) => s.goVault)
   const goTask = useViewStore((s) => s.goTask)
@@ -349,6 +350,21 @@ export default function CommandCenter({
       run: () => {
         setActive(null)
         goAllTasks()
+        closePalette()
+      }
+    })
+    // DEC-020: the Plans/Calendar/Desks-flat sidebar tabs retired — the
+    // palette is now these views' front door, so each keeps an entry here.
+    items.push({
+      id: 'go-plans',
+      label: 'Plans',
+      hint: 'Plan boards + timelines',
+      icon: 'account_tree',
+      kind: 'action',
+      score: q === '' ? 72 : matchScore('plans projects gantt timeline', q),
+      run: () => {
+        setActive(null)
+        goProjects()
         closePalette()
       }
     })
@@ -738,6 +754,7 @@ export default function CommandCenter({
     setActive,
     goHome,
     goAllTasks,
+    goProjects,
     goCalendar,
     goVault,
     goTask,
