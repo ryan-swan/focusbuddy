@@ -1,6 +1,48 @@
 import { getDb } from './database'
 import { PERSONAL_ORG_ID } from './activeOrg'
 import { emitObjectEvent } from '../context/engine'
+import { pruneSharedRows } from './nodeLifecycle'
+
+// ── Park-inbound (§2.1 receiver defensiveness; GAP-013 repair) ──────────────
+// A row this build cannot materialize (its kind fails the local CHECK — e.g. a
+// work_item arriving at an un-migrated device) is PARKED: remembered, surfaced,
+// and excluded from the applied count — never silently swallowed into an
+// infinite retry. The boot-time reapply sweep (S2's arrival router) drains the
+// set once the local schema gains the kind. In-memory is correct here: the row
+// stays on the server and re-offers every pull, so parking survives restarts by
+// construction.
+// [PLEXI-UPSTREAM] Isolated diff in the sync engine — flag to Caleb with the
+// wake-coalescing fix.
+export interface ParkedInboundRow {
+  id: string
+  itemType: string
+  reason: string
+  at: number
+}
+const parkedInbound = new Map<string, ParkedInboundRow>()
+export function listParkedInbound(): ParkedInboundRow[] {
+  return [...parkedInbound.values()]
+}
+function parkInbound(id: string, itemType: string, reason: string): void {
+  if (parkedInbound.has(id)) return
+  parkedInbound.set(id, { id, itemType, reason, at: Date.now() })
+  // eslint-disable-next-line no-console
+  console.warn(`[sync] park-inbound ${itemType} ${id}: ${reason}`)
+}
+// Classify an apply failure: a nodes CHECK rejection means the kind is unknown
+// to this build — park it. Anything else (FK parent not yet synced) keeps the
+// old behavior: the next cycle retries.
+function maybeParkApplyFailure(
+  err: unknown,
+  table: string,
+  item: { id: string; itemType: string; body?: unknown }
+): void {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (table === 'nodes' && /CHECK constraint failed/i.test(msg)) {
+    const kind = (item.body as { kind?: unknown } | undefined)?.kind
+    parkInbound(item.id, item.itemType, `kind '${String(kind)}' not accepted by local schema`)
+  }
+}
 
 // Main-process half of multi-device workspace sync. The renderer owns the network
 // (it has the signal URL + token); this layer owns the local SQLite. It collects
@@ -363,11 +405,16 @@ function collectDeskSubtree(rootId: string): { nodeIds: string[]; tableIds: stri
   const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId)
   if (!exists) return { nodeIds: [], tableIds: [] }
   const nodeIds: string[] = []
+  // §2.6 scope invariant: the shared collect cannot pick up work_items while
+  // the exposure switch is OFF — they stay personal (self-routed items are
+  // additionally exempt forever, §2.5.9; the stamp sweep honors this guard).
   const collect = (nid: string): void => {
     nodeIds.push(nid)
-    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
-      id: string
-    }>
+    const kids = db
+      .prepare(
+        "SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL AND kind != 'work_item'"
+      )
+      .all(nid) as Array<{ id: string }>
     for (const k of kids) collect(k.id)
   }
   collect(rootId)
@@ -573,9 +620,11 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
         ).run(params)
         applied++
         changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
-      } catch {
+      } catch (err) {
         // One bad row (e.g. a foreign key whose parent has not synced yet)
-        // must not abort the whole batch; the next cycle retries it.
+        // must not abort the whole batch; the next cycle retries it — EXCEPT a
+        // kind the local schema rejects, which is parked + surfaced (§2.1).
+        maybeParkApplyFailure(err, table, item)
       }
     }
   })
@@ -731,9 +780,11 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
         ).run(params)
         applied++
         changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
-      } catch {
+      } catch (err) {
         // A single bad row (e.g. a foreign key whose parent table has not synced
-        // yet) must not abort the batch; the next cycle retries it.
+        // yet) must not abort the batch; the next cycle retries it — except an
+        // unknown kind, which is parked + surfaced (§2.1).
+        maybeParkApplyFailure(err, table, item)
       }
     }
   })
@@ -846,8 +897,10 @@ export function applyRemoteShared(
         ).run(params)
         applied++
         changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
-      } catch {
-        // FK not present yet (a parent arriving in a later cycle) — retry next cycle.
+      } catch (err) {
+        // FK not present yet (a parent arriving in a later cycle) — retry next
+        // cycle. An unknown kind is parked + surfaced instead (§2.1).
+        maybeParkApplyFailure(err, table, item)
       }
     }
   })
@@ -882,13 +935,10 @@ export function adoptSharedDesk(rootId: string): boolean {
 export function pruneSharedDesk(rootId: string): number {
   const db = getDb()
   if (!rootId) return 0
-  let removed = 0
-  const tx = db.transaction(() => {
-    for (const table of ['fb_rows', 'widgets', 'fb_tables', 'nodes'] as SyncTable[]) {
-      const r = db.prepare(`DELETE FROM ${table} WHERE shared_root_id = ?`).run(rootId)
-      removed += r.changes
-    }
-  })
-  tx()
-  return removed
+  // Sanctioned hard-delete site 3/3 — the prune core lives in nodeLifecycle
+  // (§2.5.3): work_items are detached-and-revived and excluded from the DELETE.
+  const tx = db.transaction(() =>
+    pruneSharedRows(db, rootId, ['fb_rows', 'widgets', 'fb_tables', 'nodes'])
+  )
+  return tx()
 }

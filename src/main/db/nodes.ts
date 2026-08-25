@@ -2,7 +2,28 @@ import { randomUUID } from 'crypto'
 import { getDb } from './database'
 import { getActiveOrgId, PERSONAL_ORG_ID } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
+import {
+  assertNotWorkItemRoot,
+  assertParentAcceptsChildren,
+  collectActiveSubtree,
+  detachAndReviveWorkItemDescendants,
+  purgeExpiredTrash
+} from './nodeLifecycle'
+import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
+import { isWorkItemsEnabled } from '../workItemsPref'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
+
+/** §2.6 + R006: work_item creation is triple-gated at the db chokepoint —
+ *  capability flag ON, personal scope only while the exposure switch is OFF,
+ *  and the local DDL must actually accept the kind (same-device guard). */
+export class WorkItemCreationRefusedError extends Error {
+  readonly code: 'WORK_ITEMS_DISABLED' | 'WORK_ITEMS_PERSONAL_ONLY' | 'WORK_ITEMS_NOT_MIGRATED'
+  constructor(code: WorkItemCreationRefusedError['code'], message: string) {
+    super(message)
+    this.code = code
+    this.name = 'WorkItemCreationRefusedError'
+  }
+}
 
 interface NodeRow {
   id: string
@@ -70,9 +91,12 @@ export function listNodes(): FbNode[] {
       /* best-effort */
     }
   }
+  // work_item exclusion (S1, the census's highest-leverage single fix): this
+  // query feeds useNodeStore and through it every desk/room surface. Work
+  // items are listed by their own query (workItems:list, S3), never here.
   const rows = db
     .prepare(
-      'SELECT * FROM nodes WHERE trashed_at IS NULL AND org_id = ? ORDER BY sort_order ASC, created_at ASC'
+      "SELECT * FROM nodes WHERE trashed_at IS NULL AND kind != 'work_item' AND org_id = ? ORDER BY sort_order ASC, created_at ASC"
     )
     .all(getActiveOrgId()) as NodeRow[]
   return rows.map(rowToNode)
@@ -96,6 +120,22 @@ function nextSortOrder(parentId: string | null): number {
 
 export function createNode(draft: NodeDraft): FbNode {
   const db = getDb()
+  if (draft.kind === 'work_item') {
+    if (!isWorkItemsEnabled())
+      throw new WorkItemCreationRefusedError('WORK_ITEMS_DISABLED', 'Work items are not enabled.')
+    if (!nodesTableAcceptsWorkItems(db))
+      throw new WorkItemCreationRefusedError(
+        'WORK_ITEMS_NOT_MIGRATED',
+        'This device has not migrated for work items yet.'
+      )
+    if (getActiveOrgId() !== PERSONAL_ORG_ID)
+      throw new WorkItemCreationRefusedError(
+        'WORK_ITEMS_PERSONAL_ONLY',
+        'Work items are personal-scope only while the sharing switch is off.'
+      )
+  }
+  // Leaf invariant (§2.5.5): nothing is ever parented under a work_item.
+  assertParentAcceptsChildren(db, draft.parentId)
   // WS01 lifecycle: honour a client-provided id so a node created on one device
   // materialises with the SAME id when its create event is applied on another
   // (create-if-missing by primary key). Local creates pass no id → fresh one.
@@ -179,6 +219,8 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
     ['resumeUpdatedAt', 'resume_updated_at'],
     ['dueDate', 'due_date']
   ]
+  // Leaf invariant (§2.5.5): the parentId patch column is a parent_id writer.
+  if (patch.parentId !== undefined) assertParentAcceptsChildren(db, patch.parentId)
   for (const [key, col] of cols) {
     if (patch[key] !== undefined) {
       fields.push(`${col} = @${key}`)
@@ -215,17 +257,15 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
 // just hidden, until purgeTrashedNodes removes them.
 export function deleteNode(id: string): string[] {
   const db = getDb()
+  // C2 (§2.5.2): a work_item is never trashed directly — its lifecycle is
+  // dismissed/reclassified. Throws a typed error the caller renders.
+  assertNotWorkItemRoot(db, id)
   const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(id)
   if (!exists) return []
-  const ids: string[] = []
-  const collect = (nid: string): void => {
-    ids.push(nid)
-    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
-      id: string
-    }>
-    for (const k of kids) collect(k.id)
-  }
-  collect(id)
+  // The sweep INCLUDES work_item children by design (§2.5.1): trash is
+  // device-scoped and undo must restore bit-identically. The purge (below) is
+  // where work_items are protected — never the trash.
+  const ids = collectActiveSubtree(db, id)
   const now = Date.now()
   const stmt = db.prepare('UPDATE nodes SET trashed_at = ? WHERE id = ?')
   db.transaction(() => {
@@ -250,15 +290,18 @@ export function moveNodeToOrg(rootId: string, orgId: string, teamId: string | nu
   if (!orgId) return []
   const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(rootId)
   if (!exists) return []
-  const ids: string[] = []
-  const collect = (nid: string): void => {
-    ids.push(nid)
-    const kids = db.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL').all(nid) as Array<{
-      id: string
-    }>
-    for (const k of kids) collect(k.id)
+  // §2.6 scope invariant: a work_item may not enter a sync scope whose peers
+  // are unconfirmed — the org sweep refuses to carry them. They are detached
+  // (park-local) so the moved subtree never carries a cross-org parent link;
+  // the count is surfaced by the caller's toast (S6) via the detached return.
+  const all = collectActiveSubtree(db, rootId)
+  const kindOf = db.prepare('SELECT kind FROM nodes WHERE id = ?')
+  const ids = all.filter((i) => (kindOf.get(i) as { kind: string } | undefined)?.kind !== 'work_item')
+  const parkedCount = detachAndReviveWorkItemDescendants(db, [rootId])
+  if (parkedCount > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[moveNodeToOrg] ${parkedCount} work item(s) stayed personal (park-local)`)
   }
-  collect(rootId)
   // Tables backing any table widget on the moved desks must travel too, or the
   // widget lands on the other member pointing at a table that never synced (blank
   // "Loading table…"). A table widget stores its fb_tables id in widget.content.
@@ -307,14 +350,14 @@ export function restoreNodes(ids: string[]): boolean {
 export function purgeTrashedNodes(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
   const db = getDb()
   const cutoff = Date.now() - maxAgeMs
-  const rows = db.prepare('SELECT id FROM nodes WHERE trashed_at IS NOT NULL AND trashed_at < ?').all(cutoff) as Array<{
-    id: string
-  }>
-  if (!rows.length) return
-  const del = db.prepare('DELETE FROM nodes WHERE id = ?')
-  db.transaction(() => {
-    for (const r of rows) del.run(r.id)
-  })()
+  // Delegated to the lifecycle module (§2.5.2/§2.5.3): work_items are never
+  // purge targets, their descendants are detached-and-revived before any
+  // delete, and every delete re-checks liveness per id in-statement.
+  const result = db.transaction(() => purgeExpiredTrash(db, cutoff))()
+  if (result.revived > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[purgeTrashedNodes] revived ${result.revived} work item(s) at purge (detached)`)
+  }
 }
 
 // Returns true if `candidateId` is a descendant of `ancestorId` (or equal). Used to prevent
@@ -354,6 +397,8 @@ export function moveNode(
   if (newParentId !== null && isDescendantOrSelf(id, newParentId)) return null
 
   const db = getDb()
+  // Leaf invariant (§2.5.5): moveNode is a parent_id writer.
+  assertParentAcceptsChildren(db, newParentId)
   const existing = getNode(id)
   if (!existing) return null
 

@@ -1,0 +1,204 @@
+// Node lifecycle mechanics — the single owner of trash/restore/purge/detach
+// semantics for the nodes table (Attention layer S1; ARCHITECTURE §2.5).
+//
+// Why this module exists: the FK is `parent_id … ON DELETE CASCADE` and a
+// cascade cannot be kind-filtered, so every hard-delete path must detach (and
+// revive) work_item descendants BEFORE deleting, or a desk purge silently
+// destroys them. The three sanctioned hard-delete sites (purgeTrashedNodes,
+// agentHistory undo, pruneSharedDesk) all route through here, and the CI
+// delete-site lock (tests/unit/ciDeleteSiteLock.test.ts) fails the build on
+// any new DELETE against nodes that does not.
+//
+// Electron-free: production passes better-sqlite3, tests pass node:sqlite —
+// both satisfy LifecycleDb structurally. Callers own transactions.
+
+export interface LifecycleDb {
+  prepare(sql: string): {
+    run(...args: unknown[]): unknown
+    get(...args: unknown[]): unknown
+    all(...args: unknown[]): unknown[]
+  }
+}
+
+// ── Typed refusals ───────────────────────────────────────────────────────────
+
+/** §2.5.2 (validator C2): work_items are never trashed/deleted directly —
+ *  dismissed/reclassified is their lifecycle. deleteNode refuses roots. */
+export class WorkItemDeleteRefusedError extends Error {
+  readonly code = 'WORK_ITEM_DELETE_REFUSED'
+  constructor() {
+    super('Work items are dismissed or reclassified, never deleted directly.')
+    this.name = 'WorkItemDeleteRefusedError'
+  }
+}
+
+/** §2.5.5 (F-M3″): work_items are LEAF nodes at v1 — nothing may be parented
+ *  under one, enforced at every parent_id writer. */
+export class WorkItemParentRefusedError extends Error {
+  readonly code = 'WORK_ITEM_PARENT_REFUSED'
+  constructor() {
+    super('Nothing can be placed under a work item.')
+    this.name = 'WorkItemParentRefusedError'
+  }
+}
+
+export function nodeKind(d: LifecycleDb, id: string): string | null {
+  const row = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
+    | { kind: string }
+    | undefined
+  return row?.kind ?? null
+}
+
+/** Throws when the proposed parent is a work_item (leaf invariant). A null
+ *  parent (top level) always passes. */
+export function assertParentAcceptsChildren(d: LifecycleDb, parentId: string | null): void {
+  if (parentId === null || parentId === undefined) return
+  if (nodeKind(d, parentId) === 'work_item') throw new WorkItemParentRefusedError()
+}
+
+/** Throws when a direct delete/trash targets a work_item root (C2). */
+export function assertNotWorkItemRoot(d: LifecycleDb, id: string): void {
+  if (nodeKind(d, id) === 'work_item') throw new WorkItemDeleteRefusedError()
+}
+
+// ── Subtree walks ────────────────────────────────────────────────────────────
+
+/** Recursive child collection over ACTIVE rows (trashed excluded) — the
+ *  deleteNode / moveNodeToOrg shape. Includes work_items: trash deliberately
+ *  sweeps them with their desk so undo stays bit-lossless (§2.5.1). */
+export function collectActiveSubtree(d: LifecycleDb, rootId: string): string[] {
+  const ids: string[] = []
+  const kids = d.prepare('SELECT id FROM nodes WHERE parent_id = ? AND trashed_at IS NULL')
+  const walk = (nid: string): void => {
+    ids.push(nid)
+    for (const k of kids.all(nid) as Array<{ id: string }>) walk(k.id)
+  }
+  walk(rootId)
+  return ids
+}
+
+/** Descendant walk that TRAVERSES trashed rows too — purge targets are whole
+ *  trashed subtrees, and a work_item may sit under a trashed room chain. */
+function collectDescendantsIncludingTrashed(d: LifecycleDb, rootId: string): string[] {
+  const ids: string[] = []
+  const kids = d.prepare('SELECT id FROM nodes WHERE parent_id = ?')
+  const walk = (nid: string): void => {
+    for (const k of kids.all(nid) as Array<{ id: string }>) {
+      ids.push(k.id)
+      walk(k.id)
+    }
+  }
+  walk(rootId)
+  return ids
+}
+
+// ── Detach-and-revive (§2.5.3) ───────────────────────────────────────────────
+
+export interface DetachHook {
+  /** S2 records `wi_local.detached_from_id` here; S1 has no satellite table
+   *  yet, so the default is a no-op seam. */
+  onDetached?(workItemId: string, detachedFromParentId: string | null): void
+}
+
+/**
+ * Before any hard delete of the given roots: find every work_item in their
+ * subtrees, detach it (`parent_id = NULL`) and revive it (`trashed_at = NULL`),
+ * so the FK cascade that follows cannot take it. Returns the detached count.
+ * Reviving a non-trashed row is a no-op by construction.
+ */
+export function detachAndReviveWorkItemDescendants(
+  d: LifecycleDb,
+  rootIds: string[],
+  hook?: DetachHook
+): number {
+  if (!rootIds.length) return 0
+  const detach = d.prepare(
+    "UPDATE nodes SET parent_id = NULL, trashed_at = NULL, updated_at = ? WHERE id = ? AND kind = 'work_item'"
+  )
+  const kindOf = d.prepare('SELECT kind, parent_id FROM nodes WHERE id = ?')
+  let count = 0
+  const now = Date.now()
+  for (const root of rootIds) {
+    for (const id of collectDescendantsIncludingTrashed(d, root)) {
+      const row = kindOf.get(id) as { kind: string; parent_id: string | null } | undefined
+      if (row?.kind !== 'work_item') continue
+      detach.run(now, id)
+      count++
+      try {
+        hook?.onDetached?.(id, row.parent_id)
+      } catch {
+        // The detach itself must never fail on bookkeeping (F-m3): log-and-
+        // continue is the caller's job via its own hook wrapper.
+      }
+    }
+  }
+  return count
+}
+
+// ── Purge (§2.5.2 — F-C1″ target-vs-victim fix) ─────────────────────────────
+
+/**
+ * Hard-delete rows trashed before `cutoffMs`. Work_items are NEVER direct purge
+ * targets (the SELECT excludes them); they are only reachable through a
+ * parent's cascade, which the detach step above intercepts first. The DELETE
+ * re-checks liveness per id in-statement, so a row revived mid-set (a detached
+ * work_item, or anything else) can never be deleted regardless of ordering.
+ */
+/**
+ * The prune core (§2.5.3 site 3/3): remove the local materialized copy of a
+ * shared desk. Un-stamped work_items under it are detached-and-revived (the
+ * cascade cannot be kind-filtered), AND the nodes DELETE excludes work_items
+ * outright — at P1 routed items are STAMPED and match shared_root_id directly,
+ * where child-detach alone is inert (F-M1″). Both exposure states covered.
+ * Caller owns the transaction.
+ */
+export function pruneSharedRows(
+  d: LifecycleDb,
+  rootId: string,
+  tables: string[],
+  hook?: DetachHook
+): number {
+  let removed = 0
+  detachAndReviveWorkItemDescendants(
+    d,
+    (
+      d.prepare('SELECT id FROM nodes WHERE shared_root_id = ?').all(rootId) as Array<{
+        id: string
+      }>
+    ).map((r) => r.id),
+    hook
+  )
+  for (const table of tables) {
+    // ci-delete-allowlist: pruneSharedRows (§2.5.3 lock — sanctioned site 3/3)
+    const sql =
+      table === 'nodes'
+        ? `DELETE FROM ${table} WHERE shared_root_id = ? AND kind != 'work_item'`
+        : `DELETE FROM ${table} WHERE shared_root_id = ?`
+    const r = d.prepare(sql).run(rootId) as { changes?: number }
+    removed += r?.changes ?? 0
+  }
+  return removed
+}
+
+export function purgeExpiredTrash(
+  d: LifecycleDb,
+  cutoffMs: number,
+  hook?: DetachHook
+): { purged: number; revived: number } {
+  const targets = d
+    .prepare(
+      "SELECT id FROM nodes WHERE trashed_at IS NOT NULL AND trashed_at < ? AND kind != 'work_item'"
+    )
+    .all(cutoffMs) as Array<{ id: string }>
+  if (!targets.length) return { purged: 0, revived: 0 }
+  const rootIds = targets.map((t) => t.id)
+  const revived = detachAndReviveWorkItemDescendants(d, rootIds, hook)
+  // ci-delete-allowlist: purgeExpiredTrash (§2.5.3 lock — sanctioned site 1/3)
+  const del = d.prepare('DELETE FROM nodes WHERE id = ? AND trashed_at IS NOT NULL')
+  let purged = 0
+  for (const t of targets) {
+    const res = del.run(t.id) as { changes?: number }
+    if ((res?.changes ?? 0) > 0) purged++
+  }
+  return { purged, revived }
+}
