@@ -3,7 +3,8 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (early, G2 CLOSED) · **State:** IN_PROGRESS — Phase 3
+**Last updated:** 2026-08-25 (architecture gate MET) · **State:** IN_PROGRESS — Phase 5
+(build-prompt authoring; ARCHITECTURE v2.3 APPROVED)
 
 **G2 MET — Phase 2 complete, all seven items:** matrix adversarially verified (12
 CONFIRMED / 4 PARTIALLY / 0 REFUTED; two class disputes upheld + corrected; six misses
@@ -13,9 +14,12 @@ Phase 3 — strategy + logic-audited architecture** (the real build plan: schema
 dual-start migration, SPEC-002 columns + mapping table + assignee reconciliation +
 allowlist additions, IPC/preload signatures, notification substrate design, component
 decomposition, stage breakdown with verify-commands, then per-stage build prompts).
-**Phase 3/4 state (2026-08-25):** ARCHITECTURE v1 drafted → logic audit **REJECTED** (2
-CRITICAL, 9 MAJOR, 3 MINOR — gates working) → **v2 written repairing all 14** → re-gate in
-flight (fresh logic audit + independent second validator for §2/§3 dual validation).
+**Phase 3/4 CLOSED (2026-08-25): ARCHITECTURE.md v2.3 APPROVED — G3+G4 MET with dual
+signatures.** Chain: v1 REJECTED (14 findings) → v2 (11) → v2.1 (14, incl. blind
+validator's 6 conditions; C1≡F-C1″ found independently = dual validation working) → v2.2
+(narrow verify: 11/12 CLOSED, 8/8 code citations exact, 2 propagation slips) → **v2.3
+(0 open findings)**. Per §7's rule, per-stage build prompts (S0–S7) are now authorized —
+that authoring is the live task.
 Risk war-game COMPLETE → analysis/17 (18 risks; top-3: R016 GAP-013-at-fleet-scale if
 merged, R001 sync-engine collision with Caleb's churn, R008 work_item delete semantics
 undefined). **v2.1 revision after re-gate verdicts** folds in the adoptable risk repairs:
@@ -66,28 +70,35 @@ trim); ambiguities Q1–Q4, Q6–Q8 scheduled for Phase 2/3 proposals returned f
 
 ## Right now
 
-Phase 0 (Foundation) is complete and the five pre-spec rulings are **operator-approved**
-(DEC-007..011): work items are nodes (`work_item`, CHECK widened — provisional to G4);
-routing specced both scopes, built self-first; calendar engine stays with surface rebuild
-licensed; plans untouched in v1; vocabulary locked. Design Fidelity Standard codified
-(DESIGN-FIDELITY.md — repo DESIGN_SYSTEM.md is the law; primitives-first; six-point
-native-fit check in the rubric). **Next action: the spec-drafting session writes the intake
-spec with the docket's rulings; operator pastes it here → run
-[phases/PHASE-1-spec-intake/PLAN.md](phases/PHASE-1-spec-intake/PLAN.md).**
+**ARCHITECTURE.md v2.3 is APPROVED (2026-08-25) — the single source of design truth for
+the build.** Live task: author the per-stage build prompts (S0–S7 per §7's stage table)
+into `phases/BUILD-PROMPTS/`, each self-contained against v2.3 with pre-flight, contents,
+key-verify commands, and rubric hooks. Then execute S0 (SPEC-044 vocabulary quarantine)
+under DEC-015 autopilot. The lifecycle track's L1 (approval-free additive UI) interleaves
+on bandwidth; L2 still needs D1/D2. **Operator ruling set still open (non-blocking):
+D1 · D2 · R008 (v1 no-hard-delete fallback already baked in §2.5.10 pending the DEC) ·
+R012.** PR for `fix/sync-wake-coalescing` awaits operator's click.
 
 ## Execution order
 
 1. ~~Phase 0 — Foundation~~ ✔
-2. Phase 1 — Spec intake & decomposition ← **NEXT (blocked on: operator supplies spec)**
-3. Phase 2 — Current-state verification & gap analysis (incl. GAP-008 sync-layer investigation)
-4. Phase 3 — Product strategy & experience design (+ pressure test 1)
-5. Phase 4 — Technical architecture (+ pressure test 2)
-6. Phase 5 — Staged build roadmap (operator green light)
-7. Phase 6..N — Execute per-stage loop
+2. ~~Phase 1 — Spec intake & decomposition~~ ✔ (G1 MET, DEC-014)
+3. ~~Phase 2 — Current-state verification & gap analysis~~ ✔ (G2 MET, dual-validated)
+4. ~~Phase 3 — Product strategy & experience design~~ ✔ (merged into ARCHITECTURE per F011)
+5. ~~Phase 4 — Technical architecture~~ ✔ (**v2.3 APPROVED — G3+G4 MET, dual signatures**)
+6. Phase 5 — Staged build roadmap → per-stage prompts (S0–S7) ← **NOW**
+7. Phase 6..N — Execute per-stage loop (DEC-015 autopilot; lifecycle track interleaved)
 8. Phase F — Integrate & close
 
 ## Recently completed (audit trail — most recent first)
 
+- **2026-08-25 — ARCHITECTURE GATE MET (G3+G4, dual signatures) → v2.3 APPROVED.**
+  Four audit rounds + one narrow closing verification; final pass: 11/12 repairs CLOSED,
+  8/8 code citations exact, remaining 2 propagation slips + 3 nits fixed in v2.3
+  (§7-S1/S2 rows re-anchored to §2.5.4's five cases and §2.4's `detached_from_id`;
+  §2.5 renumbered 1–10; writer count six + `ensureSharedContainer`; CI-lock scope pinned
+  to nodes-targeting DELETEs + migration's own `DROP TABLE` allowlisted; §2.6 P1 checklist
+  carries the prune exclusion). Build-prompt authoring authorized per §7.
 - **2026-08-24 (latest) — Vocabulary complete + consumer census.** DEC-012: the surface is
   **"Attention"** (verified convergence with Caleb's existing `AttentionItem`/`ContextObject`
   + `attentionPrecision()`; "Signal" eliminated — the sync transport is the signal server).
