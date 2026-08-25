@@ -5,7 +5,15 @@
 
 **Last updated:** 2026-08-25 (S5 SHIPPED — **THE ATTENTION LAYER IS LIVE**) · **State:**
 IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
-→ **S6 ✔ COMPLETE (9320c6b3) → S7 next**)
+→ **S6 ✔ + DEC-019 ✔ (2d251f0a) → S7 next**)
+
+**DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
+(b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
+entry, console header 'Attention' + Open page →, ROUTED always stops at the one
+confirmation screen (classifier's pick pre-highlighted, Enter files, arrows cycle,
+deadline question inline), @attention chat-mention rule, user-facing labels say
+Attention; (c) ONE Attention widget with section slider — the seven att-* retired via
+registry flag. 2741/2741 tests.
 
 **S6 CLOSED (2026-08-25):** widgets ×7 + L3 staleDesks + ranker v1 +
 attentionPrecision wiring + lenses (Queue/Due/Origin + Recently closed) + CR-04(b)
