@@ -170,6 +170,23 @@ export interface FbNode {
   title: string
   description: string
   status: TaskStatus
+  // ── work_item fields (Attention layer S2, §2.2) — present only on
+  // kind='work_item' rows; undefined on desks/rooms. `status` above is a
+  // DERIVED projection for work_items (workItemState is authoritative);
+  // dueAt is ISO-8601, deliberately distinct from the numeric desk dueDate.
+  workItemState?: string | null
+  intentClass?: string | null
+  originatorId?: string | null
+  recipientId?: string | null
+  dueAt?: string | null
+  wiUrgency?: string | null
+  sourceRef?: string | null
+  sourceType?: string | null
+  confidence?: number | null
+  approvalState?: string | null
+  reasonCode?: string | null
+  wiOrigin?: string | null
+  schemaEpoch?: number | null
   priority: AxisValue
   interest: AxisValue
   importance: AxisValue

@@ -10,6 +10,7 @@ import {
   purgeExpiredTrash
 } from './nodeLifecycle'
 import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
+import { workItemDetachHook } from './workItems'
 import { isWorkItemsEnabled } from '../workItemsPref'
 import type { FbNode, NodeDraft, NodePatch } from '@shared/types'
 
@@ -49,6 +50,19 @@ interface NodeRow {
   is_plan: number | null
   shared_from_handle: string | null
   shared_root_id: string | null
+  work_item_state: string | null
+  intent_class: string | null
+  originator_id: string | null
+  recipient_id: string | null
+  due_at: string | null
+  wi_urgency: string | null
+  source_ref: string | null
+  source_type: string | null
+  confidence: number | null
+  approval_state: string | null
+  reason_code: string | null
+  wi_origin: string | null
+  schema_epoch: number | null
 }
 
 function rowToNode(row: NodeRow): FbNode {
@@ -75,7 +89,22 @@ function rowToNode(row: NodeRow): FbNode {
     archived: row.archived === 1,
     isPlan: row.is_plan === 1,
     sharedFromHandle: row.shared_from_handle ?? null,
-    sharedRootId: row.shared_root_id ?? null
+    sharedRootId: row.shared_root_id ?? null,
+    // work_item fields (S2): undefined-collapsed to null; only meaningful on
+    // kind='work_item' rows.
+    workItemState: row.work_item_state ?? null,
+    intentClass: row.intent_class ?? null,
+    originatorId: row.originator_id ?? null,
+    recipientId: row.recipient_id ?? null,
+    dueAt: row.due_at ?? null,
+    wiUrgency: row.wi_urgency ?? null,
+    sourceRef: row.source_ref ?? null,
+    sourceType: row.source_type ?? null,
+    confidence: row.confidence ?? null,
+    approvalState: row.approval_state ?? null,
+    reasonCode: row.reason_code ?? null,
+    wiOrigin: row.wi_origin ?? null,
+    schemaEpoch: row.schema_epoch ?? null
   }
 }
 
@@ -221,6 +250,11 @@ export function updateNode(id: string, patch: NodePatch): FbNode | null {
   ]
   // Leaf invariant (§2.5.5): the parentId patch column is a parent_id writer.
   if (patch.parentId !== undefined) assertParentAcceptsChildren(db, patch.parentId)
+  // §2.3 (F008): status for work_items is a DERIVED projection — writable only
+  // by the workItems module's state transitions, never patched directly.
+  if (existing.kind === 'work_item' && patch.status !== undefined) {
+    throw new Error('work_item status is derived from work_item_state — use workItems.setState')
+  }
   for (const [key, col] of cols) {
     if (patch[key] !== undefined) {
       fields.push(`${col} = @${key}`)
@@ -297,7 +331,7 @@ export function moveNodeToOrg(rootId: string, orgId: string, teamId: string | nu
   const all = collectActiveSubtree(db, rootId)
   const kindOf = db.prepare('SELECT kind FROM nodes WHERE id = ?')
   const ids = all.filter((i) => (kindOf.get(i) as { kind: string } | undefined)?.kind !== 'work_item')
-  const parkedCount = detachAndReviveWorkItemDescendants(db, [rootId])
+  const parkedCount = detachAndReviveWorkItemDescendants(db, [rootId], workItemDetachHook(db))
   if (parkedCount > 0) {
     // eslint-disable-next-line no-console
     console.warn(`[moveNodeToOrg] ${parkedCount} work item(s) stayed personal (park-local)`)
@@ -353,7 +387,7 @@ export function purgeTrashedNodes(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
   // Delegated to the lifecycle module (§2.5.2/§2.5.3): work_items are never
   // purge targets, their descendants are detached-and-revived before any
   // delete, and every delete re-checks liveness per id in-statement.
-  const result = db.transaction(() => purgeExpiredTrash(db, cutoff))()
+  const result = db.transaction(() => purgeExpiredTrash(db, cutoff, workItemDetachHook(db)))()
   if (result.revived > 0) {
     // eslint-disable-next-line no-console
     console.warn(`[purgeTrashedNodes] revived ${result.revived} work item(s) at purge (detached)`)

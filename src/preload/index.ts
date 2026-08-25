@@ -1689,7 +1689,25 @@ const api = {
   },
   // Multi-device workspace sync — the renderer drives the network, main owns the
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
+  // work_item internal seam (Attention S2). The arrival router in crdtSync is
+  // the ONLY caller today; S3 grows this into the full user-facing namespace.
+  workItems: {
+    kindOf: (id: string): Promise<string | null> => ipcRenderer.invoke('workItems:kindOf', id),
+    applySyncEvent: (
+      ev:
+        | { type: 'create'; snapshot: Record<string, unknown> }
+        | { type: 'attr'; id: string; attr: string; value: unknown }
+        | { type: 'trash'; id: string; trashed: boolean }
+    ): Promise<string> => ipcRenderer.invoke('workItems:applySyncEvent', ev)
+  },
   workspaceSync: {
+    // F010 — after a 409 conflict-apply, floor the local sync_rev to the
+    // server's so baseRev advances even when the apply no-opped.
+    advanceBaseRev: (
+      itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file',
+      id: string,
+      rev: number
+    ): Promise<void> => ipcRenderer.invoke('workspace:advanceBaseRev', itemType, id, rev),
     pending: (): Promise<{
       upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
       deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>

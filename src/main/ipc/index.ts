@@ -27,6 +27,7 @@ import {
   collectPendingOrg,
   collectPendingShared,
   markPushed,
+  advanceBaseRev,
   applyRemote,
   applyRemoteOrg,
   applyRemoteShared,
@@ -72,6 +73,11 @@ import { searchAll, setMailSearchCache } from '../db/search'
 const announcedMailUids = new Set<number>()
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
 import { getDb } from '../db/database'
+import {
+  applyRemoteWorkItemSnapshot,
+  applyRemoteWorkItemAttr,
+  applyRemoteWorkItemTrash
+} from '../db/workItems'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
@@ -668,6 +674,29 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  // work_item internal seam (Attention S2): the arrival router's channel into
+  // the ONE work_item code path (F008). S3 grows the namespace user-facing.
+  ipcMain.handle('workItems:kindOf', (_e, id: string) => {
+    const row = getDb().prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
+      | { kind: string }
+      | undefined
+    return row?.kind ?? null
+  })
+  ipcMain.handle(
+    'workItems:applySyncEvent',
+    (
+      _e,
+      ev:
+        | { type: 'create'; snapshot: Record<string, unknown> }
+        | { type: 'attr'; id: string; attr: string; value: unknown }
+        | { type: 'trash'; id: string; trashed: boolean }
+    ) => {
+      if (ev.type === 'create') return applyRemoteWorkItemSnapshot(ev.snapshot)
+      if (ev.type === 'attr') return applyRemoteWorkItemAttr(ev.id, ev.attr, ev.value)
+      applyRemoteWorkItemTrash(ev.id, ev.trashed)
+      return 'applied'
+    }
+  )
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
   ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => {
@@ -3012,6 +3041,11 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
+  // F010 (Attention S2): floor local sync_rev to the server's after a 409
+  // conflict-apply so baseRev advances even when the apply no-opped.
+  ipcMain.handle('workspace:advanceBaseRev', (_e, itemType: string, id: string, rev: number) =>
+    advanceBaseRev(itemType, id, rev)
+  )
   ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) =>
     markPushed(itemType, id, rev)
   )

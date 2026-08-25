@@ -2,6 +2,7 @@ import { getDb } from './database'
 import { PERSONAL_ORG_ID } from './activeOrg'
 import { emitObjectEvent } from '../context/engine'
 import { pruneSharedRows } from './nodeLifecycle'
+import { normalizeAppliedWorkItem, workItemDetachHook } from './workItems'
 
 // ── Park-inbound (§2.1 receiver defensiveness; GAP-013 repair) ──────────────
 // A row this build cannot materialize (its kind fails the local CHECK — e.g. a
@@ -42,6 +43,51 @@ function maybeParkApplyFailure(
     const kind = (item.body as { kind?: unknown } | undefined)?.kind
     parkInbound(item.id, item.itemType, `kind '${String(kind)}' not accepted by local schema`)
   }
+}
+
+// Post-apply normalization for work_item rows on ALL poll arms (§2.3 F012 +
+// §2.1): recompute the status projection locally, enforce the leaf invariant,
+// park rows from a newer schema epoch.
+function normalizeIfWorkItem(
+  db: ReturnType<typeof getDb>,
+  table: string,
+  item: { id: string; itemType: string; body?: unknown }
+): void {
+  if (table !== 'nodes') return
+  if ((item.body as { kind?: unknown } | undefined)?.kind !== 'work_item') return
+  const verdict = normalizeAppliedWorkItem(db, item.id)
+  if (verdict === 'parked-epoch') {
+    parkInbound(
+      item.id,
+      item.itemType,
+      `work_item from newer schema epoch ${String((item.body as { schema_epoch?: unknown }).schema_epoch)}`
+    )
+  }
+}
+
+/** F010 — the 409-loop fix: after a conflict where server-wins apply may have
+ *  no-opped (echo-suppression on a desynced local rev), floor the local
+ *  sync_rev to the server's so the next push carries an acceptable baseRev.
+ *  A genuinely newer local edit then re-pushes ONCE and wins; without this, a
+ *  conflicted row is permanently unroutable with no signal.
+ *  [PLEXI-UPSTREAM] flagged with the wake-coalescing fix. */
+export function advanceBaseRevCore(
+  d: { prepare(sql: string): { run(...a: unknown[]): unknown } },
+  table: string,
+  id: string,
+  rev: number
+): void {
+  if (!Number.isFinite(rev)) return
+  // A floor, never a rewind: a local rev already at/above the server's stays.
+  d.prepare(
+    `UPDATE ${table} SET sync_rev = ? WHERE id = ? AND (sync_rev IS NULL OR sync_rev < ?)`
+  ).run(rev, id, rev)
+}
+
+export function advanceBaseRev(itemType: string, id: string, rev: number): void {
+  const table = TABLE[itemType as ItemType]
+  if (!table) return
+  advanceBaseRevCore(getDb(), table, id, rev)
 }
 
 // Main-process half of multi-device workspace sync. The renderer owns the network
@@ -620,6 +666,7 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
         ).run(params)
         applied++
         changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
+        normalizeIfWorkItem(db, table, item)
       } catch (err) {
         // One bad row (e.g. a foreign key whose parent has not synced yet)
         // must not abort the whole batch; the next cycle retries it — EXCEPT a
@@ -780,6 +827,7 @@ export function applyRemoteOrg(items: RemoteItem[], orgId: string): { applied: n
         ).run(params)
         applied++
         changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
+        normalizeIfWorkItem(db, table, item)
       } catch (err) {
         // A single bad row (e.g. a foreign key whose parent table has not synced
         // yet) must not abort the batch; the next cycle retries it — except an
@@ -897,6 +945,7 @@ export function applyRemoteShared(
         ).run(params)
         applied++
         changes.push({ id: item.id, itemType: item.itemType, deleted: false, deskId: deskIdOfRemote(item) })
+        normalizeIfWorkItem(db, table, item)
       } catch (err) {
         // FK not present yet (a parent arriving in a later cycle) — retry next
         // cycle. An unknown kind is parked + surfaced instead (§2.1).
@@ -938,7 +987,7 @@ export function pruneSharedDesk(rootId: string): number {
   // Sanctioned hard-delete site 3/3 — the prune core lives in nodeLifecycle
   // (§2.5.3): work_items are detached-and-revived and excluded from the DELETE.
   const tx = db.transaction(() =>
-    pruneSharedRows(db, rootId, ['fb_rows', 'widgets', 'fb_tables', 'nodes'])
+    pruneSharedRows(db, rootId, ['fb_rows', 'widgets', 'fb_tables', 'nodes'], workItemDetachHook(db))
   )
   return tx()
 }

@@ -48,6 +48,7 @@ import {
   liveFolderPartition
 } from './syncFlags'
 import type { Widget, FbNode, TimeBlock, FbDocument, WidgetLink, WireType } from '@shared/types'
+import { WORK_ITEM_COLUMNS } from '@shared/workItems'
 import type { FbRow, FbTable, FileEntry } from '@shared/fields'
 import type { FolderEntry } from './liveFolder'
 
@@ -71,7 +72,12 @@ const NODE_ATTR_KEYS = [
   // Resume/standup markdown is a plain scalar field (LWW is fine; it is not a
   // collaborative rich-text body — those go through the Yjs text class).
   'resumeMarkdown',
-  'resumeUpdatedAt'
+  'resumeUpdatedAt',
+  // work_item routing columns (Attention S2, GAP-015): every renderer-emitted
+  // manifest attr joins the allowlist so the LIVE path carries them — without
+  // this, a routed item would arrive stripped of exactly its routing fields.
+  // schema_epoch is main-process-written and deliberately absent (F-m2″).
+  ...WORK_ITEM_COLUMNS.filter((c) => c.rendererEmitted).map((c) => c.attr)
 ] as const
 
 // WS01 sync substrate — the client sync engine.
@@ -413,6 +419,14 @@ function emitNodeCreate(node: FbNode): void {
     estimateMinutes: node.estimateMinutes,
     dueDate: node.dueDate,
     isPlan: node.isPlan
+  }
+  if (node.kind === 'work_item') {
+    // The full manifest rides the create snapshot (GAP-015) — a routed item
+    // arriving without its routing columns is the failure this prevents.
+    for (const def of WORK_ITEM_COLUMNS) {
+      if (!def.rendererEmitted) continue
+      snapshot[def.attr] = (node as unknown as Record<string, unknown>)[def.attr] ?? null
+    }
   }
   const ev = mkEvent(pk, 'node', node.id, 'create', 'set', { snapshot, at: Date.now() })
   recordLocal(ev, false)
@@ -936,9 +950,41 @@ async function applyNodeParent(id: string, parentId: string | null): Promise<voi
   useNodeStore.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, parentId } : n)) }))
 }
 
+// ── The work_item ARRIVAL ROUTER (§3 D1, Attention S2) ─────────────────────
+// The plumbing below this block would DESTROY inbound work_item events:
+// nodes.create refuses the kind at the protocol boundary, nodes.delete refuses
+// work_item roots (C2), and both refresh useNodeStore, which excludes them.
+// kind==='work_item' events therefore route to the workItems db-module
+// functions via their own internal channel (full column set, projection
+// recomputed main-side, leaf invariant enforced).
+const workItemIds = new Set<string>()
+async function isWorkItemId(id: string): Promise<boolean> {
+  if (workItemIds.has(id)) return true
+  // Known desk/room? The store holds every non-work_item node — cheap and
+  // covers the entire desk hot path without an IPC round trip.
+  if (useNodeStore.getState().nodes.some((n) => n.id === id)) return false
+  try {
+    const kind = await window.api.workItems.kindOf(id)
+    if (kind === 'work_item') {
+      workItemIds.add(id)
+      return true
+    }
+  } catch {
+    /* unknown id — treat as not-a-work-item; the poll reconciles */
+  }
+  return false
+}
+
 function applyNodeCreate(snapshot: Record<string, unknown>): void {
   const id = snapshot.id as string
   if (!id || tombstoned.has(id)) return
+  if (snapshot.kind === 'work_item') {
+    workItemIds.add(id)
+    void window.api.workItems.applySyncEvent({ type: 'create', snapshot }).catch(() => {
+      /* un-migrated / disabled device: the main side parks it (§2.1) */
+    })
+    return
+  }
   applyCreateGuarded(`node:${id}`, () => tryCreateNode(snapshot))
 }
 async function tryCreateNode(snapshot: Record<string, unknown>): Promise<boolean> {
@@ -959,6 +1005,16 @@ async function tryCreateNode(snapshot: Record<string, unknown>): Promise<boolean
 }
 
 async function applyNodeDelete(id: string): Promise<void> {
+  // Router branch (§3 D1): a work_item delete event is its desk's trash sweep
+  // propagating (§2.5.1) — soft-trash via the workItems path, never the
+  // C2-guarded user delete, and never tombstoned (a purge on the origin
+  // device revives it later).
+  if (await isWorkItemId(id)) {
+    void window.api.workItems
+      .applySyncEvent({ type: 'trash', id, trashed: true })
+      .catch(() => {})
+    return
+  }
   tombstoned.add(id)
   let removed: string[] = [id]
   try {
@@ -971,6 +1027,13 @@ async function applyNodeDelete(id: string): Promise<void> {
 }
 
 async function applyNodeAttr(id: string, attr: string, value: unknown): Promise<void> {
+  // Router branch (§3 D1): manifest attrs land through the workItems module
+  // (projection recomputed main-side; a wire 'status' for a work_item is
+  // ignored there — the projection is derived, never written from the wire).
+  if (await isWorkItemId(id)) {
+    void window.api.workItems.applySyncEvent({ type: 'attr', id, attr, value }).catch(() => {})
+    return
+  }
   try {
     await window.api.nodes.update(id, { [attr]: value } as never)
   } catch {
