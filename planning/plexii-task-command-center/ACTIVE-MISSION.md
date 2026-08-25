@@ -3,8 +3,15 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S2 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
-(DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ → S3 next)
+**Last updated:** 2026-08-25 (S3 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
+(DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ → S4 next)
+
+**S3 CLOSED (2026-08-25, commit 00240bda):** the workItems:* namespace (9 verbs, F008
+one-code-path), the renderer store as live-path producer (status never emitted; manifest
+attrs only), sync-loop refresh, the fb:command-new-work-item creation seam. 2694/2694
+tests. Flag stays OFF until S5/S6 (deliberate — the S0 catalog addendum must not
+advertise the verb before its surfaces exist). Ledger:
+[phases/HANDOFFS/s3-close.md](phases/HANDOFFS/s3-close.md).
 
 **S2 CLOSED (2026-08-25, commit 2c133165):** the sync contract. Column manifest (one
 source, 13 cols) + status projection (never-done pinned) + satellites with orphan sweep +
