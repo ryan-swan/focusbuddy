@@ -3,8 +3,18 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S0 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
-(operator green light given 2026-08-25; DEC-017. S0 ✔ → S1 next)
+**Last updated:** 2026-08-25 (S1 SHIPPED — live migration LANDED) · **State:**
+IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ → S2 next)
+
+**S1 CLOSED (2026-08-25, commits ae0f071e/63b0fc0b/bfaf00ba):** the FOUNDATIONAL stage.
+`migrateNodesKindCheckV2` **fired on the live DB and passed every assertion** (112/112
+rows, 4-kind CHECK, trigger+indexes survived, FK-check clean, dual restore points);
+`nodeLifecycle.ts` owns the closed three-site hard-delete enumeration with
+detach-and-revive; C2 + leaf-invariant typed refusals; listNodes exclusion; park-inbound
+replaces the sync swallow (GAP-013) [PLEXI-UPSTREAM]; CI delete-site lock armed; NodeKind
+union swapped (CR-05a). 2649/2649 tests. Full ledger:
+[phases/HANDOFFS/s1-close.md](phases/HANDOFFS/s1-close.md). Deferred per R010: the
+sync-side kind round-trip (disposable account, P1 checklist).
 
 **S0 CLOSED (2026-08-25, commit 09e129d9):** vocabulary quarantine executed — shared
 vocabulary module + workItems.enabled flag (default OFF, voiceProviderPref pattern);
