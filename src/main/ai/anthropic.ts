@@ -27,6 +27,13 @@ import { uiBlocksSection, validateChatUiBlocks } from './chatUiBlocks'
 import { discoverySection } from './discoveryMode'
 import { turnRetrieval } from './retrievalIntent'
 import { buildGreenLit, gateCreation } from './creationGate'
+import {
+  CREATE_TASK_DEFINITION,
+  UPDATE_TASK_DEFINITION,
+  PROTOCOL_VOCAB_NOTE,
+  workItemCatalogAddendum
+} from './vocabulary'
+import { isWorkItemsEnabled } from '../workItemsPref'
 import { MEMORY_SYSTEM, buildChatMemoryPrompt, parseMemoryResponse } from './memoryExtract'
 import { addMemory, listMemoriesBalanced } from '../db/memory'
 import { embeddingConfigured } from './embeddings'
@@ -327,8 +334,8 @@ function taskBlock(taskId: string): string {
   const widgets = listWidgetsByTask(taskId)
   const linksSummary = summarizeLinks(taskId, widgets)
   const lines = [
-    `Task: ${node.title}`,
-    `Task id: ${node.id}`,
+    `Desk: ${node.title}`,
+    `Desk id: ${node.id}`,
     node.description ? `Notes: ${node.description}` : '',
     `Status: ${node.status}`,
     `Priority/Interest/Importance: ${node.priority}/${node.interest}/${node.importance} (1-5)`,
@@ -355,7 +362,9 @@ const ACTION_KINDS_CATALOG =
   '  { "kind": "agent-browse", "task": "Search this site for a 2-bedroom under $2400 and open the best listing", "url": "https://...", "reason": "..." }  (Plexii drives the in-app browser step by step — visible, stoppable, consent-gated. Use when the user asks you to DO something on a website: search within it, fill a form, walk a flow. For simply showing a page, use open-url. It never signs in, pays, solves CAPTCHAs, or moves files — if the task needs that, say that part is theirs. "url" is where to start; omit it to act on the page already open.)\n' +
   '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
   '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "reason": "..." }\n' +
-  '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }\n' +
+  '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }  (' +
+  CREATE_TASK_DEFINITION +
+  ')\n' +
   '  { "kind": "create-table", "id": "tbl-1", "title": "Episodes", "columns": [{"label":"Title","type":"text-short"},{"label":"Status","type":"single-select","options":["Draft","Recorded","Live"]}], "reason": "..." }\n' +
   '  { "kind": "add-table-row", "tableId": "$tbl-1", "cells": {"Title":"Pilot","Status":"Draft"}, "reason": "..." }\n' +
   '  { "kind": "create-field", "label": "Energy", "fieldType": "single-select", "options": ["Low","Med","High"], "reason": "..." }\n' +
@@ -364,7 +373,9 @@ const ACTION_KINDS_CATALOG =
   '  { "kind": "update-widget", "widgetId": "<from canvas summary>", "label": "the launch checklist", "title": "...", "content": "...", "reason": "..." }\n' +
   '  { "kind": "delete-widget", "widgetId": "<from canvas summary>", "label": "the empty sticky", "reason": "..." }\n' +
   '  { "kind": "start-focus-session", "minutes": 5, "reason": "..." }\n' +
-  '  { "kind": "update-task", "taskId": "<the Task id shown above>", "label": "this task", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }\n' +
+  '  { "kind": "update-task", "taskId": "<the Desk id shown above>", "label": "this desk", "status": "done", "dueDate": null, "title": "new title", "reason": "user marked it complete" }  (' +
+  UPDATE_TASK_DEFINITION +
+  ')\n' +
   '  { "kind": "create-knowledge-entry", "title": "Brand voice rule", "body": "We write in first-person plural and never use em dashes.", "tags": ["brand"], "reason": "user stated this as a rule" }\n' +
   '  { "kind": "edit-document", "documentId": "<from the documents list>", "label": "the Q3 brief", "body": "New section text...", "operation": "append", "reason": "..." }\n' +
   '  { "kind": "generate-document", "docType": "slides"|"sheet"|"map"|"doc", "title": "Q3 launch deck", "prompt": "<what to make, grounded only in the request/context>", "reason": "..." }  (slides=presentation, sheet=spreadsheet, map=diagram/flowchart/mind map/org chart, doc=written document; the real content is generated in a follow-up step, so the prompt must restate only what was asked and invent nothing, and your text must not claim it already exists)\n' +
@@ -372,6 +383,8 @@ const ACTION_KINDS_CATALOG =
   '  { "kind": "schedule-event", "title": "Deep work: brief", "startMs": 1780000000000, "durationMinutes": 60, "recurrence": null, "reason": "..." }\n' +
   '  { "kind": "compose-mail", "to": ["ana@example.com"], "subject": "Q3 brief attached", "body": "Hi Ana, ...", "reason": "..." }\n' +
   '  { "kind": "post-chat", "conversationId": "<from chat conversations>", "conversationLabel": "#launch", "body": "Draft update: ...", "reason": "..." }\n' +
+  '\n' +
+  PROTOCOL_VOCAB_NOTE +
   '\n'
 
 function buildSystemPrompt(
@@ -383,8 +396,8 @@ function buildSystemPrompt(
   mode?: AiChatMode
 ): string {
   const base =
-    'You are PlexiDesk, the in-app pair-worker for an ADHD-friendly task-execution desktop app. ' +
-    'You help the user think, plan, research, and complete the task they are currently focused on. ' +
+    'You are PlexiDesk, the in-app pair-worker for an ADHD-friendly desktop app built around desks — focused workspaces. ' +
+    'You help the user think, plan, research, and complete the work on the desk they currently have open. ' +
     'You can see the contents of their canvas (sticky notes, browsers, files, calculators, timers — listed below). ' +
     'Be concise and action-oriented. Default to suggesting the single next concrete step over long explanations. ' +
     'When the user asks for research, give the 3–5 highest-value points, not an essay.\n\n' +
@@ -395,6 +408,7 @@ function buildSystemPrompt(
     '  "actions": [ /* zero or more action objects */ ]\n' +
     '}\n\n' +
     ACTION_KINDS_CATALOG +
+    workItemCatalogAddendum(isWorkItemsEnabled()) +
     '⚠ HARD RULES:\n' +
     '1. The user sees ONLY two things: (a) the "reply" field rendered as markdown, and (b) one action card for each item in the "actions" array. They do NOT see anything else you write. Describing widgets in prose inside "reply" does NOT create them — the actions array must contain the entries.\n' +
     '2. For pure chat / questions / no-action requests: actions = []. Just put your answer in reply.\n' +
@@ -407,7 +421,7 @@ function buildSystemPrompt(
     '7a. To add rows to a table you are creating in the SAME response, the table does not have a real id yet. Give the create-table action an "id" field (e.g. "tbl-1"), then in sibling add-table-row actions set "tableId": "$tbl-1" (literal $ prefix + the matching id). The system resolves it at apply time. NEVER guess a uuid for a not-yet-created table.\n' +
     '8. Delete only on explicit user request, never speculatively.\n' +
     '6b. Only propose "create-agent" when the request implies an ONGOING or REPEATABLE process — language like "set up", "automate", "whenever X happens", "keep this updated", or "every time I add a row". A one-time lookup or research request ("research these three companies") should be answered directly in "reply" or via a normal one-off action, never by creating an agent. To AUTOMATE work from a plain requirement, use "create-agent": a desk agent that runs an instruction over the widgets wired into it. Give it an "id" so you can wire inputs in. Default "trigger" to "manual" (it stays off until the user turns it on). Use "link-widgets" to wire things: sourceWidgetId/targetWidgetId are real ids from the canvas OR "$<id>" of things you create in this same response. Set "wireType":"context" to give the target background to read, or "transform" with a short "verb" for a live operation. An agent reads the widgets wired INTO it, so wire the source (a table, a doc, a browser) into the agent. When the user states a requirement ("set me up to track leads and draft outreach"), plan the whole setup: create the table, the agent, any doc, and the wires, as separate action entries the user confirms one by one.\n' +
-    '7b. To change the CURRENT task (mark it done, rename it, move its due date) use "update-task" with "taskId" set to the exact "Task id" shown in the context above. status must be one of open|in_progress|done|parked. Use dueDate as unix ms, or null to clear it. Omit fields you are not changing.\n' +
+    '7b. To change the CURRENT desk (mark the desk done, rename it, move its due date) use "update-task" with "taskId" set to the exact "Desk id" shown in the context above. status must be one of open|in_progress|done|parked. Use dueDate as unix ms, or null to clear it. Omit fields you are not changing.\n' +
     '7c. To remember a fact, decision, or rule the user states, use "create-knowledge-entry". The "body" MUST be real content from this conversation. Never invent facts, names, numbers, or decisions; if the user did not state it, do not store it.\n' +
     '9. Markdown is rendered. When actions carry the work, keep "reply" to 1-2 sentences and don\'t list the widgets — let the cards speak. When the user asked a QUESTION (research, explanation, overview, comparison), the reply IS the answer: write it in full flowing markdown — headings, lists, tables where they genuinely help — it streams to the user as you write it. FORMATTING VOICE (calm, never hype): you may open a section HEADING with ONE relevant emoji — the app renders it as a native icon, so choose it for meaning. Never place emoji anywhere else (bullets, labels, sentences) unless the user\'s own content uses them. Use bold sparingly — a few genuinely load-bearing phrases per answer, never whole sentences and never every list lead.\n' +
     '10. compose-mail and post-chat ALWAYS produce a DRAFT the user reviews and sends themselves. There is no send action and never will be. NEVER say or imply in "reply" that a message was sent. Their bodies must carry only content grounded in this conversation — never invent claims, commitments, dates, names, or recipients on the user\'s behalf. Use real addresses/conversation ids from context or leave "to" empty for the user to fill.\n' +
@@ -732,6 +746,20 @@ export function parseChatJson(raw: string): {
           kind: 'create-page',
           title,
           content: JSON.stringify(sectionsToTiptap(sections)),
+          reason
+        })
+        break
+      }
+      case 'create-work-item': {
+        // Reserved Attention-layer kind (S0): parsed so nothing can squat on
+        // the name; the executor no-ops it until the capability ships.
+        const title = action.title as string
+        if (!title) break
+        proposals.push({
+          id: makeProposalId('wi', i++),
+          kind: 'create-work-item',
+          title,
+          notes: typeof action.notes === 'string' ? (action.notes as string) : undefined,
           reason
         })
         break
@@ -1636,13 +1664,13 @@ export async function generateProactiveWelcome(taskId: string): Promise<ChatResp
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') {
-    return { ok: false, error: 'Task not found' }
+    return { ok: false, error: 'Desk not found' }
   }
   const block = taskBlock(taskId)
   const system =
-    'You are PlexiDesk, the in-app pair-worker. The user has just started working on a task. ' +
+    'You are PlexiDesk, the in-app pair-worker. The user has just started working on a desk. ' +
     'Give them a brief, energizing 1-2 sentence opening that: ' +
-    '(1) acknowledges the task by name without being repetitive about the title; ' +
+    '(1) acknowledges the desk by name without being repetitive about the title; ' +
     '(2) suggests ONE concrete first step they could take RIGHT NOW based on what is on their canvas; ' +
     '(3) skips pleasantries, no "great!", no "let me help you", no questions back to the user. ' +
     'Write as if you are sitting next to them, ready to work.'
@@ -1695,14 +1723,14 @@ export async function generateDailyBrief(): Promise<{ ok: boolean; brief?: strin
   const actions = buildBriefActions(tasks, scheduled, now)
 
   if (briefIsEmpty(tasks, blocks, docs)) {
-    return { ok: true, brief: 'Your workspace is clear — no open tasks or scheduled blocks. A good moment to decide the one thing that would move the needle, and put it on the calendar.', actions: [] }
+    return { ok: true, brief: 'Your workspace is clear — no open desks or scheduled blocks. A good moment to decide the one thing that would move the needle, and put it on the calendar.', actions: [] }
   }
 
   const c = getClient()
   if (!c) return { ok: false, needsApiKey: true, actions, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
 
   const system =
-    "You are the user's sharp, trusted chief of staff. From the real workspace state below, write a short morning brief. Lead with the single most important thing to do today. Then give 3 to 5 prioritised, specific items. Call out any deadline that is at risk or not yet on the calendar. Ground everything strictly in the state provided: never invent tasks, dates, meetings or documents. Keep it under 150 words, plain confident prose, no preamble and no sign-off."
+    "You are the user's sharp, trusted chief of staff. From the real workspace state below, write a short morning brief. Lead with the single most important thing to do today. Then give 3 to 5 prioritised, specific items. Call out any deadline that is at risk or not yet on the calendar. Ground everything strictly in the state provided: never invent desks, dates, meetings or documents. Keep it under 150 words, plain confident prose, no preamble and no sign-off."
   const user = `${buildBriefContext(tasks, blocks, docs, now)}\n\nWrite the brief now:`
 
   try {
@@ -1765,6 +1793,7 @@ function buildAgentSystemPrompt(taskId: string | null): string {
     '  "blocker": null  /* a sentence WHEN status is blocked or need_input; otherwise null */\n' +
     '}\n\n' +
     ACTION_KINDS_CATALOG +
+    workItemCatalogAddendum(isWorkItemsEnabled()) +
     'LOOP RULES:\n' +
     '- Each round the app applies your actions and returns an OBSERVATIONS block: one line per action, [applied] or [FAILED], with any created id. READ it before deciding the next round.\n' +
     '- To reference something you created earlier THIS RUN, use "$<id>" with the id you gave that create action (e.g. create-table "id":"leads" then a later add-table-row "tableId":"$leads"). Only the OBSERVATIONS confirm what exists.\n' +
@@ -2147,7 +2176,9 @@ export async function suggestWorkspaceActions(
     'Never fabricate facts, numbers, names or dates: any content you put in a proposal must come from the question or your answer. ' +
     'Return ONLY a single JSON object, no prose and no code fences. Schema: {"actions":[ ... ]} where each action is exactly one of:\n' +
     '  {"kind":"create-document","docType":"doc|sheet|slides|map|design","title":"...","reason":"why this helps"}  (doc=written document, sheet=spreadsheet, slides=deck, map=diagram/flowchart, design=design canvas)\n' +
-    '  {"kind":"create-task","title":"short action","notes":"optional detail","reason":"..."}\n' +
+    '  {"kind":"create-task","title":"Q1 rebrand","notes":"optional detail","reason":"..."}  (' +
+    CREATE_TASK_DEFINITION +
+    ')\n' +
     '  {"kind":"create-table","title":"...","columns":[{"label":"Name","type":"text-short"}],"reason":"..."}  (column type is one of text-short,text-long,number,checkbox,single-select,multi-select,date; add "options":["a","b"] for select types)\n' +
     '  {"kind":"create-knowledge-entry","title":"...","body":"the real fact/decision to save","tags":["optional"],"reason":"..."}\n' +
     '  {"kind":"schedule-event","title":"...","startMs":<absolute unix ms>,"durationMinutes":30,"reason":"..."}  (the current time is ' +
@@ -2193,6 +2224,9 @@ export async function suggestWorkspaceActions(
         }
         case 'create-task':
           if (title) proposals.push({ id, kind: 'create-task', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
+          break
+        case 'create-work-item':
+          if (title) proposals.push({ id, kind: 'create-work-item', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
           break
         case 'create-knowledge-entry': {
           const body = typeof d.body === 'string' ? d.body.trim() : ''
@@ -2390,7 +2424,7 @@ export async function generateStandupNarrative(input: {
     'LOOK BACK (what actually got completed) and LOOK FORWARD (the current state to pick up from).\n\n' +
     'Rules:\n' +
     `- Weave them into ONE short, natural narrative of 2 to 4 sentences: first what ${subject} completed, then what to pick up next.\n` +
-    '- Ground everything strictly in the provided facts. Never invent a task, a count, a name, or a completion that is not listed. If a section is empty, say so plainly.\n' +
+    '- Ground everything strictly in the provided facts. Never invent a desk, a count, a name, or a completion that is not listed. If a section is empty, say so plainly.\n' +
     '- Plain human prose only: no headings, no bullet lists, no markdown, no emoji, and no em dash (use a comma or a full stop).\n' +
     '- Return only the narrative text, nothing else.'
   try {
@@ -2419,7 +2453,7 @@ export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestR
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') {
-    return { ok: false, error: 'Task not found' }
+    return { ok: false, error: 'Desk not found' }
   }
   const existing = listWidgetsByTask(taskId)
   const existingSummary =
@@ -2444,8 +2478,8 @@ export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestR
       : '(no browsing history yet)'
 
   const system =
-    'You are PlexiDesk, a workspace setup assistant for an ADHD-friendly task app. ' +
-    'The user is about to start a task — they often find it hard to start because deciding which tools to open is paralyzing. ' +
+    'You are PlexiDesk, a workspace setup assistant for an ADHD-friendly, desk-based focus app. ' +
+    'The user is about to start working on a desk — they often find it hard to start because deciding which tools to open is paralyzing. ' +
     'Your job: suggest exactly the widgets they need. Be CONCRETE and SPECIFIC. If they need to research X, suggest a search URL for X, not "a browser for research". ' +
     'Aim for 4–7 suggestions. Skip widgets that are already on their canvas (listed below).' +
     '\n\nAvailable widget kinds:\n' +
@@ -2468,7 +2502,7 @@ export async function suggestSetupWidgets(taskId: string): Promise<SetupSuggestR
     '\nRespond with VALID JSON ONLY, no commentary, no markdown fence. Schema:\n' +
     '{\n  "suggestions": [\n    {\n      "kind": "webview",\n      "title": "short 1-4 word label",\n      "content": "URL or text",\n      "reason": "one sentence why this helps"\n    }\n  ]\n}'
 
-  const userMsg = `Task to set up:
+  const userMsg = `Desk to set up:
 Title: ${node.title}
 ${node.description ? 'Description: ' + node.description : ''}
 Priority/Interest/Importance: ${node.priority}/${node.interest}/${node.importance} (1-5)
@@ -2539,11 +2573,11 @@ export async function generateResume(
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') {
-    return { ok: false, error: 'Task not found' }
+    return { ok: false, error: 'Desk not found' }
   }
   const block = taskBlock(taskId)
   const system =
-    'You are generating a "handoff document" so the user can return to this task tomorrow and resume in 30 seconds instead of 20 minutes. ' +
+    'You are generating a "handoff document" so the user can return to this desk tomorrow and resume in 30 seconds instead of 20 minutes. ' +
     'Write concise markdown with these sections, in this order: ' +
     '\n\n# Where you are\n(2-3 sentences on what has been worked on, based on sticky notes / browser URLs / notes on the canvas)\n\n' +
     '# Key decisions\n(bulleted list of any decisions noted in the widgets; if none clear, write "(none captured yet)")\n\n' +
@@ -2739,7 +2773,7 @@ export async function proposeSmartStacks(taskId: string): Promise<SmartStackResp
   const c = getClient()
   if (!c) return { ok: false, needsApiKey: true, error: 'No Anthropic API key set. Open Settings → AI · API keys to paste one.' }
   const node = getNode(taskId)
-  if (!node) return { ok: false, error: 'Task not found' }
+  if (!node) return { ok: false, error: 'Desk not found' }
 
   const allWidgets = listWidgetsByTask(taskId)
   // Only group widgets that aren't already in a section, aren't archived, aren't pinned, aren't sections themselves
@@ -2773,7 +2807,7 @@ export async function proposeSmartStacks(taskId: string): Promise<SmartStackResp
     .join('\n')
 
   const system =
-    'You are PlexiDesk\'s Smart Stack organizer. The user has many widgets on their canvas for an ADHD-friendly task workspace. ' +
+    'You are PlexiDesk\'s Smart Stack organizer. The user has many widgets on their canvas for an ADHD-friendly desk workspace. ' +
     'Your job: group widgets that BELONG TOGETHER based on what sub-goal they serve. ' +
     '\n\nRules:\n' +
     '- Use widget titles and content snippets to infer relationship.\n' +
@@ -2786,7 +2820,7 @@ export async function proposeSmartStacks(taskId: string): Promise<SmartStackResp
     '\nRespond with VALID JSON ONLY, no commentary, no markdown fence. Schema:\n' +
     '{\n  "groups": [\n    {\n      "name": "string",\n      "widgetIds": ["id", "id"],\n      "reason": "one sentence"\n    }\n  ]\n}'
 
-  const user = `Active task: "${node.title}"${node.description ? '\nNotes: ' + node.description : ''}\n\nWidgets to group:\n${widgetLines}\n\nReturn JSON now.`
+  const user = `Active desk: "${node.title}"${node.description ? '\nNotes: ' + node.description : ''}\n\nWidgets to group:\n${widgetLines}\n\nReturn JSON now.`
 
   try {
     const resp = await c.messages.create({
@@ -2900,7 +2934,7 @@ Widget kinds (use the EXACT kind string):
 - "color" — hex like "#fbbf24" or empty.
 
 Rules:
-1. Choose the BEST widget for each piece of the user's intent. Prefer "table" for any list-of-records-with-attributes ("clients", "tasks", "trips", "habits"). Prefer "page" for prose, plans, briefs. Prefer "field" for single values the user wants to glance at.
+1. Choose the BEST widget for each piece of the user's intent. Prefer "table" for any list-of-records-with-attributes ("clients", "trips", "habits"). Prefer "page" for prose, plans, briefs. Prefer "field" for single values the user wants to glance at.
 2. Tables should have 3-6 columns. Include a primary text column first (e.g. Name/Title) and useful attributes (Status, Date, Tags, etc.).
 3. Pre-populate page content with section headings + a starter paragraph or todo list so the user has structure to fill in.
 4. For "field" widgets, pick the type carefully — checkbox for binary, single-select for status with options, date for due dates, number for quantities.
@@ -3047,7 +3081,7 @@ export async function regenerateLivingPage(
   }
 
   const task = getNode(w.taskId)
-  if (!task || task.kind !== 'task') return { ok: false, error: 'Task not found' }
+  if (!task || task.kind !== 'task') return { ok: false, error: 'Desk not found' }
 
   const allWidgets = listWidgetsByTask(w.taskId)
   // Exclude self + every other living document on the same canvas (a living
@@ -3067,7 +3101,7 @@ export async function regenerateLivingPage(
 
   const system =
     'You are PlexiDesk. The user has a "living page" on their canvas — a page whose body you regenerate ' +
-    'on demand from the rest of the widgets in their current task. Your job is to synthesize a clean, ' +
+    'on demand from the rest of the widgets on their current desk. Your job is to synthesize a clean, ' +
     'useful answer to their query using ONLY the source material listed below.\n\n' +
     'OUTPUT RULES — read carefully:\n' +
     '  - Reply with raw markdown. NO code fences. NO preamble like "Here is the summary".\n' +
@@ -3077,7 +3111,7 @@ export async function regenerateLivingPage(
     '  - Cite source widgets inline by quoting the widget title in **bold** when relevant, e.g. **Meeting notes**.\n' +
     '  - Keep it concise — this is a snapshot, not an essay. ~150-400 words is the right zone.'
 
-  const user = `Task: ${task.title}\n${task.description ? `Notes: ${task.description}\n` : ''}\n` +
+  const user = `Desk: ${task.title}\n${task.description ? `Notes: ${task.description}\n` : ''}\n` +
     `Living page query: ${w.livingQuery.trim()}\n\n` +
     `Source widgets on the canvas:\n${summarizeWidgets(source)}\n\n` +
     'Write the markdown body now:'
@@ -3636,20 +3670,20 @@ const WIDGET_SETUP_KINDS: Record<
     structured: true,
     guidance:
       'a starter document structure for this page: a top-level heading, then a few section headings, ' +
-      'each followed by a short paragraph or a bullet/todo list that fits the task'
+      'each followed by a short paragraph or a bullet/todo list that fits the desk'
   },
   webview: {
     applyAs: 'webview-url',
     noun: 'address',
     structured: true,
     guidance:
-      'the single most useful web address (a full https:// URL) to open for this task — a real, ' +
+      'the single most useful web address (a full https:// URL) to open for this desk — a real, ' +
       'well-known site, never a guessed or invented domain'
   },
   sticky: {
     applyAs: 'sticky-checklist',
-    noun: 'tasks',
-    guidance: 'a short, actionable checklist task of a few words'
+    noun: 'to-dos',
+    guidance: 'a short, actionable checklist to-do of a few words'
   },
   note: {
     applyAs: 'note-lines',
@@ -3716,7 +3750,7 @@ export async function suggestWidgetSetup(input: {
 
   const ctxParts = [
     task && task.kind === 'task'
-      ? `Task: ${task.title}${task.description ? `\nTask notes: ${task.description}` : ''}`
+      ? `Desk: ${task.title}${task.description ? `\nDesk notes: ${task.description}` : ''}`
       : '',
     w.title ? `Widget title: ${w.title}` : '',
     (w.content || '').trim()
@@ -3798,7 +3832,7 @@ async function suggestStructuredWidgetSetup(input: {
 
   const ctxParts = [
     task && task.kind === 'task'
-      ? `Task: ${task.title}${task.description ? `\nTask notes: ${task.description}` : ''}`
+      ? `Desk: ${task.title}${task.description ? `\nDesk notes: ${task.description}` : ''}`
       : '',
     w.title ? `Widget title: ${w.title}` : '',
     siblings.length ? `Other widgets on the desk:\n${summarizeWidgets(siblings)}` : '',
@@ -4281,7 +4315,9 @@ export async function runDeskAgent(input: {
         '  { "kind":"update-widget", "widgetId":"<id>", "label":"...", "content":"...", "operation":"append" }\n' +
         '  { "kind":"edit-document", "documentId":"<id>", "label":"...", "body":"...", "operation":"append" }\n' +
         '  { "kind":"generate-document", "docType":"slides"|"sheet"|"map"|"doc", "title":"...", "prompt":"<what to make, grounded only in the request and inputs>" }\n' +
-        '  { "kind":"create-task", "title":"...", "notes":"..." }\n' +
+        '  { "kind":"create-task", "title":"...", "notes":"..." }  (' +
+        CREATE_TASK_DEFINITION +
+        ')\n' +
         '  { "kind":"create-knowledge-entry", "title":"...", "body":"..." }\n' +
         '  { "kind":"compose-mail", "subject":"...", "body":"..." }\n' +
         'Choosing a surface: a presentation or deck -> generate-document docType "slides"; a spreadsheet, tracker, budget or table of records -> "sheet"; a diagram, flowchart, mind map, org chart or process map -> "map"; a written document, brief or plan -> "doc". edit-document only works on an existing written doc (docType doc); to fill an existing slides/sheet/map OUTPUT widget, use generate-document with its "widgetId" from ACTIONABLE WIDGETS. generate-document produces the real content in a follow-up step, so its "prompt" must restate ONLY what the user asked for and what the inputs contain — never invent facts, numbers, names or data — and your "reply" must NOT claim the content already exists (only the actions do the work).\n' +
@@ -4905,7 +4941,7 @@ export async function fillSheetRange(input: {
     'formula starting with = that references A1-style cells, for example "=B2/B1-1". ' +
     (auto
       ? 'You are solving the user\'s problem, not illustrating it. Produce EVERY row the task genuinely ' +
-        'requires to be complete and usable — for a project plan, every phase and task with no gaps; for a ' +
+        'requires to be complete and usable — for a project plan, every phase and step with no gaps; for a ' +
         'list, every real item. Do NOT stop at a few sample or explanatory rows, and do NOT pad with filler. '
       : '') +
     'No markdown, no code fences, no prose outside the JSON.'
@@ -5130,14 +5166,14 @@ Shape:
 }
 
 Each deliverable is exactly one of:
-  { "kind": "create-task", "title": "short task title", "notes": "optional detail", "reason": "what in the transcript calls for this" }
+  { "kind": "create-task", "title": "short desk title", "notes": "optional detail", "reason": "what in the transcript calls for this" }
   { "kind": "create-knowledge-entry", "title": "fact or decision title", "body": "the real content from the conversation", "tags": ["optional"], "reason": "..." }
   { "kind": "create-document", "docType": "doc", "title": "document title", "reason": "..." }   // docType is one of doc (a written document), sheet (a spreadsheet), slides (a deck), map (a diagram / flowchart), design (a design canvas)
 
 HARD RULES:
 - The summary and every deliverable MUST be grounded in the transcript. Never invent facts, names, numbers, owners, dates, or decisions that were not stated.
 - Each deliverable's "reason" must cite something specific that was actually said.
-- Use create-task for an action item someone needs to do (each task opens its own workspace). Use create-document for a written deliverable (doc), structured or tabular data like an action register or budget (sheet), or a presentation (slides). Use create-knowledge-entry for a decision, fact, or research finding worth keeping.
+- Use create-task for an action item someone needs to do — it creates a DESK: a whole workspace opens for that item, so the user can work it to completion there. Use create-document for a written deliverable (doc), structured or tabular data like an action register or budget (sheet), or a presentation (slides). Use create-knowledge-entry for a decision, fact, or research finding worth keeping.
 - If the conversation produced no clear deliverables, return "deliverables": [].
 - Never exceed 10 deliverables.`
 
@@ -5155,6 +5191,9 @@ function parseMeetingDeliverables(arr: unknown[]): ActionProposal[] {
     switch (d.kind) {
       case 'create-task':
         if (title) out.push({ id, kind: 'create-task', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
+        break
+      case 'create-work-item':
+        if (title) out.push({ id, kind: 'create-work-item', title, notes: typeof d.notes === 'string' ? d.notes : undefined, reason })
         break
       case 'create-knowledge-entry': {
         const body = typeof d.body === 'string' ? d.body.trim() : ''

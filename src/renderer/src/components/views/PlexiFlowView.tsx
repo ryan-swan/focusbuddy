@@ -506,7 +506,7 @@ function ActionCard({
 
       <div className="space-y-2 pl-8">
         {local.type === 'create-task' && (
-          <input value={local.title} onChange={(e) => setLocal({ ...local, title: e.target.value })} onBlur={commit} placeholder="Task title" className={field} />
+          <input value={local.title} onChange={(e) => setLocal({ ...local, title: e.target.value })} onBlur={commit} placeholder="Desk title" className={field} />
         )}
         {local.type === 'add-table-row' && (
           <select

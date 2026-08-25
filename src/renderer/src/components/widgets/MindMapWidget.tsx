@@ -2481,7 +2481,9 @@ function slugify(input: string): string {
 function labelForProposal(p: ActionProposal): string {
   switch (p.kind) {
     case 'create-task':
-      return `New task — ${p.title}`
+      return `New desk — ${p.title}`
+    case 'create-work-item':
+      return `Work item — ${p.title}`
     case 'create-todo-list':
       return `Todo list — ${p.title} (${p.items.length} items)`
     case 'create-widget':

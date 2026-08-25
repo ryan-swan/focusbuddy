@@ -59,8 +59,8 @@ export const ASSISTANT_CAPABILITIES: AssistantCapability[] = [
   },
   {
     icon: 'checklist',
-    label: 'Plan my tasks',
-    starter: 'Help me plan and organise my tasks',
+    label: 'Plan my desks',
+    starter: 'Help me plan and organise my desks',
     kinds: ['create-task', 'update-task', 'create-todo-list', 'toggle-todo-item']
   },
   {

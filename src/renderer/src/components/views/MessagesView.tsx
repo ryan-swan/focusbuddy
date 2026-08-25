@@ -1468,7 +1468,7 @@ export function PulsePanel({ conversationId, onClose }: { conversationId: string
       { id: `pulse-${it.id}`, kind: 'create-task', title: it.text.slice(0, 200) },
       { activeTaskId: null }
     )
-    setNote(res.ok ? 'Task created.' : res.message || 'Could not create the task.')
+    setNote(res.ok ? 'Desk created.' : res.message || 'Could not create the desk.')
   }
 
   const open = (items ?? []).filter((i) => i.status === 'open')

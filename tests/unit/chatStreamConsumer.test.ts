@@ -94,7 +94,7 @@ describe('createChatStreamConsumer', () => {
   it('draws no trace line for an object that is not an action', () => {
     // Junk in the array must not become a line claiming work is happening.
     const { tools } = run(['{"reply":"x","actions":[{"notAKind":1},{"kind":"create-task","title":"A"}]}'])
-    expect(tools).toEqual([{ index: 0, kind: 'create-task', label: 'Task — A' }])
+    expect(tools).toEqual([{ index: 0, kind: 'create-task', label: 'Desk — A' }])
   })
 
   it('reports nothing at all for a reply with no actions', () => {

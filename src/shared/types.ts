@@ -785,6 +785,17 @@ export type ActionProposal =
       reason?: string
     }
   | {
+      // Reserved by the Attention layer (S0): a work_item — a routable,
+      // to-do-like attention item, NOT a desk. Parsed and creation-gated
+      // everywhere from day one so nothing can squat on the kind name; the
+      // executor no-ops it until the work-items capability ships (S3+).
+      id: string
+      kind: 'create-work-item'
+      title: string
+      notes?: string
+      reason?: string
+    }
+  | {
       id: string
       kind: 'open-url'
       url: string
