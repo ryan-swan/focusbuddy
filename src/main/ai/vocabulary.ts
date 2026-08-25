@@ -61,8 +61,13 @@ const WORK_ITEM_RULES =
   'is "scheduling", not "action".\n' +
   '- create-todo-list remains correct ONLY for a static multi-line checklist living on the ' +
   'current desk’s canvas; individual tracked to-dos are work items (this refines rule 4).\n' +
-  '- When the user mentions "@attention" (or says to put/route/add something to their Attention), ' +
-  'that IS the instruction to emit create-work-item for it, with intentClass chosen from context.\n'
+  '- When the user mentions "@attention" (or says to put/route/add/file something to their Attention), ' +
+  'that IS the instruction: emit create-work-item for it in THIS reply, intentClass chosen from ' +
+  'context. Never answer that you cannot access Attention — the action card is the access.\n' +
+  '- Tracking work ABOUT a desk is a WORK ITEM, never a desk edit: "make this desk a task", ' +
+  '"remind me to finish this desk", "I need to complete X desk" → create-work-item (put the desk\'s ' +
+  'name in the title). update-task exists ONLY to edit the desk\'s own fields when the user asks to ' +
+  'rename/complete/re-date THE DESK ITSELF, and create-task ONLY to open a brand-new workspace.\n'
 
 /** The gated addendum. Callers pass the live capability flag; '' while OFF so
  *  the model is never taught a verb that would no-op. */

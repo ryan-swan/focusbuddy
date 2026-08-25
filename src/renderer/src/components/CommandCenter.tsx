@@ -438,7 +438,9 @@ export default function CommandCenter({
         hint: 'Routed, unrouted, or expand · @attention from anywhere',
         icon: 'notifications',
         kind: 'action',
-        score: attnPrefix ? 95 : q === '' ? 57 : matchScore('attention capture work item remind todo queue', q),
+        // An explicit @-address outranks EVERYTHING — Enter on the raw query
+        // must capture, never fall through to search or navigation.
+        score: attnPrefix ? 500 : q === '' ? 57 : matchScore('attention capture work item remind todo queue', q),
         run: () => {
           window.dispatchEvent(
             new CustomEvent('fb:command-new-work-item', {

@@ -16,6 +16,14 @@ import {
   PRIMARY_ACTION,
   QUEUE_ICON
 } from '../../lib/attentionQueues'
+import {
+  feederSignals,
+  loadMutes,
+  saveMutes,
+  mutedCountOfKind,
+  KIND_MUTE_OFFER_THRESHOLD,
+  type FeederSignal
+} from '../../lib/attentionFeeders'
 
 // The Attention surface (S6, SPEC-017). Every work item that needs the person,
 // in purpose-built queues with the class-appropriate closing verb — a LENS
@@ -90,6 +98,48 @@ export default function AttentionView(): JSX.Element {
   const detached = useMemo(() => detachedItems(items), [items])
   const closed = useMemo(() => recentlyClosed(items, nowMs), [items, nowMs])
   const total = queues.reduce((n, q) => n + q.items.length, 0)
+
+  // S7 feeders: desk signals surfacing AS attention (computed, never owned).
+  const [mutes, setMutes] = useState<Set<string>>(() => loadMutes())
+  const [staleRows, setStaleRows] = useState<Array<{ id: string; title: string; daysQuiet: number }>>([])
+  useEffect(() => {
+    let alive = true
+    void window.api.nodes
+      .staleDesks()
+      .then((rows) => {
+        if (alive) setStaleRows(rows)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+  const signals = useMemo(
+    () => feederSignals(nodes, staleRows, nowMs, mutes),
+    [nodes, staleRows, nowMs, mutes]
+  )
+  function muteSignal(s: FeederSignal): void {
+    const next = new Set(mutes)
+    next.add(s.key)
+    // Δ10: repeated mutes of one kind quiet the whole source, on offer.
+    if (mutedCountOfKind(next, s.kind) >= KIND_MUTE_OFFER_THRESHOLD) {
+      void promptText({
+        title: 'Quiet this whole source?',
+        label: `You've muted several ${s.kind === 'desk-due' ? 'due-desk' : 'stale-desk'} nudges.`,
+        choices: [
+          { value: 'kind', label: 'Mute all of these', hint: 'This source stays quiet until you clear mutes' },
+          { value: 'one', label: 'Just this one' }
+        ]
+      }).then((pick) => {
+        if (pick === 'kind') next.add(`kind:${s.kind}`)
+        setMutes(new Set(next))
+        saveMutes(next)
+      })
+      return
+    }
+    setMutes(next)
+    saveMutes(next)
+  }
 
   async function snoozeTomorrow(id: string): Promise<void> {
     const d = new Date(nowMs)
@@ -259,6 +309,48 @@ export default function AttentionView(): JSX.Element {
                 </div>
               </section>
             ))}
+            {signals.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon name="desk" size={14} className="text-[var(--ink-40)]" />
+                  <span className="fb-t-label text-[var(--ink-70)]">From your desks</span>
+                  <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{signals.length}</span>
+                </div>
+                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                  {signals.map((s) => (
+                    <div
+                      key={s.key}
+                      className="group flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
+                    >
+                      <Icon
+                        name={s.kind === 'desk-due' ? 'schedule' : 'bedtime'}
+                        size={16}
+                        className="text-[var(--ink-30)] shrink-0"
+                      />
+                      <button
+                        onClick={() => {
+                          setActive(s.id)
+                          goTask(s.id)
+                        }}
+                        className="flex-1 min-w-0 text-left fb-press"
+                      >
+                        <span className="fb-t-body font-medium text-[var(--ink-100)] truncate block">
+                          {s.title}
+                        </span>
+                        <span className="text-[11px] text-[var(--ink-40)]">{s.line}</span>
+                      </button>
+                      <button
+                        onClick={() => muteSignal(s)}
+                        title="Mute this nudge"
+                        className="icon-btn !h-7 !w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Icon name="notifications_off" size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
             {detached.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-2">

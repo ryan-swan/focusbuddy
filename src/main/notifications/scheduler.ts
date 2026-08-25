@@ -8,7 +8,7 @@
 import { Notification, BrowserWindow } from 'electron'
 import { getDb } from '../db/database'
 import { listBlocksInRange } from '../db/timeBlocks'
-import { decayLooseThoughts } from '../db/workItems'
+import { decayLooseThoughts, postDeadlineNudges } from '../db/workItems'
 import { sweepDeliveries, scheduleBlockReminders, BLOCK_REMINDER_LEAD_MS } from './substrate'
 
 export const SWEEP_INTERVAL_MS = 30 * 1000
@@ -55,6 +55,13 @@ export function runSweepOnce(nowMs = Date.now()): number {
     decayLooseThoughts(nowMs)
   } catch {
     /* decay is best-effort */
+  }
+  // S7 restraint: deadline proximity is the ONE proactive item trigger —
+  // once per item per due-day (dedupe), capped by the substrate like all else.
+  try {
+    postDeadlineNudges(nowMs)
+  } catch {
+    /* nudges are best-effort */
   }
   const deliveries = sweepDeliveries(db, nowMs)
   for (const d of deliveries) showBanner(d.title, d.body, d.ref)

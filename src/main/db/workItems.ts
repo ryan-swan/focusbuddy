@@ -366,6 +366,77 @@ export function decayLooseThoughts(nowMs = Date.now()): number {
   return decayLooseThoughtsCore(getDb(), nowMs)
 }
 
+/** S7 nudge restraint: the ONE proactive OS-notification trigger for items —
+ *  deadline proximity. An actionable item due within 24h posts once per item
+ *  per due-day (UNIQUE dedupe), through the capped substrate. Stale desks and
+ *  everything else surface passively (page/widget), never as banners. */
+export function postDeadlineNudgesCore(
+  d: LifecycleDb & { exec(sql: string): void },
+  nowMs: number
+): number {
+  const soon = new Date(nowMs + 24 * 60 * 60 * 1000).toISOString()
+  const nowIso = new Date(nowMs).toISOString()
+  const rows = d
+    .prepare(
+      `SELECT id, title, intent_class, due_at FROM nodes
+       WHERE kind = 'work_item' AND trashed_at IS NULL
+         AND intent_class IN ('action','review','scheduling')
+         AND due_at IS NOT NULL AND due_at > ? AND due_at <= ?
+         AND work_item_state IN ('open','in_progress','waiting','needs_review','needs_approval','delegated','blocked','suggested','stale')`
+    )
+    .all(nowIso, soon) as Array<{ id: string; title: string; intent_class: string; due_at: string }>
+  let posted = 0
+  for (const r of rows) {
+    const day = r.due_at.slice(0, 10)
+    const { posted: ok } = postNotification(d, {
+      ref: r.id,
+      queue: r.intent_class,
+      title: r.title || 'Work item',
+      body: 'Due within 24 hours.',
+      deliverAt: nowMs,
+      dedupeKey: `wi-due:${r.id}:${day}`,
+      category: 'attention',
+      layer: 'interruptive',
+      trigger: 'deadline-proximity',
+      origin: 'system'
+    })
+    if (ok) posted++
+  }
+  return posted
+}
+
+export function postDeadlineNudges(nowMs = Date.now()): number {
+  return postDeadlineNudgesCore(getDb(), nowMs)
+}
+
+/** Δ10 (main-side half): a source type is SUPPRESSED for auto-surfacing when
+ *  its last N AI-suggested items were all dismissed with no acceptance among
+ *  them. Every future auto-creating path (feeders that materialize, mission
+ *  suggestions at D-phases) MUST consult this before surfacing. */
+export const SOURCE_SUPPRESS_THRESHOLD = 3
+
+export function sourceTypeSuppressedCore(
+  d: LifecycleDb,
+  sourceType: string,
+  orgId: string
+): boolean {
+  const rows = d
+    .prepare(
+      `SELECT work_item_state AS state FROM nodes
+       WHERE kind = 'work_item' AND org_id = ? AND source_type = ?
+         AND wi_origin = 'ai' AND approval_state IN ('suggested','dismissed','approved','merged')
+         AND work_item_state IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed','reclassified')
+       ORDER BY updated_at DESC LIMIT ?`
+    )
+    .all(orgId, sourceType, SOURCE_SUPPRESS_THRESHOLD) as Array<{ state: string }>
+  if (rows.length < SOURCE_SUPPRESS_THRESHOLD) return false
+  return rows.every((r) => r.state === 'dismissed')
+}
+
+export function sourceTypeSuppressed(sourceType: string): boolean {
+  return sourceTypeSuppressedCore(getDb(), sourceType, getActiveOrgId())
+}
+
 export function listWorkItems(): FbNode[] {
   const db = getDb()
   const rows = db
