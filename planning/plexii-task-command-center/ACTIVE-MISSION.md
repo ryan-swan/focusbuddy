@@ -3,8 +3,16 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S3 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
-(DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ → S4 next)
+**Last updated:** 2026-08-25 (S4 SHIPPED) · **State:** IN_PROGRESS — Phase 6 execution
+(DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ → S5 next)
+
+**S4 CLOSED (2026-08-25, commit 235a016e):** the notification substrate — durable
+wi_notifications store (UNIQUE dedupe), per-queue hourly caps with one-summary collapse,
+mark-then-show delivery, block reminders moved to main (restart-proof; SPEC-024/029
+deliverable), decoy retired with its PLX-UX assertions ported, notifyExternal re-pointed
+by construction (seven callers, zero edits), DEC-018 A-1 actor seam + A-2 mission queues
+reserved+test-locked, attentionBadgeCounts ready for S6. 2700/2700 tests; live table
+verified on the real DB. Ledger: [phases/HANDOFFS/s4-close.md](phases/HANDOFFS/s4-close.md).
 
 **S3 CLOSED (2026-08-25, commit 00240bda):** the workItems:* namespace (9 verbs, F008
 one-code-path), the renderer store as live-path producer (status never emitted; manifest
