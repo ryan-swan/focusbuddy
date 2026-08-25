@@ -5,7 +5,17 @@
 
 **Last updated:** 2026-08-25 (S5 SHIPPED — **THE ATTENTION LAYER IS LIVE**) · **State:**
 IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
-→ **S6 ✔ + DEC-019 ✔ (2d251f0a) → S7 next**)
+→ **S7 ✔ — G6 MET (607ace78). THE BUILD'S SPINE IS COMPLETE AND LIVE.**)
+
+**S7 + G6 CLOSED (2026-08-25):** feeders (due/stale desks surface AS attention, muting,
+one-directional), Δ10 suppression both halves, the single deadline-proximity nudge, the
+operator's three QA fixes (⌘K @attention score 500, desk-action routing rule, imperative
+chat rule). 2745/2745 tests — 135 added over baseline, every stage closed with live
+verification in ONE day. Full honest ledger incl. PARTIAL/DEFERRED/owed-P1 + merge
+preconditions: [phases/HANDOFFS/s7-close-G6.md](phases/HANDOFFS/s7-close-G6.md).
+**Awaiting operator:** CR-08(b) nav retirement (one ruling: "retire the tabs" + the
+Plans choice → DEC-020) · D1 · D2 · R008. Next horizons: the P1 live checklist, the
+upstream PR to Caleb, V2 register, Dispatch D-phases landing on our rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
