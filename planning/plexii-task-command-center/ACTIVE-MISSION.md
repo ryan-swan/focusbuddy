@@ -3,9 +3,17 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S5 HOLD LIFTED — intake complete) · **State:**
-IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ →
-**S5 EXECUTING**)
+**Last updated:** 2026-08-25 (S5 SHIPPED — **THE ATTENTION LAYER IS LIVE**) · **State:**
+IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
+→ S6 next, after its C-4 main-diff checkpoint)
+
+**S5 CLOSED (2026-08-25, commit 7554ce86):** capture console (Routed/Unrouted/Expand,
+composer-owned Q1 question), deterministic-first classifier (Haiku fallback,
+loose-thought floor), closed-loop notifications through S4, Δ3 decay tier, flag-ON
+prompt activation (chat catalog + meeting wrapup + voice), executor's real apply path.
+**workItems.enabled = ON** (personal scope; org exposure stays behind the P1 checklist).
+2731/2731 tests; live on fresh PID. Deferred honestly: opt-in cleanup + multi-intent
+secondary cards → S6. Ledger: [phases/HANDOFFS/s5-close.md](phases/HANDOFFS/s5-close.md).
 
 **Intake CLOSED (operator, 2026-08-25):** "part 2 landscape map" was an accidental
 cross-thread paste — struck; the synthesis (analysis/20) IS the full list. S5/S6/S7
