@@ -1689,9 +1689,33 @@ const api = {
   },
   // Multi-device workspace sync — the renderer drives the network, main owns the
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
-  // work_item internal seam (Attention S2). The arrival router in crdtSync is
-  // the ONLY caller today; S3 grows this into the full user-facing namespace.
+  // The workItems:* namespace (Attention S3, §4). Work items NEVER travel
+  // nodes:* — this is their one seam; the store wraps it.
   workItems: {
+    list: (): Promise<FbNode[]> => ipcRenderer.invoke('workItems:list'),
+    get: (id: string): Promise<FbNode | null> => ipcRenderer.invoke('workItems:get', id),
+    create: (draft: {
+      title: string
+      notes?: string
+      parentId?: string | null
+      intentClass?: string
+      dueAt?: string | null
+      wiUrgency?: string | null
+      sourceRef?: string | null
+      sourceType?: string | null
+      wiOrigin?: 'human' | 'ai' | 'system'
+    }): Promise<FbNode> => ipcRenderer.invoke('workItems:create', draft),
+    updateFields: (id: string, patch: Record<string, unknown>): Promise<FbNode | null> =>
+      ipcRenderer.invoke('workItems:updateFields', id, patch),
+    setState: (id: string, state: string): Promise<boolean> =>
+      ipcRenderer.invoke('workItems:setState', id, state),
+    reclassify: (id: string, intentClass: string): Promise<FbNode | null> =>
+      ipcRenderer.invoke('workItems:reclassify', id, intentClass),
+    snooze: (id: string, until: number | null): Promise<void> =>
+      ipcRenderer.invoke('workItems:snooze', id, until),
+    markRead: (id: string): Promise<void> => ipcRenderer.invoke('workItems:markRead', id),
+    counts: (): Promise<Record<string, number>> => ipcRenderer.invoke('workItems:counts'),
+    // Internal (S2): the arrival router's seam.
     kindOf: (id: string): Promise<string | null> => ipcRenderer.invoke('workItems:kindOf', id),
     applySyncEvent: (
       ev:

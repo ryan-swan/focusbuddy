@@ -76,7 +76,18 @@ import { getDb } from '../db/database'
 import {
   applyRemoteWorkItemSnapshot,
   applyRemoteWorkItemAttr,
-  applyRemoteWorkItemTrash
+  applyRemoteWorkItemTrash,
+  createWorkItem,
+  listWorkItems,
+  getWorkItem,
+  updateWorkItemFields,
+  setWorkItemState,
+  reclassifyWorkItem,
+  snoozeWorkItem,
+  markWorkItemRead,
+  workItemCounts,
+  type WorkItemDraft,
+  type WorkItemState
 } from '../db/workItems'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
@@ -674,8 +685,27 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  // work_item internal seam (Attention S2): the arrival router's channel into
-  // the ONE work_item code path (F008). S3 grows the namespace user-facing.
+  // The workItems:* namespace (Attention S3, §4) — every verb wraps the S2
+  // db-module functions (F008 one code path); create carries the typed
+  // refusal codes (flag OFF / un-migrated / non-personal scope) to the caller.
+  ipcMain.handle('workItems:list', () => listWorkItems())
+  ipcMain.handle('workItems:get', (_e, id: string) => getWorkItem(id))
+  ipcMain.handle('workItems:create', (_e, draft: WorkItemDraft) => createWorkItem(draft))
+  ipcMain.handle('workItems:updateFields', (_e, id: string, patch: Record<string, unknown>) =>
+    updateWorkItemFields(id, patch)
+  )
+  ipcMain.handle('workItems:setState', (_e, id: string, state: WorkItemState) =>
+    setWorkItemState(id, state)
+  )
+  ipcMain.handle('workItems:reclassify', (_e, id: string, intentClass: string) =>
+    reclassifyWorkItem(id, intentClass)
+  )
+  ipcMain.handle('workItems:snooze', (_e, id: string, until: number | null) =>
+    snoozeWorkItem(id, until)
+  )
+  ipcMain.handle('workItems:markRead', (_e, id: string) => markWorkItemRead(id))
+  ipcMain.handle('workItems:counts', () => workItemCounts())
+  // Internal seam (S2): the arrival router's channel into the same code path.
   ipcMain.handle('workItems:kindOf', (_e, id: string) => {
     const row = getDb().prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
       | { kind: string }

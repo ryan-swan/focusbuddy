@@ -3,6 +3,7 @@ import { initPreviewGuard, previewSyncBlocked } from './previewGuard'
 import { useSyncStatus } from '../stores/syncStatus'
 import { useAccountStore } from '../stores/account'
 import { useNodeStore } from '../stores/nodes'
+import { useWorkItemStore } from '../stores/workItems'
 import { useWidgetStore } from '../stores/widgets'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useDocumentsStore } from '../stores/documents'
@@ -698,6 +699,8 @@ export async function syncWorkspaceOnce(): Promise<number> {
     // Refresh the UI from the merged local DB if anything changed.
     if (applied > 0) {
       await useNodeStore.getState().refresh()
+      // Work items live in their own store (S3) — refresh it alongside.
+      await useWorkItemStore.getState().refresh()
       const activeTaskId = useNodeStore.getState().activeTaskId
       if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
       // Calendar blocks sync too (rung 1): refresh whatever range is loaded.

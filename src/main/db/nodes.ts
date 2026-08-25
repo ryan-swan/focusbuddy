@@ -65,6 +65,13 @@ interface NodeRow {
   schema_epoch: number | null
 }
 
+// Exported for the workItems module (S3): work_item rows share the nodes
+// table and map through the same shape.
+export function mapNodeRow(row: NodeRow): FbNode {
+  return rowToNode(row)
+}
+export type { NodeRow }
+
 function rowToNode(row: NodeRow): FbNode {
   return {
     id: row.id,

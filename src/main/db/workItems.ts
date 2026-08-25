@@ -20,6 +20,8 @@ import { getDb } from './database'
 import { getActiveOrgId, PERSONAL_ORG_ID } from './activeOrg'
 import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
 import { isWorkItemsEnabled } from '../workItemsPref'
+import { mapNodeRow, type NodeRow } from './nodes'
+import type { FbNode } from '@shared/types'
 import type { LifecycleDb } from './nodeLifecycle'
 import {
   WORK_ITEM_COLUMNS,
@@ -246,12 +248,56 @@ export function normalizeAppliedWorkItem(d: LifecycleDb, id: string): RemoteWork
 
 // ── getDb-bound wrappers ────────────────────────────────────────────────────
 
-export function createWorkItem(draft: WorkItemDraft): { id: string } {
-  return createWorkItemCore(getDb(), draft, getActiveOrgId())
+export function createWorkItem(draft: WorkItemDraft): FbNode {
+  const { id } = createWorkItemCore(getDb(), draft, getActiveOrgId())
+  const item = getWorkItem(id)
+  if (!item) throw new Error('work_item creation failed post-insert')
+  return item
 }
 
 export function setWorkItemState(id: string, state: WorkItemState): boolean {
   return setWorkItemStateCore(getDb(), id, state)
+}
+
+export function listWorkItems(): FbNode[] {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT * FROM nodes WHERE kind = 'work_item' AND trashed_at IS NULL AND org_id = ?
+       ORDER BY created_at DESC`
+    )
+    .all(getActiveOrgId()) as NodeRow[]
+  return rows.map(mapNodeRow)
+}
+
+export function getWorkItem(id: string): FbNode | null {
+  const db = getDb()
+  const row = db.prepare(`SELECT * FROM nodes WHERE id = ? AND kind = 'work_item'`).get(id) as
+    | NodeRow
+    | undefined
+  return row ? mapNodeRow(row) : null
+}
+
+export function updateWorkItemFields(id: string, patch: Record<string, unknown>): FbNode | null {
+  if (!updateWorkItemFieldsCore(getDb(), id, patch)) return null
+  return getWorkItem(id)
+}
+
+export function reclassifyWorkItem(id: string, intentClass: string): FbNode | null {
+  if (!reclassifyWorkItemCore(getDb(), id, intentClass)) return null
+  return getWorkItem(id)
+}
+
+export function snoozeWorkItem(id: string, until: number | null): void {
+  snoozeWorkItemCore(getDb(), id, until)
+}
+
+export function markWorkItemRead(id: string): void {
+  markWorkItemReadCore(getDb(), id)
+}
+
+export function workItemCounts(): Record<string, number> {
+  return workItemCountsCore(getDb(), getActiveOrgId())
 }
 
 /** The arrival router's server side (§3 D1): materialize or update an inbound
@@ -346,4 +392,76 @@ export function applyRemoteWorkItemTrash(id: string, trashed: boolean): void {
   db.prepare(
     `UPDATE nodes SET trashed_at = ? WHERE id = ? AND kind = 'work_item'`
   ).run(trashed ? Date.now() : null, id)
+}
+
+// ── The workItems:* verb set (S3, §4) — handle-taking cores + wrappers ──────
+
+/** Fields a caller may patch through updateFields. State changes go through
+ *  setWorkItemState ONLY (the projection recompute lives there); status is
+ *  never patchable (derived). */
+const PATCHABLE: Record<string, string> = {
+  title: 'title',
+  notes: 'description',
+  intentClass: 'intent_class',
+  dueAt: 'due_at',
+  wiUrgency: 'wi_urgency',
+  reasonCode: 'reason_code',
+  approvalState: 'approval_state'
+}
+
+export function updateWorkItemFieldsCore(
+  d: LifecycleDb,
+  id: string,
+  patch: Record<string, unknown>
+): boolean {
+  const row = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
+    | { kind: string }
+    | undefined
+  if (row?.kind !== 'work_item') return false
+  const sets: string[] = []
+  const params: Record<string, unknown> = { id, now: Date.now() }
+  for (const [key, col] of Object.entries(PATCHABLE)) {
+    if (patch[key] !== undefined) {
+      sets.push(`${col} = @${key}`)
+      params[key] = patch[key]
+    }
+  }
+  if (!sets.length) return true
+  sets.push('updated_at = @now')
+  d.prepare(`UPDATE nodes SET ${sets.join(', ')} WHERE id = @id`).run(params)
+  return true
+}
+
+/** Reclassify = re-bin the item's intent (it stays active). The terminal
+ *  'reclassified' STATE is a separate outcome (an item superseded by its
+ *  replacement) and goes through setWorkItemState. */
+export function reclassifyWorkItemCore(d: LifecycleDb, id: string, intentClass: string): boolean {
+  return updateWorkItemFieldsCore(d, id, { intentClass })
+}
+
+export function snoozeWorkItemCore(d: LifecycleDb, id: string, until: number | null): void {
+  d.prepare(
+    `INSERT INTO wi_local (item_id, snooze_until) VALUES (?, ?)
+     ON CONFLICT(item_id) DO UPDATE SET snooze_until = excluded.snooze_until`
+  ).run(id, until)
+}
+
+export function markWorkItemReadCore(d: LifecycleDb, id: string): void {
+  d.prepare(
+    `INSERT INTO wi_local (item_id, read_at) VALUES (?, ?)
+     ON CONFLICT(item_id) DO UPDATE SET read_at = excluded.read_at`
+  ).run(id, Date.now())
+}
+
+export function workItemCountsCore(d: LifecycleDb, orgId: string): Record<string, number> {
+  const rows = d
+    .prepare(
+      `SELECT work_item_state AS state, COUNT(*) AS n FROM nodes
+       WHERE kind = 'work_item' AND trashed_at IS NULL AND org_id = ?
+       GROUP BY work_item_state`
+    )
+    .all(orgId) as Array<{ state: string | null; n: number }>
+  const out: Record<string, number> = {}
+  for (const r of rows) out[r.state ?? 'open'] = r.n
+  return out
 }
