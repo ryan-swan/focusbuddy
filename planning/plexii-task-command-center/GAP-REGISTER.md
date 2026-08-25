@@ -72,6 +72,16 @@ drag-reparent, snapshots). Positive filters (`kind === 'task'`) are safe by cons
 Phase 2 classifies all 305 into safe-by-construction vs. must-touch; the must-touch list
 becomes its own SPEC item + build stage. (Raised by the spec-drafting session; census by
 this session.)
+**CLASSIFIED 2026-08-24 night (analysis/10, spot-verified 6/6):** true census **223 sites /
+82 files** (29% of raw hits were unrelated `kind` unions) → **44 must-touch** (26 Class B
+binary-dispatch + 18 Class C unfiltered enumeration); all 16 literal negations proved
+"skip"-polarity safe. **No TypeScript safety net exists** (union already 3-wide, zero
+switches on NodeKind) — the census is the only defence. Census-invisible forms found and
+added (agentHistory.ts:319 ref-parse hard delete; boolean aliases). Method **validated by
+ground truth**: the shared-tab bug (BUG-C1-03) diagnosed as exactly a Class-C-shaped
+two-source enumeration miss with metadata intact (analysis/10 §6); its fix shape is a small
+product call queued for the G2 docket. Remaining: adversarial re-verification of B/C
+dispositions at G2; must-touch list becomes the SPEC-004 build stage.
 
 ## GAP-012 — `status` semantics collision on the shared nodes row
 **Severity:** HIGH · **Closes in:** Phase 4 (SPEC-002 design) · **Status:** OPEN
@@ -84,6 +94,16 @@ part of SPEC-002. (Raised by the spec session; verified + shaped by this session
 source of truth, `status` computed at write, never independently writable (drift = phantom
 completions in Pulse/lenses). Mapping table explicit in SPEC-002; `dismissed`/`reclassified`
 never project to `done`.
+
+## GAP-013 — Cross-version sync hazard: un-migrated peers silently reject work_items
+**Severity:** HIGH · **Closes in:** Phase 4 (migration strategy) + first Phase 6 schema stage · **Status:** OPEN
+`applyRemoteShared` inserts arriving rows and swallows ALL exceptions
+(`workspaceSync.ts:844-851`, bare catch commented "FK not present yet — retry next cycle").
+A peer running the old schema receives a `kind='work_item'` row, the CHECK constraint
+rejects it, and the failure is **silent, permanent, and infinitely retried** — no error
+surfaced anywhere. Closing = ship the CHECK-widening migration ahead of any work_item
+reaching the sync path, AND/OR add an explicit unknown-kind branch + migration gate at the
+apply site. (Found by the classification agent, analysis/10 §3.6/§5; spot-verified.)
 
 ## Open questions
 

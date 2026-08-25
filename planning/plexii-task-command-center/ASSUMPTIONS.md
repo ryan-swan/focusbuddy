@@ -36,8 +36,12 @@ a new sync engine.
 (`src/main/db/workspaceSync.ts`, `src/shared/crdt.ts`); per-row `sync_rev`/`needs_sync` via
 DB triggers; synced-table whitelist **includes `nodes` and `time_blocks`**; org/team/per-desk
 ACL scoping; full social layer (messaging, presence, knock, org directory, shares w/ live docs).
-**Narrowed residual unknown:** server *extensibility* — do new node columns pass through the
-loop opaquely; can new item types be added without server changes we can't make from the fork?
+**Narrowed residual unknown (updated 2026-08-24 night):** the CLIENT half is now evidenced
+from code (analysis/10 §5: `bodyFromRow` copies all non-bookkeeping columns opaquely; pull
+appliers build column lists from `PRAGMA table_info` — new columns and kinds ride
+by-construction). Remaining: the **server** (does it store/echo unknown kinds + columns
+opaquely?) plus one live end-to-end confirmation. New hazard regardless of the answer:
+GAP-013 (un-migrated peers silently reject unknown kinds — migration must lead).
 **Dependent work:** Ruling 1 ratification (G4), person-to-person routing architecture (P1).
 **Invalidation trigger (narrowed):** Phase 2 proves the server schema-validates node bodies
 strictly (new columns dropped/rejected on sync).

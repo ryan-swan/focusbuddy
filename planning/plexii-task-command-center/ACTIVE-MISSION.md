@@ -10,18 +10,22 @@ objective confirmed as drafted; all crossroads ruled (CR-01..07 = standing recom
 CR-07 = Option B parallel prerequisite); Q5 shaped (DEC-013); IQ-1 resolved (deliberate
 trim); ambiguities Q1–Q4, Q6–Q8 scheduled for Phase 2/3 proposals returned for approval.
 
-**Phase 2 scope (widened per register §5 + analysis/09):**
-1. SPEC-004 — 305-site node-consumer classification → **background agent running**,
-   draft lands in analysis/10.
-2. SPEC-044 — AI vocabulary audit (protocol-quarantine approach) → **background agent
-   running**, draft lands in analysis/11.
-3. Sync proof, SPLIT: (a) server passes new node columns/kinds opaquely; (b) client stamps
-   and preserves them on arrival. Live experiment — needs the dev app + supervised session.
-4. ACL semantics documentation (org / team / per-desk) for SPEC-030.
-5. C1-03 shared-tab triage (enumeration vs. metadata) — folded into workstream 1.
+**Phase 2 scope + state (updated after the agent returns, 2026-08-24 night):**
+1. ~~SPEC-004 classification~~ ✔ **DONE** → analysis/10 (spot-verified 6/6): 223 true
+   sites, 44 must-touch, no TS safety net, blast-radius top-8, `listNodes` = highest-leverage
+   fix, GAP-013 discovered (cross-version sync swallow).
+2. ~~SPEC-044 vocabulary audit~~ ✔ **DONE** → analysis/11 (spot-verified 6/6): 62
+   model-visible occurrences, 3 files already correct, riskiest-5 ranked, persistence map,
+   label worklist.
+3. ~~C1-03 triage~~ ✔ **DIAGNOSED** → analysis/10 §6: enumeration/two-source bug, metadata
+   intact; fix shape = product call → G2 docket.
+4. Sync proof, remaining half: the **server** (client half evidenced from code — A-003
+   updated). Live experiment — needs the dev app + supervised session.
+5. ACL semantics documentation (org / team / per-desk) for SPEC-030.
 6. Sync reliability assessment (BUG-C2-01: partial widget sync, 7–8s latency).
-7. The gap matrix itself (analysis/02): all 44 items EXISTS/PARTIAL/MISSING/CONFLICTS with
-   evidence + ≥30% adversarial re-verification (G2 dual validation).
+7. The gap matrix itself (analysis/02): all 44 SPEC items EXISTS/PARTIAL/MISSING/CONFLICTS
+   with evidence + ≥30% adversarial re-verification INCLUDING the B/C dispositions of
+   analysis/10 and the disposition tables of analysis/11 (G2 dual validation).
 
 ## Right now
 
