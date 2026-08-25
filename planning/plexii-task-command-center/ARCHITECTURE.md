@@ -250,8 +250,9 @@ exactly those). v2.1 adopts the third option:
 6. `moveNodeToOrg` carries work_items with their desk — **guarded by §2.6**.
 7. **Shared-desk guard (DEC-013, lifecycle track):** unilateral trash of a shared-root
    desk refused ahead of all of this. *(P1 note: routed items on non-shared org desks —
-   sender-side trash propagates deletes to the recipient via sync; the P1 architecture
-   pass owes the recipient-side retention rule. Registered in §8.)*
+   sender-side trash propagates deletes to the recipient via sync; the recipient-side
+   retention rule is now RULED — see the §8 row: soft-trash only, recipient's purge
+   clock, restore-detaches, one withdrawal notification.)*
 8. **Plan write guards (G2):** `addDependency` / `patchPlanTask` assert `kind='task'`.
 9. **Retroactive share exposure (F005 + F-M5 stage-qualified):** self-routed work_items
    (`recipient_id = originator_id`) are permanently exempt from the stamp sweep.
@@ -412,7 +413,7 @@ after this document passes the final re-gate + dual validation.
 | Revived-clutter accumulation (F-m4″) | Accepted + named: desk-trashed items revive at day 7 into their queues (dismiss = one tap; disclosed in trash-toast copy). S1 pre-flight checks `src/main/privacy/erasure.ts` node handling for interaction |
 | Work_item lost via desk deletion | **Revive-at-purge at the CLOSED three-site enumeration (purge, agentHistory, pruneSharedDesk) + CI delete-site grep-lock + the five §2.5.4 adversarial cases (a)–(e)** |
 | Fourth hard-delete site added later | The CI grep-assertion fails on any new literal/templated `DELETE` against `nodes` outside the sanctioned three |
-| P1 routed-item trash propagation (sender trash → recipient delete via sync) | Named P1 architecture item: recipient-side retention rule owed before SPEC-027 freezes (§2.5.7 note) |
+| P1 routed-item trash propagation (sender trash → recipient delete via sync) | **RULED at the P1 checkpoint (2026-08-25) — the recipient-retention rule:** a sender's trash arrives at the recipient as SOFT-TRASH ONLY (the apply arms already map remote deletes to `trashed_at`, never tombstone — enforced, not incidental). The recipient's copy sits in THEIR Trash on the standard purge clock, restorable like any trashed item; a restore DETACHES it from the withdrawn route (`detached_from_id` preserved, Detached-shelf semantics) so restoring never re-projects into the sender's scope. Recipient-owned satellite state (acknowledgment history, `wi_local`) survives until purge. Withdrawal surfaces ONE system-queue notification ("Withdrawn: <title>", deduped per item) through the substrate. Implementation rides SPEC-027; the rule is frozen now so SPEC-027 designs against it |
 | Merge to origin with un-migrated fleet (R016) | Named merge-readiness preconditions: defensive branches landed upstream AND observed firing; `schema_epoch` version gate live; else `workItems.enabled` ships opt-in-only |
 | Permanent-409 unroutability | **Adopted: S2 baseRev-advance fix** (15 §6 #4) |
 | Retroactive share exposure | Self-routed exemption + share-time count confirmation (F005) |

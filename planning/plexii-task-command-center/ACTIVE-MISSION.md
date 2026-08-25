@@ -21,9 +21,20 @@ operator's three QA fixes (⌘K @attention score 500, desk-action routing rule, 
 chat rule). 2745/2745 tests — 135 added over baseline, every stage closed with live
 verification in ONE day. Full honest ledger incl. PARTIAL/DEFERRED/owed-P1 + merge
 preconditions: [phases/HANDOFFS/s7-close-G6.md](phases/HANDOFFS/s7-close-G6.md).
-**Awaiting operator:** D1 · D2 · R008 (CR-08(b) ruled → DEC-020 ✔). Next horizons: the
-P1 live checklist, the upstream PR to Caleb, V2 register, Dispatch D-phases landing on
-our rails.
+**P1 LIVE PASS EXECUTED (2026-08-25):** R010 push-half PROVEN on live production data
+(9/9 work_items server-accepted, revs 5–17, zero rejections) · retention rule RULED +
+frozen in §8 · shared-refresh widened (org + shared arms reload the work-item store) ·
+`nodeSharedRoot` partition fix (work_items resolve via their own store) · migrated-peer
+attestation gate built (per-org, persisted, IPC'd; carry branch waits on SPEC-027) ·
+re-toucher hunt SOLVED (live webview nav persistence, not a sync defect; registered for
+Caleb) · [sync-mark]/[sync-409]/[sync-apply] structured trails landed (R016's named
+signal). Remaining: the two-device arrival session — instance B prepared via
+FB_TEST_USER_DATA, operator logs it in. Full record:
+[phases/HANDOFFS/p1-live-pass.md](phases/HANDOFFS/p1-live-pass.md).
+
+**Awaiting operator:** D1 · D2 · R008 (CR-08(b) ruled → DEC-020 ✔) · log in on
+instance B for the arrival tests. Next horizons: the upstream PR to Caleb, V2
+register, Dispatch D-phases landing on our rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
