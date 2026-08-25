@@ -113,7 +113,8 @@ apply site. (Found by the classification agent, analysis/10 §3.6/§5; spot-veri
 Mapped: server-mediated CRDT sync, whitelist (`nodes`, `widgets`, `time_blocks`, `documents`,
 tables/rows/files), org/team/per-desk ACL scopes, triggers-set dirty flags, full social layer
 (messaging/presence/knock/org/shares) → analysis/05-PRE-SPEC-RULINGS.md E2–E3.
-**Remaining to close:** prove new-node-column passthrough end-to-end (the A-003 residual);
+**Remaining to close:** ~~prove new-node-column passthrough end-to-end~~ **DONE 2026-08-24
+23:21 — live round-trip PASS** (analysis/12; A-003 VALIDATED at 0.97). Only remaining:
 document ACL semantics precisely enough to architect receiver queues on them.
 
 ### GAP-009 — The product spec itself

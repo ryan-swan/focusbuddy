@@ -19,8 +19,10 @@ trim); ambiguities Q1–Q4, Q6–Q8 scheduled for Phase 2/3 proposals returned f
    label worklist.
 3. ~~C1-03 triage~~ ✔ **DIAGNOSED** → analysis/10 §6: enumeration/two-source bug, metadata
    intact; fix shape = product call → G2 docket.
-4. Sync proof, remaining half: the **server** (client half evidenced from code — A-003
-   updated). Live experiment — needs the dev app + supervised session.
+4. ~~Sync proof~~ ✔ **PASSED (2026-08-24 23:21)** — operator-run live round trip:
+   server stores + echoes unknown node columns intact → analysis/12. **A-003 VALIDATED
+   (0.97); DEC-007's ratification evidence complete.** Kind-value direct confirmation
+   scheduled post-migration (Phase 6 stage 1).
 5. ACL semantics documentation (org / team / per-desk) for SPEC-030.
 6. Sync reliability assessment (BUG-C2-01: partial widget sync, 7–8s latency).
 7. The gap matrix itself (analysis/02): all 44 SPEC items EXISTS/PARTIAL/MISSING/CONFLICTS

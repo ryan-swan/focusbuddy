@@ -28,8 +28,11 @@ migration discipline for other users' databases) or "this dies" (→ archive the
 mission-control; harvest learnings).
 
 ## A-003 — The existing org/sync layer can carry shared task state
-**Status:** OPEN · **Confidence:** 0.55 at creation → **0.85 as of 2026-08-24 evening**
-(evidence upgrade, see analysis/05-PRE-SPEC-RULINGS.md E2–E4) · **Created:** 2026-08-24
+**Status:** **VALIDATED 2026-08-24 23:21** — live round-trip proof: the server stores and
+echoes unknown node columns intact (analysis/12-SYNC-SERVER-PROOF.md; operator-run,
+personal scope, zero trace). Residual: unknown-kind direct confirmation post-migration
+(inference strong; itemType stays 'node'). · **Confidence:** 0.55 → 0.85 → **0.97** ·
+**Created:** 2026-08-24
 **Text:** "Shared collaboratively" can be built on the app's existing sync substrate without
 a new sync engine.
 **Evidence found:** server-mediated multi-device sync with CRDT convergence
