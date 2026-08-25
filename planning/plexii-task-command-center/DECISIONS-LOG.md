@@ -271,4 +271,20 @@ unconditional autopilot — rejected: the condition ("clean, validated, meets
 recommendations") and the scaffolding's exception paths are retained deliberately.
 **Made by:** Operator (directive) + Claude (formalization)
 
+## DEC-016 — Q1 and Q7 approved as proposed
+
+**Date:** 2026-08-25 · **Made by:** Operator ("Approved on Q1 and Q7")
+**Decision:** Q1 — SPEC-009's single clarifying question fires only on (a) named-recipient
+ambiguity with intent confidence < 0.70, or (b) an unanchored deadline phrase on an
+actionable class; silence otherwise; hard at-most-one per send; 0.70 is a named constant
+recalibrated against `attentionPrecision()` (analysis/16 §Q1 verbatim). Q7 — system events
+(agent escalations, cost caps, build-complete) are a distinct **System queue inside
+Attention**: same SPEC-006 substrate, own widget in SPEC-014's set (now Tasks · Reviews ·
+Calendar · Awaiting Ack · Completed · Stale Desks · System), tagged `origin='system'` on
+existing intent classes, **excluded from the headline top-bar count**; CRITICAL system
+events may still push OS notifications (analysis/16 §Q7 verbatim).
+**Alternatives:** priced in analysis/16 (over-clarifying thresholds; separate tray).
+**Consumed by:** Phase 3 architecture (SPEC-009 rule, SPEC-014 widget set, SPEC-015 count
+semantics).
+
 <!-- Append below; increment DEC-NNN. -->
