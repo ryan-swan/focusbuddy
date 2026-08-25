@@ -18,8 +18,8 @@ inspection (GAP-014).
 
 | ID | Class | Evidence + delta |
 |---|---|---|
-| SPEC-001 CHECK widening | **P** | Migration exists, test-pinned (L §2). Delta: dual-start-state redesign — live DBs may already read `('folder','task','task-item')` (DB/GAP-014); guard must key on absence of `'work_item'`; second test fixture required. Blocked on SPEC-004 dispositions per gate condition — evidence complete (10). |
-| SPEC-002 work_item columns | **P** | Substrate proven: nodes sync opaquely incl. new columns (12; kind acceptance DB-evidenced). Delta: the column set with A-02's `work_item_state` + derived `status` projection (+ mapping table; `dismissed`/`reclassified` never → `done`), A-03 reference integrity vs. the verified trashNode sweep + CASCADE (10 §3.1), scope-visibility contract (14 §finding 1), shared-desk auto-share decision (14 §finding 3). |
+| SPEC-001 CHECK widening | **M (prior art on unmerged fd12cc2f)** | ⚠ G2-corrected wording: at `a92b30cb` the migration is ABSENT from app code and the DDL is narrow (`database.ts:33`) — the test-pinned migration exists only on the unmerged harvest commit (L §2), and live DBs may ALREADY be widened (GAP-014). Delta: dual-start-state redesign keyed on absence of `'work_item'`; second fixture; blocked on SPEC-004 dispositions (evidence complete, 10). |
+| SPEC-002 work_item columns | **P** | Substrate proven: nodes sync opaquely incl. new columns (12; kind acceptance DB-evidenced). Delta: the column set with A-02's `work_item_state` + derived `status` projection (+ mapping table; `dismissed`/`reclassified` never → `done`), A-03 reference integrity vs. trashNode sweep + CASCADE (10 §3.1), scope-visibility contract (14 §1), shared-desk auto-share decision (14 §3), **CRDT allowlist additions (GAP-015)**, and three G2-found inputs: **reconcile with the pre-existing synced `nodes.assignee` column** (database.ts:618 — plan-assignment vs. routing recipient must be an explicit decision, not drift), **state the write-permission contract** (per-desk grants carry view/edit tiers with NO local write gate — deskShareClient.ts:22/:43; enforcement is server-side only), and **disposition work_items for the second sharing mechanism** (token `share_links`/`shared_with_me`, `ShareableKind` includes `'task'`). |
 | SPEC-003 satellite tables | **M** | No such tables; house pattern trivial (org-scoped local tables ubiquitous, MAP §5). |
 | SPEC-004 consumer classification | **P (evidence done)** | Full classification delivered + spot-verified: 223 true sites, 44 must-touch, blast-radius ranked, census-invisible forms found (10). Delta: B/C dispositions → reviewable diffs at build; live verification with work_items present. |
 | SPEC-005 workItems:* IPC | **M** | Namespace clean; wiring order + reference shapes named (MAP §5); `fb:command-new-task` event identified as the natural creation seam (10 §7.3). |
@@ -67,7 +67,7 @@ inspection (GAP-014).
 | SPEC-027 cross-user routing | **P** | Substrate VALIDATED end-to-end (A-003 0.99; 12+14+DB). Model: scope-carried + client-filtered recipientId; **visibility contract must be stated** (14 §finding 1). Receiver-side wake cadence = reliability report (in flight). |
 | SPEC-028 acknowledgment items | **M** | One synced column change + SPEC-016 rendering. |
 | SPEC-029 loop-closure notify | **M** | Rides SPEC-006; sender-side latency ~3s proven; receiver-side latency pending reliability report. |
-| SPEC-030 ACL semantics | **E (as evidence)** | Delivered: analysis/14 — three scopes, server-side membership, team no-leak tagging, per-person addressing absent, four architecture consequences. Consumed at G4. |
+| SPEC-030 ACL semantics | **M (evidence complete)** | ⚠ G2-corrected class (capability isn't built; the *evidence* is delivered: analysis/14). Corrections from the verifier: two local permission-bearing share tables DO exist (`share_links` scope view/copy; `shared_with_me`) — "no local tables" holds for *membership* only; per-person addressing exists at the GRANT layer with view/edit tiers (deskShareClient) though not as a sync scope. Epistemic boundary stated: server-side enforcement claims are client-code + comments + live-probe corroborated — the server itself is not in this repo. Consumed at G4. |
 | SPEC-031 discussion route | **P** | Meetings store + wrapup + action-items flow exist (11 §d: fb_meetings.action_items_json). Delta: attach-to-future-meeting + closes-when-discussed. |
 
 ## Calendar
@@ -88,7 +88,7 @@ inspection (GAP-014).
 | SPEC-038 guided discovery | **P** | discoveryMode.ts EXISTS with the creation gate — closer to done than specced; artifact rendering delta. |
 | SPEC-039 MCP exposure | **P** | An HTTP api server exists in main (`apiServer.ts`, kind-filtered — 10 §2.4); exposure contract new. |
 | SPEC-040 loose thoughts | **M** | CR-06(a): classification-only at v1; light store outside authoritative memory. |
-| SPEC-041 fb_task_deps integration | **E (boundary)** | DEC-010 boundary VERIFIED free: Gantt's terminal filter excludes other kinds by construction; listing filters isPlan (10 §4). v1 schema non-foreclosing (stable id + spatial ref). One deliberate choice logged: a desk nested under a work_item would appear in the Gantt (CTE recurses through) — accept or exclude at SPEC-002. |
+| SPEC-041 fb_task_deps integration | **M (P2; boundary verified on the READ path only)** | ⚠ G2-corrected. Read path safe: the OUTER SELECT's positive `kind='task'` filter (projectPlan.ts:62 — not the CTE itself, which recurses unfiltered) keeps work_items out of TaskRows; listing filters isPlan (:502). **G2-found hole: the WRITE paths are kind-agnostic** — `addDependency` (:365-370) and `patchPlanTask` (:338) accept any node id, so fb_task_deps could silently accrete edges to work_items and stamp plan fields onto them, invisibly dropped on read. v1 stage adds write guards (two new must-touch sites → GAP-011). Desk-under-work_item Gantt appearance: accept/exclude at SPEC-002. |
 
 ## Amendments (A-07)
 
@@ -96,7 +96,7 @@ inspection (GAP-014).
 |---|---|---|
 | SPEC-042 desk lifecycle (external prerequisite) | **P-strong** | status incl. `done`, `archived` + live consumers, `trashed_at`+restore all exist (08, 09); delta = stale derivation, delete/archive UX exposure + the deletion bug fix, memory contract (DEC-013 shape), shared-desk guard. Runs on the CR-07(B) parallel track; must land before Phase 5. |
 | SPEC-043 reference integrity | folded → SPEC-002 | Danger concrete & verified (trashNode sweep + CASCADE + 7-day purge chain — 10 §3.1/3.2). Shared half closes via DEC-013 guard. |
-| SPEC-044 vocab audit | **E (as evidence)** | Complete audit delivered + spot-verified (11): 62 model-visible occurrences dispositioned, riskiest-5, action-vocabulary map, persistence map, label worklist. Delta: execution as a build stage (prompt definitions + `create-work-item` + label fixes), gating SPEC-008. |
+| SPEC-044 vocab audit | **M (evidence complete)** | ⚠ G2-corrected class (the audit is delivered + spot-verified (11); the *remediation* is unbuilt). Delta: execution as a build stage (prompt definitions + `create-work-item` + label fixes), gating SPEC-008. **G2 additions to scope: two more desk-creation surfaces need the work_item arm** — the Flow engine executor (`db/flows.ts:168-170`) and the external HTTP API (`apiServer.ts:157`, an existing external write contract that hard-codes desk creation). |
 
 ## Enhancement opportunities (the spec didn't know these exist)
 
@@ -119,7 +119,32 @@ GAP-014 dual-start-state migration + task-item row tolerance · the 44 must-touc
 sites (10) · SPEC-044 execution before SPEC-008 · scope-visibility statement for routed
 items (14) · SPEC-042 external-track coordination before Phase 5.
 
-## G2 adversarial pass
+## G2 adversarial pass — VERDICT (2026-08-25 early)
 
-Verdict appended after the independent re-verification completes (sample ≥30% + every
-E/CR-class claim).
+Independent refute-mode verification against the code at `a92b30cb` (tree-identity
+confirmed by the verifier first). **Score: 12 CONFIRMED · 4 PARTIALLY · 0 REFUTED — no
+claim false at the substance level.** The four PARTIALs: (a) SPEC-030 overstated "no local
+tables"/"no per-person addressing" (share tables + grant-layer view/edit tiers exist —
+corrected in-row); (b) SPEC-041 named the wrong mechanism (filter is the outer SELECT, not
+the CTE — corrected); (d) one wrong pointer (MindMap conversion is :677/:722, not the
+label switch :2483); S2 line range off by 2.
+
+**Two classification disputes — both UPHELD and corrected in-place** (marked ⚠
+G2-corrected): the `E (as evidence)` category error on SPEC-030/041/044 (evidence-delivered
+≠ capability-exists; the matrix now contains zero E rows, which is the honest picture of
+build state), and SPEC-001's present-tense "migration exists" (it exists on unmerged
+fd12cc2f only).
+
+**Six material misses — all integrated:** ① SPEC-041 write-path kind-agnosticism
+(addDependency/patchPlanTask → two new must-touch sites); ② the pre-existing synced
+`nodes.assignee` column → SPEC-002 reconciliation decision; ③ view/edit grant tiers with
+no local write gate → SPEC-002/013/028 write-permission contract; ④ two additional
+desk-creation surfaces (Flow executor, external HTTP API) → SPEC-044/021 scope; ⑤ the
+second sharing mechanism (token share_links, ShareableKind incl. 'task') → work_item
+shareability disposition; ⑥ the epistemic boundary that the sync server is not in this
+repo (server-side enforcement = client contracts + live-probe corroboration) — stated in
+SPEC-030's row.
+
+**G2 verdict: PASS with corrections applied.** The disputes were presentation-and-scoping
+defects, not analytic errors; the misses are named build inputs, now carried by the rows
+that consume them. Matrix confidence after corrections: 0.93.

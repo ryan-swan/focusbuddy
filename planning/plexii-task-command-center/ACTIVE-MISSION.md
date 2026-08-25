@@ -3,7 +3,19 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-24 (night, G1 closed) · **State:** IN_PROGRESS — Phase 2
+**Last updated:** 2026-08-25 (early, G2 CLOSED) · **State:** IN_PROGRESS — Phase 3
+
+**G2 MET — Phase 2 complete, all seven items:** matrix adversarially verified (12
+CONFIRMED / 4 PARTIALLY / 0 REFUTED; two class disputes upheld + corrected; six misses
+integrated → GAP-016; verdict in analysis/02). Evidence library: 02, 10, 11, 12, 13, 14,
+15, 16 + registers. Per DEC-015's clean-validation condition: **autopilot proceeds into
+Phase 3 — strategy + logic-audited architecture** (the real build plan: schema DDL incl.
+dual-start migration, SPEC-002 columns + mapping table + assignee reconciliation +
+allowlist additions, IPC/preload signatures, notification substrate design, component
+decomposition, stage breakdown with verify-commands, then per-stage build prompts).
+Architecture drafts next; logic-auditor + risk pressure test follow before G3 closes.
+Still awaiting operator (non-blocking for architecture): Q1/Q7 rulings (analysis/16);
+shared-desk delete v1 default (DEC-013).
 
 **G1 MET (DEC-014):** spec captured + inventoried (44 items + SPEC-042/043/044); primary
 objective confirmed as drafted; all crossroads ruled (CR-01..07 = standing recommendations;

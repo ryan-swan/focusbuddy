@@ -135,6 +135,18 @@ must prove a live-path arrival carries them). Related: personal scope has NO rec
 on the poll unless the fields ride the live path. (Found by the reliability agent,
 analysis/15 §6; allowlists spot-verified.)
 
+## GAP-016 — SPEC-002's three G2-found design inputs (person-field, permissions, sharing)
+**Severity:** HIGH · **Closes in:** Phase 3/4 (architecture) + SPEC-002 stage · **Status:** OPEN
+Found by the G2 adversarial pass: (1) **`nodes.assignee` already exists and already syncs**
+(database.ts:618; read by projectPlan) — SPEC-002 must explicitly reconcile plan-assignment
+(`assignee`) vs. routing (`recipientId`) or the two person-fields drift; (2) **per-desk
+grants carry view/edit tiers with NO local write gate** (deskShareClient; collectPendingShared
+pushes a view-only grantee's edits, refusal is server-side only) — the write-permission
+contract must be stated for SPEC-013 reclassification and SPEC-028 acknowledgment writes;
+(3) **the token-link sharing mechanism** (`share_links`/`shared_with_me`, `ShareableKind`
+includes `'task'`) needs a work_item disposition (shareable? what snapshot?). Also carried:
+SPEC-041 write-guards (addDependency/patchPlanTask) added to GAP-011's must-touch set.
+
 ## Open questions
 
 ### GAP-008 — What can the sync/org layer carry for shared collaboration?

@@ -1,10 +1,13 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-24 night · G1 CLOSED (spec in, all crossroads ruled, DEC-013/014);
-Phase 2 open — two analysis agents dispatched (node-consumer classification → analysis/10,
-AI vocab audit → analysis/11); next supervised work = the split sync proof (server
-passthrough + client stamping) against the live dev app, then the gap matrix + adversarial
-pass toward G2.
+**Last updated:** 2026-08-25 early · **G2 CLOSED** (all seven Phase 2 workstreams
+delivered; matrix adversarially verified 12/4/0 with corrections integrated; evidence
+library complete: analysis/02+10-16). Phase 3 open per DEC-015 autopilot: draft the
+7-section architecture (consume the FULL evidence library — esp. GAP-013/014/015/016, the
+A-01/A-02 amendments, analysis/14§consequences + 15§6 preconditions), then logic-auditor +
+risk war-game before G3; then stage decomposition + per-stage build prompts. Q1/Q7 rulings
+(analysis/16) + shared-desk delete v1 default still awaited from operator — non-blocking
+for architecture, due before Phase 5.
 
 ## <<<PROMPT BEGIN>>>
 
