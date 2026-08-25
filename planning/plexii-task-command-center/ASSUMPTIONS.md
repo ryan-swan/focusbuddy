@@ -30,8 +30,9 @@ mission-control; harvest learnings).
 ## A-003 — The existing org/sync layer can carry shared task state
 **Status:** **VALIDATED 2026-08-24 23:21** — live round-trip proof: the server stores and
 echoes unknown node columns intact (analysis/12-SYNC-SERVER-PROOF.md; operator-run,
-personal scope, zero trace). Residual: unknown-kind direct confirmation post-migration
-(inference strong; itemType stays 'node'). · **Confidence:** 0.55 → 0.85 → **0.97** ·
+personal scope, zero trace). Residual CLOSED same night by natural evidence: 14 legacy
+`task-item` rows in the live DB carry server `sync_rev` up to 4527 — the server accepts
+unfamiliar kinds (GAP-014 discovery). · **Confidence:** 0.55 → 0.85 → 0.97 → **0.99** ·
 **Created:** 2026-08-24
 **Text:** "Shared collaboratively" can be built on the app's existing sync substrate without
 a new sync engine.

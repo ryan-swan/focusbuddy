@@ -240,4 +240,35 @@ v1 default are SPEC-042/043 design work, presented for approval before build.
   including that `dismissed` and `reclassified` are NOT completions (never project to `done`).
 **Alternatives:** itemized per CR in 00-SPEC-RAW §7 and 07-BUG-CONFLICT-REGISTER §3.
 
+## DEC-015 — Conditional autopilot through the foundation build; SPEC-001+A1 is the strategy baseline
+
+**Date:** 2026-08-24 (night) · **Made by:** Operator
+**Decision:** (1) The compiled SPEC-001 + amendment record A1 (analysis/00 + analysis/13)
+is the operative **scope baseline** — what and why, deliberately not how; A-01 (protocol
+quarantine, never rename `create-task`) and A-02 (`work_item_state` authoritative; `status`
+a derived coarse projection) supersede the raw spec's §1.1/§1.5 wherever they conflict.
+The actual build plan — schema DDL, IPC signatures, component decomposition, stage
+breakdown with verify-commands, and the per-stage build prompts — is **Phase 3's output**,
+written against this scope only after Phase 2's evidence, and the per-stage prompts are
+written against *approved architecture*, never against the spec directly (operator
+clarification, 2026-08-24 night). Q1 (clarification threshold) and Q7 (system
+notifications) get concrete proposals returned to the operator DURING Phase 2. (2) **Conditional autopilot:** if the three
+remaining Phase 2 items (ACL semantics, sync reliability, gap matrix + adversarial pass)
+validate clean and meet the recommendations, proceed directly into Phase 3 (strategy +
+logic-audited architecture) and Phase 4 (foundation build: SPEC-001/002/003/005) without
+further per-gate operator sign-off — the G3/G5 approvals are satisfied in advance by this
+mandate, conditioned on clean validation. (3) The scaffolding still wins on exceptions:
+any REJECT-grade finding, new crossroads, deviation from the standing recommendations, or
+FOUNDATIONAL surprise halts and presents per the Crossroads Protocol. (4) Open questions
+Q1–Q4/Q6–Q8 come due at the phase that consumes them (Phase 5 capture/surface work), not
+before; the shared-desk delete v1 default still returns for design approval per DEC-013.
+**Context:** Operator: "if you get through these remaining three items without any issues
+and things are validated and look clean and meet the recommendations and optimal outcomes
+then just continue to work on what's below unless you have other clear directives based on
+the scaffolding."
+**Alternatives:** strict per-gate pauses — rejected by the operator's explicit instruction;
+unconditional autopilot — rejected: the condition ("clean, validated, meets
+recommendations") and the scaffolding's exception paths are retained deliberately.
+**Made by:** Operator (directive) + Claude (formalization)
+
 <!-- Append below; increment DEC-NNN. -->

@@ -23,11 +23,19 @@ trim); ambiguities Q1–Q4, Q6–Q8 scheduled for Phase 2/3 proposals returned f
    server stores + echoes unknown node columns intact → analysis/12. **A-003 VALIDATED
    (0.97); DEC-007's ratification evidence complete.** Kind-value direct confirmation
    scheduled post-migration (Phase 6 stage 1).
-5. ACL semantics documentation (org / team / per-desk) for SPEC-030.
-6. Sync reliability assessment (BUG-C2-01: partial widget sync, 7–8s latency).
-7. The gap matrix itself (analysis/02): all 44 SPEC items EXISTS/PARTIAL/MISSING/CONFLICTS
-   with evidence + ≥30% adversarial re-verification INCLUDING the B/C dispositions of
-   analysis/10 and the disposition tables of analysis/11 (G2 dual validation).
+5. ~~ACL semantics~~ ✔ **DONE** → analysis/14: three scopes, server-side membership,
+   per-person addressing absent → v1 routing = scope-carried + client-filtered with a
+   stated visibility contract; four G4 consequences named.
+6. Sync reliability assessment → **background agent in flight** (mechanism map, per-widget
+   sync paths, 7–8s latency budget, dirty-row causes) → analysis/15. Own DB inspection
+   found **GAP-014**: live DB already CHECK-widened by the legacy migration (task-item rows
+   exist, server revved them → kind acceptance proven, A-003 → 0.99; migration needs
+   dual-start-state redesign).
+7. Gap matrix DRAFTED → analysis/02 (all 44 + amendments classified with evidence);
+   **adversarial verifier agent in flight** (refute-mode, all E/CR claims + ≥30% sample).
+   G2 closes when 6+7 return clean. Also delivered: **Q1/Q7 concrete proposals →
+   analysis/16, awaiting operator ruling** (due before Phase 5, not blocking Phase 3/4
+   foundation). Operative scope baseline: SPEC-001 + A1 (analysis/13; DEC-015).
 
 ## Right now
 

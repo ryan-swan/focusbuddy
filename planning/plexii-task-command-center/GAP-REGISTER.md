@@ -105,6 +105,23 @@ surfaced anywhere. Closing = ship the CHECK-widening migration ahead of any work
 reaching the sync path, AND/OR add an explicit unknown-kind branch + migration gate at the
 apply site. (Found by the classification agent, analysis/10 §3.6/§5; spot-verified.)
 
+## GAP-014 — Live-DB schema drift: the harvested migration's guard won't fire here
+**Severity:** HIGH · **Closes in:** Phase 4 (migration design) + first Phase 6 schema stage · **Status:** OPEN
+Discovered 2026-08-24 night (read-only DB inspection): the primary dev machine's live DB
+already has `CHECK (kind IN ('folder','task','task-item'))` with the quoted-`"nodes"`
+rebuild fingerprint — the legacy branch's `migrateNodesKindCheck` ran against this userData
+on ~Aug 3 and persisted. **14 `task-item` rows exist** (demo-mode seed residue; 9 already
+trashed; server `sync_rev` up to 4527 — which incidentally proves the server accepts
+unfamiliar kinds, closing the A-003 kind residual). Consequences for the Phase 4 migration:
+(1) the harvested guard (`sql.includes("'task-item'") → return`) would skip this DB and
+never admit `work_item` — the new migration must key on the ABSENCE of `'work_item'` and
+handle BOTH starting states; (2) CR-05(a) (delete the dead TS declaration) gains a data
+dimension — legacy `task-item` ROWS exist in at least one real DB, so the new CHECK should
+tolerate `'task-item'` (recommend: CHECK admits all four kinds; the TS union carries only
+`work_item`, so no new task-items can be created; existing rows are inert residue,
+optionally cleaned later); (3) the migration's pinning test needs a second fixture: the
+already-widened legacy-migrated DB shape.
+
 ## Open questions
 
 ### GAP-008 — What can the sync/org layer carry for shared collaboration?
