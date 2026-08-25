@@ -3,9 +3,17 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (S5 SHIPPED — **THE ATTENTION LAYER IS LIVE**) · **State:**
+**Last updated:** 2026-08-25 (DEC-020 EXECUTED — the nav retirement) · **State:**
 IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
 → **S7 ✔ — G6 MET (607ace78). THE BUILD'S SPINE IS COMPLETE AND LIVE.**)
+
+**DEC-020 EXECUTED (2026-08-25):** operator ruled "Retire the tabs and add plan due
+dates to the feeders first" — done in that order. (1) `plan-due` feeder kind: plan
+roots with due dates ("Plan due tomorrow" → plan dashboard) + due desks inside plans
+("Due in 2 days · <plan>" → the desk), independent mutes/Δ10; (2) Plans, "Desks
+(flat)", and Calendar left the sidebar (both rail states) — views stay ⌘K-reachable
+(NEW "Plans" palette entry added), MainPane routes + calendar engine untouched
+(DEC-009). Caleb precondition updated (shared Calendar surface).
 
 **S7 + G6 CLOSED (2026-08-25):** feeders (due/stale desks surface AS attention, muting,
 one-directional), Δ10 suppression both halves, the single deadline-proximity nudge, the
@@ -13,9 +21,9 @@ operator's three QA fixes (⌘K @attention score 500, desk-action routing rule, 
 chat rule). 2745/2745 tests — 135 added over baseline, every stage closed with live
 verification in ONE day. Full honest ledger incl. PARTIAL/DEFERRED/owed-P1 + merge
 preconditions: [phases/HANDOFFS/s7-close-G6.md](phases/HANDOFFS/s7-close-G6.md).
-**Awaiting operator:** CR-08(b) nav retirement (one ruling: "retire the tabs" + the
-Plans choice → DEC-020) · D1 · D2 · R008. Next horizons: the P1 live checklist, the
-upstream PR to Caleb, V2 register, Dispatch D-phases landing on our rails.
+**Awaiting operator:** D1 · D2 · R008 (CR-08(b) ruled → DEC-020 ✔). Next horizons: the
+P1 live checklist, the upstream PR to Caleb, V2 register, Dispatch D-phases landing on
+our rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette

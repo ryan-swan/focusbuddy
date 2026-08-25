@@ -58,14 +58,14 @@ build.** One day, S0→S7 + L1/L3 + DEC-018/019, every stage closed with live ve
   meta-brain · FYI deadline backstop · work_item archival flag · existing-artifact
   check (full) · Settings toggle for `workItems.enabled`.
 
-## CR-08(b) — THE NAV RETIREMENT (proposal, one ruling to execute)
-The feeders now surface due/stale desks inside Attention — the flat tab is redundant
-by absorption, as planned. **Proposed DEC:** hide from the sidebar (a) "Desks (flat)"
-/ all-tasks (view stays reachable via palette), (b) Calendar (engine untouched per
-DEC-009; view via palette; Caleb informed since the tab is his surface too),
-(c) Plans — EITHER stays visible (DEC-010 conservative) OR hides with plan-item due
-dates joining the feeders first (one more feeder query). Say "retire the tabs" (+ the
-Plans choice) and it lands as DEC-020.
+## CR-08(b) — THE NAV RETIREMENT — **EXECUTED as DEC-020 (2026-08-25)**
+Operator ruled: "Retire the tabs and add plan due dates to the feeders first." Landed
+in that order: (1) `plan-due` feeder kind — plan roots with due dates open the plan
+dashboard, due desks inside plans carry the plan's name and open the desk; distinct
+kind ⇒ independent mutes/Δ10 offers. (2) "Desks (flat)", Plans, and Calendar left the
+sidebar, both rail states. Views stay ⌘K-reachable (a "Plans" palette entry was added
+— the palette had no direct opener); MainPane routes and the calendar ENGINE are
+untouched (DEC-009). Full record: DECISIONS-LOG DEC-020.
 
 ## Merge-readiness preconditions (for the eventual PR to Caleb — §8 R016 + DEC-018 A-6)
 1. Fleet migration first: every device carries S1's migration before any org exposure;
@@ -77,6 +77,10 @@ Plans choice) and it lands as DEC-020.
 4. [PLEXI-UPSTREAM] flagged diffs: wake-coalescer, park-inbound, 409 fix, prune core.
 5. Known-Caleb leads: schedule-event year-off startMs; `agentDispatcher.ts` vs
    "Dispatch" naming; capability-gates ipc/index.ts merge overlap (2-commit drift).
+6. **DEC-020 nav change on a shared surface:** the Calendar (and Plans/all-tasks)
+   sidebar rows are hidden on this branch — the calendar ENGINE is untouched, but an
+   upstream merge must either carry the retirement or consciously re-add the rows;
+   views remain palette-reachable either way.
 
 ## The operator's standing QA loop
 Live notes → registered here → fixed in-stage or explicitly scheduled. Current cycle

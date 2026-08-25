@@ -341,4 +341,33 @@ layouts keep loading; the gallery stops offering them).
 touch accuracy is the trust surface); seven separate widgets (rejected: canvas
 sprawl — the synthesis's own widget-bloat warning).
 
+---
+
+## DEC-020 — The nav retirement: plan due dates feed Attention; three tabs leave the sidebar
+**Date:** 2026-08-25 · **Status:** APPROVED + IMPLEMENTED (operator, verbatim: "Retire
+the tabs and add plan due dates to the feeders first")
+**Decision:** Executes CR-08(b) in the order the operator chose:
+**(1) Plan due dates joined the feeders FIRST.** `deskDueSignals` widened: a plan
+root (`kind='folder'` + `is_plan`) with a due date emits a `plan-due` signal
+("Plan due tomorrow") opening the plan dashboard; a due desk INSIDE a plan
+(parent chain resolved through nested folders, 20-hop cycle guard) also emits
+`plan-due` with the plan's name on the line ("Due in 2 days · Launch") opening
+the desk. Plain desks stay `desk-due`. Distinct kind ⇒ independent whole-kind
+mutes and Δ10 offers. Feeders stay computed, one-directional (F006), out of the
+headline badge (DEC-016).
+**(2) Then three sidebar tabs retired, both rail states:** "Desks (flat)" /
+all-tasks, Plans, and Calendar left the sidebar (expanded NavRows + collapsed
+icons). Absorption, not deletion: every view stays routable — MainPane cases
+untouched, ⌘K palette carries "All tasks", "Calendar", and a NEW "Plans" entry
+(the palette had no direct Plans opener; added before the tab went). Calendar
+ENGINE untouched per DEC-009 — blocks, reminders, scheduling all live; only the
+nav row is gone. Plans/AllTasks/Calendar views + their code: unchanged.
+**Caleb note (merge precondition list updated):** the Calendar tab is a shared
+surface — upstream merge must either carry this retirement or re-add the row;
+flagged in the G6 ledger.
+**Alternatives:** hide Plans without feeder coverage first (rejected — a due
+date must never lose its surface, even for one build); delete the views
+(rejected — palette reachability is the escape hatch while Attention earns
+trust).
+
 <!-- Append below; increment DEC-NNN. -->
