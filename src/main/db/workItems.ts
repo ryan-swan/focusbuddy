@@ -115,6 +115,24 @@ export interface WorkItemDraft {
   recipientId?: string | null
 }
 
+/** DEC-018 A-1 (Dispatch D4 seam): who performed a write — a person, an agent
+ *  acting for one, or the system. v1 threads and logs it; persistent storage
+ *  (columns vs event log) is a D4-time DEC. Reserved NOW because these cores
+ *  are the only write path (F008): a parameter today, a caller sweep later. */
+export interface WorkItemActor {
+  kind: 'human' | 'agent' | 'system'
+  agentRef?: string
+  missionRef?: string
+}
+
+function logActor(op: string, id: string, actor?: WorkItemActor): void {
+  if (!actor || actor.kind === 'human') return
+  // eslint-disable-next-line no-console
+  console.info(
+    `[workItems] ${op} ${id} by ${actor.kind}${actor.agentRef ? ` agent=${actor.agentRef}` : ''}${actor.missionRef ? ` mission=${actor.missionRef}` : ''}`
+  )
+}
+
 export class WorkItemWriteRefusedError extends Error {
   readonly code: string
   constructor(code: string, message: string) {
@@ -137,7 +155,8 @@ function assertWritable(d: LifecycleDb): void {
 export function createWorkItemCore(
   d: LifecycleDb,
   draft: WorkItemDraft,
-  orgId: string
+  orgId: string,
+  actor?: WorkItemActor
 ): { id: string } {
   assertWritable(d)
   if (orgId !== PERSONAL_ORG_ID)
@@ -187,10 +206,16 @@ export function createWorkItemCore(
     draft.wiOrigin ?? 'human',
     WORK_ITEM_SCHEMA_EPOCH
   )
+  logActor('create', id, actor)
   return { id }
 }
 
-export function setWorkItemStateCore(d: LifecycleDb, id: string, state: WorkItemState): boolean {
+export function setWorkItemStateCore(
+  d: LifecycleDb,
+  id: string,
+  state: WorkItemState,
+  actor?: WorkItemActor
+): boolean {
   if (!(WORK_ITEM_STATES as readonly string[]).includes(state)) return false
   const row = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
     | { kind: string }
@@ -199,6 +224,7 @@ export function setWorkItemStateCore(d: LifecycleDb, id: string, state: WorkItem
   d.prepare(
     'UPDATE nodes SET work_item_state = ?, status = ?, updated_at = ? WHERE id = ?'
   ).run(state, statusForWorkItemState(state), Date.now(), id)
+  logActor(`setState:${state}`, id, actor)
   return true
 }
 
@@ -248,15 +274,15 @@ export function normalizeAppliedWorkItem(d: LifecycleDb, id: string): RemoteWork
 
 // ── getDb-bound wrappers ────────────────────────────────────────────────────
 
-export function createWorkItem(draft: WorkItemDraft): FbNode {
-  const { id } = createWorkItemCore(getDb(), draft, getActiveOrgId())
+export function createWorkItem(draft: WorkItemDraft, actor?: WorkItemActor): FbNode {
+  const { id } = createWorkItemCore(getDb(), draft, getActiveOrgId(), actor)
   const item = getWorkItem(id)
   if (!item) throw new Error('work_item creation failed post-insert')
   return item
 }
 
-export function setWorkItemState(id: string, state: WorkItemState): boolean {
-  return setWorkItemStateCore(getDb(), id, state)
+export function setWorkItemState(id: string, state: WorkItemState, actor?: WorkItemActor): boolean {
+  return setWorkItemStateCore(getDb(), id, state, actor)
 }
 
 export function listWorkItems(): FbNode[] {
@@ -278,9 +304,36 @@ export function getWorkItem(id: string): FbNode | null {
   return row ? mapNodeRow(row) : null
 }
 
-export function updateWorkItemFields(id: string, patch: Record<string, unknown>): FbNode | null {
-  if (!updateWorkItemFieldsCore(getDb(), id, patch)) return null
+export function updateWorkItemFields(
+  id: string,
+  patch: Record<string, unknown>,
+  actor?: WorkItemActor
+): FbNode | null {
+  if (!updateWorkItemFieldsCore(getDb(), id, patch, actor)) return null
   return getWorkItem(id)
+}
+
+/** §5's badge model: per-intent-class counts of NON-TERMINAL items derived
+ *  from work_item_state exclusively (never status — F013), plus a headline
+ *  total that excludes wi_origin='system' (DEC-016). */
+export function attentionBadgeCounts(): { headline: number; byIntent: Record<string, number> } {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT intent_class AS intent, wi_origin AS origin, COUNT(*) AS n FROM nodes
+       WHERE kind = 'work_item' AND trashed_at IS NULL AND org_id = ?
+         AND work_item_state IN ('open','in_progress','waiting','needs_review','needs_approval','delegated','blocked','suggested','stale')
+       GROUP BY intent_class, wi_origin`
+    )
+    .all(getActiveOrgId()) as Array<{ intent: string | null; origin: string | null; n: number }>
+  const byIntent: Record<string, number> = {}
+  let headline = 0
+  for (const r of rows) {
+    const key = r.intent ?? 'action'
+    byIntent[key] = (byIntent[key] ?? 0) + r.n
+    if (r.origin !== 'system') headline += r.n
+  }
+  return { headline, byIntent }
 }
 
 export function reclassifyWorkItem(id: string, intentClass: string): FbNode | null {
@@ -412,7 +465,8 @@ const PATCHABLE: Record<string, string> = {
 export function updateWorkItemFieldsCore(
   d: LifecycleDb,
   id: string,
-  patch: Record<string, unknown>
+  patch: Record<string, unknown>,
+  actor?: WorkItemActor
 ): boolean {
   const row = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
     | { kind: string }
@@ -429,6 +483,7 @@ export function updateWorkItemFieldsCore(
   if (!sets.length) return true
   sets.push('updated_at = @now')
   d.prepare(`UPDATE nodes SET ${sets.join(', ')} WHERE id = @id`).run(params)
+  logActor('updateFields', id, actor)
   return true
 }
 

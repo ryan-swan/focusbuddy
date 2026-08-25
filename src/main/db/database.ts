@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { migrateNodesKindCheckV2, type NodesKindMigrationResult } from './migrateNodesKind'
 import { ensureWorkItemSchema } from './workItems'
+import { ensureNotificationSchema } from '../notifications/substrate'
 
 // The outcome of the nodes-kind widening on THIS boot, queryable by the sync
 // status surface: a 'no-check-clause' skip means the local DB never became
@@ -581,6 +582,8 @@ export function getDb(): Database.Database {
   // work_item columns + satellite tables + orphan reconciliation (S2, §2.2/§2.4)
   // — strictly AFTER the kind migration above, per its two-sided pin.
   ensureWorkItemSchema(db)
+  // The notification substrate's durable store (S4, §5).
+  ensureNotificationSchema(db)
   // Forward-compatible migrations for previously-created DBs
   // File/folder manager: fb_files grows from a flat attachment store into a
   // foldered library. parent_id nests entries (null = root), kind tells folder

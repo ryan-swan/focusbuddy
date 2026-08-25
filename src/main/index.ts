@@ -20,6 +20,7 @@ import { runDueFlows } from './db/flows'
 import { sweepDocumentChunks, sweepWidgetChunks, sweepChatChunks, sweepFileChunks } from './chunkIndex'
 import { runDueReports } from './db/reports'
 import { installMainCrashHandlers, recordCrash } from './db/crashLog'
+import { startNotificationScheduler } from './notifications/scheduler'
 
 // Capture uncaught errors + unhandled rejections from the main process before
 // anything else runs, so a startup failure is recorded instead of lost. The
@@ -498,6 +499,9 @@ app.whenReady().then(() => {
   applyDisplayMediaHandler(session.defaultSession)
   registerIpcHandlers()
   registerMdExternal()
+  // The notification substrate's scheduler (Attention S4): app-start sweep +
+  // 30s cadence; durable rows mean scheduled banners survive restarts.
+  startNotificationScheduler()
   // Stream Deck focus handoff — caches the previously-frontmost app so
   // ⌘C / ⌘V / ⌘⇧4 / type-text land in the user's actual workspace
   // rather than in FocusBuddy itself.

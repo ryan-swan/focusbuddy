@@ -86,9 +86,12 @@ import {
   snoozeWorkItem,
   markWorkItemRead,
   workItemCounts,
+  attentionBadgeCounts,
   type WorkItemDraft,
-  type WorkItemState
+  type WorkItemState,
+  type WorkItemActor
 } from '../db/workItems'
+import { postNotification, type PostInput } from '../notifications/substrate'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
@@ -690,12 +693,16 @@ export function registerIpcHandlers(): void {
   // refusal codes (flag OFF / un-migrated / non-personal scope) to the caller.
   ipcMain.handle('workItems:list', () => listWorkItems())
   ipcMain.handle('workItems:get', (_e, id: string) => getWorkItem(id))
-  ipcMain.handle('workItems:create', (_e, draft: WorkItemDraft) => createWorkItem(draft))
-  ipcMain.handle('workItems:updateFields', (_e, id: string, patch: Record<string, unknown>) =>
-    updateWorkItemFields(id, patch)
+  ipcMain.handle('workItems:create', (_e, draft: WorkItemDraft, actor?: WorkItemActor) =>
+    createWorkItem(draft, actor)
   )
-  ipcMain.handle('workItems:setState', (_e, id: string, state: WorkItemState) =>
-    setWorkItemState(id, state)
+  ipcMain.handle(
+    'workItems:updateFields',
+    (_e, id: string, patch: Record<string, unknown>, actor?: WorkItemActor) =>
+      updateWorkItemFields(id, patch, actor)
+  )
+  ipcMain.handle('workItems:setState', (_e, id: string, state: WorkItemState, actor?: WorkItemActor) =>
+    setWorkItemState(id, state, actor)
   )
   ipcMain.handle('workItems:reclassify', (_e, id: string, intentClass: string) =>
     reclassifyWorkItem(id, intentClass)
@@ -705,6 +712,11 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('workItems:markRead', (_e, id: string) => markWorkItemRead(id))
   ipcMain.handle('workItems:counts', () => workItemCounts())
+  ipcMain.handle('workItems:badgeCounts', () => attentionBadgeCounts())
+  // The notification substrate (S4, §5): the one posting door. The renderer's
+  // live banners post records-of-record through it; scheduled deliveries are
+  // swept by the main scheduler.
+  ipcMain.handle('notifications:post', (_e, input: PostInput) => postNotification(getDb(), input))
   // Internal seam (S2): the arrival router's channel into the same code path.
   ipcMain.handle('workItems:kindOf', (_e, id: string) => {
     const row = getDb().prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as

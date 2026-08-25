@@ -6,7 +6,9 @@ import {
   restoreLayout,
   type DeskLayout
 } from '../../src/shared/deskLayout'
-import { recordNotification, canSuppress, effectiveDelivery, notEscalatedDigest, type Notification } from '../../src/main/notifications/notifications'
+// The PLX-UX-043/044/045 notification assertions moved with their subject: the
+// spec-conformance decoy module retired into the real substrate (Attention S4),
+// and its contract tests live in notificationSubstrate.test.ts.
 import {
   visiblePresence,
   communicateChange,
@@ -60,27 +62,6 @@ describe('plx_ux_041 — search permission filter first (shared with SCH-001)', 
     const r = rankSearch([{ id: 'ok', keywordScore: 1, semanticScore: 1, embeddingStale: false }, { id: 'no', keywordScore: 9, semanticScore: 9, embeddingStale: false }], (id) => id === 'ok')
     expect(r.total).toBe(1) // withheld result never counted
     expect(r.results.map((x) => x.id)).toEqual(['ok'])
-  })
-})
-
-describe('plx_ux_043 / plx_ux_044 / plx_ux_045 — notifications', () => {
-  it('test_plx_ux_043_records_layer_and_trigger', () => {
-    const n = recordNotification({ id: 'n1', category: 'attention', layer: 'inbox', trigger: 'materiality>0.7', escalated: true })
-    expect(n.layer).toBe('inbox')
-    expect(() => recordNotification({ id: 'n2', category: 'attention', layer: 'inbox', trigger: '', escalated: true })).toThrow(/PLX-UX-043/)
-  })
-  it('test_plx_ux_044_security_never_suppressible', () => {
-    expect(canSuppress('security')).toBe(false)
-    expect(canSuppress('activity')).toBe(true)
-    expect(effectiveDelivery('security', true)).toBe('delivered') // cannot be suppressed
-    expect(effectiveDelivery('activity', true)).toBe('suppressed')
-  })
-  it('test_plx_ux_045_not_escalated_digest', () => {
-    const all: Notification[] = [
-      { id: 'a', category: 'activity', layer: 'ambient', trigger: 't', escalated: false },
-      { id: 'b', category: 'attention', layer: 'inbox', trigger: 't', escalated: true }
-    ]
-    expect(notEscalatedDigest(all).map((n) => n.id)).toEqual(['a']) // what the user did NOT get
   })
 })
 

@@ -17,15 +17,40 @@ function canNotify(): boolean {
  * Fire a desktop notification, but only when the app is in the background. Pass
  * `force: true` for things that should alert even with the app focused (an
  * incoming call). The optional onClick runs after the window is brought forward.
+ *
+ * Since Attention S4 this is a thin client of the notification substrate: the
+ * banner behavior is unchanged (focus gate, click-to-focus, live closure), and
+ * every call ALSO posts a record-of-record through notifications:post — the
+ * durable store that dedupes, rate-caps scheduled deliveries, and feeds the
+ * not-escalated digest. `queue` names the substrate queue (default 'activity').
  */
 export function notifyExternal(
   title: string,
   body: string,
-  opts: { onClick?: () => void; force?: boolean; tag?: string } = {}
+  opts: { onClick?: () => void; force?: boolean; tag?: string; queue?: string } = {}
 ): void {
   if (!canNotify()) return
   // Skip when the user is already looking at the app, unless forced.
-  if (!opts.force && document.hasFocus()) return
+  const suppressedByFocus = !opts.force && document.hasFocus()
+  // Record-of-record (fire-and-forget; a substrate hiccup never blocks a banner).
+  try {
+    void window.api.notifications
+      .post({
+        queue: opts.queue ?? 'activity',
+        title,
+        body,
+        dedupeKey: opts.tag ? `live:${opts.queue ?? 'activity'}:${opts.tag}` : null,
+        category: 'activity',
+        layer: suppressedByFocus ? 'ambient' : 'interruptive',
+        trigger: 'renderer-live',
+        origin: 'system',
+        alreadyDelivered: true
+      })
+      .catch(() => {})
+  } catch {
+    /* preload unavailable (tests) — banner path continues */
+  }
+  if (suppressedByFocus) return
   try {
     const n = new Notification(title, { body, tag: opts.tag, silent: false })
     n.onclick = () => {

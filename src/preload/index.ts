@@ -1715,6 +1715,8 @@ const api = {
       ipcRenderer.invoke('workItems:snooze', id, until),
     markRead: (id: string): Promise<void> => ipcRenderer.invoke('workItems:markRead', id),
     counts: (): Promise<Record<string, number>> => ipcRenderer.invoke('workItems:counts'),
+    badgeCounts: (): Promise<{ headline: number; byIntent: Record<string, number> }> =>
+      ipcRenderer.invoke('workItems:badgeCounts'),
     // Internal (S2): the arrival router's seam.
     kindOf: (id: string): Promise<string | null> => ipcRenderer.invoke('workItems:kindOf', id),
     applySyncEvent: (
@@ -1723,6 +1725,26 @@ const api = {
         | { type: 'attr'; id: string; attr: string; value: unknown }
         | { type: 'trash'; id: string; trashed: boolean }
     ): Promise<string> => ipcRenderer.invoke('workItems:applySyncEvent', ev)
+  },
+  // The notification substrate (Attention S4): every notifier posts through
+  // this one door — the renderer's live banners as records-of-record, and
+  // anything scheduled for the main sweep to deliver.
+  notifications: {
+    post: (input: {
+      ref?: string | null
+      queue: string
+      title: string
+      body?: string
+      deliverAt?: number
+      dedupeKey?: string | null
+      category?: 'security' | 'decision-risk' | 'attention' | 'activity' | 'digest'
+      layer?: 'ambient' | 'inbox' | 'interruptive'
+      trigger: string
+      origin?: 'human' | 'ai' | 'system'
+      critical?: boolean
+      alreadyDelivered?: boolean
+    }): Promise<{ posted: boolean; id: string | null }> =>
+      ipcRenderer.invoke('notifications:post', input)
   },
   workspaceSync: {
     // F010 — after a 409 conflict-apply, floor the local sync_rev to the
