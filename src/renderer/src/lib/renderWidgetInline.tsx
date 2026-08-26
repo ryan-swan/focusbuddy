@@ -21,7 +21,6 @@ import WebViewWidget from '../components/widgets/WebViewWidget'
 import ImageWidget from '../components/widgets/ImageWidget'
 import VideoWidget from '../components/widgets/VideoWidget'
 import TimerWidget from '../components/widgets/TimerWidget'
-import MinimapWidget from '../components/widgets/MinimapWidget'
 import VoiceRecorderWidget from '../components/widgets/VoiceRecorderWidget'
 import MindMapWidget from '../components/widgets/MindMapWidget'
 import ShapeWidget from '../components/widgets/ShapeWidget'
@@ -72,7 +71,9 @@ export function renderWidgetInline(w: Widget): JSX.Element | null {
     case 'timer':
       return <TimerWidget widget={w} inline />
     case 'minimap':
-      return <MinimapWidget widget={w} inline />
+      // Deprecated widget kind — the minimap is the canvas FAB now, never a
+      // placeable/embeddable widget. Legacy instances render nothing.
+      return null
     case 'voice-recorder':
       return <VoiceRecorderWidget widget={w} inline />
     case 'mindmap':

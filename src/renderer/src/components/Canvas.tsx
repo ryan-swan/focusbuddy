@@ -45,7 +45,6 @@ import BrowserContextMenu from './contextMenu/BrowserContextMenu'
 // checklist, living-doc regenerate, ...) for the unified context menu.
 import '../lib/contextMenu'
 import FloatingToolbar, { type ToolbarAction } from './FloatingToolbar'
-import MinimapWidget from './widgets/MinimapWidget'
 import CanvasMinimapFAB from './CanvasMinimapFAB'
 import AutomationsFAB from './AutomationsFAB'
 import DeskSuggestionChip from './DeskSuggestionChip'
@@ -226,7 +225,13 @@ function renderWidgetInner(w: Widget): JSX.Element | null {
     case 'streamdeck':
       return <StreamDeckWidget widget={w} />
     case 'minimap':
-      return <MinimapWidget widget={w} />
+      // Deprecated: the minimap is now the always-present corner FAB
+      // (CanvasMinimapFAB). A stored legacy minimap widget must NEVER render —
+      // it would float mid-canvas at its world position (drifting with pan/zoom)
+      // and duplicate the FAB, which is exactly the "minimap in the middle,
+      // showing twice" bug. The migration effect below also deletes them from
+      // storage; this guarantees they are invisible even before that runs.
+      return null
     case 'voice-recorder':
       return <VoiceRecorderWidget widget={w} />
     case 'mindmap':
@@ -651,14 +656,21 @@ export default function Canvas(): JSX.Element {
     else clearLinks()
   }, [activeTaskId, loadLinksForTask, clearLinks])
 
-  // Migrate: remove any legacy minimap widgets — the minimap is now a built-in FAB.
+  // Migrate: remove any legacy minimap widgets — the minimap is now a built-in
+  // FAB. This runs on mount AND subscribes to the widget store, so a minimap
+  // widget that loads or syncs in asynchronously (after this effect first ran)
+  // is still caught. Scoped to any taskId, since the old per-task + on-desk-open
+  // version raced widget loading and missed folder-desk minimaps (leaving one
+  // rendering mid-canvas). Removing a widget converges: the store change re-runs
+  // the sweep, which then finds none.
   useEffect(() => {
-    if (!activeTaskId) return
-    const minimaps = useWidgetStore.getState().widgets.filter(
-      (w) => w.kind === 'minimap' && w.taskId === activeTaskId
-    )
-    minimaps.forEach((w) => void useWidgetStore.getState().remove(w.id))
-  }, [activeTaskId])
+    const sweep = (): void => {
+      const legacy = useWidgetStore.getState().widgets.filter((w) => w.kind === 'minimap')
+      legacy.forEach((w) => void useWidgetStore.getState().remove(w.id))
+    }
+    sweep()
+    return useWidgetStore.subscribe(sweep)
+  }, [])
 
   // Imperative controller exposed via context to WidgetFrame / SectionWidget.
   // The .start() call is what arms the link gesture — it's invoked from a

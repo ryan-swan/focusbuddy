@@ -1853,9 +1853,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('backup:export', async () => {
     const parent = BrowserWindow.getFocusedWindow()
     const opts = {
-      title: 'Export a FocusBuddy backup',
+      title: 'Export a PlexiDesk backup',
       defaultPath: defaultExportName(),
-      filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup'] }]
+      filters: [{ name: 'PlexiDesk backup', extensions: ['fbbackup'] }]
     }
     const { canceled, filePath } = parent
       ? await dialog.showSaveDialog(parent, opts)
@@ -1872,14 +1872,14 @@ export function registerIpcHandlers(): void {
     const parent = BrowserWindow.getFocusedWindow()
     const open = parent
       ? await dialog.showOpenDialog(parent, {
-          title: 'Restore from a FocusBuddy backup',
+          title: 'Restore from a PlexiDesk backup',
           properties: ['openFile'],
-          filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup', 'db'] }]
+          filters: [{ name: 'PlexiDesk backup', extensions: ['fbbackup', 'db'] }]
         })
       : await dialog.showOpenDialog({
-          title: 'Restore from a FocusBuddy backup',
+          title: 'Restore from a PlexiDesk backup',
           properties: ['openFile'],
-          filters: [{ name: 'FocusBuddy backup', extensions: ['fbbackup', 'db'] }]
+          filters: [{ name: 'PlexiDesk backup', extensions: ['fbbackup', 'db'] }]
         })
     if (open.canceled || open.filePaths.length === 0) {
       return { ok: false as const, canceled: true as const }
@@ -1897,7 +1897,7 @@ export function registerIpcHandlers(): void {
       title: 'Restore from backup',
       message: 'Replace all your current data with this backup?',
       detail:
-        'Your current data will be snapshotted first (you can recover it from the backups folder), then replaced. FocusBuddy will reload when done.'
+        'Your current data will be snapshotted first (you can recover it from the backups folder), then replaced. PlexiDesk will reload when done.'
     }
     const { response } = parent
       ? await dialog.showMessageBox(parent, confirmOpts)

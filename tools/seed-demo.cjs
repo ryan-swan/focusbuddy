@@ -1,5 +1,5 @@
 /* eslint-disable */
-// Demo-workspace seeder for FocusBuddy.
+// Demo-workspace seeder for PlexiDesk.
 //
 // Adds a "Demo Workspace" folder with three desks that exercise every building
 // block: a tour of all the widget kinds, a "Live Circuit" desk wiring a browser
@@ -127,7 +127,7 @@ const seed = db.transaction(() => {
 
   // ── Desk 1 — All Widgets Tour ──────────────────────────────────────────────
   const tour = node(folder, 'task', '1 · All Widgets Tour', 0)
-  widget(tour, 'sticky', { x: 80, y: 100, w: 240, h: 180, color: '#fde68a', title: 'Welcome', content: 'Welcome to FocusBuddy.\n\nThis desk shows one of every building block. Drag, resize, wire them together, and dive into the others in this folder.' })
+  widget(tour, 'sticky', { x: 80, y: 100, w: 240, h: 180, color: '#fde68a', title: 'Welcome', content: 'Welcome to PlexiDesk.\n\nThis desk shows one of every building block. Drag, resize, wire them together, and dive into the others in this folder.' })
   widget(tour, 'note', { x: 360, y: 100, w: 280, h: 180, content: 'Your desk is spatial. Where you put things means something — and connections between widgets are live wires, not just lines.' })
   widget(tour, 'markdown', { x: 680, y: 100, w: 300, h: 200, title: 'Checklist', content: '## Try this\n- [x] Open the other demo desks\n- [ ] Click a wire to change its type\n- [ ] Run the desk agent\n- [ ] Open History (top bar) to time-travel' })
   widget(tour, 'card', { x: 1020, y: 100, w: 300, h: 200, content: JSON.stringify({ title: 'Card widget', body: 'A titled callout with an accent bar — good for highlights and summaries.', accent: '#6366f1' }) })
@@ -203,10 +203,10 @@ try {
   console.log('Demo workspace created:')
   console.log('  folder:', ids.folder)
   console.log('  desks :', ids.tour, ids.live, ids.room)
-  console.log('\nRestart FocusBuddy (or reload) and open the "Demo Workspace" folder.')
+  console.log('\nRestart PlexiDesk (or reload) and open the "Demo Workspace" folder.')
 } catch (e) {
   if (String(e.message || e).includes('locked') || String(e.code) === 'SQLITE_BUSY') {
-    console.error('The database is locked — quit FocusBuddy, then run this again.')
+    console.error('The database is locked — quit PlexiDesk, then run this again.')
   } else {
     console.error('Seed failed:', e)
   }

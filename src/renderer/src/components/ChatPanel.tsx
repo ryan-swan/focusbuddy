@@ -5,6 +5,7 @@ import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { targetForSource } from '../lib/sourceTarget'
 import { useChatStore, appliedKey, NEW_CHAT_KEY } from '../stores/chat'
+import { useAccountStore } from '../stores/account'
 import { useFileManagerStore } from '../stores/fileManager'
 import MentionComposer from './assistant/MentionComposer'
 import MentionRefRow from './assistant/MentionRefRow'
@@ -69,6 +70,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const sending = useChatStore((s) => s.sending)
   const cancelSend = useChatStore((s) => s.cancelSend)
   const hasApiKey = useChatStore((s) => s.hasApiKey)
+  // Signed-in users get managed Plexii (the metered proxy on our key, with a
+  // free trial grant), so they never need to paste an API key. The no-key nudge
+  // below therefore only shows to signed-out users, and leads with "sign in,
+  // it's included" rather than "paste a key".
+  const signedIn = useAccountStore((s) => !!s.sessionToken)
   const checkApiKey = useChatStore((s) => s.checkApiKey)
   const messagesByTask = useChatStore((s) => s.messagesByTask)
   const proposalsByMessage = useChatStore((s) => s.proposalsByMessage)
@@ -1098,13 +1104,14 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         </div>
       </div>
 
-      {hasApiKey === false && (
-        <div className="m-3 p-3 fb-card bg-amber-500/10 fb-t-label text-[var(--ink-90)] leading-relaxed flex gap-2">
-          <Icon name="key" size={16} className="text-amber-700 dark:text-amber-400 mt-0.5" />
+      {hasApiKey === false && !signedIn && (
+        <div className="m-3 p-3 fb-card bg-accent/10 fb-t-label text-[var(--ink-90)] leading-relaxed flex gap-2">
+          <Icon name="auto_awesome" size={16} className="text-accent mt-0.5" />
           <div>
-            <strong className="text-[var(--ink-100)]">No API key yet.</strong> Open{' '}
-            <strong>Settings → AI · API keys</strong> and paste your Anthropic API key.
-            It's encrypted with your system keychain and only this Mac can read it.
+            <strong className="text-[var(--ink-100)]">Plexii is included free.</strong> Sign in
+            and it just works, no API key to set up. Prefer to use your own Anthropic key?
+            Add it in <strong>Settings → AI · API keys</strong> (encrypted in your system
+            keychain, readable only on this Mac).
           </div>
         </div>
       )}
