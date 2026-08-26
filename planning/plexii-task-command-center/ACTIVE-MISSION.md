@@ -116,9 +116,13 @@ main @ 5d1ef8d8; five predicted conflicts resolved keep-branch; the auto-merge
 briefly duplicated the F010 functions + a preload property (caught by typecheck,
 excised). 2,763 green. The branch is current with everything the team has.
 
-**When ⑥ passes and the operator declares ready:** the landing is
-`git push origin ryan-command-center:main` as ryanswan313 (operator-run),
-then the message to Michael + Caleb pointing at UPSTREAM-PR-PACKAGE.md.
+**🏁 LANDED (2026-08-26): the operator declared ready — PR #4 merged, main @
+`c0e32a0c`, content delta between branch and main = ZERO files.** 91 commits,
+172 files, +16,998/−429, 2,763 tests, DEC-001…029 — from empty planning folder
+to landed layer in three days. The layer ships default-OFF; the reveal message
+to Michael + Caleb points at PR #4 + UPSTREAM-PR-PACKAGE.md. Post-landing
+queue: CR-09 (D-A…D-K brainstorm → DEC), the category alignment stage
+(analysis/22), the observers, SPEC-027 routing era.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
