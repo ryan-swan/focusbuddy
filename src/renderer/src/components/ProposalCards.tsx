@@ -7,6 +7,7 @@ import { useAgentLoop } from '../stores/agentLoop'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
 import { resolveGoToTarget, goToTarget } from '../lib/goToTarget'
+import { resolveProposalDesk } from '../lib/proposalDesk'
 import Icon from './Icon'
 
 // Proposal kinds that create content ON a desk canvas and therefore need an
@@ -162,9 +163,14 @@ export default function ProposalCards({
     resolvedIds?: Map<string, string>
   ): Promise<void> {
     if (busy || agentRunning) return
-    // A desk-capable proposal with no active desk: offer a place rather than
+    // DEC-032: a proposal that names its own desk applies THERE, with no
+    // detour through the chooser — the operator's complaint was being asked
+    // to pick a desk the assistant had already identified.
+    const named = resolveProposalDesk(p, desks)
+    const target = named ?? activeTaskId
+    // A desk-capable proposal with no desk at all: offer a place rather than
     // dead-end. The chooser then applies it wherever the user picks.
-    if (!activeTaskId && isDeskCapable(p.kind)) {
+    if (!target && isDeskCapable(p.kind)) {
       setPlaceOffer([p])
       return
     }
@@ -172,7 +178,7 @@ export default function ProposalCards({
     setBusy(p.id)
     // Resolve any not-yet-applied parent this proposal forward-references, via the
     // shared resolver (so this card path and the agent loop can never drift).
-    const dep = await ensureDependencies(p, proposals, { activeTaskId, resolvedIds: ids, destinationFolderId })
+    const dep = await ensureDependencies(p, proposals, { activeTaskId: target, resolvedIds: ids, destinationFolderId })
     if (!dep.ok) {
       setBusy(null)
       setToast({ id: p.id, ok: false, message: dep.message })
@@ -185,7 +191,7 @@ export default function ProposalCards({
     // card stays for a retry.
     let result: { ok: boolean; message: string }
     try {
-      result = await applyProposal(p, { activeTaskId, resolvedIds: ids, destinationFolderId })
+      result = await applyProposal(p, { activeTaskId: target, resolvedIds: ids, destinationFolderId })
     } catch (err) {
       result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
     }
@@ -207,7 +213,11 @@ export default function ProposalCards({
     if (pending.length === 0) return
     // Off a desk, gather the desk-kind proposals and offer a place for them first.
     if (!activeTaskId) {
-      const deskPending = pending.filter((p) => isDeskCapable(p.kind))
+      // DEC-032: proposals that named their own desk are already placed; only
+      // the genuinely homeless ones need the chooser.
+      const deskPending = pending.filter(
+        (p) => isDeskCapable(p.kind) && !resolveProposalDesk(p, desks)
+      )
       if (deskPending.length > 0) {
         setPlaceOffer(deskPending)
         return

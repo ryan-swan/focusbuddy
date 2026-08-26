@@ -9,6 +9,7 @@ import type { WidgetKind, SearchHit } from '@shared/types'
 import { WIDGET_CATALOG, isAdvancedKind } from '../lib/widgetCatalog'
 import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
+import { parseAttentionCommand, hasAttentionCommand } from '../lib/attentionCommand'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
 import { entitlementFor, capabilityForDocType, DOC_TYPE_LABEL } from '../lib/entitlementReason'
 import { canCreateWidget } from '../lib/gating'
@@ -459,9 +460,16 @@ export default function CommandCenter({
     // it. The console opens prefilled at the classify step either way.
     if (workItemsOn) {
       const attnPrefix = /^@?attention\b[:,]?\s*(.*)$/i.exec(q)
-      const atPartial = !attnPrefix ? /^@([a-z]*)$/i.exec(q) : null
+      // DEC-031: the token ANYWHERE in the query addresses Attention just as
+      // explicitly as opening with it. Before this, "…by friday @attention"
+      // scored as a fuzzy match, lost to Ask Plexii, and took a 30s round trip
+      // through the model that filed nothing (operator live QA).
+      const attnInline = !attnPrefix && hasAttentionCommand(q) ? parseAttentionCommand(q) : null
+      const atPartial = !attnPrefix && !attnInline ? /^@([a-z]*)$/i.exec(q) : null
       const atMatches = !!atPartial && 'attention'.startsWith(atPartial[1].toLowerCase())
-      const prefill = attnArmed ? q.trim() : (attnPrefix?.[1]?.trim() ?? '')
+      const prefill = attnArmed
+        ? q.trim()
+        : (attnPrefix?.[1]?.trim() ?? attnInline?.captureText ?? '')
       items.push({
         id: 'attention-capture',
         label: prefill
@@ -476,7 +484,7 @@ export default function CommandCenter({
         // outranks EVERYTHING — Enter on the raw query must capture, never
         // fall through to search or navigation.
         score:
-          attnArmed || attnPrefix
+          attnArmed || attnPrefix || attnInline
             ? 500
             : atMatches
               ? 490
@@ -720,7 +728,12 @@ export default function CommandCenter({
     // says); a bare phrase's web search sits above static nav but below a
     // strong workspace hit, so naming a document still goes to the document
     // and Tab/arrows reach the web in one step. Never on an empty query.
-    if (q !== '') {
+    // DEC-031: an @attention token is an explicit address to Attention. The
+    // omni rows must not compete with it — "Ask Plexii" hard-scores 2000 when
+    // the input reads as a question, which is exactly how the operator's
+    // "…by friday @attention" lost to a 30s model round trip that filed
+    // nothing. No omni row is offered while the token is present.
+    if (q !== '' && !hasAttentionCommand(q)) {
       const intents = classifyOmniInput(query, [])
       const lead = intents[0]?.kind
       for (const intent of intents) {

@@ -786,6 +786,11 @@ export type ActionProposal =
       widgetKind: WidgetKind
       title?: string
       content?: string
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {
@@ -860,6 +865,11 @@ export type ActionProposal =
       kind: 'create-todo-list'
       title: string
       items: string[]
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {
@@ -867,6 +877,11 @@ export type ActionProposal =
       kind: 'create-page'
       title: string
       content: string // serialized Tiptap JSON
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {
@@ -983,6 +998,11 @@ export type ActionProposal =
           | 'button'
         options?: string[] // for select types
       }>
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {

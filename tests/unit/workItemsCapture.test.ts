@@ -145,9 +145,12 @@ describe('S5 wiring locks (file-level)', () => {
     expect(sugg).toContain("kind: 'capture'")
     expect(sugg).toContain("title: 'attention'")
     // A LEADING @attention send never reaches the model — it renders the
-    // shared confirm card INLINE in the chat (DEC-028).
+    // shared confirm card INLINE in the chat (DEC-028). DEC-031 moved the
+    // grammar itself into the shared parser, so the panel reads THAT rather
+    // than carrying a private regex that could drift from the other surfaces.
     const panel = read('src/renderer/src/components/ChatPanel.tsx')
-    expect(panel).toContain('^@attention\\b')
+    expect(panel).toContain("from '../lib/attentionCommand'")
+    expect(panel).toContain('parseAttentionCommand(content)')
     expect(panel).toContain('setInlineCapture')
     // ⌘K and the home bar both arm the Slack-style pill on Tab.
     expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('attnArmed')
@@ -172,6 +175,37 @@ describe('S5 wiring locks (file-level)', () => {
     expect(read('src/renderer/src/components/assistant/MentionList.tsx')).toContain(
       'data-testid="mention-picker"'
     )
+  })
+
+  it('DEC-031 — every capture surface reads the ONE @attention grammar', () => {
+    // The operator ruled @attention deterministic wherever it sits. Three
+    // surfaces implement it; all three must consult the shared parser, or the
+    // grammar drifts back into four private regexes.
+    const parser = "from '../lib/attentionCommand'"
+    expect(read('src/renderer/src/components/ChatPanel.tsx')).toContain(parser)
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain(parser)
+    expect(read('src/renderer/src/components/views/StartOrAskPlexi.tsx')).toContain(
+      "from '../../lib/attentionCommand'"
+    )
+    // ⌘K: an inline token outranks everything, exactly like a leading one.
+    const ck = read('src/renderer/src/components/CommandCenter.tsx')
+    expect(ck).toContain('attnInline')
+    expect(ck).toContain('attnArmed || attnPrefix || attnInline')
+    // Chat: an inline token captures AND still sends the stripped message.
+    const panel = read('src/renderer/src/components/ChatPanel.tsx')
+    expect(panel).toContain("attn.mode === 'inline' && attn.messageText")
+    // The intent strip yields to ANY @attention now, not just a leading one.
+    expect(panel).toContain('hasAttentionCommand(draft)')
+    // ⌘K's omni rows ("Ask Plexii" hard-scores 2000) must yield too, or they
+    // outrank the capture entry and the token reaches the model instead.
+    expect(ck).toContain("q !== '' && !hasAttentionCommand(q)")
+    // The last mile: send() itself intercepts, so the direct callers that
+    // bypass the composer (⌘K Ask, home bar, voice) cannot leak a token to
+    // the model. The composer strips first, so this never double-captures.
+    const store = read('src/renderer/src/stores/chat.ts')
+    expect(store).toContain('parseAttentionCommand(content)')
+    expect(store).toContain("fb:command-new-work-item")
+    expect(store).toContain("attn.mode === 'leading' || !attn.messageText")
   })
 
   it('the picker highlights its selected row visibly (the Enter/Tab target is legible)', () => {

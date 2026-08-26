@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { conversationForDesk } from '../lib/deskConversation'
+import { parseAttentionCommand } from '../lib/attentionCommand'
 import { useAssistantChrome } from './assistantChrome'
 import type { JSONContent } from '@tiptap/core'
 import type {
@@ -221,6 +222,24 @@ interface ChatStore {
   pushAssistantMessage: (taskId: string | null, content: string) => void
   clear: (taskId: string | null) => void
 }
+
+// DEC-031 — the last-mile guarantee. Every surface that sends a message funnels
+// through send(), and several of them (⌘K's Ask row, the home bar, voice) call
+// it DIRECTLY, bypassing the composer where the @attention interception lives.
+// That bypass is exactly how a "…@attention" from ⌘K reached the model and
+// filed nothing. The capability is probed once here, refreshed on the Settings
+// toggle, so the check inside send() is synchronous.
+let workItemsOn = false
+const probeWorkItems = (): void => {
+  window.api?.workItems
+    ?.enabled?.()
+    .then((v: boolean) => {
+      workItemsOn = v
+    })
+    .catch(() => {})
+}
+probeWorkItems()
+window.addEventListener('fb:workitems-toggled', probeWorkItems)
 
 const GLOBAL_KEY = '__global__'
 const EMPTY_MESSAGES: ChatMessage[] = []
@@ -624,6 +643,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     })
   },
   send: async (taskId, content, threadKey) => {
+    // DEC-031: @attention is deterministic on EVERY path. The composer strips
+    // the token before it calls send(), so this fires only for the direct
+    // callers above — a double capture is impossible by construction.
+    if (workItemsOn) {
+      const attn = parseAttentionCommand(content)
+      if (attn.mode !== 'none') {
+        window.dispatchEvent(
+          new CustomEvent('fb:command-new-work-item', {
+            detail: attn.captureText ? { captureText: attn.captureText } : undefined
+          })
+        )
+        // A leading token is a pure capture — nothing is sent. An inline one
+        // still converses, with the token stripped out of the message.
+        if (attn.mode === 'leading' || !attn.messageText) return
+        content = attn.messageText
+      }
+    }
     let key = threadKey ?? taskId ?? GLOBAL_KEY
     // First message in a fresh chat: mint the conversation now, and move
     // everything the unsaved chat accumulated onto its real id. Persistence is

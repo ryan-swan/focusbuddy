@@ -41,6 +41,7 @@ import {
 import Icon from './Icon'
 import AttentionConfirmCard from './AttentionConfirmCard'
 import { deskCaptureContext } from '../lib/captureContext'
+import { parseAttentionCommand, hasAttentionCommand } from '../lib/attentionCommand'
 
 // The three display modes, in Notion's order and with Notion's labels. The
 // header's mode button shows the current mode's icon; the dropdown lists all
@@ -53,11 +54,6 @@ const MODE_OPTIONS: Array<{ mode: AssistantMode; label: string; icon: string }> 
 
 // Window for the "What was I doing?" lookback — last 30 minutes covers most context switches.
 const TRAIL_LOOKBACK_MS = 30 * 60 * 1000
-
-// DEC-027/028: the ONE predicate for "this draft is a capture, not a message".
-// The send path intercepts on it and the intent strip suppresses itself on it —
-// one regex, so what the composer PROMISES and what Enter DOES cannot drift.
-const ATTENTION_PREFIX_RE = /^@attention\b[:,]?\s*([\s\S]*)$/i
 
 const EMPTY_MESSAGES: ChatMessage[] = []
 
@@ -714,7 +710,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     // it even rendered as the PRE-SELECTED ⏎ action (operator live QA). One
     // predicate, shared with the send path, so the two can never disagree.
     () =>
-      workItemsOn && ATTENTION_PREFIX_RE.test(draft.trim())
+      workItemsOn && hasAttentionCommand(draft)
         ? []
         : composerOmniIntents(draft, omniTargets, { chatFirst: messages.length > 0 }),
     [draft, omniTargets, messages.length, workItemsOn]
@@ -754,21 +750,29 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       performOmniIntent({ kind: 'search', label: 'Search the web', url: content })
       return
     }
-    // DEC-027/028: a LEADING @attention is a capture, not a chat message — it
-    // never reaches the model, and the confirm stop renders INLINE above the
-    // composer (the same shared card as the console) so the operator never
-    // leaves the chat. Mid-sentence mentions keep the AI proposal path.
-    const attn = workItemsOn ? ATTENTION_PREFIX_RE.exec(content) : null
-    if (attn) {
+    // DEC-027/028 + DEC-031: @attention ANYWHERE is a DETERMINISTIC capture —
+    // the confirm stop renders INLINE above the composer (the same shared card
+    // as the console) so the operator never leaves the chat.
+    //   leading → pure capture; the model never sees it.
+    //   inline  → capture AND still send the message, token stripped, so a
+    //             "build me X @attention" gets both halves. This replaced a
+    //             prompt rule the model could ignore — and did (live QA: only
+    //             the page was created, the item never reached the queue).
+    const attn = workItemsOn ? parseAttentionCommand(content) : null
+    if (attn && attn.mode !== 'none') {
       ed?.commands.clearContent()
       setDraft('')
-      const captureText = attn[1].trim()
-      if (!captureText) return // a bare @attention send has nothing to file
-      setInlineCapture({
-        text: captureText,
-        deskCtx: deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
-      })
-      setInlineFiled(null)
+      if (attn.captureText) {
+        setInlineCapture({
+          text: attn.captureText,
+          deskCtx: deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
+        })
+        setInlineFiled(null)
+      }
+      // The conversational half of an inline token still runs.
+      if (attn.mode === 'inline' && attn.messageText) {
+        await send(thread.serverTaskId, attn.messageText, thread.key)
+      }
       return
     }
     // Auto (the omni door, AI-01): when the previewed pick is a non-chat

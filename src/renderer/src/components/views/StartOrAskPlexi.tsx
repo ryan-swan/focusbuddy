@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../Icon'
+import { parseAttentionCommand } from '../../lib/attentionCommand'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useChatStore, NEW_CHAT_KEY } from '../../stores/chat'
@@ -386,6 +387,20 @@ export default function StartOrAskPlexi(): JSX.Element {
               }
               if (e.key === 'Enter') {
                 e.preventDefault()
+                // DEC-031: an @attention token anywhere in the line is a
+                // deterministic capture — it must never fall through to the
+                // ask/search path (which is what silently swallowed it).
+                const attn = workItemsOn ? parseAttentionCommand(goal) : null
+                if (attn && attn.mode !== 'none') {
+                  window.dispatchEvent(
+                    new CustomEvent('fb:command-new-work-item', {
+                      detail: attn.captureText ? { captureText: attn.captureText } : undefined
+                    })
+                  )
+                  setGoal('')
+                  setAttnArmed(false)
+                  return
+                }
                 start()
               }
             }}
