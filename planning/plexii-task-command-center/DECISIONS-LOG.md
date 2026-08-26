@@ -370,4 +370,36 @@ date must never lose its surface, even for one build); delete the views
 (rejected — palette reachability is the escape hatch while Attention earns
 trust).
 
+---
+
+## DEC-021 — The delete contract: D1 + D2 + R008 adopted as proposed
+**Date:** 2026-08-25 · **Status:** APPROVED (operator: "Adopt all three") + IMPLEMENTED (L2)
+**D1 — shared desks are never trashed unilaterally in v1.** The lifecycle menu
+offers **Archive for me** (the `archived` flag made genuinely SCOPE-LOCAL for
+shared rows — stripped from shared sync in BOTH directions, or one side would
+silently overwrite the other's choice) and, on received shares, **Leave share**
+(self-revocation via the access API + local prune; server-decline leaves
+nothing half-removed). The trash entry renders disabled with the reason; the
+db layer backs it with a typed refusal (`SharedDeskTrashRefusedError`) at
+`deleteNode` AND the purge. All-participants-approve deletion = P1 flow.
+**D2 — the delete choice dialog.** Deleting a personal desk/room asks once:
+**Move to Trash** (default — today's exact behavior, 7-day window + undo,
+memory untouched, now STATED in copy) or **Delete everything permanently** —
+immediate hard-delete of the whole subtree (trashed descendants included)
+plus its memory: `fb_memory` facts (subject/`<type>:<id>` refs), `fb_chunks`
+derivations (room- and widget-keyed) + extraction ledger, and context review
+points — behind a typed-name confirmation, with a logged `[purge]` summary.
+Scope is adversarially tested: exactly the subject's rows die, bystanders
+bit-identical. The purge is the FOURTH sanctioned hard-delete site
+(`purgeDeskPermanently`, nodeLifecycle.ts), carrying its own
+detach-and-revive + CI allowlist marker; the lock's enumeration widened 3→4.
+**R008 — RATIFIED: no work_item hard-delete, permanently.** Dismiss/reclassify
+is the lifecycle; BOTH delete paths preserve attention items (trash sweeps
+them restorably; permanent purge detaches them back to the Attention page —
+the dialog says so, and a post-purge notice counts them). Re-opener: a
+privacy-erasure requirement.
+**Alternatives:** consent-based shared deletion at v1 (rejected — needs
+infrastructure P1 builds anyway); purging work items with their desk
+(rejected — R008's whole point; a routed item is not desk property).
+
 <!-- Append below; increment DEC-NNN. -->

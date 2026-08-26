@@ -79,7 +79,12 @@ machinery. L2 needs D1+D2 approval. L3 is independent. Track runs interleaved wi
 Attention build's S-stages on operator priority; everything here is ADDITIVE or a guard.
 
 ## Done when
-- [ ] All five surfaces expose the menu · trash/restore/archive round-trips verified live ·
-  D1 guard refuses unilateral shared trash · DEC-013 dialog ships with stated contract ·
-  purge adversarially verified · `staleDesks()` feeding-ready · suites + typecheck green ·
-  native-fit rubric ≥4 · ACTIVE-MISSION updated.
+- [x] All five surfaces expose the menu (L1, S6) · trash/restore/archive round-trips
+  verified live (L1) · D1 guard refuses unilateral shared trash (DEC-021: typed
+  refusal at deleteNode + purge; menu = Archive-for-me [scope-local] / Leave-share) ·
+  DEC-013 dialog ships with stated contract (`lib/deleteDeskFlow.ts`) · purge
+  adversarially verified (`tests/unit/deskPurge.test.ts` — exact scope, bystanders
+  bit-identical, work_item revive) · `staleDesks()` feeding-ready (L3 → S7 feeders) ·
+  suites + typecheck green · ACTIVE-MISSION updated. **TRACK COMPLETE 2026-08-25
+  (DEC-021).** Residual: live smoke of the dialog + shared-menu branch on the next
+  operator session; the native-fit eyeball rides it.

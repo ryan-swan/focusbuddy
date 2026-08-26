@@ -36,9 +36,19 @@ initial-pull truncation gap — fresh devices silently miss the truncated tail f
 (3 evidence rows; mechanism + remediations in the doc). Full record:
 [phases/HANDOFFS/p1-live-pass.md](phases/HANDOFFS/p1-live-pass.md).
 
-**Awaiting operator:** D1 · D2 · R008 (CR-08(b) ruled → DEC-020 ✔). Next horizons:
-the upstream PR to Caleb (P1-F1 joins the leads list), V2 register, Dispatch
-D-phases landing on our rails.
+**DEC-021 EXECUTED (2026-08-25):** operator ruled "Adopt all three" — D1/D2/R008 as
+proposed, L2 built the same evening. Shared desks: no unilateral trash (typed refusal
+at deleteNode + purge; menu = Archive-for-me [archived made scope-local on shared
+sync, both directions] / Leave-share [self-revoke + prune]). Personal delete: ONE
+choice dialog — Move to Trash (default, stated contract) / Delete everything
+permanently (typed-name confirm → subtree + memory purge via `purgeDeskPermanently`,
+the FOURTH sanctioned delete site, + `db/memoryPurge.ts`; adversarially
+scope-tested). R008 RATIFIED: no work_item hard-delete ever — both paths preserve
+attention items, purge revives them to Attention with a counted notice.
+
+**Awaiting operator:** nothing — the ruling queue is EMPTY (D1/D2/R008 → DEC-021 ✔,
+CR-08(b) → DEC-020 ✔). Next horizons: the upstream PR to Caleb (P1-F1 joins the
+leads list), V2 register, Dispatch D-phases landing on our rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette

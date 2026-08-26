@@ -211,9 +211,11 @@ exactly those). v2.1 adopts the third option:
    **enforcement site (validator C2)** is `deleteNode`/`nodes:delete` refusing
    `kind='work_item'` ROOTS with a typed error (items are dismissed/reclassified, never
    trashed directly).
-3. **Detach-and-revive at the CLOSED three-site enumeration (F-C1), LOCKED by an
+3. **Detach-and-revive at the CLOSED enumeration (F-C1), LOCKED by an
    INVERSE call-site allowlist (F-M2″):** the sites issuing unguarded `DELETE`s against
-   `nodes` are exactly three — `src/main/db/nodes.ts` :314 (`purgeTrashedNodes`),
+   `nodes` are exactly four *(widened three→four at DEC-021: `purgeDeskPermanently`,
+   the operator's D2 purge, joined with its own detach-and-revive + marker)* —
+   originally `src/main/db/nodes.ts` :314 (`purgeTrashedNodes`),
    **`src/main/ai/agentHistory.ts` :325** (full path per F-m1″), and
    `src/main/db/workspaceSync.ts` :888 (`pruneSharedDesk`, templated). Each detaches
    work_item children (`parent_id = NULL`, revive, `wi_local.detached_from_id` set)
@@ -260,9 +262,12 @@ exactly those). v2.1 adopts the third option:
    and will not be shared" — matching §2.6's refusal. **P1 (switch ON):** routed items
    follow their desk; the flow surfaces "N work items on this desk will be shared" for
    confirmation.
-10. **Work_item deletion (R008, v1 rule):** work_items have **no hard-delete at v1** —
-   `dismissed`/`reclassified` are the lifecycle; DEC-013's memory contract extends to
-   work_items before any delete flow ships (queued in the operator ruling set).
+10. **Work_item deletion (R008 — RATIFIED as the standing contract, DEC-021):**
+   work_items have **no hard-delete** — `dismissed`/`reclassified` are the lifecycle,
+   and even D2's permanent desk purge detaches-and-revives them (dialog copy states
+   it). A work item's bytes die only when the operator individually dismisses it and
+   its row later falls to the standard decay/retention machinery. Re-opener: a
+   privacy-erasure requirement (see `privacy/erasure.ts` interaction note).
 
 ### 2.6 The scope invariant (F002 repair — replaces v1's creation-only gate)
 
@@ -411,7 +416,7 @@ after this document passes the final re-gate + dual validation.
 | **Un-migrated peer meets a work_item** | §2.6 scope invariant at every crossing; apply-site **park-inbound**+surface branches; **residual accepted at P0: the user's own second device between updates — detected and contained (park-inbound+warned), not preventable without server work; release note states both devices must update.** P1 migrated-peer confirmation = presence/version surface else operator attestation (F-M5″) |
 | Cross-device undo divergence (F-M9″) | Accepted + surfaced: purge-on-A then restore-on-B leaves the item detached on B (Detached section); case (a)'s device-B arm pins it |
 | Revived-clutter accumulation (F-m4″) | Accepted + named: desk-trashed items revive at day 7 into their queues (dismiss = one tap; disclosed in trash-toast copy). S1 pre-flight checks `src/main/privacy/erasure.ts` node handling for interaction |
-| Work_item lost via desk deletion | **Revive-at-purge at the CLOSED three-site enumeration (purge, agentHistory, pruneSharedDesk) + CI delete-site grep-lock + the five §2.5.4 adversarial cases (a)–(e)** |
+| Work_item lost via desk deletion | **Revive-at-purge at the CLOSED four-site enumeration (purge, agentHistory, pruneSharedDesk, DEC-021 operator purge) + CI delete-site grep-lock + the five §2.5.4 adversarial cases (a)–(e)** |
 | Fourth hard-delete site added later | The CI grep-assertion fails on any new literal/templated `DELETE` against `nodes` outside the sanctioned three |
 | P1 routed-item trash propagation (sender trash → recipient delete via sync) | **RULED at the P1 checkpoint (2026-08-25) — the recipient-retention rule:** a sender's trash arrives at the recipient as SOFT-TRASH ONLY (the apply arms already map remote deletes to `trashed_at`, never tombstone — enforced, not incidental). The recipient's copy sits in THEIR Trash on the standard purge clock, restorable like any trashed item; a restore DETACHES it from the withdrawn route (`detached_from_id` preserved, Detached-shelf semantics) so restoring never re-projects into the sender's scope. Recipient-owned satellite state (acknowledgment history, `wi_local`) survives until purge. Withdrawal surfaces ONE system-queue notification ("Withdrawn: <title>", deduped per item) through the substrate. Implementation rides SPEC-027; the rule is frozen now so SPEC-027 designs against it |
 | Merge to origin with un-migrated fleet (R016) | Named merge-readiness preconditions: defensive branches landed upstream AND observed firing; `schema_epoch` version gate live; else `workItems.enabled` ships opt-in-only |
