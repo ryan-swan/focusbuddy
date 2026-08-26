@@ -40,6 +40,21 @@ describe('vocabulary module', () => {
     expect(on).toContain('create-todo-list')
   })
 
+  it('@attention anywhere is a standing order that must ALSO ride alongside a build action', () => {
+    // Operator live QA: "i need to create a pitch deck for cetra by friday
+    // @attention" produced ONLY a create-page — the item never reached the
+    // queue. Mid-sentence @attention keeps the model path by DEC-027, so the
+    // rule has to make the obligation unmissable and explicitly non-exclusive.
+    const on = workItemCatalogAddendum(true)
+    expect(on).toContain('ANYWHERE in the message')
+    expect(on).toContain('STANDING ORDER')
+    expect(on).toMatch(/emit\s+BOTH/)
+    expect(on).toContain('Emitting only the build action is a FAILURE')
+    // It picks from the eight primaries (taxonomy alignment).
+    expect(on).toContain('to_decide')
+    expect(on).toContain('to_respond')
+  })
+
   it('the desk definition says desk and forbids the to-do reading', () => {
     expect(CREATE_TASK_DEFINITION).toContain('DESK')
     expect(CREATE_TASK_DEFINITION).toMatch(/NOT a to-do/)

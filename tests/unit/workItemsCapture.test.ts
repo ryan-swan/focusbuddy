@@ -155,4 +155,30 @@ describe('S5 wiring locks (file-level)', () => {
     expect(home).toContain("'capture:attention'")
     expect(home).toContain('armAttention')
   })
+
+  it('the @ picker owns Tab — the intent-cycler must yield while it is open', () => {
+    // Operator live QA: Tab never selected the Attention row and silently
+    // flipped the previewed intent to "Search the web" instead. The composer's
+    // Tab cycler is CAPTURE-phase, so it ran before ProseMirror's suggestion
+    // plugin and swallowed every Tab. The guard is the fix; this pins it so
+    // the keyboard contract (DEC-028c) cannot regress.
+    const panel = read('src/renderer/src/components/ChatPanel.tsx')
+    const guard = panel.indexOf('[data-testid="mention-picker"]')
+    expect(guard).toBeGreaterThan(-1)
+    // …and it must come BEFORE the cycler, or it changes nothing.
+    const cycler = panel.indexOf('setOmniPick((p) => (p + 1) % composerIntents.length)')
+    expect(cycler).toBeGreaterThan(guard)
+    // The picker really does carry the testid the guard looks for.
+    expect(read('src/renderer/src/components/assistant/MentionList.tsx')).toContain(
+      'data-testid="mention-picker"'
+    )
+  })
+
+  it('the picker highlights its selected row visibly (the Enter/Tab target is legible)', () => {
+    const list = read('src/renderer/src/components/assistant/MentionList.tsx')
+    // A 10% tint read as "nothing is selected" in live QA.
+    expect(list).not.toContain('bg-accent/10')
+    expect(list).toContain('rgba(var(--accent),0.14)')
+    expect(list).toContain('inset_2px_0_0_rgb(var(--accent))')
+  })
 })

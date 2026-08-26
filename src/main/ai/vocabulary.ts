@@ -68,9 +68,14 @@ const WORK_ITEM_RULES =
   'Context decides — an item born from a scheduling conversation is "to_meet", not "to_do".\n' +
   '- create-todo-list remains correct ONLY for a static multi-line checklist living on the ' +
   'current desk’s canvas; individual tracked to-dos are work items (this refines rule 4).\n' +
-  '- When the user mentions "@attention" (or says to put/route/add/file something to their Attention), ' +
-  'that IS the instruction: emit create-work-item for it in THIS reply, intentClass chosen from ' +
-  'context. Never answer that you cannot access Attention — the action card is the access.\n' +
+  '- "@attention" ANYWHERE in the message — start, middle, or end — is a STANDING ORDER, not a topic: ' +
+  'this reply MUST include a create-work-item action for what the user described, with intentClass ' +
+  'chosen from context. The same goes for "put/route/add/file this to my attention". It is never ' +
+  'optional and never satisfied by prose alone.\n' +
+  '- If that message ALSO asks for something buildable (a deck, a page, a document, a desk), emit ' +
+  'BOTH: the build action AND the create-work-item that tracks it. Emitting only the build action is ' +
+  'a FAILURE — the user asked for the thing and for it to be tracked. Never answer that you cannot ' +
+  'access Attention: the action card IS the access.\n' +
   '- Tracking work ABOUT a desk is a WORK ITEM, never a desk edit: "make this desk a task", ' +
   '"remind me to finish this desk", "I need to complete X desk" → create-work-item (put the desk\'s ' +
   'name in the title). update-task exists ONLY to edit the desk\'s own fields when the user asks to ' +

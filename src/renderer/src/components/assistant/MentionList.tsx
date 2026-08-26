@@ -109,8 +109,13 @@ const MentionList = forwardRef<MentionListHandle, Props>(function MentionList(
           aria-selected={i === selected}
           onMouseEnter={() => setSelected(i)}
           onClick={() => command(item)}
+          // The highlight has to READ as "Enter/Tab takes this one" — a 10%
+          // tint did not (operator live QA: "it doesn't automatically
+          // highlight"). Tint + an accent left bar + full-strength ink.
           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-left ${
-            i === selected ? 'bg-accent/10' : 'hover:bg-[var(--surface-sunken)]'
+            i === selected
+              ? 'bg-[rgba(var(--accent),0.14)] shadow-[inset_2px_0_0_rgb(var(--accent))]'
+              : 'hover:bg-[var(--surface-sunken)]'
           }`}
         >
           <Icon name={item.icon} size={15} className="shrink-0 text-[var(--ink-70)]" />

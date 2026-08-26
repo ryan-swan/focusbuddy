@@ -54,6 +54,11 @@ const MODE_OPTIONS: Array<{ mode: AssistantMode; label: string; icon: string }> 
 // Window for the "What was I doing?" lookback — last 30 minutes covers most context switches.
 const TRAIL_LOOKBACK_MS = 30 * 60 * 1000
 
+// DEC-027/028: the ONE predicate for "this draft is a capture, not a message".
+// The send path intercepts on it and the intent strip suppresses itself on it —
+// one regex, so what the composer PROMISES and what Enter DOES cannot drift.
+const ATTENTION_PREFIX_RE = /^@attention\b[:,]?\s*([\s\S]*)$/i
+
 const EMPTY_MESSAGES: ChatMessage[] = []
 
 interface Props {
@@ -682,12 +687,37 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     ],
     [nodes, docList]
   )
+  // DEC-027: capability probe for the deterministic @attention interception —
+  // at mount, re-probed when the Settings toggle flips.
+  const [workItemsOn, setWorkItemsOn] = useState(false)
+  useEffect(() => {
+    const probe = (): void => {
+      window.api.workItems
+        .enabled()
+        .then(setWorkItemsOn)
+        .catch(() => {})
+    }
+    probe()
+    window.addEventListener('fb:workitems-toggled', probe)
+    return () => window.removeEventListener('fb:workitems-toggled', probe)
+  }, [])
+
   const composerIntents = useMemo(
     // Mid-conversation, short phrases are usually replies, so chat leads;
     // on a fresh conversation the same phrase is searchy and the web leads
     // (the instant ruling). Deterministic intents divert either way.
-    () => composerOmniIntents(draft, omniTargets, { chatFirst: messages.length > 0 }),
-    [draft, omniTargets, messages.length]
+    //
+    // …EXCEPT while the draft is a leading-@attention capture: submitComposer
+    // intercepts that before any intent runs, so Enter files it and can never
+    // search. The strip exists to say what Enter will do (R11), so offering
+    // "Search the web" here was a false promise — and on a fresh conversation
+    // it even rendered as the PRE-SELECTED ⏎ action (operator live QA). One
+    // predicate, shared with the send path, so the two can never disagree.
+    () =>
+      workItemsOn && ATTENTION_PREFIX_RE.test(draft.trim())
+        ? []
+        : composerOmniIntents(draft, omniTargets, { chatFirst: messages.length > 0 }),
+    [draft, omniTargets, messages.length, workItemsOn]
   )
   const pickedIntent: OmniIntent | null =
     composerIntents.length > 0
@@ -712,21 +742,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   } | null>(null)
   const [inlineFiled, setInlineFiled] = useState<string | null>(null)
 
-  // DEC-027: capability probe for the deterministic @attention interception —
-  // at mount, re-probed when the Settings toggle flips.
-  const [workItemsOn, setWorkItemsOn] = useState(false)
-  useEffect(() => {
-    const probe = (): void => {
-      window.api.workItems
-        .enabled()
-        .then(setWorkItemsOn)
-        .catch(() => {})
-    }
-    probe()
-    window.addEventListener('fb:workitems-toggled', probe)
-    return () => window.removeEventListener('fb:workitems-toggled', probe)
-  }, [])
-
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current
     // The document is the source of truth: its chips serialise to "@Title" in
@@ -743,7 +758,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     // never reaches the model, and the confirm stop renders INLINE above the
     // composer (the same shared card as the console) so the operator never
     // leaves the chat. Mid-sentence mentions keep the AI proposal path.
-    const attn = workItemsOn ? /^@attention\b[:,]?\s*([\s\S]*)$/i.exec(content) : null
+    const attn = workItemsOn ? ATTENTION_PREFIX_RE.exec(content) : null
     if (attn) {
       ed?.commands.clearContent()
       setDraft('')
@@ -1609,6 +1624,13 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           )}
           <div
             onKeyDownCapture={(e) => {
+              // The "@" picker OWNS Tab whenever it is open (DEC-028's keyboard
+              // contract: Tab picks the highlighted row). This handler is
+              // capture-phase, so it runs BEFORE ProseMirror's suggestion
+              // plugin — without this guard it swallowed every Tab, the picker
+              // never saw one, and the stolen keystroke silently cycled the
+              // intent to "Search the web" instead (operator live QA).
+              if (e.key === 'Tab' && document.querySelector('[data-testid="mention-picker"]')) return
               // Tab flips the previewed intent (R11) — only while the strip
               // is showing, so normal focus travel is untouched otherwise.
               if (e.key === 'Tab' && !e.shiftKey && composerMode === 'auto' && composerIntents.length > 1) {
