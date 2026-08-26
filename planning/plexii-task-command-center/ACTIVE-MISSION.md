@@ -102,6 +102,13 @@ deferred rails named (tags/cross-ref, delegation→SPEC-027, standup feed).
 Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-029.
 Recommended post-landing.
 
+**DEC-029 (2026-08-26): taxonomy tests adopted as LAW + R-06 confirmed; the
+GROUNDWORK SPLIT executed** — four Attention-independent fixes (credits chat,
+mention keyboard, room routing, 409 floor) extracted to `groundwork-fixes` off
+main, suite-green, pushed to the shared repo as **PR #2** awaiting any
+co-owner's merge click. Attention work continues on the fork unchanged; next
+fork↔main merge resolves the six shared files keep-branch.
+
 **When ⑥ passes and the operator declares ready:** the landing is
 `git push origin ryan-command-center:main` as ryanswan313 (operator-run),
 then the message to Michael + Caleb pointing at UPSTREAM-PR-PACKAGE.md.

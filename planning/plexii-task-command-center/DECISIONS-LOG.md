@@ -576,4 +576,33 @@ accent "@attention" badge sits in the input while armed.
 churn + lying chips); popping the console from chat (the operator's exact
 complaint — retired).
 
+---
+
+## DEC-029 — Taxonomy law + the groundwork split
+**Date:** 2026-08-26 · **Status:** APPROVED (operator) + EXECUTED (split); law recorded
+**(a) The five taxonomy tests (T-1 infinitive · T-2 single axis · T-3 life
+stability · T-4 honest parent · T-5 distinct question sets) + the
+anti-collision rule are adopted as STANDING LAW** for all category/vocabulary
+decisions, per the operator's eight-category synthesis and analysis/22's
+review. **R-06 confirmed as doctrine:** recipient-presence triggers the
+mandatory-clarification lane (P1/SPEC-027); self-capture always keeps the
+one-keystroke bail-out (shipped as Unrouted). Everything else in the synthesis
+— the rename to the eight primaries, To Decide, the Respond consolidation,
+reserved `intent_sub`, the clarification engine, R-01…R-05/R-07 — is
+sequenced POST-LANDING per analysis/22 §5 (alignment stage first, engine with
+SPEC-027, R-04 gets its own analysis before any ruling).
+**(b) The groundwork split (operator: fixes to main now, Attention continues
+on the fork):** four Attention-independent fixes were extracted onto
+`groundwork-fixes` (branched from main 7be3be4c, surgical patches — not file
+copies): ① chat/workspace-ask non-streaming on credits, ② mention-picker
+keyboard selection (F-9), ③ room→scoped-desks routing, ④ the permanent-409
+baseRev floor (F010) with the [sync-409] trail. Main's own suite green
+(2,604) + typecheck clean. Branch pushed to `saasmouth/focusbuddy` and opened
+as **PR #2** (https://github.com/saasmouth/focusbuddy/pull/2) — merge is one
+click for any co-owner; fast-forward-clean. NOT separable (stay on the fork):
+lifecycle/delete contract, bulk selection, sync widenings, park-inbound —
+all entangled with the work_item schema. Known cost: when the fork branch
+next merges main after PR #2 lands, the six shared files conflict textually
+(branch is the semantic superset — resolve keep-branch).
+
 <!-- Append below; increment DEC-NNN. -->
