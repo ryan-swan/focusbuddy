@@ -71,14 +71,18 @@ fully ready (memory: plexii-repo-ownership-and-push-rules). Landing when ready =
 
 **THE FINISH LINE (GA checklist): BUILD COMPLETE ①–⑤.** ① FYI backstop ✔ ·
 ② item archival ✔ (DEC-024) · ③ multi-intent ✔ (DEC-025) · ④ cleanup rewrite ✔
-(DEC-026) · ⑤ composer typeahead ✔ (DEC-027) **+ DEC-028 QA round: inline chat card,
-Tab-to-arm pills on ⌘K + home bar, Slack-style chips** ✔
-(**DEC-027/028** — picker command row, literal-text insertion never a chip,
-leading @attention routes to the console without touching the model) ·
+(DEC-026) · ⑤ composer typeahead ✔ (DEC-027) + **DEC-028 QA round ✔**: the confirm stop
+extracted into ONE AttentionConfirmCard; a leading @attention in chat files
+INLINE above the composer (never leaves the chat; cancel restores the
+message); ⌘K and the home Ask-Plexii bar surface Attention on "@a…" partials
+and **Tab arms an accent @attention pill** (query = capture text, Enter
+files, Backspace-on-empty disarms); the chat picker inserts a REAL visual
+mention chip (onPick skipped — never a stored reference) ·
 ⑥ **operator smokes remain**: capture-onto-desk → trash desk → item survives
 to Detached shelf · a compound capture (secondary chips) · a rambling capture
-(tidy offer; needs API key) · chat: type @ → pick Attention → send → console
-opens prefilled · shared-desk menu (whenever a desk is shared again).
+(tidy offer; needs API key) · chat: @ → Tab → type → send → inline card ·
+⌘K and home bar: @a → Tab → pill → Enter · shared-desk menu (whenever a
+desk is shared again).
 
 **When ⑥ passes and the operator declares ready:** the landing is
 `git push origin ryan-command-center:main` as ryanswan313 (operator-run),
