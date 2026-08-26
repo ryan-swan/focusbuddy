@@ -132,4 +132,17 @@ describe('S5 wiring locks (file-level)', () => {
     // The decay sweep rides the scheduler cadence.
     expect(read('src/main/notifications/scheduler.ts')).toContain('decayLooseThoughts(nowMs)')
   })
+
+  it('DEC-027 — the composer typeahead + deterministic @attention interception', () => {
+    // The picker offers the capture COMMAND (text insertion, never a chip —
+    // a kind with no resolver must never become a reference)…
+    const sugg = read('src/renderer/src/components/assistant/MentionSuggestion.ts')
+    expect(sugg).toContain("kind: 'capture'")
+    expect(sugg).toContain("insertContent('@attention ')")
+    // …and a LEADING @attention send routes to the ONE console seam, not the
+    // model. Mid-sentence mentions keep the AI proposal path.
+    const panel = read('src/renderer/src/components/ChatPanel.tsx')
+    expect(panel).toContain('^@attention\\b')
+    expect(panel).toContain("'fb:command-new-work-item'")
+  })
 })

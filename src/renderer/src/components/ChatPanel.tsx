@@ -702,6 +702,21 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     useChatStore.getState().setThreadDraft(draftKeyRef.current, null)
   }, [])
 
+  // DEC-027: capability probe for the deterministic @attention interception —
+  // at mount, re-probed when the Settings toggle flips.
+  const [workItemsOn, setWorkItemsOn] = useState(false)
+  useEffect(() => {
+    const probe = (): void => {
+      window.api.workItems
+        .enabled()
+        .then(setWorkItemsOn)
+        .catch(() => {})
+    }
+    probe()
+    window.addEventListener('fb:workitems-toggled', probe)
+    return () => window.removeEventListener('fb:workitems-toggled', probe)
+  }, [])
+
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current
     // The document is the source of truth: its chips serialise to "@Title" in
@@ -714,6 +729,18 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       performOmniIntent({ kind: 'search', label: 'Search the web', url: content })
       return
     }
+    // DEC-027: a LEADING @attention is a capture, not a chat message — routed
+    // deterministically to the one capture console (DEC-019), never to the
+    // model. Mid-sentence mentions keep the AI proposal path unchanged.
+    const attn = workItemsOn ? /^@attention\b[:,]?\s*([\s\S]*)$/i.exec(content) : null
+    if (attn) {
+      ed?.commands.clearContent()
+      setDraft('')
+      window.dispatchEvent(
+        new CustomEvent('fb:command-new-work-item', { detail: { captureText: attn[1].trim() } })
+      )
+      return
+    }
     // Auto (the omni door, AI-01): when the previewed pick is a non-chat
     // intent, Enter performs it instead of sending — exactly what the strip
     // said it would do.
@@ -724,7 +751,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     ed?.commands.clearContent()
     setDraft('')
     await send(thread.serverTaskId, content, thread.key)
-  }, [draft, send, thread.serverTaskId, thread.key, pickedIntent, performOmniIntent, composerMode])
+  }, [draft, send, thread.serverTaskId, thread.key, pickedIntent, performOmniIntent, composerMode, workItemsOn])
 
   async function handleSend(e: React.FormEvent): Promise<void> {
     e.preventDefault()

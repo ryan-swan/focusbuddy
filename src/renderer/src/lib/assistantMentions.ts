@@ -230,8 +230,12 @@ export function mentionFromSearchHit(
 
 // Human label for a kind, for the typeahead's secondary text and the chip's
 // tooltip. Mirrors CommandCenter's hitKindLabel vocabulary.
-export function mentionKindLabel(kind: MentionKind): string {
+export function mentionKindLabel(kind: MentionKind | 'capture'): string {
   switch (kind) {
+    // DEC-027: the @attention COMMAND row in the picker — not a mention kind
+    // and never a chip (no resolver → no reference; see the doctrine above).
+    case 'capture':
+      return 'Capture'
     case 'document':
       return 'Document'
     case 'desk':
