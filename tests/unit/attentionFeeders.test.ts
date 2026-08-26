@@ -139,14 +139,14 @@ describe('the deadline nudge — once per item per due-day, capped substrate', (
     const ins = raw.prepare(
       "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, due_at) VALUES (?, 'work_item', ?, ?, ?, ?)"
     )
-    ins.run('a', 'Call Bob', 'open', 'action', dueSoon)
-    ins.run('fyi', 'Note', 'open', 'fyi', dueSoon)
-    ins.run('done', 'Done one', 'completed', 'action', dueSoon)
-    ins.run('far', 'Later', 'open', 'action', new Date(NOW + 5 * DAY).toISOString())
+    ins.run('a', 'Call Bob', 'open', 'to_do', dueSoon)
+    ins.run('fyi', 'Note', 'open', 'to_know', dueSoon)
+    ins.run('done', 'Done one', 'completed', 'to_do', dueSoon)
+    ins.run('far', 'Later', 'open', 'to_do', new Date(NOW + 5 * DAY).toISOString())
     expect(postDeadlineNudgesCore(db, NOW)).toBe(1)
     expect(postDeadlineNudgesCore(db, NOW + 60_000)).toBe(0) // once EVER per due-day
     const out = sweepDeliveries(db, NOW + 120_000)
-    expect(out.filter((d) => d.queue === 'action')).toHaveLength(1)
+    expect(out.filter((d) => d.queue === 'to_do')).toHaveLength(1)
   })
 })
 
@@ -154,7 +154,7 @@ describe('DEC-024 — the FYI deadline backstop', () => {
   it('a dated FYI nudges ONCE when its date arrives — not before, not for ancient dates', () => {
     const { raw, db } = freshDb()
     const ins = raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, due_at) VALUES (?, 'work_item', ?, 'open', 'fyi', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, due_at) VALUES (?, 'work_item', ?, 'open', 'to_know', ?)"
     )
     ins.run('arrived', 'Policy changes today', new Date(NOW - 2 * 60 * 60 * 1000).toISOString())
     ins.run('future', 'Later note', new Date(NOW + 3 * DAY).toISOString())
@@ -164,7 +164,7 @@ describe('DEC-024 — the FYI deadline backstop', () => {
     // Once EVER per due-day: a re-sweep is silent.
     expect(postDeadlineNudgesCore(db, NOW + 60_000)).toBe(0)
     const out = sweepDeliveries(db, NOW + 120_000)
-    const fyi = out.filter((d) => d.queue === 'fyi')
+    const fyi = out.filter((d) => d.queue === 'to_know')
     expect(fyi).toHaveLength(1)
     expect(fyi[0].body).toContain('date arrived')
   })
@@ -173,7 +173,7 @@ describe('DEC-024 — the FYI deadline backstop', () => {
     const { raw, db } = freshDb()
     const due = new Date(NOW - 60 * 60 * 1000).toISOString()
     const ins = raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, due_at) VALUES (?, 'work_item', 'x', ?, 'fyi', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, due_at) VALUES (?, 'work_item', 'x', ?, 'to_know', ?)"
     )
     ins.run('shelved', 'archived', due)
     ins.run('acked', 'acknowledged', due)

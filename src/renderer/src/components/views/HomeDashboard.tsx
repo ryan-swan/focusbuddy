@@ -783,13 +783,13 @@ export default function HomeDashboard(): JSX.Element {
       case 'attention':
         return <AttentionWidget size={size} />
       case 'att-tasks':
-        return <AttentionQueueWidget queue="action" title="Tasks" emptyLine="Nothing needs you. Capture with ⌘K." size={size} />
+        return <AttentionQueueWidget queue="to_do" title="To Do" emptyLine="Nothing needs you. Capture with ⌘K." size={size} />
       case 'att-reviews':
-        return <AttentionQueueWidget queue="review" title="Reviews" emptyLine="No reviews waiting." size={size} />
+        return <AttentionQueueWidget queue="to_review" title="Review" emptyLine="No reviews waiting." size={size} />
       case 'att-calendar':
         return <AttentionCalendarWidget size={size} />
       case 'att-ack':
-        return <AttentionQueueWidget queue="acknowledgment" title="Acknowledgments" emptyLine="Nothing to acknowledge." size={size} />
+        return <AttentionQueueWidget queue="to_respond" title="Respond" emptyLine="No one waiting on you." size={size} />
       case 'att-completed':
         return <AttentionCompletedWidget size={size} />
       case 'att-stale':

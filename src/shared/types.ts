@@ -176,6 +176,7 @@ export interface FbNode {
   // dueAt is ISO-8601, deliberately distinct from the numeric desk dueDate.
   workItemState?: string | null
   intentClass?: string | null
+  intentSub?: string | null
   originatorId?: string | null
   recipientId?: string | null
   dueAt?: string | null
@@ -819,8 +820,8 @@ export type ActionProposal =
       kind: 'create-work-item'
       title: string
       notes?: string
-      // Which Attention queue this belongs to (action/review/scheduling/fyi/
-      // acknowledgment/discussion/loose_thought). Omitted → action.
+      // Which Attention queue this belongs to (to_do/to_review/to_decide/
+      // to_respond/to_meet/to_discuss/to_remember/to_know). Omitted → to_do.
       intentClass?: string
       reason?: string
     }

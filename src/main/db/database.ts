@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { migrateNodesKindCheckV2, type NodesKindMigrationResult } from './migrateNodesKind'
+import { migrateIntentTaxonomyV2 } from './migrateIntentTaxonomy'
 import { ensureWorkItemSchema } from './workItems'
 import { ensureNotificationSchema } from '../notifications/substrate'
 
@@ -20,7 +21,9 @@ let db: Database.Database | null = null
 // safety backup (see getDb): the snapshot is taken once per version bump, not on
 // every launch. It is NOT used to decide whether the idempotent migrations run —
 // those still run every launch.
-const MIGRATION_VERSION = 2
+// v3: taxonomy alignment — intent_class values rewritten to the eight
+// primaries + the intent_sub reserved column (migrateIntentTaxonomyV2).
+const MIGRATION_VERSION = 3
 
 // Synchronous, transactionally-consistent snapshot of the live database taken
 // BEFORE any migration runs, via SQLite's VACUUM INTO. It produces one
@@ -584,6 +587,18 @@ export function getDb(): Database.Database {
   ensureWorkItemSchema(db)
   // The notification substrate's durable store (S4, §5).
   ensureNotificationSchema(db)
+  // Taxonomy alignment: rewrite legacy intent_class values to the eight
+  // primaries (pre-imaged in wi_intent_taxonomy_backup; idempotent; re-run
+  // every startup so peer-pushed legacy values converge). After BOTH ensure
+  // calls above — it touches nodes.intent_class and wi_notifications.queue.
+  const taxonomy = migrateIntentTaxonomyV2(db)
+  if (taxonomy.ran && Object.keys(taxonomy.renamed).length > 0) {
+    // eslint-disable-next-line no-console
+    console.info(
+      `[migrateIntentTaxonomyV2] renamed ${JSON.stringify(taxonomy.renamed)}; ` +
+        `${taxonomy.notificationsRemapped} notification rows remapped`
+    )
+  }
   // Forward-compatible migrations for previously-created DBs
   // File/folder manager: fb_files grows from a flat attachment store into a
   // foldered library. parent_id nests entries (null = root), kind tells folder

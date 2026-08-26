@@ -20,20 +20,25 @@ const NOW = new Date('2026-08-25T10:00:00') // a Tuesday
 
 describe('hard triggers — every class, deterministically', () => {
   const cases: Array<[string, string]> = [
-    ['Remind me to call Bob about the lease', 'action'],
-    ['need to send the invoice today', 'action'],
-    ["don't forget the standup notes", 'action'],
-    ['todo: fix the login flow', 'action'],
-    ['Can you review the pricing doc before Thursday?', 'review'],
-    ['Need your sign-off on the proposal', 'review'],
-    ['Schedule a 30-min sync Thursday afternoon', 'scheduling'],
-    ['book time with the design team next week', 'scheduling'],
-    ['fyi: the vendor moved the deadline', 'fyi'],
-    ['Note to self: the API key rotates monthly', 'fyi'],
-    ['Just confirming you got the contract', 'acknowledgment'],
-    ['Bring up at next 1:1 — the hiring plan', 'discussion'],
-    ["Let's discuss the rebrand direction", 'discussion'],
-    ['What is the wifi password?', 'action'] // question → needs-answer action
+    ['Remind me to call Bob about the lease', 'to_do'],
+    ['need to send the invoice today', 'to_do'],
+    ["don't forget the standup notes", 'to_do'],
+    ['todo: fix the login flow', 'to_do'],
+    ['Can you review the pricing doc before Thursday?', 'to_review'],
+    ['Need your sign-off on the proposal', 'to_review'],
+    ['Decide whether we sponsor the meetup', 'to_decide'],
+    ['need to decide on the venue by friday', 'to_decide'], // decision outranks the bare to-do verb
+    ['make a call on the pricing tiers', 'to_decide'],
+    ['Reply to Sarah about the renewal', 'to_respond'],
+    ['get back to the landlord tomorrow', 'to_respond'],
+    ['Just confirming you got the contract', 'to_respond'], // acknowledgment merged in
+    ['Schedule a 30-min sync Thursday afternoon', 'to_meet'],
+    ['book time with the design team next week', 'to_meet'],
+    ['fyi: the vendor moved the deadline', 'to_know'],
+    ['Note to self: the API key rotates monthly', 'to_know'],
+    ['Bring up at next 1:1 — the hiring plan', 'to_discuss'],
+    ["Let's discuss the rebrand direction", 'to_discuss'],
+    ['What is the wifi password?', 'to_respond'] // question → words owed back (alignment's T-5 fix)
   ]
   it.each(cases)('"%s" → %s', (text, expected) => {
     const r = classifyByRules(text)
@@ -44,20 +49,20 @@ describe('hard triggers — every class, deterministically', () => {
   it('idea language files lightly — unless an explicit action verb outranks it', () => {
     // The live-QA case: an idea capture must not become a task.
     expect(classifyByRules('Flesh out LakeDash idea — DoorDash but on lakes')?.intentClass).toBe(
-      'loose_thought'
+      'to_remember'
     )
     expect(classifyByRules('what if we bundled the onboarding into one desk')?.intentClass).toBe(
-      'loose_thought'
+      'to_remember'
     )
-    // An explicit commitment keeps its action routing even when it says "idea".
+    // An explicit commitment keeps its to-do routing even when it says "idea".
     expect(classifyByRules('need to flesh out the pricing idea by friday')?.intentClass).toBe(
-      'action'
+      'to_do'
     )
   })
 
   it('short idle fragments become loose thoughts; long ambiguous prose goes to the model', () => {
-    expect(classifyByRules('mountain cabin idea')?.intentClass).toBe('loose_thought')
-    expect(classifyByRules('')?.intentClass).toBe('loose_thought')
+    expect(classifyByRules('mountain cabin idea')?.intentClass).toBe('to_remember')
+    expect(classifyByRules('')?.intentClass).toBe('to_remember')
     expect(
       classifyByRules(
         'The vendor conversation yesterday went in an interesting direction around pricing tiers and support'
@@ -94,12 +99,14 @@ describe('deadline scanning — resolvable anchors vs the Q1 trigger', () => {
   it('Q1 fires ONLY for unanchored deadlines on actionable classes (DEC-016)', () => {
     const unanchored = { phrase: 'asap', dueAt: null }
     const anchored = { phrase: 'by thursday', dueAt: '2026-08-27T17:00:00.000Z' }
-    expect(needsDeadlineClarification('action', unanchored)).toBe(true)
-    expect(needsDeadlineClarification('review', unanchored)).toBe(true)
-    expect(needsDeadlineClarification('action', anchored)).toBe(false) // silent anchor
-    expect(needsDeadlineClarification('fyi', unanchored)).toBe(false) // not actionable
-    expect(needsDeadlineClarification('loose_thought', unanchored)).toBe(false)
-    expect(needsDeadlineClarification('action', null)).toBe(false)
+    expect(needsDeadlineClarification('to_do', unanchored)).toBe(true)
+    expect(needsDeadlineClarification('to_review', unanchored)).toBe(true)
+    expect(needsDeadlineClarification('to_decide', unanchored)).toBe(true) // "decide by…" binds
+    expect(needsDeadlineClarification('to_respond', unanchored)).toBe(true) // "reply by…" binds
+    expect(needsDeadlineClarification('to_do', anchored)).toBe(false) // silent anchor
+    expect(needsDeadlineClarification('to_know', unanchored)).toBe(false) // not actionable
+    expect(needsDeadlineClarification('to_remember', unanchored)).toBe(false)
+    expect(needsDeadlineClarification('to_do', null)).toBe(false)
   })
 })
 
@@ -108,23 +115,26 @@ describe('Δ12 scenarios at the rules level', () => {
     const text = "Here's the new pricing doc. Can you review it before Thursday?"
     const r = classifyByRules(text)
     const scan = scanDeadline(text, NOW)
-    expect(r?.intentClass).toBe('review')
+    expect(r?.intentClass).toBe('to_review')
     expect(scan?.dueAt).toBeTruthy()
     expect(needsDeadlineClarification(r!.intentClass, scan)).toBe(false)
   })
 
   it('a scheduling hold classifies without touching the calendar machinery', () => {
     expect(classifyByRules("Let's schedule a 30-min sync Thursday afternoon")?.intentClass).toBe(
-      'scheduling'
+      'to_meet'
     )
   })
 
-  it('actionable-class helper matches the DEC-016 set', () => {
-    expect(isActionableClass('action')).toBe(true)
-    expect(isActionableClass('review')).toBe(true)
-    expect(isActionableClass('scheduling')).toBe(true)
-    expect(isActionableClass('fyi')).toBe(false)
-    expect(isActionableClass('direct')).toBe(false)
+  it('actionable-class helper matches the DEC-016 set (alignment: decide/respond joined)', () => {
+    expect(isActionableClass('to_do')).toBe(true)
+    expect(isActionableClass('to_review')).toBe(true)
+    expect(isActionableClass('to_meet')).toBe(true)
+    expect(isActionableClass('to_decide')).toBe(true)
+    expect(isActionableClass('to_respond')).toBe(true)
+    expect(isActionableClass('to_know')).toBe(false)
+    expect(isActionableClass('to_discuss')).toBe(false)
+    expect(isActionableClass('to_remember')).toBe(false)
   })
 })
 
@@ -171,11 +181,11 @@ describe('DEC-025 — multi-intent captures (deterministic splitter)', () => {
       NOW
     )
     expect(s).toHaveLength(1)
-    expect(s[0].intentClass).toBe('review')
+    expect(s[0].intentClass).toBe('to_review')
     expect(s[0].title).toBe('review the deck before standup')
     expect(s[0].dueAt).toBeNull() // "before standup" is vague — files dateless, no Q1
     const anchored = secondaryCaptures('need to send the invoice; schedule a sync tomorrow', NOW)
-    expect(anchored[0].intentClass).toBe('scheduling')
+    expect(anchored[0].intentClass).toBe('to_meet')
     expect(anchored[0].dueAt).not.toBeNull()
     // A strong-split tail with no trigger of its own is NOT offered.
     expect(secondaryCaptures('remind me to call Bob\nthe weather was lovely out there', NOW)).toEqual([])

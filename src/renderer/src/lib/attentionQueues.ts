@@ -1,69 +1,88 @@
 import type { FbNode } from '@shared/types'
+import { TERMINAL_WORK_ITEM_STATES, DEFAULT_INTENT_CLASS, canonicalIntentClass } from '@shared/workItems'
 
 // Attention queue semantics (S6, SPEC-017/§2.3-F013). Pure and testable:
 // grouping, ordering, and the per-class primary action. Everything derives
 // from work_item_state / intent_class — NEVER from the legacy status
 // projection (F013: 'open' is a compatibility value, not a "needs me" signal).
+//
+// Taxonomy alignment: the eight primaries in the synthesis's order. Schema
+// values keep the full to_* form; the labels here are THE user-facing names.
+// Item classes canonicalize at this boundary (canonicalIntentClass), so a
+// legacy value a not-yet-updated peer pushed still groups and closes right.
 
 export const QUEUE_ORDER = [
-  'action',
-  'review',
-  'scheduling',
-  'acknowledgment',
-  'discussion',
-  'fyi',
-  'loose_thought'
+  'to_do',
+  'to_review',
+  'to_decide',
+  'to_respond',
+  'to_meet',
+  'to_discuss',
+  'to_remember',
+  'to_know'
 ] as const
 
 export const QUEUE_LABEL: Record<string, string> = {
-  action: 'Tasks',
-  review: 'Reviews',
-  scheduling: 'Scheduling',
-  acknowledgment: 'Acknowledgments',
-  discussion: 'Discussions',
-  fyi: 'FYI',
-  loose_thought: 'Loose thoughts',
-  direct: 'Messages'
+  to_do: 'To Do',
+  to_review: 'Review',
+  to_decide: 'Decide',
+  to_respond: 'Respond',
+  to_meet: 'Meet',
+  to_discuss: 'Discuss',
+  to_remember: 'Remember',
+  to_know: 'Know'
 }
 
 export const QUEUE_ICON: Record<string, string> = {
-  action: 'check_circle',
-  review: 'rate_review',
-  scheduling: 'event',
-  acknowledgment: 'mark_email_read',
-  discussion: 'forum',
-  fyi: 'info',
-  loose_thought: 'lightbulb',
-  direct: 'chat'
+  to_do: 'check_circle',
+  to_review: 'rate_review',
+  to_decide: 'alt_route',
+  to_respond: 'reply',
+  to_meet: 'event',
+  to_discuss: 'forum',
+  to_remember: 'lightbulb',
+  to_know: 'info'
 }
 
-const TERMINAL: ReadonlySet<string> = new Set([
-  'acknowledged',
-  'answered',
-  'scheduled',
-  'delivered',
-  'reviewed',
-  'completed',
-  'discussed',
-  'dismissed',
-  'reclassified',
-  'archived'
-])
+/** The confirm card / reclassify / manual-form choice set — ONE copy (the
+ *  pre-alignment build had drifting duplicates in the card and the view). */
+export const CLASS_CHOICES: ReadonlyArray<{ value: string; label: string; hint: string }> = [
+  { value: 'to_do', label: 'To Do', hint: 'Something to be done' },
+  { value: 'to_review', label: 'Review', hint: 'Needs judgment or sign-off' },
+  { value: 'to_decide', label: 'Decide', hint: 'A choice between options' },
+  { value: 'to_respond', label: 'Respond', hint: 'Someone awaits words back' },
+  { value: 'to_meet', label: 'Meet', hint: 'Time and calendar' },
+  { value: 'to_discuss', label: 'Discuss', hint: 'Talk it through live' },
+  { value: 'to_remember', label: 'Remember', hint: 'Keep it around, may fade' },
+  { value: 'to_know', label: 'Know', hint: 'Worth knowing, nothing owed' }
+]
+
+export const CLASS_LABEL: Record<string, string> = Object.fromEntries(
+  CLASS_CHOICES.map((c) => [c.value, c.label])
+)
+
+const TERMINAL: ReadonlySet<string> = new Set(TERMINAL_WORK_ITEM_STATES)
 
 export function isTerminalState(state: string | null | undefined): boolean {
   return state != null && TERMINAL.has(state)
 }
 
+/** An item's class in canonical form (legacy values map forward; missing or
+ *  unknown falls to the default queue). The one lookup key for every map here. */
+export function queueOf(i: Pick<FbNode, 'intentClass'>): string {
+  return canonicalIntentClass(i.intentClass) ?? i.intentClass ?? DEFAULT_INTENT_CLASS
+}
+
 /** The class-appropriate closing verb: what "done" means per queue. */
 export const PRIMARY_ACTION: Record<string, { state: string; label: string }> = {
-  action: { state: 'completed', label: 'Done' },
-  review: { state: 'reviewed', label: 'Reviewed' },
-  scheduling: { state: 'scheduled', label: 'Scheduled' },
-  acknowledgment: { state: 'acknowledged', label: 'Acknowledge' },
-  discussion: { state: 'discussed', label: 'Discussed' },
-  fyi: { state: 'acknowledged', label: 'Got it' },
-  loose_thought: { state: 'dismissed', label: 'Let it go' },
-  direct: { state: 'acknowledged', label: 'Acknowledge' }
+  to_do: { state: 'completed', label: 'Done' },
+  to_review: { state: 'reviewed', label: 'Reviewed' },
+  to_decide: { state: 'decided', label: 'Decided' },
+  to_respond: { state: 'answered', label: 'Responded' },
+  to_meet: { state: 'scheduled', label: 'Scheduled' },
+  to_discuss: { state: 'discussed', label: 'Discussed' },
+  to_remember: { state: 'dismissed', label: 'Let it go' },
+  to_know: { state: 'acknowledged', label: 'Got it' }
 }
 
 /** Items needing the person, snooze-respecting, grouped by queue in the fixed
@@ -80,7 +99,7 @@ export function groupIntoQueues(
   )
   const byQueue = new Map<string, FbNode[]>()
   for (const i of active) {
-    const q = i.intentClass ?? 'action'
+    const q = queueOf(i)
     const list = byQueue.get(q) ?? []
     list.push(i)
     byQueue.set(q, list)
@@ -119,8 +138,10 @@ export function rankScore(i: FbNode, nowMs: number): number {
   return score
 }
 
+// Mirrors intentRules' ACTIONABLE set (deadline-bearing commitment classes).
 function isActionableIntent(c: string | null | undefined): boolean {
-  return c === 'action' || c === 'review' || c === 'scheduling'
+  const q = canonicalIntentClass(c)
+  return q === 'to_do' || q === 'to_review' || q === 'to_meet' || q === 'to_decide' || q === 'to_respond'
 }
 
 /** The Detached shelf (F-M6/F-M7″): park-local items whose desk was purged or

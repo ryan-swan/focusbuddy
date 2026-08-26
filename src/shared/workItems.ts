@@ -19,6 +19,10 @@ export interface WorkItemColumnDef {
 export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
   { column: 'work_item_state', attr: 'workItemState', ddl: 'TEXT', rendererEmitted: true },
   { column: 'intent_class', attr: 'intentClass', ddl: 'TEXT', rendererEmitted: true },
+  // Reserved secondary-intent axis (taxonomy alignment, analysis/22 §2.4):
+  // emitted + allowlisted NOW while schema churn is cheap; no UI writes it yet.
+  // UI adoption waits for the per-class question sets (SPEC-027 era).
+  { column: 'intent_sub', attr: 'intentSub', ddl: 'TEXT', rendererEmitted: true },
   { column: 'originator_id', attr: 'originatorId', ddl: 'TEXT', rendererEmitted: true },
   { column: 'recipient_id', attr: 'recipientId', ddl: 'TEXT', rendererEmitted: true },
   // ISO-8601 string — collision-proof vs the numeric desk due_date (§2.2)
@@ -39,8 +43,10 @@ export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
  *  would be unsafe for an older build to materialize as-is. */
 export const WORK_ITEM_SCHEMA_EPOCH = 1
 
-export const WORK_ITEM_STATES = [
-  // non-terminal
+/** Non-terminal states — "this still needs the person". One source for every
+ *  SQL visibility predicate (badge, nudges) so a new state can never be
+ *  half-added. */
+export const ACTIVE_WORK_ITEM_STATES = [
   'open',
   'in_progress',
   'waiting',
@@ -49,8 +55,14 @@ export const WORK_ITEM_STATES = [
   'delegated',
   'blocked',
   'suggested',
-  'stale',
-  // terminal
+  'stale'
+] as const
+
+/** Terminal states. 'decided' is the To Decide queue's closing verb (taxonomy
+ *  alignment; analysis/22 §2.1). Cross-version note: an un-updated peer
+ *  coarsens any state it doesn't know to 'open' (the conservative default)
+ *  until it updates — accepted, same as every state added since v1. */
+export const TERMINAL_WORK_ITEM_STATES = [
   'acknowledged',
   'answered',
   'scheduled',
@@ -58,33 +70,68 @@ export const WORK_ITEM_STATES = [
   'reviewed',
   'completed',
   'discussed',
+  'decided',
   'dismissed',
   'reclassified',
   // DEC-024: shelved — "keep it, done looking at it". Terminal for queue
   // visibility, but NOT a loop closure: no notification, no Recently-closed
   // row; it lives on the Archived shelf until unarchived (state → open).
-  // Cross-version note: an un-updated peer coarsens it to 'open' (the
-  // conservative default) until it updates — accepted, same as any new state.
   'archived'
 ] as const
+
+export const WORK_ITEM_STATES = [...ACTIVE_WORK_ITEM_STATES, ...TERMINAL_WORK_ITEM_STATES] as const
 export type WorkItemState = (typeof WORK_ITEM_STATES)[number]
 
+/** The eight intent primaries (taxonomy alignment stage, DEC-029a sequencing;
+ *  analysis/22). Schema values keep the full to_* form (R-01); surface labels
+ *  live in the renderer (attentionQueues). The legacy classes 'acknowledgment'
+ *  and 'direct' merged into 'to_respond'; 'to_decide' is the one genuinely new
+ *  primary. The five taxonomy tests T-1…T-5 + anti-collision (DEC-029a LAW)
+ *  govern any future change to this list. */
 export const INTENT_CLASSES = [
-  'action',
-  'review',
-  'scheduling',
-  'fyi',
-  'acknowledgment',
-  'discussion',
-  'loose_thought',
-  'direct'
+  'to_do',
+  'to_review',
+  'to_decide',
+  'to_respond',
+  'to_meet',
+  'to_discuss',
+  'to_remember',
+  'to_know'
 ] as const
 
-/** Validate a model-supplied intent class; undefined for anything else (the
- *  db default 'action' then applies). Used by every proposal parser. */
-export function normalizeIntentClass(v: unknown): string | undefined {
+/** The db default when a draft names no class ("something to do"). */
+export const DEFAULT_INTENT_CLASS = 'to_do'
+
+/** Pre-alignment class values, mapped forward. Applied at every boundary a
+ *  legacy value can still enter: model output (stale prompt caches, saved
+ *  Flows), sync arrivals from un-updated peers, stored widget/section keys.
+ *  The startup migration (migrateIntentTaxonomyV2) rewrites stored rows with
+ *  this same map — one table, two consumers, no drift. */
+export const LEGACY_INTENT_CLASS_MAP: Readonly<Record<string, string>> = {
+  action: 'to_do',
+  review: 'to_review',
+  scheduling: 'to_meet',
+  fyi: 'to_know',
+  acknowledgment: 'to_respond',
+  direct: 'to_respond',
+  discussion: 'to_discuss',
+  loose_thought: 'to_remember'
+}
+
+/** Canonical form of any intent-class value: a current class passes through,
+ *  a legacy class maps forward, anything else is undefined (the db default
+ *  then applies). */
+export function canonicalIntentClass(v: unknown): string | undefined {
   const s = String(v)
-  return (INTENT_CLASSES as readonly string[]).includes(s) ? s : undefined
+  if ((INTENT_CLASSES as readonly string[]).includes(s)) return s
+  return LEGACY_INTENT_CLASS_MAP[s]
+}
+
+/** Validate a model-supplied intent class; undefined for anything else (the
+ *  db default then applies). Used by every proposal parser. Legacy values
+ *  normalize forward rather than falling to the default. */
+export function normalizeIntentClass(v: unknown): string | undefined {
+  return canonicalIntentClass(v)
 }
 
 /** §2.3 (A-02): the derived coarse projection. Computed at every write and
@@ -108,6 +155,7 @@ export function statusForWorkItemState(
     case 'reviewed':
     case 'completed':
     case 'discussed':
+    case 'decided':
       return 'done'
     case 'dismissed':
     case 'reclassified':

@@ -115,12 +115,29 @@ describe('updateFields / reclassify', () => {
   it('reclassify re-bins intent and leaves the item active', () => {
     const { raw, db } = freshDb()
     wi(raw, 'a')
-    expect(reclassifyWorkItemCore(db, 'a', 'review')).toBe(true)
+    expect(reclassifyWorkItemCore(db, 'a', 'to_review')).toBe(true)
     const row = raw.prepare('SELECT intent_class, work_item_state FROM nodes WHERE id = ?').get('a') as {
       intent_class: string
       work_item_state: string
     }
-    expect(row).toEqual({ intent_class: 'review', work_item_state: 'open' })
+    expect(row).toEqual({ intent_class: 'to_review', work_item_state: 'open' })
+  })
+
+  it('reclassify maps legacy values forward and refuses garbage (alignment)', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'a')
+    // A legacy class (saved Flow, stale prompt cache) canonicalizes on write.
+    expect(reclassifyWorkItemCore(db, 'a', 'acknowledgment')).toBe(true)
+    let row = raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('a') as {
+      intent_class: string
+    }
+    expect(row.intent_class).toBe('to_respond')
+    // Garbage is refused — never the silent store it used to be.
+    expect(reclassifyWorkItemCore(db, 'a', 'nonsense')).toBe(false)
+    row = raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('a') as {
+      intent_class: string
+    }
+    expect(row.intent_class).toBe('to_respond')
   })
 })
 

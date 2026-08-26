@@ -4,7 +4,7 @@ import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
-import { isTerminalState, itemReason, QUEUE_ICON } from '../../lib/attentionQueues'
+import { isTerminalState, itemReason, queueOf, QUEUE_ICON } from '../../lib/attentionQueues'
 import type { WidgetSize } from './homeWidgetDefs'
 
 // The Attention widget family (S6, SPEC-014): the command center's face on the
@@ -82,7 +82,7 @@ function activeOf(items: FbNode[], queue: string): FbNode[] {
   return items
     .filter(
       (i) =>
-        (i.intentClass ?? 'action') === queue &&
+        queueOf(i) === queue &&
         !isTerminalState(i.workItemState) &&
         !(i.snoozeUntil != null && i.snoozeUntil > now) &&
         i.detachedFromId == null
@@ -130,7 +130,7 @@ export function AttentionCalendarWidget({ size = 'sm' }: { size?: WidgetSize }):
         (i) =>
           !isTerminalState(i.workItemState) &&
           i.detachedFromId == null &&
-          (i.dueAt != null || (i.intentClass ?? '') === 'scheduling')
+          (i.dueAt != null || queueOf(i) === 'to_meet')
       )
       .sort((a, b) => {
         const da = a.dueAt ? Date.parse(a.dueAt) : now + 365 * DAY
@@ -202,29 +202,37 @@ export function AttentionSystemWidget({ size = 'sm' }: { size?: WidgetSize }): J
 }
 
 // ── The unified Attention widget (DEC-019c) ─────────────────────────────────
-// One widget, a section slider: All · Tasks · Reviews · Coming up · Ack ·
+// One widget, a section slider: All · To Do · Review · Coming up · Respond ·
 // Completed · Stale desks · System. Replaces the seven separates (retired in
 // the registry; stored placements keep rendering their old cases).
 
 const SECTIONS = [
   { key: 'all', icon: 'notifications', label: 'All' },
-  { key: 'action', icon: 'check_circle', label: 'Tasks' },
-  { key: 'review', icon: 'rate_review', label: 'Reviews' },
+  { key: 'to_do', icon: 'check_circle', label: 'To Do' },
+  { key: 'to_review', icon: 'rate_review', label: 'Review' },
   { key: 'upcoming', icon: 'event', label: 'Coming up' },
-  { key: 'acknowledgment', icon: 'mark_email_read', label: 'Acknowledgments' },
+  { key: 'to_respond', icon: 'reply', label: 'Respond' },
   { key: 'completed', icon: 'task_alt', label: 'Completed' },
   { key: 'stale', icon: 'bedtime', label: 'Stale desks' },
   { key: 'system', icon: 'settings_suggest', label: 'System' }
 ] as const
+
+// Persisted section keys from before the taxonomy alignment map forward once.
+const LEGACY_SECTION: Record<string, string> = {
+  action: 'to_do',
+  review: 'to_review',
+  acknowledgment: 'to_respond'
+}
 
 export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Element {
   const items = useAttentionItems()
   const goAttention = useViewStore((s) => s.goAttention)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
-  const [section, setSection] = useState<string>(
-    () => localStorage.getItem('attention.widget.section') || 'all'
-  )
+  const [section, setSection] = useState<string>(() => {
+    const stored = localStorage.getItem('attention.widget.section') || 'all'
+    return LEGACY_SECTION[stored] ?? stored
+  })
   const pick = (k: string): void => {
     localStorage.setItem('attention.widget.section', k)
     setSection(k)
@@ -266,7 +274,7 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
           (i) =>
             !isTerminalState(i.workItemState) &&
             i.detachedFromId == null &&
-            (i.dueAt != null || (i.intentClass ?? '') === 'scheduling')
+            (i.dueAt != null || queueOf(i) === 'to_meet')
         )
         .sort((a, b) => {
           const da = a.dueAt ? Date.parse(a.dueAt) : now + 365 * DAY
@@ -294,14 +302,14 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
 
   const listFor = (): { list: FbNode[]; empty: string } => {
     switch (section) {
-      case 'action':
-        return { list: active('action'), empty: 'No open tasks. Capture with ⌘K.' }
-      case 'review':
-        return { list: active('review'), empty: 'No reviews waiting.' }
+      case 'to_do':
+        return { list: active('to_do'), empty: 'Nothing to do. Capture with ⌘K.' }
+      case 'to_review':
+        return { list: active('to_review'), empty: 'No reviews waiting.' }
       case 'upcoming':
         return { list: upcoming, empty: 'Nothing dated. Clear runway.' }
-      case 'acknowledgment':
-        return { list: active('acknowledgment'), empty: 'Nothing to acknowledge.' }
+      case 'to_respond':
+        return { list: active('to_respond'), empty: 'No one waiting on you.' }
       case 'completed':
         return { list: completed, empty: 'Loops close here as you finish things.' }
       case 'system':

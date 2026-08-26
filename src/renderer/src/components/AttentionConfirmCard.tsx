@@ -1,33 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWorkItemStore } from '../stores/workItems'
+import { CLASS_CHOICES, CLASS_LABEL } from '../lib/attentionQueues'
 import Icon from './Icon'
 
 // The ONE confirm stop (DEC-019), extracted so every capture surface renders
 // the SAME flow (DEC-028): the console overlay and the chat's inline card are
 // two hosts of this single component — classify, the pre-highlighted class
 // chips (←/→ cycle, Enter files), DEC-025's secondary chips, DEC-026's tidy
-// offer, and the Q1 date question all live here and nowhere else.
+// offer, and the Q1 date question all live here and nowhere else. The class
+// choice set lives with the queue semantics (attentionQueues) — one copy.
 
-export const CLASS_CHOICES = [
-  { value: 'action', label: 'Task', hint: 'Something to do' },
-  { value: 'review', label: 'Review', hint: 'Needs judgment or sign-off' },
-  { value: 'scheduling', label: 'Scheduling', hint: 'Time and calendar' },
-  { value: 'fyi', label: 'FYI', hint: 'Worth knowing' },
-  { value: 'acknowledgment', label: 'Acknowledgment', hint: 'Needs only receipt' },
-  { value: 'discussion', label: 'Discussion', hint: 'Talk it through live' },
-  { value: 'loose_thought', label: 'Loose thought', hint: 'Idle capture, may fade' }
-]
-
-export const CLASS_LABEL: Record<string, string> = {
-  action: 'Task',
-  review: 'Review',
-  scheduling: 'Scheduling',
-  fyi: 'FYI',
-  acknowledgment: 'Acknowledgment',
-  discussion: 'Discussion',
-  loose_thought: 'Loose thought',
-  direct: 'Message'
-}
+export { CLASS_CHOICES, CLASS_LABEL }
 
 interface ConfirmState {
   picked: string

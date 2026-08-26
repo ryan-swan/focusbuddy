@@ -47,7 +47,7 @@ function wi(over: Partial<FbNode>): FbNode {
     sharedFromHandle: null,
     sharedRootId: null,
     workItemState: 'open',
-    intentClass: 'action',
+    intentClass: 'to_do',
     ...over
   } as FbNode
 }
@@ -55,22 +55,36 @@ function wi(over: Partial<FbNode>): FbNode {
 describe('groupIntoQueues', () => {
   it('groups by intent class in the fixed order, hides terminal/snoozed/detached', () => {
     const items = [
-      wi({ id: 'a', intentClass: 'action' }),
-      wi({ id: 'r', intentClass: 'review' }),
-      wi({ id: 'done', intentClass: 'action', workItemState: 'completed' }),
+      wi({ id: 'a', intentClass: 'to_do' }),
+      wi({ id: 'r', intentClass: 'to_review' }),
+      wi({ id: 'done', intentClass: 'to_do', workItemState: 'completed' }),
       // F013: a hostile status can NEVER surface a terminal item.
-      wi({ id: 'hostile', intentClass: 'action', workItemState: 'dismissed', status: 'open' }),
-      wi({ id: 'snoozed', intentClass: 'action', snoozeUntil: NOW + DAY }),
-      wi({ id: 'wake', intentClass: 'action', snoozeUntil: NOW - 1000 }), // passed → visible
-      wi({ id: 'det', intentClass: 'action', detachedFromId: 'gone-desk' })
+      wi({ id: 'hostile', intentClass: 'to_do', workItemState: 'dismissed', status: 'open' }),
+      wi({ id: 'snoozed', intentClass: 'to_do', snoozeUntil: NOW + DAY }),
+      wi({ id: 'wake', intentClass: 'to_do', snoozeUntil: NOW - 1000 }), // passed → visible
+      wi({ id: 'det', intentClass: 'to_do', detachedFromId: 'gone-desk' })
     ]
     const qs = groupIntoQueues(items, NOW)
-    const action = qs.find((q) => q.queue === 'action')!
-    expect(action.items.map((i) => i.id).sort()).toEqual(['a', 'wake'])
-    expect(qs.find((q) => q.queue === 'review')!.items).toHaveLength(1)
+    const todo = qs.find((q) => q.queue === 'to_do')!
+    expect(todo.items.map((i) => i.id).sort()).toEqual(['a', 'wake'])
+    expect(qs.find((q) => q.queue === 'to_review')!.items).toHaveLength(1)
     expect(qs.map((q) => q.queue)).toEqual(
-      QUEUE_ORDER.filter((q) => ['action', 'review'].includes(q))
+      QUEUE_ORDER.filter((q) => ['to_do', 'to_review'].includes(q))
     )
+  })
+
+  it('legacy classes canonicalize at the grouping boundary (alignment)', () => {
+    // A straggler row an un-updated peer pushed between migrations still
+    // lands in the right queue — never a raw legacy bucket.
+    const items = [
+      wi({ id: 'l1', intentClass: 'action' }),
+      wi({ id: 'l2', intentClass: 'acknowledgment' }),
+      wi({ id: 'l3', intentClass: 'direct' }),
+      wi({ id: 'l4', intentClass: 'loose_thought' })
+    ]
+    const qs = groupIntoQueues(items, NOW)
+    expect(qs.map((q) => q.queue)).toEqual(['to_do', 'to_respond', 'to_remember'])
+    expect(qs.find((q) => q.queue === 'to_respond')!.items.map((i) => i.id).sort()).toEqual(['l2', 'l3'])
   })
 
   it('orders within a queue by rank: due proximity dominates, then staleness', () => {
@@ -80,10 +94,10 @@ describe('groupIntoQueues', () => {
       wi({ id: 'soon', dueAt: new Date(NOW + DAY).toISOString(), updatedAt: NOW }),
       wi({ id: 'fresh-undated', updatedAt: NOW })
     ]
-    const action = groupIntoQueues(items, NOW).find((q) => q.queue === 'action')!
+    const todo = groupIntoQueues(items, NOW).find((q) => q.queue === 'to_do')!
     // Ranker v1 (SPEC-019): due-soon beats due-later; among undated, the item
     // that has waited longest for the eye ranks HIGHER (staleness signal).
-    expect(action.items.map((i) => i.id)).toEqual(['soon', 'later', 'stale-undated', 'fresh-undated'])
+    expect(todo.items.map((i) => i.id)).toEqual(['soon', 'later', 'stale-undated', 'fresh-undated'])
   })
 
   it('rankScore: past due dominates; explicit human actionable gets the light thumb', () => {
@@ -161,8 +175,9 @@ describe('closing verbs + reasons', () => {
       expect(PRIMARY_ACTION[q], q).toBeTruthy()
       expect(isTerminalState(PRIMARY_ACTION[q].state), q).toBe(true)
     }
-    expect(PRIMARY_ACTION.action.label).toBe('Done')
-    expect(PRIMARY_ACTION.acknowledgment.label).toBe('Acknowledge')
+    expect(PRIMARY_ACTION.to_do.label).toBe('Done')
+    expect(PRIMARY_ACTION.to_respond.label).toBe('Responded')
+    expect(PRIMARY_ACTION.to_decide).toEqual({ state: 'decided', label: 'Decided' })
   })
 
   it('one reason per item: due proximity beats origin; decay is named', () => {

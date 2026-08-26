@@ -71,14 +71,14 @@ export default function CaptureConsole(): JSX.Element | null {
       title,
       notes: t === title ? undefined : t,
       parentId: deskCtx?.id ?? null,
-      intentClass: 'loose_thought',
+      intentClass: 'to_remember',
       dueAt: null,
       confidence: 1,
       approvalState: 'auto',
       sourceType: 'note',
       wiOrigin: 'human'
     })
-    setFiled(`${CLASS_LABEL.loose_thought} — “${item.title}”`)
+    setFiled(`${CLASS_LABEL.to_remember} — “${item.title}”`)
     setFiledId(item.id)
     setText('')
     setTimeout(close, 2500)
@@ -89,7 +89,7 @@ export default function CaptureConsole(): JSX.Element | null {
     const next = await promptText({
       title: 'Reclassify',
       label: 'Where does it belong?',
-      choices: CLASS_CHOICES
+      choices: [...CLASS_CHOICES]
     })
     if (next) {
       await useWorkItemStore.getState().reclassify(filedId, next)
@@ -176,7 +176,7 @@ export default function CaptureConsole(): JSX.Element | null {
           </div>
           <div className="flex items-center gap-1">
             {modeBtn('routed', 'Routed', 'Plexii files it as the right work object')}
-            {modeBtn('unrouted', 'Unrouted', 'No AI touch — saved verbatim as a loose thought')}
+            {modeBtn('unrouted', 'Unrouted', 'No AI touch — saved verbatim to Remember')}
             {modeBtn('expand', 'Expand', 'Hand it to the assistant to develop')}
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function CaptureConsole(): JSX.Element | null {
             placeholder={
               mode === 'unrouted'
                 ? 'Saved exactly as typed…'
-                : 'Remind me to… / Review the… / Schedule a… / fyi:…'
+                : 'Remind me to… / Review the… / Decide on… / fyi:…'
             }
             rows={3}
             className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-y"

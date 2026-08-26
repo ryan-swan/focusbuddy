@@ -53,13 +53,13 @@ describe('Δ3 — the loose-thought decay tier', () => {
     const { raw, db } = freshDb()
     const now = 100 * DAY
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'loose_thought', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'to_remember', ?)"
     ).run('stale', 'Old idea', now - (LOOSE_THOUGHT_DECAY_DAYS + 1) * DAY)
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'loose_thought', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'to_remember', ?)"
     ).run('fresh', 'New idea', now - 2 * DAY)
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'action', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'to_do', ?)"
     ).run('task', 'Real task', now - 40 * DAY) // actionable items NEVER decay
     expect(decayLooseThoughtsCore(db, now)).toBe(1)
     const stale = raw
@@ -82,7 +82,7 @@ describe('Δ3 — the loose-thought decay tier', () => {
   it('a decayed thought remains promotable: reclassify-then-reopen path stays legal', () => {
     const { raw, db } = freshDb()
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES ('t', 'work_item', 'X', 'dismissed', 'loose_thought', 0)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES ('t', 'work_item', 'X', 'dismissed', 'to_remember', 0)"
     ).run()
     expect(setWorkItemStateCore(db, 't', 'open')).toBe(true)
     const row = raw.prepare('SELECT status FROM nodes WHERE id = ?').get('t') as { status: string }

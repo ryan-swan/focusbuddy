@@ -14,8 +14,10 @@ import {
   archivedItems,
   detachedItems,
   itemReason,
+  queueOf,
   PRIMARY_ACTION,
-  QUEUE_ICON
+  QUEUE_ICON,
+  CLASS_CHOICES
 } from '../../lib/attentionQueues'
 import {
   feederSignals,
@@ -31,16 +33,6 @@ import {
 // over items that live with their desks, never a second workspace. Snoozed
 // items hide until they return; the Detached shelf (F-M6) holds park-local
 // items whose desk was purged or moved, with MOVE as the recovery.
-
-const CLASS_CHOICES = [
-  { value: 'action', label: 'Task', hint: 'Something to do' },
-  { value: 'review', label: 'Review', hint: 'Needs judgment or sign-off' },
-  { value: 'scheduling', label: 'Scheduling', hint: 'Time and calendar' },
-  { value: 'fyi', label: 'FYI', hint: 'Worth knowing' },
-  { value: 'acknowledgment', label: 'Acknowledgment', hint: 'Needs only receipt' },
-  { value: 'discussion', label: 'Discussion', hint: 'Talk it through live' },
-  { value: 'loose_thought', label: 'Loose thought', hint: 'Idle capture, may fade' }
-]
 
 function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
   if (!i.dueAt) return null
@@ -66,6 +58,7 @@ export default function AttentionView(): JSX.Element {
   const setState = useWorkItemStore((s) => s.setState)
   const reclassify = useWorkItemStore((s) => s.reclassify)
   const snooze = useWorkItemStore((s) => s.snooze)
+  const createItem = useWorkItemStore((s) => s.create)
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
@@ -81,6 +74,51 @@ export default function AttentionView(): JSX.Element {
     setLens(l)
   }
   const [showClosed, setShowClosed] = useState(false)
+
+  // The bare manual form (Layer 0, taxonomy alignment stage): a full by-hand
+  // path — title, class picked from the eight primaries, optional date and
+  // desk — no classifier, no model, no confirm stop. Files through the same
+  // store.create seam as every capture (F008 one code path). Stays open after
+  // filing for serial entry; Esc or ✕ closes.
+  const [showNew, setShowNew] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newClass, setNewClass] = useState('to_do')
+  const [newDate, setNewDate] = useState('')
+  const [newDeskId, setNewDeskId] = useState('')
+  const [newBusy, setNewBusy] = useState(false)
+  const [newFiled, setNewFiled] = useState<string | null>(null)
+
+  // Personal, live desks only — shared and archived desks refuse work-item
+  // parenting (§2.6 / DEC-023's own exclusions).
+  const deskChoices = useMemo(
+    () => nodes.filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId),
+    [nodes]
+  )
+
+  async function fileNewItem(): Promise<void> {
+    const title = newTitle.trim()
+    if (!title || newBusy) return
+    setNewBusy(true)
+    try {
+      const item = await createItem({
+        title,
+        parentId: newDeskId || null,
+        intentClass: newClass,
+        dueAt: newDate ? new Date(`${newDate}T17:00:00`).toISOString() : null,
+        confidence: 1, // human-stated, not inferred
+        approvalState: 'auto',
+        sourceType: 'note',
+        wiOrigin: 'human'
+      })
+      setNewTitle('')
+      setNewDate('')
+      setNewFiled(item.title)
+      setTimeout(() => setNewFiled(null), 2500)
+      await refresh()
+    } finally {
+      setNewBusy(false)
+    }
+  }
 
   useEffect(() => {
     void refresh()
@@ -160,7 +198,7 @@ export default function AttentionView(): JSX.Element {
     const next = await promptText({
       title: 'Reclassify',
       label: `Where does “${i.title}” belong?`,
-      choices: CLASS_CHOICES.filter((c) => c.value !== i.intentClass)
+      choices: CLASS_CHOICES.filter((c) => c.value !== queueOf(i))
     })
     if (next) await reclassify(i.id, next)
   }
@@ -188,7 +226,7 @@ export default function AttentionView(): JSX.Element {
   }
 
   function row(i: FbNode, inDetached: boolean): JSX.Element {
-    const primary = PRIMARY_ACTION[i.intentClass ?? 'action'] ?? PRIMARY_ACTION.action
+    const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
     const reason = itemReason(i, nowMs)
     const hasDesk = !!(i.parentId && nodes.some((n) => n.id === i.parentId))
     return (
@@ -197,7 +235,7 @@ export default function AttentionView(): JSX.Element {
         className="group flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
       >
         <Icon
-          name={QUEUE_ICON[i.intentClass ?? 'action'] ?? 'check_circle'}
+          name={QUEUE_ICON[queueOf(i)] ?? 'check_circle'}
           size={16}
           className="text-[var(--ink-30)] shrink-0"
         />
@@ -272,13 +310,100 @@ export default function AttentionView(): JSX.Element {
               desks — this is the lens, not the drawer.
             </p>
           </div>
-          <button
-            onClick={() => openConsole()}
-            className="inline-flex items-center gap-1.5 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)] shrink-0"
-          >
-            <Icon name="add" size={15} /> Capture
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowNew((v) => !v)}
+              title="A plain form — you pick the queue yourself"
+              className="inline-flex items-center gap-1.5 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+            >
+              <Icon name="add_task" size={15} /> New item
+            </button>
+            <button
+              onClick={() => openConsole()}
+              className="inline-flex items-center gap-1.5 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+            >
+              <Icon name="add" size={15} /> Capture
+            </button>
+          </div>
         </div>
+        {showNew && (
+          <div
+            className="mb-4 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-4 py-3"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !newBusy) void fileNewItem()
+              if (e.key === 'Escape') setShowNew(false)
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="fb-t-label text-[var(--ink-70)]">New attention item</span>
+              <button
+                onClick={() => setShowNew(false)}
+                title="Close"
+                className="icon-btn !h-7 !w-7"
+              >
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+            <input
+              autoFocus
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="What needs you?"
+              className="fb-field mt-2 w-full bg-[var(--surface-sunken)] px-3 py-2 text-[13px]"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              {CLASS_CHOICES.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => setNewClass(c.value)}
+                  title={c.hint}
+                  className={`px-2.5 h-7 fb-t-label fb-press rounded-full ${
+                    newClass === c.value
+                      ? 'bg-[rgb(var(--accent))] text-white'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <input
+                type="date"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                title="Due date (optional)"
+                className="fb-field bg-[var(--surface-sunken)] px-2 py-1 text-[12px]"
+              />
+              <select
+                value={newDeskId}
+                onChange={(e) => setNewDeskId(e.target.value)}
+                title="File onto a desk (optional)"
+                className="fb-field bg-[var(--surface-sunken)] px-2 py-1 text-[12px] max-w-[220px]"
+              >
+                <option value="">No desk</option>
+                {deskChoices.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.title || 'Untitled desk'}
+                  </option>
+                ))}
+              </select>
+              <div className="flex-1" />
+              {newFiled && (
+                <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--ink-50)]">
+                  <Icon name="check_circle" size={13} /> Filed “{newFiled}”
+                </span>
+              )}
+              <button
+                onClick={() => void fileNewItem()}
+                disabled={newBusy || !newTitle.trim()}
+                className="h-8 px-3.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
+              >
+                {newBusy ? 'Filing…' : 'File it ↵'}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="mb-4 flex items-center gap-1">
           <span className="fb-t-label text-[var(--ink-40)] mr-1">Group by</span>
           {(
