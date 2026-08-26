@@ -103,11 +103,16 @@ Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-029.
 Recommended post-landing.
 
 **DEC-029 (2026-08-26): taxonomy tests adopted as LAW + R-06 confirmed; the
-GROUNDWORK SPLIT executed** — four Attention-independent fixes (credits chat,
-mention keyboard, room routing, 409 floor) extracted to `groundwork-fixes` off
-main, suite-green, pushed to the shared repo as **PR #2** awaiting any
-co-owner's merge click. Attention work continues on the fork unchanged; next
-fork↔main merge resolves the six shared files keep-branch.
+GROUNDWORK SPLIT LANDED ON MAIN** — PR #3 (CI to Node 22; the repo's CI had
+been red on main itself: node:sqlite needs ≥22.5) merged by the operator, then
+**PR #2 merged (main @ 5d1ef8d8)**: credits chat, mention-picker keyboard,
+room routing, the 409 baseRev floor — all live for Michael + Caleb, with the
+repo's FIRST green CI runs (push + PR, 2m33s). Side discoveries recorded:
+`ryanswan313`'s token lacks the `workflow` scope (workflow-file ops need the
+browser or a scope refresh done while signed in as that account); the
+groundwork worktree lives at `~/focusbuddy-groundwork` for future fix splits.
+Attention work continues on the fork; next fork↔main merge resolves the six
+shared files keep-branch (branch is the semantic superset).
 
 **When ⑥ passes and the operator declares ready:** the landing is
 `git push origin ryan-command-center:main` as ryanswan313 (operator-run),
