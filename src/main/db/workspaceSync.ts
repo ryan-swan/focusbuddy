@@ -570,35 +570,8 @@ export function listLocalSharedRoots(): string[] {
 
 // Clear the dirty flag and record the server rev after a successful push. Updating
 // sync_rev means the dirty trigger does not re-fire (it guards on sync cols).
-/** The 409-loop fix: after a conflict where the server-wins apply may have
- *  no-opped (echo-suppression on a desynced local rev), floor the local
- *  sync_rev to the server's so the next push carries an acceptable baseRev.
- *  A genuinely newer local edit then re-pushes ONCE and wins; without this, a
- *  conflicted row is permanently unroutable with no signal. Proven live on a
- *  real workspace (cured perma-dirty rows). */
-export function advanceBaseRevCore(
-  d: { prepare(sql: string): { run(...a: unknown[]): unknown } },
-  table: string,
-  id: string,
-  rev: number
-): void {
-  if (!Number.isFinite(rev)) return
-  // A floor, never a rewind: a local rev already at/above the server's stays.
-  d.prepare(
-    `UPDATE ${table} SET sync_rev = ? WHERE id = ? AND (sync_rev IS NULL OR sync_rev < ?)`
-  ).run(rev, id, rev)
-}
-
-export function advanceBaseRev(itemType: string, id: string, rev: number): void {
-  const table = TABLE[itemType as ItemType]
-  if (!table) return
-  // Structured 409 trail: this path fires ONLY on push conflicts, so a row
-  // appearing here repeatedly is a live 409 loop — the exact signature this
-  // fix exists to break. Greppable: "[sync-409]".
-  // eslint-disable-next-line no-console
-  console.warn(`[sync-409] conflict-floor ${itemType}/${id} -> rev ${rev}`)
-  advanceBaseRevCore(getDb(), table, id, rev)
-}
+// (advanceBaseRevCore/advanceBaseRev live at the top of this module — the merge
+// from main briefly duplicated them here; the single definition stands above.)
 
 export function markPushed(itemType: ItemType, id: string, rev: number): void {
   const db = getDb()
