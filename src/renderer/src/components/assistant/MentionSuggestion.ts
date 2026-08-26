@@ -149,6 +149,12 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
         render: () => {
           let component: ReactRenderer<MentionListHandle> | null = null
           let popup: HTMLDivElement | null = null
+          // The keyboard handle, registered by MentionList itself
+          // (ReactRenderer's .ref is null on this React/tiptap pairing).
+          let keyHandle: MentionListHandle | null = null
+          const bindKeys = (h: MentionListHandle | null): void => {
+            keyHandle = h
+          }
 
           const position = (clientRect: (() => DOMRect | null) | null | undefined): void => {
             if (!popup || !clientRect) return
@@ -180,7 +186,8 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
                   items: props.items as MentionRef[],
                   loading: (props.items as MentionRef[]).length === 0,
                   atCap: atCap(),
-                  command: (item: MentionRef) => props.command(item)
+                  command: (item: MentionRef) => props.command(item),
+                  bindKeys
                 },
                 editor: props.editor
               })
@@ -196,7 +203,8 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
                 items: props.items as MentionRef[],
                 loading: false,
                 atCap: atCap(),
-                command: (item: MentionRef) => props.command(item)
+                command: (item: MentionRef) => props.command(item),
+                bindKeys
               })
               position(props.clientRect)
             },
@@ -205,7 +213,11 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
                 popup?.remove()
                 return true
               }
-              return component?.ref?.onKeyDown(props.event) ?? false
+              // Prefer the self-registered handle: ReactRenderer's .ref is
+              // unreliable on this pairing (null or stale), and a truthy-but-
+              // dead ref must never shadow the working one.
+              const h = keyHandle ?? component?.ref
+              return h?.onKeyDown(props.event) ?? false
             },
             onExit: () => {
               popup?.remove()

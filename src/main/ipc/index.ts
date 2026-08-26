@@ -27,6 +27,7 @@ import {
   collectPendingOrg,
   collectPendingShared,
   markPushed,
+  advanceBaseRev,
   applyRemote,
   applyRemoteOrg,
   applyRemoteShared,
@@ -3035,6 +3036,11 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
+  // The 409-loop fix: floor local sync_rev to the server's after a conflict-
+  // apply so baseRev advances even when the echo-suppressed apply no-opped.
+  ipcMain.handle('workspace:advanceBaseRev', (_e, itemType: string, id: string, rev: number) =>
+    advanceBaseRev(itemType, id, rev)
+  )
   ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) =>
     markPushed(itemType, id, rev)
   )

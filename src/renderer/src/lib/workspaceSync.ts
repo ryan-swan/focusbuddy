@@ -348,6 +348,8 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
         orgId
       )
       if (res.item.itemType === 'file') await fetchMissingOrgBlobs(token, orgId, [res.item])
+      // 409 fix: floor baseRev to the server's after a conflict-apply.
+      await window.api.workspaceSync.advanceBaseRev(res.item.itemType, res.item.id, res.item.rev)
     }
   }
   for (const d of pending.deletes) {
@@ -539,6 +541,8 @@ async function syncSharedWorkspaceOnce(token: string): Promise<number> {
           rootId: res.item.rootId
         }
       ])
+      // 409 fix: floor baseRev to the server's after a conflict-apply.
+      await window.api.workspaceSync.advanceBaseRev(res.item.itemType, res.item.id, res.item.rev)
     }
   }
   for (const d of pending.deletes) {
@@ -653,6 +657,9 @@ export async function syncWorkspaceOnce(): Promise<number> {
         await window.api.workspaceSync.applyRemote([
           { id: res.item.id, itemType: res.item.itemType, body: res.item.body, rev: res.item.rev, deleted: res.item.deleted }
         ])
+        // 409 fix: the apply can no-op on a desynced local rev — floor baseRev
+        // to the server's so this row can never 409 forever.
+        await window.api.workspaceSync.advanceBaseRev(res.item.itemType, res.item.id, res.item.rev)
       }
     }
     for (const d of pending.deletes) {
