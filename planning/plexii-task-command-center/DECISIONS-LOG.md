@@ -503,4 +503,25 @@ the filed toast counts them; desk-context parenting (DEC-023) applies to all.
 trigger discriminator is the honest precision boundary); a second confirm
 screen per secondary (rejected — DEC-019's one-stop rule).
 
+---
+
+## DEC-026 — The opt-in cleanup rewrite (Δ6)
+**Date:** 2026-08-26 · **Status:** APPROVED (operator: "Start cleanup rewrite") + IMPLEMENTED
+**Decision:** Messy brain-dump captures get an OFFERED tidy — never a silent
+rewrite. A deterministic messiness gate (`needsCleanup`, pure + tested: 30+
+words, filler-dense, or an 18+-word unpunctuated run-on) decides whether the
+capture even qualifies; a Haiku call (new purpose `capture_cleanup`, routed +
+shown in the model picker's Auto table) extracts a crisp ≤90-char title and a
+1–3-sentence gist — facts only, nothing invented, writer's language kept.
+**Latency contract:** the proposal is requested async AFTER the confirm
+screen is already up — a capture never waits on it; slow/failed proposals
+simply never appear (null on every failure mode; a seq guard drops stale
+arrivals after re-edits). **Approve-before-apply:** it renders as an offer
+row ("Tidied: … — Use tidied / ✕"); using it swaps the title, adds the gist
+as the notes' lead, and keeps the capture verbatim below "— as captured —";
+one-click Undo before filing. The verbatim text is NEVER lost, tidied or not.
+**Alternatives:** blocking tidy on the classify path (rejected — R011's
+budget); silent auto-tidy above a confidence bar (rejected — first-touch
+trust is the product; Δ6 said propose-and-approve and it stays that way).
+
 <!-- Append below; increment DEC-NNN. -->
