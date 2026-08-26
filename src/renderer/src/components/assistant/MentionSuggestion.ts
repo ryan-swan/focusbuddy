@@ -173,10 +173,32 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
         },
         command: ({ editor, range, props }) => {
           const ref = props as unknown as MentionRef
-          // DEC-027: the command row inserts literal text, never a chip and
-          // never a stored reference — the send path does the actual routing.
+          // DEC-027/028: the command row inserts a VISUAL chip (the Slack-
+          // style cue that routing is armed) but NEVER a stored reference —
+          // onPick is skipped, so the resolver and the conversation's
+          // reference set never see it. The chip's title is exactly
+          // "attention", so it serialises to "@attention" and the send path's
+          // deterministic interception fires on it.
           if ((ref as { kind: string }).kind === 'capture') {
-            editor.chain().focus().deleteRange(range).insertContent('@attention ').run()
+            editor
+              .chain()
+              .focus()
+              .deleteRange(range)
+              .insertContent([
+                {
+                  type: 'mention',
+                  attrs: {
+                    kind: 'capture',
+                    id: 'attention-command',
+                    title: 'attention',
+                    icon: 'notifications',
+                    taskId: null,
+                    conversationKey: (ref as { conversationKey: string }).conversationKey
+                  }
+                },
+                { type: 'text', text: ' ' }
+              ])
+              .run()
             return
           }
           const hooks = getHooks()

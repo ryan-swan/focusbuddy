@@ -148,9 +148,47 @@ export default function StartOrAskPlexi(): JSX.Element {
   const atQuery = mentionQuery(goal)
   const pickerOpen = atQuery !== null && dismissedFor !== goal
 
+  // DEC-028: the armed @attention pill — same grammar as ⌘K and the chat.
+  // Tab (or picking the Attention row) arms it; the bar's text then IS the
+  // capture, Enter routes it to the confirm card, Backspace-on-empty disarms.
+  const [attnArmed, setAttnArmed] = useState(false)
+  const [workItemsOn, setWorkItemsOn] = useState(false)
+  useEffect(() => {
+    const probe = (): void => {
+      window.api.workItems
+        .enabled()
+        .then(setWorkItemsOn)
+        .catch(() => {})
+    }
+    probe()
+    window.addEventListener('fb:workitems-toggled', probe)
+    return () => window.removeEventListener('fb:workitems-toggled', probe)
+  }, [])
+  function armAttention(): void {
+    const i = goal.lastIndexOf('@')
+    setGoal(i >= 0 ? goal.slice(0, i).trimEnd() : goal)
+    setAttnArmed(true)
+    setHighlight(0)
+  }
+
   // Instant candidates from the stores; the search backend joins in ≥2 chars.
   const localItems = useMemo<PickItem[]>(() => {
     if (atQuery === null) return []
+    // DEC-028: Attention rides on top whenever the @-query prefixes it — the
+    // Slack-style "type @a, Tab, done" path. Selection ARMS (see goItem).
+    const attnRow: PickItem[] =
+      workItemsOn && (!atQuery.trim() || 'attention'.startsWith(atQuery.trim().toLowerCase()))
+        ? [
+            {
+              key: 'capture:attention',
+              type: 'page',
+              id: 'attention-capture',
+              title: 'attention',
+              hint: 'Capture — Tab to arm',
+              icon: 'notifications'
+            }
+          ]
+        : []
     const pool: PickItem[] = [
       ...nodes
         .filter((n) => n.kind === 'task' || n.kind === 'folder')
@@ -172,7 +210,7 @@ export default function StartOrAskPlexi(): JSX.Element {
       }))
     ]
     const q = atQuery.trim()
-    if (!q) return pool.slice(0, 8)
+    if (!q) return [...attnRow, ...pool.slice(0, 8 - attnRow.length)]
     // Rank with the same token-coverage matcher the take-me-to route uses.
     const byId = new Map(pool.map((x) => [x.key, x]))
     const ranked = matchTargets(
@@ -180,8 +218,8 @@ export default function StartOrAskPlexi(): JSX.Element {
       pool.map((x) => ({ kind: 'page' as const, id: x.key, title: x.title })),
       8
     )
-    return ranked.map((r) => byId.get(r.id)).filter((x): x is PickItem => !!x)
-  }, [atQuery, nodes])
+    return [...attnRow, ...ranked.map((r) => byId.get(r.id)).filter((x): x is PickItem => !!x)]
+  }, [atQuery, nodes, workItemsOn])
 
   useEffect(() => {
     const q = atQuery?.trim() ?? ''
@@ -234,6 +272,11 @@ export default function StartOrAskPlexi(): JSX.Element {
 
   // Same landings PlexiSearch gives these hit types; widgets arrive selected.
   function goItem(it: PickItem): void {
+    // DEC-028: the Attention row never navigates — it arms the pill.
+    if (it.key === 'capture:attention') {
+      armAttention()
+      return
+    }
     const view = useViewStore.getState()
     if (it.type === 'page') {
       if (it.id === 'tasks') view.goAllTasks()
@@ -273,6 +316,15 @@ export default function StartOrAskPlexi(): JSX.Element {
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent shrink-0">
             <Icon name={searching ? 'travel_explore' : 'auto_awesome'} size={17} />
           </span>
+          {attnArmed && (
+            <span
+              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-accent bg-accent/10 border border-accent/20 rounded-md px-1.5 py-0.5"
+              title="Armed — Enter files what you type to Attention. Backspace on empty removes it."
+            >
+              <Icon name="notifications" size={11} />
+              @attention
+            </span>
+          )}
           <input
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
@@ -286,6 +338,17 @@ export default function StartOrAskPlexi(): JSX.Element {
                   })
                   return
                 }
+                // DEC-028: Tab arms @attention when its row is highlighted or
+                // the @-query is a prefix of it — same grammar as ⌘K.
+                if (e.key === 'Tab' && !e.shiftKey) {
+                  const hl = pickItems[Math.min(highlight, pickItems.length - 1)]
+                  const q = (atQuery ?? '').trim().toLowerCase()
+                  if (hl?.key === 'capture:attention' || (workItemsOn && q && 'attention'.startsWith(q))) {
+                    e.preventDefault()
+                    armAttention()
+                    return
+                  }
+                }
                 if (e.key === 'Enter') {
                   e.preventDefault()
                   goItem(pickItems[Math.min(highlight, pickItems.length - 1)])
@@ -297,6 +360,30 @@ export default function StartOrAskPlexi(): JSX.Element {
                   return
                 }
               }
+              if (attnArmed) {
+                if (e.key === 'Backspace' && goal === '') {
+                  setAttnArmed(false)
+                  return
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setAttnArmed(false)
+                  return
+                }
+                if (e.key === 'Enter') {
+                  // Armed Enter files: the confirm card takes it from here.
+                  e.preventDefault()
+                  const captureText = goal.trim()
+                  window.dispatchEvent(
+                    new CustomEvent('fb:command-new-work-item', {
+                      detail: captureText ? { captureText } : undefined
+                    })
+                  )
+                  setGoal('')
+                  setAttnArmed(false)
+                  return
+                }
+              }
               if (e.key === 'Enter') {
                 e.preventDefault()
                 start()
@@ -305,9 +392,11 @@ export default function StartOrAskPlexi(): JSX.Element {
             disabled={sending}
             data-testid="start-or-ask-input"
             placeholder={
-              searching
-                ? 'Search the web — results open right here in Plexi'
-                : 'Ask Plexii, search the web, or open anything — @ jumps to a desk, room or widget'
+              attnArmed
+                ? 'What needs attention? Enter files it…'
+                : searching
+                  ? 'Search the web — results open right here in Plexi'
+                  : 'Ask Plexii, search the web, or open anything — @ jumps to a desk, room or widget'
             }
             // No focus box (Caleb's ruling): the global :focus-visible outline
             // draws a hard accent rectangle around text inputs; this bar's

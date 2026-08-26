@@ -80,6 +80,9 @@ export default function CommandCenter({
     return () => window.removeEventListener('fb:workitems-toggled', probe)
   }, [])
   const [highlightIdx, setHighlightIdx] = useState(0)
+  // DEC-028: the armed @attention pill — Tab on the Attention row (or on an
+  // "@a…" partial) arms it; the query then IS the capture text.
+  const [attnArmed, setAttnArmed] = useState(false)
   // Deep content search results (notes, doc bodies, table cells, files) from the
   // main process, fetched async + debounced as the query changes.
   const [deepHits, setDeepHits] = useState<SearchHit[]>([])
@@ -157,9 +160,11 @@ export default function CommandCenter({
     setPaletteOpen(true)
     setQuery('')
     setHighlightIdx(0)
+    setAttnArmed(false)
   }
   function closePalette(): void {
     setPaletteOpen(false)
+    setAttnArmed(false)
   }
 
   // Cmd+K from anywhere — open palette. Cmd+Shift+K = body double quick
@@ -447,22 +452,37 @@ export default function CommandCenter({
         closePalette()
       }
     })
-    // DEC-019(b): ONE universal Attention entry. Typing "@attention <text>"
-    // (or "attention <text>") captures that text directly — the console opens
-    // prefilled at the classify step; the bare entry opens it empty. The page
-    // itself is one click inside the console ("Open page →") or via nav/badge.
+    // DEC-019(b) + DEC-028: ONE universal Attention entry. Typing
+    // "@attention <text>" captures that text directly; typing "@a…" (any
+    // prefix of attention) surfaces this entry on top, and Tab ARMS the
+    // Slack-style pill — the query then IS the capture text and Enter files
+    // it. The console opens prefilled at the classify step either way.
     if (workItemsOn) {
       const attnPrefix = /^@?attention\b[:,]?\s*(.*)$/i.exec(q)
-      const prefill = attnPrefix?.[1]?.trim() ?? ''
+      const atPartial = !attnPrefix ? /^@([a-z]*)$/i.exec(q) : null
+      const atMatches = !!atPartial && 'attention'.startsWith(atPartial[1].toLowerCase())
+      const prefill = attnArmed ? q.trim() : (attnPrefix?.[1]?.trim() ?? '')
       items.push({
         id: 'attention-capture',
-        label: prefill ? `Attention — capture “${prefill.slice(0, 40)}${prefill.length > 40 ? '…' : ''}”` : 'Attention — capture anything',
+        label: prefill
+          ? `Attention — capture “${prefill.slice(0, 40)}${prefill.length > 40 ? '…' : ''}”`
+          : atMatches
+            ? 'Attention — Tab to arm, then type your thought'
+            : 'Attention — capture anything',
         hint: 'Routed, unrouted, or expand · @attention from anywhere',
         icon: 'notifications',
         kind: 'action',
-        // An explicit @-address outranks EVERYTHING — Enter on the raw query
-        // must capture, never fall through to search or navigation.
-        score: attnPrefix ? 500 : q === '' ? 57 : matchScore('attention capture work item remind todo queue', q),
+        // An explicit @-address (armed pill, full prefix, or @-partial)
+        // outranks EVERYTHING — Enter on the raw query must capture, never
+        // fall through to search or navigation.
+        score:
+          attnArmed || attnPrefix
+            ? 500
+            : atMatches
+              ? 490
+              : q === ''
+                ? 57
+                : matchScore('attention capture work item remind todo queue', q),
         run: () => {
           window.dispatchEvent(
             new CustomEvent('fb:command-new-work-item', {
@@ -753,6 +773,7 @@ export default function CommandCenter({
     query,
     nodes,
     workItemsOn,
+    attnArmed,
     canSmartStack,
     activeTaskId,
     onOpenBodyDouble,
@@ -799,6 +820,19 @@ export default function CommandCenter({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setHighlightIdx((i) => Math.max(0, i - 1))
+    } else if (e.key === 'Tab' && !e.shiftKey && workItemsOn && !attnArmed) {
+      // DEC-028: Tab arms the @attention pill when the Attention row is
+      // highlighted or the query is an "@a…" partial of it.
+      const partial = /^@([a-z]*)$/i.exec(query)
+      const onRow = results[highlightIdx]?.id === 'attention-capture'
+      if (onRow || (partial && 'attention'.startsWith(partial[1].toLowerCase()))) {
+        e.preventDefault()
+        setAttnArmed(true)
+        setQuery('')
+        setHighlightIdx(0)
+      }
+    } else if (e.key === 'Backspace' && attnArmed && query === '') {
+      setAttnArmed(false)
     } else if (e.key === 'Enter') {
       e.preventDefault()
       const r = results[highlightIdx]
@@ -839,6 +873,15 @@ export default function CommandCenter({
                     {editorScope}
                   </span>
                 )}
+                {attnArmed && (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-accent bg-accent/10 border border-accent/20 rounded-md px-1.5 py-0.5"
+                    title="Armed — Enter files what you type to Attention. Backspace on empty removes it."
+                  >
+                    <Icon name="notifications" size={11} />
+                    @attention
+                  </span>
+                )}
                 <input
                   ref={inputRef}
                   data-testid="command-palette-input"
@@ -849,9 +892,11 @@ export default function CommandCenter({
                   }}
                   onKeyDown={paletteKeyDown}
                   placeholder={
-                    editorScope && editorCommands.length > 0
-                      ? `Command the ${editorScope.toLowerCase()}, or search everything…`
-                      : 'Search everything — tasks, notes, docs, files, actions…'
+                    attnArmed
+                      ? 'What needs attention? Enter files it…'
+                      : editorScope && editorCommands.length > 0
+                        ? `Command the ${editorScope.toLowerCase()}, or search everything…`
+                        : 'Search everything — tasks, notes, docs, files, actions…'
                   }
                   className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                 />

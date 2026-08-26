@@ -121,9 +121,13 @@ describe('S5 wiring locks (file-level)', () => {
   })
 
   it('the capture console + classifier + seam are wired end to end', () => {
-    expect(read('src/renderer/src/components/CaptureConsole.tsx')).toContain(
-      'window.api.workItems.classify'
-    )
+    // DEC-028: the ONE confirm stop is the shared card — classify lives there,
+    // and both hosts (console overlay + chat inline) render it.
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    expect(card).toContain('window.api.workItems')
+    expect(card).toContain('.classify(')
+    expect(read('src/renderer/src/components/CaptureConsole.tsx')).toContain('AttentionConfirmCard')
+    expect(read('src/renderer/src/components/ChatPanel.tsx')).toContain('AttentionConfirmCard')
     expect(read('src/renderer/src/components/Sidebar.tsx')).toContain('openConsole(')
     expect(read('src/main/ipc/index.ts')).toContain("'workItems:classify'")
     // DEC-019(b): ONE universal entry, @attention prefix captures directly.
@@ -133,16 +137,22 @@ describe('S5 wiring locks (file-level)', () => {
     expect(read('src/main/notifications/scheduler.ts')).toContain('decayLooseThoughts(nowMs)')
   })
 
-  it('DEC-027 — the composer typeahead + deterministic @attention interception', () => {
-    // The picker offers the capture COMMAND (text insertion, never a chip —
-    // a kind with no resolver must never become a reference)…
+  it('DEC-027/028 — typeahead, chips, arming, and the inline chat card', () => {
+    // The chat picker offers the capture COMMAND; picking inserts a VISUAL
+    // chip whose title serialises to "@attention" — never a stored reference
+    // (onPick skipped; a kind with no resolver must never become one).
     const sugg = read('src/renderer/src/components/assistant/MentionSuggestion.ts')
     expect(sugg).toContain("kind: 'capture'")
-    expect(sugg).toContain("insertContent('@attention ')")
-    // …and a LEADING @attention send routes to the ONE console seam, not the
-    // model. Mid-sentence mentions keep the AI proposal path.
+    expect(sugg).toContain("title: 'attention'")
+    // A LEADING @attention send never reaches the model — it renders the
+    // shared confirm card INLINE in the chat (DEC-028).
     const panel = read('src/renderer/src/components/ChatPanel.tsx')
     expect(panel).toContain('^@attention\\b')
-    expect(panel).toContain("'fb:command-new-work-item'")
+    expect(panel).toContain('setInlineCapture')
+    // ⌘K and the home bar both arm the Slack-style pill on Tab.
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('attnArmed')
+    const home = read('src/renderer/src/components/views/StartOrAskPlexi.tsx')
+    expect(home).toContain("'capture:attention'")
+    expect(home).toContain('armAttention')
   })
 })

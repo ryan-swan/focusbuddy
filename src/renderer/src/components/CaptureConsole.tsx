@@ -7,16 +7,7 @@ import { useNodeStore } from '../stores/nodes'
 import { deskCaptureContext } from '../lib/captureContext'
 import { promptText } from './plexi/PromptDialog'
 import Icon from './Icon'
-
-const CLASS_CHOICES = [
-  { value: 'action', label: 'Task', hint: 'Something to do' },
-  { value: 'review', label: 'Review', hint: 'Needs judgment or sign-off' },
-  { value: 'scheduling', label: 'Scheduling', hint: 'Time and calendar' },
-  { value: 'fyi', label: 'FYI', hint: 'Worth knowing' },
-  { value: 'acknowledgment', label: 'Acknowledgment', hint: 'Needs only receipt' },
-  { value: 'discussion', label: 'Discussion', hint: 'Talk it through live' },
-  { value: 'loose_thought', label: 'Loose thought', hint: 'Idle capture, may fade' }
-]
+import AttentionConfirmCard, { CLASS_CHOICES, CLASS_LABEL } from './AttentionConfirmCard'
 
 // The capture console (Attention S5, SPEC-007–013). One box, three modes:
 //   Routed   — the classifier files the text as the right work object
@@ -25,22 +16,11 @@ const CLASS_CHOICES = [
 //   Unrouted — no AI touch at all: filed verbatim as a loose thought.
 //   Expand   — hands the text to the assistant panel (the existing
 //              chat-to-desk promotion path formalized).
-// The composer owns DEC-016's ONE clarifying question: an unanchored deadline
-// phrase on an actionable class asks for a date once — never more, never for
-// anything else. House dialog shell (fb-scrim / fb-card / fb-field).
+// DEC-028: the routed confirm stop is the SHARED AttentionConfirmCard — the
+// same component the chat renders inline — so the flow can never fork.
+// House dialog shell (fb-scrim / fb-card / fb-field).
 
 type Mode = 'routed' | 'unrouted' | 'expand'
-
-const CLASS_LABEL: Record<string, string> = {
-  action: 'Task',
-  review: 'Review',
-  scheduling: 'Scheduling',
-  fyi: 'FYI',
-  acknowledgment: 'Acknowledgment',
-  discussion: 'Discussion',
-  loose_thought: 'Loose thought',
-  direct: 'Message'
-}
 
 export default function CaptureConsole(): JSX.Element | null {
   const open = useCaptureConsole((s) => s.open)
@@ -55,40 +35,12 @@ export default function CaptureConsole(): JSX.Element | null {
   const [error, setError] = useState<string | null>(null)
   const [filed, setFiled] = useState<string | null>(null)
   const [filedId, setFiledId] = useState<string | null>(null)
-  // DEC-019(b): routed capture ALWAYS stops at ONE confirmation screen — the
-  // classifier's pick pre-highlighted (Enter = confirm), any other class one
-  // click or arrow away, and the deadline question inline on the same screen
-  // when an unanchored phrase triggered it. One stop, never more.
-  const [confirm, setConfirm] = useState<{
-    picked: string
-    confidence: number
-    title: string
-    dueAt: string | null
-    needsDate: boolean
-    phrase: string | null
-    // DEC-025: further intents the compound carried — pre-checked chips on
-    // the SAME stop (one Enter files primary + every checked secondary).
-    secondaries: Array<{
-      text: string
-      intentClass: string
-      title: string
-      dueAt: string | null
-      checked: boolean
-    }>
-  } | null>(null)
-  const [confirmDate, setConfirmDate] = useState('')
+  // DEC-019(b): routed capture ALWAYS stops at the ONE confirm card. When
+  // set, the card owns the flow (classify, chips, secondaries, tidy, date).
+  const [confirmText, setConfirmText] = useState<string | null>(null)
   // V2 (DEC-023): when the console opens over a desk view, the capture files
-  // ONTO that desk (origin lens + detach semantics). Clearable with one ✕ —
-  // then it files standalone like before. Snapshot at open time, so
-  // navigation underneath never re-targets a capture mid-thought.
+  // ONTO that desk (origin lens + detach semantics). Clearable with one ✕.
   const [deskCtx, setDeskCtx] = useState<{ id: string; title: string } | null>(null)
-  // DEC-026 (Δ6): the opt-in tidy. Requested async AFTER the confirm screen
-  // is up (never on the capture's latency path); appears as an offer; nothing
-  // changes unless "Use tidied" is clicked, and the verbatim text is kept in
-  // the notes either way. The seq ref drops stale arrivals after re-edits.
-  const [cleanup, setCleanup] = useState<{ title: string; note: string; originalTitle: string } | null>(null)
-  const [cleanupUsed, setCleanupUsed] = useState(false)
-  const cleanupSeq = useRef(0)
   const fieldRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -98,44 +50,31 @@ export default function CaptureConsole(): JSX.Element | null {
       setError(null)
       setFiled(null)
       setFiledId(null)
-      setConfirm(null)
-      setConfirmDate('')
-      setCleanup(null)
-      setCleanupUsed(false)
-      cleanupSeq.current++
-      setDeskCtx(
-        deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
-      )
+      setConfirmText(null)
+      setDeskCtx(deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes))
       setTimeout(() => fieldRef.current?.focus(), 0)
     }
   }, [open, initialText])
 
   if (!open) return null
 
-  async function file(
-    intentClass: string,
-    confidence: number,
-    title: string,
-    dueAt: string | null,
-    notesOverride?: string
-  ): Promise<void> {
+  async function fileUnrouted(): Promise<void> {
+    const t = text.trim()
+    const title = t.length > 120 ? `${t.slice(0, 117)}…` : t
     const item = await createItem({
       title,
-      notes: notesOverride ?? (text.trim() === title ? undefined : text.trim()),
+      notes: t === title ? undefined : t,
       parentId: deskCtx?.id ?? null,
-      intentClass,
-      dueAt,
-      confidence,
-      approvalState: 'auto', // user-authored: submitting IS the approval
+      intentClass: 'loose_thought',
+      dueAt: null,
+      confidence: 1,
+      approvalState: 'auto',
       sourceType: 'note',
       wiOrigin: 'human'
     })
-    setFiled(`${CLASS_LABEL[intentClass] ?? intentClass} — “${item.title}”`)
+    setFiled(`${CLASS_LABEL.loose_thought} — “${item.title}”`)
     setFiledId(item.id)
     setText('')
-    setConfirm(null)
-    // The class was confirmed on-screen; a short beat to see it land, plus the
-    // belt-and-braces reclassify link.
     setTimeout(close, 2500)
   }
 
@@ -176,91 +115,16 @@ export default function CaptureConsole(): JSX.Element | null {
       }
       if (mode === 'unrouted') {
         // No AI touch by contract — verbatim, no confirmation stop.
-        await file('loose_thought', 1, t.length > 120 ? `${t.slice(0, 117)}…` : t, null)
+        await fileUnrouted()
         return
       }
-      // DEC-019(b): classify, then ALWAYS confirm — pre-highlighted, one Enter.
-      const c = await window.api.workItems.classify(t)
-      setConfirm({
-        picked: c.intentClass,
-        confidence: c.confidence,
-        title: c.title,
-        dueAt: c.dueAt,
-        needsDate: c.clarify != null,
-        phrase: c.clarify?.phrase ?? null,
-        secondaries: (c.secondaries ?? []).map((s) => ({
-          text: s.text,
-          intentClass: s.intentClass,
-          title: s.title,
-          dueAt: s.dueAt,
-          checked: true
-        }))
-      })
-      // DEC-026: request the tidy AFTER the confirm screen is already up —
-      // it slots in as an offer if (and only if) it arrives while this same
-      // capture is still on screen.
-      const seq = ++cleanupSeq.current
-      setCleanup(null)
-      setCleanupUsed(false)
-      void window.api.workItems.proposeCleanup(t).then((p) => {
-        if (p && cleanupSeq.current === seq) {
-          setCleanup({ title: p.title, note: p.note, originalTitle: c.title })
-        }
-      })
+      // DEC-019(b): classify + ALWAYS confirm — the shared card takes over.
+      setConfirmText(t)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
     } finally {
       setBusy(false)
     }
-  }
-
-  async function fileConfirmed(): Promise<void> {
-    if (!confirm || busy) return
-    setBusy(true)
-    try {
-      const dueAt = confirm.needsDate
-        ? confirmDate
-          ? new Date(`${confirmDate}T17:00:00`).toISOString()
-          : null
-        : confirm.dueAt
-      const extras = confirm.secondaries.filter((s) => s.checked)
-      // DEC-026: a used tidy leads the notes with the clean gist and keeps
-      // the capture verbatim below it — nothing written is ever lost.
-      const tidiedNotes =
-        cleanupUsed && cleanup
-          ? `${cleanup.note}\n\n— as captured —\n${text.trim()}`
-          : undefined
-      await file(confirm.picked, confirm.confidence, confirm.title, dueAt, tidiedNotes)
-      // DEC-025: each checked secondary files as its own loop — its segment
-      // text, its own class and (already-anchored) date; same desk context.
-      for (const s of extras) {
-        await createItem({
-          title: s.title,
-          notes: s.text.trim() === s.title ? undefined : s.text.trim(),
-          parentId: deskCtx?.id ?? null,
-          intentClass: s.intentClass,
-          dueAt: s.dueAt,
-          confidence: 0.95,
-          approvalState: 'auto',
-          sourceType: 'note',
-          wiOrigin: 'human'
-        })
-      }
-      if (extras.length > 0) {
-        setFiled((f) => (f ? `${f} · +${extras.length} more` : f))
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function cycleClass(dir: 1 | -1): void {
-    if (!confirm) return
-    const idx = CLASS_CHOICES.findIndex((c) => c.value === confirm.picked)
-    const next = CLASS_CHOICES[(idx + dir + CLASS_CHOICES.length) % CLASS_CHOICES.length]
-    setConfirm({ ...confirm, picked: next.value })
   }
 
   const modeBtn = (m: Mode, label: string, hint: string): JSX.Element => (
@@ -323,154 +187,38 @@ export default function CaptureConsole(): JSX.Element | null {
             </button>
           </div>
         )}
-        <textarea
-          ref={fieldRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit()
-            if (e.key === 'Escape') close()
-          }}
-          placeholder={
-            mode === 'unrouted'
-              ? 'Saved exactly as typed…'
-              : 'Remind me to… / Review the… / Schedule a… / fyi:…'
-          }
-          rows={3}
-          className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-y"
-        />
-        {confirm && (
-          <div
-            className="mt-3 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2.5"
+        {confirmText == null && (
+          <textarea
+            ref={fieldRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'ArrowRight') cycleClass(1)
-              if (e.key === 'ArrowLeft') cycleClass(-1)
-              if (e.key === 'Enter') void fileConfirmed()
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit()
+              if (e.key === 'Escape') close()
             }}
-          >
-            <div className="text-[12px] text-[var(--ink-70)]">
-              File as <strong>{CLASS_LABEL[confirm.picked]}</strong>? Enter confirms — or pick
-              another.
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1">
-              {CLASS_CHOICES.map((c) => (
-                <button
-                  key={c.value}
-                  autoFocus={c.value === confirm.picked}
-                  onClick={() => setConfirm({ ...confirm, picked: c.value })}
-                  title={c.hint}
-                  className={`px-2.5 h-7 fb-t-label fb-press rounded-full ${
-                    confirm.picked === c.value
-                      ? 'bg-[rgb(var(--accent))] text-white'
-                      : 'bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-            {confirm.secondaries.length > 0 && (
-              <div className="mt-2.5">
-                <div className="text-[11px] text-[var(--ink-40)]">
-                  Also caught {confirm.secondaries.length === 1 ? 'another' : `${confirm.secondaries.length} more`} —
-                  filed together unless unchecked:
-                </div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {confirm.secondaries.map((s, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() =>
-                        setConfirm({
-                          ...confirm,
-                          secondaries: confirm.secondaries.map((x, i) =>
-                            i === idx ? { ...x, checked: !x.checked } : x
-                          )
-                        })
-                      }
-                      title={s.text}
-                      className={`inline-flex items-center gap-1.5 pl-1.5 pr-2.5 h-7 fb-t-label fb-press rounded-full ${
-                        s.checked
-                          ? 'bg-[rgba(var(--accent),0.12)] text-[var(--ink-100)] shadow-[0_0_0_1px_rgba(var(--accent),0.4)]'
-                          : 'bg-[var(--surface-raised)] text-[var(--ink-40)] line-through'
-                      }`}
-                    >
-                      <Icon name={s.checked ? 'check_circle' : 'radio_button_unchecked'} size={13} />
-                      <span className="max-w-[200px] truncate">
-                        {CLASS_LABEL[s.intentClass] ?? s.intentClass} · {s.title}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {cleanup && !cleanupUsed && (
-              <div className="mt-2.5 flex items-start gap-2 rounded-[var(--radius-field)] bg-[var(--surface-raised)] px-2.5 py-2">
-                <Icon name="auto_awesome" size={14} className="text-[var(--ink-40)] mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[11px] text-[var(--ink-40)]">Tidied version:</div>
-                  <div className="text-[12px] text-[var(--ink-90)] truncate" title={cleanup.note}>
-                    “{cleanup.title}”
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setConfirm({ ...confirm, title: cleanup.title })
-                    setCleanupUsed(true)
-                  }}
-                  className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] shrink-0"
-                >
-                  Use tidied
-                </button>
-                <button
-                  onClick={() => setCleanup(null)}
-                  title="Keep as written"
-                  className="icon-btn !h-7 !w-7 shrink-0"
-                >
-                  <Icon name="close" size={13} />
-                </button>
-              </div>
-            )}
-            {cleanup && cleanupUsed && (
-              <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ink-40)]">
-                <Icon name="auto_awesome" size={12} /> Tidied — the original stays in the notes.
-                <button
-                  onClick={() => {
-                    setConfirm({ ...confirm, title: cleanup.originalTitle })
-                    setCleanupUsed(false)
-                  }}
-                  className="underline underline-offset-2 hover:text-[var(--ink-100)] fb-press"
-                >
-                  Undo
-                </button>
-              </div>
-            )}
-            {confirm.needsDate && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-[12px] text-[var(--ink-70)]">When is “{confirm.phrase}”?</span>
-                <input
-                  type="date"
-                  value={confirmDate}
-                  onChange={(e) => setConfirmDate(e.target.value)}
-                  className="fb-field bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
-                />
-                <span className="text-[11px] text-[var(--ink-40)]">leave empty for no date</span>
-              </div>
-            )}
-            <div className="mt-2.5 flex items-center justify-between">
-              <button
-                onClick={() => setConfirm(null)}
-                className="text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
-              >
-                ← Edit text
-              </button>
-              <button
-                onClick={() => void fileConfirmed()}
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 h-8 px-3.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
-              >
-                {busy ? 'Filing…' : 'File it ↵'}
-              </button>
-            </div>
+            placeholder={
+              mode === 'unrouted'
+                ? 'Saved exactly as typed…'
+                : 'Remind me to… / Review the… / Schedule a… / fyi:…'
+            }
+            rows={3}
+            className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-y"
+          />
+        )}
+        {confirmText != null && (
+          <div className="mt-3">
+            <AttentionConfirmCard
+              text={confirmText}
+              deskCtx={deskCtx}
+              onFiled={(summary, _count, id) => {
+                setFiled(summary)
+                setFiledId(id)
+                setText('')
+                setConfirmText(null)
+                setTimeout(close, 2500)
+              }}
+              onCancel={() => setConfirmText(null)}
+            />
           </div>
         )}
         {error && <div className="mt-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
@@ -489,7 +237,7 @@ export default function CaptureConsole(): JSX.Element | null {
             )}
           </div>
         )}
-        {!confirm && (
+        {confirmText == null && (
           <div className="mt-3 flex items-center justify-between">
             <div className="text-[11px] text-[var(--ink-30)]">⌘↵ to file · Esc to close</div>
             <button
