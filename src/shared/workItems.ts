@@ -59,7 +59,13 @@ export const WORK_ITEM_STATES = [
   'completed',
   'discussed',
   'dismissed',
-  'reclassified'
+  'reclassified',
+  // DEC-024: shelved — "keep it, done looking at it". Terminal for queue
+  // visibility, but NOT a loop closure: no notification, no Recently-closed
+  // row; it lives on the Archived shelf until unarchived (state → open).
+  // Cross-version note: an un-updated peer coarsens it to 'open' (the
+  // conservative default) until it updates — accepted, same as any new state.
+  'archived'
 ] as const
 export type WorkItemState = (typeof WORK_ITEM_STATES)[number]
 
@@ -105,6 +111,7 @@ export function statusForWorkItemState(
       return 'done'
     case 'dismissed':
     case 'reclassified':
+    case 'archived':
       return 'parked'
     default:
       // open, suggested, stale, waiting, blocked — and unknown future states,

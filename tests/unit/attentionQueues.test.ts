@@ -5,6 +5,7 @@ import {
   groupByDue,
   groupByOrigin,
   recentlyClosed,
+  archivedItems,
   detachedItems,
   itemReason,
   isTerminalState,
@@ -113,14 +114,33 @@ describe('lenses (SPEC-017 v1)', () => {
     expect(groupByOrigin(items, NOW).map((g) => g.label)).toEqual(['You', 'Plexii', 'System'])
   })
 
-  it('recentlyClosed keeps finished loops, excludes dismissals and old items', () => {
+  it('recentlyClosed keeps finished loops, excludes dismissals, archived and old items', () => {
     const items = [
       wi({ id: 'done', workItemState: 'completed', updatedAt: NOW - DAY }),
       wi({ id: 'dismissed', workItemState: 'dismissed', updatedAt: NOW - DAY }),
+      wi({ id: 'shelved', workItemState: 'archived', updatedAt: NOW - DAY }),
       wi({ id: 'old', workItemState: 'completed', updatedAt: NOW - 10 * DAY }),
       wi({ id: 'open' })
     ]
     expect(recentlyClosed(items, NOW).map((i) => i.id)).toEqual(['done'])
+  })
+
+  it('DEC-024 — the Archived shelf: archived only, out of queues, newest first', () => {
+    const items = [
+      wi({ id: 'a1', workItemState: 'archived', updatedAt: NOW - DAY }),
+      wi({ id: 'a2', workItemState: 'archived', updatedAt: NOW - 2 * DAY }),
+      wi({ id: 'open' }),
+      wi({ id: 'done', workItemState: 'completed' })
+    ]
+    expect(archivedItems(items).map((i) => i.id)).toEqual(['a1', 'a2'])
+    // Archived is terminal for visibility: never in the queues…
+    expect(
+      groupIntoQueues(items, NOW)
+        .flatMap((q) => q.items)
+        .map((i) => i.id)
+    ).toEqual(['open'])
+    // …and never on the Detached shelf either.
+    expect(detachedItems([wi({ id: 'ad', detachedFromId: 'x', workItemState: 'archived' })])).toEqual([])
   })
 })
 

@@ -58,6 +58,31 @@ const wi = (raw: DatabaseSync, id: string, state = 'open'): void => {
     .run(id, `Item ${id}`, state, 'open')
 }
 
+describe('archive (DEC-024)', () => {
+  it('archive projects to parked (never done); unarchive round-trips to open', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'a')
+    expect(setWorkItemStateCore(db, 'a', 'archived')).toBe(true)
+    let row = raw.prepare('SELECT work_item_state AS s, status FROM nodes WHERE id = ?').get('a') as {
+      s: string
+      status: string
+    }
+    expect(row).toEqual({ s: 'archived', status: 'parked' })
+    expect(setWorkItemStateCore(db, 'a', 'open')).toBe(true)
+    row = raw.prepare('SELECT work_item_state AS s, status FROM nodes WHERE id = ?').get('a') as {
+      s: string
+      status: string
+    }
+    expect(row).toEqual({ s: 'open', status: 'open' })
+  })
+
+  it('archive is QUIET: never in the closure-notification state set (source lock)', () => {
+    const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'db', 'workItems.ts'), 'utf-8')
+    const terminalBlock = src.slice(src.indexOf('const TERMINAL_STATES'), src.indexOf('const CLOSURE_VERB'))
+    expect(terminalBlock).not.toContain("'archived'")
+  })
+})
+
 describe('updateFields / reclassify', () => {
   it('patches the patchable set, refuses non-work_items, and cannot touch state or status', () => {
     const { raw, db } = freshDb()

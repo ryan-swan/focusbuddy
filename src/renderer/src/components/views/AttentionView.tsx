@@ -11,6 +11,7 @@ import {
   groupByDue,
   groupByOrigin,
   recentlyClosed,
+  archivedItems,
   detachedItems,
   itemReason,
   PRIMARY_ACTION,
@@ -98,6 +99,9 @@ export default function AttentionView(): JSX.Element {
   )
   const detached = useMemo(() => detachedItems(items), [items])
   const closed = useMemo(() => recentlyClosed(items, nowMs), [items, nowMs])
+  // DEC-024: the Archived shelf — kept, out of the way, no clock.
+  const archived = useMemo(() => archivedItems(items), [items])
+  const [showArchived, setShowArchived] = useState(false)
   const total = queues.reduce((n, q) => n + q.items.length, 0)
 
   // S7 feeders: desk signals surfacing AS attention (computed, never owned).
@@ -236,6 +240,13 @@ export default function AttentionView(): JSX.Element {
                 className="icon-btn !h-7 !w-7"
               >
                 <Icon name="swap_horiz" size={14} />
+              </button>
+              <button
+                onClick={() => void setState(i.id, 'archived')}
+                title="Archive — keep it, out of the way"
+                className="icon-btn !h-7 !w-7"
+              >
+                <Icon name="archive" size={14} />
               </button>
               <button
                 onClick={() => void setState(i.id, primary.state)}
@@ -394,6 +405,42 @@ export default function AttentionView(): JSX.Element {
                         <Icon name="task_alt" size={14} className="text-[var(--ink-30)] shrink-0" />
                         <span className="fb-t-body text-[var(--ink-50)] truncate flex-1">{i.title}</span>
                         <span className="text-[11px] text-[var(--ink-30)]">{i.workItemState}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+            {archived.length > 0 && (
+              <section>
+                <button
+                  onClick={() => setShowArchived((v) => !v)}
+                  className="flex items-center gap-2 mb-2 fb-press"
+                >
+                  <Icon
+                    name={showArchived ? 'expand_more' : 'chevron_right'}
+                    size={14}
+                    className="text-[var(--ink-40)]"
+                  />
+                  <span className="fb-t-label text-[var(--ink-70)]">Archived</span>
+                  <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{archived.length}</span>
+                </button>
+                {showArchived && (
+                  <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden opacity-80">
+                    {archived.map((i) => (
+                      <div
+                        key={i.id}
+                        className="group flex items-center gap-3 px-4 py-2 bg-[var(--surface-raised)]"
+                      >
+                        <Icon name="archive" size={14} className="text-[var(--ink-30)] shrink-0" />
+                        <span className="fb-t-body text-[var(--ink-50)] truncate flex-1">{i.title}</span>
+                        <button
+                          onClick={() => void setState(i.id, 'open')}
+                          title="Back to the queues"
+                          className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)] opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          Unarchive
+                        </button>
                       </div>
                     ))}
                   </div>

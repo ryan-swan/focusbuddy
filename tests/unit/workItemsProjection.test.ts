@@ -70,7 +70,8 @@ describe('the status projection (§2.3, A-02) — every state, table-driven', ()
     completed: 'done',
     discussed: 'done',
     dismissed: 'parked',
-    reclassified: 'parked'
+    reclassified: 'parked',
+    archived: 'parked'
   }
 
   it('covers exactly the declared state set', () => {
@@ -81,9 +82,10 @@ describe('the status projection (§2.3, A-02) — every state, table-driven', ()
     expect(statusForWorkItemState(state)).toBe(status)
   })
 
-  it('dismissed/reclassified are NEVER done, and unknown future states coarsen to open', () => {
+  it('dismissed/reclassified/archived are NEVER done, and unknown future states coarsen to open', () => {
     expect(statusForWorkItemState('dismissed')).not.toBe('done')
     expect(statusForWorkItemState('reclassified')).not.toBe('done')
+    expect(statusForWorkItemState('archived')).not.toBe('done')
     expect(statusForWorkItemState('some_future_state')).toBe('open')
   })
 })

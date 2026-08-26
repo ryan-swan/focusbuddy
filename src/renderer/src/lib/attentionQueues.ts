@@ -46,7 +46,8 @@ const TERMINAL: ReadonlySet<string> = new Set([
   'completed',
   'discussed',
   'dismissed',
-  'reclassified'
+  'reclassified',
+  'archived'
 ])
 
 export function isTerminalState(state: string | null | undefined): boolean {
@@ -200,7 +201,8 @@ export function groupByOrigin(
 }
 
 /** The closed shelf: loops finished in the window (dismissed/reclassified are
- *  not celebrations and stay out; the queues' own history covers them). */
+ *  not celebrations and stay out; the queues' own history covers them —
+ *  archived is a shelf of its own, not a closure). */
 export function recentlyClosed(items: FbNode[], nowMs: number, windowDays = 7): FbNode[] {
   const cutoff = nowMs - windowDays * 24 * 60 * 60 * 1000
   return items
@@ -209,8 +211,17 @@ export function recentlyClosed(items: FbNode[], nowMs: number, windowDays = 7): 
         isTerminalState(i.workItemState) &&
         i.workItemState !== 'dismissed' &&
         i.workItemState !== 'reclassified' &&
+        i.workItemState !== 'archived' &&
         i.updatedAt > cutoff
     )
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+/** DEC-024 — the Archived shelf: kept, out of the way, no clock. Unarchive
+ *  (state → open) is the recovery; nothing here ever nudges or decays. */
+export function archivedItems(items: FbNode[]): FbNode[] {
+  return items
+    .filter((i) => i.workItemState === 'archived')
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 

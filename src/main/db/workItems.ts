@@ -351,7 +351,7 @@ export function decayLooseThoughtsCore(d: LifecycleDb, nowMs: number): number {
     .prepare(
       `SELECT id FROM nodes WHERE kind = 'work_item' AND intent_class = 'loose_thought'
          AND trashed_at IS NULL AND updated_at < ?
-         AND work_item_state NOT IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed','reclassified')`
+         AND work_item_state NOT IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed','reclassified','archived')`
     )
     .all(cutoff) as Array<{ id: string }>
   for (const row of stale) {
@@ -397,6 +397,37 @@ export function postDeadlineNudgesCore(
       dedupeKey: `wi-due:${r.id}:${day}`,
       category: 'attention',
       layer: 'interruptive',
+      trigger: 'deadline-proximity',
+      origin: 'system'
+    })
+    if (ok) posted++
+  }
+  // DEC-024 — the FYI deadline backstop: a dated FYI gets ONE quiet nudge
+  // when its date ARRIVES (not before — FYIs are never "due soon"), on the
+  // inbox layer, same dedupe shape and caps. The 24h lookback keeps ancient
+  // pre-feature dates from spamming a first sweep; anything older missed its
+  // window silently, by restraint.
+  const dayAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
+  const fyis = d
+    .prepare(
+      `SELECT id, title, due_at FROM nodes
+       WHERE kind = 'work_item' AND trashed_at IS NULL
+         AND intent_class = 'fyi'
+         AND due_at IS NOT NULL AND due_at > ? AND due_at <= ?
+         AND work_item_state IN ('open','in_progress','waiting','needs_review','needs_approval','delegated','blocked','suggested','stale')`
+    )
+    .all(dayAgo, nowIso) as Array<{ id: string; title: string; due_at: string }>
+  for (const r of fyis) {
+    const day = r.due_at.slice(0, 10)
+    const { posted: ok } = postNotification(d, {
+      ref: r.id,
+      queue: 'fyi',
+      title: r.title || 'FYI',
+      body: 'Its date arrived.',
+      deliverAt: nowMs,
+      dedupeKey: `wi-due:${r.id}:${day}`,
+      category: 'attention',
+      layer: 'inbox',
       trigger: 'deadline-proximity',
       origin: 'system'
     })
