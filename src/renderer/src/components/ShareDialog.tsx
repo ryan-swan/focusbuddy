@@ -174,8 +174,13 @@ export default function ShareDialog({
     }
   }
 
-  async function handleCreate(): Promise<void> {
+  async function handleCreate(scopeOverride?: ShareScope): Promise<void> {
     if (busy) return
+    // A scopeOverride lets the one-click "public duplicate link" mint a copy-scope
+    // share without the user touching the permission picker; keep the picker in
+    // sync so the rest of the dialog reflects what was minted.
+    const useScope = scopeOverride ?? scope
+    if (scopeOverride && scopeOverride !== scope) setScope(scopeOverride)
     setBusy(true)
     try {
       // Build the snapshot — this is what the viewer page will render and
@@ -234,7 +239,7 @@ export default function ShareDialog({
         kind,
         entityId,
         label,
-        scope,
+        scope: useScope,
         snapshot,
         fromHandle,
         createdBy,
@@ -312,11 +317,40 @@ export default function ShareDialog({
             </div>
           )}
 
+          {/* One-click public duplicate link — the growth path. Mints a
+              copy-scope snapshot and copies the public viewer URL, so anyone can
+              open it with no login or install and duplicate it into their own
+              workspace. The granular permission picker below stays for choosing
+              view-only instead. */}
+          <div className="space-y-1">
+            <button
+              onClick={() => void handleCreate('copy')}
+              disabled={busy}
+              className="w-full text-[13px] py-2.5 rounded-md bg-accent text-white hover:brightness-110 disabled:opacity-60 inline-flex items-center justify-center gap-1.5 font-semibold"
+            >
+              {busy ? (
+                <>
+                  <Icon name="autorenew" size={14} className="animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Icon name="link" size={14} />
+                  Copy a public link anyone can duplicate
+                </>
+              )}
+            </button>
+            <p className="text-[11px] text-[var(--ink-50)] leading-snug px-0.5">
+              Opens in any browser with no login or install, and can be duplicated into
+              their own workspace in one click.
+            </p>
+          </div>
+
           {/* Read-only link + snapshot sharing below. */}
           {/* Scope picker */}
           <div>
             <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--ink-50)] mb-1.5">
-              Permission
+              Or choose the permission yourself
             </label>
             <div className="space-y-1.5">
               <button
