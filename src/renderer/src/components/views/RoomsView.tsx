@@ -37,6 +37,7 @@ export default function RoomsView(): JSX.Element {
   const sharedOrgs = useMemo(() => orgs.filter((o) => !o.personal), [orgs])
   const canShare = activeOrgId === PERSONAL_ORG_ID && sharedOrgs.length > 0
   const goRoom = useViewStore((s) => s.goRoom)
+  const goDesks = useViewStore((s) => s.goDesks)
   const openObjectChannel = useMessagingStore((s) => s.openObjectChannel)
   // Public share-link target (a room shared as a 'folder' snapshot with its
   // desks). Opens the universal ShareDialog; null when closed.
@@ -172,13 +173,16 @@ export default function RoomsView(): JSX.Element {
       { key: 'top', label: 'Top level', predicate: (r) => r.parentId == null }
     ],
     timelineDate: (r) => r.createdAt,
-    onOpen: (r) => goRoom(r.id),
+    // Opening a room = its scoped Desks index (the "show me its desks"
+    // gesture this page's header promises). A room that is a PLAN keeps its
+    // plan dashboard — that canvas has content; a plain room's would be blank.
+    onOpen: (r) => (r.isPlan ? goRoom(r.id) : goDesks(r.id)),
     newLabel: 'New room',
     onNew: () => {
       void (async () => {
         try {
           const node = await create({ parentId: null, kind: 'folder', title: 'New room' })
-          goRoom(node.id)
+          goDesks(node.id)
         } catch {
           /* create() surfaces its own limit prompt */
         }
@@ -259,8 +263,8 @@ export default function RoomsView(): JSX.Element {
       {
         key: 'open',
         icon: 'chevron_right',
-        label: 'Open room',
-        onClick: () => goRoom(r.id)
+        label: r.isPlan ? 'Open plan' : 'Open room',
+        onClick: () => (r.isPlan ? goRoom(r.id) : goDesks(r.id))
       }
     ]
   }
