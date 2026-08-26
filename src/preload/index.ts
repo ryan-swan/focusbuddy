@@ -1814,6 +1814,8 @@ const api = {
       upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
       deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pending'),
+    advanceBaseRev: (itemType: string, id: string, rev: number): Promise<void> =>
+      ipcRenderer.invoke('workspace:advanceBaseRev', itemType, id, rev),
     markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number): Promise<void> =>
       ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
     applyRemote: (
