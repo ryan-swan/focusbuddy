@@ -53,6 +53,11 @@ import {
   getMessage,
   markSeen,
   resetConnection as resetMailConnection, archiveMessage } from '../mail/imap'
+// NOTE: mail-OAuth wiring temporarily reverted for the 4.1.1 release. The
+// ../mail/oauth and ../mail/oauthProviders modules, explainImapError, and the
+// mailAccount OAuth methods were referenced here but never committed, which broke
+// the build on a clean checkout. Re-add these imports + the two handlers below
+// (mail:oauthProviders / mail:oauthConnect) once those modules land.
 import {
   listDocuments,
   listTrashedDocuments,
@@ -2598,7 +2603,32 @@ export function registerIpcHandlers(): void {
   // The user's own mailbox, connected directly from the desktop. The renderer
   // only ever sees host/port/user (never the password), proposes a config to
   // save+test, and asks for the message list / one full message on demand.
+  // Resolve the connected account, renewing an expiring OAuth access token
+  // first. Every handler below goes through this rather than getFull(), because
+  // an access token only lasts about an hour and a stale one comes back from
+  // the server as a bare authentication failure.
+  type MailConfigResult =
+    | { ok: true; config: MailAccountConfig }
+    | { ok: false; error: string }
+
+  async function currentMailAccount(): Promise<MailConfigResult> {
+    try {
+      const config = mailAccount.getFull()
+      if (!config) return { ok: false, error: 'No mail account connected.' }
+      return { ok: true, config }
+    } catch (err) {
+      // A failed refresh means the grant is genuinely gone. Say so plainly
+      // instead of reporting an empty inbox as if the mailbox were fine.
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
   ipcMain.handle('mail:getAccount', () => mailAccount.getPublic())
+
+  // mail:oauthProviders and mail:oauthConnect handlers temporarily removed for
+  // the 4.1.1 release: their ../mail/oauth and ../mail/oauthProviders modules
+  // were referenced but not committed. Re-add both handlers together with those
+  // modules (see the NOTE at the imports above).
 
   ipcMain.handle('mail:saveAccount', async (_e, config: MailAccountConfig) => {
     try {
@@ -2632,8 +2662,9 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('mail:list', async (e, limit?: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
+    const config = acc.config
     try {
       const items = await listInbox(config, limit ?? 40)
       // New-mail detection: any unseen uid we have not announced yet fires one
@@ -2659,10 +2690,10 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('mail:get', async (_e, uid: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     try {
-      const message = await getMessage(config, uid)
+      const message = await getMessage(acc.config, uid)
       if (!message) return { ok: false as const, error: 'Message not found.' }
       return { ok: true as const, message }
     } catch (err) {
@@ -2671,20 +2702,20 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('mail:archive', async (_e, uid: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     try {
-      await archiveMessage(config, uid)
+      await archiveMessage(acc.config, uid)
       return { ok: true as const }
     } catch (err) {
       return { ok: false as const, error: (err as Error).message }
     }
   })
   ipcMain.handle('mail:markSeen', async (_e, uid: number) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     try {
-      await markSeen(config, uid)
+      await markSeen(acc.config, uid)
       return { ok: true as const }
     } catch (err) {
       return { ok: false as const, error: (err as Error).message }
@@ -2694,10 +2725,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'mail:suggestReply',
     async (_e, incoming: { subject: string; from: string; body: string }) => {
-      const config = mailAccount.getFull()
-      if (!config) return { ok: false as const, error: 'No mail account connected.' }
+      const acc = await currentMailAccount()
+      if (!acc.ok) return { ok: false as const, error: acc.error }
       try {
-        return await suggestReply(config, {
+        return await suggestReply(acc.config, {
           subject: incoming?.subject ?? '',
           from: incoming?.from ?? '',
           body: incoming?.body ?? ''
@@ -2709,14 +2740,14 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('mail:send', async (_e, input: MailSendInput) => {
-    const config = mailAccount.getFull()
-    if (!config) return { ok: false as const, error: 'No mail account connected.' }
+    const acc = await currentMailAccount()
+    if (!acc.ok) return { ok: false as const, error: acc.error }
     const to = (input.to ?? []).map((a) => a.trim()).filter(Boolean)
     if (to.length === 0) {
       return { ok: false as const, error: 'Add at least one recipient.' }
     }
     try {
-      await sendMail(config, {
+      await sendMail(acc.config, {
         to,
         cc: (input.cc ?? []).map((a) => a.trim()).filter(Boolean),
         bcc: (input.bcc ?? []).map((a) => a.trim()).filter(Boolean),
