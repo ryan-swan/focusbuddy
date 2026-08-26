@@ -524,4 +524,29 @@ one-click Undo before filing. The verbatim text is NEVER lost, tidied or not.
 budget); silent auto-tidy above a confidence bar (rejected — first-touch
 trust is the product; Δ6 said propose-and-approve and it stays that way).
 
+---
+
+## DEC-027 — The composer @attention typeahead + deterministic interception
+**Date:** 2026-08-26 · **Status:** APPROVED (operator: "Start typeahead") + IMPLEMENTED
+**Decision:** The chat composer finally knows "attention" — as a **command,
+not a mention**. The @ picker offers "Attention — capture what follows"
+(top row while `attention` matches, capability-gated with live re-probe);
+picking it inserts the literal text `@attention ` — NEVER a chip, honoring
+the mentions doctrine's own rule that a kind with no resolver must never
+become a reference. On send, a **leading** `@attention` is intercepted
+deterministically in `submitComposer`: the message never reaches the model —
+the remainder routes through the one `fb:command-new-work-item` seam into the
+capture console (DEC-019's single model: same confirm stop, chips, tidy,
+desk-context parenting). Mid-sentence @attention keeps the AI proposal path;
+a mode-locked Search stays literal (interception sits after the search
+branch). Diffs into Caleb's mentions machinery kept additive + minimal:
+one command branch, one picker row source, a widened label union.
+**Alternatives:** a real 'attention' mention KIND with chips (rejected —
+no resolver → lying chips, plus wire-shape churn in Caleb's shared types);
+send-then-AI-files (the old path — kept as the mid-sentence fallback, but the
+leading imperative now never pays model latency or model judgment).
+
+**WITH THIS, THE GA CHECKLIST'S BUILD ITEMS ARE COMPLETE (①–⑤).** Remaining
+before the reveal: the operator's ⑥ live smokes, then the landing command.
+
 <!-- Append below; increment DEC-NNN. -->
