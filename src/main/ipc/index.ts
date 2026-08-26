@@ -51,11 +51,12 @@ import {
   listInbox,
   getMessage,
   markSeen,
-  resetConnection as resetMailConnection, archiveMessage,
-  explainImapError } from '../mail/imap'
-import { authorize as authorizeMailOAuth } from '../mail/oauth'
-import { allAvailability as mailOAuthAvailability, availability as mailProviderAvailability,
-  type MailOAuthProvider } from '../mail/oauthProviders'
+  resetConnection as resetMailConnection, archiveMessage } from '../mail/imap'
+// NOTE: mail-OAuth wiring temporarily reverted for the 4.1.1 release. The
+// ../mail/oauth and ../mail/oauthProviders modules, explainImapError, and the
+// mailAccount OAuth methods were referenced here but never committed, which broke
+// the build on a clean checkout. Re-add these imports + the two handlers below
+// (mail:oauthProviders / mail:oauthConnect) once those modules land.
 import {
   listDocuments,
   listTrashedDocuments,
@@ -2473,7 +2474,7 @@ export function registerIpcHandlers(): void {
 
   async function currentMailAccount(): Promise<MailConfigResult> {
     try {
-      const config = await mailAccount.getFullFresh()
+      const config = mailAccount.getFull()
       if (!config) return { ok: false, error: 'No mail account connected.' }
       return { ok: true, config }
     } catch (err) {
@@ -2485,41 +2486,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('mail:getAccount', () => mailAccount.getPublic())
 
-  // Which provider sign-ins this build can actually offer. The renderer shows
-  // the unavailable ones with their reason rather than hiding them, so an
-  // operator can see what registration is missing.
-  ipcMain.handle('mail:oauthProviders', () => mailOAuthAvailability())
-
-  ipcMain.handle('mail:oauthConnect', async (_e, provider: MailOAuthProvider) => {
-    const avail = mailProviderAvailability(provider)
-    if (!avail.available) {
-      return { ok: false as const, error: avail.reason ?? 'That sign-in is not available.' }
-    }
-    try {
-      const result = await authorizeMailOAuth(provider)
-      const account = mailAccount.accountFromOAuth(result)
-      // Prove the tokens actually open the mailbox before saving them, the
-      // same gate the password path uses. A grant that consents but cannot
-      // IMAP (a tenant with IMAP disabled, most often) fails here rather than
-      // looking connected and returning nothing.
-      const probe = await testMailConnection({
-        host: account.host,
-        port: account.port,
-        secure: account.secure,
-        user: account.user,
-        email: account.email,
-        password: '',
-        oauth: account.tokens
-      })
-      if (!probe.ok) return probe
-      mailAccount.saveOAuth(account)
-      resetMailConnection()
-      resetToneCache()
-      return { ok: true as const, account: mailAccount.getPublic() }
-    } catch (err) {
-      return { ok: false as const, error: (err as Error).message }
-    }
-  })
+  // mail:oauthProviders and mail:oauthConnect handlers temporarily removed for
+  // the 4.1.1 release: their ../mail/oauth and ../mail/oauthProviders modules
+  // were referenced but not committed. Re-add both handlers together with those
+  // modules (see the NOTE at the imports above).
 
   ipcMain.handle('mail:saveAccount', async (_e, config: MailAccountConfig) => {
     try {
@@ -2576,7 +2546,7 @@ export function registerIpcHandlers(): void {
       setMailSearchCache(items)
       return { ok: true as const, items }
     } catch (err) {
-      return { ok: false as const, error: explainImapError(err, config) }
+      return { ok: false as const, error: (err as Error).message }
     }
   })
 
@@ -2588,7 +2558,7 @@ export function registerIpcHandlers(): void {
       if (!message) return { ok: false as const, error: 'Message not found.' }
       return { ok: true as const, message }
     } catch (err) {
-      return { ok: false as const, error: explainImapError(err, acc.config) }
+      return { ok: false as const, error: (err as Error).message }
     }
   })
 
@@ -2599,7 +2569,7 @@ export function registerIpcHandlers(): void {
       await archiveMessage(acc.config, uid)
       return { ok: true as const }
     } catch (err) {
-      return { ok: false as const, error: explainImapError(err, acc.config) }
+      return { ok: false as const, error: (err as Error).message }
     }
   })
   ipcMain.handle('mail:markSeen', async (_e, uid: number) => {
@@ -2609,7 +2579,7 @@ export function registerIpcHandlers(): void {
       await markSeen(acc.config, uid)
       return { ok: true as const }
     } catch (err) {
-      return { ok: false as const, error: explainImapError(err, acc.config) }
+      return { ok: false as const, error: (err as Error).message }
     }
   })
 
