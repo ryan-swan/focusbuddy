@@ -120,7 +120,27 @@ const api = {
       ipcRenderer.invoke('nodes:update', id, patch),
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
+    // DEC-021 (D2): immediate hard-delete + memory purge — the dialog's
+    // "Delete everything permanently" choice. No trash window, no undo.
+    deletePermanent: (
+      id: string
+    ): Promise<{
+      purgedNodes: number
+      revived: number
+      memory: { memoryRows: number; chunkRows: number; ledgerRows: number; reviewPoints: number }
+    }> => ipcRenderer.invoke('nodes:deletePermanent', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
+    // Trash surfacing (lifecycle L1): trashed roots + days-remaining, and
+    // lossless subtree restore.
+    listTrash: (): Promise<
+      Array<{ id: string; kind: string; title: string; trashedAt: number; purgeAt: number }>
+    > => ipcRenderer.invoke('nodes:listTrash'),
+    restoreTree: (rootId: string): Promise<string[]> =>
+      ipcRenderer.invoke('nodes:restoreTree', rootId),
+    // Lifecycle L3: computed desk staleness (Stale Desks widget's only feed).
+    staleDesks: (): Promise<
+      Array<{ id: string; title: string; lastActivityMs: number; daysQuiet: number }>
+    > => ipcRenderer.invoke('nodes:staleDesks'),
     moveToOrg: (id: string, orgId: string, teamId?: string | null): Promise<string[]> =>
       ipcRenderer.invoke('nodes:moveToOrg', id, orgId, teamId ?? null),
     move: (
@@ -1689,13 +1709,111 @@ const api = {
   },
   // Multi-device workspace sync — the renderer drives the network, main owns the
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
+  // The workItems:* namespace (Attention S3, §4). Work items NEVER travel
+  // nodes:* — this is their one seam; the store wraps it.
+  workItems: {
+    list: (): Promise<FbNode[]> => ipcRenderer.invoke('workItems:list'),
+    get: (id: string): Promise<FbNode | null> => ipcRenderer.invoke('workItems:get', id),
+    create: (draft: {
+      title: string
+      notes?: string
+      parentId?: string | null
+      intentClass?: string
+      dueAt?: string | null
+      wiUrgency?: string | null
+      sourceRef?: string | null
+      sourceType?: string | null
+      confidence?: number | null
+      approvalState?: string
+      wiOrigin?: 'human' | 'ai' | 'system'
+    }): Promise<FbNode> => ipcRenderer.invoke('workItems:create', draft),
+    updateFields: (id: string, patch: Record<string, unknown>): Promise<FbNode | null> =>
+      ipcRenderer.invoke('workItems:updateFields', id, patch),
+    setState: (id: string, state: string): Promise<boolean> =>
+      ipcRenderer.invoke('workItems:setState', id, state),
+    reclassify: (id: string, intentClass: string): Promise<FbNode | null> =>
+      ipcRenderer.invoke('workItems:reclassify', id, intentClass),
+    snooze: (id: string, until: number | null): Promise<void> =>
+      ipcRenderer.invoke('workItems:snooze', id, until),
+    markRead: (id: string): Promise<void> => ipcRenderer.invoke('workItems:markRead', id),
+    clearDetached: (id: string): Promise<void> => ipcRenderer.invoke('workItems:clearDetached', id),
+    counts: (): Promise<Record<string, number>> => ipcRenderer.invoke('workItems:counts'),
+    badgeCounts: (): Promise<{ headline: number; byIntent: Record<string, number> }> =>
+      ipcRenderer.invoke('workItems:badgeCounts'),
+    setEnabled: (enabled: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('workItems:setEnabled', enabled),
+    // P1 migrated-peer confirmation: per-org gate + attestation record.
+    orgEnabled: (orgId: string): Promise<boolean> => ipcRenderer.invoke('workItems:orgEnabled', orgId),
+    orgAttestation: (orgId: string): Promise<{ attestedAt: number; note: string } | null> =>
+      ipcRenderer.invoke('workItems:orgAttestation', orgId),
+    attestOrgMigrated: (orgId: string, note: string): Promise<void> =>
+      ipcRenderer.invoke('workItems:attestOrgMigrated', orgId, note),
+    revokeOrgAttestation: (orgId: string): Promise<void> =>
+      ipcRenderer.invoke('workItems:revokeOrgAttestation', orgId),
+    classify: (
+      text: string
+    ): Promise<{
+      intentClass: string
+      confidence: number
+      title: string
+      dueAt: string | null
+      clarify: { kind: 'deadline'; phrase: string } | null
+      via: 'rules' | 'model' | 'fallback'
+      secondaries: Array<{
+        text: string
+        intentClass: string
+        trigger: string
+        title: string
+        dueAt: string | null
+      }>
+    }> => ipcRenderer.invoke('workItems:classify', text),
+    // DEC-026: the opt-in tidy — null unless the capture is messy enough AND
+    // the model produced a faithful title+gist. Approve-before-apply.
+    proposeCleanup: (text: string): Promise<{ title: string; note: string } | null> =>
+      ipcRenderer.invoke('workItems:proposeCleanup', text),
+    enabled: (): Promise<boolean> => ipcRenderer.invoke('workItems:enabled'),
+    precision: (): Promise<number | null> => ipcRenderer.invoke('workItems:precision'),
+    // Internal (S2): the arrival router's seam.
+    kindOf: (id: string): Promise<string | null> => ipcRenderer.invoke('workItems:kindOf', id),
+    applySyncEvent: (
+      ev:
+        | { type: 'create'; snapshot: Record<string, unknown> }
+        | { type: 'attr'; id: string; attr: string; value: unknown }
+        | { type: 'trash'; id: string; trashed: boolean }
+    ): Promise<string> => ipcRenderer.invoke('workItems:applySyncEvent', ev)
+  },
+  // The notification substrate (Attention S4): every notifier posts through
+  // this one door — the renderer's live banners as records-of-record, and
+  // anything scheduled for the main sweep to deliver.
+  notifications: {
+    post: (input: {
+      ref?: string | null
+      queue: string
+      title: string
+      body?: string
+      deliverAt?: number
+      dedupeKey?: string | null
+      category?: 'security' | 'decision-risk' | 'attention' | 'activity' | 'digest'
+      layer?: 'ambient' | 'inbox' | 'interruptive'
+      trigger: string
+      origin?: 'human' | 'ai' | 'system'
+      critical?: boolean
+      alreadyDelivered?: boolean
+    }): Promise<{ posted: boolean; id: string | null }> =>
+      ipcRenderer.invoke('notifications:post', input)
+  },
   workspaceSync: {
+    // F010 — after a 409 conflict-apply, floor the local sync_rev to the
+    // server's so baseRev advances even when the apply no-opped.
+    advanceBaseRev: (
+      itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file',
+      id: string,
+      rev: number
+    ): Promise<void> => ipcRenderer.invoke('workspace:advanceBaseRev', itemType, id, rev),
     pending: (): Promise<{
       upserts: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; body: Record<string, unknown>; baseRev: number }>
       deletes: Array<{ id: string; itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file'; baseRev: number }>
     }> => ipcRenderer.invoke('workspace:pending'),
-    advanceBaseRev: (itemType: string, id: string, rev: number): Promise<void> =>
-      ipcRenderer.invoke('workspace:advanceBaseRev', itemType, id, rev),
     markPushed: (itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number): Promise<void> =>
       ipcRenderer.invoke('workspace:markPushed', itemType, id, rev),
     applyRemote: (

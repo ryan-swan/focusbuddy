@@ -125,7 +125,7 @@ export default function InsightsView(): JSX.Element {
             </div>
           ) : suggestions.length === 0 ? (
             <p className="text-[12px] text-[var(--ink-50)]">
-              Energy is <strong>{ENERGY_META[energy.level].label.toLowerCase()}</strong>, but no open task fits
+              Energy is <strong>{ENERGY_META[energy.level].label.toLowerCase()}</strong>, but no open desk fits
               it right now. <button onClick={() => void logEnergy('medium')} className="text-accent hover:underline">Update energy</button>.
             </p>
           ) : (

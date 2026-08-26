@@ -1468,14 +1468,14 @@ export function PulsePanel({ conversationId, onClose }: { conversationId: string
       { id: `pulse-${it.id}`, kind: 'create-task', title: it.text.slice(0, 200) },
       { activeTaskId: null }
     )
-    setNote(res.ok ? 'Task created.' : res.message || 'Could not create the task.')
+    setNote(res.ok ? 'Desk created.' : res.message || 'Could not create the desk.')
   }
 
   const open = (items ?? []).filter((i) => i.status === 'open')
   const groups: Array<{ kind: PulseItem['kind']; label: string; icon: string }> = [
     { kind: 'decision', label: 'Decisions', icon: 'check_circle' },
     { kind: 'question', label: 'Open questions', icon: 'help' },
-    { kind: 'action', label: 'Action items', icon: 'task_alt' }
+    { kind: 'action', label: 'Desks to create', icon: 'task_alt' }
   ]
 
   return (

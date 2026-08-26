@@ -39,6 +39,8 @@ import {
   TURN_INTO_DESK_MESSAGE
 } from '../lib/conversationDesks'
 import Icon from './Icon'
+import AttentionConfirmCard from './AttentionConfirmCard'
+import { deskCaptureContext } from '../lib/captureContext'
 
 // The three display modes, in Notion's order and with Notion's labels. The
 // header's mode button shows the current mode's icon; the dropdown lists all
@@ -702,6 +704,29 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     useChatStore.getState().setThreadDraft(draftKeyRef.current, null)
   }, [])
 
+  // DEC-028: the inline capture card — @attention filed WITHOUT leaving the
+  // chat. deskCtx is snapshotted at send so navigation can't re-target it.
+  const [inlineCapture, setInlineCapture] = useState<{
+    text: string
+    deskCtx: { id: string; title: string } | null
+  } | null>(null)
+  const [inlineFiled, setInlineFiled] = useState<string | null>(null)
+
+  // DEC-027: capability probe for the deterministic @attention interception —
+  // at mount, re-probed when the Settings toggle flips.
+  const [workItemsOn, setWorkItemsOn] = useState(false)
+  useEffect(() => {
+    const probe = (): void => {
+      window.api.workItems
+        .enabled()
+        .then(setWorkItemsOn)
+        .catch(() => {})
+    }
+    probe()
+    window.addEventListener('fb:workitems-toggled', probe)
+    return () => window.removeEventListener('fb:workitems-toggled', probe)
+  }, [])
+
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current
     // The document is the source of truth: its chips serialise to "@Title" in
@@ -714,6 +739,23 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       performOmniIntent({ kind: 'search', label: 'Search the web', url: content })
       return
     }
+    // DEC-027/028: a LEADING @attention is a capture, not a chat message — it
+    // never reaches the model, and the confirm stop renders INLINE above the
+    // composer (the same shared card as the console) so the operator never
+    // leaves the chat. Mid-sentence mentions keep the AI proposal path.
+    const attn = workItemsOn ? /^@attention\b[:,]?\s*([\s\S]*)$/i.exec(content) : null
+    if (attn) {
+      ed?.commands.clearContent()
+      setDraft('')
+      const captureText = attn[1].trim()
+      if (!captureText) return // a bare @attention send has nothing to file
+      setInlineCapture({
+        text: captureText,
+        deskCtx: deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
+      })
+      setInlineFiled(null)
+      return
+    }
     // Auto (the omni door, AI-01): when the previewed pick is a non-chat
     // intent, Enter performs it instead of sending — exactly what the strip
     // said it would do.
@@ -724,7 +766,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     ed?.commands.clearContent()
     setDraft('')
     await send(thread.serverTaskId, content, thread.key)
-  }, [draft, send, thread.serverTaskId, thread.key, pickedIntent, performOmniIntent, composerMode])
+  }, [draft, send, thread.serverTaskId, thread.key, pickedIntent, performOmniIntent, composerMode, workItemsOn])
 
   async function handleSend(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -1518,6 +1560,51 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   </button>
                 )
               })}
+            </div>
+          )}
+          {inlineCapture && (
+            <div className="mb-2 rounded-[var(--radius-field)] border border-[rgba(var(--accent),0.35)] bg-[var(--surface-raised)] p-2.5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded bg-[rgba(var(--accent),0.14)] text-[rgb(var(--accent))] fb-t-caption font-medium">
+                  @attention
+                </span>
+                <span className="fb-t-caption text-[var(--ink-50)] truncate flex-1">
+                  “{inlineCapture.text.slice(0, 60)}
+                  {inlineCapture.text.length > 60 ? '…' : ''}”
+                </span>
+                <button
+                  onClick={() => {
+                    // Back to the composer, text restored where it was.
+                    const restore = `@attention ${inlineCapture.text}`
+                    setInlineCapture(null)
+                    window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: restore }))
+                  }}
+                  title="Cancel — back to the message"
+                  className="icon-btn !h-6 !w-6 shrink-0"
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+              <AttentionConfirmCard
+                text={inlineCapture.text}
+                deskCtx={inlineCapture.deskCtx}
+                cancelLabel="Cancel"
+                onFiled={(summary) => {
+                  setInlineCapture(null)
+                  setInlineFiled(summary)
+                  setTimeout(() => setInlineFiled(null), 4000)
+                }}
+                onCancel={() => {
+                  const restore = `@attention ${inlineCapture.text}`
+                  setInlineCapture(null)
+                  window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: restore }))
+                }}
+              />
+            </div>
+          )}
+          {inlineFiled && (
+            <div className="mb-2 flex items-center gap-1.5 fb-t-caption text-[var(--ink-60)]">
+              <Icon name="check_circle" size={13} /> Filed to Attention · {inlineFiled}
             </div>
           )}
           <div

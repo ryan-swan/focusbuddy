@@ -33,6 +33,57 @@ import {
 
 const MAX_OPTIONS = 8
 
+// ── DEC-027: the @attention command row ─────────────────────────────────────
+// "attention" in the picker is a COMMAND, not a mention: picking it inserts
+// the literal text "@attention " (no chip — a kind with no resolver must
+// never become a reference), and the composer's send path routes a leading
+// @attention deterministically to the capture console (DEC-019's one model).
+// Offered only while the work-items capability is on; the probe caches and
+// re-checks on the Settings toggle's event.
+
+interface AttentionCommandRow {
+  kind: 'capture'
+  id: 'attention-command'
+  title: string
+  icon: string
+  taskId: null
+  conversationKey: string
+}
+
+let workItemsOn = false
+let workItemsProbed = false
+function probeWorkItems(): void {
+  window.api.workItems
+    .enabled()
+    .then((v) => {
+      workItemsOn = v
+    })
+    .catch(() => {})
+}
+function ensureWorkItemsProbe(): void {
+  if (workItemsProbed) return
+  workItemsProbed = true
+  probeWorkItems()
+  window.addEventListener('fb:workitems-toggled', probeWorkItems)
+}
+// Probe at module load — waiting for the first "@" keystroke would race the
+// async answer and silently hide the Attention row on the picker's first open.
+ensureWorkItemsProbe()
+
+function attentionCommandRow(query: string, conversationKey: string): AttentionCommandRow | null {
+  if (!workItemsOn) return null
+  const q = query.trim().toLowerCase()
+  if (q && !'attention'.startsWith(q)) return null
+  return {
+    kind: 'capture',
+    id: 'attention-command',
+    title: 'Attention — capture what follows',
+    icon: 'notifications',
+    taskId: null,
+    conversationKey
+  }
+}
+
 export interface MentionSuggestionHooks {
   // The conversation the chip will belong to, read at the moment of the query
   // so a mention picked after a conversation switch belongs to the right one.
@@ -111,16 +162,48 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
         items: async ({ query }: { query: string }): Promise<MentionRef[]> => {
           const hooks = getHooks()
           if (!hooks) return []
+          ensureWorkItemsProbe()
           const already = activeMentions(hooks.current(), hooks.conversationKey())
           if (already.length >= MENTION_CAP) return []
           const found = await candidatesFor(query, hooks.conversationKey())
           // Never offer something this conversation already references — the
           // add would be a no-op and the picker would look broken.
           const takenKeys = new Set(already.map(mentionKey))
-          return found.filter((r) => !takenKeys.has(mentionKey(r)))
+          const out = found.filter((r) => !takenKeys.has(mentionKey(r)))
+          // DEC-027: the capture command rides on top when it matches.
+          const attn = attentionCommandRow(query, hooks.conversationKey())
+          return (attn ? [attn as unknown as MentionRef, ...out] : out).slice(0, MAX_OPTIONS)
         },
         command: ({ editor, range, props }) => {
           const ref = props as unknown as MentionRef
+          // DEC-027/028: the command row inserts a VISUAL chip (the Slack-
+          // style cue that routing is armed) but NEVER a stored reference —
+          // onPick is skipped, so the resolver and the conversation's
+          // reference set never see it. The chip's title is exactly
+          // "attention", so it serialises to "@attention" and the send path's
+          // deterministic interception fires on it.
+          if ((ref as { kind: string }).kind === 'capture') {
+            editor
+              .chain()
+              .focus()
+              .deleteRange(range)
+              .insertContent([
+                {
+                  type: 'mention',
+                  attrs: {
+                    kind: 'capture',
+                    id: 'attention-command',
+                    title: 'attention',
+                    icon: 'notifications',
+                    taskId: null,
+                    conversationKey: (ref as { conversationKey: string }).conversationKey
+                  }
+                },
+                { type: 'text', text: ' ' }
+              ])
+              .run()
+            return
+          }
           const hooks = getHooks()
           if (!hooks) return
           const already = activeMentions(hooks.current(), hooks.conversationKey())
@@ -149,7 +232,7 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
         render: () => {
           let component: ReactRenderer<MentionListHandle> | null = null
           let popup: HTMLDivElement | null = null
-          // The keyboard handle, registered by MentionList itself
+          // DEC-028 fix: the keyboard handle, registered by MentionList itself
           // (ReactRenderer's .ref is null on this React/tiptap pairing).
           let keyHandle: MentionListHandle | null = null
           const bindKeys = (h: MentionListHandle | null): void => {

@@ -18,11 +18,11 @@ interface Props {
   // silently doing nothing when a choice is made.
   atCap: boolean
   command: (item: MentionRef) => void
-  // Belt-and-braces handle registration: ReactRenderer's `.ref` comes back
-  // null on this React/tiptap pairing, so ↑/↓/Enter/Tab silently fell through
-  // to the composer (Enter even SENT the half-typed mention as a message).
-  // The suggestion plugin passes this callback and keeps whichever handle it
-  // can get; the keyboard contract finally works either way.
+  // Belt-and-braces handle registration (DEC-028 fix): ReactRenderer's `.ref`
+  // came back null on this React/tiptap pairing, so ↑/↓/Enter/Tab silently
+  // fell through to the composer (Enter even SENT the half-typed mention as a
+  // message). The suggestion plugin passes this callback and keeps whichever
+  // handle it can get; the keyboard contract finally works either way.
   bindKeys?: (h: MentionListHandle | null) => void
 }
 

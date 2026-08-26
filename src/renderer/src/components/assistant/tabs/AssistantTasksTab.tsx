@@ -34,7 +34,7 @@ export default function AssistantTasksTab(): JSX.Element {
     <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-tasks-body">
       {tasks.length === 0 ? (
         <div className="py-10 text-center text-[12.5px] text-[var(--ink-50)]">
-          No open tasks. New desks and tasks show up here.
+          No open desks yet. New desks show up here.
         </div>
       ) : (
         <ul className="space-y-1">

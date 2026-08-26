@@ -30,6 +30,8 @@ import { readFileSync } from 'fs'
 import type Anthropic from '@anthropic-ai/sdk'
 import { getModelClient } from './modelClient'
 import { randomUUID } from 'crypto'
+import { CREATE_TASK_DEFINITION } from './vocabulary'
+import { normalizeIntentClass } from '@shared/workItems'
 import type { ActionProposal } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
 import { recordInvocation } from './agentHistory'
@@ -141,7 +143,9 @@ export async function invokeAgent(
     '  "reply": "<plain-text reply explaining what you propose and why, 1-4 short paragraphs>",\n' +
     '  "proposals": [\n' +
     '    /* zero or more ActionProposal items. Each MUST be one of these shapes: */\n' +
-    '    {"kind":"create-task","title":"…","notes":"…","reason":"…"},\n' +
+    '    {"kind":"create-task","title":"…","notes":"…","reason":"…"},  /* ' +
+    CREATE_TASK_DEFINITION +
+    ' */\n' +
     '    {"kind":"create-todo-list","title":"…","items":["…","…"],"reason":"…"},\n' +
     '    {"kind":"create-widget","widgetKind":"sticky"|"note"|"markdown"|"page","title":"…","content":"…","reason":"…"},\n' +
     '    {"kind":"create-page","title":"…","content":"…","reason":"…"}\n' +
@@ -369,7 +373,18 @@ function parseInvokeResult(raw: string): ParseOk | ParseErr {
     const pp = p as Record<string, unknown>
     const kind = pp.kind
     const id = randomUUID()
-    if (kind === 'create-task' && typeof pp.title === 'string') {
+    if (kind === 'create-work-item' && typeof pp.title === 'string') {
+      // Reserved Attention-layer kind (S0): parsed everywhere, executes nowhere
+      // until the work-items capability ships.
+      proposals.push({
+        id,
+        kind: 'create-work-item',
+        title: pp.title,
+        notes: typeof pp.notes === 'string' ? pp.notes : undefined,
+        intentClass: normalizeIntentClass(pp.intentClass),
+        reason: typeof pp.reason === 'string' ? pp.reason : undefined
+      })
+    } else if (kind === 'create-task' && typeof pp.title === 'string') {
       proposals.push({
         id,
         kind: 'create-task',

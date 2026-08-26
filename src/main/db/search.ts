@@ -53,6 +53,7 @@ export async function searchAll(rawQuery: string): Promise<SearchHit[]> {
     .prepare(
       `SELECT id, kind, title, description FROM nodes
        WHERE trashed_at IS NULL AND archived = 0
+       AND kind IN ('folder', 'task')
        AND (title LIKE ?${ESC} OR description LIKE ?${ESC}) LIMIT ?`
     )
     .all(like, like, PER_CATEGORY) as Array<{

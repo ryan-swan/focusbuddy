@@ -24,7 +24,7 @@ describe('buildBriefContext', () => {
       NOW
     )
     expect(ctx).toContain('Current date and time')
-    expect(ctx).toContain('Open and in-progress tasks')
+    expect(ctx).toContain('Open and in-progress desks')
     expect(ctx).toContain('Ship launch')
     expect(ctx).toContain('in progress')
     expect(ctx).toContain('due')
@@ -47,7 +47,7 @@ describe('buildBriefContext', () => {
 
   it('omits sections that have no data (no fabricated headings)', () => {
     const ctx = buildBriefContext([{ title: 'Only task', status: 'open', priority: 3, importance: 3, dueDate: null }], [], [], NOW)
-    expect(ctx).toContain('Open and in-progress tasks')
+    expect(ctx).toContain('Open and in-progress desks')
     expect(ctx).not.toContain('Scheduled time blocks')
     expect(ctx).not.toContain('Recently worked-on documents')
   })

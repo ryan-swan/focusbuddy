@@ -161,7 +161,7 @@ export default function HomeDashboardRegion(): JSX.Element {
 
             <RailCard title="My tasks" icon="check_circle" tone="accent" action={{ label: 'All tasks', onClick: () => v.goAllTasks() }}>
               {myTasks.length === 0 ? (
-                <EmptyCard text="No open tasks. Enjoy the clear deck." />
+                <EmptyCard text="No open desks. Enjoy the clear deck." />
               ) : (
                 <ul className="space-y-1" data-testid="home-tasks">
                   {myTasks.map((n) => (

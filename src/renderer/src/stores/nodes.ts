@@ -44,6 +44,8 @@ interface NodeStore {
   create: (draft: NodeDraft) => Promise<FbNode>
   update: (id: string, patch: NodePatch) => Promise<void>
   remove: (id: string) => Promise<void>
+  /** Bulk trash (DEC-022): several roots, one emit + one undo toast. */
+  removeMany: (rootIds: string[]) => Promise<void>
   // Atomic reparent + reorder. beforeId=null appends to end of new parent.
   move: (id: string, newParentId: string | null, beforeId: string | null) => Promise<void>
   // Share a personal room/desk (and everything under it) with an org, optionally
@@ -215,6 +217,40 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
         }
       })
     }
+  },
+  removeMany: async (rootIds) => {
+    // DEC-022 bulk trash: the same contract as remove(), once — one tombstone
+    // emit, one undo toast covering every subtree. Shared roots are the
+    // caller's job to exclude (D1); the db layer refuses them anyway.
+    const targets = get().nodes.filter((n) => rootIds.includes(n.id))
+    const allIds: string[] = []
+    for (const root of rootIds) {
+      const ids = await window.api.nodes.delete(root)
+      allIds.push(...ids)
+    }
+    if (!allIds.length) return
+    crdtEmitNodeDelete(allIds)
+    set({
+      nodes: get().nodes.filter((n) => !allIds.includes(n.id)),
+      activeTaskId: allIds.includes(get().activeTaskId ?? '') ? null : get().activeTaskId
+    })
+    nudgeSync()
+    for (const t of targets) {
+      void useMessagingStore
+        .getState()
+        .archiveObjectChannel(t.kind === 'folder' ? 'room' : 'desk', t.id)
+    }
+    recordActionWithToast({
+      label: `Delete ${targets.length} item${targets.length === 1 ? '' : 's'}`,
+      undo: async () => {
+        await window.api.nodes.restore(allIds)
+        await get().refresh()
+      },
+      redo: async () => {
+        for (const root of rootIds) await window.api.nodes.delete(root)
+        await get().refresh()
+      }
+    })
   },
   moveToOrg: async (id, orgId, teamId) => {
     const ids = await window.api.nodes.moveToOrg(id, orgId, teamId)

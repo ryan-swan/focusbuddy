@@ -78,6 +78,38 @@ import { searchAll, setMailSearchCache } from '../db/search'
 const announcedMailUids = new Set<number>()
 import { getActiveOrgId, setActiveOrgId } from '../db/activeOrg'
 import { getDb } from '../db/database'
+import {
+  applyRemoteWorkItemSnapshot,
+  applyRemoteWorkItemAttr,
+  applyRemoteWorkItemTrash,
+  createWorkItem,
+  listWorkItems,
+  getWorkItem,
+  updateWorkItemFields,
+  setWorkItemState,
+  reclassifyWorkItem,
+  snoozeWorkItem,
+  markWorkItemRead,
+  clearWorkItemDetached,
+  workItemCounts,
+  workItemAttentionPrecision,
+  attentionBadgeCounts,
+  type WorkItemDraft,
+  type WorkItemState,
+  type WorkItemActor
+} from '../db/workItems'
+import { postNotification, type PostInput } from '../notifications/substrate'
+import { classifyCapture } from '../ai/intentClassify'
+import { proposeCleanup } from '../ai/cleanupRewrite'
+import {
+  isWorkItemsEnabled,
+  setWorkItemsEnabled,
+  workItemsOrgEnabled,
+  orgMigrationAttested,
+  attestOrgMigrated,
+  revokeOrgAttestation
+} from '../workItemsPref'
+import { staleDesks } from '../db/nodeActivity'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
@@ -97,10 +129,13 @@ import { getModelClient } from '../ai/modelClient'
 import {
   createNode,
   deleteNode,
+  deleteNodePermanent,
   moveNodeToOrg,
   restoreNodes,
   getNode,
   listNodes,
+  listTrash,
+  restoreTree,
   moveNode,
   updateNode,
   ensureSharedContainer
@@ -674,11 +709,103 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  // The workItems:* namespace (Attention S3, §4) — every verb wraps the S2
+  // db-module functions (F008 one code path); create carries the typed
+  // refusal codes (flag OFF / un-migrated / non-personal scope) to the caller.
+  ipcMain.handle('workItems:list', () => listWorkItems())
+  ipcMain.handle('workItems:get', (_e, id: string) => getWorkItem(id))
+  ipcMain.handle('workItems:create', (_e, draft: WorkItemDraft, actor?: WorkItemActor) =>
+    createWorkItem(draft, actor)
+  )
+  ipcMain.handle(
+    'workItems:updateFields',
+    (_e, id: string, patch: Record<string, unknown>, actor?: WorkItemActor) =>
+      updateWorkItemFields(id, patch, actor)
+  )
+  ipcMain.handle('workItems:setState', (_e, id: string, state: WorkItemState, actor?: WorkItemActor) =>
+    setWorkItemState(id, state, actor)
+  )
+  ipcMain.handle('workItems:reclassify', (_e, id: string, intentClass: string) =>
+    reclassifyWorkItem(id, intentClass)
+  )
+  ipcMain.handle('workItems:snooze', (_e, id: string, until: number | null) =>
+    snoozeWorkItem(id, until)
+  )
+  ipcMain.handle('workItems:markRead', (_e, id: string) => markWorkItemRead(id))
+  ipcMain.handle('workItems:clearDetached', (_e, id: string) => clearWorkItemDetached(id))
+  ipcMain.handle('workItems:counts', () => workItemCounts())
+  ipcMain.handle('workItems:badgeCounts', () => attentionBadgeCounts())
+  // S5: the capture classifier (hard rules first — zero model latency on the
+  // common cases; Haiku fallback; loose_thought floor) and the capability
+  // probe surfaces can gate on.
+  ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  // DEC-026 (Δ6): the opt-in tidy proposal — gated on the deterministic
+  // messiness test inside, null on any failure, never blocks a capture.
+  ipcMain.handle('workItems:proposeCleanup', (_e, text: string) =>
+    isWorkItemsEnabled() ? proposeCleanup(String(text ?? '')) : null
+  )
+  ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
+  // V2 (DEC-023): the Settings toggle — the pref finally has a real switch.
+  // Prompt vocabulary reads the pref live per call; renderer surfaces
+  // re-probe on the fb:workitems-toggled event the Settings row dispatches.
+  ipcMain.handle('workItems:setEnabled', (_e, enabled: boolean) => {
+    setWorkItemsEnabled(enabled === true)
+    return isWorkItemsEnabled()
+  })
+  // P1 migrated-peer confirmation (§2.6/§8): the per-org gate the SPEC-027
+  // org-carry branch will consult. Record/revoke are operator actions.
+  ipcMain.handle('workItems:orgEnabled', (_e, orgId: string) => workItemsOrgEnabled(String(orgId ?? '')))
+  ipcMain.handle('workItems:orgAttestation', (_e, orgId: string) => orgMigrationAttested(String(orgId ?? '')))
+  ipcMain.handle('workItems:attestOrgMigrated', (_e, orgId: string, note: string) =>
+    attestOrgMigrated(String(orgId ?? ''), String(note ?? ''))
+  )
+  ipcMain.handle('workItems:revokeOrgAttestation', (_e, orgId: string) =>
+    revokeOrgAttestation(String(orgId ?? ''))
+  )
+  // Lifecycle L3: computed desk staleness — the Stale Desks widget's feed.
+  ipcMain.handle('nodes:staleDesks', () => staleDesks())
+  // Attention precision (MET-006 wiring): acted vs dismissed over recent
+  // terminal transitions — the metric Q1's threshold recalibrates against.
+  ipcMain.handle('workItems:precision', () => workItemAttentionPrecision())
+  // The notification substrate (S4, §5): the one posting door. The renderer's
+  // live banners post records-of-record through it; scheduled deliveries are
+  // swept by the main scheduler.
+  ipcMain.handle('notifications:post', (_e, input: PostInput) => postNotification(getDb(), input))
+  // Internal seam (S2): the arrival router's channel into the same code path.
+  ipcMain.handle('workItems:kindOf', (_e, id: string) => {
+    const row = getDb().prepare('SELECT kind FROM nodes WHERE id = ?').get(id) as
+      | { kind: string }
+      | undefined
+    return row?.kind ?? null
+  })
+  ipcMain.handle(
+    'workItems:applySyncEvent',
+    (
+      _e,
+      ev:
+        | { type: 'create'; snapshot: Record<string, unknown> }
+        | { type: 'attr'; id: string; attr: string; value: unknown }
+        | { type: 'trash'; id: string; trashed: boolean }
+    ) => {
+      if (ev.type === 'create') return applyRemoteWorkItemSnapshot(ev.snapshot)
+      if (ev.type === 'attr') return applyRemoteWorkItemAttr(ev.id, ev.attr, ev.value)
+      applyRemoteWorkItemTrash(ev.id, ev.trashed)
+      return 'applied'
+    }
+  )
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
   ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => {
+    // Work_items never travel the nodes:* namespace (F008 one-code-path):
+    // their creator is workItems:create (S3), which wraps the dedicated
+    // db-module function. This protocol-boundary refusal is additional to
+    // createNode's own capability/migration/scope gates.
+    if (draft.kind === 'work_item') {
+      throw new Error('work_item creation goes through workItems:create, not nodes:create')
+    }
     const node = createNode(draft)
     // Live projection: a real ObjectCreated Event on a real user action.
+    // (Binary ternary is safe: work_item was refused above.)
     emitObjectEvent({
       eventType: node.kind === 'folder' ? 'RoomCreated' : 'DeskCreated',
       category: 'user',
@@ -709,6 +836,9 @@ export function registerIpcHandlers(): void {
     }
     return node
   })
+  // Trash surfacing (lifecycle L1): the Trash view's list + subtree restore.
+  ipcMain.handle('nodes:listTrash', () => listTrash())
+  ipcMain.handle('nodes:restoreTree', (_e, rootId: string) => restoreTree(rootId))
   ipcMain.handle('nodes:delete', (_e, id: string) => {
     const before = getNode(id)
     const removed = deleteNode(id)
@@ -720,6 +850,20 @@ export function registerIpcHandlers(): void {
       changeSummary: `Deleted "${before?.title ?? id}"`
     })
     return removed
+  })
+  // DEC-021 (D2): the permanent-purge arm of the delete dialog. Refusals (C2
+  // work_item root, D1 shared desk) throw typed errors the renderer surfaces.
+  ipcMain.handle('nodes:deletePermanent', (_e, id: string) => {
+    const before = getNode(String(id || ''))
+    const result = deleteNodePermanent(String(id || ''))
+    emitObjectEvent({
+      eventType: 'DeskDeleted',
+      category: 'user',
+      objectId: String(id || ''),
+      currentState: { title: before?.title ?? null, trashed: false },
+      changeSummary: `Permanently deleted "${before?.title ?? id}" (memory purged)`
+    })
+    return result
   })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
   ipcMain.handle('nodes:moveToOrg', (_e, id: string, orgId: string, teamId?: string | null) =>
@@ -3036,14 +3180,18 @@ export function registerIpcHandlers(): void {
   // signal URL + token); these expose the local-DB half: what to push, what to
   // mark pushed, applying pulled rows, and the pull cursor.
   ipcMain.handle('workspace:pending', () => collectPending())
-  // The 409-loop fix: floor local sync_rev to the server's after a conflict-
-  // apply so baseRev advances even when the echo-suppressed apply no-opped.
+  // F010 (Attention S2): floor local sync_rev to the server's after a 409
+  // conflict-apply so baseRev advances even when the apply no-opped.
   ipcMain.handle('workspace:advanceBaseRev', (_e, itemType: string, id: string, rev: number) =>
     advanceBaseRev(itemType, id, rev)
   )
-  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) =>
-    markPushed(itemType, id, rev)
-  )
+  ipcMain.handle('workspace:markPushed', (_e, itemType: 'node' | 'widget' | 'timeblock' | 'document' | 'table' | 'row' | 'file', id: string, rev: number) => {
+    // P1 diagnostics, widget-only trail: paired with "[sync-409]" this tells
+    // a live churn loop apart from a permanent-conflict loop at a glance.
+    // eslint-disable-next-line no-console
+    if (itemType === 'widget') console.log(`[sync-mark] pushed widget/${id} @ rev ${rev}`)
+    return markPushed(itemType, id, rev)
+  })
   ipcMain.handle('workspace:applyRemote', (_e, items: RemoteItem[]) =>
     applyRemote(Array.isArray(items) ? items : [])
   )

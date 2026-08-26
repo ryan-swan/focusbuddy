@@ -292,6 +292,12 @@ export function getProjectPlan(projectId: string, nowMs = Date.now()): ProjectPl
 
 export function setTaskPlan(taskId: string, patch: PlanTaskPatch): boolean {
   const db = getDb()
+  // Plan write guard (§2.5.8): plan fields belong to desks only — a work_item
+  // (or folder) id here is a caller bug, refused rather than silently written.
+  const target = db.prepare('SELECT kind FROM nodes WHERE id = ?').get(taskId) as
+    | { kind: string }
+    | undefined
+  if (target?.kind !== 'task') return false
   const sets: string[] = []
   const vals: Array<number | string | null> = []
   if ('planStart' in patch) {
@@ -365,8 +371,11 @@ function wouldCycle(predId: string, succId: string): boolean {
 export function addDependency(predId: string, succId: string, type: DepType = 'FS', lag = 0): AddDepResult {
   const db = getDb()
   if (predId === succId) return { ok: false, reason: 'self' }
+  // Plan write guard (§2.5.8): dependencies join desks only.
   const exists = (id: string): boolean =>
-    !!db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(id)
+    !!db
+      .prepare("SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL AND kind = 'task'")
+      .get(id)
   if (!exists(predId) || !exists(succId)) return { ok: false, reason: 'missing' }
   const dup = db
     .prepare('SELECT id FROM fb_task_deps WHERE pred_id = ? AND succ_id = ?')

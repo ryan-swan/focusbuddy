@@ -118,7 +118,7 @@ export function buildBriefContext(
       .sort((a, b) => b.importance - a.importance || a.priority - b.priority)
       .slice(0, 12)
     parts.push(
-      'Open and in-progress tasks (most important first):\n' +
+      'Open and in-progress desks (most important first):\n' +
         ranked
           .map((t) => {
             const state = t.status === 'in_progress' ? 'in progress' : 'open'

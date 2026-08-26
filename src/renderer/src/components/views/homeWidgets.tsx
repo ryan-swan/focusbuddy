@@ -1999,7 +1999,7 @@ export function OneThingNowWidget(): JSX.Element {
   return (
     <RailCard title="One thing now" icon="target" tone="amber">
       {!pick ? (
-        <EmptyState text="No open tasks. Enjoy it." />
+        <EmptyState text="No open desks. Enjoy it." />
       ) : (
         <div className="flex-1 flex items-center gap-3" data-testid="home-one-thing">
           <div className="min-w-0 flex-1">

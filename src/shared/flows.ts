@@ -21,7 +21,9 @@ export type FlowTrigger =
   | { kind: 'webhook' }
 
 export const FLOW_EVENT_LABELS: Record<FlowEventName, string> = {
-  'task-completed': 'When a task is completed',
+  // The 'task-completed' EVENT NAME is a persisted protocol string (it means a
+  // desk was completed); only this render-time label may say "desk".
+  'task-completed': 'When a desk is completed',
   'row-added': 'When a table row is added'
 }
 
@@ -97,7 +99,9 @@ export function blankAction(type: FlowActionType, id: string): FlowAction {
 }
 
 export const ACTION_LABELS: Record<FlowActionType, string> = {
-  'create-task': 'Create a task',
+  // 'create-task' is the frozen wire verb; it creates a DESK, and the label
+  // says so. Saved Flows persist the verb, never this label.
+  'create-task': 'Create a desk',
   'add-table-row': 'Add a table row',
   'send-email': 'Send an email',
   'create-knowledge': 'Add a knowledge entry',

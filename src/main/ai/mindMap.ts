@@ -33,6 +33,7 @@ import { randomUUID } from 'crypto'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import type Anthropic from '@anthropic-ai/sdk'
+import { MINDMAP_TASK_SCOPE_NOTE } from './vocabulary'
 import { getModelClient } from './modelClient'
 import { resolveAnthropicKey } from '../settingsStore'
 import { findAgentsDirectory } from '../workspaceResolver'
@@ -87,7 +88,9 @@ export async function expandMindMapNode(input: {
     '\n' +
     'Rules:\n' +
     '- "idea" = a concept to explore further (default if unsure)\n' +
-    '- "task" = something the user could do; should fit on a to-do line\n' +
+    '- "task" = something the user could do; should fit on a to-do line ' +
+    MINDMAP_TASK_SCOPE_NOTE +
+    '\n' +
     '- "question" = an open question the user should answer\n' +
     '- "tool" = a tool, app, or file the user should reach for\n' +
     '- "agent" = a domain of work an AI agent could own end-to-end\n' +

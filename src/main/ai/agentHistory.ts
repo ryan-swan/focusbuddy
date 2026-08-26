@@ -23,6 +23,8 @@
 import { randomUUID } from 'crypto'
 import type { ActionProposal } from '@shared/types'
 import { getDb } from '../db/database'
+import { detachAndReviveWorkItemDescendants } from '../db/nodeLifecycle'
+import { workItemDetachHook } from '../db/workItems'
 
 export interface InvocationRecord {
   id: string
@@ -321,7 +323,12 @@ export function undoLastApply(): UndoResult {
 
   try {
     if (kind === 'task') {
-      // Recursive delete via the existing FK cascade on nodes.parent_id.
+      // Sanctioned hard-delete site 2/3 (§2.5.3): the FK cascade on
+      // nodes.parent_id cannot be kind-filtered, so any work_item that landed
+      // under this agent-created desk is detached-and-revived first — the
+      // undo removes what the agent made, never the user's attention items.
+      detachAndReviveWorkItemDescendants(db, [id], workItemDetachHook(db))
+      // ci-delete-allowlist: agentHistory undo (§2.5.3 lock — sanctioned site 2/4)
       db.prepare('DELETE FROM nodes WHERE id = ?').run(id)
     } else if (kind === 'widget') {
       db.prepare('DELETE FROM widgets WHERE id = ?').run(id)

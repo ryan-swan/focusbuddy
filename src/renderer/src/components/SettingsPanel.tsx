@@ -34,6 +34,7 @@ import OrganisationSection from './settings/OrganisationSection'
 import TemplatesSection from './settings/TemplatesSection'
 import DocumentsSyncSection from './settings/DocumentsSyncSection'
 import ApiKeysSection from './settings/ApiKeysSection'
+import AttentionSection from './settings/AttentionSection'
 import AutonomySection from './settings/AutonomySection'
 import BrowsingConsentSection from './settings/BrowsingConsentSection'
 import BackupSection from './settings/BackupSection'
@@ -347,6 +348,7 @@ export default function SettingsPanel({
         {tab === 'ai' && (
           <>
             <ApiKeysSection />
+            <AttentionSection />
             <AutonomySection />
             <BrowsingConsentSection />
           </>

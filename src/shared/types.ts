@@ -4,11 +4,14 @@ import type { DesignBody } from './design'
 import type { ChartCore } from './chart'
 
 export type AxisValue = 1 | 2 | 3 | 4 | 5
-// 'task-item' is Caleb's lightweight sub-task kind (delivered as its own slice
-// with the node-table migration + task-list widget). Declared here so the
-// Focus-Mode workspace snapshot can classify it; no node of this kind is created
-// until the task-item slice lands.
-export type NodeKind = 'folder' | 'task' | 'task-item'
+// 'work_item' is the Attention layer's routable to-do-like entity (S1+): a
+// LEAF node, excluded from listNodes and every desk/room surface, listed only
+// by its own workItems queries. NOT a desk — see the vocabulary quarantine
+// (src/main/ai/vocabulary.ts). The retired declared-but-unbuilt 'task-item'
+// kind is gone from this union (CR-05a); legacy rows of that kind remain
+// tolerated at the DB layer (the CHECK keeps the literal) but no code creates
+// or types them.
+export type NodeKind = 'folder' | 'task' | 'work_item'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'parked'
 export type SectionLayout = 'free' | 'grid' | 'stacks' | 'icons' | 'list'
 
@@ -167,6 +170,29 @@ export interface FbNode {
   title: string
   description: string
   status: TaskStatus
+  // ── work_item fields (Attention layer S2, §2.2) — present only on
+  // kind='work_item' rows; undefined on desks/rooms. `status` above is a
+  // DERIVED projection for work_items (workItemState is authoritative);
+  // dueAt is ISO-8601, deliberately distinct from the numeric desk dueDate.
+  workItemState?: string | null
+  intentClass?: string | null
+  originatorId?: string | null
+  recipientId?: string | null
+  dueAt?: string | null
+  wiUrgency?: string | null
+  sourceRef?: string | null
+  sourceType?: string | null
+  confidence?: number | null
+  approvalState?: string | null
+  reasonCode?: string | null
+  wiOrigin?: string | null
+  schemaEpoch?: number | null
+  // Device-local satellite fields (wi_local), joined at read by listWorkItems
+  // ONLY — never synced, never in bodies (§2.4). detachedFromId marks the
+  // Detached shelf (the desk this item was park-local'd from, F-M6″);
+  // snoozeUntil hides an item from queues until it passes.
+  detachedFromId?: string | null
+  snoozeUntil?: number | null
   priority: AxisValue
   interest: AxisValue
   importance: AxisValue
@@ -785,6 +811,20 @@ export type ActionProposal =
       reason?: string
     }
   | {
+      // Reserved by the Attention layer (S0): a work_item — a routable,
+      // to-do-like attention item, NOT a desk. Parsed and creation-gated
+      // everywhere from day one so nothing can squat on the kind name; the
+      // executor no-ops it until the work-items capability ships (S3+).
+      id: string
+      kind: 'create-work-item'
+      title: string
+      notes?: string
+      // Which Attention queue this belongs to (action/review/scheduling/fyi/
+      // acknowledgment/discussion/loose_thought). Omitted → action.
+      intentClass?: string
+      reason?: string
+    }
+  | {
       id: string
       kind: 'open-url'
       url: string
@@ -1110,6 +1150,10 @@ export type AIPurpose =
   | 'agent_step'
   | 'memory_extract'
   | 'browser_agent'
+  // Attention S5: the capture console's intent classifier — a tight classify
+  // into one of the eight intent classes, small JSON out, fires per capture.
+  | 'intent_classify'
+  | 'capture_cleanup'
 
 // Result of asking AI to draft a reply to an open email in the user's voice.
 // `skip` is the expected, non-error outcome for newsletters / no-reply senders /

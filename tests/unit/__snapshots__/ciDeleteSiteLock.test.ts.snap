@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the closed four-site hard-delete enumeration > the inbound ON DELETE CASCADE set into nodes is pinned 1`] = `
+{
+  "db/database.ts": 11,
+}
+`;

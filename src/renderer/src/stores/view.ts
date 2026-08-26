@@ -17,6 +17,12 @@ export type View =
   // Rooms and desks other people have shared with you, shown as a gallery under
   // the Rooms nav rather than an inline tree.
   | { kind: 'shared' }
+  // Trashed rooms/desks awaiting the 7-day purge, restorable with their subtree.
+  | { kind: 'trash' }
+  // The Attention surface (S6): every work item that needs the person, in
+  // purpose-built queues. A lens over items that live with their desks —
+  // it references work, it never owns it.
+  | { kind: 'attention' }
   | { kind: 'calendar' }
   | { kind: 'project-dashboard'; projectId: string }
   | { kind: 'task'; taskId: string }
@@ -82,6 +88,8 @@ interface ViewStore {
   goRoom: (roomId: string) => void
   goDesks: (roomId?: string) => void
   goShared: () => void
+  goTrash: () => void
+  goAttention: () => void
   goCalendar: () => void
   goProject: (projectId: string) => void
   goTask: (taskId: string) => void
@@ -215,6 +223,8 @@ export const useViewStore = create<ViewStore>((set, get) => {
     goRoom: (roomId) => commit({ kind: 'project-dashboard', projectId: roomId }),
     goDesks: (roomId) => commit({ kind: 'desks', roomId }),
     goShared: () => commit({ kind: 'shared' }),
+    goTrash: () => commit({ kind: 'trash' }),
+    goAttention: () => commit({ kind: 'attention' }),
     goCalendar: () => commit({ kind: 'calendar' }),
     goProject: (projectId) => commit({ kind: 'project-dashboard', projectId }),
     goTask: (taskId) => commit({ kind: 'task', taskId }),

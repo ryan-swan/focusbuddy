@@ -34,6 +34,7 @@ function orderTree(nodes: FbNode[]): Array<{ node: FbNode; depth: number }> {
   const byParent = new Map<string | null, FbNode[]>()
   for (const n of nodes) {
     if (n.archived) continue
+    if (n.kind === 'work_item') continue // a work_item can never be a destination parent (S1)
     const list = byParent.get(n.parentId) ?? []
     list.push(n)
     byParent.set(n.parentId, list)

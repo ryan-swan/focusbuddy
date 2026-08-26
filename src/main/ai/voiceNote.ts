@@ -34,6 +34,9 @@ import { randomUUID } from 'crypto'
 import type Anthropic from '@anthropic-ai/sdk'
 import { getModelClient } from './modelClient'
 import type { ActionProposal } from '@shared/types'
+import { CREATE_TASK_DEFINITION, VOICE_WORK_ITEM_SHAPE } from './vocabulary'
+import { normalizeIntentClass } from '@shared/workItems'
+import { isWorkItemsEnabled } from '../workItemsPref'
 import { resolveAnthropicKey, resolveOpenAIKey } from '../settingsStore'
 import { transcribeLocal } from './localWhisper'
 import { getTranscriptionProvider } from '../voiceProviderPref'
@@ -349,11 +352,16 @@ export async function extractActionsFromTranscript(
   // would otherwise add; the parser below is defensive against any
   // surrounding prose anyway.
   const SYSTEM =
-    'You read a voice-note transcript and propose concrete actions to add to a personal task workspace.\n' +
+    'You read a voice-note transcript and propose concrete actions to add to a personal desk workspace.\n' +
     '\n' +
     'Return a JSON array of action objects. Each action MUST be one of these shapes:\n' +
     '\n' +
-    '{"kind":"create-task","title":"…","notes":"…","reason":"…"}\n' +
+    '{"kind":"create-task","title":"…","notes":"…","reason":"…"}  (' +
+    CREATE_TASK_DEFINITION +
+    ')\n' +
+    // Δ13 (S5): "remind me to call Bob" is the canonical work-item utterance —
+    // the shape appears the moment the capability is on, never before.
+    (isWorkItemsEnabled() ? VOICE_WORK_ITEM_SHAPE : '') +
     '{"kind":"create-todo-list","title":"…","items":["…","…"],"reason":"…"}\n' +
     '{"kind":"create-widget","widgetKind":"sticky"|"note"|"markdown"|"page","title":"…","content":"…","reason":"…"}\n' +
     '{"kind":"create-page","title":"…","content":"…","reason":"…"}\n' +
@@ -435,7 +443,18 @@ function safeParseProposals(raw: string): ParseOk | ParseErr {
     const obj = item as Record<string, unknown>
     const kind = obj.kind
     const id = randomUUID()
-    if (kind === 'create-task' && typeof obj.title === 'string') {
+    if (kind === 'create-work-item' && typeof obj.title === 'string') {
+      // Reserved Attention-layer kind (S0): parsed everywhere, executes nowhere
+      // until the work-items capability ships.
+      proposals.push({
+        id,
+        kind: 'create-work-item',
+        title: obj.title,
+        notes: typeof obj.notes === 'string' ? obj.notes : undefined,
+        intentClass: normalizeIntentClass(obj.intentClass),
+        reason: typeof obj.reason === 'string' ? obj.reason : undefined
+      })
+    } else if (kind === 'create-task' && typeof obj.title === 'string') {
       proposals.push({
         id,
         kind: 'create-task',

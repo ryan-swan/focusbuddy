@@ -35,7 +35,7 @@ describe('describeAction — the shapes the trace shows', () => {
       'Table — Prospects'
     )
     expect(describeAction({ kind: 'create-task', title: 'Ship the updater' })?.label).toBe(
-      'Task — Ship the updater'
+      'Desk — Ship the updater'
     )
   })
 

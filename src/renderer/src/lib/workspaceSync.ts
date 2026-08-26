@@ -3,6 +3,7 @@ import { initPreviewGuard, previewSyncBlocked } from './previewGuard'
 import { useSyncStatus } from '../stores/syncStatus'
 import { useAccountStore } from '../stores/account'
 import { useNodeStore } from '../stores/nodes'
+import { useWorkItemStore } from '../stores/workItems'
 import { useWidgetStore } from '../stores/widgets'
 import { useTimeBlockStore } from '../stores/timeBlocks'
 import { useDocumentsStore } from '../stores/documents'
@@ -11,6 +12,7 @@ import { useFileManagerStore } from '../stores/fileManager'
 import { useOrgStore, PERSONAL_ORG_ID } from '../stores/org'
 import { setOrgWorkspaceChangedHandler, setSharedWorkspaceChangedHandler } from './messagingSocket'
 import { registerSyncNudge } from './syncNudge'
+import { syncWakeCoalescer } from './syncWakeCoalescer'
 
 // Every item type carried over the sync transport. The personal loop has always
 // carried node and widget; rung 2 added document, table and row alongside the
@@ -348,7 +350,7 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
         orgId
       )
       if (res.item.itemType === 'file') await fetchMissingOrgBlobs(token, orgId, [res.item])
-      // 409 fix: floor baseRev to the server's after a conflict-apply.
+      // F010: floor baseRev to the server's after a conflict-apply.
       await window.api.workspaceSync.advanceBaseRev(res.item.itemType, res.item.id, res.item.rev)
     }
   }
@@ -392,6 +394,9 @@ async function syncOrgWorkspaceOnce(token: string, orgId: string): Promise<numbe
   // cached tables/rows are re-fetched here explicitly.
   if (applied > 0) {
     await useNodeStore.getState().refresh()
+    // P1 shared-refresh widening (15 §6 #5): work_items ride org pulls too —
+    // the Attention surface reads its own store, so reload it alongside.
+    await useWorkItemStore.getState().refresh()
     const activeTaskId = useNodeStore.getState().activeTaskId
     if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
     await useTimeBlockStore.getState().reload()
@@ -541,7 +546,7 @@ async function syncSharedWorkspaceOnce(token: string): Promise<number> {
           rootId: res.item.rootId
         }
       ])
-      // 409 fix: floor baseRev to the server's after a conflict-apply.
+      // F010: floor baseRev to the server's after a conflict-apply.
       await window.api.workspaceSync.advanceBaseRev(res.item.itemType, res.item.id, res.item.rev)
     }
   }
@@ -579,6 +584,10 @@ async function syncSharedWorkspaceOnce(token: string): Promise<number> {
 
   if (applied > 0 || pruned > 0) {
     await useNodeStore.getState().refresh()
+    // P1 shared-refresh widening (15 §6 #5): a shared desk can carry
+    // work_items — Attention reads its own store, so a shared pull (or a
+    // prune's detach-and-revive) must reload it or the page shows stale.
+    await useWorkItemStore.getState().refresh()
     const activeTaskId = useNodeStore.getState().activeTaskId
     if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
     await refreshCachedTables()
@@ -596,7 +605,6 @@ export function orgSyncOrder(activeOrgId: string, memberOrgIds: string[]): strin
   return [...active, ...members.filter((id) => id !== activeOrgId)]
 }
 
-let running = false
 
 // Per-cycle transport outcome, so the status store can tell "could not reach
 // the server" (offline, transient, keep retrying quietly) from "the server
@@ -620,11 +628,15 @@ function currentCycleFailure(): 'none' | 'offline' | 'server' {
 // One full push+pull cycle. Returns the number of remote items applied locally.
 export async function syncWorkspaceOnce(): Promise<number> {
   const token = useAccountStore.getState().sessionToken
-  if (!enabled() || !token || running) {
+  if (!enabled() || !token) {
     if (!token || previewSyncBlocked()) useSyncStatus.getState().setDisabled()
     return 0
   }
-  running = true
+  if (!syncWakeCoalescer.enter()) {
+    // A cycle is in flight. The wake is recorded; one coalesced follow-up runs
+    // from the finally below — it is no longer silently dropped.
+    return 0
+  }
   cycleFailure = 'none'
   useSyncStatus.getState().setSyncing()
   try {
@@ -657,8 +669,8 @@ export async function syncWorkspaceOnce(): Promise<number> {
         await window.api.workspaceSync.applyRemote([
           { id: res.item.id, itemType: res.item.itemType, body: res.item.body, rev: res.item.rev, deleted: res.item.deleted }
         ])
-        // 409 fix: the apply can no-op on a desynced local rev — floor baseRev
-        // to the server's so this row can never 409 forever.
+        // F010: the apply can no-op on a desynced local rev — floor baseRev to
+        // the server's so this row can never 409 forever.
         await window.api.workspaceSync.advanceBaseRev(res.item.itemType, res.item.id, res.item.rev)
       }
     }
@@ -694,6 +706,8 @@ export async function syncWorkspaceOnce(): Promise<number> {
     // Refresh the UI from the merged local DB if anything changed.
     if (applied > 0) {
       await useNodeStore.getState().refresh()
+      // Work items live in their own store (S3) — refresh it alongside.
+      await useWorkItemStore.getState().refresh()
       const activeTaskId = useNodeStore.getState().activeTaskId
       if (activeTaskId) await useWidgetStore.getState().loadForTask(activeTaskId, { refresh: true })
       // Calendar blocks sync too (rung 1): refresh whatever range is loaded.
@@ -701,7 +715,10 @@ export async function syncWorkspaceOnce(): Promise<number> {
     }
     return applied + orgApplied + sharedApplied
   } finally {
-    running = false
+    if (syncWakeCoalescer.exit()) {
+      // At least one wake landed while this cycle ran. One follow-up, not N.
+      void syncWorkspaceOnce()
+    }
   }
 }
 

@@ -44,6 +44,9 @@ export interface IndexAction {
   // Set false for actions that should only live in the context menu (e.g. Open,
   // which clicking the card already does) so the strip stays uncluttered.
   inStrip?: boolean
+  // Informational row (e.g. the D1 shared-desk reason): rendered muted in the
+  // context menu, never in the strip, and clicks do nothing.
+  disabled?: boolean
   onClick: () => void
 }
 
@@ -73,6 +76,13 @@ export interface IndexConfig<T> {
   // Small marker rendered next to the title (gallery + list), e.g. a "Shared by X"
   // badge on a room/desk shared with you. Absent = no badge.
   badge?: (item: T) => ReactNode
+  // DEC-022 selection mode: when present, a "Select" toggle joins the toolbar
+  // (gallery/list/table). The page defines the bulk actions; each receives the
+  // selected ids and a `done` callback that clears the selection after acting.
+  bulkActions?: (
+    selectedIds: string[],
+    done: () => void
+  ) => Array<{ key: string; icon: string; label: string; onClick: () => void }>
 }
 
 const MODES: Array<{ key: IndexMode; icon: string; label: string }> = [
@@ -124,7 +134,8 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
     itemActions,
     onReorder,
     headerActions,
-    badge
+    badge,
+    bulkActions
   } = config
 
   const [mode, setMode] = usePersistedString(`${storageKey}.mode`, 'gallery') as [
@@ -143,6 +154,33 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; actions: IndexAction[] } | null>(
     null
   )
+
+  // DEC-022 selection mode: clicking toggles membership instead of opening;
+  // the bar under the toolbar carries the bulk actions the page defined.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const selectable =
+    Boolean(bulkActions) && (mode === 'gallery' || mode === 'list' || mode === 'table')
+  const exitSelect = (): void => {
+    setSelecting(false)
+    setSelected(new Set())
+  }
+  const toggleSelected = (id: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const handleOpen = (it: T): void => {
+    if (selecting) toggleSelected(idOf(it))
+    else onOpen(it)
+  }
+  // Leaving the selectable modes (kanban/timeline) ends selection cleanly.
+  useEffect(() => {
+    if (selecting && !selectable) exitSelect()
+  }, [selecting, selectable])
 
   function openCtxMenu(e: React.MouseEvent, it: T): void {
     if (!itemActions) return
@@ -296,10 +334,61 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             </label>
           )}
 
+          {selectable && !selecting && (
+            <button
+              onClick={() => setSelecting(true)}
+              data-testid={`${storageKey}-select`}
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+            >
+              <Icon name="check_circle" size={15} /> Select
+            </button>
+          )}
+
           <span className="ml-auto fb-t-caption fb-tabular">
             {visible.length} {visible.length === 1 ? 'item' : 'items'}
           </span>
         </div>
+
+        {/* DEC-022: the selection bar — count, select-all, the page's bulk
+            actions, and Done. Lives under the toolbar while selecting. */}
+        {selecting && bulkActions && (
+          <div
+            data-testid={`${storageKey}-selection-bar`}
+            className="flex flex-wrap items-center gap-2 mb-4 px-3 py-2 rounded-[var(--radius-field)] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)]"
+          >
+            <span className="fb-t-label text-[var(--ink-90)] fb-tabular">
+              {selected.size} selected
+            </span>
+            <button
+              onClick={() => {
+                const all = visible.map(idOf)
+                setSelected((prev) => (prev.size === all.length ? new Set() : new Set(all)))
+              }}
+              className="inline-flex items-center gap-1 h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+            >
+              <Icon name="select_all" size={14} />
+              {selected.size === visible.length && visible.length > 0 ? 'Select none' : 'Select all'}
+            </button>
+            <div className="w-px h-5 bg-[var(--edge-soft)]" />
+            {bulkActions([...selected], exitSelect).map((a) => (
+              <button
+                key={a.key}
+                onClick={a.onClick}
+                disabled={selected.size === 0}
+                data-testid={`${storageKey}-bulk-${a.key}`}
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <Icon name={a.icon} size={14} /> {a.label}
+              </button>
+            ))}
+            <button
+              onClick={exitSelect}
+              className="ml-auto inline-flex items-center gap-1 h-7 px-2.5 fb-t-label text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press"
+            >
+              Done
+            </button>
+          </div>
+        )}
 
         {visible.length === 0 ? (
           // Two honest empty states: a search that matched nothing offers a way
@@ -356,9 +445,11 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
             idOf={idOf}
             titleOf={titleOf}
             smallIcon={smallIcon}
-            onOpen={onOpen}
+            onOpen={handleOpen}
             onItemContextMenu={openCtxMenu}
             storageKey={storageKey}
+            selecting={selecting}
+            selectedIds={selected}
           />
         ) : mode === 'timeline' ? (
           <TimelineView
@@ -399,12 +490,14 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                         thumb={thumb(it)}
                         meta={metaLine(it)}
                         actions={stripOf(it)}
-                        onOpen={() => onOpen(it)}
+                        onOpen={() => handleOpen(it)}
                         onContextMenu={(e) => openCtxMenu(e, it)}
-                        canReorder={canReorder}
+                        canReorder={canReorder && !selecting}
                         onDragStart={() => setDragId(idOf(it))}
                         onDrop={() => handleDrop(idOf(it))}
                         dragging={dragId === idOf(it)}
+                        selecting={selecting}
+                        selected={selected.has(idOf(it))}
                       />
                     ))}
                   </div>
@@ -420,12 +513,14 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
                         icon={smallIcon(it)}
                         meta={metaLine(it)}
                         actions={stripOf(it)}
-                        onOpen={() => onOpen(it)}
+                        onOpen={() => handleOpen(it)}
                         onContextMenu={(e) => openCtxMenu(e, it)}
-                        canReorder={canReorder}
+                        canReorder={canReorder && !selecting}
                         onDragStart={() => setDragId(idOf(it))}
                         onDrop={() => handleDrop(idOf(it))}
                         dragging={dragId === idOf(it)}
+                        selecting={selecting}
+                        selected={selected.has(idOf(it))}
                       />
                     ))}
                   </div>
@@ -443,7 +538,7 @@ export default function RoomsDesksIndex<T>({ config }: { config: IndexConfig<T> 
 // The hover icon strip, rendered from the same IndexAction list as the context
 // menu. Visuals match the previous hand-rolled buttons exactly.
 function ActionStrip({ actions }: { actions: IndexAction[] }): JSX.Element | null {
-  const strip = actions.filter((a) => a.inStrip !== false)
+  const strip = actions.filter((a) => a.inStrip !== false && !a.disabled)
   if (strip.length === 0) return null
   return (
     <div className="flex items-center gap-1">
@@ -510,20 +605,33 @@ function IndexContextMenu({
         data-testid="index-context-menu"
         className="absolute min-w-[200px] rounded-[var(--radius-row)] fb-glass-panel fb-pop-in py-1"
       >
-        {menu.actions.map((a) => (
-          <button
-            key={a.key}
-            onClick={() => {
-              onClose()
-              a.onClick()
-            }}
-            data-testid={`index-context-menu-${a.key}`}
-            className="w-full flex items-center gap-2.5 px-3 h-8 text-left fb-t-body text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] fb-press"
-          >
-            <Icon name={a.icon} size={15} className="text-[var(--ink-60)] shrink-0" />
-            <span className="truncate">{a.label}</span>
-          </button>
-        ))}
+        {menu.actions.map((a) =>
+          a.disabled ? (
+            // Informational row (e.g. the D1 shared-desk reason) — readable,
+            // never clickable.
+            <div
+              key={a.key}
+              data-testid={`index-context-menu-${a.key}`}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left fb-t-caption text-[var(--ink-50)]"
+            >
+              <Icon name={a.icon} size={14} className="text-[var(--ink-40)] shrink-0" />
+              <span className="whitespace-normal leading-snug">{a.label}</span>
+            </div>
+          ) : (
+            <button
+              key={a.key}
+              onClick={() => {
+                onClose()
+                a.onClick()
+              }}
+              data-testid={`index-context-menu-${a.key}`}
+              className="w-full flex items-center gap-2.5 px-3 h-8 text-left fb-t-body text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] fb-press"
+            >
+              <Icon name={a.icon} size={15} className="text-[var(--ink-60)] shrink-0" />
+              <span className="truncate">{a.label}</span>
+            </button>
+          )
+        )}
       </div>
     </div>
   )
@@ -561,6 +669,8 @@ function GalleryCard(props: {
   onDragStart: () => void
   onDrop: () => void
   dragging: boolean
+  selecting?: boolean
+  selected?: boolean
 }): JSX.Element {
   return (
     <div
@@ -572,7 +682,7 @@ function GalleryCard(props: {
       style={{ animationDelay: `${props.enterDelay}ms` }}
       className={`group relative ${PLEXI_CARD} overflow-hidden fb-lift fb-press fb-fade-in-up ${
         props.dragging ? 'opacity-40' : ''
-      }`}
+      } ${props.selected ? 'ring-2 ring-[rgb(var(--accent))]' : ''}`}
       data-testid={`index-card-${props.id}`}
     >
       <button onClick={props.onOpen} className="block w-full text-left">
@@ -587,7 +697,19 @@ function GalleryCard(props: {
           <div className="fb-t-caption mt-0.5 truncate">{props.meta}</div>
         </div>
       </button>
-      {props.actions && (
+      {props.selecting && (
+        <span
+          data-testid={`index-card-check-${props.id}`}
+          className={`absolute top-1.5 left-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full shadow-[0_0_0_1px_var(--edge-hairline)] ${
+            props.selected
+              ? 'bg-[rgb(var(--accent))] text-white'
+              : 'bg-[var(--surface-raised)]/95 text-[var(--ink-40)]'
+          }`}
+        >
+          <Icon name={props.selected ? 'check' : 'radio_button_unchecked'} size={15} />
+        </span>
+      )}
+      {props.actions && !props.selecting && (
         <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {props.actions}
         </div>
@@ -610,6 +732,8 @@ function ListRow(props: {
   onDragStart: () => void
   onDrop: () => void
   dragging: boolean
+  selecting?: boolean
+  selected?: boolean
 }): JSX.Element {
   return (
     <div
@@ -619,12 +743,23 @@ function ListRow(props: {
       onDrop={props.onDrop}
       onContextMenu={props.onContextMenu}
       style={{ animationDelay: `${props.enterDelay}ms` }}
-      className={`group flex items-center gap-3 px-3 h-12 bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] fb-press fb-fade-in-up ${
+      className={`group flex items-center gap-3 px-3 h-12 fb-press fb-fade-in-up ${
         props.dragging ? 'opacity-40' : ''
+      } ${
+        props.selected
+          ? 'bg-[rgba(var(--accent),0.08)] hover:bg-[rgba(var(--accent),0.12)]'
+          : 'bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)]'
       }`}
       data-testid={`index-row-${props.id}`}
     >
-      {props.canReorder && (
+      {props.selecting && (
+        <Icon
+          name={props.selected ? 'check_circle' : 'radio_button_unchecked'}
+          size={17}
+          className={`shrink-0 ${props.selected ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-30)]'}`}
+        />
+      )}
+      {props.canReorder && !props.selecting && (
         <Icon name="drag_indicator" size={15} className="text-[var(--ink-30)] cursor-grab shrink-0" />
       )}
       <div className="w-8 h-8 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
@@ -707,6 +842,8 @@ function TableView<T>(props: {
   onOpen: (t: T) => void
   onItemContextMenu: (e: React.MouseEvent, t: T) => void
   storageKey: string
+  selecting?: boolean
+  selectedIds?: ReadonlySet<string>
 }): JSX.Element {
   return (
     <div className="overflow-x-auto fb-card">
@@ -742,6 +879,8 @@ function TableGroup<T>(props: {
   smallIcon: (t: T) => ReactNode
   onOpen: (t: T) => void
   onItemContextMenu: (e: React.MouseEvent, t: T) => void
+  selecting?: boolean
+  selectedIds?: ReadonlySet<string>
 }): JSX.Element {
   return (
     <>
@@ -761,10 +900,25 @@ function TableGroup<T>(props: {
           onClick={() => props.onOpen(it)}
           onContextMenu={(e) => props.onItemContextMenu(e, it)}
           data-testid={`table-row-${props.idOf(it)}`}
-          className="hover:bg-[var(--surface-hover)] active:bg-[var(--surface-sunken)] cursor-pointer"
+          className={`cursor-pointer ${
+            props.selectedIds?.has(props.idOf(it))
+              ? 'bg-[rgba(var(--accent),0.08)] hover:bg-[rgba(var(--accent),0.12)]'
+              : 'hover:bg-[var(--surface-hover)] active:bg-[var(--surface-sunken)]'
+          }`}
         >
           <td className="px-3 py-2">
             <div className="flex items-center gap-2">
+              {props.selecting && (
+                <Icon
+                  name={props.selectedIds?.has(props.idOf(it)) ? 'check_circle' : 'radio_button_unchecked'}
+                  size={16}
+                  className={`shrink-0 ${
+                    props.selectedIds?.has(props.idOf(it))
+                      ? 'text-[rgb(var(--accent))]'
+                      : 'text-[var(--ink-30)]'
+                  }`}
+                />
+              )}
               <span className="w-6 h-6 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] flex items-center justify-center shrink-0">
                 {props.smallIcon(it)}
               </span>

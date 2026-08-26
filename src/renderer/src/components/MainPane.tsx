@@ -5,6 +5,8 @@ import AllTasksView from './views/AllTasksView'
 import RoomsView from './views/RoomsView'
 import DesksView from './views/DesksView'
 import SharedView from './views/SharedView'
+import TrashView from './views/TrashView'
+import AttentionView from './views/AttentionView'
 import ConnectedAppView from './views/ConnectedAppView'
 import VaultView from './views/VaultView'
 import CalendarView from './views/CalendarView'
@@ -85,6 +87,10 @@ function renderView(view: View): JSX.Element {
       return <DesksView roomId={view.roomId} />
     case 'shared':
       return <SharedView />
+    case 'trash':
+      return <TrashView />
+    case 'attention':
+      return <AttentionView />
     // Every desk is a canvas: a top-level folder-desk opens the same drag-onto
     // canvas as a task (App keeps activeTaskId pointed at the folder's node).
     case 'project-dashboard':

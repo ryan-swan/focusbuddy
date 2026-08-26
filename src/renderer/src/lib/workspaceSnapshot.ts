@@ -56,9 +56,12 @@ export function gatherWorkspaceSnapshot(): WorkspaceSnapshot {
 
   let truncated = false
 
-  // Desks = top-level folders. Tasks = task / task-item nodes, mapped to a desk.
+  // Desks = top-level folders. Tasks = desk nodes (plus legacy 'task-item'
+  // residue rows, tolerated as a string compare — the kind left the TS union
+  // with CR-05a). work_item nodes never reach this snapshot (listNodes
+  // excludes them) and are not desks.
   const deskNodes = nodes.filter((n) => n.parentId === null && n.kind === 'folder')
-  const taskNodes = nodes.filter((n) => n.kind === 'task' || n.kind === 'task-item')
+  const taskNodes = nodes.filter((n) => n.kind === 'task' || (n.kind as string) === 'task-item')
 
   const cappedTasks = taskNodes.slice(0, MAX_TASKS)
   if (cappedTasks.length < taskNodes.length) truncated = true

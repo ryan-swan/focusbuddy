@@ -87,6 +87,8 @@ export async function applyProposal(
       return applyCreatePage(proposal, ctx)
     case 'create-task':
       return applyCreateTask(proposal, ctx)
+    case 'create-work-item':
+      return applyCreateWorkItem(proposal)
     case 'start-focus-session':
       return applyStartFocusSession(proposal, ctx)
     case 'delete-widget':
@@ -204,7 +206,7 @@ export async function ensureDependencies(
     if (!r.ok) return r
   }
   if (p.kind === 'schedule-event' && p.taskId && p.taskId.startsWith('$')) {
-    const r = await resolveParent(p.taskId.slice(1), ['create-task'], 'Event references a task that was never proposed alongside it.')
+    const r = await resolveParent(p.taskId.slice(1), ['create-task'], 'Event references a desk that was never proposed alongside it.')
     if (!r.ok) return r
   }
   return { ok: true, appliedParents }
@@ -647,7 +649,7 @@ async function applyCreateWidget(
   ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — widgets need a canvas.' }
+    return { ok: false, message: 'Open a desk first — widgets need a canvas.' }
   }
   const entry = catalogFor(p.widgetKind)
   // A table widget's content is its backing-table id, NOT free text. If the AI
@@ -695,7 +697,7 @@ async function applyCreateAgent(
   ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — agents live on a canvas.' }
+    return { ok: false, message: 'Open a desk first — agents live on a canvas.' }
   }
   const entry = catalogFor('agent')
   const content = serializeAgent({
@@ -794,7 +796,7 @@ async function applyCreateTodoList(
   ctx: { activeTaskId: string | null }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — todos need a canvas.' }
+    return { ok: false, message: 'Open a desk first — todos need a canvas.' }
   }
   // Render as a markdown widget with GFM task-list syntax. Each item on its
   // own line with the strict `- [ ] ` prefix tiptap-markdown recognises.
@@ -819,7 +821,7 @@ async function applyCreatePage(
   ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — pages need a canvas.' }
+    return { ok: false, message: 'Open a desk first — pages need a canvas.' }
   }
   const entry = catalogFor('page')
   const widget = await useWidgetStore.getState().create({
@@ -862,13 +864,36 @@ async function applyStartFocusSession(
   if (!ctx.activeTaskId) {
     return {
       ok: false,
-      message: 'Open a task first — focus sessions are task-bound.'
+      message: 'Open a desk first — focus sessions are desk-bound.'
     }
   }
   await useFocusSessionStore
     .getState()
     .start(ctx.activeTaskId, Math.max(60, p.minutes * 60), `${p.minutes}min`)
   return { ok: true, message: `Started ${p.minutes}-minute focus session` }
+}
+
+// S5: an AI-proposed work item, approved by the user's card tap — the one
+// code path (the store → workItems module), origin 'ai', approval recorded.
+// The typed refusals (capability off / un-migrated device) surface honestly.
+async function applyCreateWorkItem(
+  p: Extract<ActionProposal, { kind: 'create-work-item' }>
+): Promise<ApplyResult> {
+  try {
+    const { useWorkItemStore } = await import('../stores/workItems')
+    const item = await useWorkItemStore.getState().create({
+      title: p.title,
+      notes: p.notes,
+      intentClass: p.intentClass,
+      wiOrigin: 'ai',
+      approvalState: 'approved',
+      sourceType: 'chat'
+    })
+    return { ok: true, message: `Filed "${item.title}" to Attention` }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Could not create the work item.'
+    return { ok: false, message: msg }
+  }
 }
 
 async function applyDeleteWidget(
@@ -916,7 +941,7 @@ async function applyLinkWidgets(
   ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — links live on a canvas.' }
+    return { ok: false, message: 'Open a desk first — links live on a canvas.' }
   }
   // Resolve "$<proposalId>" references so a link can point at a widget or agent
   // created earlier in the same batch (the planner does not know the real ids
@@ -1035,7 +1060,7 @@ async function applyArrangeWidgets(
   ctx: { activeTaskId: string | null }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — nothing to arrange.' }
+    return { ok: false, message: 'Open a desk first — nothing to arrange.' }
   }
   const store = useWidgetStore.getState()
   // Resolve the set we're arranging: explicit list, or every visible
@@ -1176,7 +1201,7 @@ async function applyCreateTable(
   ctx: { activeTaskId: string | null; resolvedIds?: Map<string, string> }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — tables need a canvas.' }
+    return { ok: false, message: 'Open a desk first — tables need a canvas.' }
   }
   const schema = buildSchemaFromAiColumns(p.columns)
   // Create the backing table FIRST so the widget can spawn pre-configured —
@@ -1356,7 +1381,7 @@ async function applyCreateField(
   ctx: { activeTaskId: string | null }
 ): Promise<ApplyResult> {
   if (!ctx.activeTaskId) {
-    return { ok: false, message: 'Open a task first — fields need a canvas.' }
+    return { ok: false, message: 'Open a desk first — fields need a canvas.' }
   }
   // Build a FieldDefinition + initial value blob for the FieldWidget's
   // content (which is the JSON of {def, value}).
@@ -1432,7 +1457,9 @@ export function describeProposal(
     case 'create-page':
       return { icon: 'description', verb: 'Add page', subject: p.title }
     case 'create-task':
-      return { icon: 'task_alt', verb: 'New task', subject: p.title }
+      return { icon: 'task_alt', verb: 'New desk', subject: p.title }
+    case 'create-work-item':
+      return { icon: 'notifications', verb: 'To Attention', subject: p.title }
     case 'start-focus-session':
       return {
         icon: 'timer',

@@ -66,8 +66,12 @@ import UndoToast from './components/UndoToast'
 import { PromptDialogHost, confirmDialog } from './components/plexi/PromptDialog'
 import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
+import CaptureConsole from './components/CaptureConsole'
+import AttentionBadge from './components/AttentionBadge'
 import './lib/timeOfDay' // side-effect: pushes --tod-* CSS vars to :root + ticks every 60s
-import './lib/blockReminders' // side-effect: desktop notification 5 min before each planned time block
+// Block reminders moved to the main-process notification substrate (Attention
+// S4): durable rows + the 30s sweep replace the renderer setInterval engine,
+// so a reminder scheduled before a restart still fires after it.
 import './lib/modelPrefs' // side-effect: pushes user's saved model mode to main process
 import './lib/bodyDouble' // side-effect: auto-resumes Body Double mode if user had it enabled
 import './lib/driftDetector' // side-effect: listens for window/document visibility + idle to detect drift
@@ -599,6 +603,7 @@ export default function App(): JSX.Element {
             </button>
           </Tooltip>
           <TeamPresenceButton />
+          <AttentionBadge />
           <Tooltip content="Search and commands (⌘K)" placement="bottom">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('fb:open-command-palette'))}
@@ -684,6 +689,7 @@ export default function App(): JSX.Element {
       <FeatureSpotlightPopup />
       <OnboardingHub />
       <UndoToast />
+      <CaptureConsole />
       <PromptDialogHost />
       <DocHistoryPanelHost />
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
+import { useWorkItemStore } from '../stores/workItems'
+import { useCaptureConsole } from '../stores/captureConsole'
 import PlexiiLogo from './PlexiiLogo'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
@@ -119,12 +121,11 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
   const view = useViewStore((s) => s.view)
   const goHome = useViewStore((s) => s.goHome)
-  const goAllTasks = useViewStore((s) => s.goAllTasks)
-  const goCalendar = useViewStore((s) => s.goCalendar)
-  const goProjects = useViewStore((s) => s.goProjects)
   const goRooms = useViewStore((s) => s.goRooms)
   const goDesks = useViewStore((s) => s.goDesks)
   const goShared = useViewStore((s) => s.goShared)
+  const goTrash = useViewStore((s) => s.goTrash)
+  const goAttention = useViewStore((s) => s.goAttention)
   const goFiles = useViewStore((s) => s.goFiles)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
@@ -210,7 +211,31 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
       })
     }
     window.addEventListener('fb:command-new-task', onCmd)
-    return () => window.removeEventListener('fb:command-new-task', onCmd)
+    // The Attention capture seam (S3/S5, DEC-019): a dispatch WITH a title
+    // creates directly (the programmatic path); `captureText` opens the
+    // console PREFILLED (the @attention path); a bare dispatch opens it empty.
+    function onNewWorkItem(e: Event): void {
+      const detail = (e as CustomEvent).detail as
+        | { title?: string; captureText?: string }
+        | undefined
+      const title = detail?.title?.trim()
+      if (!title) {
+        useCaptureConsole.getState().openConsole(detail?.captureText?.trim() || '')
+        return
+      }
+      void useWorkItemStore
+        .getState()
+        .create({ title })
+        .catch((err: unknown) => {
+          // eslint-disable-next-line no-console
+          console.warn('[workItems] create refused:', err instanceof Error ? err.message : err)
+        })
+    }
+    window.addEventListener('fb:command-new-work-item', onNewWorkItem)
+    return () => {
+      window.removeEventListener('fb:command-new-task', onCmd)
+      window.removeEventListener('fb:command-new-work-item', onNewWorkItem)
+    }
   }, [])
 
   // The header "New" now creates a Desk (a canvas). The create dialog lets the
@@ -337,14 +362,14 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
           <CollapsedNavIcon icon="plexii:home"  label="Home"         tone={AREA_TONES.home}  active={viewIsActive({ kind: 'home' })}       onClick={() => { setActive(null); goHome() }} />
           {/* Monochrome by plexidesk-75's rail rule: no tone, accent only when active. */}
           <CollapsedNavIcon icon="plexii:ai"     label="Plexii"       active={viewIsActive({ kind: 'plexii' })}     onClick={() => { setActive(null); goPlexii() }} />
+          <CollapsedNavIcon icon="notifications" label="Attention"    tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'attention' })} onClick={() => { setActive(null); goAttention() }} />
           <CollapsedNavIcon icon="meeting_room"  label="Rooms"        tone={AREA_TONES.rooms}     active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
           <CollapsedNavIcon icon="desk"          label="Desks"        tone={AREA_TONES.desks}    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
           <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone={AREA_TONES.shared} active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
-          <CollapsedNavIcon icon="account_tree"  label="Plans"        tone={AREA_TONES.plans}  active={viewIsActive({ kind: 'projects' })}  onClick={() => { setActive(null); goProjects() }} />
-          <CollapsedNavIcon icon="checklist"     label="Tasks"        tone={AREA_TONES.tasks} active={viewIsActive({ kind: 'all-tasks' })} onClick={() => { setActive(null); goAllTasks() }} />
-          {viewEnabled('calendar') && (
-            <CollapsedNavIcon icon="calendar_month" label="Calendar" tone={AREA_TONES.calendar} active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
-          )}
+          <CollapsedNavIcon icon="delete"        label="Trash"        tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'trash' })}     onClick={() => { setActive(null); goTrash() }} />
+          {/* DEC-020: Plans / Desks (flat) / Calendar tabs retired — Attention
+              absorbed them (feeders carry desk + plan due dates). The views
+              stay reachable via the ⌘K palette; engines untouched (DEC-009). */}
           {viewEnabled('files') && (
             <CollapsedNavIcon icon="folder" label="Files" tone={AREA_TONES.files} active={viewIsActive({ kind: 'files' })} onClick={() => { setActive(null); goFiles() }} />
           )}
@@ -472,6 +497,18 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
               goHome()
             }}
           />
+          {/* Attention — what needs you, top-level by design (S6): the
+              surface's whole job is being one glance away. */}
+          <NavRow
+            icon="notifications"
+            label="Attention"
+            tone={AREA_TONES.desks}
+            active={viewIsActive({ kind: 'attention' })}
+            onClick={() => {
+              setActive(null)
+              goAttention()
+            }}
+          />
           {/* Plexii — the AI hub. Clicking opens the hub page; the chevron
               expands to the 3 most recent conversations (Rooms sublist
               pattern). AI carries the accent hue per the destination-hue
@@ -565,40 +602,21 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
                   goShared()
                 }}
               />
+              <NavRow
+                icon="delete"
+                label="Trash"
+                tone={AREA_TONES.desks}
+                active={viewIsActive({ kind: 'trash' })}
+                onClick={() => {
+                  setActive(null)
+                  goTrash()
+                }}
+              />
             </div>
           )}
-          <NavRow
-            icon="account_tree"
-            label="Plans"
-            tone={AREA_TONES.plans}
-            active={viewIsActive({ kind: 'projects' })}
-            onClick={() => {
-              setActive(null)
-              goProjects()
-            }}
-          />
-          <NavRow
-            icon="checklist"
-            label="Tasks"
-            tone={AREA_TONES.tasks}
-            active={viewIsActive({ kind: 'all-tasks' })}
-            onClick={() => {
-              setActive(null)
-              goAllTasks()
-            }}
-          />
-          {viewEnabled('calendar') && (
-            <NavRow
-              icon="calendar_month"
-              label="Calendar"
-              tone={AREA_TONES.calendar}
-              active={viewIsActive({ kind: 'calendar' })}
-              onClick={() => {
-                setActive(null)
-                goCalendar()
-              }}
-            />
-          )}
+          {/* DEC-020: Plans / Desks (flat) / Calendar tabs retired — Attention
+              absorbed them (feeders carry desk + plan due dates). The views
+              stay reachable via the ⌘K palette; engines untouched (DEC-009). */}
           {viewEnabled('files') && (
             <NavRow
               icon="folder"

@@ -63,10 +63,10 @@ export const TEMPLATES: TemplateMeta[] = [
   {
     key: 'daily-standup',
     name: 'Daily standup flow',
-    description: 'A scheduled flow that drafts a standup prompt with AI and creates a task for it.',
+    description: 'A scheduled flow that drafts a standup prompt with AI and creates a desk for it.',
     icon: 'bolt',
     category: 'Automations',
-    creates: ['A "Daily standup" flow with an AI step and a create-task step, scheduled daily']
+    creates: ['A "Daily standup" flow with an AI step and a desk-creating step, scheduled daily']
   },
   {
     key: 'team-wiki',

@@ -166,9 +166,9 @@ async function runAction(action: FlowAction, ctx: { ai: string }): Promise<FlowR
   try {
     switch (action.type) {
       case 'create-task': {
-        const title = fill(action.title, ctx).trim() || 'Untitled task'
+        const title = fill(action.title, ctx).trim() || 'Untitled desk'
         createNode({ parentId: null, kind: 'task', title })
-        return { ...base, ok: true, message: `Created task "${title}".` }
+        return { ...base, ok: true, message: `Created desk "${title}".` }
       }
       case 'add-table-row': {
         if (!action.tableId) return { ...base, ok: false, message: 'No table chosen.' }
@@ -243,6 +243,11 @@ async function runAction(action: FlowAction, ctx: { ai: string }): Promise<FlowR
           return { ...base, ok: false, message: err instanceof Error ? err.message : 'Request failed.' }
         }
       }
+      default:
+        // actions_json is persisted data other writers (the API, future
+        // versions) can populate: an action type this build does not know must
+        // fail as an honest step, never fall through to an undefined result.
+        return { ...base, ok: false, message: `Unknown action type "${String(base.type)}".` }
     }
   } catch (err) {
     return { ...base, ok: false, message: err instanceof Error ? err.message : 'Action failed.' }

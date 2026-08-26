@@ -2,6 +2,17 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
+import { migrateNodesKindCheckV2, type NodesKindMigrationResult } from './migrateNodesKind'
+import { ensureWorkItemSchema } from './workItems'
+import { ensureNotificationSchema } from '../notifications/substrate'
+
+// The outcome of the nodes-kind widening on THIS boot, queryable by the sync
+// status surface: a 'no-check-clause' skip means the local DB never became
+// work_item-capable and must be surfaced loudly, not silently retried (§2.1).
+let nodesKindMigration: NodesKindMigrationResult | null = null
+export function nodesKindMigrationStatus(): NodesKindMigrationResult | null {
+  return nodesKindMigration
+}
 
 let db: Database.Database | null = null
 
@@ -9,7 +20,7 @@ let db: Database.Database | null = null
 // safety backup (see getDb): the snapshot is taken once per version bump, not on
 // every launch. It is NOT used to decide whether the idempotent migrations run —
 // those still run every launch.
-const MIGRATION_VERSION = 1
+const MIGRATION_VERSION = 2
 
 // Synchronous, transactionally-consistent snapshot of the live database taken
 // BEFORE any migration runs, via SQLite's VACUUM INTO. It produces one
@@ -30,7 +41,7 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
   parent_id TEXT REFERENCES nodes(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task')),
+  kind TEXT NOT NULL CHECK (kind IN ('folder', 'task', 'task-item', 'work_item')),
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'open',
@@ -553,6 +564,26 @@ export function getDb(): Database.Database {
     backupBeforeMigrating(db)
   }
   db.exec(SCHEMA)
+  // Widen the nodes kind CHECK for the Attention layer (work_item). Pinned
+  // TWO-SIDED (§2.1 F-M1): after db.exec(SCHEMA), before the nodes_mark_dirty
+  // trigger creation below and before any work_item ensureColumn. Fresh
+  // installs are born wide by the SCHEMA constant; this rebuild exists for
+  // pre-existing DBs (both verified starting shapes, GAP-014) and no-ops after.
+  nodesKindMigration = migrateNodesKindCheckV2(db)
+  if (nodesKindMigration.ran === false && nodesKindMigration.reason === 'no-check-clause') {
+    // Never fire vacuously on an unanticipated DDL shape — skip and surface.
+    // eslint-disable-next-line no-console
+    console.error(
+      '[migrateNodesKindCheckV2] SKIPPED: nodes DDL carries no extractable kind CHECK; ' +
+        'this device cannot hold work_items until inspected. DDL: ' +
+        nodesKindMigration.ddl
+    )
+  }
+  // work_item columns + satellite tables + orphan reconciliation (S2, §2.2/§2.4)
+  // — strictly AFTER the kind migration above, per its two-sided pin.
+  ensureWorkItemSchema(db)
+  // The notification substrate's durable store (S4, §5).
+  ensureNotificationSchema(db)
   // Forward-compatible migrations for previously-created DBs
   // File/folder manager: fb_files grows from a flat attachment store into a
   // foldered library. parent_id nests entries (null = root), kind tells folder
