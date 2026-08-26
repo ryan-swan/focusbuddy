@@ -65,13 +65,19 @@ export default function CommandCenter({
 }: Props): JSX.Element {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [query, setQuery] = useState('')
-  // Attention S5: one boot-time capability probe gates the capture entry.
+  // Attention S5: capability probe gates the capture entry — at boot, and
+  // re-probed live when the Settings toggle flips (DEC-023).
   const [workItemsOn, setWorkItemsOn] = useState(false)
   useEffect(() => {
-    window.api.workItems
-      .enabled()
-      .then(setWorkItemsOn)
-      .catch(() => {})
+    const probe = (): void => {
+      window.api.workItems
+        .enabled()
+        .then(setWorkItemsOn)
+        .catch(() => {})
+    }
+    probe()
+    window.addEventListener('fb:workitems-toggled', probe)
+    return () => window.removeEventListener('fb:workitems-toggled', probe)
   }, [])
   const [highlightIdx, setHighlightIdx] = useState(0)
   // Deep content search results (notes, doc bodies, table cells, files) from the

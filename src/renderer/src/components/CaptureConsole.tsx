@@ -3,6 +3,8 @@ import { useCaptureConsole } from '../stores/captureConsole'
 import { useWorkItemStore } from '../stores/workItems'
 import { useAssistantChrome } from '../stores/assistantChrome'
 import { useViewStore } from '../stores/view'
+import { useNodeStore } from '../stores/nodes'
+import { deskCaptureContext } from '../lib/captureContext'
 import { promptText } from './plexi/PromptDialog'
 import Icon from './Icon'
 
@@ -66,6 +68,11 @@ export default function CaptureConsole(): JSX.Element | null {
     phrase: string | null
   } | null>(null)
   const [confirmDate, setConfirmDate] = useState('')
+  // V2 (DEC-023): when the console opens over a desk view, the capture files
+  // ONTO that desk (origin lens + detach semantics). Clearable with one ✕ —
+  // then it files standalone like before. Snapshot at open time, so
+  // navigation underneath never re-targets a capture mid-thought.
+  const [deskCtx, setDeskCtx] = useState<{ id: string; title: string } | null>(null)
   const fieldRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -77,6 +84,9 @@ export default function CaptureConsole(): JSX.Element | null {
       setFiledId(null)
       setConfirm(null)
       setConfirmDate('')
+      setDeskCtx(
+        deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
+      )
       setTimeout(() => fieldRef.current?.focus(), 0)
     }
   }, [open, initialText])
@@ -92,6 +102,7 @@ export default function CaptureConsole(): JSX.Element | null {
     const item = await createItem({
       title,
       notes: text.trim() === title ? undefined : text.trim(),
+      parentId: deskCtx?.id ?? null,
       intentClass,
       dueAt,
       confidence,
@@ -236,6 +247,19 @@ export default function CaptureConsole(): JSX.Element | null {
             {modeBtn('expand', 'Expand', 'Hand it to the assistant to develop')}
           </div>
         </div>
+        {deskCtx && mode !== 'expand' && (
+          <div className="mt-2 inline-flex items-center gap-1.5 h-6 pl-2 pr-1 rounded-full bg-[var(--surface-sunken)] fb-t-caption text-[var(--ink-70)]">
+            <Icon name="desk" size={12} className="text-[var(--ink-40)]" />
+            <span className="truncate max-w-[220px]">on {deskCtx.title}</span>
+            <button
+              onClick={() => setDeskCtx(null)}
+              title="File standalone instead"
+              className="inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-[var(--surface-raised)] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+            >
+              <Icon name="close" size={11} />
+            </button>
+          </div>
+        )}
         <textarea
           ref={fieldRef}
           value={text}

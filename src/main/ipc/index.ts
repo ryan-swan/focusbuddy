@@ -97,6 +97,7 @@ import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
 import {
   isWorkItemsEnabled,
+  setWorkItemsEnabled,
   workItemsOrgEnabled,
   orgMigrationAttested,
   attestOrgMigrated,
@@ -733,6 +734,13 @@ export function registerIpcHandlers(): void {
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
   ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
+  // V2 (DEC-023): the Settings toggle — the pref finally has a real switch.
+  // Prompt vocabulary reads the pref live per call; renderer surfaces
+  // re-probe on the fb:workitems-toggled event the Settings row dispatches.
+  ipcMain.handle('workItems:setEnabled', (_e, enabled: boolean) => {
+    setWorkItemsEnabled(enabled === true)
+    return isWorkItemsEnabled()
+  })
   // P1 migrated-peer confirmation (§2.6/§8): the per-org gate the SPEC-027
   // org-carry branch will consult. Record/revoke are operator actions.
   ipcMain.handle('workItems:orgEnabled', (_e, orgId: string) => workItemsOrgEnabled(String(orgId ?? '')))

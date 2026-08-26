@@ -1740,6 +1740,8 @@ const api = {
     counts: (): Promise<Record<string, number>> => ipcRenderer.invoke('workItems:counts'),
     badgeCounts: (): Promise<{ headline: number; byIntent: Record<string, number> }> =>
       ipcRenderer.invoke('workItems:badgeCounts'),
+    setEnabled: (enabled: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('workItems:setEnabled', enabled),
     // P1 migrated-peer confirmation: per-org gate + attestation record.
     orgEnabled: (orgId: string): Promise<boolean> => ipcRenderer.invoke('workItems:orgEnabled', orgId),
     orgAttestation: (orgId: string): Promise<{ attestedAt: number; note: string } | null> =>
