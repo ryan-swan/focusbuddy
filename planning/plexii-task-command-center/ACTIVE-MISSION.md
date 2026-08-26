@@ -3,11 +3,36 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-26 (DEC-030 — leave-landed ruled) · **State:**
+**Last updated:** 2026-08-26 (taxonomy alignment stage EXECUTED) · **State:**
 🏁 **LANDED on main** (PR #4, main @ `c0e32a0c`, main CI green, default-OFF) →
-**POST-LANDING ITERATION** — next up: the operator's detailed pass, then the
-CR-09 brainstorm (D-A…D-K → DEC-031+) and the category alignment stage.
+**POST-LANDING ITERATION, round 1 done** — the category alignment stage shipped
+on the branch (commit `0ae275bf`, both remotes; NOT yet PR'd to main — the
+operator chooses the landing round). Next up: the operator's detailed pass and
+the CR-09 brainstorm (D-A…D-K → DEC-031+).
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
+
+**TAXONOMY ALIGNMENT EXECUTED (2026-08-26, commit `0ae275bf` — the stage
+DEC-029a sequenced; no DEC consumed):** the eight primaries live end-to-end —
+schema `to_do/to_review/to_decide/to_respond/to_meet/to_discuss/to_remember/
+to_know` (acknowledgment+direct merged into to_respond; to_decide NEW with
+terminal `'decided'`), labels To Do · Review · Decide · Respond · Meet ·
+Discuss · Remember · Know, legacy→canonical map at every boundary, NEW
+decide/respond hard triggers + the question-mark→to_respond wart fix, prompts
+derive unions from the one shared list, `intent_sub` reserved in the manifest,
+R-03 precision fix, SQL state predicates built from shared state arrays,
+CLASS_CHOICES centralized (two drifting copies removed), and the **Layer-0
+bare manual form** on the Attention page. `migrateIntentTaxonomyV2` renamed
+the live DB's 24 rows + 20 notification rows (pre-imaged, idempotent,
+re-runs each boot; VACUUM restore point via MIGRATION_VERSION 3).
+**Incident caught live:** the first sync cycle REVERTED the rename (stale
+baseRev → 409 → conflict-apply of the server's old copy) — fixed by
+canonicalizing legacy classes in `normalizeAppliedWorkItem` ON APPLY (dirty
+trigger re-pushes; fleet converges forward); second boot observed settled
+canonical+clean on the real DB. CDP smoke: classify→to_decide/to_respond via
+rules, new queue labels rendering, manual form→Decide queue→archived.
+Baseline now **2,778 tests / 274 files**. Housekeeping: the standalone
+sync-wake PR is MOOT (PRs #1–4 all merged, none open). Full ledger:
+[phases/HANDOFFS/taxonomy-alignment.md](phases/HANDOFFS/taxonomy-alignment.md).
 
 **DEC-020 EXECUTED (2026-08-25):** operator ruled "Retire the tabs and add plan due
 dates to the feeders first" — done in that order. (1) `plan-due` feeder kind: plan
