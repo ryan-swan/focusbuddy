@@ -84,6 +84,15 @@ to Detached shelf · a compound capture (secondary chips) · a rambling capture
 ⌘K and home bar: @a → Tab → pill → Enter · shared-desk menu (whenever a
 desk is shared again).
 
+**CR-09 REGISTERED (2026-08-26, ANALYSIS ONLY — nothing built):** contextual
+attention — object-marking (widget/desk → deterministically-named item via the
+existing confirm card; sourceType/sourceRef already in the manifest), widget
+scope control (desk/room/all), the plan-boundary rule (items point, scopes
+group, plans are CHOSEN — accumulation only ever SUGGESTS), and the context-menu
+IA regroup (additive-only pre-landing lean). Full design space + decision list
+D-A…D-E: [analysis/21-CR09-CONTEXTUAL-ATTENTION.md](analysis/21-CR09-CONTEXTUAL-ATTENTION.md).
+Awaiting the operator's brainstorm → DEC-029. Recommended post-landing.
+
 **When ⑥ passes and the operator declares ready:** the landing is
 `git push origin ryan-command-center:main` as ryanswan313 (operator-run),
 then the message to Michael + Caleb pointing at UPSTREAM-PR-PACKAGE.md.
