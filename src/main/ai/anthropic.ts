@@ -1525,17 +1525,36 @@ export async function sendChatStream(
   let stopReason = ''
 
   try {
-    const stream = c.messages.stream({
-      model: resolveModel('chat'),
-      max_tokens: 16384,
-      system: prepared.system,
-      messages: prepared.msgs
-    })
-    opts?.onAbortReady?.(() => stream.abort())
+    // The PlexiDesk-credits proxy rejects streaming requests outright
+    // (400 "Streaming is not supported on PlexiDesk credits"), so on credits
+    // the SAME request runs non-streamed and the full text lands in the
+    // consumer as one delta — everything downstream reads only the
+    // accumulated text, so the two shapes converge by construction.
+    const onCredits = shouldUseCredits() && getCreditClient() === c
+    let finalMsg: Awaited<ReturnType<typeof c.messages.create>>
+    if (onCredits) {
+      finalMsg = await c.messages.create({
+        model: resolveModel('chat'),
+        max_tokens: 16384,
+        system: prepared.system,
+        messages: prepared.msgs
+      })
+      for (const b of finalMsg.content) {
+        if (b.type === 'text') consumer.push(b.text)
+      }
+    } else {
+      const stream = c.messages.stream({
+        model: resolveModel('chat'),
+        max_tokens: 16384,
+        system: prepared.system,
+        messages: prepared.msgs
+      })
+      opts?.onAbortReady?.(() => stream.abort())
 
-    stream.on('text', (delta: string) => consumer.push(delta))
+      stream.on('text', (delta: string) => consumer.push(delta))
 
-    const finalMsg = await stream.finalMessage()
+      finalMsg = await stream.finalMessage()
+    }
     {
       const ct = cacheTokens(finalMsg.usage)
       recordAiUsage(resolveModel('chat'), finalMsg.usage?.input_tokens ?? 0, finalMsg.usage?.output_tokens ?? 0, ct.read, ct.write)
@@ -2084,18 +2103,36 @@ export async function askWorkspaceStream(
   const docsContext = `Workspace documents:\n${docList}`
   const tail = `${convo}Question: ${question}\n\nAnswer now:`
   try {
-    const stream = c.messages.stream({
-      model: resolveModel('chat'),
-      max_tokens: 1500,
-      system,
-      messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
-    })
+    // Credits proxy: no streaming (see sendChat) — same request non-streamed,
+    // delivered to the caller as one delta.
     let full = ''
-    stream.on('text', (delta: string) => {
-      full += delta
-      onDelta(delta)
-    })
-    const final = await stream.finalMessage()
+    let final: Awaited<ReturnType<typeof c.messages.create>>
+    if (shouldUseCredits() && getCreditClient() === c) {
+      final = await c.messages.create({
+        model: resolveModel('chat'),
+        max_tokens: 1500,
+        system,
+        messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
+      })
+      for (const b of final.content) {
+        if (b.type === 'text') {
+          full += b.text
+          onDelta(b.text)
+        }
+      }
+    } else {
+      const stream = c.messages.stream({
+        model: resolveModel('chat'),
+        max_tokens: 1500,
+        system,
+        messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
+      })
+      stream.on('text', (delta: string) => {
+        full += delta
+        onDelta(delta)
+      })
+      final = await stream.finalMessage()
+    }
     {
       const ct = cacheTokens(final.usage)
       recordAiUsage(resolveModel('chat'), final.usage?.input_tokens ?? 0, final.usage?.output_tokens ?? 0, ct.read, ct.write)
