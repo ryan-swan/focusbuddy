@@ -11,6 +11,25 @@ operator chooses the landing round). Next up: the operator's detailed pass and
 the CR-09 brainstorm (D-A…D-K → DEC-031+).
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
 
+**QA ROUND 1 — chat composer (2026-08-26, commit `e61da75b`):** operator live QA
+found the @ picker's keyboard contract (DEC-028c) broken in practice. Root cause:
+ChatPanel's omni-intent Tab cycler is CAPTURE-phase, so it ran before
+ProseMirror's suggestion plugin and swallowed every Tab — the picker's own
+handler never fired, and the stolen keystroke cycled the preview to "Search the
+web". Fixed (picker owns Tab while open) + two adjacent defects: the selected
+row's 10%-tint highlight was invisible (now tint + inset accent bar), and the
+intent strip PRE-SELECTED "Search the web" for @attention drafts even without
+Tab — a false promise, since `submitComposer` intercepts a leading @attention
+first; the strip now suppresses itself on a shared `ATTENTION_PREFIX_RE`.
+Also strengthened the model rule: "@attention" ANYWHERE is a STANDING ORDER to
+emit create-work-item, and alongside a buildable ask it must emit BOTH (the
+operator's "pitch deck … @attention" produced only a create-page). Verified live
+via CDP with real key events. Suite **2,781**. **OPEN FOR RULING (3):** (a) should
+a trailing/mid-sentence @attention become DETERMINISTIC capture instead of
+model-mediated (amends DEC-027)? (b) should `create-page` (and friends) carry a
+desk target so "apply" doesn't demand a manual pick the model already knows?
+(c) the ⌘K→ask→chat round trip took ~30s — needs its own latency trace.
+
 **TAXONOMY ALIGNMENT EXECUTED (2026-08-26, commit `0ae275bf` — the stage
 DEC-029a sequenced; no DEC consumed):** the eight primaries live end-to-end —
 schema `to_do/to_review/to_decide/to_respond/to_meet/to_discuss/to_remember/
