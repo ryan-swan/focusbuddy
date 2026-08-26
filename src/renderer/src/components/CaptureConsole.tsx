@@ -66,6 +66,15 @@ export default function CaptureConsole(): JSX.Element | null {
     dueAt: string | null
     needsDate: boolean
     phrase: string | null
+    // DEC-025: further intents the compound carried — pre-checked chips on
+    // the SAME stop (one Enter files primary + every checked secondary).
+    secondaries: Array<{
+      text: string
+      intentClass: string
+      title: string
+      dueAt: string | null
+      checked: boolean
+    }>
   } | null>(null)
   const [confirmDate, setConfirmDate] = useState('')
   // V2 (DEC-023): when the console opens over a desk view, the capture files
@@ -167,7 +176,14 @@ export default function CaptureConsole(): JSX.Element | null {
         title: c.title,
         dueAt: c.dueAt,
         needsDate: c.clarify != null,
-        phrase: c.clarify?.phrase ?? null
+        phrase: c.clarify?.phrase ?? null,
+        secondaries: (c.secondaries ?? []).map((s) => ({
+          text: s.text,
+          intentClass: s.intentClass,
+          title: s.title,
+          dueAt: s.dueAt,
+          checked: true
+        }))
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
@@ -185,7 +201,26 @@ export default function CaptureConsole(): JSX.Element | null {
           ? new Date(`${confirmDate}T17:00:00`).toISOString()
           : null
         : confirm.dueAt
+      const extras = confirm.secondaries.filter((s) => s.checked)
       await file(confirm.picked, confirm.confidence, confirm.title, dueAt)
+      // DEC-025: each checked secondary files as its own loop — its segment
+      // text, its own class and (already-anchored) date; same desk context.
+      for (const s of extras) {
+        await createItem({
+          title: s.title,
+          notes: s.text.trim() === s.title ? undefined : s.text.trim(),
+          parentId: deskCtx?.id ?? null,
+          intentClass: s.intentClass,
+          dueAt: s.dueAt,
+          confidence: 0.95,
+          approvalState: 'auto',
+          sourceType: 'note',
+          wiOrigin: 'human'
+        })
+      }
+      if (extras.length > 0) {
+        setFiled((f) => (f ? `${f} · +${extras.length} more` : f))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
     } finally {
@@ -306,6 +341,40 @@ export default function CaptureConsole(): JSX.Element | null {
                 </button>
               ))}
             </div>
+            {confirm.secondaries.length > 0 && (
+              <div className="mt-2.5">
+                <div className="text-[11px] text-[var(--ink-40)]">
+                  Also caught {confirm.secondaries.length === 1 ? 'another' : `${confirm.secondaries.length} more`} —
+                  filed together unless unchecked:
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {confirm.secondaries.map((s, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() =>
+                        setConfirm({
+                          ...confirm,
+                          secondaries: confirm.secondaries.map((x, i) =>
+                            i === idx ? { ...x, checked: !x.checked } : x
+                          )
+                        })
+                      }
+                      title={s.text}
+                      className={`inline-flex items-center gap-1.5 pl-1.5 pr-2.5 h-7 fb-t-label fb-press rounded-full ${
+                        s.checked
+                          ? 'bg-[rgba(var(--accent),0.12)] text-[var(--ink-100)] shadow-[0_0_0_1px_rgba(var(--accent),0.4)]'
+                          : 'bg-[var(--surface-raised)] text-[var(--ink-40)] line-through'
+                      }`}
+                    >
+                      <Icon name={s.checked ? 'check_circle' : 'radio_button_unchecked'} size={13} />
+                      <span className="max-w-[200px] truncate">
+                        {CLASS_LABEL[s.intentClass] ?? s.intentClass} · {s.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {confirm.needsDate && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-[12px] text-[var(--ink-70)]">When is “{confirm.phrase}”?</span>

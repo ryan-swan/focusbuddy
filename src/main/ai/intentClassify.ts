@@ -18,7 +18,10 @@ import {
   scanDeadline,
   needsDeadlineClarification,
   titleFromCapture,
-  type IntentClass
+  splitCompound,
+  secondaryCaptures,
+  type IntentClass,
+  type SecondaryIntent
 } from './intentRules'
 
 export interface CaptureClassification {
@@ -32,6 +35,9 @@ export interface CaptureClassification {
   clarify: { kind: 'deadline'; phrase: string } | null
   /** 'rules' = deterministic (no model call, R011's fast path). */
   via: 'rules' | 'model' | 'fallback'
+  /** DEC-025: further intents the compound carried (rules-only, ≤3). The
+   *  console offers them as pre-checked chips on the same confirm stop. */
+  secondaries: SecondaryIntent[]
 }
 
 const CLASSES: ReadonlySet<string> = new Set([
@@ -82,9 +88,15 @@ async function classifyWithModel(text: string): Promise<{ intentClass: IntentCla
 }
 
 export async function classifyCapture(text: string, now = new Date()): Promise<CaptureClassification> {
-  const title = titleFromCapture(text)
-  const scan = scanDeadline(text, now)
-  const ruled = classifyByRules(text)
+  // DEC-025: a compound capture classifies its PRIMARY on the first segment —
+  // each loop gets its own text — while notes keep the full capture verbatim
+  // (the console stores `text` unchanged). Secondaries are rules-only.
+  const segments = splitCompound(text)
+  const primaryText = segments.length > 1 ? segments[0] : text
+  const secondaries = secondaryCaptures(text, now)
+  const title = titleFromCapture(primaryText)
+  const scan = scanDeadline(primaryText, now)
+  const ruled = classifyByRules(primaryText)
   if (ruled) {
     return {
       intentClass: ruled.intentClass,
@@ -94,10 +106,11 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
       clarify: needsDeadlineClarification(ruled.intentClass, scan)
         ? { kind: 'deadline', phrase: scan!.phrase }
         : null,
-      via: 'rules'
+      via: 'rules',
+      secondaries
     }
   }
-  const modeled = await classifyWithModel(text)
+  const modeled = await classifyWithModel(primaryText)
   if (modeled) {
     return {
       intentClass: modeled.intentClass,
@@ -107,9 +120,18 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
       clarify: needsDeadlineClarification(modeled.intentClass, scan)
         ? { kind: 'deadline', phrase: scan!.phrase }
         : null,
-      via: 'model'
+      via: 'model',
+      secondaries
     }
   }
   // The floor: never block, never lose — file it lightly.
-  return { intentClass: 'loose_thought', confidence: 0, title, dueAt: null, clarify: null, via: 'fallback' }
+  return {
+    intentClass: 'loose_thought',
+    confidence: 0,
+    title,
+    dueAt: null,
+    clarify: null,
+    via: 'fallback',
+    secondaries
+  }
 }

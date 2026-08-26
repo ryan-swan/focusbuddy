@@ -184,3 +184,83 @@ export function titleFromCapture(text: string): string {
   const t = first.replace(/^(fyi|note to self|for the record)\b[:,]?\s*/i, '').trim()
   return (t.length > 120 ? `${t.slice(0, 117)}…` : t) || 'Untitled work item'
 }
+
+// ── Multi-intent captures (DEC-025) ─────────────────────────────────────────
+// "call Bob Thursday and review the deck" is TWO loops wearing one sentence.
+// The splitter is deterministic and deliberately conservative: a strong
+// separator (newline, semicolon) always cuts; a weak joiner ("and", "then")
+// cuts ONLY where the right side independently trips a hard trigger of its
+// own — so "call Bob and Alice" (one action, compound object) never splits,
+// and a false secondary is structurally rarer than a missed one. Secondaries
+// never pay a model call and never ask Q1 (DEC-016: at most one question,
+// and it belongs to the primary); an unanchorable date on a secondary simply
+// files dateless.
+
+export interface SecondaryIntent {
+  /** The segment, verbatim — becomes the secondary's capture text. */
+  text: string
+  intentClass: IntentClass
+  trigger: string
+  title: string
+  dueAt: string | null
+}
+
+const STRONG_SEPARATOR = /\n+|;\s*/
+const WEAK_JOINER = /\s+(?:and\s+then|and\s+also|then|and|plus|also)\s+/gi
+
+/** Triggers real enough to justify a cut — fallback buckets don't qualify. */
+function qualifies(c: RuleClassification | undefined): c is RuleClassification {
+  return !!c?.trigger && c.trigger !== 'empty' && c.trigger !== 'short-fragment'
+}
+
+/** Split a capture into intent-bearing segments (first = the primary's home). */
+export function splitCompound(text: string): string[] {
+  const out: string[] = []
+  for (const strong of text.split(STRONG_SEPARATOR)) {
+    let rest = strong.trim()
+    if (!rest) continue
+    // Cut at each weak joiner whose right side carries its own trigger.
+    let guard = 0
+    while (guard++ < 8) {
+      WEAK_JOINER.lastIndex = 0
+      let cutAt: { idx: number; len: number } | null = null
+      let m: RegExpExecArray | null
+      while ((m = WEAK_JOINER.exec(rest)) !== null) {
+        const right = rest.slice(m.index + m[0].length).trim()
+        if (right.split(/\s+/).length >= 2 && qualifies(classifyByRules(right))) {
+          cutAt = { idx: m.index, len: m[0].length }
+          break
+        }
+      }
+      if (!cutAt) break
+      out.push(rest.slice(0, cutAt.idx).trim())
+      rest = rest.slice(cutAt.idx + cutAt.len).trim()
+    }
+    if (rest) out.push(rest)
+  }
+  return out.filter(Boolean)
+}
+
+export const MAX_SECONDARY_INTENTS = 3
+
+/** The secondaries a compound capture carries beyond its primary. Rules-only:
+ *  a segment with no hard trigger of its own is NOT offered (it stays part of
+ *  the primary's context rather than becoming a speculative item). */
+export function secondaryCaptures(text: string, now: Date): SecondaryIntent[] {
+  const segments = splitCompound(text)
+  if (segments.length <= 1) return []
+  const out: SecondaryIntent[] = []
+  for (const seg of segments.slice(1)) {
+    if (out.length >= MAX_SECONDARY_INTENTS) break
+    const cls = classifyByRules(seg)
+    if (!qualifies(cls)) continue
+    out.push({
+      text: seg,
+      intentClass: cls.intentClass,
+      trigger: cls.trigger!,
+      title: titleFromCapture(seg),
+      dueAt: scanDeadline(seg, now)?.dueAt ?? null
+    })
+  }
+  return out
+}

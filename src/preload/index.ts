@@ -1759,6 +1759,13 @@ const api = {
       dueAt: string | null
       clarify: { kind: 'deadline'; phrase: string } | null
       via: 'rules' | 'model' | 'fallback'
+      secondaries: Array<{
+        text: string
+        intentClass: string
+        trigger: string
+        title: string
+        dueAt: string | null
+      }>
     }> => ipcRenderer.invoke('workItems:classify', text),
     enabled: (): Promise<boolean> => ipcRenderer.invoke('workItems:enabled'),
     precision: (): Promise<number | null> => ipcRenderer.invoke('workItems:precision'),

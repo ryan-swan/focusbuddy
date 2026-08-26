@@ -5,7 +5,10 @@ import {
   needsDeadlineClarification,
   titleFromCapture,
   isActionableClass,
-  Q1_CONFIDENCE_THRESHOLD
+  Q1_CONFIDENCE_THRESHOLD,
+  splitCompound,
+  secondaryCaptures,
+  MAX_SECONDARY_INTENTS
 } from '../../src/main/ai/intentRules'
 
 // Attention S5 — the deterministic classifier rules (R011's fast path: these
@@ -132,5 +135,58 @@ describe('title extraction', () => {
     expect(titleFromCapture('Remind me to call Bob')).toBe('Remind me to call Bob')
     expect(titleFromCapture('x'.repeat(200)).length).toBeLessThanOrEqual(120)
     expect(titleFromCapture('   ')).toBe('Untitled work item')
+  })
+})
+
+describe('DEC-025 — multi-intent captures (deterministic splitter)', () => {
+  it('a weak "and" cuts ONLY when the right side trips its own trigger', () => {
+    expect(splitCompound('call Bob Thursday and review the deck before standup')).toEqual([
+      'call Bob Thursday',
+      'review the deck before standup'
+    ])
+    // Compound OBJECT, single intent — never split.
+    expect(splitCompound('remind me to call Bob and Alice by Thursday')).toEqual([
+      'remind me to call Bob and Alice by Thursday'
+    ])
+    // No trigger on the right — no cut.
+    expect(splitCompound('remind me to call Bob and enjoy the weather')).toEqual([
+      'remind me to call Bob and enjoy the weather'
+    ])
+  })
+
+  it('strong separators always cut; three-way compounds chain', () => {
+    expect(splitCompound('remind me to email the invoice; schedule a sync with Caleb tomorrow')).toEqual([
+      'remind me to email the invoice',
+      'schedule a sync with Caleb tomorrow'
+    ])
+    expect(
+      splitCompound('remind me to call Bob and review the deck and schedule a sync tomorrow')
+    ).toEqual(['remind me to call Bob', 'review the deck', 'schedule a sync tomorrow'])
+  })
+
+  it('secondaries: rules-only, own class + anchored date, non-triggering tails skipped', () => {
+    const s = secondaryCaptures(
+      'remind me to call Bob today and review the deck before standup',
+      NOW
+    )
+    expect(s).toHaveLength(1)
+    expect(s[0].intentClass).toBe('review')
+    expect(s[0].title).toBe('review the deck before standup')
+    expect(s[0].dueAt).toBeNull() // "before standup" is vague — files dateless, no Q1
+    const anchored = secondaryCaptures('need to send the invoice; schedule a sync tomorrow', NOW)
+    expect(anchored[0].intentClass).toBe('scheduling')
+    expect(anchored[0].dueAt).not.toBeNull()
+    // A strong-split tail with no trigger of its own is NOT offered.
+    expect(secondaryCaptures('remind me to call Bob\nthe weather was lovely out there', NOW)).toEqual([])
+    // Simple captures carry none.
+    expect(secondaryCaptures('remind me to call Bob', NOW)).toEqual([])
+  })
+
+  it('caps at MAX_SECONDARY_INTENTS', () => {
+    const s = secondaryCaptures(
+      'remind me to call Bob; review the deck; schedule a sync; discuss the roadmap; approve the budget',
+      NOW
+    )
+    expect(s.length).toBe(MAX_SECONDARY_INTENTS)
   })
 })
