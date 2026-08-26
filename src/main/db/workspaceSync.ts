@@ -426,7 +426,15 @@ export function collectPendingShared(): { upserts: PendingUpsert[]; deletes: Pen
     const rootId = (row.shared_root_id ?? null) as string | null
     if (!rootId) return
     if (row.trashed_at != null) deletes.push({ id, itemType, baseRev, rootId })
-    else upserts.push({ id, itemType, body: bodyFromRow(row), baseRev, rootId })
+    else {
+      // D1 (DEC-021): `archived` is SCOPE-LOCAL on shared rows — "Archive for
+      // me" must never sync a shared desk out of the other participants'
+      // views. Stripped here on emit and ignored on shared apply (both
+      // directions, or one side silently overwrites the other's choice).
+      const body = bodyFromRow(row)
+      delete body.archived
+      upserts.push({ id, itemType, body, baseRev, rootId })
+    }
   }
 
   // Every desk-content table carries shared_root_id directly (stamped across the
@@ -921,7 +929,10 @@ export function applyRemoteShared(
       if (!item.body || typeof item.body !== 'object') continue
 
       const cols = tableCols(table)
-      const present = cols.filter((c) => !SYNC_COLS.has(c) && c in item.body!)
+      // D1 (DEC-021): `archived` is scope-local on shared rows — an inbound
+      // shared apply never overwrites this device's "Archive for me" choice
+      // (the emit side strips it too; see collectPendingShared).
+      const present = cols.filter((c) => !SYNC_COLS.has(c) && c !== 'archived' && c in item.body!)
       if (!present.includes('id')) continue
       const params: Record<string, unknown> = {}
       for (const c of present) params[c] = (item.body as Record<string, unknown>)[c]

@@ -4,10 +4,11 @@
 // Why this module exists: the FK is `parent_id … ON DELETE CASCADE` and a
 // cascade cannot be kind-filtered, so every hard-delete path must detach (and
 // revive) work_item descendants BEFORE deleting, or a desk purge silently
-// destroys them. The three sanctioned hard-delete sites (purgeTrashedNodes,
-// agentHistory undo, pruneSharedDesk) all route through here, and the CI
-// delete-site lock (tests/unit/ciDeleteSiteLock.test.ts) fails the build on
-// any new DELETE against nodes that does not.
+// destroys them. The four sanctioned hard-delete sites (purgeTrashedNodes,
+// agentHistory undo, pruneSharedDesk, and DEC-021's operator purge) all route
+// through here, and the CI delete-site lock
+// (tests/unit/ciDeleteSiteLock.test.ts) fails the build on any new DELETE
+// against nodes that does not.
 //
 // Electron-free: production passes better-sqlite3, tests pass node:sqlite —
 // both satisfy LifecycleDb structurally. Callers own transactions.
@@ -59,6 +60,24 @@ export function assertParentAcceptsChildren(d: LifecycleDb, parentId: string | n
 /** Throws when a direct delete/trash targets a work_item root (C2). */
 export function assertNotWorkItemRoot(d: LifecycleDb, id: string): void {
   if (nodeKind(d, id) === 'work_item') throw new WorkItemDeleteRefusedError()
+}
+
+/** D1 (DEC-021): a shared desk is never trashed or purged unilaterally in v1 —
+ *  the menu offers "Archive for me" / "Leave share" instead, and renders this
+ *  refusal's message when anything still reaches the db layer. */
+export class SharedDeskTrashRefusedError extends Error {
+  readonly code = 'SHARED_DESK_TRASH_REFUSED'
+  constructor() {
+    super('This desk is shared — leave the share or archive it for yourself instead.')
+    this.name = 'SharedDeskTrashRefusedError'
+  }
+}
+
+export function assertNotSharedRoot(d: LifecycleDb, id: string): void {
+  const row = d.prepare('SELECT shared_root_id FROM nodes WHERE id = ?').get(id) as
+    | { shared_root_id: string | null }
+    | undefined
+  if (row?.shared_root_id != null) throw new SharedDeskTrashRefusedError()
 }
 
 // ── Subtree walks ────────────────────────────────────────────────────────────
@@ -216,7 +235,7 @@ export function pruneSharedRows(
     hook
   )
   for (const table of tables) {
-    // ci-delete-allowlist: pruneSharedRows (§2.5.3 lock — sanctioned site 3/3)
+    // ci-delete-allowlist: pruneSharedRows (§2.5.3 lock — sanctioned site 3/4)
     const sql =
       table === 'nodes'
         ? `DELETE FROM ${table} WHERE shared_root_id = ? AND kind != 'work_item'`
@@ -240,7 +259,7 @@ export function purgeExpiredTrash(
   if (!targets.length) return { purged: 0, revived: 0 }
   const rootIds = targets.map((t) => t.id)
   const revived = detachAndReviveWorkItemDescendants(d, rootIds, hook)
-  // ci-delete-allowlist: purgeExpiredTrash (§2.5.3 lock — sanctioned site 1/3)
+  // ci-delete-allowlist: purgeExpiredTrash (§2.5.3 lock — sanctioned site 1/4)
   const del = d.prepare('DELETE FROM nodes WHERE id = ? AND trashed_at IS NOT NULL')
   let purged = 0
   for (const t of targets) {
@@ -248,4 +267,61 @@ export function purgeExpiredTrash(
     if ((res?.changes ?? 0) > 0) purged++
   }
   return { purged, revived }
+}
+
+/** Recursive child collection over ALL rows, trashed included — the operator
+ *  purge shape: "delete everything permanently" must take the whole subtree
+ *  regardless of trash state, or a half-trashed desk leaks orphans. */
+export function collectSubtreeAll(d: LifecycleDb, rootId: string): string[] {
+  const ids: string[] = []
+  const kids = d.prepare('SELECT id FROM nodes WHERE parent_id = ?')
+  const walk = (nid: string): void => {
+    ids.push(nid)
+    for (const k of kids.all(nid) as Array<{ id: string }>) walk(k.id)
+  }
+  walk(rootId)
+  return ids
+}
+
+/**
+ * DEC-021 (D2) — the operator's "Delete everything permanently" choice: an
+ * immediate hard-delete of one desk/room subtree, skipping the trash window
+ * the operator just opted out of. Refusals first (C2: never a work_item root;
+ * D1: never a shared desk). Work_item descendants DETACH AND REVIVE — R008
+ * ratified no-hard-delete for work items, so even the permanent purge
+ * preserves them (the dialog copy states it). Returns the subtree's widget
+ * ids, captured BEFORE the delete cascades them away, so the caller can purge
+ * their memory derivations (db/memoryPurge.ts).
+ */
+export function purgeDeskPermanently(
+  d: LifecycleDb,
+  rootId: string,
+  hook?: DetachHook
+): { purgedNodes: number; revived: number; nodeIds: string[]; widgetIds: string[] } {
+  assertNotWorkItemRoot(d, rootId)
+  assertNotSharedRoot(d, rootId)
+  const exists = d.prepare('SELECT id FROM nodes WHERE id = ?').get(rootId)
+  if (!exists) return { purgedNodes: 0, revived: 0, nodeIds: [], widgetIds: [] }
+  const all = collectSubtreeAll(d, rootId)
+  const revived = detachAndReviveWorkItemDescendants(d, [rootId], hook)
+  // Detached work items left the subtree above (alive, parent NULL) — they are
+  // excluded from both the delete and the memory purge. Widget ids first: the
+  // delete destroys the task_id linkage.
+  const remaining = all.filter((id) => nodeKind(d, id) !== 'work_item')
+  const widgetIds: string[] = []
+  const widgetsOf = d.prepare('SELECT id FROM widgets WHERE task_id = ?')
+  for (const id of remaining) {
+    for (const w of widgetsOf.all(id) as Array<{ id: string }>) widgetIds.push(w.id)
+  }
+  // Explicit per-row delete, leaves first — never trusts the FK cascade
+  // (foreign_keys pragma state differs across connections), and is idempotent
+  // when the pragma IS on and the root delete already cascaded.
+  // ci-delete-allowlist: purgeDeskPermanently (§2.5.3 lock — sanctioned site 4/4, DEC-021)
+  const del = d.prepare('DELETE FROM nodes WHERE id = ?')
+  let purgedNodes = 0
+  for (const id of [...remaining].reverse()) {
+    const res = del.run(id) as { changes?: number }
+    if ((res?.changes ?? 0) > 0) purgedNodes++
+  }
+  return { purgedNodes, revived, nodeIds: remaining, widgetIds }
 }

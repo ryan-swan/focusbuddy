@@ -122,6 +122,7 @@ import { getModelClient } from '../ai/modelClient'
 import {
   createNode,
   deleteNode,
+  deleteNodePermanent,
   moveNodeToOrg,
   restoreNodes,
   getNode,
@@ -830,6 +831,20 @@ export function registerIpcHandlers(): void {
       changeSummary: `Deleted "${before?.title ?? id}"`
     })
     return removed
+  })
+  // DEC-021 (D2): the permanent-purge arm of the delete dialog. Refusals (C2
+  // work_item root, D1 shared desk) throw typed errors the renderer surfaces.
+  ipcMain.handle('nodes:deletePermanent', (_e, id: string) => {
+    const before = getNode(String(id || ''))
+    const result = deleteNodePermanent(String(id || ''))
+    emitObjectEvent({
+      eventType: 'DeskDeleted',
+      category: 'user',
+      objectId: String(id || ''),
+      currentState: { title: before?.title ?? null, trashed: false },
+      changeSummary: `Permanently deleted "${before?.title ?? id}" (memory purged)`
+    })
+    return result
   })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
   ipcMain.handle('nodes:moveToOrg', (_e, id: string, orgId: string, teamId?: string | null) =>

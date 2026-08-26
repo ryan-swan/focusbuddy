@@ -120,6 +120,15 @@ const api = {
       ipcRenderer.invoke('nodes:update', id, patch),
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
     delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
+    // DEC-021 (D2): immediate hard-delete + memory purge — the dialog's
+    // "Delete everything permanently" choice. No trash window, no undo.
+    deletePermanent: (
+      id: string
+    ): Promise<{
+      purgedNodes: number
+      revived: number
+      memory: { memoryRows: number; chunkRows: number; ledgerRows: number; reviewPoints: number }
+    }> => ipcRenderer.invoke('nodes:deletePermanent', id),
     restore: (ids: string[]): Promise<boolean> => ipcRenderer.invoke('nodes:restore', ids),
     // Trash surfacing (lifecycle L1): trashed roots + days-remaining, and
     // lossless subtree restore.

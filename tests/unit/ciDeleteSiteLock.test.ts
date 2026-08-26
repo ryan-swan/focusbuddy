@@ -4,9 +4,9 @@ import { join } from 'path'
 
 // ARCHITECTURE §2.5.3 — the CI delete-site lock. The revive-at-purge design is
 // only sound while the set of hard-delete paths against `nodes` stays CLOSED:
-// exactly three sanctioned sites (purgeExpiredTrash, agentHistory undo,
-// pruneSharedRows), each carrying its detach-and-revive step. This test fails
-// the build on:
+// exactly four sanctioned sites (purgeExpiredTrash, agentHistory undo,
+// pruneSharedRows, and DEC-021's purgeDeskPermanently), each carrying its
+// detach-and-revive step. This test fails the build on:
 //   1. any DELETE whose target table is or could be `nodes` (literal `nodes`
 //      or a templated `${…}` table variable) without the allowlist marker;
 //   2. `DROP TABLE nodes` outside the migration's sanctioned rebuild;
@@ -56,7 +56,7 @@ function scan(re: RegExp): Hit[] {
   return hits
 }
 
-describe('the closed three-site hard-delete enumeration', () => {
+describe('the closed four-site hard-delete enumeration', () => {
   it('every DELETE that is or could be against nodes carries the allowlist marker', () => {
     // Literal `DELETE FROM nodes` plus every templated `DELETE FROM ${…}` —
     // a template variable COULD resolve to nodes, so it must be marked (or the

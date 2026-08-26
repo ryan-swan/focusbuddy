@@ -3,15 +3,18 @@ import { getDb } from './database'
 import { getActiveOrgId, PERSONAL_ORG_ID } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
 import {
+  assertNotSharedRoot,
   assertNotWorkItemRoot,
   assertParentAcceptsChildren,
   collectActiveSubtree,
   detachAndReviveWorkItemDescendants,
   listTrashedRoots,
+  purgeDeskPermanently,
   purgeExpiredTrash,
   restoreTrashedTree,
   type TrashedRoot
 } from './nodeLifecycle'
+import { purgeMemoryForSubjects, type MemoryPurgeSummary } from './memoryPurge'
 import { nodesTableAcceptsWorkItems } from './migrateNodesKind'
 import { workItemDetachHook } from './workItems'
 import { isWorkItemsEnabled } from '../workItemsPref'
@@ -304,6 +307,9 @@ export function deleteNode(id: string): string[] {
   // C2 (§2.5.2): a work_item is never trashed directly — its lifecycle is
   // dismissed/reclassified. Throws a typed error the caller renders.
   assertNotWorkItemRoot(db, id)
+  // D1 (DEC-021): a shared desk is never trashed unilaterally — the menu
+  // offers Archive-for-me / Leave-share; this typed refusal is the backstop.
+  assertNotSharedRoot(db, id)
   const exists = db.prepare('SELECT id FROM nodes WHERE id = ? AND trashed_at IS NULL').get(id)
   if (!exists) return []
   // The sweep INCLUDES work_item children by design (§2.5.1): trash is
@@ -405,6 +411,33 @@ export function purgeTrashedNodes(maxAgeMs = 7 * 24 * 60 * 60 * 1000): void {
     // eslint-disable-next-line no-console
     console.warn(`[purgeTrashedNodes] revived ${result.revived} work item(s) at purge (detached)`)
   }
+}
+
+// DEC-021 (D2): the operator's "Delete everything permanently" choice — the
+// desk subtree hard-deletes immediately (no trash window) and its MEMORY dies
+// with it. Work items detach-and-revive (R008: no work_item hard-delete), the
+// dialog copy states both, and a summary is logged + returned for the toast.
+export function deleteNodePermanent(id: string): {
+  purgedNodes: number
+  revived: number
+  memory: MemoryPurgeSummary
+} {
+  const db = getDb()
+  const result = db.transaction(() => {
+    const purge = purgeDeskPermanently(db, id, workItemDetachHook(db))
+    const memory = purgeMemoryForSubjects(db, {
+      nodeIds: purge.nodeIds,
+      widgetIds: purge.widgetIds
+    })
+    return { purgedNodes: purge.purgedNodes, revived: purge.revived, memory }
+  })()
+  // eslint-disable-next-line no-console
+  console.log(
+    `[purge] permanent delete of ${id}: ${result.purgedNodes} node(s), ` +
+      `${result.revived} work item(s) revived, memory: ${result.memory.memoryRows} fact(s), ` +
+      `${result.memory.chunkRows} chunk(s), ${result.memory.reviewPoints} review point(s)`
+  )
+  return result
 }
 
 // ── Trash surfacing (lifecycle track L1) ────────────────────────────────────

@@ -328,7 +328,7 @@ export function undoLastApply(): UndoResult {
       // under this agent-created desk is detached-and-revived first — the
       // undo removes what the agent made, never the user's attention items.
       detachAndReviveWorkItemDescendants(db, [id], workItemDetachHook(db))
-      // ci-delete-allowlist: agentHistory undo (§2.5.3 lock — sanctioned site 2/3)
+      // ci-delete-allowlist: agentHistory undo (§2.5.3 lock — sanctioned site 2/4)
       db.prepare('DELETE FROM nodes WHERE id = ?').run(id)
     } else if (kind === 'widget') {
       db.prepare('DELETE FROM widgets WHERE id = ?').run(id)
