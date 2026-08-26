@@ -433,4 +433,27 @@ honest count (D1); archive applies scope-local to shared rows.
 selection mode); dialog kept at delete time (rejected — operator QA, and the
 Trash-page placement answers the discovery failure directly).
 
+---
+
+## DEC-023 — V2 first picks: capture-from-desk parenting + the Settings toggle
+**Date:** 2026-08-25 · **Status:** APPROVED (operator: "do the two V2 quick wins") + IMPLEMENTED
+**(a) Capture-from-desk parenting.** The capture console snapshots the view at
+open time: over a live, personal desk view, the filed item is PARENTED to that
+desk — a visible "on <desk>" chip with a one-✕ opt-out files standalone
+instead. Conservative by construction (`lib/captureContext.ts`): only
+`view.kind === 'task'`, desk live, not archived, NOT shared (§2.6 keeps work
+items personal at P0). Desk surfaces stay blind to the item (quarantine
+unchanged); what parenting buys: the By-origin lens, honest provenance, and
+desk-trash → detach-and-revive semantics now reachable from real usage (this
+also creates the parented items the last live GAP-015 arm needs).
+**(b) The Settings toggle.** Settings → AI → "Attention layer":
+`workItems:setEnabled` IPC over the persisted pref (attestations preserved),
+honest copy (off = no capture, no AI filing; captured data stays). Applies
+live — vocabulary reads the pref per call; the ⌘K entry re-probes on
+`fb:workitems-toggled`; the badge rides `fb:workitems-changed`.
+**Also this session:** instance B shut down + its throwaway profile removed;
+the UPSTREAM-PR-PACKAGE.md deliverable produced (paste-ready PR body, flagged
+diffs, findings F-1…F-6, preconditions checklist, drift status: 6 upstream
+commits, no sync-engine collisions, ipc/index.ts only).
+
 <!-- Append below; increment DEC-NNN. -->

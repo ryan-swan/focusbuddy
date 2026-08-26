@@ -54,10 +54,18 @@ rules as desks incl. shared branches. Bulk selection landed in the shared index
 engine: Select mode + Select all + bulk Move-to-room/Archive/Trash (one undo toast,
 shared items skipped from trash with a count).
 
-**Awaiting operator:** nothing — the ruling queue is EMPTY (D1/D2/R008 → DEC-021 ✔,
-CR-08(b) → DEC-020 ✔, QA reshape → DEC-022 ✔). Next horizons: the upstream PR to
-Caleb (P1-F1 joins the leads list), V2 register, Dispatch D-phases landing on our
-rails.
+**DEC-023 EXECUTED (2026-08-25):** capture-from-desk parenting (view-snapshot,
+"on <desk>" chip, shared/archived excluded) + the Settings → AI → Attention layer
+toggle (live re-probe). Instance B retired (profile removed).
+**THE PR PACKAGE IS BUILT:** [UPSTREAM-PR-PACKAGE.md](UPSTREAM-PR-PACKAGE.md) —
+paste-ready PR body, layer map, flagged diffs, findings F-1…F-6, preconditions,
+drift status (6 upstream commits, ipc/index.ts-only overlap), rollout plan.
+**Operator's move:** merge-from-main once on the fork, open the PR with the
+package's body, hand Caleb §4 (F-1 matters independently).
+
+**Awaiting operator:** nothing else — ruling queue EMPTY. Next horizons: PR
+review cycle with Caleb, dogfood soak, remaining V2 register, Dispatch D-phases
+landing on our rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
