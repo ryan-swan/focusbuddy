@@ -52,7 +52,10 @@ Ryan opens the PR (never pushed from automation); everything below is paste-read
 > **Bugs found in the base while building (§4 of the package, evidence
 > included):** initial-pull truncation permanently skips rows on fresh-device
 > login; chat schedule-event lands a year off; undebounced webview nav
-> persistence pushes every sync cycle.
+> persistence pushes every sync cycle; and `1cec7b6a` on main references
+> mail-OAuth modules that were never committed, so a fresh clone of main
+> fails typecheck/build (this branch's merge reverts those five hunks —
+> details in merge commit `297a6620`).
 >
 > **Merge preconditions (§5):** fleet migration ordering, defensive branches
 > observed firing, and the one-code-path rule for work_item writes. Default:
@@ -101,6 +104,7 @@ Ryan opens the PR (never pushed from automation); everything below is paste-read
 | F-4 | Widget writes that skip `updated_at` skew L3 staleness (June timestamp on a row churning in August) | same trace | touch `updated_at` on nav persistence |
 | F-5 | `agentDispatcher.ts` vs the "Dispatch" product naming — collision risk with A7 vocabulary | naming audit (analysis/19) | rename before Dispatch ships |
 | F-6 | `ipc/index.ts` concurrent-edit drift (capability gates vs this branch) — now +1 commit (`7930141f`) | merge-base diff | coordinate merge order; file is append-heavy, conflicts are mechanical |
+| F-7 | **Main does not build from a fresh clone**: `1cec7b6a` ("Rebrand miss…") ships the IPC half of a mail-OAuth feature — imports of `mail/oauth` + `mail/oauthProviders` (files never committed, exist only untracked on the dev machine) and calls to `explainImapError` / `getFullFresh` / `accountFromOAuth` / `saveOAuth` that exist in no committed module; no renderer calls the new handlers either | typecheck of a clean checkout of `39faa2c4`; `git ls-tree origin/main src/main/mail/` | commit the missing files (or revert the five ipc hunks); this branch's merge commit `297a6620` documents the exact hunks and carries the revert |
 
 Note: `b66ffe24`/`44f240f8` upstream (managed-Plexii first-run; legacy minimap
 retirement) are welcome — the retired legacy minimap matches the stuck widget
@@ -121,14 +125,17 @@ observed in P1 diagnostics.
 6. **DEC-020 nav retirement acknowledged** — Calendar/Plans/Desks-flat rows
    hidden on this branch; carry or consciously re-add. ☐
 
-## 6. Drift status at package time
+## 6. Drift status — **MERGED (2026-08-26, commit `297a6620`)**
 
-`origin/main` is 6 commits ahead of the merge-base (`7930141f…39faa2c4`):
-share-dialog, capabilities, first-run, minimap retirement, rebrand, release
-4.1.1. **Collision check: NO overlap with workspaceSync/crdtSync/vocabulary/
-nodes.ts — only `ipc/index.ts` (mechanical).** Recommended: one
-merge-from-main on the fork before opening the PR; expected conflicts:
-`ipc/index.ts` only.
+`origin/main` (`7930141f…39faa2c4`, release 4.1.1) is merged into the branch:
+share-dialog, capabilities, first-run, minimap retirement, rebrand all
+carried. **No overlap with workspaceSync/crdtSync/vocabulary/nodes.ts
+materialized; the textual merge was clean.** One exception, documented in the
+merge commit itself: the five broken mail-OAuth ipc hunks from `1cec7b6a`
+(finding F-7) are reverted to upstream's own last working version so the tree
+builds; the next merge picks the feature up once its files are committed.
+Post-merge gates: typecheck clean, 2,750 tests green. The branch is
+PR-ready against `39faa2c4`.
 
 ## 7. Rollout plan
 
