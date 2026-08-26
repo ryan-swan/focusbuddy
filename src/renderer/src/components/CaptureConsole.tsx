@@ -82,6 +82,13 @@ export default function CaptureConsole(): JSX.Element | null {
   // then it files standalone like before. Snapshot at open time, so
   // navigation underneath never re-targets a capture mid-thought.
   const [deskCtx, setDeskCtx] = useState<{ id: string; title: string } | null>(null)
+  // DEC-026 (Δ6): the opt-in tidy. Requested async AFTER the confirm screen
+  // is up (never on the capture's latency path); appears as an offer; nothing
+  // changes unless "Use tidied" is clicked, and the verbatim text is kept in
+  // the notes either way. The seq ref drops stale arrivals after re-edits.
+  const [cleanup, setCleanup] = useState<{ title: string; note: string; originalTitle: string } | null>(null)
+  const [cleanupUsed, setCleanupUsed] = useState(false)
+  const cleanupSeq = useRef(0)
   const fieldRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -93,6 +100,9 @@ export default function CaptureConsole(): JSX.Element | null {
       setFiledId(null)
       setConfirm(null)
       setConfirmDate('')
+      setCleanup(null)
+      setCleanupUsed(false)
+      cleanupSeq.current++
       setDeskCtx(
         deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
       )
@@ -106,11 +116,12 @@ export default function CaptureConsole(): JSX.Element | null {
     intentClass: string,
     confidence: number,
     title: string,
-    dueAt: string | null
+    dueAt: string | null,
+    notesOverride?: string
   ): Promise<void> {
     const item = await createItem({
       title,
-      notes: text.trim() === title ? undefined : text.trim(),
+      notes: notesOverride ?? (text.trim() === title ? undefined : text.trim()),
       parentId: deskCtx?.id ?? null,
       intentClass,
       dueAt,
@@ -185,6 +196,17 @@ export default function CaptureConsole(): JSX.Element | null {
           checked: true
         }))
       })
+      // DEC-026: request the tidy AFTER the confirm screen is already up —
+      // it slots in as an offer if (and only if) it arrives while this same
+      // capture is still on screen.
+      const seq = ++cleanupSeq.current
+      setCleanup(null)
+      setCleanupUsed(false)
+      void window.api.workItems.proposeCleanup(t).then((p) => {
+        if (p && cleanupSeq.current === seq) {
+          setCleanup({ title: p.title, note: p.note, originalTitle: c.title })
+        }
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
     } finally {
@@ -202,7 +224,13 @@ export default function CaptureConsole(): JSX.Element | null {
           : null
         : confirm.dueAt
       const extras = confirm.secondaries.filter((s) => s.checked)
-      await file(confirm.picked, confirm.confidence, confirm.title, dueAt)
+      // DEC-026: a used tidy leads the notes with the clean gist and keeps
+      // the capture verbatim below it — nothing written is ever lost.
+      const tidiedNotes =
+        cleanupUsed && cleanup
+          ? `${cleanup.note}\n\n— as captured —\n${text.trim()}`
+          : undefined
+      await file(confirm.picked, confirm.confidence, confirm.title, dueAt, tidiedNotes)
       // DEC-025: each checked secondary files as its own loop — its segment
       // text, its own class and (already-anchored) date; same desk context.
       for (const s of extras) {
@@ -373,6 +401,47 @@ export default function CaptureConsole(): JSX.Element | null {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+            {cleanup && !cleanupUsed && (
+              <div className="mt-2.5 flex items-start gap-2 rounded-[var(--radius-field)] bg-[var(--surface-raised)] px-2.5 py-2">
+                <Icon name="auto_awesome" size={14} className="text-[var(--ink-40)] mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-[var(--ink-40)]">Tidied version:</div>
+                  <div className="text-[12px] text-[var(--ink-90)] truncate" title={cleanup.note}>
+                    “{cleanup.title}”
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setConfirm({ ...confirm, title: cleanup.title })
+                    setCleanupUsed(true)
+                  }}
+                  className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] shrink-0"
+                >
+                  Use tidied
+                </button>
+                <button
+                  onClick={() => setCleanup(null)}
+                  title="Keep as written"
+                  className="icon-btn !h-7 !w-7 shrink-0"
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+            )}
+            {cleanup && cleanupUsed && (
+              <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ink-40)]">
+                <Icon name="auto_awesome" size={12} /> Tidied — the original stays in the notes.
+                <button
+                  onClick={() => {
+                    setConfirm({ ...confirm, title: cleanup.originalTitle })
+                    setCleanupUsed(false)
+                  }}
+                  className="underline underline-offset-2 hover:text-[var(--ink-100)] fb-press"
+                >
+                  Undo
+                </button>
               </div>
             )}
             {confirm.needsDate && (

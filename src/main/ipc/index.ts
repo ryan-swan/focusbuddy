@@ -100,6 +100,7 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
+import { proposeCleanup } from '../ai/cleanupRewrite'
 import {
   isWorkItemsEnabled,
   setWorkItemsEnabled,
@@ -738,6 +739,11 @@ export function registerIpcHandlers(): void {
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  // DEC-026 (Δ6): the opt-in tidy proposal — gated on the deterministic
+  // messiness test inside, null on any failure, never blocks a capture.
+  ipcMain.handle('workItems:proposeCleanup', (_e, text: string) =>
+    isWorkItemsEnabled() ? proposeCleanup(String(text ?? '')) : null
+  )
   ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
   // V2 (DEC-023): the Settings toggle — the pref finally has a real switch.
   // Prompt vocabulary reads the pref live per call; renderer surfaces

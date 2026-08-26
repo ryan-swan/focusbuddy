@@ -243,6 +243,28 @@ export function splitCompound(text: string): string[] {
 
 export const MAX_SECONDARY_INTENTS = 3
 
+// ── The cleanup gate (DEC-026, Δ6) ──────────────────────────────────────────
+// Deterministic messiness test deciding whether a capture even QUALIFIES for
+// the opt-in tidy proposal. Clean short captures never pay a model call and
+// never see the offer. Pure and unit-tested; the model half lives in
+// ai/cleanupRewrite.ts.
+
+const FILLER_RE =
+  /\b(um+|uh+|so basically|basically|you know|i think maybe|kind of|sort of|or something|stuff like that|whatever|anyway|like i said)\b/gi
+
+/** Messy enough to offer a tidy: long, rambling, or filler-dense. */
+export function needsCleanup(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  const words = t.split(/\s+/).length
+  if (words >= 30) return true
+  const fillers = t.match(FILLER_RE)?.length ?? 0
+  if (fillers >= 2) return true
+  // A long unpunctuated run-on: 18+ words with no sentence break at all.
+  if (words >= 18 && !/[.!?;\n]/.test(t.slice(0, -1))) return true
+  return false
+}
+
 /** The secondaries a compound capture carries beyond its primary. Rules-only:
  *  a segment with no hard trigger of its own is NOT offered (it stays part of
  *  the primary's context rather than becoming a speculative item). */

@@ -36,6 +36,11 @@ const AUTO_ROUTING: Record<AIPurpose, string> = {
   // command_route: tiny classify, fires per capture, deterministic hard
   // triggers run FIRST so most captures never reach the model at all.
   intent_classify: HAIKU,
+  // DEC-026 (Δ6): the opt-in capture tidy — clean title + gist from a messy
+  // brain-dump. Fires only behind the deterministic messiness gate, async
+  // after the confirm screen is already up (never on the latency path), and
+  // the user approves before anything replaces anything.
+  capture_cleanup: HAIKU,
   // Office-document generation (the "Create with AI" flow for docs, sheets and
   // slides). The user reads and then edits the result, so quality matters;
   // Sonnet is the right default, with the global model-mode override available.

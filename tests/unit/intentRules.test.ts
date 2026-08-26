@@ -8,7 +8,8 @@ import {
   Q1_CONFIDENCE_THRESHOLD,
   splitCompound,
   secondaryCaptures,
-  MAX_SECONDARY_INTENTS
+  MAX_SECONDARY_INTENTS,
+  needsCleanup
 } from '../../src/main/ai/intentRules'
 
 // Attention S5 — the deterministic classifier rules (R011's fast path: these
@@ -188,5 +189,30 @@ describe('DEC-025 — multi-intent captures (deterministic splitter)', () => {
       NOW
     )
     expect(s.length).toBe(MAX_SECONDARY_INTENTS)
+  })
+})
+
+describe('DEC-026 — the cleanup gate (deterministic, pure)', () => {
+  it('clean short captures never qualify', () => {
+    expect(needsCleanup('Remind me to call Bob today')).toBe(false)
+    expect(needsCleanup('fyi: the vendor moved the deadline to Friday.')).toBe(false)
+    expect(needsCleanup('')).toBe(false)
+  })
+
+  it('long, filler-dense, or unpunctuated run-ons qualify', () => {
+    // 30+ words.
+    expect(
+      needsCleanup(
+        'so I was talking to the vendor about the contract terms and they said the pricing model changes next quarter which means we need to redo the projections for the board deck next month'
+      )
+    ).toBe(true)
+    // Filler-dense.
+    expect(needsCleanup('so basically we need the thing, you know, for the launch')).toBe(true)
+    // 18+ words, zero sentence punctuation.
+    expect(
+      needsCleanup(
+        'need to grab the numbers from finance then fold them into the deck before the call with the team'
+      )
+    ).toBe(true)
   })
 })
