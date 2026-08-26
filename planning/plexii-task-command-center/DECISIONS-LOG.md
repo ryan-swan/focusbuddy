@@ -605,4 +605,32 @@ all entangled with the work_item schema. Known cost: when the fork branch
 next merges main after PR #2 lands, the six shared files conflict textually
 (branch is the semantic superset — resolve keep-branch).
 
+---
+
+## DEC-030 — Leave it landed; iteration continues on main's substrate
+**Date:** 2026-08-26 · **Status:** RULED (operator)
+**Context:** After PR #4 merged, the operator revealed "declare ready" had been
+a misunderstanding — he believed he was confirming the groundwork split
+(DEC-029b), not authorizing the full landing, and his standing intent had been
+wait-until-finished (the fork-only rule). He asked whether reverting the
+Attention layer off main was feasible without pain.
+**Analysis given:** (1) a revert cannot un-reveal anything — PR #4's diff, the
+shared-repo branch, and the in-repo planning corpus are permanently visible in
+history; the real usage gate is `workItems.enabled` default-OFF; (2) reverting
+a merged branch plants the revert-then-re-merge trap (git treats the 91 commits
+as already-in-history; re-landing later requires revert-of-the-revert); (3) the
+layer is dormant for Michael + Caleb until they toggle it.
+**Ruling:** **"Leave it landed, let's keep working through the attention
+layer."** The landing stands. Future Attention work iterates on the branch and
+lands in rounds via PRs when the operator chooses — no revert, no freeze.
+**Owed:** the operator sends Michael + Caleb the WIP framing note (drafted in
+session: the big PR is the Attention layer, work-in-progress, off by default,
+don't toggle it on yet).
+**Process lesson (standing):** before any big irreversible or outward-facing
+action, the assistant restates CONCRETELY what is about to happen ("this
+merges 91 commits into main, visible to the team immediately") and gets fresh
+explicit confirmation — never executes off a pre-agreed codeword alone.
+**Numbering note:** the CR-09 brainstorm rulings (D-A…D-K, analysis/21) will
+record as DEC-031+; older pointers saying "→ DEC-029/030" mean "the next DEC."
+
 <!-- Append below; increment DEC-NNN. -->

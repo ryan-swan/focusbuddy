@@ -3,9 +3,11 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (DEC-020 EXECUTED — the nav retirement) · **State:**
-IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
-→ **S7 ✔ — G6 MET (607ace78). THE BUILD'S SPINE IS COMPLETE AND LIVE.**)
+**Last updated:** 2026-08-26 (DEC-030 — leave-landed ruled) · **State:**
+🏁 **LANDED on main** (PR #4, main @ `c0e32a0c`, main CI green, default-OFF) →
+**POST-LANDING ITERATION** — next up: the operator's detailed pass, then the
+CR-09 brainstorm (D-A…D-K → DEC-031+) and the category alignment stage.
+**Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
 
 **DEC-020 EXECUTED (2026-08-25):** operator ruled "Retire the tabs and add plan due
 dates to the feeders first" — done in that order. (1) `plan-due` feeder kind: plan
@@ -63,11 +65,13 @@ drift status (6 upstream commits, ipc/index.ts-only overlap), rollout plan.
 **Operator's move:** merge-from-main once on the fork, open the PR with the
 package's body, hand Caleb §4 (F-1 matters independently).
 
-**LANDING STATUS (corrected 2026-08-26):** `saasmouth main` was NEVER updated —
-the push was classifier-blocked and the handed command not run; the operator then
-ruled WAIT-UNTIL-FINISHED: **fork-branch pushes only** until Attention is declared
-fully ready (memory: plexii-repo-ownership-and-push-rules). Landing when ready =
-`git push origin ryan-command-center:main` as ryanswan313, run by the operator.
+**LANDING STATUS (final, 2026-08-26):** the layer **LANDED via PR #4** (main @
+`c0e32a0c`, main CI green). The wait-until-finished fork-only rule is FULFILLED
+and retired. "Declare ready" was later revealed as a misunderstanding; **DEC-030
+ruled LEAVE IT LANDED** — no revert (can't un-reveal; revert-trap), the flag is
+the gate, iteration continues in PR-sized rounds. Landing pattern that stands:
+branch push + `gh pr merge` as ryanswan313 (raw push to main stays blocked).
+Owed: the operator's WIP framing note to Michael + Caleb (drafted, unsent).
 
 **THE FINISH LINE (GA checklist): BUILD COMPLETE ①–⑤.** ① FYI backstop ✔ ·
 ② item archival ✔ (DEC-024) · ③ multi-intent ✔ (DEC-025) · ④ cleanup rewrite ✔
@@ -99,7 +103,7 @@ observed), Living Doc + Meetings as the first observers (both half-built:
 meeting vocabulary + approval_state='suggested' shipped in S2/S5), the Layer-0
 gap audit (no item editing · no Attention selection mode · no bare manual form),
 deferred rails named (tags/cross-ref, delegation→SPEC-027, standup feed).
-Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-029.
+Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-031+.
 Recommended post-landing.
 
 **DEC-029 (2026-08-26): taxonomy tests adopted as LAW + R-06 confirmed; the
@@ -121,8 +125,10 @@ excised). 2,763 green. The branch is current with everything the team has.
 172 files, +16,998/−429, 2,763 tests, DEC-001…029 — from empty planning folder
 to landed layer in three days. The layer ships default-OFF; the reveal message
 to Michael + Caleb points at PR #4 + UPSTREAM-PR-PACKAGE.md. Post-landing
-queue: CR-09 (D-A…D-K brainstorm → DEC), the category alignment stage
-(analysis/22), the observers, SPEC-027 routing era.
+queue: CR-09 (D-A…D-K brainstorm → DEC-031+), the category alignment stage
+(analysis/22), the observers, SPEC-027 routing era. **DEC-030 (same day):
+"declare ready" had been a misunderstanding — operator ruled LEAVE IT LANDED;
+iteration continues; the WIP note to the team is his to send.**
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
