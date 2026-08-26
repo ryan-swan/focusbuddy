@@ -13,6 +13,8 @@ import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
 import ShareDialog from '../ShareDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
+import { lifecycleIndexActions } from '../../lib/deskLifecycleMenu'
+import { bulkArchive, bulkTrash } from '../../lib/deleteDeskFlow'
 
 // The All Rooms index. A Room is a folder node — a place desks live. Clicking a
 // room opens its scoped Desks index (the "expand to show my desks" gesture). A
@@ -27,7 +29,6 @@ export default function RoomsView(): JSX.Element {
   const move = useNodeStore((s) => s.move)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
-  const remove = useNodeStore((s) => s.remove)
   const moveToOrg = useNodeStore((s) => s.moveToOrg)
   // Lifecycle L1: the archived shelf (same mechanics as All Desks).
   const [showArchived, setShowArchived] = useState(
@@ -278,32 +279,36 @@ export default function RoomsView(): JSX.Element {
         label: 'Open room',
         onClick: () => goRoom(r.id)
       },
-      // Lifecycle L1 (menu-only): archive shelves a room; trash starts the
-      // 7-day clock (its desks travel with it — the undo toast restores all).
-      // Shared rooms hold both back until the sharing rules land (D1).
-      ...(!r.sharedRootId
-        ? [
-            {
-              key: 'archive',
-              icon: r.archived ? 'unarchive' : 'archive',
-              label: r.archived ? 'Unarchive room' : 'Archive room',
-              inStrip: false,
-              onClick: () => {
-                void update(r.id, { archived: !r.archived })
-              }
-            },
-            {
-              key: 'trash',
-              icon: 'delete',
-              label: 'Move to Trash',
-              inStrip: false,
-              onClick: () => {
-                void remove(r.id)
-              }
-            }
-          ]
-        : [])
+      // Lifecycle (DEC-021): the ONE shared definition — archive/trash for
+      // personal rooms; Archive-for-me / Leave-share + the reason for shared.
+      // A trashed room's desks travel with it; the undo toast restores all.
+      ...lifecycleIndexActions(r)
     ],
+    // DEC-022: bulk archive/trash over selected rooms (desks travel along).
+    bulkActions: (ids, done) => {
+      const byId = (): FbNode[] => {
+        const all = useNodeStore.getState().nodes
+        return ids.map((id) => all.find((n) => n.id === id)).filter((n): n is FbNode => !!n)
+      }
+      return [
+        {
+          key: 'archive',
+          icon: showArchived ? 'unarchive' : 'archive',
+          label: showArchived ? 'Unarchive' : 'Archive',
+          onClick: () => {
+            void bulkArchive(byId(), !showArchived).then(done)
+          }
+        },
+        {
+          key: 'trash',
+          icon: 'delete',
+          label: 'Move to Trash',
+          onClick: () => {
+            void bulkTrash(byId()).then(done)
+          }
+        }
+      ]
+    },
     headerActions:
       archivedCount > 0 || showArchived ? (
         <button

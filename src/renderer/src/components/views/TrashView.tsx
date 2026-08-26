@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNodeStore } from '../../stores/nodes'
 import Icon from '../Icon'
+import { confirmPermanentDelete } from '../../lib/deleteDeskFlow'
 
-// Trash (lifecycle track L1). Trashed rooms and desks wait here for the 7-day
-// purge; Restore brings one back with its entire subtree, bit-lossless
-// (§2.5.1 — work_item children included). The list shows ROOTS only: children
-// travel with their parent. Purge timing is honest — each row says when the
-// sweep will claim it.
+// Trash (lifecycle track L1 + DEC-021's D2). Trashed rooms and desks wait
+// here for the 7-day purge; Restore brings one back with its entire subtree,
+// bit-lossless (§2.5.1 — work_item children included). The list shows ROOTS
+// only: children travel with their parent. Purge timing is honest — each row
+// says when the sweep will claim it.
+//
+// "Delete permanently" is the D2 choice, living where the trash lives (the
+// OS "empty trash" shape): typed-name confirmation, immediate hard-delete,
+// memory purged. The auto-purge keeps memory; only the explicit permanent
+// delete erases it — stated in the header copy.
 
 interface TrashEntry {
   id: string
@@ -50,14 +56,26 @@ export default function TrashView(): JSX.Element {
     }
   }
 
+  async function deleteForever(e: TrashEntry): Promise<void> {
+    setBusyId(e.id)
+    try {
+      const done = await confirmPermanentDelete(e)
+      if (done) await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="fb-t-title text-[var(--ink-90)]">Trash</h1>
           <p className="fb-t-body text-[var(--ink-50)] mt-1">
-            Deleted rooms and desks stay here for 7 days, then purge automatically. Restoring
-            brings everything back exactly as it was.
+            Deleted rooms and desks stay here for 7 days, then purge automatically — what
+            Plexii learned from them stays either way. Restoring brings everything back
+            exactly as it was. “Delete permanently” erases the item AND its memory, right
+            now; attention items always survive and move to your Attention page.
           </p>
         </div>
         {entries === null ? null : entries.length === 0 ? (
@@ -89,7 +107,17 @@ export default function TrashView(): JSX.Element {
                   className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-50"
                 >
                   <Icon name="restore_from_trash" size={15} />
-                  {busyId === e.id ? 'Restoring…' : 'Restore'}
+                  {busyId === e.id ? 'Working…' : 'Restore'}
+                </button>
+                <button
+                  onClick={() => void deleteForever(e)}
+                  disabled={busyId === e.id}
+                  title="Erase this and its memory immediately (typed confirmation)"
+                  data-testid={`trash-delete-forever-${e.id}`}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--danger,#c0392b)] hover:opacity-80 disabled:opacity-50"
+                >
+                  <Icon name="delete_forever" size={15} />
+                  Delete permanently
                 </button>
               </div>
             ))}

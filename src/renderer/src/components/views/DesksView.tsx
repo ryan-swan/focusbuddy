@@ -12,6 +12,8 @@ import { promptText } from '../plexi/PromptDialog'
 import { shareToOrgOrGroup } from '../../lib/shareScope'
 import ShareDialog from '../ShareDialog'
 import RoomsDesksIndex, { type IndexConfig } from './RoomsDesksIndex'
+import { lifecycleIndexActions } from '../../lib/deskLifecycleMenu'
+import { bulkArchive, bulkMoveToRoom, bulkTrash } from '../../lib/deleteDeskFlow'
 
 // The All Desks index. A Desk is a task node (a canvas). Optionally scoped to a
 // single Room via roomId, in which case only that room's descendant desks show.
@@ -39,7 +41,6 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   const setActive = useNodeStore((s) => s.setActive)
   const create = useNodeStore((s) => s.create)
   const update = useNodeStore((s) => s.update)
-  const remove = useNodeStore((s) => s.remove)
   const moveToOrg = useNodeStore((s) => s.moveToOrg)
   // Lifecycle L1: the archived shelf. Off = the live index (archived hidden,
   // as always); on = archived desks only. Persisted like the index's own modes.
@@ -289,32 +290,44 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
           goTask(d.id)
         }
       },
-      // Lifecycle L1 (menu-only): archive puts a desk away without ending it;
-      // trash starts the 7-day clock with the standard undo toast. Shared
-      // desks keep both actions held back until the sharing rules land (D1).
-      ...(!d.sharedRootId
-        ? [
-            {
-              key: 'archive',
-              icon: d.archived ? 'unarchive' : 'archive',
-              label: d.archived ? 'Unarchive desk' : 'Archive desk',
-              inStrip: false,
-              onClick: () => {
-                void update(d.id, { archived: !d.archived })
-              }
-            },
-            {
-              key: 'trash',
-              icon: 'delete',
-              label: 'Move to Trash',
-              inStrip: false,
-              onClick: () => {
-                void remove(d.id)
-              }
-            }
-          ]
-        : [])
+      // Lifecycle (DEC-021): the ONE shared definition — archive/trash for
+      // personal desks; Archive-for-me / Leave-share + the reason for shared.
+      ...lifecycleIndexActions(d)
     ],
+    // DEC-022: selection-mode bulk actions. Ids resolve against the live
+    // store at click time; shared desks are skipped from trash with a count.
+    bulkActions: (ids, done) => {
+      const byId = (): FbNode[] => {
+        const all = useNodeStore.getState().nodes
+        return ids.map((id) => all.find((n) => n.id === id)).filter((n): n is FbNode => !!n)
+      }
+      return [
+        {
+          key: 'move-room',
+          icon: 'drive_file_move',
+          label: 'Move to room…',
+          onClick: () => {
+            void bulkMoveToRoom(byId()).then(done)
+          }
+        },
+        {
+          key: 'archive',
+          icon: showArchived ? 'unarchive' : 'archive',
+          label: showArchived ? 'Unarchive' : 'Archive',
+          onClick: () => {
+            void bulkArchive(byId(), !showArchived).then(done)
+          }
+        },
+        {
+          key: 'trash',
+          icon: 'delete',
+          label: 'Move to Trash',
+          onClick: () => {
+            void bulkTrash(byId()).then(done)
+          }
+        }
+      ]
+    },
     headerActions: (
       <>
         {roomId ? (

@@ -5,68 +5,50 @@ import { useWorkItemStore } from '../stores/workItems'
 import { useAccountStore } from '../stores/account'
 import { revokeDeskAccess } from './deskShareClient'
 
-// DEC-021 — the delete flows behind the lifecycle menu (TRACK-LIFECYCLE L2).
+// DEC-021/DEC-022 — the delete flows (TRACK-LIFECYCLE L2, reshaped by
+// operator QA):
 //
-// D2: deleting a personal desk/room goes through ONE choice dialog. "Move to
-// Trash" (the default) is exactly today's behavior — 7-day window, undo
-// toast, memory untouched — finally stated in copy. "Delete everything
-// permanently" purges the subtree's memory (facts, chunk derivations, review
-// points) and hard-deletes immediately, behind a typed-name confirmation.
-// Attention items are preserved on BOTH paths (R008: no work_item
-// hard-delete) — trash sweeps them restorably, purge detaches them back to
-// the Attention page — and the dialog says so.
+// "Move to Trash" is DIRECT — no dialog. It is the everyday, undoable path
+// (7-day window; memory untouched; attention items sweep along restorably).
+// The memory-preservation contract is stated where the trash lives: the
+// Trash page's copy.
 //
-// D1: shared desks never reach this dialog — the menu offers Archive-for-me
-// and Leave-share instead (leaveSharedDesk below), with the trash action
-// disabled and the reason shown.
+// "Delete permanently" lives on the Trash page, per item — the OS-native
+// "empty trash" shape: typed-name confirmation, immediate hard-delete of the
+// whole subtree, memory purged (facts, chunk derivations, review points).
+// Attention items STILL survive it (R008: no work_item hard-delete) — they
+// detach back to the Attention page, and the closing notice counts them.
+//
+// D1: shared desks reach neither path — Archive-for-me / Leave-share instead
+// (the archived flag is scope-local on shared sync, both directions).
 
-export async function confirmDeleteDesk(node: FbNode): Promise<void> {
-  const noun = node.kind === 'folder' ? 'room' : 'desk'
-  const title = node.title || `Untitled ${noun}`
-  const choice = await promptText({
-    title: `Delete “${title}”?`,
-    label: 'Attention items on it are preserved either way — they move to your Attention page.',
-    choices: [
-      {
-        value: 'preserve',
-        label: 'Move to Trash',
-        hint: `The ${noun} is gone; what Plexii learned from it stays. Restorable for 7 days.`
-      },
-      {
-        value: 'purge',
-        label: 'Delete everything permanently',
-        hint: 'Also erases its memory and document derivations. No trash window, no undo.'
-      }
-    ]
-  })
-  if (choice === 'preserve') {
-    await useNodeStore.getState().remove(node.id)
-    return
-  }
-  if (choice !== 'purge') return
-
-  const expected = (node.title || '').trim()
+export async function confirmPermanentDelete(entry: {
+  id: string
+  kind: string
+  title: string
+}): Promise<boolean> {
+  const noun = entry.kind === 'folder' ? 'room' : 'desk'
+  const title = entry.title || `Untitled ${noun}`
+  const expected = (entry.title || '').trim()
   const typed = await promptText({
     title: `Type the ${noun}'s name to confirm`,
-    label: `“${title}” and everything Plexii learned from it are erased immediately. This cannot be undone.`,
+    label: `“${title}” and everything Plexii learned from it are erased immediately. Attention items on it are preserved — they move to your Attention page. This cannot be undone.`,
     placeholder: expected || `Untitled ${noun}`,
     confirmLabel: 'Delete permanently',
     danger: true,
     selectAll: false
   })
-  if (typed == null) return
+  if (typed == null) return false
   if (expected && typed.trim().toLowerCase() !== expected.toLowerCase()) {
     await confirmDialog({
       title: 'Name did not match',
       body: `Nothing was deleted. Type “${expected}” exactly to confirm a permanent delete.`,
       confirmLabel: 'OK'
     })
-    return
+    return false
   }
 
-  const result = await window.api.nodes.deletePermanent(node.id)
-  // The subtree is gone and any attention items it held are back on the
-  // Attention page — refresh both stores so every surface agrees.
+  const result = await window.api.nodes.deletePermanent(entry.id)
   await useNodeStore.getState().refresh()
   await useWorkItemStore.getState().refresh()
   window.dispatchEvent(new CustomEvent('fb:workitems-changed'))
@@ -77,6 +59,7 @@ export async function confirmDeleteDesk(node: FbNode): Promise<void> {
       confirmLabel: 'OK'
     })
   }
+  return true
 }
 
 /** D1's "Leave share" — the recipient side: give up this account's access,
@@ -107,4 +90,63 @@ export async function leaveSharedDesk(node: FbNode): Promise<void> {
   await window.api.workspaceSync.pruneSharedDesk(rootId)
   await useNodeStore.getState().refresh()
   await useWorkItemStore.getState().refresh()
+}
+
+// ── Bulk lifecycle actions (DEC-022) ────────────────────────────────────────
+// Shared by the All Desks and All Rooms indexes' selection mode. Shared-scope
+// roots are excluded from trash (D1) with an honest count; archive applies to
+// everything selected (scope-local on shared rows).
+
+export async function bulkArchive(nodes: FbNode[], archived: boolean): Promise<void> {
+  const update = useNodeStore.getState().update
+  for (const n of nodes) {
+    if (n.archived !== archived) await update(n.id, { archived })
+  }
+}
+
+export async function bulkTrash(nodes: FbNode[]): Promise<void> {
+  const shared = nodes.filter((n) => n.sharedRootId)
+  const own = nodes.filter((n) => !n.sharedRootId)
+  if (own.length) {
+    const ok = await confirmDialog({
+      title: `Move ${own.length} item${own.length === 1 ? '' : 's'} to Trash?`,
+      body:
+        `Restorable for 7 days; what Plexii learned stays.` +
+        (shared.length
+          ? ` ${shared.length} shared item${shared.length === 1 ? ' is' : 's are'} skipped — leave or archive those instead.`
+          : ''),
+      confirmLabel: 'Move to Trash',
+      danger: true
+    })
+    if (!ok) return
+    await useNodeStore.getState().removeMany(own.map((n) => n.id))
+  } else if (shared.length) {
+    await confirmDialog({
+      title: 'Only shared items selected',
+      body: 'Shared desks and rooms are never trashed unilaterally — leave the share or archive them for yourself instead.',
+      confirmLabel: 'OK'
+    })
+  }
+}
+
+/** Move the selected desks under another room (or to the top level). */
+export async function bulkMoveToRoom(nodes: FbNode[]): Promise<void> {
+  const all = useNodeStore.getState().nodes
+  const rooms = all.filter((n) => n.kind === 'folder' && !n.archived)
+  const movable = nodes.filter((n) => !n.sharedRootId)
+  if (!movable.length) return
+  const target = await promptText({
+    title: `Move ${movable.length} desk${movable.length === 1 ? '' : 's'} where?`,
+    choices: [
+      { value: '', label: 'Top level', hint: 'No room' },
+      ...rooms
+        .filter((r) => !nodes.some((n) => n.id === r.id))
+        .map((r) => ({ value: r.id, label: r.title || 'Untitled room' }))
+    ]
+  })
+  if (target == null) return
+  const move = useNodeStore.getState().move
+  for (const n of movable) {
+    if ((n.parentId ?? '') !== target) await move(n.id, target || null, null)
+  }
 }

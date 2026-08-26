@@ -2,18 +2,19 @@ import type { FbNode } from '@shared/types'
 import type { CtxMenuItem } from '../components/CanvasContextMenu'
 import { useNodeStore } from '../stores/nodes'
 import { useViewStore } from '../stores/view'
-import { confirmDeleteDesk, leaveSharedDesk } from './deleteDeskFlow'
+import { leaveSharedDesk } from './deleteDeskFlow'
 
 // ONE lifecycle menu definition for every desk/room card surface (L1/S6):
-// DeskGallery, the Stage Manager strip, and the canvas breadcrumb all build
-// their context menus here, so the actions can never drift from the index
-// pages' set.
+// DeskGallery, the Stage Manager strip, the canvas breadcrumb, AND (via
+// lifecycleIndexActions below) the All Desks / All Rooms index pages all
+// build their lifecycle actions here, so they can never drift.
 //
-// DEC-021: delete goes through the D2 choice dialog (preserve-in-memory
-// default / permanent purge). Shared desks (D1) never see it — they get
-// Archive-for-me (scope-local: the archived flag is stripped from shared
-// sync in both directions) and, for received shares, Leave share; the delete
-// entry renders disabled with the reason.
+// DEC-021 (reshaped by operator QA): "Move to Trash" is DIRECT — undoable,
+// 7-day window, memory untouched (the contract is stated on the Trash page,
+// where "Delete permanently" lives). Shared desks (D1) get Archive-for-me
+// (scope-local: the archived flag is stripped from shared sync in both
+// directions) and, for received shares, Leave share; trash renders disabled
+// with the reason.
 
 export function deskLifecycleMenuItems(node: FbNode, opts?: { includeOpen?: boolean }): CtxMenuItem[] {
   const items: CtxMenuItem[] = []
@@ -72,11 +73,81 @@ export function deskLifecycleMenuItems(node: FbNode, opts?: { includeOpen?: bool
     }
   })
   items.push({
-    label: 'Delete…',
+    label: 'Move to Trash',
     icon: 'delete',
     onClick: () => {
-      void confirmDeleteDesk(node)
+      void useNodeStore.getState().remove(node.id)
     }
   })
   return items
+}
+
+// The same lifecycle set in the index pages' action shape (hover strip +
+// right-click). `disabled` rows are informational (the D1 reason).
+export interface LifecycleIndexAction {
+  key: string
+  icon: string
+  label: string
+  inStrip?: boolean
+  disabled?: boolean
+  onClick: () => void
+}
+
+export function lifecycleIndexActions(node: FbNode): LifecycleIndexAction[] {
+  const noun = node.kind === 'folder' ? 'room' : 'desk'
+  if (node.sharedRootId) {
+    const out: LifecycleIndexAction[] = [
+      {
+        key: 'archive',
+        icon: node.archived ? 'unarchive' : 'archive',
+        label: node.archived ? 'Unarchive for me' : 'Archive for me',
+        inStrip: false,
+        onClick: () => {
+          void useNodeStore.getState().update(node.id, { archived: !node.archived })
+        }
+      }
+    ]
+    if (node.sharedFromHandle) {
+      out.push({
+        key: 'leave-share',
+        icon: 'logout',
+        label: 'Leave share',
+        inStrip: false,
+        onClick: () => {
+          void leaveSharedDesk(node)
+        }
+      })
+    }
+    out.push({
+      key: 'shared-note',
+      icon: 'group',
+      label: node.sharedFromHandle
+        ? `Shared by @${node.sharedFromHandle} — leave or archive instead`
+        : 'Shared — unshare it before deleting',
+      inStrip: false,
+      disabled: true,
+      onClick: () => {}
+    })
+    return out
+  }
+  return [
+    {
+      key: 'archive',
+      icon: node.archived ? 'unarchive' : 'archive',
+      label: node.archived ? `Unarchive ${noun}` : `Archive ${noun}`,
+      inStrip: false,
+      onClick: () => {
+        void useNodeStore.getState().update(node.id, { archived: !node.archived })
+      }
+    },
+    {
+      key: 'trash',
+      icon: 'delete',
+      label: 'Move to Trash',
+      inStrip: false,
+      onClick: () => {
+        void useNodeStore.getState().remove(node.id)
+      }
+    }
+  ]
 }
