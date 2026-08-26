@@ -71,8 +71,9 @@ fully ready (memory: plexii-repo-ownership-and-push-rules). Landing when ready =
 
 **THE FINISH LINE (GA checklist): BUILD COMPLETE ①–⑤.** ① FYI backstop ✔ ·
 ② item archival ✔ (DEC-024) · ③ multi-intent ✔ (DEC-025) · ④ cleanup rewrite ✔
-(DEC-026) · ⑤ composer typeahead + deterministic @attention interception ✔
-(**DEC-027** — picker command row, literal-text insertion never a chip,
+(DEC-026) · ⑤ composer typeahead ✔ (DEC-027) **+ DEC-028 QA round: inline chat card,
+Tab-to-arm pills on ⌘K + home bar, Slack-style chips** ✔
+(**DEC-027/028** — picker command row, literal-text insertion never a chip,
 leading @attention routes to the console without touching the model) ·
 ⑥ **operator smokes remain**: capture-onto-desk → trash desk → item survives
 to Detached shelf · a compound capture (secondary chips) · a rambling capture

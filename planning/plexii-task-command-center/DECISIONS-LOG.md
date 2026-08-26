@@ -549,4 +549,31 @@ leading imperative now never pays model latency or model judgment).
 **WITH THIS, THE GA CHECKLIST'S BUILD ITEMS ARE COMPLETE (①–⑤).** Remaining
 before the reveal: the operator's ⑥ live smokes, then the landing command.
 
+---
+
+## DEC-028 — @attention everywhere: inline chat card, Tab-to-arm, the Slack-style pill
+**Date:** 2026-08-26 · **Status:** APPROVED (operator QA directives) + IMPLEMENTED
+**(a) The confirm stop is now ONE component.** `AttentionConfirmCard` extracts
+DEC-019's confirm flow (classify, pre-highlighted chips, ←/→/Enter, DEC-025
+secondary chips, DEC-026 tidy offer, Q1 date) — the console overlay and the
+chat both render it; the flow can never fork again.
+**(b) Chat files INLINE.** A leading @attention send renders the card in a
+bordered box above the composer — the operator never leaves the chat. Cancel
+restores the message (via fb:composer-stage) exactly as typed; filing shows a
+4s confirmation line in place. deskCtx snapshots at send.
+**(c) Keyboard-first on every @ surface.** Chat picker: Attention rides FIRST
+while "a…" prefixes it; Tab already selected (Enter‖Tab). ⌘K: "@a…" partials
+surface the entry on top; **Tab ARMS a pill** — the query then IS the capture
+text, Enter files, Backspace-on-empty disarms. Home bar (StartOrAskPlexi):
+same grammar — Attention row atop the @ picker, Tab/pick arms, armed Enter
+routes to the card, Esc/Backspace disarms.
+**(d) The Slack-style visual cue.** Chat: picking Attention inserts a REAL
+mention chip (accent pill, "@attention") — visual only: onPick is skipped so
+it is never a stored reference (the no-resolver doctrine holds); its title
+serialises to "@attention" so the interception fires. ⌘K + home bar: an
+accent "@attention" badge sits in the input while armed.
+**Alternatives:** a stored 'attention' mention kind (rejected again — wire
+churn + lying chips); popping the console from chat (the operator's exact
+complaint — retired).
+
 <!-- Append below; increment DEC-NNN. -->
