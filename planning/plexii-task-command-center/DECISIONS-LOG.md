@@ -456,4 +456,29 @@ the UPSTREAM-PR-PACKAGE.md deliverable produced (paste-ready PR body, flagged
 diffs, findings F-1…F-6, preconditions checklist, drift status: 6 upstream
 commits, no sync-engine collisions, ipc/index.ts only).
 
+---
+
+## DEC-024 — Polish stage 1: the FYI deadline backstop + work-item archival
+**Date:** 2026-08-26 · **Status:** APPROVED (operator: "Start the polish stage") + IMPLEMENTED
+**Push rule in force:** fork branch only until the operator declares Attention
+fully ready; `saasmouth main` untouched (the earlier landing never executed —
+confirmed and kept that way by the operator's wait-until-finished directive).
+**(a) FYI deadline backstop.** A dated FYI now gets ONE quiet nudge when its
+date ARRIVES — never "due soon" (FYIs aren't due), inbox layer not
+interruptive, same `wi-due:{id}:{day}` dedupe and substrate caps, with a 24h
+lookback so pre-feature dates stay silent. Second arm in
+`postDeadlineNudgesCore`; the restraint doctrine holds (still exactly one
+proactive trigger family).
+**(b) Work-item archival.** New terminal state `'archived'` — "keep it, done
+looking at it": projects to `parked` (never done), leaves the queues and the
+Detached shelf, is NOT a loop closure (no notification — source-locked), stays
+out of Recently closed, never decays or nudges, and lives on a collapsible
+**Archived** shelf on the Attention page with one-click Unarchive (state →
+open). Archive verb on every queue row. Rides sync via the existing
+state-column manifest; un-updated peers coarsen it to 'open' until they
+update (accepted, noted in the enum).
+**Alternatives:** an orthogonal archived FLAG beside state (rejected —
+"archive an in-progress item" is not a real need at v1 and the flag doubles
+every visibility predicate); interruptive FYI nudges (rejected — restraint).
+
 <!-- Append below; increment DEC-NNN. -->

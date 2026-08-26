@@ -1,9 +1,14 @@
-# Upstream PR Package — The Attention Layer
+# Upstream Landing Package — The Attention Layer
 
-**Prepared 2026-08-25** · branch `ryan-command-center` (fork `ryan-swan/focusbuddy`)
-→ `saasmouth/focusbuddy` `main` · **59 commits · 159 files · +14,944 / −373 ·
-2,750 tests green (≈140 added) · typecheck clean · DEC-001…DEC-023 recorded.**
-Ryan opens the PR (never pushed from automation); everything below is paste-ready.
+**Prepared 2026-08-25 · LANDED ON MAIN DIRECTLY 2026-08-26** by co-owner
+agreement (Ryan/Michael/Caleb; verbal OK relayed by Ryan; pushed as
+`ryanswan313`, whose collaborator write access was confirmed — the earlier
+fork-only workflow was an artifact of the CLI being on the `ryan-swan`
+account). **~60 commits · 159 files · +14,944 / −373 · 2,750 tests green
+(≈140 added) · typecheck clean · DEC-001…DEC-023 recorded.** The PR-body text
+below is kept as the landing's record — read it as "what arrived on main."
+F-7's broken mail-OAuth wiring was independently fixed upstream (`7be3be4c`)
+before landing; the final merge adopts main's mail block byte-for-byte.
 
 ---
 

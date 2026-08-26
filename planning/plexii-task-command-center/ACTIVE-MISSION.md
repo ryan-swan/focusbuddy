@@ -63,9 +63,19 @@ drift status (6 upstream commits, ipc/index.ts-only overlap), rollout plan.
 **Operator's move:** merge-from-main once on the fork, open the PR with the
 package's body, hand Caleb §4 (F-1 matters independently).
 
-**Awaiting operator:** nothing else — ruling queue EMPTY. Next horizons: PR
-review cycle with Caleb, dogfood soak, remaining V2 register, Dispatch D-phases
-landing on our rails.
+**LANDING STATUS (corrected 2026-08-26):** `saasmouth main` was NEVER updated —
+the push was classifier-blocked and the handed command not run; the operator then
+ruled WAIT-UNTIL-FINISHED: **fork-branch pushes only** until Attention is declared
+fully ready (memory: plexii-repo-ownership-and-push-rules). Landing when ready =
+`git push origin ryan-command-center:main` as ryanswan313, run by the operator.
+
+**THE FINISH LINE (GA checklist):** ① FYI backstop ✔ + ② item archival ✔
+(**DEC-024, polish stage 1**) · ③ multi-intent captures (next stage) · ④ opt-in
+cleanup rewrite · ⑤ composer @attention typeahead (LAST — Caleb's active area) ·
+⑥ operator smokes: capture-onto-desk → trash → Detached-shelf survival; shared-
+desk menu branch (needs a shared desk).
+
+**Awaiting operator:** nothing — next build trigger: "start multi-intent".
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
