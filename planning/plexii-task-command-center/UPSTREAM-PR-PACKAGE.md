@@ -1,14 +1,16 @@
 # Upstream Landing Package — The Attention Layer
 
-**Prepared 2026-08-25 · LANDED ON MAIN DIRECTLY 2026-08-26** by co-owner
-agreement (Ryan/Michael/Caleb; verbal OK relayed by Ryan; pushed as
-`ryanswan313`, whose collaborator write access was confirmed — the earlier
-fork-only workflow was an artifact of the CLI being on the `ryan-swan`
-account). **~60 commits · 159 files · +14,944 / −373 · 2,750 tests green
-(≈140 added) · typecheck clean · DEC-001…DEC-023 recorded.** The PR-body text
-below is kept as the landing's record — read it as "what arrived on main."
-F-7's broken mail-OAuth wiring was independently fixed upstream (`7be3be4c`)
-before landing; the final merge adopts main's mail block byte-for-byte.
+**Prepared 2026-08-25 · NOT YET LANDED** — the operator ruled
+wait-until-finished: the branch stays on the fork until the GA smokes pass,
+then the landing is one operator-run command
+(`git push origin ryan-command-center:main` as `ryanswan313`, whose
+collaborator write access is confirmed; the earlier fork-only workflow was an
+artifact of the CLI being on the `ryan-swan` account). Repo is co-owned
+(Ryan/Michael/Caleb). **~75 commits · 160+ files · +15k / −0.4k · 2,763 tests
+green · typecheck clean · DEC-001…DEC-028 recorded.** The PR-body text below
+is the landing's record — read it as "what arrives on main." F-7's broken
+mail-OAuth wiring was independently fixed upstream (`7be3be4c`); the merge
+adopts main's mail block byte-for-byte.
 
 ---
 
