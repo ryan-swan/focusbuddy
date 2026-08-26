@@ -143,6 +143,13 @@ function sectionsToTiptap(
 // the next call — no app restart, no stale auth header.
 let client: { key: string; instance: Anthropic } | null = null
 
+/** The credits-aware client for OTHER ai modules (classify, tidy): same
+ *  resolution as chat — credits proxy when policy says so, else BYOK. Their
+ *  calls are plain create() (non-streaming), so credits-safe by shape. */
+export function getSharedAiClient(): Anthropic | null {
+  return getClient()
+}
+
 function getClient(): Anthropic | null {
   // Credit mode first: when the user is signed in and policy says to use
   // PlexiDesk credits, route through the metered proxy. The proxy client's

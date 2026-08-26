@@ -7,8 +7,7 @@
 // most captures with zero model latency (R011); only genuinely ambiguous prose
 // pays for a model call, tagged purpose 'intent_classify' (Haiku-routed).
 
-import { getModelClient } from './modelClient'
-import { resolveAnthropicKey } from '../settingsStore'
+import { getSharedAiClient } from './anthropic'
 import { resolveModel } from './modelRouting'
 import { recordAiUsage } from '../db/telemetry'
 import { extractJson } from './chatJson'
@@ -53,9 +52,10 @@ const CLASSES: ReadonlySet<string> = new Set([
 
 async function classifyWithModel(text: string): Promise<{ intentClass: IntentClass; confidence: number } | null> {
   try {
-    const key = resolveAnthropicKey()
-    if (!key) return null
-    const client = getModelClient(key)
+    // Credits-aware (F-8 family): the fallback classifier must work on
+    // PlexiDesk credits too, not only BYOK. Plain create() — credits-safe.
+    const client = getSharedAiClient()
+    if (!client) return null
     const model = resolveModel('intent_classify')
     const resp = await client.messages.create({
       model,

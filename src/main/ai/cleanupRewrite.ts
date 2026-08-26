@@ -11,8 +11,7 @@
 // confirm screen is up; a slow or failed proposal simply never appears.
 // Every failure mode returns null — no error surface, no retry, no blocking.
 
-import { getModelClient } from './modelClient'
-import { resolveAnthropicKey } from '../settingsStore'
+import { getSharedAiClient } from './anthropic'
 import { resolveModel } from './modelRouting'
 import { recordAiUsage } from '../db/telemetry'
 import { extractJson } from './chatJson'
@@ -29,9 +28,9 @@ export async function proposeCleanup(text: string): Promise<CleanupProposal | nu
   const t = text.trim()
   if (!needsCleanup(t)) return null
   try {
-    const key = resolveAnthropicKey()
-    if (!key) return null
-    const client = getModelClient(key)
+    // Credits-aware (F-8 family): the tidy works on PlexiDesk credits too.
+    const client = getSharedAiClient()
+    if (!client) return null
     const model = resolveModel('capture_cleanup')
     const resp = await client.messages.create({
       model,
