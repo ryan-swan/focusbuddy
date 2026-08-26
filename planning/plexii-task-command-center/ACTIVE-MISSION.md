@@ -91,7 +91,16 @@ scope control (desk/room/all), the plan-boundary rule (items point, scopes
 group, plans are CHOSEN — accumulation only ever SUGGESTS), and the context-menu
 IA regroup (additive-only pre-landing lean). Full design space + decision list
 D-A…D-E: [analysis/21-CR09-CONTEXTUAL-ATTENTION.md](analysis/21-CR09-CONTEXTUAL-ATTENTION.md).
-Awaiting the operator's brainstorm → DEC-029. Recommended post-landing.
+**PART II added (operator pullback — the full-scope frame):** the two-layer LAW
+(manual complete / AI only pre-fills+proposes+enriches), pull-not-push (suggested
+items never notify — surfaced at moments of use), the ProposalTray as the one
+review discipline (chips generalized), three sources one system (typed / marked /
+observed), Living Doc + Meetings as the first observers (both half-built:
+meeting vocabulary + approval_state='suggested' shipped in S2/S5), the Layer-0
+gap audit (no item editing · no Attention selection mode · no bare manual form),
+deferred rails named (tags/cross-ref, delegation→SPEC-027, standup feed).
+Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-029.
+Recommended post-landing.
 
 **When ⑥ passes and the operator declares ready:** the landing is
 `git push origin ryan-command-center:main` as ryanswan313 (operator-run),
