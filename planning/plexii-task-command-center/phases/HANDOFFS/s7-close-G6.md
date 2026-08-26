@@ -76,7 +76,11 @@ untouched (DEC-009). Full record: DECISIONS-LOG DEC-020.
    breaks projection/leaf/scope/C2/CI-locks.
 4. [PLEXI-UPSTREAM] flagged diffs: wake-coalescer, park-inbound, 409 fix, prune core.
 5. Known-Caleb leads: schedule-event year-off startMs; `agentDispatcher.ts` vs
-   "Dispatch" naming; capability-gates ipc/index.ts merge overlap (2-commit drift).
+   "Dispatch" naming; capability-gates ipc/index.ts merge overlap (2-commit drift);
+   **P1-F1 initial-pull truncation gap** (fresh-device pulls silently drop the
+   truncated tail forever — evidence + mechanism in p1-live-pass.md §2a);
+   webview nav-persistence churn (one push per sync cycle under auto-refreshing
+   embedded pages; his stated no-debounce choice, registered not overridden).
 6. **DEC-020 nav change on a shared surface:** the Calendar (and Plans/all-tasks)
    sidebar rows are hidden on this branch — the calendar ENGINE is untouched, but an
    upstream merge must either carry the retirement or consciously re-add the rows;

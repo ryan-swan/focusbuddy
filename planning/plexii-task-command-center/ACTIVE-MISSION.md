@@ -28,13 +28,17 @@ frozen in §8 · shared-refresh widened (org + shared arms reload the work-item 
 attestation gate built (per-org, persisted, IPC'd; carry branch waits on SPEC-027) ·
 re-toucher hunt SOLVED (live webview nav persistence, not a sync defect; registered for
 Caleb) · [sync-mark]/[sync-409]/[sync-apply] structured trails landed (R016's named
-signal). Remaining: the two-device arrival session — instance B prepared via
-FB_TEST_USER_DATA, operator logs it in. Full record:
+signal). **TWO-DEVICE SESSION RUN (same evening): GAP-015 CLOSED** — 9/9 work items
+materialized on device B with kind + projection intact (dismissed→parked held live);
+fresh @attention capture round-tripped A→server→B; desk-trash arrived as soft-trash
+(retention-rule substrate observed). **NEW FINDING P1-F1 [PLEXI-UPSTREAM]:** the
+initial-pull truncation gap — fresh devices silently miss the truncated tail forever
+(3 evidence rows; mechanism + remediations in the doc). Full record:
 [phases/HANDOFFS/p1-live-pass.md](phases/HANDOFFS/p1-live-pass.md).
 
-**Awaiting operator:** D1 · D2 · R008 (CR-08(b) ruled → DEC-020 ✔) · log in on
-instance B for the arrival tests. Next horizons: the upstream PR to Caleb, V2
-register, Dispatch D-phases landing on our rails.
+**Awaiting operator:** D1 · D2 · R008 (CR-08(b) ruled → DEC-020 ✔). Next horizons:
+the upstream PR to Caleb (P1-F1 joins the leads list), V2 register, Dispatch
+D-phases landing on our rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette
