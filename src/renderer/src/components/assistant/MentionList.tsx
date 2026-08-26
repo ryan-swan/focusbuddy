@@ -18,16 +18,22 @@ interface Props {
   // silently doing nothing when a choice is made.
   atCap: boolean
   command: (item: MentionRef) => void
+  // Belt-and-braces handle registration (DEC-028 fix): ReactRenderer's `.ref`
+  // came back null on this React/tiptap pairing, so ↑/↓/Enter/Tab silently
+  // fell through to the composer (Enter even SENT the half-typed mention as a
+  // message). The suggestion plugin passes this callback and keeps whichever
+  // handle it can get; the keyboard contract finally works either way.
+  bindKeys?: (h: MentionListHandle | null) => void
 }
 
 const MentionList = forwardRef<MentionListHandle, Props>(function MentionList(
-  { items, loading, atCap, command },
+  { items, loading, atCap, command, bindKeys },
   ref
 ): JSX.Element {
   const [selected, setSelected] = useState(0)
   useEffect(() => setSelected(0), [items])
 
-  useImperativeHandle(ref, () => ({
+  const handle: MentionListHandle = {
     onKeyDown: (e: KeyboardEvent): boolean => {
       if (items.length === 0) return false
       if (e.key === 'ArrowDown') {
@@ -45,7 +51,12 @@ const MentionList = forwardRef<MentionListHandle, Props>(function MentionList(
       }
       return false
     }
-  }))
+  }
+  useImperativeHandle(ref, () => handle)
+  useEffect(() => {
+    bindKeys?.(handle)
+    return () => bindKeys?.(null)
+  })
 
   if (atCap) {
     return (

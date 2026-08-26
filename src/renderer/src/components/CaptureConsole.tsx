@@ -45,14 +45,20 @@ export default function CaptureConsole(): JSX.Element | null {
 
   useEffect(() => {
     if (open) {
-      setText(initialText)
+      const t = initialText.trim()
+      setText(t)
       setMode('routed')
       setError(null)
       setFiled(null)
       setFiledId(null)
-      setConfirmText(null)
+      // DEC-028: a capture that arrives WITH text (armed pill, @attention
+      // prefix, chat hand-off) already carries the operator's commitment —
+      // it opens straight AT the confirm card ("opens prefilled at the
+      // classify step", DEC-019's own words). "← Edit text" drops back to
+      // the textarea with the text intact. A bare open stays a textarea.
+      setConfirmText(t ? t : null)
       setDeskCtx(deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes))
-      setTimeout(() => fieldRef.current?.focus(), 0)
+      if (!t) setTimeout(() => fieldRef.current?.focus(), 0)
     }
   }, [open, initialText])
 
