@@ -633,4 +633,81 @@ explicit confirmation — never executes off a pre-agreed codeword alone.
 **Numbering note:** the CR-09 brainstorm rulings (D-A…D-K, analysis/21) will
 record as DEC-031+; older pointers saying "→ DEC-029/030" mean "the next DEC."
 
+
+
+---
+
+## DEC-031 — @attention is deterministic ANYWHERE in the message
+**Date:** 2026-08-26 · **Status:** RULED (operator: "yes to all three — do them") + IMPLEMENTED
+**Context:** DEC-027 made a LEADING @attention deterministic and deliberately
+left mid-sentence/trailing on the AI proposal path. Operator live QA broke that
+premise: "i need to create a pitch deck for cetra by friday @attention" produced
+only a create-page card — the item never reached the queue. A prompt rule the
+model can ignore is not a capture guarantee.
+**Ruling:** the token is an ADDRESS, not a topic. Wherever it sits, the capture
+happens deterministically. What position still decides is the fate of the REST
+of the message: **leading** = pure capture (the model never sees it, DEC-028's
+inline card); **inline** = capture AND still send the message with the token
+stripped, so a "build me X @attention" gets both halves — the build action the
+operator liked AND the tracking item he was missing.
+**Implementation:** ONE shared grammar (`lib/attentionCommand.ts`) read by the
+chat composer, ⌘K, the home bar, and the chat store — four private regexes
+could not be kept honest. Two bypasses were found only by driving the real UI:
+(a) ⌘K's omni rows hard-score "Ask Plexii" at 2000 and outranked the capture
+entry (the operator's exact 30s path) — omni rows now yield while the token is
+present; (b) ⌘K/home/voice call `chatStore.send()` DIRECTLY, bypassing the
+composer where the interception lived — `send()` is now the last-mile guarantee.
+The composer strips the token before calling it, so double capture is
+impossible by construction.
+**Alternatives:** strengthening the prompt rule only (rejected — tried first
+this same session; it is a nudge, and the operator asked for a guarantee);
+pure-deterministic with no message sent (rejected — it would have silently
+removed the buildable half he explicitly valued).
+
+---
+
+## DEC-032 — desk-placed proposals carry their own target
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Context:** operator QA: "It's making me manually select the desk even though
+it already identifies the right desk." True, and structural — `create-page`
+carried no desk field at all, so the card genuinely could not know; a desk named
+in the model's PROSE is not machine-readable. Off a desk, every desk-kind card
+dead-ended into the chooser.
+**Ruling:** desk-placed proposals may name their destination. Optional `deskId`
+on create-page / create-widget / create-todo-list / create-table; the model is
+shown a real desk ROSTER (ids + titles, capped at 25, newest first) in both the
+chat and agent-loop prompts, and is told to use an exact id and never invent
+one. The card resolves id-then-title against the live node store and applies
+there without asking.
+**Safety rule:** an id (or title) matching nothing live resolves to null and the
+normal chooser runs — a stale or hallucinated id must NEVER silently retarget a
+different desk. Pure resolver in `lib/proposalDesk.ts`, unit-tested including
+that refusal.
+**Cost noted:** the roster rides the cached system prefix; desks change rarely
+enough for that to hold, and it is capped.
+
+---
+
+## DEC-033 — the ask-latency trail (and what it already proved)
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED + MEASURED
+**Context:** operator QA: a ⌘K ask "took over 30 seconds" with no visible
+progress, and nothing in the app could say where the time went.
+**Ruling:** instrument before optimising. `[ask-latency]` in `sendChatStream`
+reports total / retrieval / time-to-first-token / generate, the system-prompt
+size, token counts, cache reads, the model, and — decisively — whether the turn
+actually STREAMED.
+**First measurement on the operator's own setup:** `total=7350ms
+retrieval=831ms ttft=6518ms generate=1ms streamed=false in=660 out=252`.
+**What it proves:** retrieval is not the problem (<1s). `streamed=false` is: the
+PlexiDesk-credits proxy rejects streaming outright (a known constraint, see the
+credits arm in `sendChatStream`), so the ENTIRE answer is generated before a
+single character reaches the screen. At ~40 output tokens/sec, the operator's
+"thorough" answer was simply ~30s of generation with **zero feedback by
+construction** — not a hidden inefficiency, and not something a code fix in
+this repo can shorten.
+**Open (needs a ruling, not yet built):** the honest levers are (a) BYOK — his
+own Anthropic key streams, and the wait becomes visible progress; (b) a real
+progress affordance for credits mode; (c) trimming output size for simple asks.
+(a) is the only one that removes the wait rather than dressing it.
+
 <!-- Append below; increment DEC-NNN. -->

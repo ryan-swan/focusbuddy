@@ -11,6 +11,26 @@ operator chooses the landing round). Next up: the operator's detailed pass and
 the CR-09 brainstorm (D-A…D-K → DEC-031+).
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
 
+**DEC-031/032/033 EXECUTED (2026-08-26, commit `f3741bf5`):** the operator ruled
+"yes to all three" on the QA round's open questions. **DEC-031:** @attention is
+now DETERMINISTIC anywhere in a message — one shared grammar
+(`lib/attentionCommand.ts`) read by the composer, ⌘K, the home bar AND
+`chatStore.send()`; leading = pure capture, inline = capture AND still send the
+stripped message (both halves). Two bypasses were found only by driving the real
+UI: ⌘K's "Ask Plexii" hard-scores 2000 and outranked the capture entry (the
+operator's exact 30s path), and ⌘K/home/voice call `send()` directly, skipping
+the composer's interception — `send()` is now the last-mile guarantee, and the
+composer strips first so double capture is impossible. **DEC-032:** desk-placed
+proposals carry an optional `deskId`; the model gets a real desk roster in both
+prompts, the card resolves id-then-title and applies there — an unresolvable id
+falls back to the chooser, never a silent retarget. **DEC-033:** the
+`[ask-latency]` trail shipped and already answered the question —
+`retrieval=831ms ttft=6518ms streamed=FALSE`: the credits proxy rejects
+streaming, so the whole answer generates before anything appears. The 30s was
+generation with zero feedback BY CONSTRUCTION, not a code inefficiency.
+**Still open (needs a ruling):** BYOK-vs-progress-affordance for credits mode.
+Suite **2,797**.
+
 **QA ROUND 1 — chat composer (2026-08-26, commit `e61da75b`):** operator live QA
 found the @ picker's keyboard contract (DEC-028c) broken in practice. Root cause:
 ChatPanel's omni-intent Tab cycler is CAPTURE-phase, so it ran before
