@@ -24,7 +24,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # node:sqlite (the unit suite's test DB) needs Node >= 22.5 — on 20 every
+          # sqlite-based test dies with 'No such built-in module: node:sqlite',
+          # which is why CI has been red on main too.
+          node-version: 22
           cache: npm
 
       - run: npm ci
