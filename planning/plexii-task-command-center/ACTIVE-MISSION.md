@@ -111,8 +111,10 @@ repo's FIRST green CI runs (push + PR, 2m33s). Side discoveries recorded:
 `ryanswan313`'s token lacks the `workflow` scope (workflow-file ops need the
 browser or a scope refresh done while signed in as that account); the
 groundwork worktree lives at `~/focusbuddy-groundwork` for future fix splits.
-Attention work continues on the fork; next fork↔main merge resolves the six
-shared files keep-branch (branch is the semantic superset).
+**Fork↔main merge DONE (836e0bb1 + repair 13da3c34):** the branch now contains
+main @ 5d1ef8d8; five predicted conflicts resolved keep-branch; the auto-merge
+briefly duplicated the F010 functions + a preload property (caught by typecheck,
+excised). 2,763 green. The branch is current with everything the team has.
 
 **When ⑥ passes and the operator declares ready:** the landing is
 `git push origin ryan-command-center:main` as ryanswan313 (operator-run),
