@@ -217,3 +217,132 @@ land first, then CR-09 as the first post-GA track.
   (lean), or full regroup on the branch? Which of Copy URL / Change URL
   merge; does the Create/Convert audit happen with Caleb?
 - **D-E** Confirm sequencing: CR-09 entirely post-landing?
+
+---
+
+# PART II — The full-scope frame (operator pullback, 2026-08-26)
+
+Before ruling on Part I, the operator pulled the lens back to the product's
+original scope. Part II integrates that frame; the Part I decisions survive
+but now sit INSIDE it. The bar, verbatim in spirit: *the smoothest,
+most frictionless task and project tool that exists — Attention has to match
+the canvas + AI-brain level, not sit beside it.*
+
+## 7. The two-layer principle (the governing constraint)
+
+**Layer 0 — Manual, complete.** Every Attention capability must have a full
+by-hand path: no AI, no credits, toggle off — and nothing about the
+experience reads as degraded. Deterministic machinery (hard triggers, preset
+tables, templates) is Layer 0, not AI.
+
+**Layer 1 — Intelligence, everywhere it can infer.** With AI on, assume
+leverage at every seam: names, titles, due dates, deliverables,
+classifications, tags. If the system can infer it, it OFFERS it.
+
+The relationship is strict: **Layer 1 only ever pre-fills, proposes, and
+enriches what Layer 0 can already do.** No capability exists only behind the
+model. This is already the build's DNA (rules-first classify, the tidy as an
+offer, the flag default-OFF) — Part II promotes it from habit to law.
+
+## 8. "The system already knows" × the restraint doctrine — pull, not push
+
+The north star: the user stops asking *what do I need to do / how do I
+structure this / what am I doing today / what have I forgotten* — because the
+system watched the work happen.
+
+The tension: the shipped doctrine deliberately has ONE proactive notification
+trigger, capped queues, quiet decay. "Already knows" must not become "always
+talking." The operator's own sentence resolves it: *"keeps all of that
+invisible until the moment it's useful."*
+
+**The rule: proactive DETECTION, passive PRESENTATION.** Observation runs
+continuously; findings accumulate silently as `approval_state='suggested'`
+items (the column has waited for this since S2). They SURFACE only at
+moments of use — opening Attention (a Suggested tray), viewing the Living
+Doc that produced them, the meeting-end screen, the morning standup. They
+NEVER ride the notification substrate. Banners remain reserved for deadline
+proximity; the caps and Δ10 suppression stand unchanged (and Δ10 already
+gives users "stop suggesting from this source" for free).
+
+## 9. One review discipline: the proposal tray
+
+DEC-025's secondary chips are the seed of the universal pattern: **a set of
+pre-checked, one-line proposals reviewed in one stop — uncheck what's wrong,
+one Enter accepts the rest.** A meeting yielding five action items, a Living
+Doc yielding three next steps, a compound capture yielding two loops — same
+review surface, same muscle memory, same approval semantics. Generalize the
+chips into a `ProposalTray` (items with source, class, owner?, due?) rendered
+by: the confirm card (compounds), the meeting-end screen, the Living Doc
+offer row, and the Attention page's Suggested section. ONE component, four
+hosts — the AttentionConfirmCard precedent applied again.
+
+## 10. Three sources, one system
+
+| Source | Gesture | Layer 0 | Layer 1 adds |
+|---|---|---|---|
+| **Typed** | capture (⌘K, chat, home bar, console) | rules classify, presets, verbatim unrouted | Haiku fallback class, tidy, date anchoring |
+| **Marked** | Part I's object/desk marking | deterministic naming table | smarter title from widget CONTENT, suggested due |
+| **Observed** | pipelines watching work happen | — (observation IS the AI layer; its Layer 0 is that everything observed is also creatable by hand) | Living Doc + Meetings extractors → suggested items in the tray |
+
+## 11. The first two observers (both half-built already)
+
+**Living Doc.** `LivingDocWidget` already reads a desk and writes a summary
+including what needs doing. The observer = an extraction pass over its
+OUTPUT (not another read of the desk) producing suggested items parented to
+that desk, plus the offer verbs on the widget itself: *group into a plan ·
+create the tasks · route them · delegate them*. Route/delegate are P1
+(SPEC-027) territory — the verbs render, the cross-user half waits.
+
+**Meetings.** The S5 vocabulary already ships `meetingCaptureRule` +
+`MEETING_WORK_ITEM_DELIVERABLE`, and `meeting_end` is a routed AI purpose —
+the proposal half exists. Missing: owner + due extraction per action item,
+the batch tray at meeting end, and routing. Owner extraction is P1-shaped
+(named recipients need SPEC-027 to mean anything); at P0 owner tags ride as
+text ("owner: Michael") awaiting the routing rails.
+
+Both observers obey §8: they produce suggested items silently; the tray
+surfaces them at the widget / meeting-end / Attention-page moments.
+
+## 12. Manual-completeness audit (Layer 0 gaps found today)
+
+- **No post-creation editing.** Attention rows cannot edit title/notes/due by
+  hand (updateFields exists at IPC; no UI). A complete manual path needs an
+  edit affordance. **Gap, must fix.**
+- **No bare "new item" form.** The console always classifies (deterministic —
+  acceptable), but a zero-classification manual form (title, class picker,
+  date, desk) would make Layer 0 unmistakably first-class. **Decide.**
+- **No manual grouping.** "Select N items → make a plan / move to desk" —
+  the bulk-selection engine exists on the index pages; the Attention page has
+  no selection mode yet. **Gap for the plan-boundary flow.**
+- Everything else already holds: rules-only classify works keyless; unrouted
+  mode is verbatim; presets are tables; tidy/fallback silently absent
+  without AI — nothing reads degraded.
+
+## 13. Named rails, deliberately deferred (so nothing gets lost)
+
+- **Tags + continuous cross-referencing:** no tag column exists; the
+  knowledge-graph/Relationships machinery is the likely substrate. Own
+  analysis when the observers exist to feed it.
+- **Delegation / owners:** SPEC-027 routing (P1) — the attestation gate and
+  retention rule already wait for it.
+- **Standup integration:** "What am I doing today?" = the standup widget
+  reading the ranker's top-N. Cheap, high-value, post-landing.
+- **"What have I forgotten?"** = the ranker's staleness term + feeders,
+  already live; improves as observers add volume.
+
+## 14. REVISED DECISION LIST (supersedes §6)
+
+- **D-A…D-E** stand as written (Part I), now read through the two-layer law.
+- **D-F** Adopt the two-layer principle as LAW (every capability manual-complete;
+  AI only pre-fills/proposes/enriches)?
+- **D-G** Adopt pull-not-push (suggested items never notify; surfaced only at
+  moments of use: Attention tray, source widget, meeting end, standup)?
+- **D-H** Adopt the ProposalTray as the ONE review surface (generalizing the
+  chips), hosted by card / meeting end / Living Doc / Suggested section?
+- **D-I** Layer-0 gap order: post-creation editing first, Attention-page
+  selection mode second, bare manual form third — agree?
+- **D-J** Observer order: Living Doc first (all-local, no scheduling
+  dependency), Meetings second (richer, needs owner/due extraction)?
+- **D-K** Sequencing confirmation: landing first; then CR-09 stages
+  S-CR9a…d (Part I) interleaved with L0-gaps + observers — or a different
+  priority order?
