@@ -46,9 +46,18 @@ the FOURTH sanctioned delete site, + `db/memoryPurge.ts`; adversarially
 scope-tested). R008 RATIFIED: no work_item hard-delete ever — both paths preserve
 attention items, purge revives them to Attention with a counted notice.
 
+**DEC-022 EXECUTED (2026-08-25, operator QA):** the delete dialog retired for
+placement — "Move to Trash" direct everywhere; "Delete permanently" lives on the
+Trash page (typed confirm, memory purge, items revive). DesksView/RoomsView adopted
+the ONE lifecycle definition (they had drifted — QA caught it): rooms get the same
+rules as desks incl. shared branches. Bulk selection landed in the shared index
+engine: Select mode + Select all + bulk Move-to-room/Archive/Trash (one undo toast,
+shared items skipped from trash with a count).
+
 **Awaiting operator:** nothing — the ruling queue is EMPTY (D1/D2/R008 → DEC-021 ✔,
-CR-08(b) → DEC-020 ✔). Next horizons: the upstream PR to Caleb (P1-F1 joins the
-leads list), V2 register, Dispatch D-phases landing on our rails.
+CR-08(b) → DEC-020 ✔, QA reshape → DEC-022 ✔). Next horizons: the upstream PR to
+Caleb (P1-F1 joins the leads list), V2 register, Dispatch D-phases landing on our
+rails.
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette

@@ -402,4 +402,35 @@ privacy-erasure requirement.
 infrastructure P1 builds anyway); purging work items with their desk
 (rejected — R008's whole point; a routed item is not desk property).
 
+---
+
+## DEC-022 — Delete reshape (operator QA) + bulk selection on the indexes
+**Date:** 2026-08-25 · **Status:** APPROVED (operator QA directive) + IMPLEMENTED
+**(a) The D2 choice dialog is retired; placement over prompting.** Operator QA:
+the delete-time two-choice dialog never appeared on the index pages (they had
+NEVER adopted the shared lifecycle definition — exactly the drift it exists to
+prevent) and reads as redundant. Ruling: archive ≠ trash stands (archive =
+keep-but-hide forever; trash = discard, 7-day clock, memory persists), but the
+CHOICE moves to where the trash lives: **"Move to Trash" is direct everywhere**
+(undoable, no dialog), and **"Delete permanently" is a per-item action on the
+Trash page** (OS empty-trash shape) — typed-name confirm, immediate purge +
+memory erase, attention items still revive (R008). The memory contract is
+stated in the Trash page's header copy. DEC-021's db layer (purge site 4/4,
+memory purge, guards) is unchanged — only the affordance moved.
+**(b) The index pages join the ONE lifecycle definition.** DesksView and
+RoomsView now build lifecycle actions from `lifecycleIndexActions` (same
+source as the card/breadcrumb menus): personal → Archive/Trash; shared →
+Archive-for-me / Leave-share / the D1 reason (rooms included — same rules as
+desks, as directed).
+**(c) Bulk selection (both index pages, one engine).** RoomsDesksIndex gains
+a selection mode: a **Select** button in the toolbar (gallery/list/table),
+click-to-toggle with visible checks, Select all/none, and a selection bar
+carrying the page's bulk actions — desks: **Move to room… / Archive / Move to
+Trash**; rooms: **Archive / Move to Trash**. Bulk trash = ONE undo toast over
+every subtree (`removeMany`); shared items are skipped from trash with an
+honest count (D1); archive applies scope-local to shared rows.
+**Alternatives:** per-card persistent checkboxes (rejected — noise outside
+selection mode); dialog kept at delete time (rejected — operator QA, and the
+Trash-page placement answers the discovery failure directly).
+
 <!-- Append below; increment DEC-NNN. -->
