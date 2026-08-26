@@ -36,6 +36,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.1.1',
+    date: '2026-08-26T12:00:00Z',
+    title: 'PlexiDesk 4.1.1 — share and duplicate, Plexii included free, minimap fix',
+    tag: 'feature',
+    summary:
+      'Share any desk as a public link that anyone can open in a browser, with no login or install, and duplicate into their own workspace in one click. Plexii is now included free when you sign in, with no API key to set up, and the assistant no longer asks signed-in people for a key. The minimap that could appear twice, or float in the middle of the canvas, is fixed, and the last few dialogs that used the old product name now say PlexiDesk.',
+    highlights: [
+      'Share a desk as a public link anyone can open, with no login or install, and duplicate in one click.',
+      'Plexii is included free when you sign in, with no API key to set up.',
+      'Fixed the minimap that could show twice or float in the middle of the desk.',
+      'Renamed the last backup and restore dialogs from the old name to PlexiDesk.'
+    ]
+  },
+  {
     version: '4.1.0',
     date: '2026-08-25T12:00:00Z',
     title: 'PlexiDesk 4.1.0 — meet Plexii, a new Home, and a system-wide design pass',
