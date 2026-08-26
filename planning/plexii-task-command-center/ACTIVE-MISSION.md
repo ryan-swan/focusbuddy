@@ -69,13 +69,15 @@ ruled WAIT-UNTIL-FINISHED: **fork-branch pushes only** until Attention is declar
 fully ready (memory: plexii-repo-ownership-and-push-rules). Landing when ready =
 `git push origin ryan-command-center:main` as ryanswan313, run by the operator.
 
-**THE FINISH LINE (GA checklist):** ① FYI backstop ✔ + ② item archival ✔
-(**DEC-024, polish stage 1**) · ③ multi-intent captures (next stage) · ④ opt-in
-cleanup rewrite · ⑤ composer @attention typeahead (LAST — Caleb's active area) ·
-⑥ operator smokes: capture-onto-desk → trash → Detached-shelf survival; shared-
-desk menu branch (needs a shared desk).
+**THE FINISH LINE (GA checklist):** ① FYI backstop ✔ · ② item archival ✔
+(DEC-024) · ③ multi-intent captures ✔ (**DEC-025** — deterministic splitter,
+pre-checked secondary chips, one-Enter files all) · ④ opt-in cleanup rewrite
+(next: "start cleanup rewrite") · ⑤ composer @attention typeahead (LAST —
+Caleb's active area) · ⑥ operator smokes: capture-onto-desk → trash →
+Detached-shelf survival; shared-desk menu branch (needs a shared desk); plus a
+compound capture ("remind me to X and review Y") to see the chips live.
 
-**Awaiting operator:** nothing — next build trigger: "start multi-intent".
+**Awaiting operator:** nothing — next build trigger: "start cleanup rewrite".
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette

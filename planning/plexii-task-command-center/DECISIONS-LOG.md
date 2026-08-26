@@ -481,4 +481,26 @@ update (accepted, noted in the enum).
 "archive an in-progress item" is not a real need at v1 and the flag doubles
 every visibility predicate); interruptive FYI nudges (rejected — restraint).
 
+---
+
+## DEC-025 — Multi-intent captures
+**Date:** 2026-08-26 · **Status:** APPROVED (operator: "Start multi-intent") + IMPLEMENTED
+**Decision:** A compound capture ("call Bob Thursday and review the deck") is
+TWO loops wearing one sentence — and now files as such, still in ONE stop.
+**The splitter (deterministic, `intentRules.splitCompound`):** strong
+separators (newline, semicolon) always cut; weak joiners (and/then/also/plus)
+cut ONLY where the right side independently trips a hard trigger — so
+compound OBJECTS ("call Bob and Alice") never split, making a false secondary
+structurally rarer than a missed one. **Secondaries** (≤3, rules-only, never
+a model call): own class, own title, own ANCHORED date (an unanchorable
+phrase files dateless — Q1 stays at-most-one and belongs to the primary,
+DEC-016 intact). **The primary classifies on its own first segment** (title,
+date, Q1 all from segment 1; notes keep the full capture verbatim).
+**Console:** the confirm stop shows "Also caught …" as PRE-CHECKED chips —
+one Enter files the primary plus every checked secondary (uncheck = opt out);
+the filed toast counts them; desk-context parenting (DEC-023) applies to all.
+**Alternatives:** model-driven splitting (rejected — latency + R011, and the
+trigger discriminator is the honest precision boundary); a second confirm
+screen per secondary (rejected — DEC-019's one-stop rule).
+
 <!-- Append below; increment DEC-NNN. -->
