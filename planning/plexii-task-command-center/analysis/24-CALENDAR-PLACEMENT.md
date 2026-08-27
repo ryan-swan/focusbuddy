@@ -535,6 +535,15 @@ slow, then dropped — and dropped notifications are unrecoverable. Set
 `lifecycleNotificationUrl` **at creation** (it cannot be added later); its
 `missed` event means "run a full delta resync".
 
+**The single biggest build risk, named plainly: recurring events.** Two
+independent vendors' public changelogs show that is where the overwhelming
+majority of real sync defects live — duplicates on instance edits, stale
+instances surviving a series delete, weekday rules not round-tripping. Our own
+recurrence is materialised locally with deterministic occurrence ids, which is
+a good foundation, but every external-sync bug the competition ships lands
+here. Budget for it, and treat "edit one occurrence of a synced series" as the
+acceptance test that gates Track C rather than an afterthought.
+
 **The three traps worth naming in the code:**
 
 1. **Graph's `calendarView/delta` window is frozen into the token, and an event
@@ -574,6 +583,104 @@ a week would email every guest fifty times.
   silent, per Sunsama.
 - **Don't over-pin by default** — Motion's own docs warn that too many locked
   tasks starve the scheduler. Guardrails should be user-invoked.
+
+## 5d. What users actually punish — and the four things we already do right
+
+A later pass reached real user sentiment (Reddit via an archive API, since the
+site itself is unreachable from here; plus App Store and Trustpilot review
+feeds). It changes several defaults below. One caveat carried from the source:
+a handful of pro-Akiflow comments in Motion's subreddit follow an identical
+promotional pattern and may be astroturf — every claim kept here has at least
+one non-suspect source behind it.
+
+### The five failure modes, ranked by how loudly they are punished
+
+**1. Calendar pollution is the loudest complaint in the category, and it is a
+social problem, not a tidiness one.** Users describe colleagues asking whether
+they were *actually* busy after a completed task vacated its slot; a manager
+asking about an auto-created buffer titled "😎 Decompress", which turned into
+an awkward conversation about AI; clients told the calendar showed unavailable
+when it was open. The trap is a four-way lose: don't push and get overbooked;
+push and expose personal work to colleagues; obfuscate the titles and advertise
+someone else's product on your calendar; or pay for a team plan. **One user
+abandoned Motion over the busy/free binary alone.**
+
+→ **Free-vs-busy is not enough** (this extends §5c). We need: per-calendar
+routing so personal work never lands on a work calendar, neutral
+user-controlled titles, and a third state — *busy to humans, free to the
+scheduler* — because "block the time so nobody books it, but let my own planner
+still use it" is the thing every one of them wanted and none of them had.
+
+**2. A manual override that doesn't stick is the single most-named reason
+people leave Motion.** Users reverse-engineer rituals to make a fixed-time task
+stay put; one long-term subscriber's parting line was that the developers trust
+the auto-scheduler more than they should.
+
+→ This is now the best-evidenced argument for the honour-and-pin rule in §5c.
+A manual placement must be **visibly pinned** — a state you can see on the
+block, not a hidden mode — and it must survive every subsequent replan.
+
+**3. Over-optimism is the three-month retention killer.** Reviewers who loved
+squeezing the day full concluded within a quarter that it was unrealistic;
+users report nine consecutive hours on one hard task, no automatic gaps, and
+— the sharpest one — **tasks that are blocked or waiting on someone else still
+getting scheduled**, which makes the whole day a fiction.
+
+→ **We get this one nearly free: `waiting` and `blocked` are already states in
+our machine (DEC-047).** The scheduler must simply refuse to place them. Add
+default slack between blocks and a max-session length, both on by default —
+Reclaim's equivalents are opt-in, which is why their users hit burnout and said
+so.
+
+**4. "Couldn't fit" must be a first-class, actionable state.** Today's
+competitors either dump such tasks into a strip you cannot drag out of, or
+flag them past-due forever until the user builds a manual ritual to clear the
+red. Two people independently reported finishing 35 minutes late and watching
+the task *fly off the calendar* — hard even to find to mark done.
+
+→ Surface unplaceable work as a resolvable queue with a reason
+("your Tuesday is full", "this is blocked"), never a silent bin or a wall of
+red. And adopt Akiflow's grace period so finishing at 5:04 is not a failure.
+
+**5. Notification fatigue cuts both ways, and both are failures.** Reclaim
+fires one notification per auto-created task and users cannot mute them without
+muting a whole calendar; Motion sends none at all, and a rescheduled block
+silently loses any reminder the user had attached. Worst of all: adding another
+person as a guest floods them with email **every time the calendar reshuffles**.
+
+→ Notify once, on *the day's shape changing*, not per block; a moved block
+carries its reminder with it; and never put attendees on an auto-movable block
+(§5c said this on API grounds — here is the human cost).
+
+Two more, thinner but consistent: **rollover needs a visible ceremony** (one
+competitor silently *deletes* what you didn't get to; another accumulates
+forever — both are trust-killers), and **the commitment horizon should be
+bounded**. On that last point there is a vendor admission worth having: a
+Motion staffer explained their two-week scheduling horizon was deliberate,
+because scheduling further out "constantly reshuffles once new events come in".
+Stability is a feature.
+
+### The four things we already do right
+
+Validated by what these users say they cannot get anywhere:
+
+1. **Frictionless capture is the category's #1 unmet need.** Motion's most
+   self-inflicted wound is forcing duration, project, priority and deadline
+   *up front*; users repeatedly ask for an inbox with no required fields.
+   **Ours is a single line with AI classification behind it** — this is
+   already our strongest advantage, and the calendar work must not regress it
+   by demanding a duration at capture.
+2. **Preview-and-confirm beats silent apply.** Reclaim shipped a proposed
+   schedule you confirm, and Motion refugees call it the better model. Our
+   `schedule-event` proposal already runs through an explicit approval gate
+   (`actionExecutor`), so the AI scheduler should extend that path rather than
+   writing directly.
+3. **Auto-rescheduling incomplete work is the one feature that keeps people on
+   Motion despite everything else** — "what's the point of a planner if it
+   doesn't plan for you?" It is Track B4, and it should not slip.
+4. **Keyboard-first capture and a universal inbox are consensus best-in-class
+   in Akiflow** — and our ⌘K plus the Attention layer is the same shape, only
+   classified. The gap is single-key actions on a selected item (§5b).
 
 ## 6. Merge map — Akiflow's feature set against what Plexi already holds
 
