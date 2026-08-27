@@ -6,6 +6,7 @@ import { useTimeBlockStore } from '../../stores/timeBlocks'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { useViewStore } from '../../stores/view'
 import { futuristicPowerOn } from '../../lib/audioBeep'
+import { blockFit } from '../../lib/calendarGeometry'
 import { QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
 import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
 import { sendMeetingInvites } from '../../lib/meetingInvite'
@@ -489,13 +490,23 @@ export default function WeekTimeGrid({
                   const wiHue = isWorkItem ? QUEUE_COLOR[queueOf(linked!)] ?? '#64748b' : null
                   const done = block.status === 'done'
                   const isPast = startMs + durMin * 60000 < now
+                  // A short block cannot hold padded text. The caption line is
+                  // ~15px on its own, so py-1's 4px top and bottom crop it
+                  // inside a 16px box — a 15-minute event rendered its title
+                  // with the bottom sheared off. Short blocks therefore shed
+                  // the vertical padding and centre a single line, and the
+                  // floor rises to the height one line actually needs.
+                  const fit = blockFit(height)
+                  const tight = fit.tight
                   return (
                     <div
                       key={block.id}
                       data-testid="time-block"
                       onPointerDown={(e) => beginDrag(e, block, 'move')}
                       onClick={(e) => e.stopPropagation()}
-                      className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 py-1 fb-t-caption overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
+                      className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 ${
+                        tight ? 'py-0 flex items-center' : 'py-1'
+                      } fb-t-caption overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
                         done
                           ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                           : isPast
@@ -504,7 +515,7 @@ export default function WeekTimeGrid({
                       }`}
                       style={{
                         top: Math.max(0, top),
-                        height: Math.max(16, height),
+                        height: fit.boxHeight,
                         ...(wiHue && !done && !isPast
                           ? {
                               backgroundColor: queueTint(wiHue, 0.14),
@@ -515,7 +526,7 @@ export default function WeekTimeGrid({
                       title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
                     >
                       <div
-                        className={`font-medium leading-[1.25] ${done ? 'line-through' : ''} ${
+                        className={`min-w-0 flex-1 font-medium leading-[1.25] ${done ? 'line-through' : ''} ${
                           height < 34 ? 'truncate' : 'line-clamp-2'
                         }`}
                       >

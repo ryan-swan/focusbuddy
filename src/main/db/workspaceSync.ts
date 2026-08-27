@@ -606,23 +606,47 @@ function deskIdOfRemote(it: RemoteItem): string | null {
 // nesting (a nested attempt would be swallowed, silently dropping the signal).
 // Deliberately does NOT advance the review point, so the change stays surfaced until
 // the user actually opens the desk. Non-fatal (emitObjectEvent swallows failures).
-function emitRemoteChangeEvents(changes: RemoteApplied[], orgId?: string): void {
-  const orgOpt = orgId && orgId !== PERSONAL_ORG_ID ? { organisationId: orgId } : {}
+// DEC-056 — which remote changes deserve an Event, as a pure decision so it can
+// be pinned by a test. Two rules, both aimed at the same failure:
+//
+//   DELETIONS DO NOT EMIT. The only purpose of these Events is the "changed on
+//   another device" frame a returning reader sees, and a deleted object has no
+//   frame to light — its row is gone from the desk, so the Event could never be
+//   read by anything. This was the dominant source of an unbounded Event table:
+//   590,304 of 761,344 rows on the operator's machine were WidgetDeleted /
+//   DeskDeleted that nothing consumed, because one cascade delete fans out an
+//   Event per descendant widget. Events cannot be pruned afterwards
+//   (PLX-EVT-030), so the only place to fix this is at the source.
+//
+//   UPDATES EMIT ONCE PER OBJECT. A sync pass that touches the same widget
+//   twice is one change to the reader, not two.
+export function changeEventsFor(
+  changes: RemoteApplied[]
+): { eventType: 'WidgetUpdated' | 'DeskUpdated'; objectId: string; deskId?: string | null }[] {
+  const seen = new Set<string>()
+  const out: { eventType: 'WidgetUpdated' | 'DeskUpdated'; objectId: string; deskId?: string | null }[] = []
   for (const c of changes) {
     if (c.itemType !== 'node' && c.itemType !== 'widget') continue
-    const eventType =
-      c.itemType === 'widget'
-        ? c.deleted
-          ? 'WidgetDeleted'
-          : 'WidgetUpdated'
-        : c.deleted
-          ? 'DeskDeleted'
-          : 'DeskUpdated'
-    emitObjectEvent({
-      eventType,
-      category: 'system',
+    if (c.deleted) continue
+    if (seen.has(c.id)) continue
+    seen.add(c.id)
+    out.push({
+      eventType: c.itemType === 'widget' ? 'WidgetUpdated' : 'DeskUpdated',
       objectId: c.id,
-      deskId: c.deskId,
+      deskId: c.deskId
+    })
+  }
+  return out
+}
+
+function emitRemoteChangeEvents(changes: RemoteApplied[], orgId?: string): void {
+  const orgOpt = orgId && orgId !== PERSONAL_ORG_ID ? { organisationId: orgId } : {}
+  for (const e of changeEventsFor(changes)) {
+    emitObjectEvent({
+      eventType: e.eventType,
+      category: 'system',
+      objectId: e.objectId,
+      deskId: e.deskId,
       changeSummary: 'Changed on another device',
       ...orgOpt
     })

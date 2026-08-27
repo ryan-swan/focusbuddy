@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { config as loadEnv } from 'dotenv'
 import { closeDb, getDb } from './db/database'
+import { runRetentionSweep } from './db/retention'
 import { autoBackupOnLaunch } from './db/backup'
 import { registerIpcHandlers } from './ipc'
 import { registerMdExternal } from './mdExternal'
@@ -530,6 +531,23 @@ app.whenReady().then(() => {
   }
   setTimeout(runDueAutomation, 20_000)
   setInterval(runDueAutomation, 5 * 60_000)
+
+  // DEC-056 — retention sweep. Bounded tables only; Events are protected four
+  // ways and are never in scope (see db/retention.ts). Deferred off the boot
+  // path and run once per launch: the queue only grows while the app is open,
+  // so a per-boot cap is enough to keep it flat.
+  setTimeout(() => {
+    try {
+      for (const o of runRetentionSweep()) {
+        if (o.removed > 0) {
+          // eslint-disable-next-line no-console
+          console.log(`[retention] ${o.target}: released ${o.removed}, retained ${o.kept}`)
+        }
+      }
+    } catch (err) {
+      console.warn('[retention] sweep failed (non-fatal):', (err as Error).message)
+    }
+  }, 30_000)
 
   // Chunk-index sweep (A2, R10 + #16): reconcile fb_chunks with the document
   // and widget populations once per boot — content-hash cheap for unchanged
