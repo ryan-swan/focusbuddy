@@ -10,7 +10,8 @@ import {
   secondaryCaptures,
   MAX_SECONDARY_INTENTS,
   needsCleanup,
-  qualifiesForTidy
+  qualifiesForTidy,
+  lightTidyTitle
 } from '../../src/main/ai/intentRules'
 
 // Attention S5 — the deterministic classifier rules (R011's fast path: these
@@ -142,7 +143,7 @@ describe('Δ12 scenarios at the rules level', () => {
 describe('title extraction', () => {
   it('takes the first sentence, strips capture prefixes, caps length', () => {
     expect(titleFromCapture('fyi: the vendor moved the deadline. Also more detail here.')).toBe(
-      'the vendor moved the deadline.'
+      'The vendor moved the deadline.'
     )
     expect(titleFromCapture('Remind me to call Bob')).toBe('Remind me to call Bob')
     expect(titleFromCapture('x'.repeat(200)).length).toBeLessThanOrEqual(120)
@@ -183,7 +184,8 @@ describe('DEC-025 — multi-intent captures (deterministic splitter)', () => {
     )
     expect(s).toHaveLength(1)
     expect(s[0].intentClass).toBe('to_review')
-    expect(s[0].title).toBe('review the deck before standup')
+    // Light tidy (DEC-043) capitalizes secondaries the same as primaries.
+    expect(s[0].title).toBe('Review the deck before standup')
     expect(s[0].dueAt).toBeNull() // "before standup" is vague — files dateless, no Q1
     const anchored = secondaryCaptures('need to send the invoice; schedule a sync tomorrow', NOW)
     expect(anchored[0].intentClass).toBe('to_meet')
@@ -244,5 +246,34 @@ describe('DEC-040 — when the preview attempts a tidy at all', () => {
     expect(qualifiesForTidy('call Bob Thursday')).toBe(false)
     expect(qualifiesForTidy('')).toBe(false)
     expect(qualifiesForTidy('   ')).toBe(false)
+  })
+})
+
+describe('DEC-043 — light tidy: capitalization without a model call', () => {
+  it('the operator’s own example: "call bob thursday" → "Call Bob Thursday"', () => {
+    expect(lightTidyTitle('call bob thursday')).toBe('Call Bob Thursday')
+    expect(titleFromCapture('call bob thursday')).toBe('Call Bob Thursday')
+  })
+
+  it('only ADDS capitals — deliberate casing and stopwords survive', () => {
+    expect(lightTidyTitle('call the notary')).toBe('Call the notary')
+    expect(lightTidyTitle('ship the iPhone build')).toBe('Ship the iPhone build')
+    expect(lightTidyTitle('remind me to breathe')).toBe('Remind me to breathe')
+    // Idempotent: tidying a tidy changes nothing.
+    expect(lightTidyTitle(lightTidyTitle('call bob thursday'))).toBe('Call Bob Thursday')
+  })
+
+  it('standalone i, weekdays and months — but "may" stays a verb', () => {
+    expect(lightTidyTitle('i owe caleb a reply on friday')).toBe('I owe caleb a reply on Friday')
+    expect(lightTidyTitle('may need to review the january numbers')).toBe(
+      'May need to review the January numbers'
+    )
+    // 'may' mid-sentence is untouched (only the first-letter rule hit above).
+    expect(lightTidyTitle('we may need this')).toBe('We may need this')
+  })
+
+  it('the tidy bar sits at FIVE words now', () => {
+    expect(qualifiesForTidy('draft the cetra pitch deck')).toBe(true) // 5 words
+    expect(qualifiesForTidy('call bob on thursday')).toBe(false) // 4 — light tidy covers it
   })
 })

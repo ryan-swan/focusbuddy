@@ -204,10 +204,42 @@ export function needsDeadlineClarification(
   return isActionableClass(intentClass) && scan !== null && scan.dueAt === null
 }
 
+// ── Light tidy (DEC-043) ───────────────────────────────────────────────────
+// Deterministic capitalization for titles below the model-tidy bar: "call bob
+// thursday" should still come out "Call Bob Thursday" without paying a model
+// call. Only ever ADDS capitals, never lowercases — idempotent, and safe on
+// deliberate casing ("iPhone" is untouched). Four rules:
+//   1. the first letter
+//   2. standalone "i"
+//   3. weekday + month names ("may" excluded — "may need to" is a verb)
+//   4. a name-shaped word right after a person-verb ("call bob" → "call Bob"),
+//      unless it is a stopword ("call the notary" stays)
+
+const CAL_WORD_RE =
+  /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|june|july|august|september|october|november|december)\b/g
+const PERSON_VERB_RE = /\b(call|email|text|ping|ask|tell|meet|message|remind)\s+([a-z][a-z']+)\b/g
+const NAME_STOPWORDS = new Set([
+  'the', 'a', 'an', 'my', 'our', 'your', 'his', 'her', 'their',
+  'them', 'him', 'me', 'back', 'in', 'on', 'at', 'to', 'with', 'about',
+  'up', 'everyone', 'someone', 'anybody', 'people', 'team', 'again', 'now',
+  'today', 'tomorrow', 'tonight'
+])
+
+export function lightTidyTitle(raw: string): string {
+  let t = raw
+  t = t.replace(/\bi\b/g, 'I')
+  t = t.replace(CAL_WORD_RE, (w) => w[0].toUpperCase() + w.slice(1))
+  t = t.replace(PERSON_VERB_RE, (m, verb: string, name: string) =>
+    NAME_STOPWORDS.has(name) ? m : `${verb} ${name[0].toUpperCase()}${name.slice(1)}`
+  )
+  if (t && /[a-z]/.test(t[0])) t = t[0].toUpperCase() + t.slice(1)
+  return t
+}
+
 /** A short title from a capture: first sentence-ish, trimmed, capped. */
 export function titleFromCapture(text: string): string {
   const first = text.trim().split(/(?<=[.!?])\s+|\n/)[0] ?? ''
-  const t = first.replace(/^(fyi|note to self|for the record)\b[:,]?\s*/i, '').trim()
+  const t = lightTidyTitle(first.replace(/^(fyi|note to self|for the record)\b[:,]?\s*/i, '').trim())
   return (t.length > 120 ? `${t.slice(0, 117)}…` : t) || 'Untitled work item'
 }
 
@@ -305,7 +337,7 @@ export function qualifiesForTidy(text: string, notes?: string): boolean {
   if ((notes ?? '').trim()) return true
   if (needsCleanup(t)) return true
   const words = t.split(/\s+/).length
-  if (words >= 8) return true
+  if (words >= 5) return true
   // Sentence punctuation anywhere before the final character = more than
   // one segment (same trick as needsCleanup's run-on test).
   return /[.!?;\n]/.test(t.slice(0, -1))

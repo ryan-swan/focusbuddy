@@ -44,6 +44,29 @@ export const QUEUE_ICON: Record<string, string> = {
   to_know: 'info'
 }
 
+/** DEC-043 — each class's hue, drawn from the PlexiSuite brand family
+ *  (styles/tokens.css: the same seven vivid accents the product groups use,
+ *  so the queues read as part of the SAME system). Applied SUBTLY by design:
+ *  icon tints, a 10%-alpha wash on the active tab, a soft underline — never
+ *  a colored panel. Remember takes the lightbulb's yellow; Know stays a
+ *  neutral slate (information carries no temperature). */
+export const QUEUE_COLOR: Record<string, string> = {
+  to_do: '#0ea5e9', //     sky    (PlexiData)
+  to_review: '#8b5cf6', // violet (PlexiAI)
+  to_decide: '#f59e0b', // amber  (PlexiOffice)
+  to_respond: '#14b8a6', // teal  (PlexiOps)
+  to_meet: '#10b981', //   green  (PlexiBuild)
+  to_discuss: '#6366f1', // indigo (PlexiConnect)
+  to_remember: '#eab308', // yellow (the lightbulb)
+  to_know: '#64748b' //    slate  (neutral)
+}
+
+/** hex + alpha → rgba() for the subtle washes. */
+export function queueTint(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+}
+
 /** The confirm card / reclassify / manual-form choice set — ONE copy (the
  *  pre-alignment build had drifting duplicates in the card and the view). */
 export const CLASS_CHOICES: ReadonlyArray<{ value: string; label: string; hint: string }> = [

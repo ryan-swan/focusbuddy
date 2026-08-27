@@ -150,3 +150,33 @@ describe('DEC-039 — capture-time context + the one input everywhere', () => {
     expect(input).toContain('usePeopleStore')
   })
 })
+
+describe('DEC-043 — queue tabs, class colors, drag-only reclassify', () => {
+  const view = read('src/renderer/src/components/views/AttentionView.tsx')
+
+  it('every class is a tab; All is the full-list view; tabs take drops', () => {
+    expect(view).toContain("(['all', ...QUEUE_ORDER] as string[])")
+    expect(view).toContain("localStorage.getItem('attention.queueTab')")
+    // A class tab narrows to its one queue…
+    expect(view).toContain("allQueues.filter((q) => q.queue === queueTab)")
+    // …and dragging an item onto a tab reclassifies it into that class.
+    expect(view).toContain('void moveToSection(t, [])')
+  })
+
+  it('colors come from the ONE palette, subtly applied', () => {
+    const lib = read('src/renderer/src/lib/attentionQueues.ts')
+    // Every class has a hue, from the PlexiSuite brand family.
+    for (const c of ['to_do','to_review','to_decide','to_respond','to_meet','to_discuss','to_remember','to_know'])
+      expect(lib).toContain(`${c}: '#`)
+    // Subtle by construction: low-alpha washes, not colored panels.
+    expect(view).toContain('queueTint(hue, 0.1)')
+    expect(view).toContain('QUEUE_COLOR[q.queue]')
+  })
+
+  it('the row reclassify button is GONE — drag or the editor are the two paths', () => {
+    expect(view).not.toContain('This isn’t right — reclassify')
+    expect(view).not.toContain('swap_horiz')
+    // The editor path still exists (class chips in the edit dialog).
+    expect(read('src/renderer/src/components/AttentionItemEditor.tsx')).toContain('Classification')
+  })
+})

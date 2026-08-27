@@ -35,6 +35,10 @@ import {
   rankScore,
   PRIMARY_ACTION,
   QUEUE_ICON,
+  QUEUE_ORDER,
+  QUEUE_LABEL,
+  QUEUE_COLOR,
+  queueTint,
   CLASS_CHOICES
 } from '../../lib/attentionQueues'
 import {
@@ -85,7 +89,6 @@ export default function AttentionView(): JSX.Element {
   const loaded = useWorkItemStore((s) => s.loaded)
   const refresh = useWorkItemStore((s) => s.refresh)
   const setState = useWorkItemStore((s) => s.setState)
-  const reclassify = useWorkItemStore((s) => s.reclassify)
   const snooze = useWorkItemStore((s) => s.snooze)
   const createItem = useWorkItemStore((s) => s.create)
   const updateFields = useWorkItemStore((s) => s.updateFields)
@@ -107,6 +110,16 @@ export default function AttentionView(): JSX.Element {
     setLens(l)
   }
   const [showClosed, setShowClosed] = useState(false)
+  // DEC-043 — one PAGE per class. 'all' is the full-list view (the old
+  // layout); a class tab shows only that queue, so no queue ever requires
+  // scrolling past the others. Persisted like the lens.
+  const [queueTab, setQueueTab] = useState<string>(
+    () => localStorage.getItem('attention.queueTab') || 'all'
+  )
+  const pickTab = (t: string): void => {
+    localStorage.setItem('attention.queueTab', t)
+    setQueueTab(t)
+  }
   // DEC-037 — filtering by a chosen tag. One at a time: the point is to narrow
   // to a thread of work, not to build a query language.
   const [tagFilter, setTagFilter] = useState<string | null>(null)
@@ -289,7 +302,7 @@ export default function AttentionView(): JSX.Element {
     () => (tagFilter ? items.filter((i) => hasTag(i, tagFilter)) : items),
     [items, tagFilter]
   )
-  const queues = useMemo(
+  const allQueues = useMemo(
     () =>
       lens === 'due'
         ? groupByDue(visible, nowMs)
@@ -298,6 +311,20 @@ export default function AttentionView(): JSX.Element {
           : groupIntoQueues(visible, nowMs),
     [visible, nowMs, lens]
   )
+  // A class tab narrows to its one queue; the alternate lenses (Due/Origin)
+  // answer a different question and always show everything.
+  const queues = useMemo(
+    () =>
+      queueTab === 'all' || lens !== 'queue'
+        ? allQueues
+        : allQueues.filter((q) => q.queue === queueTab),
+    [allQueues, queueTab, lens]
+  )
+  const countByClass = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const q of groupIntoQueues(items, nowMs)) m[q.queue] = q.items.length
+    return m
+  }, [items, nowMs])
   const nodesById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
   const detached = useMemo(() => detachedItems(items), [items])
   const closed = useMemo(() => recentlyClosed(items, nowMs), [items, nowMs])
@@ -356,15 +383,6 @@ export default function AttentionView(): JSX.Element {
     d.setHours(9, 0, 0, 0)
     await snooze(id, d.getTime())
     await refresh()
-  }
-
-  async function reclassifyItem(i: FbNode): Promise<void> {
-    const next = await promptText({
-      title: 'Reclassify',
-      label: `Where does “${i.title}” belong?`,
-      choices: CLASS_CHOICES.filter((c) => c.value !== queueOf(i))
-    })
-    if (next) await reclassify(i.id, next)
   }
 
   async function moveDetached(i: FbNode): Promise<void> {
@@ -573,6 +591,7 @@ export default function AttentionView(): JSX.Element {
             name={hasMore ? (isOpen ? 'expand_more' : 'chevron_right') : (QUEUE_ICON[queueOf(i)] ?? 'check_circle')}
             size={16}
             className="text-[var(--ink-30)]"
+            style={!hasMore && QUEUE_COLOR[queueOf(i)] ? { color: queueTint(QUEUE_COLOR[queueOf(i)], 0.75) } : undefined}
           />
         </button>
         <div className="flex-1 min-w-0">
@@ -763,13 +782,6 @@ export default function AttentionView(): JSX.Element {
                 <Icon name="snooze" size={14} />
               </button>
               <button
-                onClick={() => void reclassifyItem(i)}
-                title="This isn’t right — reclassify"
-                className="icon-btn !h-7 !w-7"
-              >
-                <Icon name="swap_horiz" size={14} />
-              </button>
-              <button
                 onClick={() => void setState(i.id, 'archived')}
                 title="Archive — keep it, out of the way"
                 className="icon-btn !h-7 !w-7"
@@ -926,6 +938,60 @@ export default function AttentionView(): JSX.Element {
             </div>
           </div>
         )}
+        <div className="mb-3 flex items-center gap-1 flex-wrap">
+          {(['all', ...QUEUE_ORDER] as string[]).map((t) => {
+            const active = queueTab === t
+            const hue = t === 'all' ? null : QUEUE_COLOR[t]
+            const n = t === 'all' ? undefined : countByClass[t]
+            return (
+              <button
+                key={t}
+                onClick={() => pickTab(t)}
+                onDragOver={
+                  dragId && t !== 'all'
+                    ? (e) => {
+                        e.preventDefault()
+                        setOverSection(t)
+                      }
+                    : undefined
+                }
+                onDragLeave={dragId ? () => setOverSection((c) => (c === t ? null : c)) : undefined}
+                onDrop={
+                  dragId && t !== 'all'
+                    ? (e) => {
+                        e.preventDefault()
+                        void moveToSection(t, [])
+                      }
+                    : undefined
+                }
+                style={
+                  active && hue
+                    ? { backgroundColor: queueTint(hue, 0.1), boxShadow: `inset 0 -2px 0 ${queueTint(hue, 0.45)}` }
+                    : overSection === t && dragId
+                      ? { backgroundColor: queueTint(hue ?? '#64748b', 0.14) }
+                      : undefined
+                }
+                className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg fb-t-label fb-press ${
+                  active
+                    ? hue
+                      ? 'text-[var(--ink-100)]'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
+                    : 'text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+                }`}
+              >
+                <Icon
+                  name={t === 'all' ? 'notifications' : (QUEUE_ICON[t] ?? 'label')}
+                  size={14}
+                  style={hue ? { color: hue } : undefined}
+                />
+                {t === 'all' ? 'All' : QUEUE_LABEL[t]}
+                {n !== undefined && n > 0 && (
+                  <span className="fb-t-caption fb-tabular text-[var(--ink-40)]">{n}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
         <div className="mb-4 flex items-center gap-1">
           <span className="fb-t-label text-[var(--ink-40)] mr-1">Group by</span>
           {(
@@ -1055,7 +1121,12 @@ export default function AttentionView(): JSX.Element {
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon name={QUEUE_ICON[q.queue] ?? 'label'} size={14} className="text-[var(--ink-40)]" />
+                    <Icon
+                      name={QUEUE_ICON[q.queue] ?? 'label'}
+                      size={14}
+                      className="text-[var(--ink-40)]"
+                      style={QUEUE_COLOR[q.queue] ? { color: QUEUE_COLOR[q.queue] } : undefined}
+                    />
                     <span className="fb-t-label text-[var(--ink-70)]">{q.label}</span>
                     <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{q.items.length}</span>
                     {overSection === q.queue && (
