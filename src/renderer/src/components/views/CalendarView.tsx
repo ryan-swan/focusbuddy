@@ -357,7 +357,7 @@ export default function CalendarView(): JSX.Element {
           e.dataTransfer.setData('text/fb-workitem', i.id)
           e.dataTransfer.effectAllowed = 'copy'
         }}
-        className={`group relative flex items-center gap-2 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] pl-3 pr-2 py-1.5 cursor-grab active:cursor-grabbing hover:border-[var(--edge-firm)] transition-colors ${
+        className={`group relative flex items-center gap-2 rounded-lg fb-glass-row pl-3 pr-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-[rgba(var(--accent),0.05)] hover:-translate-y-px transition-all ${
           placed ? 'opacity-60' : ''
         }`}
         title={placed ? `${i.title} — already on the calendar` : `Drag onto the calendar to schedule: ${i.title}`}
@@ -388,41 +388,49 @@ export default function CalendarView(): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
-      <div className="max-w-[1500px] mx-auto px-6 xl:px-10 py-8">
-        <div className="mb-5 flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="fb-t-title text-[var(--ink-90)]">Calendar</h1>
-            <p className="fb-t-body text-[var(--ink-50)] mt-1">
-              Your attention, on the clock. Drag work from the queue into your day — deadlines ride
-              above the grid, blocks live in it.
-            </p>
+    <div className="h-full overflow-y-auto paper-texture text-[var(--ink-100)]">
+      <div className="fb-cq max-w-[1600px] mx-auto px-5 lg:px-8 xl:px-10 py-7">
+        {/* DEC-054 — the header is TWO stable rows, not one that reflows: a
+            title row, then a toolbar that keeps its shape whether the left
+            panel is open or closed. The mode switcher never compresses (its
+            buttons carry a min width) and the toolbar wraps as a whole
+            instead of squeezing its members. */}
+        <div className="mb-5 flex flex-col gap-3.5">
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <div className="min-w-0">
+              <h1 className="fb-t-title text-[var(--ink-90)]">Calendar</h1>
+              <p className="fb-t-body text-[var(--ink-50)] mt-1 max-w-[62ch]">
+                Your attention, on the clock. Drag work from the queue into your day — deadlines
+                ride above the grid, blocks live in it.
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <select
+                value={classFilter}
+                onChange={(e) => pickClass(e.target.value)}
+                title="Show one classification"
+                className="fb-field h-9 min-w-[124px] bg-[var(--surface-raised)] px-2.5 text-[12.5px] text-[var(--ink-80)] shadow-[0_0_0_1px_var(--edge-hairline)]"
+                data-testid="calendar-class-filter"
+              >
+                <option value="all">All classes</option>
+                {QUEUE_ORDER.map((q) => (
+                  <option key={q} value={q}>
+                    {QUEUE_LABEL[q]}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => openConsole()}
+                title="Capture a new attention item"
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-label text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-[rgba(var(--accent),0.06)] transition-colors"
+              >
+                <Icon name="add" size={15} /> New
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {/* DEC-053 — classification filter + New, per operator ruling. */}
-            <select
-              value={classFilter}
-              onChange={(e) => pickClass(e.target.value)}
-              title="Show one classification"
-              className="fb-field h-8 bg-[var(--surface-sunken)] px-2 text-[12px] text-[var(--ink-80)]"
-              data-testid="calendar-class-filter"
-            >
-              <option value="all">All classes</option>
-              {QUEUE_ORDER.map((q) => (
-                <option key={q} value={q}>
-                  {QUEUE_LABEL[q]}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => openConsole()}
-              title="Capture a new attention item"
-              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
-            >
-              <Icon name="add" size={14} /> New
-            </button>
-            <div className="w-px h-5 bg-[var(--edge-soft)]" />
-            <div className="flex items-center rounded-lg bg-[var(--surface-sunken)] p-0.5">
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center rounded-[var(--radius-field)] fb-glass-row p-1 gap-0.5 shrink-0">
               {(
                 [
                   ['day', 'Day'],
@@ -434,39 +442,43 @@ export default function CalendarView(): JSX.Element {
                 <button
                   key={m}
                   onClick={() => pickMode(m)}
-                  className={`px-2.5 h-7 fb-t-label fb-press rounded-[var(--radius-field)] ${
+                  className={`min-w-[62px] px-3 h-8 fb-t-label fb-press rounded-[calc(var(--radius-field)-3px)] whitespace-nowrap transition-colors ${
                     mode === m
-                      ? 'bg-[var(--surface-raised)] text-[var(--ink-100)] shadow-sm'
-                      : 'text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+                      ? 'bg-[rgba(var(--accent),0.14)] text-[var(--ink-100)] shadow-[inset_0_0_0_1px_rgba(var(--accent),0.3)]'
+                      : 'text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[rgba(var(--accent),0.06)]'
                   }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <button onClick={() => shift(-1)} className="icon-btn" title="Earlier">
-              <Icon name="chevron_left" size={16} />
-            </button>
-            <button
-              onClick={() => setAnchor(dayStart(new Date()))}
-              className="h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)]"
-            >
-              Today
-            </button>
-            <button onClick={() => shift(1)} className="icon-btn" title="Later">
-              <Icon name="chevron_right" size={16} />
-            </button>
-            <span className="fb-t-label text-[var(--ink-70)] fb-tabular min-w-[130px] text-right">
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => shift(-1)} className="icon-btn !h-9 !w-9" title="Earlier">
+                <Icon name="chevron_left" size={17} />
+              </button>
+              <button
+                onClick={() => setAnchor(dayStart(new Date()))}
+                className="h-9 px-3.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-label text-[var(--ink-80)] hover:bg-[rgba(var(--accent),0.06)] transition-colors"
+              >
+                Today
+              </button>
+              <button onClick={() => shift(1)} className="icon-btn !h-9 !w-9" title="Later">
+                <Icon name="chevron_right" size={17} />
+              </button>
+            </div>
+
+            <span className="fb-t-label text-[var(--ink-70)] fb-tabular whitespace-nowrap px-1">
               {rangeLabel}
             </span>
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
+        <div className="fb-cq-cal">
           {/* The queue rail — the half you drag FROM. */}
           <aside
             ref={railRef}
-            className={`hidden xl:flex flex-col gap-2 sticky top-0 rounded-xl transition-shadow ${
+            className={`fb-cq-rail flex-col gap-2 sticky top-0 rounded-xl transition-shadow ${
               blockDragging ? 'ring-2 ring-[rgba(var(--accent),0.45)] ring-offset-4 ring-offset-[var(--surface-base)]' : ''
             }`}
           >
@@ -502,7 +514,7 @@ export default function CalendarView(): JSX.Element {
           <div className="min-w-0">
             {mode !== 'month' && (
               <div className="mb-3 flex flex-col gap-2" data-testid="plan-bar">
-                <div className="flex items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] pl-3 pr-2 py-2">
+                <div className="flex items-center gap-2 rounded-[var(--radius-card)] fb-glass-card pl-3.5 pr-2 py-2">
                   <Icon name="auto_awesome" size={15} className="shrink-0 text-[rgb(var(--accent))]" />
                   <input
                     value={intent}
@@ -538,7 +550,7 @@ export default function CalendarView(): JSX.Element {
                       <Icon name="tune" size={15} />
                     </button>
                     {showSettings && (
-                      <div className="absolute right-0 top-9 z-30 w-[280px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-3 flex flex-col gap-2.5">
+                      <div className="absolute right-0 top-10 z-30 w-[292px] rounded-[var(--radius-card)] fb-glass-card p-3.5 flex flex-col gap-2.5">
                         <div className="fb-t-label text-[var(--ink-70)]">Planner settings</div>
                         <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
                           Day starts
@@ -618,7 +630,7 @@ export default function CalendarView(): JSX.Element {
                   </div>
                 </div>
                 {(proposals || planNote) && (
-                  <div className="flex items-center gap-3 rounded-xl border border-dashed border-accent/50 bg-accent/[0.05] px-3 py-2">
+                  <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-accent/50 bg-accent/[0.06] px-3.5 py-2 backdrop-blur-sm">
                     <Icon name="draw" size={14} className="shrink-0 text-[rgb(var(--accent))]" />
                     <span className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0 truncate">
                       {proposals
@@ -653,15 +665,15 @@ export default function CalendarView(): JSX.Element {
               </div>
             )}
             {mode === 'month' ? (
-              <div>
-                <div className="grid grid-cols-7 gap-1 mb-1">
+              <div className="rounded-[var(--radius-card)] fb-glass-card p-3">
+                <div className="grid grid-cols-7 gap-1.5 mb-1.5">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
                     <div key={d} className="text-center fb-t-caption font-semibold text-[var(--ink-40)]">
                       {d}
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1.5">
                   {monthDays.map((d) => {
                     const key = dayMs(d)
                     const inMonth = d.getMonth() === rangeStart.getMonth()
@@ -683,11 +695,11 @@ export default function CalendarView(): JSX.Element {
                           const iso = new Date(key + 17 * 3600_000).toISOString()
                           void updateFields(id, { dueAt: iso })
                         }}
-                        className={`min-h-[92px] rounded-lg border p-1.5 flex flex-col gap-1 ${
+                        className={`min-h-[104px] rounded-lg p-2 flex flex-col gap-1 transition-colors ${
                           isToday
-                            ? 'border-accent/40 bg-accent/[0.04]'
-                            : 'border-[var(--edge-soft)] bg-[var(--surface-raised)]'
-                        } ${inMonth ? '' : 'opacity-45'}`}
+                            ? 'fb-glass-row ring-2 ring-[rgba(var(--accent),0.45)]'
+                            : 'fb-glass-row'
+                        } ${inMonth ? '' : 'opacity-40'}`}
                       >
                         <div
                           className={`fb-t-caption fb-tabular ${
@@ -701,7 +713,7 @@ export default function CalendarView(): JSX.Element {
                             key={i.id}
                             onClick={goAttention}
                             title={i.title}
-                            className="relative w-full text-left truncate rounded-[var(--radius-chip)] pl-2 pr-1 py-0.5 text-[10.5px] fb-press"
+                            className="relative w-full text-left truncate rounded-[var(--radius-chip)] pl-2.5 pr-1.5 py-1 text-[11px] leading-snug fb-press"
                             style={{
                               backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.12),
                               color: 'var(--ink-80)'
@@ -741,6 +753,7 @@ export default function CalendarView(): JSX.Element {
                 </div>
               </div>
             ) : (
+              <div className="rounded-[var(--radius-card)] fb-glass-card p-3">
               <WeekTimeGrid
                 weekStart={rangeStart}
                 days={MODE_DAYS[mode]}
@@ -755,6 +768,7 @@ export default function CalendarView(): JSX.Element {
                   })
                 }
               />
+              </div>
             )}
           </div>
         </div>

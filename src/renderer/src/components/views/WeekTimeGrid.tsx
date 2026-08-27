@@ -363,12 +363,12 @@ export default function WeekTimeGrid({
   return (
     <div className="flex" data-testid="week-time-grid">
       {/* Hour gutter */}
-      <div className={`${compact ? 'w-6' : 'w-12'} shrink-0 select-none`} style={{ paddingTop: 22 }}>
+      <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`} style={{ paddingTop: 30 }}>
         {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
           <div
             key={i}
             style={{ height: hourPx }}
-            className="fb-t-caption font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
+            className={`font-mono text-[var(--ink-40)] text-right pr-2 -translate-y-1.5 whitespace-nowrap ${compact ? 'text-[9.5px]' : 'text-[11px]'}`}
           >
             {(() => {
               // DEC-053 — 12-hour cycle, per operator ruling (no military time).
@@ -382,7 +382,10 @@ export default function WeekTimeGrid({
       </div>
 
       {/* Day columns */}
-      <div className="grid gap-1 flex-1" style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}>
+      <div
+        className={`grid flex-1 min-w-0 ${compact ? 'gap-1' : 'gap-1.5'}`}
+        style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
+      >
         {Array.from({ length: days }, (_, dayIndex) => {
           const label = new Date(dayStartMs(weekStart, dayIndex)).toLocaleDateString(undefined, {
             weekday: 'short'
@@ -397,11 +400,16 @@ export default function WeekTimeGrid({
           return (
             <div key={dayIndex} className="flex flex-col min-w-0">
               <div
-                className={`text-center fb-t-caption font-semibold py-1 rounded-[var(--radius-chip)] ${
+                className={`text-center py-1.5 mb-1 rounded-[var(--radius-chip)] truncate ${
                   isToday
-                    ? 'text-accent'
-                    : 'text-[var(--ink-50)]'
-                }`}
+                    ? 'text-accent font-semibold bg-[rgba(var(--accent),0.10)]'
+                    : 'text-[var(--ink-50)] font-medium'
+                } ${compact ? 'text-[11px]' : 'text-[12px]'}`}
+                title={new Date(dStart).toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric'
+                })}
               >
                 {label} {new Date(dStart).getDate()}
               </div>
@@ -415,7 +423,9 @@ export default function WeekTimeGrid({
                         goAttention()
                       }}
                       title={`Due: ${i.title} — open Attention`}
-                      className="relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2 pr-1 py-0.5 fb-t-caption fb-press bg-[var(--surface-raised)]"
+                      className={`relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2.5 pr-1.5 py-1 fb-press bg-[var(--surface-raised)] ${
+                        compact ? 'text-[10.5px]' : 'text-[11px]'
+                      } leading-snug`}
                       style={{
                         borderColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.6),
                         color: 'var(--ink-70)'
@@ -504,10 +514,18 @@ export default function WeekTimeGrid({
                       }}
                       title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
                     >
-                      <div className={`font-medium truncate ${done ? 'line-through' : ''}`}>
+                      <div
+                        className={`font-medium leading-[1.25] ${done ? 'line-through' : ''} ${
+                          height < 34 ? 'truncate' : 'line-clamp-2'
+                        }`}
+                      >
                         {block.title || linked?.title || 'Focus time'}
                       </div>
-                      <div className="text-[9px] opacity-70 tabular-nums">{fmtTime(startMs)}</div>
+                      {height >= 34 && (
+                        <div className="text-[9.5px] opacity-70 tabular-nums mt-px">
+                          {fmtTime(startMs)}
+                        </div>
+                      )}
 
                       {/* hover actions — z-raised above the resize handles,
                           whose top strip otherwise overlaps these buttons'
@@ -648,8 +666,10 @@ export default function WeekTimeGrid({
                         style={{ top: Math.max(0, top), height: Math.max(16, height) }}
                         title={`${g.title} — ${g.reason} (proposed; accept to book)`}
                       >
-                        <div className="font-medium truncate">{g.title}</div>
-                        <div className="text-[9px] opacity-70 truncate">{g.reason}</div>
+                        <div className="font-medium leading-[1.25] truncate">{g.title}</div>
+                        {(g.durationMin / 60) * hourPx >= 34 && (
+                          <div className="text-[9.5px] opacity-70 truncate">{g.reason}</div>
+                        )}
                         {onGhostRemove && (
                           <button
                             onClick={(e) => {

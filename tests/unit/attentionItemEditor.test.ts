@@ -340,7 +340,11 @@ describe('DEC-049 — the command-center layout (file-level pins)', () => {
     const aside = view.slice(view.indexOf('<aside'), view.indexOf('</aside>'))
     expect(aside).toContain('<AgendaBlock variant="full" />')
     expect(aside).toContain('<OverdueRadarBlock variant="full" />')
-    expect(aside).toContain('xl:sticky')
+    // DEC-054: the rail sticks and is shown by a CONTAINER query, not a
+    // viewport breakpoint — the sidebar reserves width with padding, so the
+    // window never narrows when it opens and xl: could not respond.
+    expect(aside).toContain('fb-cq-rail')
+    expect(aside).toContain('sticky top-0')
     // Everything else was moved out of the column the operator called too long.
     expect(aside).not.toContain('AnalyticsBlock')
     expect(aside).not.toContain('StartHereBlock')
@@ -367,11 +371,12 @@ describe('DEC-050 — the item rows read like a project tool', () => {
     // CLUSTERS, so a queue with one cluster had no lines at all.
     expect(view).not.toContain('divide-y divide-[var(--edge-firm)]')
     expect(view).toContain('<div className="flex flex-col gap-1.5">')
-    // Each row carries its own border + radius, and lifts on hover. DEC-053
-    // tightened the card (rounded-md, vertically CENTERED content) after the
-    // operator called the first pass blocky and off-centre.
-    expect(view).toContain('items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-md border bg-[var(--surface-raised)]')
-    expect(view).toContain('hover:bg-[rgba(var(--accent),0.045)]')
+    // Each row is its own surface that lifts on hover. DEC-053 centred and
+    // tightened it; DEC-054 moved it onto the home page's glass material so
+    // every surface in the app reads as one system.
+    expect(view).toContain('items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-lg fb-glass-row')
+    expect(view).toContain('hover:bg-[rgba(var(--accent),0.05)]')
+    expect(view).toContain('hover:-translate-y-px')
   })
 
   it('every row has the project-tool anatomy', () => {

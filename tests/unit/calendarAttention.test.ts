@@ -192,3 +192,62 @@ describe('DEC-053 — the calendar QA round (operator live QA)', () => {
     expect(view).toContain('const settings = loadPlannerSettings()')
   })
 })
+
+describe('DEC-054 — one visual system across Home, Attention and Calendar', () => {
+  const css = read('src/renderer/src/styles/globals.css')
+  const att = read('src/renderer/src/components/views/AttentionView.tsx')
+  const cal = read('src/renderer/src/components/views/CalendarView.tsx')
+  const blocks = read('src/renderer/src/components/attention/attentionBlocks.tsx')
+
+  it('both pages sit on the home page\'s dotted paper', () => {
+    expect(att).toContain('paper-texture')
+    expect(cal).toContain('paper-texture')
+  })
+
+  it('the glass card is the SAME material as the home tile, minus its child-layout rules', () => {
+    // The tile forces its children into a column (for widget interiors); a
+    // page card owns its own layout, so it gets the material only.
+    expect(css).toContain('.fb-glass-card {')
+    expect(css).toContain('--glass-pillow-fill')
+    expect(css).toContain('var(--shadow-inset-highlight)')
+    expect(css).toContain('html.dark .fb-glass-card {')
+    // Widgets/cards/rows all read the same tokens — no forked palettes.
+    expect(css).toContain('.fb-glass-row {')
+  })
+
+  it('blocks, rows and shells adopt it', () => {
+    expect(blocks).toContain('fb-glass-card rounded-[var(--radius-card)]')
+    expect(att).toContain('fb-glass-row')
+    expect(cal).toContain('fb-glass-card')
+    expect(cal).toContain('fb-glass-row')
+  })
+
+  it('layout responds to the CONTAINER, so the left panel opening cannot squeeze it', () => {
+    // The sidebar reserves width via padding on <main>; the window width is
+    // unchanged, so viewport breakpoints were blind to it.
+    expect(css).toContain('container-type: inline-size')
+    expect(css).toContain('@container (min-width: 1040px)')
+    expect(att).toContain('fb-cq-att')
+    expect(cal).toContain('fb-cq-cal')
+    expect(att).toContain('fb-cq ')
+    expect(cal).toContain('fb-cq ')
+    // The old viewport-based two-column rules are gone from both pages.
+    expect(att).not.toContain('xl:grid-cols-[minmax(0,1fr)_340px]')
+    expect(cal).not.toContain('xl:grid-cols-[300px_minmax(0,1fr)]')
+  })
+
+  it('the calendar toolbar keeps its shape: two rows, mode buttons that cannot compress', () => {
+    expect(cal).toContain('min-w-[62px] px-3 h-8')
+    expect(cal).toContain('whitespace-nowrap')
+    expect(cal).toContain('min-w-[124px]')
+  })
+
+  it('grid text is given room instead of being clipped', () => {
+    const grid = read('src/renderer/src/components/views/WeekTimeGrid.tsx')
+    // Short blocks truncate one line; taller blocks get two and the time.
+    expect(grid).toContain("height < 34 ? 'truncate' : 'line-clamp-2'")
+    expect(grid).toContain('{height >= 34 && (')
+    // The gutter widened so "12 PM" cannot clip.
+    expect(grid).toContain("compact ? 'w-8' : 'w-14'")
+  })
+})

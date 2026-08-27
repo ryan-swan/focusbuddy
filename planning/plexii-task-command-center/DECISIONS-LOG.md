@@ -1381,4 +1381,53 @@ actions (h-6), the desk chip suppressed inside its own desk cluster
 Suite 3,047 green (six new DEC-053 pins + the DEC-050 card pin updated to
 the new anatomy); typecheck clean.
 
+---
+
+## DEC-054 — One visual system: Attention + Calendar adopt the Home material
+**Date:** 2026-08-27 · **Status:** RULED (operator: "adopt the UI, UX and design
+principles of the home page… dotted texture, shadowing so widgets pop… start
+to feel like a unified app") + IMPLEMENTED
+
+**The material, shared not copied.** Home's ground is `.paper-texture` (a
+dotted radial-gradient over `--surface-base`, theme-aware) and its widgets ride
+`.fb-widget-tile` — a Liquid Glass fill with a four-layer depth shadow and an
+inset highlight. Attention and Calendar now sit on the SAME paper, and their
+cards use a new `.fb-glass-card` (plus a quieter `.fb-glass-row` for list
+rows). Card and tile read the identical tokens — `--glass-pillow-fill`,
+`--glass-pillow-blur`, `--shadow-inset-highlight` — so a change to the
+material reaches every surface at once.
+**Why a second class rather than reusing the tile:** `.fb-widget-tile > *`
+forces its children into a flex column, because a widget INTERIOR must
+distribute its rows. A page card owns its own layout — applying the tile
+would have turned every card header into a stacked column. One material, two
+jobs, no drift.
+
+**The sidebar problem, root-caused.** The left panel reserves its width with
+PADDING on `<main>`, so the window width is identical whether it is open or
+closed — which means Tailwind's `xl:` breakpoints (viewport-based) fired the
+same either way, and the two-column pages simply got ~260px narrower with no
+layout response. That is the "clunky when the menu opens" the operator saw.
+Both pages now use **container queries** (`container-type: inline-size` +
+`@container`): the grid columns and the rail's visibility respond to the space
+the page ACTUALLY has, at 1040/1360px for Calendar and 1080/1400px for
+Attention. Verified at both sidebar states.
+
+**Calendar toolbar breathes.** The header is two stable rows — title/actions,
+then a toolbar — instead of one that reflowed. Mode buttons carry a min-width
+and `whitespace-nowrap` so Day/3-Day/Week/Month can never compress; the class
+filter has a min-width; nav controls sit at h-9 with real spacing.
+
+**Legibility fixes (operator: "some things get cut off").** The hour gutter
+widened (w-14 / w-8 compact) so "12 PM" cannot clip; day headers carry a full
+title attribute and their own tint for today; blocks show two title lines and
+the start time when tall enough and truncate cleanly when short (instead of
+clipping both); ghosts and deadline chips follow the same rule; month cells
+grew to 104px with larger chip text.
+
+Suite 3,061 green (six DEC-054 pins; the DEC-049 rail pin and DEC-050 row pin
+updated to the new chrome); typecheck clean for these files.
+
+*(The React max-update-depth warning from the CRDT sync layer is being fixed
+in a separate session — untouched here.)*
+
 <!-- Append below; increment DEC-NNN. -->

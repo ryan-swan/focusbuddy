@@ -472,6 +472,106 @@ body {
       0 18px 44px -14px oklch(0% 0 0 / 0.55),
       var(--shadow-inset-highlight);
   }
+  /* ── Container-query layout (DEC-054) ───────────────────────────────────
+     The sidebar reserves its width with PADDING on <main>, so the window
+     width never changes when the left panel opens — which means Tailwind's
+     xl: breakpoints (viewport-based) fire identically whether the panel is
+     open or closed, and a two-column page silently gets ~260px narrower
+     with no layout response. That is the "clunky when the menu opens"
+     failure. These rules watch the CONTAINER instead, so the page reflows
+     on the space it actually has. */
+  .fb-cq {
+    container-type: inline-size;
+  }
+  /* Calendar: queue rail + grid. */
+  .fb-cq-cal {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  @container (min-width: 1040px) {
+    .fb-cq-cal {
+      grid-template-columns: 288px minmax(0, 1fr);
+    }
+  }
+  @container (min-width: 1360px) {
+    .fb-cq-cal {
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+  /* Attention: queues + block rail. */
+  .fb-cq-att {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  @container (min-width: 1080px) {
+    .fb-cq-att {
+      grid-template-columns: minmax(0, 1fr) 330px;
+    }
+  }
+  @container (min-width: 1400px) {
+    .fb-cq-att {
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 1.5rem;
+    }
+  }
+  /* The rail hides itself only when the CONTAINER is genuinely too narrow. */
+  .fb-cq-rail {
+    display: none;
+  }
+  @container (min-width: 1040px) {
+    .fb-cq-rail {
+      display: flex;
+    }
+  }
+
+  /* ── Glass card (DEC-054) ───────────────────────────────────────────────
+     The SAME material as .fb-widget-tile — Liquid Glass fill, layered depth
+     shadow, inset highlight — without the tile's child-layout rules. Those
+     rules exist to make a widget INTERIOR distribute its rows; a page card
+     (an Attention block, the calendar shell) owns its own layout and would
+     be broken by having its header forced into a column. One material, two
+     jobs, no drift: both read the same tokens. */
+  .fb-glass-card {
+    background-color: var(--glass-pillow-fill);
+    backdrop-filter: var(--glass-pillow-blur);
+    -webkit-backdrop-filter: var(--glass-pillow-blur);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(20% 0.01 264 / 0.05),
+      0 6px 16px -6px oklch(20% 0.01 264 / 0.1),
+      0 18px 40px -14px oklch(20% 0.01 264 / 0.13),
+      var(--shadow-inset-highlight);
+  }
+  html.dark .fb-glass-card {
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(0% 0 0 / 0.35),
+      0 6px 16px -6px oklch(0% 0 0 / 0.45),
+      0 18px 44px -14px oklch(0% 0 0 / 0.55),
+      var(--shadow-inset-highlight);
+  }
+  /* A quieter sibling for rows INSIDE a glass card (queue rows, rail items):
+     the same family, one depth step down, so a list reads as content on the
+     card rather than a stack of competing cards. */
+  .fb-glass-row {
+    background-color: var(--glass-pillow-fill);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(20% 0.01 264 / 0.04),
+      0 4px 10px -8px oklch(20% 0.01 264 / 0.10);
+  }
+  html.dark .fb-glass-row {
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(0% 0 0 / 0.28),
+      0 4px 12px -8px oklch(0% 0 0 / 0.4);
+  }
+
   /* Inside a tile, the widget root is a flex column and its content region
      (the card's last child) grows — so interiors distribute rows, stretch
      grids, or center singles instead of pooling dead space at the bottom. */

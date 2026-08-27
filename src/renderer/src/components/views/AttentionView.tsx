@@ -733,10 +733,10 @@ export default function AttentionView(): JSX.Element {
             : undefined
         }
         style={{ marginLeft: `${Math.min(group?.indent ?? 0, 3) * 26}px` }}
-        className={`group relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-md border bg-[var(--surface-raised)] transition-colors ${
+        className={`group relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-lg fb-glass-row transition-all ${
           selected.has(i.id) && selectMode
-            ? 'border-[rgba(var(--accent),0.5)] bg-[rgba(var(--accent),0.05)]'
-            : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:bg-[rgba(var(--accent),0.045)]'
+            ? 'ring-2 ring-[rgba(var(--accent),0.45)]'
+            : 'hover:bg-[rgba(var(--accent),0.05)] hover:-translate-y-px'
         } ${
           dragId === i.id || (dragMulti && dragId && selected.has(i.id)) ? 'opacity-40' : ''
         } ${
@@ -1098,12 +1098,12 @@ export default function AttentionView(): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
+    <div className="h-full overflow-y-auto paper-texture text-[var(--ink-100)]">
       {/* DEC-048 — the command center: a wide grid, not stretched text. The
           queue column keeps a readable measure; the rail carries the
           attention-backed blocks (full variants of the SAME components the
           home dashboard shows compact). */}
-      <div className="max-w-[1440px] mx-auto px-6 xl:px-10 py-8">
+      <div className="fb-cq max-w-[1600px] mx-auto px-5 lg:px-8 xl:px-10 py-7">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="fb-t-title text-[var(--ink-90)]">Attention</h1>
@@ -1142,7 +1142,7 @@ export default function AttentionView(): JSX.Element {
         </div>
         {showNew && (
           <div
-            className="mb-4 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-4 py-3"
+            className="mb-4 rounded-[var(--radius-card)] fb-glass-card px-4 py-3"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !newBusy) void fileNewItem()
               if (e.key === 'Escape') setShowNew(false)
@@ -1259,7 +1259,7 @@ export default function AttentionView(): JSX.Element {
             and the day's calendar takes the top right, directly under the
             banner. The rail below it is SHORT and sticky, so nothing
             important is a long scroll away. */}
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] items-start">
+        <div className="fb-cq-att">
         <div className="min-w-0">
         <div className="flex flex-col gap-4 mb-5">
           <AnalyticsBlock
@@ -1506,7 +1506,7 @@ export default function AttentionView(): JSX.Element {
                       : ''
                   }`}
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 px-0.5">
                     <Icon
                       name={QUEUE_ICON[q.queue] ?? 'label'}
                       size={14}
@@ -1539,7 +1539,7 @@ export default function AttentionView(): JSX.Element {
                                     setActive(desk.id)
                                     goTask(desk.id)
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-sunken)] text-left fb-press mt-1"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(var(--accent),0.05)] ring-1 ring-inset ring-[var(--edge-hairline)] text-left fb-press mt-1 backdrop-blur-sm"
                                 >
                                   <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
                                   <span className="fb-t-label text-[var(--ink-70)] truncate">
@@ -1593,7 +1593,7 @@ export default function AttentionView(): JSX.Element {
                   {signals.map((s) => (
                     <div
                       key={s.key}
-                      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] transition-colors"
+                      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg fb-glass-row hover:bg-[rgba(var(--accent),0.05)] transition-colors"
                     >
                       <Icon
                         name={s.kind === 'desk-due' ? 'schedule' : s.kind === 'plan-due' ? 'account_tree' : 'bedtime'}
@@ -1713,7 +1713,7 @@ export default function AttentionView(): JSX.Element {
           </div>
         )}
         </div>
-        <aside className="hidden xl:flex flex-col gap-4 min-w-0 xl:sticky xl:top-0 self-start">
+        <aside className="fb-cq-rail flex-col gap-4 min-w-0 sticky top-0 self-start">
           <AgendaBlock variant="full" />
           <OverdueRadarBlock variant="full" />
         </aside>

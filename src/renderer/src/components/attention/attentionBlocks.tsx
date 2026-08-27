@@ -68,7 +68,7 @@ function BlockShell({
 }): JSX.Element {
   return (
     <section
-      className={`rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] ${
+      className={`fb-glass-card rounded-[var(--radius-card)] ${
         variant === 'compact' ? 'p-3' : 'p-4'
       } flex flex-col min-h-0`}
     >
