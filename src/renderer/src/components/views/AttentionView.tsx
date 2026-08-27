@@ -16,10 +16,12 @@ import {
   itemReason,
   itemFullText,
   queueOf,
+  rankScore,
   PRIMARY_ACTION,
   QUEUE_ICON,
   CLASS_CHOICES
 } from '../../lib/attentionQueues'
+import { orderWithGroups, planDrop, planUngroup, type DropPosition } from '../../lib/attentionGrouping'
 import {
   feederSignals,
   loadMutes,
@@ -60,6 +62,7 @@ export default function AttentionView(): JSX.Element {
   const reclassify = useWorkItemStore((s) => s.reclassify)
   const snooze = useWorkItemStore((s) => s.snooze)
   const createItem = useWorkItemStore((s) => s.create)
+  const updateFields = useWorkItemStore((s) => s.updateFields)
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
@@ -80,6 +83,50 @@ export default function AttentionView(): JSX.Element {
   // the capture behind it is often a paragraph — and until now there was NO
   // way to read or copy it without opening the DB (operator live QA). Expand
   // shows the untouched title + notes; Copy puts them on the clipboard.
+  // DEC-035 — the six-dot handle: rearrange, move between sections, or attach
+  // one item to another. Native HTML5 drag (the house pattern; no dnd library
+  // in this codebase). `over` is the row being hovered and where.
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [over, setOver] = useState<{ id: string; pos: DropPosition } | null>(null)
+  const [overSection, setOverSection] = useState<string | null>(null)
+
+  /** Dropping on a section header IS a reclassify — the gesture the operator
+   *  asked for ("move them to other sections") on top of machinery that
+   *  already existed. A moved item also leaves its group: the group lived in
+   *  the queue it came from. */
+  async function moveToSection(queue: string): Promise<void> {
+    const id = dragId
+    setDragId(null)
+    setOver(null)
+    setOverSection(null)
+    if (!id) return
+    const item = items.find((x) => x.id === id)
+    if (!item || queueOf(item) === queue) return
+    await updateFields(id, { intentClass: queue, groupId: null, sortOrder: 0 })
+    await refresh()
+  }
+
+  async function applyDrop(targetId: string, pos: DropPosition, rows: ReturnType<typeof orderWithGroups>): Promise<void> {
+    const id = dragId
+    setDragId(null)
+    setOver(null)
+    if (!id) return
+    const writes = planDrop(id, targetId, pos, rows)
+    if (!writes.length) return
+    for (const w of writes) {
+      const patch: Record<string, unknown> = {}
+      if (w.sortOrder !== undefined) patch.sortOrder = w.sortOrder
+      if (w.groupId !== undefined) patch.groupId = w.groupId
+      await updateFields(w.id, patch)
+    }
+    await refresh()
+  }
+
+  async function ungroup(id: string): Promise<void> {
+    for (const w of planUngroup(id)) await updateFields(w.id, { groupId: w.groupId })
+    await refresh()
+  }
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const toggleExpanded = (id: string): void =>
@@ -251,7 +298,11 @@ export default function AttentionView(): JSX.Element {
     }
   }
 
-  function row(i: FbNode, inDetached: boolean): JSX.Element {
+  function row(
+    i: FbNode,
+    inDetached: boolean,
+    group?: { isChild: boolean; childCount: number; rows: ReturnType<typeof orderWithGroups> }
+  ): JSX.Element {
     const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
     const reason = itemReason(i, nowMs)
     const hasDesk = !!(i.parentId && nodes.some((n) => n.id === i.parentId))
@@ -259,11 +310,62 @@ export default function AttentionView(): JSX.Element {
     const notes = (i.description || '').trim()
     // Worth opening when the title is long enough to clip, or notes exist.
     const hasMore = notes.length > 0 || i.title.length > 60
+    const canDrag = !!group && !inDetached
+    const isOver = over?.id === i.id
     return (
       <div
         key={i.id}
-        className="group flex items-start gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
+        onDragOver={
+          canDrag
+            ? (e) => {
+                if (!dragId || dragId === i.id) return
+                e.preventDefault()
+                // Top third = before, bottom third = after, middle = attach.
+                const r = e.currentTarget.getBoundingClientRect()
+                const y = (e.clientY - r.top) / r.height
+                setOver({ id: i.id, pos: y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'into' })
+              }
+            : undefined
+        }
+        onDragLeave={canDrag ? () => setOver((o) => (o?.id === i.id ? null : o)) : undefined}
+        onDrop={
+          canDrag
+            ? (e) => {
+                e.preventDefault()
+                const pos = over?.pos ?? 'after'
+                void applyDrop(i.id, pos, group!.rows)
+              }
+            : undefined
+        }
+        className={`group flex items-start gap-2 px-4 py-2.5 bg-[var(--surface-raised)] ${
+          group?.isChild ? 'pl-10' : ''
+        } ${dragId === i.id ? 'opacity-40' : ''} ${
+          isOver && over?.pos === 'into'
+            ? 'shadow-[inset_0_0_0_2px_rgba(var(--accent),0.5)]'
+            : isOver && over?.pos === 'before'
+              ? 'shadow-[inset_0_2px_0_rgb(var(--accent))]'
+              : isOver && over?.pos === 'after'
+                ? 'shadow-[inset_0_-2px_0_rgb(var(--accent))]'
+                : ''
+        }`}
       >
+        {canDrag && (
+          <button
+            draggable
+            onDragStart={(e) => {
+              setDragId(i.id)
+              e.dataTransfer.effectAllowed = 'move'
+            }}
+            onDragEnd={() => {
+              setDragId(null)
+              setOver(null)
+            }}
+            title="Drag to reorder, attach to another item, or move to another section"
+            className="shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Icon name="drag_indicator" size={16} />
+          </button>
+        )}
         <button
           onClick={() => hasMore && toggleExpanded(i.id)}
           title={hasMore ? (isOpen ? 'Collapse' : 'Show the full text') : undefined}
@@ -296,12 +398,26 @@ export default function AttentionView(): JSX.Element {
             </div>
           )}
           {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
+          {group && group.childCount > 0 && (
+            <div className="text-[11px] text-[var(--ink-40)] mt-0.5">
+              {group.childCount} related item{group.childCount === 1 ? '' : 's'}
+            </div>
+          )}
         </div>
         <div
           className={`flex items-center gap-1 transition-opacity ${
             isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
         >
+          {group?.isChild && (
+            <button
+              onClick={() => void ungroup(i.id)}
+              title="Detach from its group"
+              className="icon-btn !h-7 !w-7"
+            >
+              <Icon name="link_off" size={14} />
+            </button>
+          )}
           {hasMore && (
             <button
               onClick={() => void copyItem(i)}
@@ -500,18 +616,57 @@ export default function AttentionView(): JSX.Element {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            {queues.map((q) => (
-              <section key={q.queue}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Icon name={QUEUE_ICON[q.queue] ?? 'label'} size={14} className="text-[var(--ink-40)]" />
-                  <span className="fb-t-label text-[var(--ink-70)]">{q.label}</span>
-                  <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{q.items.length}</span>
-                </div>
-                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
-                  {q.items.map((i) => row(i, false))}
-                </div>
-              </section>
-            ))}
+            {queues.map((q) => {
+              // DEC-035: in the Queue lens the rows carry grouping + manual
+              // order; the other lenses (Due/Origin) answer a different
+              // question, so they stay ranked and undraggable.
+              const grouped =
+                lens === 'queue' ? orderWithGroups(q.items, (x) => rankScore(x, nowMs)) : null
+              return (
+                <section key={q.queue}>
+                  <div
+                    onDragOver={
+                      lens === 'queue' && dragId
+                        ? (e) => {
+                            e.preventDefault()
+                            setOverSection(q.queue)
+                          }
+                        : undefined
+                    }
+                    onDragLeave={() => setOverSection((c) => (c === q.queue ? null : c))}
+                    onDrop={
+                      lens === 'queue' && dragId
+                        ? (e) => {
+                            e.preventDefault()
+                            void moveToSection(q.queue)
+                          }
+                        : undefined
+                    }
+                    className={`flex items-center gap-2 mb-2 rounded-md px-1 -mx-1 ${
+                      overSection === q.queue ? 'bg-[rgba(var(--accent),0.12)]' : ''
+                    }`}
+                  >
+                    <Icon name={QUEUE_ICON[q.queue] ?? 'label'} size={14} className="text-[var(--ink-40)]" />
+                    <span className="fb-t-label text-[var(--ink-70)]">{q.label}</span>
+                    <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{q.items.length}</span>
+                    {overSection === q.queue && (
+                      <span className="fb-t-caption text-[rgb(var(--accent))]">move here</span>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                    {grouped
+                      ? grouped.map((g) =>
+                          row(g.item, false, {
+                            isChild: g.isChild,
+                            childCount: g.childCount,
+                            rows: grouped
+                          })
+                        )
+                      : q.items.map((i) => row(i, false))}
+                  </div>
+                </section>
+              )
+            })}
             {signals.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-2">

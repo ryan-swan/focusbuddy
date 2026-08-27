@@ -23,6 +23,13 @@ export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
   // emitted + allowlisted NOW while schema churn is cheap; no UI writes it yet.
   // UI adoption waits for the per-class question sets (SPEC-027 era).
   { column: 'intent_sub', attr: 'intentSub', ddl: 'TEXT', rendererEmitted: true },
+  // DEC-035 — grouping. The id of the item that LEADS this item's group.
+  // A SIBLING reference, deliberately not parent_id: work items are leaf nodes
+  // (§2.5 leaf invariant — nothing nests under a work item, enforced at create
+  // AND at sync apply), and parent_id already means "the desk this lives on".
+  // Exactly one level: a group leader never itself carries a group_id, so a
+  // group can never become a tree.
+  { column: 'group_id', attr: 'groupId', ddl: 'TEXT', rendererEmitted: true },
   { column: 'originator_id', attr: 'originatorId', ddl: 'TEXT', rendererEmitted: true },
   { column: 'recipient_id', attr: 'recipientId', ddl: 'TEXT', rendererEmitted: true },
   // ISO-8601 string — collision-proof vs the numeric desk due_date (§2.2)

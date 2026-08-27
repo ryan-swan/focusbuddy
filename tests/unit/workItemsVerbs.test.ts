@@ -141,6 +141,57 @@ describe('updateFields / reclassify', () => {
   })
 })
 
+describe('DEC-035 — grouping is one level, enforced at the db', () => {
+  it('groups an item under a leader, and flattens a group-under-a-child', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'lead')
+    wi(raw, 'kid')
+    wi(raw, 'other')
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })).toBe(true)
+    expect(
+      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('kid') as { group_id: string })
+        .group_id
+    ).toBe('lead')
+    // Dropping onto a CHILD joins that child's group — never a second level.
+    expect(updateWorkItemFieldsCore(db, 'other', { groupId: 'kid' })).toBe(true)
+    expect(
+      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('other') as { group_id: string })
+        .group_id
+    ).toBe('lead')
+  })
+
+  it('refuses self-grouping, a non-item leader, and grouping a LEADER', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'lead')
+    wi(raw, 'kid')
+    wi(raw, 'other')
+    raw.prepare("INSERT INTO nodes (id, kind, title) VALUES ('desk', 'task', 'D')").run()
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'lead' })).toBe(false)
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'desk' })).toBe(false)
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'missing' })).toBe(false)
+    // 'lead' now leads someone…
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })).toBe(true)
+    // …so it can no longer be grouped itself.
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'other' })).toBe(false)
+    expect(
+      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('lead') as { group_id: string | null })
+        .group_id
+    ).toBeNull()
+  })
+
+  it('ungroup clears the reference', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'lead')
+    wi(raw, 'kid')
+    updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: null })).toBe(true)
+    expect(
+      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('kid') as { group_id: string | null })
+        .group_id
+    ).toBeNull()
+  })
+})
+
 describe('snooze / markRead (wi_local, device-local)', () => {
   it('upserts satellite state without touching the node row', () => {
     const { raw, db } = freshDb()

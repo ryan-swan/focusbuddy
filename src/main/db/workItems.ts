@@ -696,6 +696,11 @@ const PATCHABLE: Record<string, string> = {
   notes: 'description',
   intentClass: 'intent_class',
   intentSub: 'intent_sub',
+  groupId: 'group_id',
+  // DEC-035: manual placement within a queue. A base `nodes` column that
+  // already rides the sync body, so a hand-ordered queue travels between
+  // devices without joining the work_item manifest.
+  sortOrder: 'sort_order',
   dueAt: 'due_at',
   wiUrgency: 'wi_urgency',
   reasonCode: 'reason_code',
@@ -718,6 +723,27 @@ export function updateWorkItemFieldsCore(
     const canonical = canonicalIntentClass(patch.intentClass)
     if (!canonical) return false
     patch = { ...patch, intentClass: canonical }
+  }
+  if (patch.groupId !== undefined && patch.groupId !== null) {
+    // DEC-035 — the one-level rule, enforced HERE and not only in the UI: a
+    // group must never become a tree, whatever writes it (drag, a future
+    // agent, a peer's sync arrival replayed through this path).
+    const leaderId = String(patch.groupId)
+    if (leaderId === id) return false // never its own leader
+    const leader = d.prepare('SELECT kind, group_id FROM nodes WHERE id = ?').get(leaderId) as
+      | { kind: string; group_id: string | null }
+      | undefined
+    if (leader?.kind !== 'work_item') return false
+    // This item already leads others — grouping it would nest two groups.
+    const kids = d
+      .prepare(`SELECT 1 FROM nodes WHERE kind = 'work_item' AND group_id = ? LIMIT 1`)
+      .get(id)
+    if (kids) return false
+    // Grouping under a CHILD means "join that child's group" — flattened, so
+    // the stored shape stays exactly one level deep.
+    const resolved = leader.group_id && leader.group_id !== leaderId ? leader.group_id : leaderId
+    if (resolved === id) return false
+    patch = { ...patch, groupId: resolved }
   }
   const sets: string[] = []
   const params: Record<string, unknown> = { id, now: Date.now() }

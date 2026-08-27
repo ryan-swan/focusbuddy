@@ -177,6 +177,8 @@ export interface FbNode {
   workItemState?: string | null
   intentClass?: string | null
   intentSub?: string | null
+  /** DEC-035: the item LEADING this item's group (a sibling ref, one level). */
+  groupId?: string | null
   originatorId?: string | null
   recipientId?: string | null
   dueAt?: string | null
