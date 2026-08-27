@@ -917,4 +917,27 @@ in-flight tidy so it files the cleaned version. Regex lesson pinned: the
 first multi-sentence probe used `[.!?;]\S` and missed normal prose — the
 slice(0,-1) trick from needsCleanup is the correct test.
 
+
+
+---
+
+## DEC-043 — A page per class; on-brand subtle colors; drag-only reclassify; light tidy
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**(a) Tabs.** The eight classes become PAGES: a tab row (All + the eight, with
+counts) above the queue. A class tab shows only that queue — no scrolling past
+the others; All is the old full-list view. Tabs are DROP TARGETS, which is what
+makes drag-reclassify work on a single-class page. Due/Origin lenses still show
+everything. **(b) Colors from the ONE palette:** each class takes a PlexiSuite
+brand-family hue (tokens.css — the product groups' own accents): To Do sky,
+Review violet, Decide amber, Respond teal, Meet green, Discuss indigo, Remember
+lightbulb yellow, Know neutral slate. Subtle by construction — icon tints, a
+10%-alpha wash + soft underline on the active tab, never a colored panel.
+**(c) The row reclassify button is REMOVED** per the ruling; the two paths are
+drag (section or tab) and the editor's class chips. **(d) Tidy calibration:**
+the model-tidy bar drops 8→5 words, and BELOW it a deterministic light tidy
+capitalizes every derived title (first letter, standalone "i", weekdays/months
+with "may" excluded, a name after a person-verb unless stopword) — "call bob
+thursday" → "Call Bob Thursday" with zero model calls; only ever ADDS capitals,
+idempotent, reaches secondaries.
+
 <!-- Append below; increment DEC-NNN. -->
