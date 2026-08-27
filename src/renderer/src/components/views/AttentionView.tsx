@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
+import AttentionItemEditor from '../AttentionItemEditor'
 import {
   groupIntoQueues,
   groupByDue,
@@ -21,7 +22,13 @@ import {
   QUEUE_ICON,
   CLASS_CHOICES
 } from '../../lib/attentionQueues'
-import { orderWithGroups, planDrop, planUngroup, type DropPosition } from '../../lib/attentionGrouping'
+import {
+  orderWithGroups,
+  planDrop,
+  planMoveToQueue,
+  planUngroup,
+  type DropPosition
+} from '../../lib/attentionGrouping'
 import {
   feederSignals,
   loadMutes,
@@ -36,6 +43,10 @@ import {
 // over items that live with their desks, never a second workspace. Snoozed
 // items hide until they return; the Detached shelf (F-M6) holds park-local
 // items whose desk was purged or moved, with MOVE as the recovery.
+
+/** How long a drag must rest on a row before it means "attach to this"
+ *  rather than "drop near this". A deliberate pause, not a twitch. */
+const GROUP_DWELL_MS = 700
 
 function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
   if (!i.dueAt) return null
@@ -79,53 +90,85 @@ export default function AttentionView(): JSX.Element {
   }
   const [showClosed, setShowClosed] = useState(false)
 
-  // Full text on demand: a queue row truncates by design (scannability), but
-  // the capture behind it is often a paragraph — and until now there was NO
-  // way to read or copy it without opening the DB (operator live QA). Expand
-  // shows the untouched title + notes; Copy puts them on the clipboard.
-  // DEC-035 — the six-dot handle: rearrange, move between sections, or attach
-  // one item to another. Native HTML5 drag (the house pattern; no dnd library
-  // in this codebase). `over` is the row being hovered and where.
+  // DEC-035 — the six-dot handle: rearrange, attach one item to another, or
+  // move between classifications. Native HTML5 drag (the house pattern; there
+  // is no dnd library in this codebase). `over` is the row being hovered and
+  // where; `overSection` is a whole-section target.
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<{ id: string; pos: DropPosition } | null>(null)
   const [overSection, setOverSection] = useState<string | null>(null)
-
-  /** Dropping on a section header IS a reclassify — the gesture the operator
-   *  asked for ("move them to other sections") on top of machinery that
-   *  already existed. A moved item also leaves its group: the group lived in
-   *  the queue it came from. */
-  async function moveToSection(queue: string): Promise<void> {
-    const id = dragId
-    setDragId(null)
-    setOver(null)
-    setOverSection(null)
-    if (!id) return
-    const item = items.find((x) => x.id === id)
-    if (!item || queueOf(item) === queue) return
-    await updateFields(id, { intentClass: queue, groupId: null, sortOrder: 0 })
-    await refresh()
+  // Dwell-to-group: hovering a row for a beat means "attach to this", which is
+  // how the operator described it. Position still decides before/after.
+  const dwell = useRef<{ id: string; timer: number } | null>(null)
+  const clearDwell = (): void => {
+    if (dwell.current) window.clearTimeout(dwell.current.timer)
+    dwell.current = null
   }
 
-  async function applyDrop(targetId: string, pos: DropPosition, rows: ReturnType<typeof orderWithGroups>): Promise<void> {
-    const id = dragId
-    setDragId(null)
-    setOver(null)
-    if (!id) return
-    const writes = planDrop(id, targetId, pos, rows)
-    if (!writes.length) return
+  async function writeAll(
+    writes: Array<{ id: string; groupId?: string | null; sortOrder?: number; intentClass?: string }>
+  ): Promise<void> {
     for (const w of writes) {
       const patch: Record<string, unknown> = {}
       if (w.sortOrder !== undefined) patch.sortOrder = w.sortOrder
       if (w.groupId !== undefined) patch.groupId = w.groupId
+      if (w.intentClass !== undefined) patch.intentClass = w.intentClass
       await updateFields(w.id, patch)
     }
     await refresh()
   }
 
-  async function ungroup(id: string): Promise<void> {
-    for (const w of planUngroup(id)) await updateFields(w.id, { groupId: w.groupId })
-    await refresh()
+  const endDrag = (): void => {
+    setDragId(null)
+    setOver(null)
+    setOverSection(null)
+    clearDwell()
   }
+
+  /** A drop ONTO a row. When that row lives in a different queue the same
+   *  gesture reclassifies the item — dragging between classifications was
+   *  silently doing nothing, because the dragged row was not in the target
+   *  queue's list at all (operator live QA). */
+  async function applyDrop(
+    targetId: string,
+    pos: DropPosition,
+    rows: ReturnType<typeof orderWithGroups>,
+    targetQueue: string
+  ): Promise<void> {
+    const id = dragId
+    endDrag()
+    if (!id) return
+    const dragged = items.find((x) => x.id === id)
+    if (!dragged) return
+    const crossQueue = queueOf(dragged) !== targetQueue
+    await writeAll(planDrop(dragged, targetId, pos, rows, crossQueue ? targetQueue : undefined))
+  }
+
+  /** Dropping on a section's header or empty space: reclassify into it and
+   *  land at the end. The item leaves its old group — the group belonged to
+   *  the queue it came from. */
+  async function moveToSection(
+    queue: string,
+    rows: ReturnType<typeof orderWithGroups>
+  ): Promise<void> {
+    const id = dragId
+    endDrag()
+    if (!id) return
+    const item = items.find((x) => x.id === id)
+    if (!item || queueOf(item) === queue) return
+    await writeAll(planMoveToQueue(id, queue, rows))
+  }
+
+  async function ungroup(id: string): Promise<void> {
+    await writeAll(planUngroup(id))
+  }
+
+  // Full text on demand: a queue row truncates by design (scannability), but
+  // the capture behind it is often a paragraph — and until now there was NO
+  // way to read or copy it without opening the DB (operator live QA). Expand
+  // shows the untouched title + notes; Copy puts them on the clipboard.
+  // DEC-036 — double-click opens the whole item for editing.
+  const [editing, setEditing] = useState<FbNode | null>(null)
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -301,7 +344,12 @@ export default function AttentionView(): JSX.Element {
   function row(
     i: FbNode,
     inDetached: boolean,
-    group?: { isChild: boolean; childCount: number; rows: ReturnType<typeof orderWithGroups> }
+    group?: {
+      isChild: boolean
+      childCount: number
+      rows: ReturnType<typeof orderWithGroups>
+      queue: string
+    }
   ): JSX.Element {
     const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
     const reason = itemReason(i, nowMs)
@@ -315,25 +363,60 @@ export default function AttentionView(): JSX.Element {
     return (
       <div
         key={i.id}
+        data-item-row
+        onDoubleClick={(e) => {
+          // Only the ACTION cluster is off-limits — double-clicking Archive
+          // should archive, not open an editor behind it. The title and the
+          // expander are buttons too, and double-clicking THOSE must still
+          // open the item (guarding on `button` blocked nearly the whole row).
+          if ((e.target as HTMLElement).closest('[data-row-action]')) return
+          setEditing(i)
+        }}
+        title="Double-click to edit"
         onDragOver={
           canDrag
             ? (e) => {
                 if (!dragId || dragId === i.id) return
                 e.preventDefault()
-                // Top third = before, bottom third = after, middle = attach.
+                e.stopPropagation()
                 const r = e.currentTarget.getBoundingClientRect()
                 const y = (e.clientY - r.top) / r.height
-                setOver({ id: i.id, pos: y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'into' })
+                // The edges mean "place it here"; resting in the MIDDLE for a
+                // beat means "attach to this" — the operator's own grammar.
+                const edge = y < 0.25 ? 'before' : y > 0.75 ? 'after' : null
+                if (edge) {
+                  clearDwell()
+                  setOver({ id: i.id, pos: edge })
+                  return
+                }
+                if (dwell.current?.id !== i.id) {
+                  clearDwell()
+                  setOver({ id: i.id, pos: 'after' })
+                  dwell.current = {
+                    id: i.id,
+                    timer: window.setTimeout(
+                      () => setOver({ id: i.id, pos: 'into' }),
+                      GROUP_DWELL_MS
+                    )
+                  }
+                }
               }
             : undefined
         }
-        onDragLeave={canDrag ? () => setOver((o) => (o?.id === i.id ? null : o)) : undefined}
+        onDragLeave={
+          canDrag
+            ? () => {
+                clearDwell()
+                setOver((o) => (o?.id === i.id ? null : o))
+              }
+            : undefined
+        }
         onDrop={
           canDrag
             ? (e) => {
                 e.preventDefault()
-                const pos = over?.pos ?? 'after'
-                void applyDrop(i.id, pos, group!.rows)
+                e.stopPropagation()
+                void applyDrop(i.id, over?.pos ?? 'after', group!.rows, group!.queue)
               }
             : undefined
         }
@@ -353,13 +436,19 @@ export default function AttentionView(): JSX.Element {
           <button
             draggable
             onDragStart={(e) => {
+              // Drag the whole row, not a bare handle — the operator should
+              // see the item itself move.
+              const rowEl = (e.currentTarget as HTMLElement).closest(
+                '[data-item-row]'
+              ) as HTMLElement | null
+              if (rowEl) {
+                const r = rowEl.getBoundingClientRect()
+                e.dataTransfer.setDragImage(rowEl, e.clientX - r.left, e.clientY - r.top)
+              }
               setDragId(i.id)
               e.dataTransfer.effectAllowed = 'move'
             }}
-            onDragEnd={() => {
-              setDragId(null)
-              setOver(null)
-            }}
+            onDragEnd={endDrag}
             title="Drag to reorder, attach to another item, or move to another section"
             className="shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
           >
@@ -405,6 +494,7 @@ export default function AttentionView(): JSX.Element {
           )}
         </div>
         <div
+          data-row-action
           className={`flex items-center gap-1 transition-opacity ${
             isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
@@ -623,29 +713,35 @@ export default function AttentionView(): JSX.Element {
               const grouped =
                 lens === 'queue' ? orderWithGroups(q.items, (x) => rankScore(x, nowMs)) : null
               return (
-                <section key={q.queue}>
-                  <div
-                    onDragOver={
-                      lens === 'queue' && dragId
-                        ? (e) => {
-                            e.preventDefault()
-                            setOverSection(q.queue)
-                          }
-                        : undefined
-                    }
-                    onDragLeave={() => setOverSection((c) => (c === q.queue ? null : c))}
-                    onDrop={
-                      lens === 'queue' && dragId
-                        ? (e) => {
-                            e.preventDefault()
-                            void moveToSection(q.queue)
-                          }
-                        : undefined
-                    }
-                    className={`flex items-center gap-2 mb-2 rounded-md px-1 -mx-1 ${
-                      overSection === q.queue ? 'bg-[rgba(var(--accent),0.12)]' : ''
-                    }`}
-                  >
+                <section
+                  key={q.queue}
+                  // The WHOLE section takes the drop, not just its header —
+                  // dragging between classifications has to be easy to hit.
+                  // Row drops stopPropagation, so a precise drop still wins.
+                  onDragOver={
+                    lens === 'queue' && dragId
+                      ? (e) => {
+                          e.preventDefault()
+                          setOverSection(q.queue)
+                        }
+                      : undefined
+                  }
+                  onDragLeave={() => setOverSection((c) => (c === q.queue ? null : c))}
+                  onDrop={
+                    lens === 'queue' && dragId
+                      ? (e) => {
+                          e.preventDefault()
+                          void moveToSection(q.queue, grouped ?? [])
+                        }
+                      : undefined
+                  }
+                  className={`rounded-lg ${
+                    overSection === q.queue && dragId
+                      ? 'ring-2 ring-[rgba(var(--accent),0.45)] ring-offset-4 ring-offset-[var(--surface-base)]'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
                     <Icon name={QUEUE_ICON[q.queue] ?? 'label'} size={14} className="text-[var(--ink-40)]" />
                     <span className="fb-t-label text-[var(--ink-70)]">{q.label}</span>
                     <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{q.items.length}</span>
@@ -659,7 +755,8 @@ export default function AttentionView(): JSX.Element {
                           row(g.item, false, {
                             isChild: g.isChild,
                             childCount: g.childCount,
-                            rows: grouped
+                            rows: grouped,
+                            queue: q.queue
                           })
                         )
                       : q.items.map((i) => row(i, false))}
@@ -794,6 +891,16 @@ export default function AttentionView(): JSX.Element {
           </div>
         )}
       </div>
+      {editing && (
+        <AttentionItemEditor
+          item={editing}
+          desks={deskChoices}
+          onClose={(changed) => {
+            setEditing(null)
+            if (changed) void refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

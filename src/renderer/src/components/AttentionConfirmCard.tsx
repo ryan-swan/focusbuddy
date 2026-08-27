@@ -12,6 +12,11 @@ import Icon from './Icon'
 
 export { CLASS_CHOICES, CLASS_LABEL }
 
+/** How long Enter will wait on an in-flight tidy before filing what it has.
+ *  Long enough for a normal Haiku round trip, short enough that a dead call
+ *  never strands the capture. */
+export const TIDY_WAIT_CAP_MS = 4000
+
 interface ConfirmState {
   picked: string
   confidence: number
@@ -63,6 +68,14 @@ export default function AttentionConfirmCard({
   const [cleanup, setCleanup] = useState<{ title: string; note: string; originalTitle: string } | null>(null)
   const [cleanupUsed, setCleanupUsed] = useState(false)
   const cleanupSeq = useRef(0)
+  // The Enter that OPENED this card must not also file it. The card mounts
+  // with a class chip auto-focused, so that same keystroke (or its auto-repeat)
+  // landed straight on the confirm handler and filed the untidied item —
+  // "if I click enter it just enters as is" (operator live QA). The card arms
+  // on the first keyUP, which is the release of the very key that opened it.
+  const [armed, setArmed] = useState(false)
+  // The tidy in flight, so Enter can WAIT for it rather than racing it.
+  const tidyPending = useRef<Promise<unknown> | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -71,6 +84,8 @@ export default function AttentionConfirmCard({
     setCleanupUsed(false)
     setConfirmDate('')
     setError(null)
+    setArmed(false)
+    tidyPending.current = null
     // A MARKED object already knows what it is — the preset table decided,
     // so the classifier is skipped entirely (no latency, no model, works with
     // the key removed). Typed captures still classify.
@@ -113,15 +128,23 @@ export default function AttentionConfirmCard({
         // The tidy is still requested AFTER the screen is up — a capture never
         // waits on it (R011) — but it now lands INTO the preview rather than
         // sitting beside it as an offer. "Enter as is" is the escape hatch.
-        void window.api.workItems.proposeCleanup(text, rawNotes.trim() || undefined).then((p) => {
-          if (alive && p && cleanupSeq.current === seq) {
-            setCleanup({ title: p.title, note: p.note, originalTitle: c.title })
-            setCleanupUsed(true)
-            setConfirm((prev) =>
-              prev ? { ...prev, title: p.title, notes: p.note || prev.notes } : prev
-            )
-          }
-        })
+        const tidy = window.api.workItems
+          .proposeCleanup(text, rawNotes.trim() || undefined)
+          .then((p) => {
+            if (alive && p && cleanupSeq.current === seq) {
+              setCleanup({ title: p.title, note: p.note, originalTitle: c.title })
+              setCleanupUsed(true)
+              setConfirm((prev) =>
+                prev ? { ...prev, title: p.title, notes: p.note || prev.notes } : prev
+              )
+            }
+            return p
+          })
+          .catch(() => null)
+          .finally(() => {
+            if (tidyPending.current === tidy) tidyPending.current = null
+          })
+        tidyPending.current = tidy
       })
       .catch(() => {
         if (alive) setError('Could not classify that. Try again.')
@@ -144,6 +167,16 @@ export default function AttentionConfirmCard({
     if (!confirm || busy) return
     setBusy(true)
     try {
+      // "If I click enter there, it should save the TIDIED item." When the
+      // tidy is still in flight, Enter waits for it rather than racing it —
+      // capped, so a slow or dead call can never strand the capture. (The
+      // capture path itself still never waits: this is the confirm step.)
+      if (!asIs && tidyPending.current) {
+        await Promise.race([
+          tidyPending.current,
+          new Promise((r) => setTimeout(r, TIDY_WAIT_CAP_MS))
+        ])
+      }
       const dueAt = confirm.needsDate
         ? confirmDate
           ? new Date(`${confirmDate}T17:00:00`).toISOString()
@@ -156,7 +189,6 @@ export default function AttentionConfirmCard({
       const typed = text.trim()
       const rawTitle = typed.length > 120 ? `${typed.slice(0, 117)}…` : typed
       const ownNotes = rawNotes.trim()
-      const captured = [typed, ownNotes].filter(Boolean).join('\n\n')
       const title = asIs ? rawTitle : confirm.title
       // Untidied: keep BOTH the operator's notes and the verbatim capture when
       // the derived title dropped part of it (e.g. "fyi:" stripped, or only the
@@ -164,9 +196,16 @@ export default function AttentionConfirmCard({
       // silently discarded the rest of what was typed.
       const verbatim = typed === confirm.title ? '' : typed
       const notes = asIs
-        ? ownNotes || (typed === rawTitle ? undefined : typed)
+        ? // "Enter as is" IS the verbatim path — the operator's own words are
+          // the item, so no marker is needed to say so.
+          ownNotes || (typed === rawTitle ? undefined : typed)
         : cleanupUsed && cleanup
-          ? `${confirm.notes}\n\n— as captured —\n${captured}`
+          ? // A tidied save is CLEAN (operator ruling): no "— as captured —"
+            // block trailing the notes. The two recovery paths sit BEFORE the
+            // save — "Tidied · undo" restores his wording in the preview, and
+            // "Enter as is" files it untouched — so the choice is always his
+            // and always visible, rather than archived into the notes.
+            confirm.notes || undefined
           : [confirm.notes, verbatim].filter(Boolean).join('\n\n') || undefined
       const item = await createItem({
         title,
@@ -225,10 +264,18 @@ export default function AttentionConfirmCard({
   return (
     <div
       className="rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2.5"
+      onKeyUp={(e) => {
+        // The release of the Enter that opened this card arms it.
+        if (e.key === 'Enter') setArmed(true)
+      }}
       onKeyDown={(e) => {
         if (e.key === 'ArrowRight') cycleClass(1)
         if (e.key === 'ArrowLeft') cycleClass(-1)
-        if (e.key === 'Enter') void fileConfirmed()
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          if (!armed) return // the keystroke that got us here
+          void fileConfirmed()
+        }
         if (e.key === 'Escape') onCancel()
       }}
     >

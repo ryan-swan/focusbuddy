@@ -91,24 +91,30 @@ export type DropPosition = 'before' | 'after' | 'into'
  * bigger gesture than a drag and belongs to an explicit "ungroup" action.
  */
 export function planDrop(
-  draggedId: string,
+  dragged: FbNode,
   targetId: string,
   position: DropPosition,
-  ordered: GroupedRow[]
-): Array<{ id: string; groupId?: string | null; sortOrder?: number }> {
-  if (draggedId === targetId) return []
+  ordered: GroupedRow[],
+  /** Set when the drop lands in a DIFFERENT queue than the item came from:
+   *  the item is reclassified into it as part of the same gesture. */
+  intoQueue?: string
+): Array<{
+  id: string
+  groupId?: string | null
+  sortOrder?: number
+  intentClass?: string
+}> {
+  if (dragged.id === targetId) return []
   const rows = ordered.map((r) => r.item)
-  const dragged = rows.find((i) => i.id === draggedId)
   const target = rows.find((i) => i.id === targetId)
-  if (!dragged || !target) return []
+  if (!target) return []
 
   // A leader with children cannot be dropped INTO another group (one level).
-  const leads = ordered.find((r) => r.item.id === draggedId)?.childCount ?? 0
+  const leads = ordered.find((r) => r.item.id === dragged.id)?.childCount ?? 0
   if (position === 'into' && leads > 0) return []
-  // …and a group's leader is the only legal 'into' target.
-  const targetIsChild = !!(target.groupId && target.groupId !== target.id)
   const groupOf = (i: FbNode): string | null =>
     i.groupId && i.groupId !== i.id ? i.groupId : null
+  const targetIsChild = !!groupOf(target)
 
   let nextGroup: string | null
   if (position === 'into') {
@@ -116,30 +122,59 @@ export function planDrop(
   } else {
     nextGroup = groupOf(target)
   }
-  if (nextGroup === draggedId) return [] // never group an item under itself
+  if (nextGroup === dragged.id) return [] // never group an item under itself
 
-  // Rebuild the visible order with the dragged row moved, then renumber every
-  // row from 1. Renumbering the whole queue (rather than nudging one value)
-  // is what keeps the order stable and free of ties as items come and go.
-  const without = rows.filter((i) => i.id !== draggedId)
+  // Rebuild the visible order with the dragged row placed, then renumber every
+  // row from 1. Renumbering the whole queue (rather than nudging one value) is
+  // what keeps the order stable and free of ties as items come and go. A row
+  // arriving from ANOTHER queue is simply inserted — it was never in `rows`.
+  const without = rows.filter((i) => i.id !== dragged.id)
   const at = without.findIndex((i) => i.id === targetId)
   const insertAt = position === 'before' ? at : at + 1
   const nextRows = [...without.slice(0, insertAt), dragged, ...without.slice(insertAt)]
 
-  const writes: Array<{ id: string; groupId?: string | null; sortOrder?: number }> = []
+  const writes: Array<{
+    id: string
+    groupId?: string | null
+    sortOrder?: number
+    intentClass?: string
+  }> = []
   nextRows.forEach((i, idx) => {
     const order = idx + 1
-    const isDragged = i.id === draggedId
+    const isDragged = i.id === dragged.id
     const groupChanged = isDragged && (i.groupId ?? null) !== nextGroup
-    if ((i.sortOrder ?? 0) !== order || groupChanged) {
+    const reclass = isDragged && !!intoQueue
+    if ((i.sortOrder ?? 0) !== order || groupChanged || reclass) {
       writes.push({
         id: i.id,
         sortOrder: order,
-        ...(groupChanged ? { groupId: nextGroup } : {})
+        ...(groupChanged || reclass ? { groupId: nextGroup } : {}),
+        ...(reclass ? { intentClass: intoQueue } : {})
       })
     }
   })
   return writes
+}
+
+/**
+ * Dropping into a queue's empty space (or onto its header): the item is
+ * reclassified into that queue and lands at the end, keeping whatever manual
+ * order the queue already had. It leaves its old group behind — the group
+ * belonged to the queue it came from.
+ */
+export function planMoveToQueue(
+  draggedId: string,
+  queue: string,
+  ordered: GroupedRow[]
+): Array<{ id: string; groupId: null; sortOrder: number; intentClass: string }> {
+  return [
+    {
+      id: draggedId,
+      groupId: null,
+      sortOrder: ordered.length + 1,
+      intentClass: queue
+    }
+  ]
 }
 
 /** Detach an item from its group — the explicit escape from a drag. */

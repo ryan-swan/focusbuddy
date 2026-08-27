@@ -3,6 +3,7 @@ import type { FbNode } from '../../src/shared/types'
 import {
   orderWithGroups,
   planDrop,
+  planMoveToQueue,
   planUngroup
 } from '../../src/renderer/src/lib/attentionGrouping'
 
@@ -75,29 +76,31 @@ describe('planDrop', () => {
   const base = [wi({ id: 'a1' }), wi({ id: 'a2' }), wi({ id: 'a3' })]
   const ordered = (items: FbNode[]) => orderWithGroups(items, rank)
 
+  const node = (rows: FbNode[], id: string): FbNode => rows.find((r) => r.id === id)!
+
   it('dropping INTO a row groups the dragged item under it', () => {
-    const writes = planDrop('a1', 'a3', 'into', ordered(base))
+    const writes = planDrop(node(base, 'a1'), 'a3', 'into', ordered(base))
     const dragged = writes.find((w) => w.id === 'a1')!
     expect(dragged.groupId).toBe('a3')
   })
 
   it('dropping INTO a CHILD joins that child’s group, never nests deeper', () => {
     const items = [wi({ id: 'a1' }), wi({ id: 'a2', groupId: 'a1' }), wi({ id: 'a3' })]
-    const writes = planDrop('a3', 'a2', 'into', ordered(items))
+    const writes = planDrop(node(items, 'a3'), 'a2', 'into', ordered(items))
     expect(writes.find((w) => w.id === 'a3')!.groupId).toBe('a1')
   })
 
   it('refuses to group a LEADER under anything (one level, always)', () => {
     const items = [wi({ id: 'a1' }), wi({ id: 'a2', groupId: 'a1' }), wi({ id: 'a3' })]
-    expect(planDrop('a1', 'a3', 'into', ordered(items))).toEqual([])
+    expect(planDrop(node(items, 'a1'), 'a3', 'into', ordered(items))).toEqual([])
   })
 
   it('never groups an item under itself', () => {
-    expect(planDrop('a1', 'a1', 'into', ordered(base))).toEqual([])
+    expect(planDrop(node(base, 'a1'), 'a1', 'into', ordered(base))).toEqual([])
   })
 
   it('before/after reorders and renumbers every row from 1', () => {
-    const writes = planDrop('a1', 'a3', 'before', ordered(base))
+    const writes = planDrop(node(base, 'a1'), 'a3', 'before', ordered(base))
     // Ranked order is a3,a2,a1; moving a1 before a3 gives a1,a3,a2.
     const order = writes.sort((x, y) => x.sortOrder! - y.sortOrder!).map((w) => w.id)
     expect(order).toEqual(['a1', 'a3', 'a2'])
@@ -108,12 +111,35 @@ describe('planDrop', () => {
     // Otherwise it would sit visually inside a group while not belonging to
     // it — the order would lie about the relationship.
     const items = [wi({ id: 'a1' }), wi({ id: 'a2', groupId: 'a1' }), wi({ id: 'a3' })]
-    const writes = planDrop('a3', 'a2', 'after', ordered(items))
+    const writes = planDrop(node(items, 'a3'), 'a2', 'after', ordered(items))
     expect(writes.find((w) => w.id === 'a3')!.groupId).toBe('a1')
   })
 
   it('a no-op drag produces no writes', () => {
-    expect(planDrop('a1', 'missing', 'into', ordered(base))).toEqual([])
+    expect(planDrop(node(base, 'a1'), 'missing', 'into', ordered(base))).toEqual([])
+  })
+})
+
+describe('cross-queue drops (the gesture that silently did nothing)', () => {
+  it('an item from ANOTHER queue is inserted AND reclassified', () => {
+    const target = [wi({ id: 'b1' }), wi({ id: 'b2' })]
+    const incoming = wi({ id: 'a9', intentClass: 'to_do' })
+    const writes = planDrop(incoming, 'b1', 'before', orderWithGroups(target, rank), 'to_review')
+    const moved = writes.find((w) => w.id === 'a9')!
+    // The reclassify rides the SAME gesture — that is the whole point.
+    expect(moved.intentClass).toBe('to_review')
+    expect(moved.groupId).toBeNull() // it left its old queue's group behind
+    // It lands immediately before b1, and the destination is renumbered around
+    // it. (Ranked order here is b2 then b1, so "before b1" is position 2.)
+    const order = [...writes].sort((x, y) => x.sortOrder! - y.sortOrder!).map((w) => w.id)
+    expect(order).toEqual(['b2', 'a9', 'b1'])
+  })
+
+  it('planMoveToQueue drops it at the end and leaves its old group behind', () => {
+    const target = [wi({ id: 'b1' }), wi({ id: 'b2' })]
+    expect(planMoveToQueue('a9', 'to_meet', orderWithGroups(target, rank))).toEqual([
+      { id: 'a9', groupId: null, sortOrder: 3, intentClass: 'to_meet' }
+    ])
   })
 })
 
