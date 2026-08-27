@@ -196,9 +196,14 @@ export const CREATE_AND_CONNECT_MENU: CreateMenuEntry[] = [
   { label: 'File',           icon: 'attach_file',   kind: 'file' },
   { label: 'Field',          icon: 'input',         kind: 'field' },
   { label: 'Table',          icon: 'table_chart',   kind: 'table' },
-  { label: 'Color',          icon: 'palette',       kind: 'color' },
+  { label: 'Color',          icon: 'palette',       kind: 'color' }
   // 'email' was removed: it's a folded kind (hidden from the picker, folded into
   // File), so offering it for NEW creation here contradicted the fold. An inbox is
   // reached via File (paste the URL) or a Browser widget.
-  { label: 'Task link',      icon: 'task_alt',      kind: 'task-link' }
+  //
+  // DEC-041: 'task-link' was removed too, for a harder reason — it was BROKEN.
+  // A task link stores its target task id in `widget.content`, and this menu
+  // has no way to pick one, so every one it created rendered nothing but
+  // "Referenced task was deleted or moved." The catalogue's own hint says you
+  // make one by dragging a task from the sidebar; that remains the way.
 ]

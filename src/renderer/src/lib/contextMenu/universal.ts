@@ -11,6 +11,7 @@ import { presetForWidget, presetForMulti } from '../attentionPresets'
 import { workItemsEnabled } from '../workItemsCapability'
 import {
   createWidget,
+  hasWorkableText,
   convertWidget,
   bringToFront,
   ejectFromSection,
@@ -32,14 +33,17 @@ import {
 // Kinds the Convert / Turn-into menu offers. Only kinds that actually exist as
 // widgets, gated per the critic: no Calendar event, no Desk, until those
 // receiving surfaces exist.
+// DEC-041 — only kinds that can actually RECEIVE the source's text.
+//
+// Table, Mind map and Diagram used to be offered here and never once carried
+// anything across: the copy only happens between text kinds, so "turn this
+// into a Mind map" produced an EMPTY mind map every time, from every source.
+// A menu entry that never does what it says is worse than a missing one.
 const CONVERT_TARGETS: Array<{ kind: WidgetKind; label: string; icon: string }> = [
   { kind: 'sticky', label: 'Sticky', icon: 'sticky_note_2' },
   { kind: 'note', label: 'Note', icon: 'description' },
   { kind: 'markdown', label: 'Markdown', icon: 'subject' },
-  { kind: 'page', label: 'Page', icon: 'article' },
-  { kind: 'table', label: 'Table', icon: 'table_chart' },
-  { kind: 'mindmap', label: 'Mind map', icon: 'account_tree' },
-  { kind: 'diagram', label: 'Diagram', icon: 'schema' }
+  { kind: 'page', label: 'Page', icon: 'article' }
 ]
 
 const seedText = (ctx: MenuContext): string => workingText(ctx).text
@@ -109,7 +113,7 @@ export function buildCreate(ctx: MenuContext): MenuContribution[] {
       id: 'core/create',
       section: MenuSection.Create,
       priority: 0,
-      label: 'Create',
+      label: 'Create & link',
       icon: 'add',
       children: CREATE_AND_CONNECT_MENU.map<MenuContribution>((entry) => ({
         id: `core/create/${entry.kind}`,
@@ -126,13 +130,17 @@ export function buildCreate(ctx: MenuContext): MenuContribution[] {
 // Convert only makes sense from an existing object with content to reinterpret.
 export function buildConvert(ctx: MenuContext): MenuContribution[] {
   if (ctx.object.type === 'empty-canvas') return []
+  // DEC-041: no text, no copy. Without this the submenu appeared on a browser
+  // or a table and silently degraded into "spawn an empty widget and wire it"
+  // — which is exactly what Create already does, under an honest name.
+  if (!hasWorkableText(ctx)) return []
   const src = sourceWidget(ctx)
   return [
     {
       id: 'core/convert',
       section: MenuSection.Convert,
       priority: 0,
-      label: 'Convert',
+      label: 'Copy into',
       icon: 'sync_alt',
       children: CONVERT_TARGETS.filter((t) => t.kind !== src?.kind).map<MenuContribution>((t) => ({
         id: `core/convert/${t.kind}`,

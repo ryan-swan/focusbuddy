@@ -97,13 +97,17 @@ function createConvertSlot(ctx: MenuContext, suppress: WidgetContribution['suppr
   }
   if (convertRows.length) {
     if (children.length) children.push({ separator: true })
-    children.push({ label: 'Turn this into', disabled: true })
+    // DEC-041: "Turn this into" was false — the source is never replaced or
+    // removed; a NEW widget appears beside it carrying a copy of the text.
+    children.push({ label: 'Copy into', disabled: true })
     for (const k of convertRows) {
       const item = toItem(k, ctx)
       children.push(item)
     }
   }
-  return { label: 'Create', icon: 'add', children }
+  // DEC-041: the wire IS the feature — every entry here spawns a widget AND
+  // links it to this one — so the label finally says so.
+  return { label: 'Create & link', icon: 'add', children }
 }
 
 // Destructive band: one slot. A single destructive row inlines; two or more
