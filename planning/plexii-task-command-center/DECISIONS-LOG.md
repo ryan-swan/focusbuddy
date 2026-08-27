@@ -877,4 +877,44 @@ One earlier commit (`1d0ac432`) had already swept 28 additive lines of its
 autoArrange work via a broad `git add` — disclosed, harmless (suite was
 green), and staging is explicit-file-list from now on.
 
+
+
+---
+
+## DEC-040 · DEC-041 — (parallel session) tidy geometry + widget-menu honesty
+**Date:** 2026-08-26 · **Status:** IMPLEMENTED by the PARALLEL session, recorded here for continuity
+A second session working this same branch shipped two rounds without log
+entries: `860644fd` "tidy stops stretching widgets, and square grid picks its
+own shape" (claims DEC-040) and `e846113e` "the widget menu only offers what
+it can actually do" (claims DEC-041). Numbers honored as theirs by commit
+order. Cross-check done here: the Attention menu row (CR-09 D-A) survived
+their contextMenu changes; resolver + preset suites green after their commit.
+
+---
+
+## DEC-042 — Notes on EVERY capture path; the tidy always attempts on real content
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**⚠ Numbering note:** commit `bbe2c397` and its code/test comments say
+"DEC-040" — written before the parallel session's commits surfaced and took
+040/041. THIS log is canonical: the notes/tidy round is **DEC-042**.
+**Finding 1 — "I lost the ability to add a note… in the ai chat… sometimes
+I see it."** The notes stage lived on the console's textarea screen; the
+chat's inline card and every prefilled console open (armed ⌘K pill,
+@attention) render the confirm card DIRECTLY and never visit that stage.
+**Fix:** the preview itself carries an editable notes area on every path.
+Enter inside it = newline; ⌘/Ctrl+Enter files. Card-typed notes are the
+operator's own words: the tidy never clobbers them (notesEdited guard) and
+"Enter as is" keeps them while reverting only the AI's title rewording. The
+bare manual form gains a notes field (it never had one).
+**Finding 2 — "sometimes I get the tidied up version, other times I don't."**
+The DEC-026 messiness gate only requested a tidy for 30+ words / filler /
+run-ons; medium captures showed raw. Per the operator's restated contract
+(Enter → ALWAYS the tidied version → Enter files the cleaned version),
+`qualifiesForTidy` now fires on 8+ words, multi-sentence text, attached
+notes, or the messiness signs; tiny fragments still skip ("call Bob
+Thursday" IS its own tidy). The armed second Enter waits (4s cap) for the
+in-flight tidy so it files the cleaned version. Regex lesson pinned: the
+first multi-sentence probe used `[.!?;]\S` and missed normal prose — the
+slice(0,-1) trick from needsCleanup is the correct test.
+
 <!-- Append below; increment DEC-NNN. -->
