@@ -10,6 +10,9 @@ import AttentionItemEditor from '../AttentionItemEditor'
 import { useWidgetStore } from '../../stores/widgets'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { startPromptForItem, startPromptForMany } from '../../lib/startPrompt'
+import TagMentionInput from '../TagMentionInput'
+import { serializeTags } from '../../lib/itemTags'
+import { parseMentions, serializeMentions, mentionKey, MENTION_ICON, type ItemMention } from '../../lib/itemMentions'
 import {
   itemContext,
   urgencyOf,
@@ -90,6 +93,7 @@ export default function AttentionView(): JSX.Element {
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
+  const goRoom = useViewStore((s) => s.goRoom)
   const openConsole = useCaptureConsole((s) => s.openConsole)
   const setFocusedWidget = useWidgetStore((s) => s.setFocused)
   const openAssistant = useAssistantChrome((s) => s.openPanel)
@@ -232,6 +236,8 @@ export default function AttentionView(): JSX.Element {
   const [newDate, setNewDate] = useState('')
   const [newDeskId, setNewDeskId] = useState('')
   const [newBusy, setNewBusy] = useState(false)
+  const [newTags, setNewTags] = useState<string[]>([])
+  const [newMentions, setNewMentions] = useState<ItemMention[]>([])
   const [newFiled, setNewFiled] = useState<string | null>(null)
 
   // Personal, live desks only — shared and archived desks refuse work-item
@@ -251,6 +257,8 @@ export default function AttentionView(): JSX.Element {
         parentId: newDeskId || null,
         intentClass: newClass,
         dueAt: newDate ? new Date(`${newDate}T17:00:00`).toISOString() : null,
+        tags: serializeTags(newTags),
+        mentions: serializeMentions(newMentions),
         confidence: 1, // human-stated, not inferred
         approvalState: 'auto',
         sourceType: 'note',
@@ -258,6 +266,8 @@ export default function AttentionView(): JSX.Element {
       })
       setNewTitle('')
       setNewDate('')
+      setNewTags([])
+      setNewMentions([])
       setNewFiled(item.title)
       setTimeout(() => setNewFiled(null), 2500)
       await refresh()
@@ -587,7 +597,9 @@ export default function AttentionView(): JSX.Element {
             const ctx = itemContext(i, nodesById)
             const urg = urgencyOf(i)
             const tags = parseTags(i.tags)
-            if (!ctx.desk && !ctx.plan && !ctx.source && !urg && tags.length === 0) return null
+            const ments = parseMentions(i.mentions)
+            if (!ctx.desk && !ctx.plan && !ctx.source && !urg && tags.length === 0 && ments.length === 0)
+              return null
             return (
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 {urg && (
@@ -634,6 +646,29 @@ export default function AttentionView(): JSX.Element {
                     {ctx.source.type}
                   </span>
                 )}
+                {ments.map((m) => (
+                  <button
+                    key={mentionKey(m)}
+                    onClick={() => {
+                      // Desk/room/plan mentions NAVIGATE; a person mention is
+                      // informational until SPEC-027 routing exists.
+                      if (m.kind === 'desk') {
+                        setActive(m.id)
+                        goTask(m.id)
+                      } else if (m.kind === 'plan') goProject(m.id)
+                      else if (m.kind === 'room') goRoom(m.id)
+                    }}
+                    title={
+                      m.kind === 'person'
+                        ? `${m.title} — mentioned (notifications arrive with routing)`
+                        : `Open ${m.title}`
+                    }
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[rgba(var(--accent),0.10)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press max-w-[150px]"
+                  >
+                    <Icon name={MENTION_ICON[m.kind]} size={10} />
+                    <span className="truncate">{m.title}</span>
+                  </button>
+                ))}
                 {tags.map((t) => (
                   <button
                     key={t}
@@ -830,6 +865,14 @@ export default function AttentionView(): JSX.Element {
                   {c.label}
                 </button>
               ))}
+            </div>
+            <div className="mt-2">
+              <TagMentionInput
+                tags={newTags}
+                mentions={newMentions}
+                onTags={setNewTags}
+                onMentions={setNewMentions}
+              />
             </div>
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <input

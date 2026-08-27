@@ -3,6 +3,8 @@ import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../stores/workItems'
 import { CLASS_CHOICES, queueOf } from '../lib/attentionQueues'
 import { URGENCY_LEVELS, parseTags, serializeTags, urgencyOf } from '../lib/itemTags'
+import { parseMentions, serializeMentions, type ItemMention } from '../lib/itemMentions'
+import TagMentionInput from './TagMentionInput'
 import Icon from './Icon'
 
 // DEC-036 — the item editor. Double-clicking a queue row opens the WHOLE item
@@ -42,7 +44,8 @@ export default function AttentionItemEditor({
   const [deskId, setDeskId] = useState(item.parentId ?? '')
   // DEC-037 — the chosen context. Never mandatory.
   const [urgency, setUrgency] = useState<string>(urgencyOf(item) ?? 'normal')
-  const [tagText, setTagText] = useState(parseTags(item.tags).join(', '))
+  const [tagList, setTagList] = useState<string[]>(parseTags(item.tags))
+  const [mentionList, setMentionList] = useState<ItemMention[]>(parseMentions(item.mentions))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement | null>(null)
@@ -71,8 +74,10 @@ export default function AttentionItemEditor({
       if (nextDue !== (item.dueAt ?? null)) patch.dueAt = nextDue
       const nextUrgency = urgency === 'normal' ? null : urgency
       if (nextUrgency !== (item.wiUrgency ?? null)) patch.wiUrgency = nextUrgency
-      const nextTags = serializeTags(tagText.split(','))
+      const nextTags = serializeTags(tagList)
       if (nextTags !== (item.tags ?? null)) patch.tags = nextTags
+      const nextMentions = serializeMentions(mentionList)
+      if (nextMentions !== (item.mentions ?? null)) patch.mentions = nextMentions
       let changed = Object.keys(patch).length > 0
       if (changed) await updateFields(item.id, patch)
 
@@ -214,17 +219,18 @@ export default function AttentionItemEditor({
           </div>
         </div>
 
-        <label className="block mt-3">
+        <div className="block mt-3">
           <span className="fb-t-caption text-[var(--ink-40)]">
-            Tags <span className="text-[var(--ink-30)]">— optional, comma separated</span>
+            Tags &amp; mentions{' '}
+            <span className="text-[var(--ink-30)]">— optional · @ mentions a person, desk, room or plan</span>
           </span>
-          <input
-            value={tagText}
-            onChange={(e) => setTagText(e.target.value)}
-            placeholder="client, rush, q3"
-            className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-3 py-2 text-[12.5px]"
+          <TagMentionInput
+            tags={tagList}
+            mentions={mentionList}
+            onTags={setTagList}
+            onMentions={setMentionList}
           />
-        </label>
+        </div>
 
         {error && <div className="mt-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
 

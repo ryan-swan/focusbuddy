@@ -89,7 +89,41 @@ describe('DEC-037 — context at a glance, and the two doors back', () => {
     expect(view).toContain('hasTag(i, tagFilter)')
     expect(view).toContain('tagVocabulary(items)')
     expect(editor).toContain('URGENCY_LEVELS.map')
-    expect(editor).toContain('serializeTags(tagText.split')
-    expect(editor).toContain('optional, comma separated')
+    // DEC-039 upgraded the plain input to the shared TagMentionInput.
+    expect(editor).toContain('serializeTags(tagList)')
+    expect(editor).toContain('serializeMentions(mentionList)')
+  })
+})
+
+describe('DEC-039 — capture-time context + the one input everywhere', () => {
+  it('the confirm card carries urgency and tags/mentions on the preview screen', () => {
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    expect(card).toContain('URGENCY_LEVELS.map')
+    expect(card).toContain('TagMentionInput')
+    // …and they ride the create, not a follow-up patch.
+    expect(card).toContain('serializeTags(capTags)')
+    expect(card).toContain('serializeMentions(capMentions)')
+    expect(card).toContain("wiUrgency: urgency === 'normal' ? null : urgency")
+  })
+
+  it('all three surfaces share ONE input, so the @ grammar cannot fork', () => {
+    for (const f of [
+      'src/renderer/src/components/AttentionConfirmCard.tsx',
+      'src/renderer/src/components/AttentionItemEditor.tsx',
+      'src/renderer/src/components/views/AttentionView.tsx'
+    ])
+      expect(read(f)).toContain('TagMentionInput')
+  })
+
+  it('mention chips render on rows; desk/room/plan navigate, person is honest', () => {
+    const view = read('src/renderer/src/components/views/AttentionView.tsx')
+    expect(view).toContain('parseMentions(i.mentions)')
+    expect(view).toContain('goRoom(m.id)')
+    expect(view).toContain('goProject(m.id)')
+    // A person mention must SAY routing is not here yet, not imply a ping.
+    expect(view).toContain('notifications arrive with routing')
+    const input = read('src/renderer/src/components/TagMentionInput.tsx')
+    expect(input).toContain("text.startsWith('@')")
+    expect(input).toContain('usePeopleStore')
   })
 })

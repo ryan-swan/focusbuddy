@@ -141,6 +141,22 @@ describe('updateFields / reclassify', () => {
   })
 })
 
+describe('DEC-039 — creation carries the chosen context (file-level pins)', () => {
+  // createWorkItemCore is guarded by the capability pref + the CHECK-clause
+  // probe, so it is pinned at the source: the INSERT must carry tags and
+  // mentions, and the draft must map them — a capture-time tag that silently
+  // vanished at create would otherwise look like a UI bug.
+  it('the INSERT and the draft both know tags + mentions', () => {
+    const src = readFileSync(join(process.cwd(), 'src/main/db/workItems.ts'), 'utf8')
+    expect(src).toContain('due_at, wi_urgency, tags, mentions, source_ref')
+    expect(src).toContain('draft.tags ?? null')
+    expect(src).toContain('draft.mentions ?? null')
+    // …and both stay patchable after creation.
+    expect(src).toContain("tags: 'tags'")
+    expect(src).toContain("mentions: 'mentions'")
+  })
+})
+
 describe('DEC-035 — grouping is one level, enforced at the db', () => {
   it('groups an item under a leader, and flattens a group-under-a-child', () => {
     const { raw, db } = freshDb()

@@ -61,6 +61,7 @@ interface NodeRow {
   intent_sub: string | null
   group_id: string | null
   tags: string | null
+  mentions: string | null
   originator_id: string | null
   recipient_id: string | null
   due_at: string | null
@@ -113,6 +114,7 @@ function rowToNode(row: NodeRow): FbNode {
     intentSub: row.intent_sub ?? null,
     groupId: row.group_id ?? null,
     tags: row.tags ?? null,
+    mentions: row.mentions ?? null,
     originatorId: row.originator_id ?? null,
     recipientId: row.recipient_id ?? null,
     dueAt: row.due_at ?? null,

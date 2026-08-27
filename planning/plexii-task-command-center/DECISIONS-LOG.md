@@ -839,4 +839,42 @@ unit/pin-tested; the live click-through was not visually confirmed — the
 operator was actively using the app and driving it further would have
 interrupted him.
 
+
+
+---
+
+## DEC-039 — Capture-time context: urgency + tags on the preview; tags become @-MENTIONS
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED (P0 half)
+**Decision:** the confirm card's preview screen carries the chosen context —
+an urgency row and ONE shared TagMentionInput — so an item can arrive in the
+queue already tagged; both ride the CREATE itself, not a follow-up patch. The
+same input serves the manual form and the item editor, so the @ grammar
+cannot fork. Grammar: a plain word is a free-form tag; "@" opens a typeahead
+over the PRIMARY GROUPINGS — people (org directory), desks, rooms, plans —
+and picking one attaches a TYPED mention ({kind,id,title} in the new
+`mentions` manifest column; JSON, defensively parsed — the column rides sync
+and a peer could write anything; title frozen at pick time so a dangling
+mention degrades to text, never a blank).
+**Chips:** mention chips render on rows after tags. Desk/room/plan mentions
+NAVIGATE (goTask/goRoom/goProject). A PERSON mention is stored and shown with
+honest copy — "notifications arrive with routing" — because pinging them is
+SPEC-027; the reference is captured NOW so nothing is re-entered when the
+rails land.
+**THE BIGGER PROGRAM (registered, not built):** the operator's directive —
+@-mentions of people/desks/rooms/plans THROUGHOUT the app (docs, sticky
+notes, messaging, any surface) to bring someone's attention to a thing. This
+is the cross-reference rail (analysis/21 §13) + SPEC-027 routing converging:
+mention-in-any-surface → a to_respond item in the mentioned person's queue.
+The chat composer's mention machinery (tiptap MentionSuggestion) and this
+input's grammar are the two seeds; unifying them + the routed-notification
+half is its own initiative with Caleb's surfaces involved (docs/stickies are
+core PlexiDesk). Sequenced with SPEC-027; nothing else rides it quietly.
+**Session note (two sessions, one worktree):** a second Claude session was
+mid-flight on tidy/auto-arrange in this SAME working tree. Its four files
+(FloatingPill, autoArrange, two tidy tests) were left untouched and
+uncommitted here; its two failing tests are its own WIP, not this round's.
+One earlier commit (`1d0ac432`) had already swept 28 additive lines of its
+autoArrange work via a broad `git add` — disclosed, harmless (suite was
+green), and staging is explicit-file-list from now on.
+
 <!-- Append below; increment DEC-NNN. -->

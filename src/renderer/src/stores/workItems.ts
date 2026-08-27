@@ -25,6 +25,9 @@ interface WorkItemStore {
     parentId?: string | null
     intentClass?: string
     dueAt?: string | null
+    wiUrgency?: string | null
+    tags?: string | null
+    mentions?: string | null
     confidence?: number | null
     approvalState?: string
     sourceRef?: string | null

@@ -34,6 +34,11 @@ export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
   // renderer/lib/itemTags.ts). Never mandatory: the value of a tag is that it
   // was chosen, so nothing in the layer requires one.
   { column: 'tags', attr: 'tags', ddl: 'TEXT', rendererEmitted: true },
+  // DEC-039 — ENTITY mentions: people, desks, rooms, plans this item is about,
+  // as a JSON array of {kind,id,title} (renderer/lib/itemMentions.ts). Typed
+  // references, distinct from free-form tags: they resolve to real things and
+  // (people, once SPEC-027 routing exists) will carry attention TO someone.
+  { column: 'mentions', attr: 'mentions', ddl: 'TEXT', rendererEmitted: true },
   { column: 'originator_id', attr: 'originatorId', ddl: 'TEXT', rendererEmitted: true },
   { column: 'recipient_id', attr: 'recipientId', ddl: 'TEXT', rendererEmitted: true },
   // ISO-8601 string — collision-proof vs the numeric desk due_date (§2.2)

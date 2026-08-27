@@ -117,6 +117,8 @@ export interface WorkItemDraft {
   intentClass?: string
   dueAt?: string | null
   wiUrgency?: string | null
+  tags?: string | null
+  mentions?: string | null
   sourceRef?: string | null
   sourceType?: string | null
   confidence?: number | null
@@ -192,9 +194,9 @@ export function createWorkItemCore(
        id, parent_id, kind, title, description, status,
        priority, interest, importance, sort_order, created_at, updated_at,
        org_id, work_item_state, intent_class, originator_id, recipient_id,
-       due_at, wi_urgency, source_ref, source_type, confidence, approval_state,
-       reason_code, wi_origin, schema_epoch
-     ) VALUES (?, ?, 'work_item', ?, ?, ?, 3, 3, 3, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       due_at, wi_urgency, tags, mentions, source_ref, source_type, confidence,
+       approval_state, reason_code, wi_origin, schema_epoch
+     ) VALUES (?, ?, 'work_item', ?, ?, ?, 3, 3, 3, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     draft.parentId ?? null,
@@ -210,6 +212,8 @@ export function createWorkItemCore(
     draft.recipientId ?? draft.originatorId ?? null,
     draft.dueAt ?? null,
     draft.wiUrgency ?? null,
+    draft.tags ?? null,
+    draft.mentions ?? null,
     draft.sourceRef ?? null,
     draft.sourceType ?? null,
     draft.confidence ?? null,
@@ -698,6 +702,7 @@ const PATCHABLE: Record<string, string> = {
   intentSub: 'intent_sub',
   groupId: 'group_id',
   tags: 'tags',
+  mentions: 'mentions',
   // DEC-035: manual placement within a queue. A base `nodes` column that
   // already rides the sync body, so a hand-ordered queue travels between
   // devices without joining the work_item manifest.

@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useWorkItemStore } from '../stores/workItems'
 import { CLASS_CHOICES, CLASS_LABEL, QUEUE_ICON } from '../lib/attentionQueues'
 import Icon from './Icon'
+import TagMentionInput from './TagMentionInput'
+import { URGENCY_LEVELS } from '../lib/itemTags'
+import { serializeTags } from '../lib/itemTags'
+import { serializeMentions, type ItemMention } from '../lib/itemMentions'
 
 // The ONE confirm stop (DEC-019), extracted so every capture surface renders
 // the SAME flow (DEC-028): the console overlay and the chat's inline card are
@@ -74,6 +78,11 @@ export default function AttentionConfirmCard({
   // "if I click enter it just enters as is" (operator live QA). The card arms
   // on the first keyUP, which is the release of the very key that opened it.
   const [armed, setArmed] = useState(false)
+  // DEC-039 — chosen context at CAPTURE time: urgency + tags/mentions ride
+  // the preview screen, so an item can arrive in the queue already tagged.
+  const [urgency, setUrgency] = useState<string>('normal')
+  const [capTags, setCapTags] = useState<string[]>([])
+  const [capMentions, setCapMentions] = useState<ItemMention[]>([])
   // The tidy in flight, so Enter can WAIT for it rather than racing it.
   const tidyPending = useRef<Promise<unknown> | null>(null)
 
@@ -85,6 +94,9 @@ export default function AttentionConfirmCard({
     setConfirmDate('')
     setError(null)
     setArmed(false)
+    setUrgency('normal')
+    setCapTags([])
+    setCapMentions([])
     tidyPending.current = null
     // A MARKED object already knows what it is — the preset table decided,
     // so the classifier is skipped entirely (no latency, no model, works with
@@ -213,6 +225,9 @@ export default function AttentionConfirmCard({
         parentId: deskCtx?.id ?? null,
         intentClass: confirm.picked,
         dueAt,
+        wiUrgency: urgency === 'normal' ? null : urgency,
+        tags: serializeTags(capTags),
+        mentions: serializeMentions(capMentions),
         confidence: confirm.confidence,
         approvalState: 'auto', // user-authored: submitting IS the approval
         sourceType: source?.sourceType ?? 'note',
@@ -385,6 +400,30 @@ export default function AttentionConfirmCard({
           </div>
         </div>
       )}
+      <div className="mt-2.5 flex flex-wrap items-center gap-1">
+        <span className="text-[11px] text-[var(--ink-40)] mr-1">Urgency</span>
+        {URGENCY_LEVELS.map((u) => (
+          <button
+            key={u}
+            onClick={() => setUrgency(u)}
+            className={`px-2 h-6 fb-t-label fb-press rounded-full capitalize ${
+              urgency === u
+                ? 'bg-[rgb(var(--accent))] text-white'
+                : 'bg-[var(--surface-raised)] text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+            }`}
+          >
+            {u}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1.5">
+        <TagMentionInput
+          tags={capTags}
+          mentions={capMentions}
+          onTags={setCapTags}
+          onMentions={setCapMentions}
+        />
+      </div>
       {confirm.needsDate && (
         <div className="mt-2 flex items-center gap-2">
           <span className="text-[12px] text-[var(--ink-70)]">When is “{confirm.phrase}”?</span>

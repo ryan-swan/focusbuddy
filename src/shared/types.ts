@@ -181,6 +181,8 @@ export interface FbNode {
   groupId?: string | null
   /** DEC-037: comma-delimited normalized tags. Optional, always. */
   tags?: string | null
+  /** DEC-039: JSON entity mentions ({kind,id,title}[]) — people/desks/rooms/plans. */
+  mentions?: string | null
   originatorId?: string | null
   recipientId?: string | null
   dueAt?: string | null
