@@ -940,4 +940,25 @@ with "may" excluded, a name after a person-verb unless stopword) — "call bob
 thursday" → "Call Bob Thursday" with zero model calls; only ever ADDS capitals,
 idempotent, reaches secondaries.
 
+
+
+---
+
+## DEC-044 — A highlight IS the capture: full selection → notes, on every surface
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Finding:** marking a highlighted passage ("Add to Attention" on a desk page)
+produced a good title and EMPTY notes — the mark used the widget-level preset
+and never read `ctx.selection`; the highlighted text was dropped. And the AI
+chat's selection menu offered only sticky/note/copy — no attention option.
+**Ruling + implementation:** `presetForSelection` — the selection's first line
+titles the item ("+N more" when a list was highlighted), the FULL selection
+rides the notes verbatim; one-line selections keep empty notes rather than
+repeating the title; class still from the host kind. The notes travel the whole
+path (menu → seam's new `notes` field → console store `initialNotes` → notes
+field → card → item), pinned at every hop. The chat menu gains "Add to
+Attention…" as its FIRST row, deliberately NOT desk-gated (an item files
+standalone; sticky/note need a canvas). Class call worth recording: an AI-chat
+selection routes to the DEFAULT to_do, not chat→to_respond — a highlighted AI
+answer is something to act on; nobody awaits words back from a bot.
+
 <!-- Append below; increment DEC-NNN. -->
