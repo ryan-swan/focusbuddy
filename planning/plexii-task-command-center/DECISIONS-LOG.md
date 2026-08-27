@@ -710,4 +710,75 @@ own Anthropic key streams, and the wait becomes visible progress; (b) a real
 progress affordance for credits mode; (c) trimming output size for simple asks.
 (a) is the only one that removes the wait rather than dressing it.
 
+
+
+---
+
+## DEC-034 — Capture is task + optional notes, then a PREVIEW of the finished item
+**Date:** 2026-08-26 · **Status:** RULED (operator, from his own queued items 3+4) + IMPLEMENTED
+**Context:** two of the operator's own captured to-dos, built as one round because
+they are one flow. (3) "There should be an optional notes section on attention
+items… write the task, hit tab, add some additional context, then hit enter."
+(4) "instead of the button being 'Classify' it should just be 'Enter'… the next
+section should be an example of the tidied up version… formatted how the final
+task will look, and if the user approves all they have to do is click enter,
+otherwise… 'Enter As Is' which doesn't clean up any of the title or notes."
+**Ruling + implementation:** the console gains a second, optional NOTES field
+(Tab into it, Enter from either field files; Shift+Enter still newlines). The
+button says **Enter ↵** — "Classify" named an implementation detail and
+mis-described the key. The confirm card stops ASKING what the capture will
+become and instead PREVIEWS the finished item — class icon, title, notes, due
+chip, target desk — laid out as it will sit in the queue.
+**The tidy moved INTO the preview** (amends DEC-026's presentation, not its
+principle): it used to sit beside the card as a "Use tidied" offer; it now
+lands in the preview when it arrives, marked "Tidied · undo", with **Enter as
+is** filing the operator's own title and notes untouched. Approve-before-apply
+still holds — approval is now the Enter he was already pressing. "Enter as is"
+appears ONLY when a tidy actually changed something, else both buttons file an
+identical item.
+**Latency contract intact (R011):** the tidy is still requested AFTER the screen
+is up; a capture never waits. A slow or absent tidy means the preview shows the
+operator's own words — a correct outcome, not a degraded one. The tidy now reads
+the notes too, so a crisp task line with a rambling note qualifies and the note
+is cleaned rather than replaced by a summary of the title.
+**Preservation:** verbatim capture is never lost on any path — tidied items keep
+the original under "— as captured —"; untidied ones keep BOTH the notes and the
+typed text whenever the derived title dropped part of it (a stripped "fyi:", or
+only the first sentence becoming the title). Letting notes win alone would have
+silently discarded the rest; caught in review, pinned by test.
+
+---
+
+## DEC-035 — Grouping + manual order in the queue (the six-dot handle)
+**Date:** 2026-08-26 · **Status:** RULED (operator, his queued item 2) + IMPLEMENTED
+**Context:** "if I have 2 tasks created at different times but they end up being
+related there should be that six dot icon thing next to the tasks that allow me
+rearrange tasks, move them to other sections, or even attach to already existing
+tasks for grouped tasks/related task or subtask."
+**The architectural constraint that shaped it:** work items are LEAF nodes
+(§2.5 leaf invariant — nothing nests under a work item, enforced at create AND
+at sync apply), and `parent_id` already means "the desk this lives on". A
+subtask via parent_id was therefore structurally unavailable.
+**Ruling:** grouping is a **SIBLING reference** — `group_id` = the leading
+item's id — joining the column manifest, so it syncs / is allowlisted / is
+emitted without touching a transport by hand. **Exactly ONE level**, enforced
+at the DB and not merely in the UI: a leader can never be grouped, self-grouping
+refused, a non-item leader refused, and grouping onto a CHILD flattens to that
+child's leader. A group can never become a tree, whatever writes it.
+**Three gestures, one handle:** drop on a row's middle = attach; top/bottom =
+reorder; on a section header = move sections (a reclassify, machinery that
+already existed). Native HTML5 drag — the house pattern; there is no dnd
+library in this codebase.
+**Ordering:** manual placement beats the ranker ONLY where the operator placed
+something (`sortOrder` 0 = never dragged → keeps its ranked position); a drop
+renumbers the whole queue from 1, which keeps order stable and tie-free as items
+come and go. `sort_order` is a base nodes column already in the sync body, so a
+hand-ordered queue travels between devices without joining the manifest.
+**The failure mode it must never have:** a child whose leader leaves the queue
+(completed / reclassified / snoozed) is **PROMOTED to standing alone, never
+hidden** — an item vanishing because of something that happened to a DIFFERENT
+item would be unforgivable. Pinned by test.
+**Scope:** Queue lens only; Due and Origin answer a different question and stay
+ranked. Deferred: multi-select drag, cross-queue grouping.
+
 <!-- Append below; increment DEC-NNN. -->

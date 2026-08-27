@@ -11,6 +11,24 @@ operator chooses the landing round). Next up: the operator's detailed pass and
 the CR-09 brainstorm (D-A…D-K → DEC-031+).
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
 
+**QA ROUND 3 + DEC-034/035 EXECUTED (2026-08-26, commits `ba3b518c`,
+`2e7e210e`, `14419286`):** the operator captured his next asks INTO the layer
+itself and they were built from his own queue. **Read/copy (`ba3b518c`):** queue
+rows truncated with no way to open them — the text existed but only the DB could
+give it back. Rows now expand in place (full title + notes, selectable) with a
+Copy action; `itemFullText()` is the one definition. **DEC-034 (`2e7e210e`):**
+capture is now task + optional NOTES (Tab into it, Enter files), the button says
+**Enter ↵** not "Classify", and the second screen PREVIEWS the finished item
+instead of asking what it will become. The tidy moved INTO that preview
+("Tidied · undo") with **Enter as is** filing his own words — approve-before-
+apply holds, R011 latency holds, and the verbatim capture is preserved on every
+path (an untidied-notes case that would have dropped the typed text was caught
+in review). **DEC-035 (`14419286`):** the six-dot handle — attach (group),
+reorder, or drag to another section. Grouping is a SIBLING ref (`group_id` in
+the manifest) because the leaf invariant forbids work-item parents; **exactly
+one level, enforced at the DB**, and a child whose leader leaves the queue is
+PROMOTED, never hidden. Suite **2,840**. Live-verified through the real IPC path.
+
 **DEC-031/032/033 EXECUTED (2026-08-26, commit `f3741bf5`):** the operator ruled
 "yes to all three" on the QA round's open questions. **DEC-031:** @attention is
 now DETERMINISTIC anywhere in a message — one shared grammar
