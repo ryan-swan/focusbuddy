@@ -15,6 +15,14 @@ import { serializeTags } from '../../lib/itemTags'
 import { parseMentions, serializeMentions, mentionKey, MENTION_ICON, type ItemMention } from '../../lib/itemMentions'
 import { CAPTURE_STATES } from '@shared/workItems'
 import {
+  AttentionPulseBlock,
+  OverdueRadarBlock,
+  AgendaBlock,
+  RecentActivityBlock,
+  AnalyticsBlock,
+  StartHereBlock
+} from '../attention/attentionBlocks'
+import {
   itemContext,
   urgencyOf,
   parseTags,
@@ -848,7 +856,11 @@ export default function AttentionView(): JSX.Element {
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--surface-base)] text-[var(--ink-100)]">
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      {/* DEC-048 — the command center: a wide grid, not stretched text. The
+          queue column keeps a readable measure; the rail carries the
+          attention-backed blocks (full variants of the SAME components the
+          home dashboard shows compact). */}
+      <div className="max-w-[1440px] mx-auto px-6 xl:px-10 py-8">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="fb-t-title text-[var(--ink-90)]">Attention</h1>
@@ -999,6 +1011,8 @@ export default function AttentionView(): JSX.Element {
             </div>
           </div>
         )}
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
         <div className="mb-3 flex items-center gap-1 flex-wrap">
           {(['all', ...QUEUE_ORDER] as string[]).map((t) => {
             const active = queueTab === t
@@ -1194,7 +1208,7 @@ export default function AttentionView(): JSX.Element {
                       <span className="fb-t-caption text-[rgb(var(--accent))]">move here</span>
                     )}
                   </div>
-                  <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                  <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
                     {grouped
                       ? clusterByDesk(grouped).map((cluster, ci) => {
                           const desk = cluster.deskId ? nodesById.get(cluster.deskId) : null
@@ -1257,7 +1271,7 @@ export default function AttentionView(): JSX.Element {
                   <span className="fb-t-label text-[var(--ink-70)]">From your desks</span>
                   <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{signals.length}</span>
                 </div>
-                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
                   {signals.map((s) => (
                     <div
                       key={s.key}
@@ -1306,7 +1320,7 @@ export default function AttentionView(): JSX.Element {
                 <p className="text-[11px] text-[var(--ink-40)] mb-2">
                   Their desks were removed or moved — the items were kept. Give each a new home.
                 </p>
-                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
                   {detached.map((i) => row(i, true))}
                 </div>
               </section>
@@ -1376,6 +1390,16 @@ export default function AttentionView(): JSX.Element {
             )}
           </div>
         )}
+        </div>
+        <aside className="hidden xl:flex flex-col gap-4 min-w-0">
+          <StartHereBlock variant="full" />
+          <OverdueRadarBlock variant="full" />
+          <AgendaBlock variant="full" />
+          <AnalyticsBlock variant="full" />
+          <AttentionPulseBlock variant="full" />
+          <RecentActivityBlock variant="full" />
+        </aside>
+        </div>
       </div>
       {editing && (
         <AttentionItemEditor
