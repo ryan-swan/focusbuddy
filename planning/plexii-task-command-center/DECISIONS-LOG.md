@@ -1321,4 +1321,31 @@ truth + rail row + day column) → B1 (drag-to-schedule) → B2/C-foundation
 first). D is elevated in importance by ruling (6) but still sequenced after
 the surface exists.
 
+**Build status (same day, four commits, both remotes):**
+- **Foundation** `9900e80c` — scheduling+sync columns (origin/locked/
+  push_policy/transparency/visibility/external_*), status → 4 states via a
+  dynamic CHECK-drop rebuild (FK restated by hand; live DB migrated clean,
+  backup `focusbuddy.db.bak-20260827-pre-dec052`), work_items.source_url.
+- **Track A** `786530c8` — CalendarView rebuilt on work items + rankScore
+  (second ranker gone); queue rail drags with `text/fb-workitem`; grid
+  parameterised (days 1/3/7, compact) with the deadline band and
+  drop-books-immediately; Attention rail = the same grid narrow; Calendar
+  back in the sidebar (both states). A-006 → CONFIRMED.
+- **Track B** `cdbe25e8` — the planner: pure engine (honesty filter: waiting/
+  blocked never scheduled; 330-min ceiling; gaps; session cap; clock floor;
+  momentum by desk), Plan-my-day + intent mode (Haiku select w/ stopworded
+  keyword floor), dashed-ghost preview, Accept = ONE undo batch, replan-
+  undone marks missed + re-proposes (never moves), 1-hour grace.
+- **Track D tier 1** `5068a7d4` — the typed ledger (wi_signal +
+  wi_signal_match; device-local; once-ever pairing as a DB guarantee), four
+  emitters (block done, focus finished, chat message sent, desk closed),
+  pure matcher, the Enter-to-complete toast through useCloseWorkItem, and
+  quiet-wins analytics ("counted from the work, not the checkboxes").
+
+Gates across the day: suite grew 2,992 → 3,041 green; typecheck clean at
+every commit; live smokes on the real DB (calendar surfaces, planner ghost
+preview with zero writes). Remaining under this ruling: working-hours
+settings UI (engine reads them; no editor yet), Track D tiers 3a/3b (email
+via IMAP, then Slack behind the shared OAuth layer), Track C itself.
+
 <!-- Append below; increment DEC-NNN. -->

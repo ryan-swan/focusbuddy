@@ -431,8 +431,10 @@ export default function WeekTimeGrid({
                       </div>
                       <div className="text-[9px] opacity-70 tabular-nums">{fmtTime(startMs)}</div>
 
-                      {/* hover actions */}
-                      <div className="absolute top-0.5 right-0.5 hidden group-hover/block:flex items-center gap-0.5">
+                      {/* hover actions — z-raised above the resize handles,
+                          whose top strip otherwise overlaps these buttons'
+                          first few pixels and eats clicks there. */}
+                      <div className="absolute top-0.5 right-0.5 z-10 hidden group-hover/block:flex items-center gap-0.5">
                         {block.meeting && (
                           <button
                             onClick={(e) => {
