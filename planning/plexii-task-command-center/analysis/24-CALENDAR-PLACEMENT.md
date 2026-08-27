@@ -71,14 +71,21 @@ segment ("Your work by date"), gated on the `time_blocking` capability, plus a
 ⌘K entry. That is one level of nesting below Attention, which sits in the rail.
 
 Discoverability should track frequency of use. Triage is continuous —
-Attention earns its slot. Planning is a **daily ritual**, and Akiflow's
-best-documented failure mode is users falling out of that ritual: an
-independent practitioner guide reports that skipping it means *"overdue tasks
-pile up, the inbox grows, and within a few days the whole system feels like a
-burden"* (`dawid.ai/how-to-use-akiflow-effectively`), and their own Today page
-stacks overdue items first by design. A surface whose value depends on a daily
-visit should not be two clicks inside a segment grid. Keep the segment tile and
-the ⌘K entry — they cost nothing — and add the rail row beside Attention.
+Attention earns its slot. Planning is a **daily ritual**, and their own Today
+page stacks overdue items first by design, so falling behind is visible and
+compounding. A surface whose value depends on a daily visit should not be two
+clicks inside a segment grid. Keep the segment tile and the ⌘K entry — they
+cost nothing — and add the rail row beside Attention.
+
+> **Correction, 2026-08-27.** An earlier draft of this section claimed
+> Akiflow's *"best-documented failure mode"* was users falling out of the
+> ritual, with a quote about the system feeling like a burden within days. A
+> later, targeted review pass could not support that framing: the decay/
+> "graveyard" metaphor does **not** appear as a criticism of Akiflow in user
+> corpora — it appears twice as *praise*, from advocates describing what
+> Akiflow prevents. The underlying pain is real but differently shaped, and
+> §5d carries the better-evidenced version. The placement argument does not
+> depend on the retracted claim.
 
 ### One coordination flag before this is acted on
 
@@ -433,9 +440,31 @@ it is also the cheapest source of the deep links §5 needs.
   large task lists, and no responsive behaviour is documented at narrow widths.
 - **Overdue compounds by design**: missed recurring instances stack while new
   ones keep generating, so a missed week has to be cleaned up by hand.
-- **Over-organising is a named complaint** — a reviewer reports spending so
-  long arranging tasks that she doesn't do them. Every affordance we add to the
-  planning surface should be judged against that.
+- **Over-organising is a named complaint**, and it is the best-evidenced
+  version of "the ritual is the problem": a Capterra reviewer (Head of
+  Production, Oct 2025) writes *"there's a danger of 'over organising' and I
+  spend so much time organising my tasks that I don't actually do them!"*, a
+  Trustpilot reviewer calls the app *"buggy, overly complicated, and truly hard
+  to maintain"*, and a prospective user's stated worry before buying is *"I
+  really don't know if it's going to help me or cost a lot of time to
+  maintain."* Every affordance we add to the planning surface should be judged
+  against those three sentences.
+- **Re-planning after you slip is entirely manual** — *"if I miss doing a task,
+  I have to manually move everything around on my calendar to make things fit
+  again"* — and there is no bulk "push everything forward". This is the exact
+  gap Track B4 fills, and it is the honest version of the decay argument.
+- **No public API** (requested for years; they shipped an MCP connector
+  instead) and **no task export** — one user lost account access with no way to
+  retrieve their data. Whatever we hold, the operator should be able to get out.
+- **Recurring tasks are a persistent, specific weakness** — their own changelog
+  fixed four separate recurrence bug classes in 2026 alone (save failures, a
+  null-end-date crash, incorrect exceptions and duplicates on drag). This
+  independently corroborates the §5c warning that recurrence is where sync
+  defects cluster.
+- **Trust, once lost to data loss, does not come back.** A two-year-old bug
+  silently dropped task descriptions written in focus mode; support could not
+  reproduce it and closed it; the reporter left, saying they *"can't trust the
+  product not to delete important task context on some sync failure."*
 
 ## 5c. External sync (brief §3) — the convention, researched
 
@@ -659,6 +688,30 @@ bounded**. On that last point there is a vendor admission worth having: a
 Motion staffer explained their two-week scheduling horizon was deliberate,
 because scheduling further out "constantly reshuffles once new events come in".
 Stability is a feature.
+
+### A posture signal worth heeding: some users resent being managed by AI
+
+Akiflow's community thread on their roadmap is blunt about it. Subtasks had
+been requested for five years (1.1k upvotes) and iOS calendar sync for five
+years (779 upvotes), both deprioritised in favour of their AI assistant. The
+top replies: *"I don't want more Aki"*, *"Never use Aki. Return to improving
+core features"*, and the one to pin above the desk —
+**"We want to manage ourselves, not be managed by AI."**
+
+This does not argue against Track B. It argues for its *posture*, and it
+happens to match what we already committed to:
+
+- **Preview-and-confirm, never silent apply** — the approval gate we already
+  have.
+- **Never auto-complete** (DEC-051's completion loop rule) and never nag.
+- **Honour a manual edit permanently** (§5c) rather than re-deciding for them.
+- **Ship the fundamentals first.** Their loudest churn signal is not "the AI is
+  bad", it is "you built AI instead of fixing what I asked for". Track A is
+  fundamentals — the calendar being able to see your work — and it goes first
+  for that reason as well as the technical one.
+
+(Also worth noting: subtasks, requested there for five years, are something we
+shipped last week.)
 
 ### The four things we already do right
 
