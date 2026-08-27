@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useCompletionOffer } from './completionOffer'
 import type { FocusSession, FocusSessionOutcome } from '@shared/types'
 import { recordTrail } from '../lib/trail'
 import { hapticMedium, hapticSuccess } from '../lib/haptics'
@@ -143,6 +144,14 @@ export const useFocusSessionStore = create<FocusSessionStore>((set, get) => ({
       actualSeconds,
       outcome
     })
+    if (outcome === 'done' && cur.taskId) {
+      // DEC-052 Track D — a finished focus session on a linked item.
+      void useCompletionOffer.getState().observe({
+        kind: 'focus_finished',
+        targetKind: 'work_item',
+        targetRef: cur.taskId
+      })
+    }
     recordTrail('session_ended', cur.taskId, {
       sessionId: cur.id,
       outcome,

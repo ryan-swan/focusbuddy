@@ -101,6 +101,14 @@ import {
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
 import { selectItemsForPlan } from '../ai/planSelect'
+import {
+  ensureSignalSchema,
+  recordSignal,
+  listSignals,
+  matchState,
+  markPrompted,
+  recordOutcome as recordSignalOutcome
+} from '../db/signals'
 import { proposeCleanup } from '../ai/cleanupRewrite'
 import {
   isWorkItemsEnabled,
@@ -740,6 +748,27 @@ export function registerIpcHandlers(): void {
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  // DEC-052 (Track D, tier 1) — the typed action ledger + the once-ever
+  // pairing guard. Device-local observations; never rides sync.
+  ensureSignalSchema()
+  ipcMain.handle('signals:record', (_e, input: { kind: string; targetKind?: string; targetRef?: string; payload?: string }) =>
+    recordSignal({
+      kind: String(input?.kind ?? ''),
+      targetKind: input?.targetKind ?? null,
+      targetRef: input?.targetRef ?? null,
+      payload: input?.payload ?? null
+    })
+  )
+  ipcMain.handle('signals:list', (_e, sinceMs: number) => listSignals(Number(sinceMs) || 0))
+  ipcMain.handle('signals:matchState', (_e, signalId: string, itemId: string) =>
+    matchState(String(signalId), String(itemId))
+  )
+  ipcMain.handle('signals:markPrompted', (_e, signalId: string, itemId: string, confidence: number) =>
+    markPrompted(String(signalId), String(itemId), Number(confidence) || 0)
+  )
+  ipcMain.handle('signals:outcome', (_e, signalId: string, itemId: string, outcome: string) =>
+    recordSignalOutcome(String(signalId), String(itemId), String(outcome))
+  )
   // DEC-052 (B3, intent mode) — pick + order the items an intent names. Pure
   // selection: placement and the preview-confirm stay in the renderer.
   ipcMain.handle('planner:selectItems', (_e, intent: string, candidates: unknown) =>

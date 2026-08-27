@@ -1711,6 +1711,19 @@ const api = {
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
   // The workItems:* namespace (Attention S3, §4). Work items NEVER travel
   // nodes:* — this is their one seam; the store wraps it.
+  /** DEC-052 Track D — the typed action ledger (device-local). */
+  signals: {
+    record: (input: { kind: string; targetKind?: string; targetRef?: string; payload?: string }): Promise<{ id: string; kind: string; occurredAt: number }> =>
+      ipcRenderer.invoke('signals:record', input),
+    list: (sinceMs: number): Promise<Array<{ id: string; kind: string; targetKind: string | null; targetRef: string | null; occurredAt: number; payload: string | null }>> =>
+      ipcRenderer.invoke('signals:list', sinceMs),
+    matchState: (signalId: string, itemId: string): Promise<{ promptedAt: number | null; outcome: string | null } | null> =>
+      ipcRenderer.invoke('signals:matchState', signalId, itemId),
+    markPrompted: (signalId: string, itemId: string, confidence: number): Promise<void> =>
+      ipcRenderer.invoke('signals:markPrompted', signalId, itemId, confidence),
+    outcome: (signalId: string, itemId: string, outcome: 'completed' | 'dismissed' | 'ignored'): Promise<void> =>
+      ipcRenderer.invoke('signals:outcome', signalId, itemId, outcome)
+  },
   workItems: {
     list: (): Promise<FbNode[]> => ipcRenderer.invoke('workItems:list'),
     get: (id: string): Promise<FbNode | null> => ipcRenderer.invoke('workItems:get', id),

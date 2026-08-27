@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/view'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
 import WeekTimeGrid from '../views/WeekTimeGrid'
+import { quietWinLines } from '../../lib/completionDetect'
 import Icon from '../Icon'
 import { QUEUE_COLOR, QUEUE_ICON, queueOf, queueTint } from '../../lib/attentionQueues'
 import {
@@ -358,6 +359,21 @@ export function AnalyticsBlock({
   const nowMs = Date.now()
   const rows = useMemo(() => statusBreakdown(items, nowMs), [items, nowMs])
   const trends = useMemo(() => trendLines(items, nowMs), [items, nowMs])
+  // DEC-052 #7 — quiet wins from the ledger: work that happened without a
+  // checkbox still counts (desks closed, sittings finished). Device-local.
+  const [quietWins, setQuietWins] = useState<string[]>([])
+  useEffect(() => {
+    let alive = true
+    void window.api.signals
+      .list(Date.now() - 7 * 86_400_000)
+      .then((sig) => {
+        if (alive) setQuietWins(quietWinLines(sig, Date.now()))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
   const shown = variant === 'compact' ? rows.slice(0, 3) : rows
   const kpis = useMemo(() => kpiMetrics(items, nowMs), [items, nowMs])
   const pulse = useMemo(() => pulseCounts(items, nowMs), [items, nowMs])
@@ -522,12 +538,18 @@ export function AnalyticsBlock({
           })}
         </div>
       )}
-      {trends.length > 0 && (
+      {(trends.length > 0 || quietWins.length > 0) && (
         <div className={`${variant === 'full' ? 'mt-3 pt-2 border-t border-[var(--edge-soft)]' : 'mt-2'} flex flex-col gap-1`}>
           {(variant === 'full' ? trends : trends.slice(0, 1)).map((t) => (
             <div key={t} className="flex items-start gap-1.5 text-[11.5px] text-[var(--ink-60)]">
               <Icon name="trending_up" size={12} className="mt-0.5 shrink-0 text-[var(--ink-30)]" />
               {t}
+            </div>
+          ))}
+          {(variant === 'full' ? quietWins : quietWins.slice(0, 1)).map((l) => (
+            <div key={l} className="flex items-start gap-1.5 text-[11.5px] text-[var(--ink-60)]">
+              <Icon name="eco" size={12} className="mt-0.5 shrink-0 text-emerald-500" />
+              {l}
             </div>
           ))}
         </div>

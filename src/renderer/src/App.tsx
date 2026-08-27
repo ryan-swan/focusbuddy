@@ -63,6 +63,7 @@ import { installCapabilityWatcher } from './stores/capabilities'
 import { useViewStore } from './stores/view'
 import { useActionHistory } from './stores/actionHistory'
 import UndoToast from './components/UndoToast'
+import CompletionToast from './components/CompletionToast'
 import { PromptDialogHost, confirmDialog } from './components/plexi/PromptDialog'
 import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
@@ -689,6 +690,7 @@ export default function App(): JSX.Element {
       <FeatureSpotlightPopup />
       <OnboardingHub />
       <UndoToast />
+      <CompletionToast />
       <CaptureConsole />
       <PromptDialogHost />
       <DocHistoryPanelHost />

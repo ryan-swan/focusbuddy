@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useCompletionOffer } from './completionOffer'
 import { conversationForDesk } from '../lib/deskConversation'
 import { parseAttentionCommand } from '../lib/attentionCommand'
 import { useAssistantChrome } from './assistantChrome'
@@ -718,6 +719,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const webSearch = get().activeWebSearch()
     const current = get().messagesByTask[key] ?? []
     const userMsg: ChatMessage = { role: 'user', content, ts: Date.now() }
+    // DEC-052 Track D — a message SENT into a conversation an item was
+    // captured from plausibly closes its loop. Observed, matched, offered —
+    // never auto-completed. Fire-and-forget: an observation must never slow
+    // or break the send.
+    {
+      const convId = get().activeConversationId
+      if (convId) {
+        void useCompletionOffer.getState().observe({
+          kind: 'chat_message_sent',
+          targetKind: 'conversation',
+          targetRef: convId
+        })
+      }
+    }
     const next = [...current, userMsg]
     set({
       messagesByTask: { ...get().messagesByTask, [key]: next },
