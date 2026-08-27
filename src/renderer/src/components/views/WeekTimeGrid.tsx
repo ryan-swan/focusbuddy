@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FbNode, TimeBlock, TimeBlockMeeting, TimeBlockRecurrence } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useWorkItemStore } from '../../stores/workItems'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { useViewStore } from '../../stores/view'
 import { futuristicPowerOn } from '../../lib/audioBeep'
+import { QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
 import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
 import { sendMeetingInvites } from '../../lib/meetingInvite'
 import { googleCalendarUrl } from '@shared/ics'
@@ -20,7 +22,6 @@ const END_HOUR = 23 // exclusive-ish; we render rows START_HOUR..END_HOUR-1
 const HOUR_PX = 44
 const SNAP_MIN = 15
 const DAY_MS = 86_400_000
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function dayStartMs(weekStart: Date, dayIndex: number): number {
   const d = new Date(weekStart)
@@ -45,7 +46,17 @@ interface Composer {
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
 }
 
-export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.Element {
+export default function WeekTimeGrid({
+  weekStart,
+  days = 7,
+  compact = false
+}: {
+  weekStart: Date
+  /** How many day columns to render from weekStart (7 = week, 3, 1 = day). */
+  days?: number
+  /** Narrow-surface mode (the Attention rail): tighter rows, smaller gutter. */
+  compact?: boolean
+}): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const blocks = useTimeBlockStore((s) => s.blocks)
   const loadRange = useTimeBlockStore((s) => s.loadRange)
@@ -57,25 +68,59 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
 
+  const hourPx = compact ? 30 : HOUR_PX
   const weekFrom = weekStart.getTime()
-  const weekTo = weekFrom + 7 * DAY_MS
+  const weekTo = weekFrom + days * DAY_MS
 
   useEffect(() => {
     void loadRange(weekFrom, weekTo)
   }, [weekFrom, weekTo, loadRange])
 
-  // A block can link to ANY node — a task (focusable) or a folder (jump-to).
+  // A block can link to ANY node — a task (focusable), a folder (jump-to), or
+  // (DEC-052) a WORK ITEM. Work items never pass through the node store by
+  // design (listNodes filters the kind out), so they resolve from their own
+  // store — widening listNodes would leak them into every desk surface.
+  const workItems = useWorkItemStore((st) => st.items)
+  const wiLoaded = useWorkItemStore((st) => st.loaded)
+  const refreshItems = useWorkItemStore((st) => st.refresh)
+  useEffect(() => {
+    if (!wiLoaded) void refreshItems()
+  }, [wiLoaded, refreshItems])
+  const goAttention = useViewStore((st) => st.goAttention)
   const nodesById = useMemo(() => {
     const m = new Map<string, FbNode>()
     for (const n of nodes) m.set(n.id, n)
     return m
   }, [nodes])
+  const itemsById = useMemo(() => {
+    const m = new Map<string, FbNode>()
+    for (const i of workItems) m.set(i.id, i)
+    return m
+  }, [workItems])
+  // DEC-052 — the deadline band: due Attention items render ABOVE the grid,
+  // per day, visually distinct from scheduled blocks (the Akiflow deadline-row
+  // convention). Active items only; closing one clears it from the band.
+  const dueByDay = useMemo(() => {
+    const m = new Map<number, FbNode[]>()
+    for (const i of workItems) {
+      if (!i.dueAt || isTerminalState(i.workItemState) || i.detachedFromId != null) continue
+      const t = Date.parse(i.dueAt)
+      if (Number.isNaN(t) || t < weekFrom || t >= weekTo) continue
+      const dayIndex = Math.floor((t - weekFrom) / DAY_MS)
+      m.set(dayIndex, [...(m.get(dayIndex) ?? []), i])
+    }
+    for (const list of m.values())
+      list.sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
+    return m
+  }, [workItems, weekFrom, weekTo])
   const tasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
 
   // Open the node a block links to: tasks open in the canvas, folders open the
   // project dashboard.
   function jumpToNode(node: FbNode): void {
-    if (node.kind === 'task') {
+    if (node.kind === 'work_item') {
+      goAttention()
+    } else if (node.kind === 'task') {
       setActive(node.id)
       goTask(node.id)
     } else {
@@ -104,7 +149,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   // Convert a y offset within a day column to an absolute time for that day.
   function yToMs(dayIndex: number, y: number): number {
     const base = dayStartMs(weekStart, dayIndex) + START_HOUR * 3_600_000
-    return base + (y / HOUR_PX) * 3_600_000
+    return base + (y / hourPx) * 3_600_000
   }
 
   function onColumnClick(e: React.MouseEvent, dayIndex: number): void {
@@ -118,21 +163,34 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   // composer pre-filled at the dropped time, so you book it by just confirming
   // how long. The sidebar already publishes the node id as `text/fb-node`.
   function onColumnDragOver(e: React.DragEvent): void {
-    if (e.dataTransfer.types.includes('text/fb-node')) {
+    if (
+      e.dataTransfer.types.includes('text/fb-node') ||
+      e.dataTransfer.types.includes('text/fb-workitem')
+    ) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
     }
   }
 
   function onColumnDrop(e: React.DragEvent, dayIndex: number): void {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const startMs = snapMs(yToMs(dayIndex, y))
+    // DEC-052 — dropping an ATTENTION item books it immediately: a 30-minute
+    // block linked to the item, resizable after the fact. No composer stop —
+    // the drag was the decision (Undo covers regret). Title stays empty so
+    // the block always renders the item's live title.
+    const itemId = e.dataTransfer.getData('text/fb-workitem')
+    if (itemId && itemsById.has(itemId)) {
+      e.preventDefault()
+      void createBlock({ taskId: itemId, title: '', startMs, durationMin: 30 })
+      return
+    }
     const id = e.dataTransfer.getData('text/fb-node')
     if (!id) return
     e.preventDefault()
     const node = nodes.find((n) => n.id === id)
     if (!node) return
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const y = e.clientY - rect.top
-    const startMs = snapMs(yToMs(dayIndex, y))
     setComposer({
       dayIndex,
       startMs,
@@ -164,12 +222,12 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     const d = dragRef.current
     if (!d) return
     const deltaY = e.clientY - d.startClientY
-    const deltaMs = (deltaY / HOUR_PX) * 3_600_000
+    const deltaMs = (deltaY / hourPx) * 3_600_000
     if (d.mode === 'move') {
       // Cross-day: find the day column under the pointer's X so a block can be
       // dragged to another day, keeping its time-of-day plus the vertical delta.
       let targetDay = d.origDayIndex
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < days; i++) {
         const r = colRefs.current[i]?.getBoundingClientRect()
         if (r && e.clientX >= r.left && e.clientX <= r.right) {
           targetDay = i
@@ -213,27 +271,30 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     }
   }
 
-  const gridHeight = (END_HOUR - START_HOUR) * HOUR_PX
+  const gridHeight = (END_HOUR - START_HOUR) * hourPx
   const now = Date.now()
 
   return (
     <div className="flex" data-testid="week-time-grid">
       {/* Hour gutter */}
-      <div className="w-12 shrink-0 select-none" style={{ paddingTop: 22 }}>
+      <div className={`${compact ? 'w-6' : 'w-12'} shrink-0 select-none`} style={{ paddingTop: 22 }}>
         {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
           <div
             key={i}
-            style={{ height: HOUR_PX }}
+            style={{ height: hourPx }}
             className="fb-t-caption font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
           >
-            {START_HOUR + i}:00
+            {compact ? START_HOUR + i : `${START_HOUR + i}:00`}
           </div>
         ))}
       </div>
 
       {/* Day columns */}
-      <div className="grid grid-cols-7 gap-1 flex-1">
-        {DAY_LABELS.map((label, dayIndex) => {
+      <div className="grid gap-1 flex-1" style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}>
+        {Array.from({ length: days }, (_, dayIndex) => {
+          const label = new Date(dayStartMs(weekStart, dayIndex)).toLocaleDateString(undefined, {
+            weekday: 'short'
+          })
           const dStart = dayStartMs(weekStart, dayIndex)
           const isToday = new Date(dStart).toDateString() === new Date().toDateString()
           // A block being dragged is placed by its PREVIEW start, so a cross-day
@@ -252,6 +313,43 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
               >
                 {label} {new Date(dStart).getDate()}
               </div>
+              {(dueByDay.get(dayIndex)?.length ?? 0) > 0 && (
+                <div className="flex flex-col gap-0.5 pb-1" data-testid="deadline-band">
+                  {(dueByDay.get(dayIndex) ?? []).slice(0, compact ? 2 : 4).map((i) => (
+                    <button
+                      key={i.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        goAttention()
+                      }}
+                      title={`Due: ${i.title} — open Attention`}
+                      className="relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2 pr-1 py-0.5 fb-t-caption fb-press bg-[var(--surface-raised)]"
+                      style={{
+                        borderColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.6),
+                        color: 'var(--ink-70)'
+                      }}
+                    >
+                      <span
+                        aria-hidden
+                        className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full"
+                        style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.7) }}
+                      />
+                      {i.title}
+                    </button>
+                  ))}
+                  {(dueByDay.get(dayIndex)?.length ?? 0) > (compact ? 2 : 4) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        goAttention()
+                      }}
+                      className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] text-left pl-2 fb-press"
+                    >
+                      +{(dueByDay.get(dayIndex)?.length ?? 0) - (compact ? 2 : 4)} more due
+                    </button>
+                  )}
+                </div>
+              )}
               <div
                 ref={(el) => (colRefs.current[dayIndex] = el)}
                 className={`relative rounded-[var(--radius-row)] border ${
@@ -269,7 +367,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                 {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
                   <div
                     key={i}
-                    style={{ top: i * HOUR_PX, height: HOUR_PX }}
+                    style={{ top: i * hourPx, height: hourPx }}
                     className="absolute left-0 right-0 border-t border-[var(--edge-soft)] pointer-events-none"
                   />
                 ))}
@@ -279,10 +377,14 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                   const startMs = preview ? preview.previewStart : block.startMs
                   const durMin = preview ? preview.previewDur : block.durationMin
                   const top =
-                    ((startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * HOUR_PX
-                  const height = (durMin / 60) * HOUR_PX
-                  const linked = block.taskId ? nodesById.get(block.taskId) ?? null : null
+                    ((startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * hourPx
+                  const height = (durMin / 60) * hourPx
+                  const linked = block.taskId
+                    ? nodesById.get(block.taskId) ?? itemsById.get(block.taskId) ?? null
+                    : null
+                  const isWorkItem = linked?.kind === 'work_item'
                   const isTaskBlock = !block.taskId || linked?.kind === 'task'
+                  const wiHue = isWorkItem ? QUEUE_COLOR[queueOf(linked!)] ?? '#64748b' : null
                   const done = block.status === 'done'
                   const isPast = startMs + durMin * 60000 < now
                   return (
@@ -298,7 +400,16 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             ? 'bg-[var(--surface-sunken)]/90 border-[var(--edge-firm)]/50 text-[var(--ink-50)]'
                             : 'bg-accent/15 border-accent/40 text-[var(--ink-90)]'
                       }`}
-                      style={{ top: Math.max(0, top), height: Math.max(16, height) }}
+                      style={{
+                        top: Math.max(0, top),
+                        height: Math.max(16, height),
+                        ...(wiHue && !done && !isPast
+                          ? {
+                              backgroundColor: queueTint(wiHue, 0.14),
+                              borderColor: queueTint(wiHue, 0.45)
+                            }
+                          : {})
+                      }}
                       title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
                     >
                       <div className={`font-medium truncate ${done ? 'line-through' : ''}`}>

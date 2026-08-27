@@ -61,8 +61,11 @@ dev, HMR, tests, and builds behave as they would on Node 20–22.
 under Node 22 (nvm) before debugging the code.
 
 ## A-006 — The Calendar tab has ~zero real usage
-**Status:** OPEN · **Confidence at creation:** 0.75 (operator-stated for their own use; other
-users unverified) · **Created:** 2026-08-24
+**Status:** CONFIRMED (operator, 2026-08-27, DEC-052: "The claim about nobody using the
+calendar is factual. And the calendars are barely even usable, and the number of people
+using this tool is very low… everyone knows it's still an active development, so we don't
+need to worry about things changing upon redeployment.") · **Confidence at creation:** 0.75
+· **Created:** 2026-08-24
 **Text:** "Nobody currently uses the calendar tab in the left panel menu" (operator,
 2026-08-24) — so a ground-up rebuild of the Calendar surface is low-risk to existing users
 if the spec needs it.

@@ -782,6 +782,10 @@ export default function AttentionView(): JSX.Element {
               setDragId(i.id)
               // DEC-048 — grabbing a SELECTED row moves the whole selection.
               setDragMulti(selectMode && selected.has(i.id) && selected.size > 1)
+              // DEC-052 — the same drag can land OUTSIDE the queues: the rail
+              // day grid (and the Calendar page) read this payload to book
+              // the item. Internal reorder/nest handlers keep using state.
+              e.dataTransfer.setData('text/fb-workitem', i.id)
               e.dataTransfer.effectAllowed = 'move'
             }}
             onDragEnd={endDrag}

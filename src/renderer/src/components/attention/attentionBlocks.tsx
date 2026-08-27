@@ -5,6 +5,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
+import WeekTimeGrid from '../views/WeekTimeGrid'
 import Icon from '../Icon'
 import { QUEUE_COLOR, QUEUE_ICON, queueOf, queueTint } from '../../lib/attentionQueues'
 import {
@@ -255,7 +256,20 @@ export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element
         ) : undefined
       }
     >
-      {timeline.length === 0 ? (
+      {variant !== 'compact' ? (
+        /* DEC-052 — the rail is a REAL day column, not a list: the same grid
+           the Calendar page renders wide, narrow. Drag an item from the queues
+           onto it to book time; deadlines ride above it; blocks drag/resize
+           in place. (The compact home/desk widget keeps the read-only list
+           below — a canvas tile is for glancing, not planning.) */
+        <div className="-mx-1" data-testid="rail-day-grid">
+          <WeekTimeGrid
+            weekStart={new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())}
+            days={1}
+            compact
+          />
+        </div>
+      ) : timeline.length === 0 ? (
         <div className="text-[11.5px] text-[var(--ink-30)]">Nothing scheduled or due today.</div>
       ) : (
         <div className="flex flex-col">
