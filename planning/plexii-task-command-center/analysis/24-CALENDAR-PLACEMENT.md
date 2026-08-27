@@ -247,8 +247,10 @@ migration, which is why it can move fast.
 | AI placed this block (so "replan" knows what it may move) | no provenance | `origin TEXT` — `manual` \| `auto` |
 | "Don't move this" | none | `locked INTEGER DEFAULT 0` |
 | Block didn't happen | `status` CHECK allows only planned/done | widen to `planned\|done\|missed\|skipped` |
-| Push to external calendar, per block | none | `push_policy TEXT` (`local`\|`push`), `external_event_id`, `external_calendar_id`, `external_etag`, `sync_state`, `last_synced_at` |
-| Busy/free + visibility on the pushed event | none | `transparency`, `visibility` |
+| Push to external calendar, per block | none | `push_policy TEXT` (`local`\|`push`), `external_event_id`, `external_calendar_id`, `external_etag` (for `If-Match` → 412 reconcile), `sync_state`, `last_synced_at` |
+| Busy/free + visibility on the pushed event | none | `transparency` (free → busy **escalates** when the deadline is at risk, per §5c), `visibility` (`default`\|`private`\|`busy_masked`) |
+| "The user moved this in Google, so stop managing it" | none | covered by `locked` above — set automatically on any external edit (§5c) |
+| Hard vs soft deadline (a hard one may schedule outside working hours) | work items carry `due_at` only | `due_kind TEXT` (`hard`\|`soft`) on the item |
 | Working hours / protected time for the scheduler | **no setting exists anywhere** — `WeekTimeGrid` hard-codes 06:00–23:00 (`START_HOUR`/`END_HOUR`) | new settings: work-hours windows per weekday, protected ranges, max daily focus load |
 | Deadline vs. scheduled work, visually distinct | calendar has no deadline row | render-layer only |
 | 3-day view | month + week only | render-layer only |
@@ -435,6 +437,144 @@ it is also the cheapest source of the deep links §5 needs.
   long arranging tasks that she doesn't do them. Every affordance we add to the
   planning surface should be judged against that.
 
+## 5c. External sync (brief §3) — the convention, researched
+
+The brief said to find the established convention and implement it rather than
+invent one. Here it is, with the half of the stated baseline that holds and the
+half that does not.
+
+### The baseline, adjudicated
+
+> *"last-write-wins, with the external calendar as source of truth for events
+> that originated there, and Plexi as source of truth for Plexi-native tasks
+> and blocks"*
+
+- **Second clause: confirmed, and it is the industry model.** Motion documents
+  it explicitly — *events* sync bi-directionally, *tasks* sync one way
+  (Motion → calendar) because external calendars can't carry the metadata the
+  scheduler needs (priority, duration, deadline), and accepting inbound task
+  edits would corrupt scheduling. External events always override task blocks.
+  Reclaim reaches the same place differently: every non-Reclaim event is
+  treated as Critical by default, so Reclaim never overbooks one. Todoist goes
+  further — calendar events are read-only inside the app.
+- **First clause: refuted. Nobody uses timestamp last-write-wins.** Both
+  platforms ship optimistic concurrency instead: Google `If-Match` + ETag,
+  Graph `If-Match` + `changeKey`, both returning **412 Precondition Failed**,
+  and the documented remedy is *re-fetch and re-apply* — never blind overwrite.
+  Adopt 412-and-reconcile; it is the difference between losing a user's edit
+  and merging it.
+
+### The decision that matters most: the user drags our block in Google
+
+Two shipped answers, and they are opposites:
+
+| | **Reclaim — honour and pin** | **Motion — ignore** |
+|---|---|---|
+| The drag | keeps the new time, and **auto-locks** the block so nothing moves it again | block **stays at its original time**; Motion never learns about the drag |
+| Breadth | any direct external edit locks it, not just a move | — |
+| Aftermath | locked blocks are always written Busy | the dragged block is a stale orphan until rewritten |
+
+**Adopt Reclaim's.** A manual edit in the external calendar is the strongest
+statement of intent a person can make, and silently discarding it is the most
+trust-destroying thing this feature could do. The elegant part is that the edit
+doesn't just win once — it **changes the block's mode** from scheduler-managed
+to user-pinned, which resolves the conflict permanently instead of
+re-litigating it on every pass. That is exactly the `locked` column in §4, and
+it matches the operator's own instruction for the local case: *"Do not
+auto-replan… the user decides."*
+
+**Field ownership splits too:** Reclaim accepts external *time* changes and
+re-asserts its own title, description, colour and linkage. **Time is
+user-owned; identity is app-owned** — otherwise a renamed block becomes an
+unattributable orphan.
+
+*(Worth noting: Sunsama, Morgen and Akiflow publish no conflict rule at all for
+externally-edited app blocks, despite all three marketing two-way sync. Read
+the silence as a finding — this is the hard part.)*
+
+### Busy or free? The convention is neither — it escalates
+
+Motion and Reclaim converged independently on: **blocks are written FREE, and
+escalate to BUSY only when the deadline is genuinely at risk.** Motion ships it
+as a setting ("Show At-Risk Tasks as Busy"); Reclaim encodes the state visually
+(dotted+🆓 free, solid+🛡️ busy, 🔒 locked — and locked is always busy).
+Google's own first-party API agrees: `focusTime` and `outOfOffice` events
+*require* `transparency: opaque`, while `workingLocation` requires
+`transparent` — defended time is busy, informational time is free.
+
+Akiflow is the only one with a true **per-block** choice at push time
+(Public / Private / Busy-with-title-masked), with push off by default. Combine
+them: **default local; on push, free-then-escalate; per-block visibility
+override including title-masked Busy.** That is precisely the brief's ask, and
+it is what users already expect.
+
+### Mechanics, and the traps that cost real data
+
+**Google:** scopes `calendar.events` + `calendar.readonly`. Full `events.list`
+→ persist `nextSyncToken` (**only on the final page**) → `watch` channel per
+calendar (**7-day TTL, no auto-renew, notifications carry no body — a doorbell,
+not a payload**) → incremental list on ring → on `410 fullSyncRequired`, wipe
+and full-resync. **Google states plainly that a small percentage of push
+notifications are dropped under normal conditions**, so a low-frequency poll is
+a required backstop, not an optimisation. Set our **own event `id`** on insert:
+a retry then returns `409 duplicate` instead of creating a second event — the
+cheapest correct de-dup available — and stamp
+`extendedProperties.private` with `{app_id, item_id, schema_version}`
+(key ≤44 chars, value ≤1024, both silently truncated). Note `syncToken` is
+**incompatible with any filtering**, so reconciliation is local by necessity.
+
+**Graph:** `Calendars.ReadWrite` + `Calendars.Read.Shared` +
+**`MailboxSettings.Read`** (the only way to get an Outlook user's timezone) +
+`offline_access`. Send **`Prefer: IdType="ImmutableId"` on every request** —
+including subscription creation — or an item moved between folders orphans our
+record. Use `transactionId` for idempotency and
+`singleValueExtendedProperties` for the app id (open extensions **cannot be
+filtered**). Webhook contract is unforgiving: **acknowledge within 3 seconds**
+(validate `clientState`, enqueue, return `202`) or the endpoint gets marked
+slow, then dropped — and dropped notifications are unrecoverable. Set
+`lifecycleNotificationUrl` **at creation** (it cannot be added later); its
+`missed` event means "run a full delta resync".
+
+**The three traps worth naming in the code:**
+
+1. **Graph's `calendarView/delta` window is frozen into the token, and an event
+   moved outside it reports as `@removed: deleted`.** A meeting dragged from
+   this month to next is byte-identical to a deletion — re-fetch by id to
+   disambiguate, or we will delete real events.
+2. **`iCalUID` semantics are inverted between platforms** — shared across a
+   recurring series on Google, different per occurrence on Graph. Porting the
+   Google assumption silently corrupts series.
+3. **Patch, never delete-and-recreate.** Beyond being racier, Google throttles
+   accounts that create very large numbers of events — *possibly for months* —
+   and a re-optimising scheduler is exactly the shape that trips it.
+
+And one rule that is cheap to honour and expensive to discover: **never put
+attendees on an auto-movable block.** A scheduler that re-optimises fifty times
+a week would email every guest fifty times.
+
+### Scheduling defaults worth stealing (brief §2)
+
+- **Deadlines: hard vs soft.** Motion's highest-leverage field — a *hard*
+  deadline is permitted to schedule outside working hours. Ours should carry
+  the same distinction rather than treating every due date alike.
+- **Chunking with a minimum block size**, and Reclaim's trick of using *max*
+  duration as the spacing control so chunks don't stack back-to-back.
+- **Ordering:** ASAP → hard deadline → soonest soft deadline → priority →
+  duration. Our `rankScore` already encodes most of this.
+- **Daily load ceiling.** Neither Motion nor Reclaim enforces one — Sunsama
+  does, and recommends **~5.5 hours of planned work per day** for new users.
+  That single number is the best available calibration against the
+  over-optimism that makes a disrupted day cascade.
+- **All-day busy events are the documented #1 cause of "why won't it schedule
+  anything?"** at both Motion and Reclaim. Surface that diagnosis in the UI
+  instead of making the operator find a help article.
+- **Rollover:** auto-roll incomplete work forward, but add Akiflow's **one-hour
+  grace period** before anything is marked overdue (the cheapest possible fix
+  for "I finished it at 5:04"), and let the roll be a prompt rather than
+  silent, per Sunsama.
+- **Don't over-pin by default** — Motion's own docs warn that too many locked
+  tasks starve the scheduler. Guardrails should be user-invoked.
+
 ## 6. Merge map — Akiflow's feature set against what Plexi already holds
 
 | Akiflow | Plexi today | Verdict |
@@ -519,6 +659,11 @@ and "removing a connector never deletes what it imported". It is currently
 imported by **one unit test and no production code** — a specified, tested
 contract waiting for its first real implementation. The Google connector
 should be that implementation rather than inventing its own bookkeeping.
+
+Build it to the convention in §5c, not to first principles: push-plus-poll
+(never push-only), own event ids for idempotency, extended properties for
+recovery, 412-and-reconcile rather than last-write-wins, honour-and-pin on any
+external edit, and free-escalating-to-busy transparency.
 
 Do not start before A and B1 are in a user's hands.
 
