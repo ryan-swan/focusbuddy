@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { collectMenuRects, resolveCenteredTop } from '../lib/floatingChrome'
 import { motion } from 'framer-motion'
 import Icon from './Icon'
+import { TIDY_MODES, TIDY_COUNTS, type TidyOptions } from '../lib/autoArrange'
 import LoadMeter from './LoadMeter'
 import { useCognitiveLoad } from '../lib/useCognitiveLoad'
 
 interface Props {
-  onTidy: () => void
+  /** Undefined opts = the default tidy (the button's own click). */
+  onTidy: (opts?: TidyOptions) => void
   tidyDisabled: boolean
   onBuild: () => void
   onSaveTemplate: () => void
@@ -42,6 +44,129 @@ function MotionLabel({ hovered, children }: { hovered: boolean; children: React.
     >
       {children}
     </motion.span>
+  )
+}
+
+/**
+ * DEC-038 — Tidy, with its modes on hover.
+ *
+ * The operator asked for Tidy to live in ONE place (this pill, not also the
+ * desk right-click menu) and for its modes to be offered as "just the images".
+ * So the labels become tooltips and accessible names; the visible menu is a
+ * strip of icons. Clicking the button itself still runs the default tidy, so
+ * the fast path is unchanged for anyone who never opens the menu.
+ *
+ * Hover-out is delayed, because the pointer has to cross a gap to reach the
+ * menu — closing on the first mouseleave would make it unreachable.
+ */
+function TidyControl({
+  onTidy,
+  disabled,
+  hovered,
+  rounded
+}: {
+  onTidy: (opts?: TidyOptions) => void
+  disabled: boolean
+  hovered: boolean
+  rounded: string
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<number | null>(null)
+  const cancelClose = (): void => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current)
+    closeTimer.current = null
+  }
+  const scheduleClose = (): void => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => setOpen(false), 220)
+  }
+  useEffect(() => cancelClose, [])
+
+  const pick = (opts: TidyOptions): void => {
+    setOpen(false)
+    onTidy(opts)
+  }
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => {
+        if (!disabled) {
+          cancelClose()
+          setOpen(true)
+        }
+      }}
+      onMouseLeave={scheduleClose}
+    >
+      <button
+        onClick={() => onTidy()}
+        disabled={disabled}
+        className={`inline-flex items-center h-6 px-1.5 ${rounded} text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] disabled:opacity-30 transition-colors`}
+        title="Tidy"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-testid="pill-tidy"
+      >
+        <Icon name="grid_view" size={12} />
+        <MotionLabel hovered={hovered}>Tidy</MotionLabel>
+      </button>
+      {open && !disabled && (
+        <div
+          role="menu"
+          aria-label="Tidy layout"
+          data-testid="tidy-menu"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-[400] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-xl px-1.5 py-1.5"
+        >
+          <div className="flex items-center gap-0.5">
+            {TIDY_MODES.map((m) => (
+              <button
+                key={m.icon + m.label}
+                role="menuitem"
+                onClick={() => pick(m.opts)}
+                title={m.label}
+                aria-label={m.label}
+                data-testid={`tidy-mode-${m.opts.mode}`}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-lg text-[var(--ink-60)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] fb-press transition-colors"
+              >
+                <Icon name={m.icon} size={15} />
+              </button>
+            ))}
+          </div>
+          {/* An exact column/row count cannot be an icon on its own, so the
+              icon leads and the numerals do the choosing — still no labels. */}
+          {(
+            [
+              { icon: 'view_week', key: 'cols' as const, label: 'columns' },
+              { icon: 'table_rows', key: 'rows' as const, label: 'rows' }
+            ]
+          ).map((row) => (
+            <div key={row.key} className="mt-1 flex items-center gap-0.5">
+              <span
+                title={`Exact number of ${row.label}`}
+                className="inline-flex items-center justify-center h-6 w-7 text-[var(--ink-30)]"
+              >
+                <Icon name={row.icon} size={14} />
+              </span>
+              {TIDY_COUNTS.map((n) => (
+                <button
+                  key={n}
+                  role="menuitem"
+                  onClick={() => pick({ mode: 'custom', [row.key]: n } as TidyOptions)}
+                  title={`${n} ${row.label}`}
+                  aria-label={`${n} ${row.label}`}
+                  data-testid={`tidy-${row.key}-${n}`}
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-md text-[11px] tabular-nums text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] fb-press transition-colors"
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -266,10 +391,7 @@ export default function FloatingPill({
 
           <div className="h-px bg-[var(--edge-firm)] mx-1 my-0.5 shrink-0" />
 
-          <button onClick={onTidy} disabled={tidyDisabled} className="inline-flex items-center h-6 px-1.5 rounded-lg text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] disabled:opacity-30 transition-colors" title="Tidy" data-testid="pill-tidy">
-            <Icon name="grid_view" size={12} />
-            <MotionLabel hovered={hovered}>Tidy</MotionLabel>
-          </button>
+          <TidyControl onTidy={onTidy} disabled={tidyDisabled} hovered={hovered} rounded="rounded-lg" />
 
           <button onClick={onBuild} className="inline-flex items-center h-6 px-1.5 rounded-lg text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)] transition-colors" title="Build with AI" data-testid="pill-build">
             <Icon name="auto_awesome" size={12} />
@@ -372,10 +494,7 @@ export default function FloatingPill({
 
         <div className="w-px h-3 bg-[var(--edge-firm)] mx-0.5 shrink-0" />
 
-        <button onClick={onTidy} disabled={tidyDisabled} className="inline-flex items-center h-6 px-1.5 rounded-full text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] disabled:opacity-30 transition-colors" title="Tidy" data-testid="pill-tidy">
-          <Icon name="grid_view" size={12} />
-          <MotionLabel hovered={hovered}>Tidy</MotionLabel>
-        </button>
+        <TidyControl onTidy={onTidy} disabled={tidyDisabled} hovered={hovered} rounded="rounded-full" />
 
         <button onClick={onBuild} className="inline-flex items-center h-6 px-1.5 rounded-full text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)] transition-colors" title="Build with AI" data-testid="pill-build">
           <Icon name="auto_awesome" size={12} />

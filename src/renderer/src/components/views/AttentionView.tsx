@@ -8,6 +8,8 @@ import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
 import AttentionItemEditor from '../AttentionItemEditor'
 import { useWidgetStore } from '../../stores/widgets'
+import { useAssistantChrome } from '../../stores/assistantChrome'
+import { startPromptForItem, startPromptForMany } from '../../lib/startPrompt'
 import {
   itemContext,
   urgencyOf,
@@ -25,6 +27,7 @@ import {
   detachedItems,
   itemReason,
   itemFullText,
+  isTerminalState,
   queueOf,
   rankScore,
   PRIMARY_ACTION,
@@ -89,6 +92,7 @@ export default function AttentionView(): JSX.Element {
   const goProject = useViewStore((s) => s.goProject)
   const openConsole = useCaptureConsole((s) => s.openConsole)
   const setFocusedWidget = useWidgetStore((s) => s.setFocused)
+  const openAssistant = useAssistantChrome((s) => s.openPanel)
   const [nowMs, setNowMs] = useState(() => Date.now())
   // SPEC-017 lenses: the same active set through three groupings, persisted.
   const [lens, setLens] = useState<'queue' | 'due' | 'origin'>(
@@ -102,6 +106,19 @@ export default function AttentionView(): JSX.Element {
   // DEC-037 — filtering by a chosen tag. One at a time: the point is to narrow
   // to a thread of work, not to build a query language.
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  // DEC-038 — selection mode. The Attention page's own bulk pattern, matching
+  // the index pages' Select/Select-all shape (DEC-022) so the muscle memory
+  // carries. Its one bulk action today is handing the set to Plexii.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const toggleSelected = (id: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // DEC-035 — the six-dot handle: rearrange, attach one item to another, or
   // move between classifications. Native HTML5 drag (the house pattern; there
@@ -352,6 +369,36 @@ export default function AttentionView(): JSX.Element {
     }
   }
 
+  /** DEC-038 — hand the captured intent to Plexii as a PREFILLED chat.
+   *  Staged in the composer, never sent (fb:composer-stage, the same seam the
+   *  console's Expand mode uses): the assistant must not start acting because
+   *  the operator glanced at his queue. He reads it, edits it, presses send.
+   *  When the work belongs to a desk we go there first, so the assistant has
+   *  that desk's context in its prompt rather than answering in the abstract. */
+  function startWithPlexii(list: FbNode[]): void {
+    if (list.length === 0) return
+    const prompt =
+      list.length === 1
+        ? startPromptForItem(list[0], nodesById)
+        : startPromptForMany(list, nodesById)
+    if (!prompt) return
+    const deskId = list.length === 1 ? list[0].parentId : null
+    if (deskId && nodes.some((n) => n.id === deskId && n.kind === 'task')) {
+      setActive(deskId)
+      goTask(deskId)
+    }
+    useAssistantChrome.getState().setTab('chat')
+    openAssistant()
+    const stage = (): void =>
+      window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: prompt }))
+    stage()
+    // The panel may still be mounting; the second dispatch covers that (same
+    // belt-and-braces the capture console uses).
+    setTimeout(stage, 400)
+    setSelectMode(false)
+    setSelected(new Set())
+  }
+
   /** Open the DESK the item lives on — the whole canvas, in context. */
   function openSource(i: FbNode): void {
     if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
@@ -465,7 +512,20 @@ export default function AttentionView(): JSX.Element {
                 : ''
         }`}
       >
-        {canDrag && (
+        {selectMode && !inDetached && (
+          <button
+            onClick={() => toggleSelected(i.id)}
+            title={selected.has(i.id) ? 'Deselect' : 'Select'}
+            className="shrink-0 mt-0.5 fb-press"
+          >
+            <Icon
+              name={selected.has(i.id) ? 'check_box' : 'check_box_outline_blank'}
+              size={16}
+              className={selected.has(i.id) ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-30)]'}
+            />
+          </button>
+        )}
+        {canDrag && !selectMode && (
           <button
             draggable
             onDragStart={(e) => {
@@ -650,6 +710,13 @@ export default function AttentionView(): JSX.Element {
                 </button>
               )}
               <button
+                onClick={() => startWithPlexii([i])}
+                title="Start it with Plexii — opens a chat prefilled from this capture"
+                className="icon-btn !h-7 !w-7"
+              >
+                <Icon name="auto_awesome" size={14} />
+              </button>
+              <button
                 onClick={() => void snoozeTomorrow(i.id)}
                 title="Snooze until tomorrow morning"
                 className="icon-btn !h-7 !w-7"
@@ -695,6 +762,18 @@ export default function AttentionView(): JSX.Element {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setSelectMode((v) => !v)
+                setSelected(new Set())
+              }}
+              title="Select several items to hand to Plexii at once"
+              className={`inline-flex items-center gap-1.5 h-9 px-3 fb-btn-surface fb-press fb-t-label ${
+                selectMode ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-70)] hover:text-[var(--ink-100)]'
+              }`}
+            >
+              <Icon name="checklist" size={15} /> {selectMode ? 'Done' : 'Select'}
+            </button>
             <button
               onClick={() => setShowNew((v) => !v)}
               title="A plain form — you pick the queue yourself"
@@ -810,6 +889,36 @@ export default function AttentionView(): JSX.Element {
             </button>
           ))}
         </div>
+        {selectMode && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-[rgba(var(--accent),0.35)] bg-[rgba(var(--accent),0.06)] px-3 py-2">
+            <span className="fb-t-label text-[var(--ink-70)]">
+              {selected.size} selected
+            </span>
+            <button
+              onClick={() => setSelected(new Set(visible.filter((i) => !isTerminalState(i.workItemState)).map((i) => i.id)))}
+              className="fb-t-label text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
+            >
+              Select all
+            </button>
+            {selected.size > 0 && (
+              <button
+                onClick={() => setSelected(new Set())}
+                className="fb-t-label text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
+              >
+                Clear
+              </button>
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={() => startWithPlexii(items.filter((i) => selected.has(i.id)))}
+              disabled={selected.size === 0}
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-40"
+            >
+              <Icon name="auto_awesome" size={14} />
+              Get started with Plexii
+            </button>
+          </div>
+        )}
         {(() => {
           const vocab = tagVocabulary(items)
           if (vocab.length === 0) return null

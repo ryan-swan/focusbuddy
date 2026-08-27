@@ -2677,7 +2677,7 @@ export default function Canvas(): JSX.Element {
               cognitive-load ring + canvas tools. Uses fixed positioning internally. */}
           {activeTaskId && (
             <FloatingPill
-              onTidy={() => void handleAutoArrange()}
+              onTidy={(opts) => void handleAutoArrange(opts)}
               tidyDisabled={!activeTaskId}
               onBuild={() => setShowAiBuilder(true)}
               onSaveTemplate={() => setSaveTemplateOpen({ context: 'toolbar' })}
