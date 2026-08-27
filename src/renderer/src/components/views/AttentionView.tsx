@@ -23,6 +23,7 @@ import {
 } from '../attention/attentionBlocks'
 import { KPI_FILTERS, type KpiKey } from '../../lib/attentionAnalytics'
 import ItemStatusPill from '../attention/ItemStatusPill'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import {
   itemContext,
   urgencyOf,
@@ -132,7 +133,6 @@ export default function AttentionView(): JSX.Element {
   const updateFields = useWorkItemStore((s) => s.updateFields)
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
-  const updateNode = useNodeStore((s) => s.update)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goRoom)
@@ -180,6 +180,7 @@ export default function AttentionView(): JSX.Element {
     })
   }
   const [bulkBusy, setBulkBusy] = useState(false)
+  const closeWithOffer = useCloseWorkItem()
 
   // DEC-048 — collapsed parents. View state, persisted so an outline the
   // operator folded stays folded across restarts.
@@ -350,64 +351,9 @@ export default function AttentionView(): JSX.Element {
     await writeAll(writes)
   }
 
-  /** DEC-047 D-3 — a SUGGESTION, never a write: closing the last open item
-   *  on a still-open desk offers "mark the desk done?" once, right then.
-   *  Accepting uses the same user-owned status write every desk surface uses
-   *  (D-6: the app never auto-writes desk status).
-   *
-   *  DEC-048 — completing a PARENT accounts for its subtasks: open
-   *  descendants surface as an offer (close them with it / leave them), never
-   *  a silent cascade — their closure is each queue's own honest verb. */
-  async function closeWithOffer(i: FbNode, state: string): Promise<void> {
-    const openKids = [...subtreeIds(i.id, items)]
-      .filter((id) => id !== i.id)
-      .map((id) => items.find((x) => x.id === id))
-      .filter(
-        (x): x is FbNode => !!x && !isTerminalState(x.workItemState) && x.detachedFromId == null
-      )
-    if (openKids.length > 0) {
-      const pick = await promptText({
-        title: 'Close its subtasks too?',
-        label: `“${i.title || 'This item'}” still has ${openKids.length} open subtask${
-          openKids.length === 1 ? '' : 's'
-        }.`,
-        choices: [
-          { value: 'all', label: `Close all ${openKids.length} with it` },
-          { value: 'one', label: 'Just this one — subtasks stay open' },
-          { value: 'cancel', label: 'Cancel' }
-        ]
-      })
-      if (pick === 'cancel' || pick == null) return
-      if (pick === 'all') {
-        for (const k of openKids) {
-          const verb = PRIMARY_ACTION[queueOf(k)] ?? PRIMARY_ACTION.to_do
-          await setState(k.id, verb.state)
-        }
-      }
-    }
-    await setState(i.id, state)
-    const deskId = i.parentId
-    if (!deskId) return
-    const desk = nodes.find((n) => n.id === deskId && n.kind === 'task')
-    if (!desk || desk.status === 'done' || desk.status === 'parked') return
-    const remaining = items.filter(
-      (x) =>
-        x.id !== i.id &&
-        x.parentId === deskId &&
-        !isTerminalState(x.workItemState) &&
-        x.detachedFromId == null
-    )
-    if (remaining.length > 0) return
-    const pick = await promptText({
-      title: 'Desk complete?',
-      label: `Everything on “${desk.title || 'this desk'}” is closed.`,
-      choices: [
-        { value: 'done', label: 'Mark the desk done' },
-        { value: 'no', label: 'Leave it as is' }
-      ]
-    })
-    if (pick === 'done') await updateNode(desk.id, { status: 'done' })
-  }
+  // DEC-051 — closing runs through the SHARED path (useCloseWorkItem), so the
+  // desk-done offer and the subtask accounting behave identically here, on the
+  // home widget, and on the desk widget. See that module for the rules.
 
   async function ungroup(id: string): Promise<void> {
     await writeAll(planUngroup(id))

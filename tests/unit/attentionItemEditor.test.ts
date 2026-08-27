@@ -290,13 +290,17 @@ describe('DEC-047 — desk ⇄ attention, the derived shape (analysis/23 execute
   })
 
   it('D-3: closing the last item OFFERS desk-done — a suggestion, never an auto-write', () => {
+    // DEC-051 — the offer moved into the SHARED close path so the widgets
+    // cannot quietly diverge from the page; the view calls it, the rules live
+    // in one file.
     expect(view).toContain('closeWithOffer')
-    expect(view).toContain('Mark the desk done')
+    const close = read('src/renderer/src/components/attention/useCloseWorkItem.ts')
+    expect(close).toContain('Mark the desk done')
     // Only fires on a still-open desk with nothing else active.
-    expect(view).toContain("desk.status === 'done' || desk.status === 'parked'")
-    expect(view).toContain('if (remaining.length > 0) return')
+    expect(close).toContain("desk.status === 'done' || desk.status === 'parked'")
+    expect(close).toContain('if (remaining.length > 0) return')
     // Accepting uses the ordinary user-owned node update.
-    expect(view).toContain("updateNode(desk.id, { status: 'done' })")
+    expect(close).toContain("updateNode(desk.id, { status: 'done' })")
   })
 
   it('D-4: All-Desks cards carry the attention signal; status groups untouched', () => {
@@ -392,5 +396,60 @@ describe('DEC-050 — the item rows read like a project tool', () => {
     // The pill colours itself from the derived projection, so a state we add
     // later can never render unstyled.
     expect(pill).toContain('statusForWorkItemState')
+  })
+})
+
+describe('DEC-051 — desk + home widgets carry the same row anatomy', () => {
+  const widgets = read('src/renderer/src/components/views/attentionWidgets.tsx')
+  const view = read('src/renderer/src/components/views/AttentionView.tsx')
+
+  it('widget rows are cards with the queue spine, a completion circle and status', () => {
+    expect(widgets).toContain('rounded-md border border-[var(--edge-soft)]')
+    expect(widgets).toContain('absolute left-0 top-1.5 bottom-1.5') // the spine
+    expect(widgets).toContain('close this item') // the completion circle
+    expect(widgets).toContain('<ItemStatusPill') // status, changeable in place
+    expect(widgets).toContain('statusLabel(i.workItemState, primary.label)') // dense dot
+  })
+
+  it('ONE row renderer feeds every widget, so the surfaces cannot drift', () => {
+    // Queue widgets, calendar, completed, system, and the big widget the DESK
+    // widget delegates to — all render through ItemLines.
+    expect(widgets.match(/<ItemLines /g)?.length).toBe(5)
+    expect(widgets).toContain('function ItemLines(')
+    expect(widgets.match(/function ItemLines\(/g)?.length).toBe(1)
+  })
+
+  it('closing from a widget runs the SAME accounted path as the page', () => {
+    expect(widgets).toContain("import { useCloseWorkItem } from '../attention/useCloseWorkItem'")
+    expect(view).toContain("import { useCloseWorkItem } from '../attention/useCloseWorkItem'")
+    // Both spell the close identically: the queue's own verb, via the hook.
+    expect(widgets).toContain('void closeItem(i, primary.state)')
+    expect(view).toContain('void closeWithOffer(i, primary.state)')
+  })
+
+  it('the widget is no longer one giant button (which swallowed row clicks)', () => {
+    // Nested buttons are invalid, and every inner click became "open
+    // Attention" — which is why rows could never be interactive out here.
+    expect(widgets).not.toContain('className="w-full h-full text-left flex flex-col p-3 fb-press"')
+    expect(widgets).toContain('<div className="w-full h-full text-left flex flex-col p-3">')
+  })
+})
+
+describe('DEC-051 — the agenda READS the calendar, never re-ranges it', () => {
+  const blocks = read('src/renderer/src/components/attention/attentionBlocks.tsx')
+
+  it('fetches today directly instead of calling the shared loadRange', () => {
+    // The time-block store holds ONE range for whatever surface last asked.
+    // WeekTimeGrid loads a week into it; a widget narrowing that to today
+    // would blank the rest of an open calendar's week until it remounted.
+    expect(blocks).not.toContain('s.loadRange') // never subscribes to the setter
+    expect(blocks).not.toContain('void loadRange(') // never calls it
+    expect(blocks).toContain('window.api.timeBlocks')
+    expect(blocks).toContain('.list(from.getTime(), to.getTime())')
+  })
+
+  it('still refreshes when the calendar changes and when the day rolls over', () => {
+    expect(blocks).toContain('const timeBlockTick = useTimeBlockStore((s) => s.blocks.length)')
+    expect(blocks).toContain('}, [dayKey, timeBlockTick])')
   })
 })

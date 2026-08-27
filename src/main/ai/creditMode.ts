@@ -170,6 +170,38 @@ export function invalidateCreditClient(): void {
   creditClient = null
 }
 
+/**
+ * DEC-051 — is THIS client the metered proxy?
+ *
+ * Streaming call sites must know whether the request will hit the proxy (which
+ * rejects streaming outright, 400 "Streaming is not supported on PlexiDesk
+ * credits"). Asking policy — `shouldUseCredits() && getCreditClient() === c` —
+ * is a race: the client is resolved once at the top of a long turn, and by the
+ * time the model call runs, retrieval's own AI calls may have moved the
+ * balance (auto mode then prefers BYOK) or a settings change may have
+ * invalidated the cached instance. Policy says "not credits", the client still
+ * IS the proxy, and the stream 400s in the user's face.
+ *
+ * The client's own baseURL cannot drift out from under the request it is about
+ * to make, so that is what we read.
+ */
+export function isCreditClient(c: { baseURL?: string } | null | undefined): boolean {
+  const base = c?.baseURL
+  return typeof base === 'string' && base.startsWith(SIGNAL_BASE)
+}
+
+/** The proxy's refusal, matched on the wire text rather than the status alone
+ *  (a 400 has many causes; only this one is retryable non-streamed). */
+export function isStreamingUnsupported(err: unknown): boolean {
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : JSON.stringify(err ?? '')
+  return /streaming is not supported/i.test(msg)
+}
+
 /** Fetch the live balance from the server and refresh the cache. */
 export async function refreshCredits(): Promise<CreditCache> {
   const token = sessionToken()

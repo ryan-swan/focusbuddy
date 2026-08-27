@@ -6,7 +6,18 @@ import WidgetFrame from '../widgets/WidgetFrame'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
-import { isTerminalState, itemReason, queueOf, scopeItemsForDesk, QUEUE_ICON } from '../../lib/attentionQueues'
+import {
+  isTerminalState,
+  itemReason,
+  queueOf,
+  scopeItemsForDesk,
+  queueTint,
+  PRIMARY_ACTION,
+  QUEUE_COLOR,
+  QUEUE_ICON
+} from '../../lib/attentionQueues'
+import ItemStatusPill, { statusLabel, statusTone } from '../attention/ItemStatusPill'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import type { WidgetSize } from './homeWidgetDefs'
 
 // The Attention widget family (S6, SPEC-014): the command center's face on the
@@ -41,16 +52,16 @@ function WidgetShell({
 }): JSX.Element {
   const goAttention = useViewStore((s) => s.goAttention)
   return (
-    <button
-      onClick={goAttention}
-      className="w-full h-full text-left flex flex-col p-3 fb-press"
-      title="Open Attention"
-    >
-      <div className="flex items-center gap-2">
+    <div className="w-full h-full text-left flex flex-col p-3">
+      <button
+        onClick={goAttention}
+        title="Open Attention"
+        className="flex items-center gap-2 fb-press text-left"
+      >
         <Icon name={icon} size={15} className="text-[var(--ink-40)]" />
         <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{title}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
-      </div>
+      </button>
       <div className="mt-2 flex-1 min-h-0 overflow-hidden">
         {count === 0 ? (
           <div className="text-[11px] text-[var(--ink-30)]">{emptyLine}</div>
@@ -58,20 +69,100 @@ function WidgetShell({
           children
         )}
       </div>
-    </button>
+    </div>
   )
 }
 
-function ItemLines({ items, max }: { items: FbNode[]; max: number }): JSX.Element {
+/**
+ * DEC-050/051 — the widget row, carrying the SAME anatomy as the Attention
+ * page: a card with the queue's colour as a left spine, a completion circle
+ * that closes with the queue's own verb, the status, and the due date. Only
+ * the density differs — `dense` (small widgets) shows a status DOT where a
+ * roomy widget shows the full pill.
+ *
+ * Closing runs through useCloseWorkItem, the same path the page uses, so the
+ * desk-done and open-subtask offers cannot quietly go missing out here.
+ */
+function ItemLines({
+  items,
+  max,
+  dense = false
+}: {
+  items: FbNode[]
+  max: number
+  dense?: boolean
+}): JSX.Element {
   const now = Date.now()
+  const goAttention = useViewStore((s) => s.goAttention)
+  const setState = useWorkItemStore((s) => s.setState)
+  const closeItem = useCloseWorkItem()
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       {items.slice(0, max).map((i) => {
         const reason = itemReason(i, now)
+        const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
+        const closed = isTerminalState(i.workItemState)
+        const tone = statusTone(i.workItemState)
+        const overdue = i.dueAt && Date.parse(i.dueAt) < now
         return (
-          <div key={i.id} className="min-w-0">
-            <div className="text-[12px] text-[var(--ink-90)] truncate">{i.title}</div>
-            {reason && <div className="text-[10px] text-[var(--ink-40)]">{reason}</div>}
+          <div
+            key={i.id}
+            className="group relative flex items-center gap-2 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] hover:bg-[rgba(var(--accent),0.045)] transition-colors pl-2.5 pr-2 py-1.5"
+          >
+            <span
+              aria-hidden
+              className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full"
+              style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55) }}
+            />
+            {!closed && (
+              <button
+                onClick={() => void closeItem(i, primary.state)}
+                title={`${primary.label} — close this item`}
+                className="shrink-0 h-[15px] w-[15px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
+              >
+                <Icon name="check" size={10} />
+              </button>
+            )}
+            <button
+              onClick={goAttention}
+              title={i.title}
+              className="min-w-0 flex-1 text-left fb-press"
+            >
+              <span className="block text-[12px] text-[var(--ink-90)] truncate">{i.title}</span>
+              {reason && !dense && (
+                <span className="block text-[10px] text-[var(--ink-40)] truncate">{reason}</span>
+              )}
+            </button>
+            {i.dueAt && (
+              <span
+                className={`shrink-0 text-[10px] fb-tabular ${
+                  overdue ? 'text-rose-500' : 'text-[var(--ink-40)]'
+                }`}
+              >
+                {new Date(i.dueAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </span>
+            )}
+            {closed ? (
+              <Icon name="task_alt" size={13} className="shrink-0 text-emerald-500" />
+            ) : dense ? (
+              <span
+                title={statusLabel(i.workItemState, primary.label)}
+                className="shrink-0 h-2 w-2 rounded-full"
+                style={{ backgroundColor: tone.fg }}
+              />
+            ) : (
+              <ItemStatusPill
+                state={i.workItemState}
+                closeChoice={{ state: primary.state, label: primary.label }}
+                onPick={(next) => {
+                  if (next === primary.state) void closeItem(i, next)
+                  else void setState(i.id, next)
+                }}
+              />
+            )}
           </div>
         )
       })}
@@ -116,7 +207,7 @@ export function AttentionQueueWidget({
       count={active.length}
       emptyLine={emptyLine}
     >
-      <ItemLines items={active} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={active} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -147,7 +238,7 @@ export function AttentionCalendarWidget({ size = 'sm' }: { size?: WidgetSize }):
       count={upcoming.length}
       emptyLine="Nothing dated. Clear runway."
     >
-      <ItemLines items={upcoming} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={upcoming} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -175,7 +266,7 @@ export function AttentionCompletedWidget({ size = 'sm' }: { size?: WidgetSize })
       count={done.length}
       emptyLine="Loops close here as you finish things."
     >
-      <ItemLines items={done} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={done} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -198,7 +289,7 @@ export function AttentionSystemWidget({ size = 'sm' }: { size?: WidgetSize }): J
       count={sys.length}
       emptyLine="No system signals. All quiet."
     >
-      <ItemLines items={sys} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={sys} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -388,7 +479,7 @@ export function AttentionWidget({
         ) : count === 0 ? (
           <div className="text-[11px] text-[var(--ink-30)]">{empty}</div>
         ) : (
-          <ItemLines items={list} max={max} />
+          <ItemLines items={list} max={max} dense={size === 'sm'} />
         )}
       </div>
     </div>

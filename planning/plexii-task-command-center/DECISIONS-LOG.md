@@ -1190,4 +1190,71 @@ indents, 8 pills, 2 progress bars, the pill menu opened with REAL mouse input
 and a full round-trip verified (menu click → db write → re-render), zero
 console errors.
 
+---
+
+## DEC-051 — Widget parity (one row renderer) + the credits streaming 400
+**Date:** 2026-08-27 · **Status:** IMPLEMENTED (operator: "now do the same for
+the desk and home widget versions" + "im getting this error" — a raw
+`400 {"error":…"Streaming is not supported on PlexiDesk credits."}` printed
+where the chat answer belongs)
+
+### A. The streaming 400 — a race, not a config problem
+Both streaming call sites already guarded against the credits proxy (which
+rejects streaming outright). The guard asked POLICY:
+`shouldUseCredits() && getCreditClient() === c` — and policy is re-derived
+long after the client was chosen, so it drifts inside a single turn:
+1. `c = getClient()` at the top of `sendChat` → the credits proxy.
+2. `prepareChatCall()` runs retrieval, whose own AI calls update the credit
+   cache (balance → 0 flips auto-mode to BYOK) or a settings change calls
+   `invalidateCreditClient()` (breaking the `===` identity check).
+3. The guard now answers "not credits" while `c` still IS the proxy → it
+   streams → the proxy 400s → the raw error lands in the transcript.
+**Fix:** ask the CLIENT, not policy. `isCreditClient(c)` reads the instance's
+own `baseURL`, which cannot drift out from under the request it is about to
+make (prefix-matched against SIGNAL_BASE, so a look-alike host cannot spoof
+it). Both sites now use it. **Plus a safety net:** `isStreamingUnsupported(e)`
+matches only that refusal, and the site re-runs the SAME request body
+non-streamed — so any future route that reaches a streaming-refusing endpoint
+answers instead of erroring. The `[ask-latency]` trail now logs what actually
+happened (`streamed=${streamed}`), not what was planned — the old field would
+have logged a lie through a fallback, which is part of why this stayed
+invisible.
+*(Unchanged and deliberate: the BYOK-vs-credits billing choice is still the
+operator's. This makes credits work correctly, it does not switch modes.)*
+
+### B. Widget parity — ONE row renderer
+`ItemLines` is the row for every widget in the family (the four queue
+widgets, and the big `AttentionWidget` that the DESK widget delegates to), so
+upgrading it upgraded all three surfaces at once. Widget rows now carry the
+DEC-050 anatomy at widget scale: a bordered card with the queue's colour as a
+left spine, a working completion circle, the due date, and status — the full
+`ItemStatusPill` in roomy widgets, a coloured status dot (with the same
+label as its tooltip) in small ones, via a `dense` prop.
+**The bug that blocked it:** `WidgetShell` wrapped the ENTIRE widget in one
+`<button>`, so nothing inside could be interactive — nested buttons are
+invalid and every inner click became "open Attention". The header keeps that
+job; the body is now free to hold controls.
+**Closing is one code path.** `useCloseWorkItem` (new) owns the DEC-047 D-3
+desk-done offer and the DEC-048 open-subtask accounting; the page and both
+widgets call it. Forking that logic per surface is exactly how a widget
+quietly stops asking about subtasks while the page still does — so it is now
+impossible by construction, and pinned.
+### C. The agenda stops re-ranging the shared calendar
+Found by inspection while wiring the widgets: DEC-049's AgendaBlock called
+`useTimeBlockStore.loadRange()` to fetch today. That store holds ONE range for
+whatever surface last asked, and `WeekTimeGrid` loads a whole WEEK into it —
+so a mounted agenda widget could narrow the range to today underneath an open
+calendar, blanking the rest of its week until it remounted. The block now
+fetches today's blocks straight from `window.api.timeBlocks.list()` into local
+state and never writes the store; it re-fetches when the calendar's block
+count changes and when the day rolls over. Pinned.
+
+**Gates:** 2,992 green (9 new credit-streaming tests incl. the drift race and
+"other 400s still surface"; widget-parity, one-renderer, and read-only-agenda
+pins); typecheck clean. **Live verification was not possible this round:** the
+dev app opens a window and then loses it (0 windows, main process idle, CDP
+unreachable) — and it reproduces with ALL of this work stashed, at the
+DEC-050 commit, so it is not caused by these changes. Flagged to the operator
+rather than worked around.
+
 <!-- Append below; increment DEC-NNN. -->

@@ -16,7 +16,8 @@ import {
   startRecommendations,
   kpiMetrics,
   dayTimeline,
-  type KpiKey
+  type KpiKey,
+  type CalendarBlockLike
 } from '../../lib/attentionAnalytics'
 import { startPromptForItem } from '../../lib/startPrompt'
 
@@ -198,22 +199,38 @@ export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element
   const goAttention = useGoAttention()
   const goCalendar = useViewStore((s) => s.goCalendar)
   const nowMs = Date.now()
-  // DEC-049 — the day's REAL shape: the calendar's own blocks for today
-  // merged with the work that is due in it. The block loads today only when
-  // the store's window doesn't already cover it, so the Calendar view's own
-  // (wider) range is never clobbered.
-  const blocks = useTimeBlockStore((s) => s.blocks)
-  const rangeFrom = useTimeBlockStore((s) => s.rangeFrom)
-  const rangeTo = useTimeBlockStore((s) => s.rangeTo)
-  const loadRange = useTimeBlockStore((s) => s.loadRange)
+  // A change-signal only — never the range itself (see below).
+  const timeBlockTick = useTimeBlockStore((s) => s.blocks.length)
+  // DEC-049/051 — the day's REAL shape: the calendar's own blocks for today
+  // merged with the work that is due in it.
+  //
+  // This block READS the calendar; it must never write the shared view range.
+  // The time-block store holds ONE range for whatever surface last asked, and
+  // WeekTimeGrid loads a whole week into it — a widget calling loadRange()
+  // would narrow that range to today underneath an open calendar, blanking
+  // the rest of its week until it remounted. So we fetch today's blocks
+  // directly into local state and leave the store alone.
+  const [blocks, setBlocks] = useState<CalendarBlockLike[]>([])
+  const dayKey = new Date().toDateString()
   useEffect(() => {
+    let alive = true
     const from = new Date()
     from.setHours(0, 0, 0, 0)
     const to = new Date()
     to.setHours(23, 59, 59, 999)
-    if (rangeFrom == null || rangeTo == null || rangeFrom > from.getTime() || rangeTo < to.getTime())
-      void loadRange(from.getTime(), to.getTime())
-  }, [rangeFrom, rangeTo, loadRange])
+    void window.api.timeBlocks
+      .list(from.getTime(), to.getTime())
+      .then((rows) => {
+        if (alive) setBlocks(rows as CalendarBlockLike[])
+      })
+      .catch(() => {
+        /* the day simply shows its work items */
+      })
+    return () => {
+      alive = false
+    }
+    // Re-fetch when the calendar changes under us, and when the day rolls over.
+  }, [dayKey, timeBlockTick])
 
   const timeline = useMemo(() => dayTimeline(items, blocks, nowMs), [items, blocks, nowMs])
   const shown = variant === 'compact' ? 4 : 9

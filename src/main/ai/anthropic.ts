@@ -53,7 +53,13 @@ import { normalizeMapBody, autoLayout } from '@shared/mapGraph'
 import type { MapShape } from '@shared/types'
 import type { SlidesBody } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
-import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
+import {
+  shouldUseCredits,
+  getCreditClient,
+  invalidateCreditClient,
+  isCreditClient,
+  isStreamingUnsupported
+} from './creditMode'
 import { groundingBlock, retrievalSourceLine, type GroundingSource } from './grounding'
 import { cachedSystem, cachedUserContent, cacheTokens, type CacheTextBlock } from './cacheControl'
 import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus, parseVerifyResult, type VerifyVerdict } from './agentEnvelope'
@@ -1615,34 +1621,48 @@ export async function sendChatStream(
     // the SAME request runs non-streamed and the full text lands in the
     // consumer as one delta — everything downstream reads only the
     // accumulated text, so the two shapes converge by construction.
-    const onCredits = shouldUseCredits() && getCreditClient() === c
-    let finalMsg: Awaited<ReturnType<typeof c.messages.create>>
-    if (onCredits) {
-      finalMsg = await c.messages.create({
-        model: resolveModel('chat'),
-        max_tokens: 16384,
-        system: prepared.system,
-        messages: prepared.msgs
-      })
-      tFirstToken = Date.now()
-      for (const b of finalMsg.content) {
+    // DEC-051 — ask the CLIENT, not policy. `shouldUseCredits()` is re-derived
+    // here from global state that retrieval may have moved during this very
+    // turn (a balance update, a settings change invalidating the cached
+    // instance): policy would say "not credits" while `c` still IS the proxy,
+    // and the stream 400s in the user's face. The baseURL cannot drift.
+    const onCredits = isCreditClient(c)
+    const body: Anthropic.MessageCreateParamsNonStreaming = {
+      model: resolveModel('chat'),
+      max_tokens: 16384,
+      system: prepared.system,
+      messages: prepared.msgs
+    }
+    const nonStreamed = async (): Promise<Anthropic.Message> => {
+      const msg = (await c.messages.create(body)) as Anthropic.Message
+      if (!tFirstToken) tFirstToken = Date.now()
+      for (const b of msg.content) {
         if (b.type === 'text') consumer.push(b.text)
       }
+      return msg
+    }
+    let streamed = !onCredits
+    let finalMsg: Anthropic.Message
+    if (onCredits) {
+      finalMsg = await nonStreamed()
     } else {
-      const stream = c.messages.stream({
-        model: resolveModel('chat'),
-        max_tokens: 16384,
-        system: prepared.system,
-        messages: prepared.msgs
-      })
-      opts?.onAbortReady?.(() => stream.abort())
+      try {
+        const stream = c.messages.stream(body)
+        opts?.onAbortReady?.(() => stream.abort())
 
-      stream.on('text', (delta: string) => {
-        if (!tFirstToken) tFirstToken = Date.now()
-        consumer.push(delta)
-      })
+        stream.on('text', (delta: string) => {
+          if (!tFirstToken) tFirstToken = Date.now()
+          consumer.push(delta)
+        })
 
-      finalMsg = await stream.finalMessage()
+        finalMsg = await stream.finalMessage()
+      } catch (e) {
+        // Belt and braces: any route that still reaches a streaming-refusing
+        // endpoint answers non-streamed instead of showing a raw 400.
+        if (!isStreamingUnsupported(e)) throw e
+        streamed = false
+        finalMsg = await nonStreamed()
+      }
     }
     {
       const ct = cacheTokens(finalMsg.usage)
@@ -1653,7 +1673,7 @@ export async function sendChatStream(
         `[ask-latency] total=${done - t0}ms retrieval=${tPrepared - t0}ms ` +
           `ttft=${tFirstToken ? tFirstToken - tPrepared : -1}ms ` +
           `generate=${tFirstToken ? done - tFirstToken : -1}ms ` +
-          `streamed=${!onCredits} systemChars=${prepared.system.reduce((n, b) => n + (b.text?.length ?? 0), 0)} ` +
+          `streamed=${streamed} systemChars=${prepared.system.reduce((n, b) => n + (b.text?.length ?? 0), 0)} ` +
           `in=${finalMsg.usage?.input_tokens ?? 0} out=${finalMsg.usage?.output_tokens ?? 0} ` +
           `cacheRead=${ct.read} model=${resolveModel('chat')}`
       )
@@ -2206,32 +2226,39 @@ export async function askWorkspaceStream(
     // Credits proxy: no streaming (see sendChat) — same request non-streamed,
     // delivered to the caller as one delta.
     let full = ''
-    let final: Awaited<ReturnType<typeof c.messages.create>>
-    if (shouldUseCredits() && getCreditClient() === c) {
-      final = await c.messages.create({
-        model: resolveModel('chat'),
-        max_tokens: 1500,
-        system,
-        messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
-      })
-      for (const b of final.content) {
+    const body: Anthropic.MessageCreateParamsNonStreaming = {
+      model: resolveModel('chat'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
+    }
+    const nonStreamed = async (): Promise<Anthropic.Message> => {
+      const msg = (await c.messages.create(body)) as Anthropic.Message
+      for (const b of msg.content) {
         if (b.type === 'text') {
           full += b.text
           onDelta(b.text)
         }
       }
+      return msg
+    }
+    let final: Anthropic.Message
+    // DEC-051 — the client decides (see sendChat), with the same fallback.
+    if (isCreditClient(c)) {
+      final = await nonStreamed()
     } else {
-      const stream = c.messages.stream({
-        model: resolveModel('chat'),
-        max_tokens: 1500,
-        system,
-        messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
-      })
-      stream.on('text', (delta: string) => {
-        full += delta
-        onDelta(delta)
-      })
-      final = await stream.finalMessage()
+      try {
+        const stream = c.messages.stream(body)
+        stream.on('text', (delta: string) => {
+          full += delta
+          onDelta(delta)
+        })
+        final = await stream.finalMessage()
+      } catch (e) {
+        if (!isStreamingUnsupported(e)) throw e
+        full = ''
+        final = await nonStreamed()
+      }
     }
     {
       const ct = cacheTokens(final.usage)
