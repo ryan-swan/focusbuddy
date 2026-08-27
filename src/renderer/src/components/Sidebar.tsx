@@ -216,14 +216,15 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
     // console PREFILLED (the @attention path); a bare dispatch opens it empty.
     function onNewWorkItem(e: Event): void {
       const detail = (e as CustomEvent).detail as
-        | { title?: string; captureText?: string; source?: CaptureSource | null }
+        | { title?: string; captureText?: string; notes?: string; source?: CaptureSource | null }
         | undefined
       const title = detail?.title?.trim()
       if (!title) {
-        // CR-09 D-A: a MARK carries its object through to the confirm card.
+        // CR-09 D-A: a MARK carries its object through to the confirm card —
+        // and a marked SELECTION carries the full highlight as notes (DEC-044).
         useCaptureConsole
           .getState()
-          .openConsole(detail?.captureText?.trim() || '', detail?.source ?? null)
+          .openConsole(detail?.captureText?.trim() || '', detail?.source ?? null, detail?.notes ?? '')
         return
       }
       void useWorkItemStore

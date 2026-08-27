@@ -42,6 +42,7 @@ import Icon from './Icon'
 import AttentionConfirmCard from './AttentionConfirmCard'
 import { deskCaptureContext } from '../lib/captureContext'
 import { parseAttentionCommand, hasAttentionCommand } from '../lib/attentionCommand'
+import { presetForSelection } from '../lib/attentionPresets'
 
 // The three display modes, in Notion's order and with Notion's labels. The
 // header's mode button shows the current mode's icon; the dropdown lists all
@@ -526,6 +527,35 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     const text = ctxMenu.selection
     const noTask = !activeTaskId
     return [
+      {
+        // DEC-044: a highlight in the CHAT marks the same way one in a doc
+        // does — first row, first line titles it, the full selection rides
+        // the notes. Works with no desk open (the item files standalone).
+        label: 'Add to Attention…',
+        icon: 'notifications',
+        onClick: () => {
+          // 'ai-chat' lands the preset's DEFAULT class (to_do): a highlighted
+          // AI answer is usually something to act on — 'chat' would map to
+          // to_respond, but nobody awaits words back from a bot.
+          const p = presetForSelection('ai-chat', text)
+          window.dispatchEvent(
+            new CustomEvent('fb:command-new-work-item', {
+              detail: {
+                captureText: p.text,
+                notes: p.notes || undefined,
+                source: {
+                  sourceType: 'chat',
+                  sourceRef: activeConversationId ?? 'chat',
+                  intentClass: p.intentClass,
+                  deskId: activeTaskId
+                }
+              }
+            })
+          )
+          window.getSelection()?.removeAllRanges()
+        }
+      },
+      { separator: true },
       {
         label: 'Save selection as sticky',
         icon: 'sticky_note_2',

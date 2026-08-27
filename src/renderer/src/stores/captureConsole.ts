@@ -21,15 +21,20 @@ export interface CaptureSource {
 interface CaptureConsoleStore {
   open: boolean
   initialText: string
+  /** DEC-044: pre-seeded notes — a marked SELECTION arrives with its full
+   *  highlighted text here, so nothing the operator highlighted is dropped. */
+  initialNotes: string
   source: CaptureSource | null
-  openConsole: (initialText?: string, source?: CaptureSource | null) => void
+  openConsole: (initialText?: string, source?: CaptureSource | null, initialNotes?: string) => void
   close: () => void
 }
 
 export const useCaptureConsole = create<CaptureConsoleStore>((set) => ({
   open: false,
   initialText: '',
+  initialNotes: '',
   source: null,
-  openConsole: (initialText = '', source = null) => set({ open: true, initialText, source }),
-  close: () => set({ open: false, initialText: '', source: null })
+  openConsole: (initialText = '', source = null, initialNotes = '') =>
+    set({ open: true, initialText, source, initialNotes }),
+  close: () => set({ open: false, initialText: '', initialNotes: '', source: null })
 }))

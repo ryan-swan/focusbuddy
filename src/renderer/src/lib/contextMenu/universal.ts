@@ -7,7 +7,7 @@
 import type { WidgetKind } from '@shared/types'
 import { MenuSection, type MenuContribution, type MenuContext } from './types'
 import { CREATE_AND_CONNECT_MENU } from '../createConnectedTool'
-import { presetForWidget, presetForMulti } from '../attentionPresets'
+import { presetForWidget, presetForMulti, presetForSelection } from '../attentionPresets'
 import { workItemsEnabled } from '../workItemsCapability'
 import {
   createWidget,
@@ -59,11 +59,18 @@ export function buildAttention(ctx: MenuContext): MenuContribution | null {
   const obj = ctx.object
   if (obj.type === 'empty-canvas') return null
 
-  const openMark = (text: string, intentClass: string, ref: string, type: string): void => {
+  const openMark = (
+    text: string,
+    intentClass: string,
+    ref: string,
+    type: string,
+    notes?: string
+  ): void => {
     window.dispatchEvent(
       new CustomEvent('fb:command-new-work-item', {
         detail: {
           captureText: text,
+          notes,
           source: { sourceType: type, sourceRef: ref, intentClass, deskId: ctx.taskId }
         }
       })
@@ -94,6 +101,15 @@ export function buildAttention(ctx: MenuContext): MenuContribution | null {
     icon: 'notifications',
     shortcut: undefined,
     onSelect: () => {
+      // DEC-044: a HIGHLIGHT is the capture — its first line titles the item
+      // and the whole selection rides the notes, so nothing highlighted is
+      // dropped. No selection = the widget-level preset, as before.
+      const sel = ctx.selection?.text?.trim()
+      if (sel) {
+        const p = presetForSelection(w.kind, sel)
+        openMark(p.text, p.intentClass, w.id, 'widget', p.notes || undefined)
+        return
+      }
       const p = presetForWidget(w.kind, w.title ?? '', seedText(ctx))
       openMark(p.text, p.intentClass, w.id, 'widget')
     }

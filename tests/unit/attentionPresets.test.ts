@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   presetForWidget,
   presetForDesk,
-  presetForMulti
+  presetForMulti,
+  presetForSelection
 } from '../../src/renderer/src/lib/attentionPresets'
 import { INTENT_CLASSES } from '../../src/shared/workItems'
 
@@ -68,5 +69,34 @@ describe('desk + multi marking', () => {
   it('marking several objects yields ONE item naming the count', () => {
     expect(presetForMulti(4).text).toBe('Attend to 4 items')
     expect(presetForMulti(4, 'Meeting Prep').text).toBe('Attend to 4 items on Meeting Prep')
+  })
+})
+
+describe('DEC-044 — marking a SELECTION: the highlight IS the capture', () => {
+  it('one line: it becomes the title; no duplicate notes', () => {
+    const p = presetForSelection('page', 'Send the revised pricing to Cetra')
+    expect(p.text).toBe('Send the revised pricing to Cetra')
+    expect(p.notes).toBe('')
+    expect(p.intentClass).toBe('to_review') // class still from the host kind
+  })
+
+  it('a highlighted LIST: first line titles it with a +N, the WHOLE thing rides the notes', () => {
+    const sel = 'buy the domain\nset up hosting\nwire the DNS'
+    const p = presetForSelection('page', sel)
+    expect(p.text).toBe('buy the domain (+2 more)')
+    expect(p.notes).toBe(sel) // verbatim — nothing highlighted is dropped
+  })
+
+  it('a long single line keeps its full text in the notes past the title trim', () => {
+    const long = 'x'.repeat(120)
+    const p = presetForSelection('note', long)
+    expect(p.text.endsWith('…')).toBe(true)
+    expect(p.notes).toBe(long)
+  })
+
+  it('an AI-chat selection defaults to to_do — nobody awaits words back from a bot', () => {
+    expect(presetForSelection('ai-chat', 'file the LLC paperwork').intentClass).toBe('to_do')
+    // A Slack-like pane still marks respond-shaped.
+    expect(presetForSelection('slack', 'ping from Sara').intentClass).toBe('to_respond')
   })
 })

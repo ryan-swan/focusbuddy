@@ -50,7 +50,7 @@ export default function CaptureConsole(): JSX.Element | null {
     if (open) {
       const t = initialText.trim()
       setText(t)
-      setNotes('')
+      setNotes(useCaptureConsole.getState().initialNotes || '')
       setMode('routed')
       setError(null)
       setFiled(null)

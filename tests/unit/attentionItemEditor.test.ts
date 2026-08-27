@@ -180,3 +180,28 @@ describe('DEC-043 — queue tabs, class colors, drag-only reclassify', () => {
     expect(read('src/renderer/src/components/AttentionItemEditor.tsx')).toContain('Classification')
   })
 })
+
+describe('DEC-044 — the highlight travels the WHOLE path to the notes', () => {
+  it('menu → seam → console → card: notes at every hop', () => {
+    // The desk-page path: a selection leads with its own text + notes.
+    const universal = read('src/renderer/src/lib/contextMenu/universal.ts')
+    expect(universal).toContain('presetForSelection(w.kind, sel)')
+    expect(universal).toContain('p.notes || undefined')
+    // The seam and store carry them…
+    expect(read('src/renderer/src/components/Sidebar.tsx')).toContain('detail?.notes ?? ')
+    expect(read('src/renderer/src/stores/captureConsole.ts')).toContain('initialNotes')
+    // …and the console seeds its notes field from them.
+    expect(read('src/renderer/src/components/CaptureConsole.tsx')).toContain(
+      'useCaptureConsole.getState().initialNotes'
+    )
+  })
+
+  it('the AI chat selection menu offers Add to Attention — FIRST', () => {
+    const chat = read('src/renderer/src/components/ChatPanel.tsx')
+    const menu = chat.slice(chat.indexOf('function ctxMenuItems'), chat.indexOf('Save selection as sticky'))
+    expect(menu).toContain('Add to Attention…')
+    expect(chat).toContain("presetForSelection('ai-chat', text)")
+    // Standalone-friendly: filing must NOT require an open desk.
+    expect(menu).not.toContain('disabled: noTask')
+  })
+})

@@ -64,6 +64,31 @@ export function presetForWidget(kind: string, title: string, text?: string): Att
   }
 }
 
+/** DEC-044 — marking a SELECTION: the highlighted text IS the capture, not
+ *  the widget it sits in. The title is the selection's first line (with a
+ *  "+N more" when a list was highlighted, so the row admits there is more);
+ *  the FULL selection rides the notes verbatim. The class still comes from
+ *  the host widget's kind — a highlight in a doc is review-shaped, in a
+ *  Slack pane respond-shaped. */
+export function presetForSelection(
+  kind: string,
+  selection: string
+): AttentionPreset & { notes: string } {
+  const full = (selection || '').trim()
+  const lines = full.split('\n').map((l) => l.trim()).filter(Boolean)
+  const first = short(lines[0] ?? '')
+  const more = lines.length - 1
+  const base = presetForWidget(kind, '', full)
+  return {
+    text: more > 0 ? `${first} (+${more} more)` : first || base.text,
+    intentClass: base.intentClass,
+    // The whole highlight, verbatim — "capture the full context of what was
+    // highlighted" (operator). One line selected = the title already says it,
+    // so the notes stay empty rather than repeating the title.
+    notes: more > 0 || full.length > first.length ? full : ''
+  }
+}
+
 /** Marking a whole desk from its own menu (CR-09 Q3): an ITEM that references
  *  the desk — never a feeder (those stay computed) and never a plan. */
 export function presetForDesk(title: string): AttentionPreset {
