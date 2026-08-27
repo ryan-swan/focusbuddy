@@ -215,6 +215,16 @@ describe('DEC-045 — the Attention widget on any desk', () => {
     expect(read('src/renderer/src/components/Canvas.tsx')).toContain('<DeskAttentionWidget widget={w} />')
   })
 
+  it('it is a REAL widget: framed, draggable, layered like every other kind', () => {
+    // Live QA: the first cut rendered bare divs — "just text on the screen
+    // with an invisible background… nothing I can grab". Every canvas kind
+    // renders its OWN WidgetFrame; this one must too, or it has no header to
+    // drag, no background, and no z-order.
+    const w = read('src/renderer/src/components/views/attentionWidgets.tsx')
+    expect(w).toContain('<WidgetFrame widget={widget} headerLabel="attention"')
+    expect(w).toContain('bg-[var(--surface-raised)]')
+  })
+
   it('same look as home (one component), scope persisted per widget', () => {
     const w = read('src/renderer/src/components/views/attentionWidgets.tsx')
     // The desk variant WRAPS the home widget rather than forking it.

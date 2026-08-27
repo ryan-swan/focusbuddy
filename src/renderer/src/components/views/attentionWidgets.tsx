@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useWidgetStore } from '../../stores/widgets'
+import WidgetFrame from '../widgets/WidgetFrame'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
@@ -454,7 +455,7 @@ export function StaleDesksWidget({ size = 'sm' }: { size?: WidgetSize }): JSX.El
 export function DeskAttentionWidget({
   widget
 }: {
-  widget: { id: string; taskId: string; content: string | null }
+  widget: import('@shared/types').Widget
 }): JSX.Element {
   const items = useAttentionItems()
   const update = useWidgetStore((s) => s.update)
@@ -476,40 +477,42 @@ export function DeskAttentionWidget({
   const effective = scope === 'all' ? items : scoped
   const deskCount = fellBack ? 0 : scoped.length
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex items-center gap-1 px-3 pt-2.5">
-        {(
-          [
-            ['desk', `This desk${deskCount ? ` · ${deskCount}` : ''}`],
-            ['all', 'All']
-          ] as const
-        ).map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => pickScope(k)}
-            className={`px-2 h-6 rounded-full fb-t-caption fb-press ${
-              scope === k
-                ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
-                : 'text-[var(--ink-40)] hover:text-[var(--ink-80)]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-        {scope === 'desk' && fellBack && (
-          <span className="fb-t-caption text-[var(--ink-30)] truncate">
-            nothing here yet — showing all
-          </span>
-        )}
+    <WidgetFrame widget={widget} headerLabel="attention" headerAccent="bg-violet-300/60">
+      <div className="w-full h-full flex flex-col bg-[var(--surface-raised)]">
+        <div className="flex items-center gap-1 px-3 pt-2.5">
+          {(
+            [
+              ['desk', `This desk${deskCount ? ` · ${deskCount}` : ''}`],
+              ['all', 'All']
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => pickScope(k)}
+              className={`px-2 h-6 rounded-full fb-t-caption fb-press ${
+                scope === k
+                  ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
+                  : 'text-[var(--ink-40)] hover:text-[var(--ink-80)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {scope === 'desk' && fellBack && (
+            <span className="fb-t-caption text-[var(--ink-30)] truncate">
+              nothing here yet — showing all
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-h-0">
+          <AttentionWidget
+            size="lg"
+            itemsOverride={effective}
+            showStale={scope === 'all'}
+            storageKey={`attention.widget.section:${widget.id}`}
+          />
+        </div>
       </div>
-      <div className="flex-1 min-h-0">
-        <AttentionWidget
-          size="lg"
-          itemsOverride={effective}
-          showStale={scope === 'all'}
-          storageKey={`attention.widget.section:${widget.id}`}
-        />
-      </div>
-    </div>
+    </WidgetFrame>
   )
 }
