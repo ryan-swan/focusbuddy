@@ -741,8 +741,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
   // DEC-026 (Δ6): the opt-in tidy proposal — gated on the deterministic
   // messiness test inside, null on any failure, never blocks a capture.
-  ipcMain.handle('workItems:proposeCleanup', (_e, text: string) =>
-    isWorkItemsEnabled() ? proposeCleanup(String(text ?? '')) : null
+  ipcMain.handle('workItems:proposeCleanup', (_e, text: string, notes?: string) =>
+    isWorkItemsEnabled() ? proposeCleanup(String(text ?? ''), notes ? String(notes) : undefined) : null
   )
   ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
   // V2 (DEC-023): the Settings toggle — the pref finally has a real switch.

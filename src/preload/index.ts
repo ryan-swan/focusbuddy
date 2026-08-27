@@ -1769,8 +1769,11 @@ const api = {
     }> => ipcRenderer.invoke('workItems:classify', text),
     // DEC-026: the opt-in tidy — null unless the capture is messy enough AND
     // the model produced a faithful title+gist. Approve-before-apply.
-    proposeCleanup: (text: string): Promise<{ title: string; note: string } | null> =>
-      ipcRenderer.invoke('workItems:proposeCleanup', text),
+    proposeCleanup: (
+      text: string,
+      notes?: string
+    ): Promise<{ title: string; note: string } | null> =>
+      ipcRenderer.invoke('workItems:proposeCleanup', text, notes),
     enabled: (): Promise<boolean> => ipcRenderer.invoke('workItems:enabled'),
     precision: (): Promise<number | null> => ipcRenderer.invoke('workItems:precision'),
     // Internal (S2): the arrival router's seam.

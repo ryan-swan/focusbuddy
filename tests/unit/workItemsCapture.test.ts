@@ -208,6 +208,37 @@ describe('S5 wiring locks (file-level)', () => {
     expect(store).toContain("attn.mode === 'leading' || !attn.messageText")
   })
 
+  it('DEC-034 — capture is task + optional notes, then a PREVIEW of the item', () => {
+    const console_ = read('src/renderer/src/components/CaptureConsole.tsx')
+    // The optional notes field, and the keys the operator asked for: Enter
+    // advances from either field, Shift+Enter still makes a newline.
+    expect(console_).toContain('Notes (optional)')
+    expect(console_).toContain("e.key === 'Enter' && !e.shiftKey")
+    // The button says what the key does — "Classify" was the complaint.
+    expect(console_).toContain("'Enter ↵'")
+    expect(console_).not.toContain(": 'Classify'")
+    // Notes reach the confirm card, and the unrouted path keeps them too.
+    expect(console_).toContain('notes={notes}')
+
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    // The second screen previews the FINISHED item rather than asking what it
+    // will become, and the tidy lands IN it instead of beside it.
+    expect(card).toContain('This is how it will file')
+    expect(card).toContain('setCleanupUsed(true)')
+    // Both exits exist: accept the tidied version, or file the raw words.
+    expect(card).toContain('fileConfirmed(true)')
+    expect(card).toContain('Enter as is')
+    // "As is" must file the operator's OWN title and notes.
+    expect(card).toContain('const title = asIs ? rawTitle : confirm.title')
+    // The verbatim capture still survives a tidy (DEC-026 holds).
+    expect(card).toContain('— as captured —')
+    // The tidy sees the notes as well as the task line.
+    expect(card).toContain('proposeCleanup(text, rawNotes.trim() || undefined)')
+    const cleanup = read('src/main/ai/cleanupRewrite.ts')
+    expect(cleanup).toContain('notes?: string')
+    expect(cleanup).toContain('NOTES:')
+  })
+
   it('the picker highlights its selected row visibly (the Enter/Tab target is legible)', () => {
     const list = read('src/renderer/src/components/assistant/MentionList.tsx')
     // A 10% tint read as "nothing is selected" in live QA.

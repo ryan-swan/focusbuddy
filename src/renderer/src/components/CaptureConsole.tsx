@@ -31,6 +31,8 @@ export default function CaptureConsole(): JSX.Element | null {
   const openAssistant = useAssistantChrome((s) => s.openPanel)
 
   const [text, setText] = useState('')
+  // DEC-034: optional context. Type the task, Tab into notes, Enter to file.
+  const [notes, setNotes] = useState('')
   const [mode, setMode] = useState<Mode>('routed')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +50,7 @@ export default function CaptureConsole(): JSX.Element | null {
     if (open) {
       const t = initialText.trim()
       setText(t)
+      setNotes('')
       setMode('routed')
       setError(null)
       setFiled(null)
@@ -75,7 +78,7 @@ export default function CaptureConsole(): JSX.Element | null {
     const title = t.length > 120 ? `${t.slice(0, 117)}…` : t
     const item = await createItem({
       title,
-      notes: t === title ? undefined : t,
+      notes: [t === title ? '' : t, notes.trim()].filter(Boolean).join('\n\n') || undefined,
       parentId: deskCtx?.id ?? null,
       intentClass: 'to_remember',
       dueAt: null,
@@ -205,7 +208,12 @@ export default function CaptureConsole(): JSX.Element | null {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit()
+              // DEC-034: Enter advances (Shift+Enter is a newline); Tab falls
+              // through to the notes field by normal focus order.
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void submit()
+              }
               if (e.key === 'Escape') close()
             }}
             placeholder={
@@ -217,16 +225,34 @@ export default function CaptureConsole(): JSX.Element | null {
             className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-y"
           />
         )}
+        {confirmText == null && mode !== 'expand' && (
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void submit()
+              }
+              if (e.key === 'Escape') close()
+            }}
+            placeholder="Notes (optional) — Tab here to add context, Enter to file"
+            rows={2}
+            className="fb-field mt-2 w-full bg-[var(--surface-raised)] px-3 py-2 text-[12px] resize-y text-[var(--ink-70)]"
+          />
+        )}
         {confirmText != null && (
           <div className="mt-3">
             <AttentionConfirmCard
               text={confirmText}
+              notes={notes}
               deskCtx={deskCtx}
               source={source}
               onFiled={(summary, _count, id) => {
                 setFiled(summary)
                 setFiledId(id)
                 setText('')
+                setNotes('')
                 setConfirmText(null)
                 setTimeout(close, 2500)
               }}
@@ -252,7 +278,9 @@ export default function CaptureConsole(): JSX.Element | null {
         )}
         {confirmText == null && (
           <div className="mt-3 flex items-center justify-between">
-            <div className="text-[11px] text-[var(--ink-30)]">⌘↵ to file · Esc to close</div>
+            <div className="text-[11px] text-[var(--ink-30)]">
+              ↵ to continue · ⇥ for notes · Esc to close
+            </div>
             <button
               onClick={() => void submit()}
               disabled={busy || !text.trim()}
@@ -264,7 +292,7 @@ export default function CaptureConsole(): JSX.Element | null {
                   ? 'Open in assistant'
                   : mode === 'unrouted'
                     ? 'File it'
-                    : 'Classify'}
+                    : 'Enter ↵'}
             </button>
           </div>
         )}
