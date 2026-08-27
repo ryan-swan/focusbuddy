@@ -46,6 +46,10 @@ export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
   { column: 'wi_urgency', attr: 'wiUrgency', ddl: 'TEXT', rendererEmitted: true },
   { column: 'source_ref', attr: 'sourceRef', ddl: 'TEXT', rendererEmitted: true },
   { column: 'source_type', attr: 'sourceType', ddl: 'TEXT', rendererEmitted: true },
+  // DEC-052 (Track D baseline) — a deep link back to the EXACT external
+  // source: the URL/URI to reopen (a mail message-id URI, a Slack permalink,
+  // a web page). source_ref stays the internal id; this is the external one.
+  { column: 'source_url', attr: 'sourceUrl', ddl: 'TEXT', rendererEmitted: true },
   { column: 'confidence', attr: 'confidence', ddl: 'REAL', rendererEmitted: true },
   { column: 'approval_state', attr: 'approvalState', ddl: 'TEXT', rendererEmitted: true },
   { column: 'reason_code', attr: 'reasonCode', ddl: 'TEXT', rendererEmitted: true },

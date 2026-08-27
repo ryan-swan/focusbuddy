@@ -192,6 +192,7 @@ export interface FbNode {
   dueAt?: string | null
   wiUrgency?: string | null
   sourceRef?: string | null
+  sourceUrl?: string | null
   sourceType?: string | null
   confidence?: number | null
   approvalState?: string | null
@@ -283,7 +284,10 @@ export interface NodePatch {
 // A booked stretch of time on the calendar, optionally tied to a task. This is
 // how the calendar goes from "tasks shown on their due day" to "I've booked
 // 2-3pm to focus on this", and a block can launch a focus session for its task.
-export type TimeBlockStatus = 'planned' | 'done'
+// DEC-052: 'missed' (the slot passed, work not done — what "replan undone"
+// sweeps) and 'skipped' (deliberately let go) join the union. The db CHECK was
+// dropped (migrateTimeBlocksStatusCheck); this union is the guard.
+export type TimeBlockStatus = 'planned' | 'done' | 'missed' | 'skipped'
 
 // When a time block is a scheduled meeting, it carries the room to join and the
 // people invited to it. The room id is stable so the same link works for the
@@ -310,6 +314,15 @@ export interface TimeBlock {
   // row; clearing it (delete "this and future") stops the series.
   recurrence?: TimeBlockRecurrence | null
   seriesId?: string | null
+  // DEC-052 scheduling foundation. origin: who placed this block — 'manual'
+  // (a person) or 'auto' (the planner); replan may only move 'auto' blocks.
+  // locked: never moved by any scheduler — set by hand, or automatically when
+  // an external edit is detected (the honour-and-pin convention). pushPolicy:
+  // whether this block ever leaves Plexi for an external calendar ('local' is
+  // the default and the convention).
+  origin: 'manual' | 'auto'
+  locked: boolean
+  pushPolicy: 'local' | 'push'
   createdAt: number
   updatedAt: number
 }
@@ -323,6 +336,8 @@ export interface TimeBlockDraft {
   durationMin: number
   meeting?: TimeBlockMeeting | null
   recurrence?: TimeBlockRecurrence | null
+  /** Who is placing this block (default 'manual'). */
+  origin?: 'manual' | 'auto'
 }
 
 export interface TimeBlockPatch {
@@ -332,6 +347,8 @@ export interface TimeBlockPatch {
   durationMin?: number
   status?: TimeBlockStatus
   meeting?: TimeBlockMeeting | null
+  locked?: boolean
+  pushPolicy?: 'local' | 'push'
 }
 
 export interface Widget {

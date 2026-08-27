@@ -1097,6 +1097,21 @@ export function getDb(): Database.Database {
   // A calendar block can be a video meeting; its room + invitee list ride along
   // as JSON. Nullable, so every existing focus block stays a plain focus block.
   ensureColumn(db, 'time_blocks', 'meeting_json', 'TEXT')
+  // DEC-052 — the scheduling + external-sync FOUNDATION (Analysis 24 §4/§5c).
+  // Laid now so the planner and, later, the Google/Graph connector layer in
+  // without a migration. Sync columns are db-only until Track C builds: the
+  // row mapper deliberately does not surface them yet.
+  ensureColumn(db, 'time_blocks', 'origin', "TEXT NOT NULL DEFAULT 'manual'")
+  ensureColumn(db, 'time_blocks', 'locked', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'time_blocks', 'push_policy', "TEXT NOT NULL DEFAULT 'local'")
+  ensureColumn(db, 'time_blocks', 'transparency', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'visibility', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'external_event_id', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'external_calendar_id', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'external_etag', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'sync_state', 'TEXT')
+  ensureColumn(db, 'time_blocks', 'last_synced_at', 'INTEGER')
+  migrateTimeBlocksStatusCheck(db)
   ensureColumn(db, 'vault_entries', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_knowledge', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_tables', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
@@ -1280,6 +1295,60 @@ function migrateDocumentsDocTypeCheck(d: Database.Database): void {
     DROP TABLE documents;
     ALTER TABLE documents_new RENAME TO documents;
     CREATE INDEX IF NOT EXISTS idx_documents_updated ON documents (updated_at DESC);
+    COMMIT;
+    PRAGMA foreign_keys=on;
+  `)
+}
+
+// time_blocks shipped with CHECK (status IN ('planned','done')). DEC-052 adds
+// 'missed' and 'skipped' (replan-undone needs to know a slot passed unworked),
+// and rather than migrate the CHECK each time the union grows, this drops it —
+// the TimeBlockStatus TS union is the guard, the same call migrateShareKindChecks
+// made for share kinds. Rebuild is DYNAMIC over the live column list because,
+// unlike the documents rebuild, existing DBs already carry post-create columns
+// (org_id, recurrence, sync bookkeeping, the DEC-052 set) that a hard-coded
+// copy would silently drop. Idempotent; a no-op once the CHECK is gone.
+function migrateTimeBlocksStatusCheck(d: Database.Database): void {
+  const row = d
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='time_blocks'")
+    .get() as { sql?: string } | undefined
+  if (!row?.sql || !/CHECK\s*\(\s*status\s+IN/i.test(row.sql)) return
+  const cols = d.prepare('PRAGMA table_info(time_blocks)').all() as Array<{
+    name: string
+    type: string
+    notnull: number
+    dflt_value: string | null
+    pk: number
+  }>
+  const defs = cols
+    .map((c) => {
+      // PRAGMA table_info carries no FK clauses — restate task_id's by hand,
+      // or the rebuild would silently drop the ON DELETE CASCADE.
+      if (c.name === 'task_id') return 'task_id TEXT REFERENCES nodes(id) ON DELETE CASCADE'
+      let def = `${c.name} ${c.type || 'TEXT'}`
+      if (c.pk) def += ' PRIMARY KEY'
+      if (c.notnull && !c.pk) def += ' NOT NULL'
+      if (c.dflt_value != null) def += ` DEFAULT ${c.dflt_value}`
+      return def
+    })
+    .join(',\n      ')
+  const names = cols.map((c) => c.name).join(', ')
+  d.exec(`
+    PRAGMA foreign_keys=off;
+    BEGIN;
+    DROP TRIGGER IF EXISTS time_blocks_mark_dirty;
+    CREATE TABLE time_blocks_new (
+      ${defs}
+    );
+    INSERT INTO time_blocks_new (${names}) SELECT ${names} FROM time_blocks;
+    DROP TABLE time_blocks;
+    ALTER TABLE time_blocks_new RENAME TO time_blocks;
+    CREATE INDEX IF NOT EXISTS idx_time_blocks_start ON time_blocks (start_ms);
+    CREATE INDEX IF NOT EXISTS idx_time_blocks_task ON time_blocks (task_id);
+    CREATE INDEX IF NOT EXISTS idx_time_blocks_series ON time_blocks(series_id);
+    CREATE TRIGGER IF NOT EXISTS time_blocks_mark_dirty AFTER UPDATE ON time_blocks
+    WHEN NEW.needs_sync = OLD.needs_sync AND NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0
+    BEGIN UPDATE time_blocks SET needs_sync = 1 WHERE id = NEW.id; END;
     COMMIT;
     PRAGMA foreign_keys=on;
   `)

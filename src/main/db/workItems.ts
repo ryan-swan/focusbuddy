@@ -125,6 +125,7 @@ export interface WorkItemDraft {
   tags?: string | null
   mentions?: string | null
   sourceRef?: string | null
+  sourceUrl?: string | null
   sourceType?: string | null
   confidence?: number | null
   approvalState?: string
@@ -199,9 +200,9 @@ export function createWorkItemCore(
        id, parent_id, kind, title, description, status,
        priority, interest, importance, sort_order, created_at, updated_at,
        org_id, work_item_state, intent_class, originator_id, recipient_id,
-       due_at, wi_urgency, tags, mentions, source_ref, source_type, confidence,
+       due_at, wi_urgency, tags, mentions, source_ref, source_url, source_type, confidence,
        approval_state, reason_code, wi_origin, schema_epoch
-     ) VALUES (?, ?, 'work_item', ?, ?, ?, 3, 3, 3, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, 'work_item', ?, ?, ?, 3, 3, 3, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     draft.parentId ?? null,
@@ -220,6 +221,7 @@ export function createWorkItemCore(
     draft.tags ?? null,
     draft.mentions ?? null,
     draft.sourceRef ?? null,
+    draft.sourceUrl ?? null,
     draft.sourceType ?? null,
     draft.confidence ?? null,
     draft.approvalState ?? 'auto',
@@ -704,6 +706,7 @@ const PATCHABLE: Record<string, string> = {
   title: 'title',
   notes: 'description',
   intentClass: 'intent_class',
+  sourceUrl: 'source_url',
   intentSub: 'intent_sub',
   groupId: 'group_id',
   tags: 'tags',

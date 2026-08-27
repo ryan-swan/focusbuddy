@@ -1257,4 +1257,68 @@ unreachable) — and it reproduces with ALL of this work stashed, at the
 DEC-050 commit, so it is not caused by these changes. Flagged to the operator
 rather than worked around.
 
+---
+
+## DEC-052 — Calendar: the operator's full ruling on Analysis 24
+**Date:** 2026-08-27 · **Status:** RULED (operator, in full) — build begins
+
+**(1) Coordination overruled.** The nav row does NOT need to go through Caleb.
+"We can solve whatever needs to be solved in service of this feature as long
+as it doesn't ruin other critical developments that already exist." A-006
+("nobody uses the calendar") is confirmed FACTUAL by the operator; the
+calendars are barely usable and the user base is small and knows this is
+active development. Rewiring is pre-approved; a destructive approach is also
+on the table IF it serves the best outcome — but only with a clear plan laid
+out first: what is lost, and the downstream effects, for the operator to
+decide. Default remains rewire.
+
+**(2) OAuth audit performed (operator asked for a double check).** Verdict:
+NO reusable OAuth exists. Mail = IMAP + app-specific passwords (safeStorage);
+zero token storage in main; zero provider SDKs; popupRouter's "OAuth" is
+popup ROUTING so sign-ins complete inside webviews — sessions live in the
+webview cookie jar, the app never holds a token, and cookies cannot
+authenticate Calendar API calls. Foundation must be laid fresh.
+
+**(3) External sync: design + foundation ONLY, no build now.** Schema fields
+and the connector contract land so it layers in later; the sync itself waits.
+
+**(4) Research consensus + Analysis 24 recommendation = the direction.**
+Everything not explicitly addressed in the operator's message is approved
+as written.
+
+**(5) Calendar pollution is THE problem being solved.** Neither a calendar
+chock-full of blocks nor an empty one. The model: users explicitly drag what
+they WANT time-blocked; for the rest, two AI modes, both preview-first —
+(a) "Let Plexii plan your day": fill empty slots by priority/urgency/due;
+(b) intent-driven: describe the day in natural language ("I'm feeling
+motivated to take on the CETRA project today"), the system compiles the
+relevant open items, previews a schedule, the user rearranges/accepts, and it
+lands as time blocks with clear deliverables.
+
+**(6) THE most important thing: completion clears the task — with approval.**
+When work is completed in Plexi, the system offers "complete this task or
+leave it?" — one keystroke. NEVER auto-complete without approval; the human
+stays in the loop about everything happening on their behalf. This is the
+feature that removes list maintenance as a job.
+
+**(7) Unlogged work counts.** A user who works a desk without ever logging an
+attention item should still see completions in analytics — "things completed
+and desks closed based on the work that was done rather than checkboxes
+ticked." The attention layer watches silently; it surfaces only when needed.
+
+**(8) The philosophy, verbatim spirit:** attention goes where the user needs
+it, when they need it. The layer sits silently in the background — collecting,
+watching, interpreting, ready — and stays out of the way otherwise.
+Flow state is sacred: if the user is active and getting things done, even if
+it isn't what the calendar intended, the system recognises that rather than
+nagging about the plan. Balance freedom and organisation through
+ADAPTABILITY, not forced structure. The quality bar: a perfect executive
+assistant at a CEO's side. Treat with the respect that implies.
+
+**Build order (per Analysis 24, now unblocked):** Track A (calendar tells the
+truth + rail row + day column) → B1 (drag-to-schedule) → B2/C-foundation
+(schema) → B3 (plan-my-day, preview-first) → D (completion loop, in-Plexi
+first). D is elevated in importance by ruling (6) but still sequenced after
+the surface exists.
+
 <!-- Append below; increment DEC-NNN. -->
