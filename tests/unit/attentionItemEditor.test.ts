@@ -367,8 +367,10 @@ describe('DEC-050 — the item rows read like a project tool', () => {
     // CLUSTERS, so a queue with one cluster had no lines at all.
     expect(view).not.toContain('divide-y divide-[var(--edge-firm)]')
     expect(view).toContain('<div className="flex flex-col gap-1.5">')
-    // Each row carries its own border + radius, and lifts on hover.
-    expect(view).toContain('rounded-lg border bg-[var(--surface-raised)]')
+    // Each row carries its own border + radius, and lifts on hover. DEC-053
+    // tightened the card (rounded-md, vertically CENTERED content) after the
+    // operator called the first pass blocky and off-centre.
+    expect(view).toContain('items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-md border bg-[var(--surface-raised)]')
     expect(view).toContain('hover:bg-[rgba(var(--accent),0.045)]')
   })
 

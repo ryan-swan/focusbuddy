@@ -1348,4 +1348,37 @@ preview with zero writes). Remaining under this ruling: working-hours
 settings UI (engine reads them; no editor yet), Track D tiers 3a/3b (email
 via IMAP, then Slack behind the shared OAuth layer), Track C itself.
 
+---
+
+## DEC-053 — Calendar QA round one + the premium row pass
+**Date:** 2026-08-27 · **Status:** RULED (operator live QA, seven items) + IMPLEMENTED
+
+**(1) Planner settings editor** — a gear on the plan bar opens the editor:
+day start/end (12-hour options), planned-work ceiling, longest sitting,
+breathing room. Writes the same persisted settings the engine reads on every
+plan run.
+**(2) Drag-to-create** — Google-style: press empty grid, drag a span at the
+15-minute snap (live overlay shows the range), release → the composer opens
+at exactly that length. A press that never travels stays a plain click.
+**(3) 12-hour clock** — the gutter reads 6 AM…9 PM (compact: 6a…9p). No
+military time anywhere.
+**(4) Today's column** — raised surface with a purple ring, replacing the
+too-faint purple wash; other days stay grayed. Ruled colour treatment.
+**(5) Drag a block back to the list** — a block pointer-dragged onto the
+queue rail UNSCHEDULES it (the rail lights "Drop here to unschedule" during
+the drag; delete is undo-able; the item resurfaces in To-schedule by
+construction). A LOCKED block refuses — the pin means what it says.
+**(6) Classification dropdown + New** — a class filter (All + the eight)
+that narrows the rail, the deadline band, the month lens and the planner
+pool together, persisted; a New button beside it opens the capture console.
+**(7) The rows** — the operator: "text isn't centered; too blocky… needs to
+feel premium like ClickUp." Root cause measured, not guessed: the row was
+`items-start`, so the 18px title top-aligned against 26–28px controls.
+Now: vertically centred, min-h 42px, py-1.5, rounded-md, slimmer hover
+actions (h-6), the desk chip suppressed inside its own desk cluster
+(the header already says it), spacing kept, no dividers (per ruling).
+
+Suite 3,047 green (six new DEC-053 pins + the DEC-050 card pin updated to
+the new anatomy); typecheck clean.
+
 <!-- Append below; increment DEC-NNN. -->

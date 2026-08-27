@@ -636,6 +636,9 @@ export default function AttentionView(): JSX.Element {
     group?: {
       isChild: boolean
       childCount: number
+      /** DEC-053 — rendered under this desk's cluster header, so the desk
+       *  chip would repeat what the header already says. */
+      clusterDeskId?: string | null
       /** STORAGE nesting depth (0 = root) — what the cap is measured against. */
       depth: number
       /** Rendered indent level: storage depth plus the desk-cluster offset. */
@@ -730,7 +733,7 @@ export default function AttentionView(): JSX.Element {
             : undefined
         }
         style={{ marginLeft: `${Math.min(group?.indent ?? 0, 3) * 26}px` }}
-        className={`group relative flex items-start gap-2.5 pl-3 pr-3 py-2.5 rounded-lg border bg-[var(--surface-raised)] transition-colors ${
+        className={`group relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-md border bg-[var(--surface-raised)] transition-colors ${
           selected.has(i.id) && selectMode
             ? 'border-[rgba(var(--accent),0.5)] bg-[rgba(var(--accent),0.05)]'
             : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:bg-[rgba(var(--accent),0.045)]'
@@ -757,7 +760,7 @@ export default function AttentionView(): JSX.Element {
           <button
             onClick={() => toggleSelected(i.id)}
             title={selected.has(i.id) ? 'Deselect' : 'Select'}
-            className="shrink-0 mt-0.5 fb-press"
+            className="shrink-0 fb-press"
           >
             <Icon
               name={selected.has(i.id) ? 'check_box' : 'check_box_outline_blank'}
@@ -794,14 +797,14 @@ export default function AttentionView(): JSX.Element {
                 ? `Drag to move all ${selected.size} selected — drop ON an item to nest them as its subtasks`
                 : 'Drag to reorder, attach to another item, or move to another section'
             }
-            className="shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="shrink-0 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <Icon name="drag_indicator" size={16} />
           </button>
         )}
         {/* A fixed slot for the subtask chevron, so every title starts at the
             same x whether or not the row has children. */}
-        <span className="shrink-0 w-4 mt-0.5 flex items-center justify-center">
+        <span className="shrink-0 w-4 flex items-center justify-center">
           {hasKids && (
             <button
               data-row-action
@@ -823,7 +826,7 @@ export default function AttentionView(): JSX.Element {
             data-row-action
             onClick={() => void closeWithOffer(i, primary.state)}
             title={`${primary.label} — close this item`}
-            className="shrink-0 mt-[2px] h-[19px] w-[19px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
+            className="shrink-0 h-[18px] w-[18px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
           >
             <Icon name="check" size={13} />
           </button>
@@ -856,7 +859,7 @@ export default function AttentionView(): JSX.Element {
             if (!ctx.desk && !ctx.plan && !ctx.source && tags.length === 0 && ments.length === 0)
               return null
             return (
-              <div className="mt-1 flex flex-wrap items-center gap-1">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1">
                 {ctx.plan && (
                   <button
                     onClick={() => goProject(ctx.plan!.id)}
@@ -867,7 +870,7 @@ export default function AttentionView(): JSX.Element {
                     <span className="truncate">{ctx.plan.title}</span>
                   </button>
                 )}
-                {ctx.desk && (
+                {ctx.desk && ctx.desk.id !== group?.clusterDeskId && (
                   <button
                     onClick={() => openSource(i)}
                     title="Open the desk"
@@ -927,7 +930,7 @@ export default function AttentionView(): JSX.Element {
               </div>
             )
           })()}
-          {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
+          {reason && <div className="text-[11px] text-[var(--ink-40)] mt-px leading-tight">{reason}</div>}
           {progress && progress.total > 0 && (
             /* DEC-048/050 — subtask progress, the "2/5" a project tool shows,
                with a bar. The chevron beside the title does the folding. */
@@ -956,7 +959,7 @@ export default function AttentionView(): JSX.Element {
         {/* DEC-050 — the meta rail: the columns a project tool aligns down the
             right of every row. Always visible (unlike the hover actions), so
             the list can be SCANNED: priority, status, date, who. */}
-        <div className="flex items-center gap-1.5 shrink-0 mt-[1px]">
+        <div className="flex items-center gap-1.5 shrink-0">
           {urgency && (
             <span
               title={`Priority: ${urgency}`}
@@ -1018,7 +1021,7 @@ export default function AttentionView(): JSX.Element {
             <button
               onClick={() => void ungroup(i.id)}
               title="Detach from its group"
-              className="icon-btn !h-7 !w-7"
+              className="icon-btn !h-6 !w-6"
             >
               <Icon name="link_off" size={14} />
             </button>
@@ -1027,7 +1030,7 @@ export default function AttentionView(): JSX.Element {
             <button
               onClick={() => void copyItem(i)}
               title="Copy the full text"
-              className="icon-btn !h-7 !w-7"
+              className="icon-btn !h-6 !w-6"
             >
               <Icon name={copiedId === i.id ? 'check' : 'content_copy'} size={14} />
             </button>
@@ -1045,7 +1048,7 @@ export default function AttentionView(): JSX.Element {
                 <button
                   onClick={() => openHere(i)}
                   title="Open it here — the object itself, full screen inside Plexi"
-                  className="icon-btn !h-7 !w-7"
+                  className="icon-btn !h-6 !w-6"
                 >
                   <Icon name="open_in_full" size={14} />
                 </button>
@@ -1054,7 +1057,7 @@ export default function AttentionView(): JSX.Element {
                 <button
                   onClick={() => openSource(i)}
                   title="Open the whole desk it came from"
-                  className="icon-btn !h-7 !w-7"
+                  className="icon-btn !h-6 !w-6"
                 >
                   <Icon name="desk" size={14} />
                 </button>
@@ -1062,28 +1065,28 @@ export default function AttentionView(): JSX.Element {
               <button
                 onClick={() => startWithPlexii([i])}
                 title="Start it with Plexii — opens a chat prefilled from this capture"
-                className="icon-btn !h-7 !w-7"
+                className="icon-btn !h-6 !w-6"
               >
                 <Icon name="auto_awesome" size={14} />
               </button>
               <button
                 onClick={() => void snoozeTomorrow(i.id)}
                 title="Snooze until tomorrow morning"
-                className="icon-btn !h-7 !w-7"
+                className="icon-btn !h-6 !w-6"
               >
                 <Icon name="snooze" size={14} />
               </button>
               <button
                 onClick={() => void setState(i.id, 'archived')}
                 title="Archive — keep it, out of the way"
-                className="icon-btn !h-7 !w-7"
+                className="icon-btn !h-6 !w-6"
               >
                 <Icon name="archive" size={14} />
               </button>
               <button
                 onClick={() => setEditing(i)}
                 title="Open the item"
-                className="icon-btn !h-7 !w-7"
+                className="icon-btn !h-6 !w-6"
               >
                 <Icon name="open_in_new" size={14} />
               </button>
@@ -1150,7 +1153,7 @@ export default function AttentionView(): JSX.Element {
               <button
                 onClick={() => setShowNew(false)}
                 title="Close"
-                className="icon-btn !h-7 !w-7"
+                className="icon-btn !h-6 !w-6"
               >
                 <Icon name="close" size={13} />
               </button>
@@ -1563,6 +1566,7 @@ export default function AttentionView(): JSX.Element {
                                 row(g.item, false, {
                                   isChild: g.isChild || !!desk,
                                   childCount: g.childCount,
+                                  clusterDeskId: desk?.id ?? null,
                                   depth: g.depth,
                                   indent: g.depth + (desk ? 1 : 0),
                                   descendants: g.descendants,

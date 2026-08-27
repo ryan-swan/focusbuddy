@@ -150,3 +150,45 @@ describe('DEC-052 B3/B4 — the planner is preview-first, always', () => {
     expect(sel).toContain('an empty selection is a valid answer')
   })
 })
+
+describe('DEC-053 — the calendar QA round (operator live QA)', () => {
+  const grid = read('src/renderer/src/components/views/WeekTimeGrid.tsx')
+  const view = read('src/renderer/src/components/views/CalendarView.tsx')
+
+  it('the clock is a 12-hour cycle, never military', () => {
+    expect(grid).toContain("const mer = h < 12 ? 'AM' : 'PM'")
+    expect(grid).not.toContain('`${START_HOUR + i}:00`')
+  })
+
+  it('drag-to-create selects a span at the 15-minute snap; a still press stays a click', () => {
+    expect(grid).toContain('data-testid="drag-select"')
+    expect(grid).toContain("if (!cur.moved || at === cur.anchorMs) {")
+    expect(grid).toContain('initialDurationMin: durationMin')
+    // The composer opens at exactly the dragged length.
+    expect(grid).toContain('useState(initialDurationMin ?? 60)')
+  })
+
+  it("today is a raised column with a ring — not a purple wash", () => {
+    expect(grid).toContain("'border-transparent bg-[var(--surface-raised)] ring-2 ring-[rgba(var(--accent),0.45)]'")
+  })
+
+  it('a block dragged onto the rail unschedules — locked blocks refuse', () => {
+    expect(grid).toContain('onBlockDragOut(block, d.lastClientX, d.lastClientY)')
+    expect(view).toContain('if (block.locked) return false')
+    expect(view).toContain('Drop here to unschedule')
+  })
+
+  it('the class dropdown filters rail + deadlines + month; New opens capture', () => {
+    expect(view).toContain('data-testid="calendar-class-filter"')
+    expect(view).toContain("classFilter === 'all' || queueOf(i) === classFilter")
+    expect(view).toContain("filterQueue={classFilter === 'all' ? undefined : classFilter}")
+    expect(view).toContain('openConsole()')
+  })
+
+  it('the planner settings editor writes what the engine reads', () => {
+    expect(view).toContain('data-testid="planner-settings"')
+    expect(view).toContain('savePlannerSettings(next)')
+    // runPlan re-reads persisted settings each run, so edits apply next plan.
+    expect(view).toContain('const settings = loadPlannerSettings()')
+  })
+})

@@ -16,13 +16,21 @@ import {
 import { parseTags } from '../../lib/itemTags'
 import { parseMentions } from '../../lib/itemMentions'
 import { useActionHistory } from '../../stores/actionHistory'
+import { useRef } from 'react'
 import {
   QUEUE_COLOR,
+  QUEUE_LABEL,
+  QUEUE_ORDER,
   queueOf,
   queueTint,
   rankScore,
   isTerminalState
 } from '../../lib/attentionQueues'
+import { useCaptureConsole } from '../../stores/captureConsole'
+import {
+  savePlannerSettings,
+  type PlannerSettings
+} from '../../lib/attentionPlanner'
 
 // The Calendar destination (DEC-052, Analysis 24 §0) — the planning half of
 // the Attention layer. The queue rides on the LEFT as a draggable list (the
@@ -78,6 +86,7 @@ export default function CalendarView(): JSX.Element {
   const updateBlock = useTimeBlockStore((s) => s.update)
   const nodes = useNodeStore((s) => s.nodes)
   const goAttention = useViewStore((s) => s.goAttention)
+  const openConsole = useCaptureConsole((s) => s.openConsole)
 
   useEffect(() => {
     if (!wiLoaded) void refreshItems()
@@ -93,6 +102,24 @@ export default function CalendarView(): JSX.Element {
   }
   const [anchor, setAnchor] = useState<Date>(() => dayStart(today))
   const [query, setQuery] = useState('')
+  // DEC-053 — one classification at a time, or all. Persisted like the mode.
+  const [classFilter, setClassFilter] = useState<string>(
+    () => localStorage.getItem('calendar.classFilter') || 'all'
+  )
+  const pickClass = (c: string): void => {
+    localStorage.setItem('calendar.classFilter', c)
+    setClassFilter(c)
+  }
+  const [showSettings, setShowSettings] = useState(false)
+  const [settings, setSettings] = useState<PlannerSettings>(() => loadPlannerSettings())
+  const patchSettings = (patch: Partial<PlannerSettings>): void => {
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    savePlannerSettings(next)
+  }
+  // DEC-053 — dragging a block over the queue rail unschedules it.
+  const railRef = useRef<HTMLElement | null>(null)
+  const [blockDragging, setBlockDragging] = useState(false)
 
   const rangeStart = useMemo(() => {
     if (mode === 'week') return mondayOf(anchor)
@@ -116,9 +143,10 @@ export default function CalendarView(): JSX.Element {
         (i) =>
           !isTerminalState(i.workItemState) &&
           i.detachedFromId == null &&
-          !(i.snoozeUntil != null && i.snoozeUntil > nowMs)
+          !(i.snoozeUntil != null && i.snoozeUntil > nowMs) &&
+          (classFilter === 'all' || queueOf(i) === classFilter)
       ),
-    [items, nowMs]
+    [items, nowMs, classFilter]
   )
   // An item with a FUTURE block is already placed — it sinks below the rest
   // (never hidden: nothing leaves the queue without landing somewhere).
@@ -238,6 +266,22 @@ export default function CalendarView(): JSX.Element {
     }
   }
 
+  /** DEC-053 — a block released over the rail: delete it (undo-able); the
+   *  item drops back into "To schedule" by construction. Locked blocks are
+   *  the pin — a pin dropped on the rail stays put. */
+  const removeBlock = useTimeBlockStore.getState().remove
+  function handleBlockDragOut(
+    block: import('@shared/types').TimeBlock,
+    x: number,
+    y: number
+  ): boolean {
+    const r = railRef.current?.getBoundingClientRect()
+    if (!r || x < r.left || x > r.right || y < r.top || y > r.bottom) return false
+    if (block.locked) return false
+    void removeBlock(block.id)
+    return true
+  }
+
   async function acceptPlan(): Promise<void> {
     if (!proposals) return
     // One gesture, one undo: the whole accepted plan reverses with a single
@@ -355,6 +399,29 @@ export default function CalendarView(): JSX.Element {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* DEC-053 — classification filter + New, per operator ruling. */}
+            <select
+              value={classFilter}
+              onChange={(e) => pickClass(e.target.value)}
+              title="Show one classification"
+              className="fb-field h-8 bg-[var(--surface-sunken)] px-2 text-[12px] text-[var(--ink-80)]"
+              data-testid="calendar-class-filter"
+            >
+              <option value="all">All classes</option>
+              {QUEUE_ORDER.map((q) => (
+                <option key={q} value={q}>
+                  {QUEUE_LABEL[q]}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => openConsole()}
+              title="Capture a new attention item"
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] hover:text-[var(--ink-100)]"
+            >
+              <Icon name="add" size={14} /> New
+            </button>
+            <div className="w-px h-5 bg-[var(--edge-soft)]" />
             <div className="flex items-center rounded-lg bg-[var(--surface-sunken)] p-0.5">
               {(
                 [
@@ -397,10 +464,17 @@ export default function CalendarView(): JSX.Element {
 
         <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
           {/* The queue rail — the half you drag FROM. */}
-          <aside className="hidden xl:flex flex-col gap-2 sticky top-0">
+          <aside
+            ref={railRef}
+            className={`hidden xl:flex flex-col gap-2 sticky top-0 rounded-xl transition-shadow ${
+              blockDragging ? 'ring-2 ring-[rgba(var(--accent),0.45)] ring-offset-4 ring-offset-[var(--surface-base)]' : ''
+            }`}
+          >
             <div className="flex items-center gap-2">
               <Icon name="notifications" size={14} className="text-[var(--ink-40)]" />
-              <span className="fb-t-label text-[var(--ink-70)] flex-1">To schedule</span>
+              <span className="fb-t-label text-[var(--ink-70)] flex-1">
+                {blockDragging ? 'Drop here to unschedule' : 'To schedule'}
+              </span>
               <button
                 onClick={goAttention}
                 className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] fb-press"
@@ -454,6 +528,94 @@ export default function CalendarView(): JSX.Element {
                   >
                     Replan undone
                   </button>
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setShowSettings((v) => !v)}
+                      title="Planner settings — working hours, daily ceiling, session length"
+                      className="icon-btn !h-8 !w-8"
+                      data-testid="planner-settings"
+                    >
+                      <Icon name="tune" size={15} />
+                    </button>
+                    {showSettings && (
+                      <div className="absolute right-0 top-9 z-30 w-[280px] rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg p-3 flex flex-col gap-2.5">
+                        <div className="fb-t-label text-[var(--ink-70)]">Planner settings</div>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Day starts
+                          <select
+                            value={settings.dayStartMin}
+                            onChange={(e) => patchSettings({ dayStartMin: Number(e.target.value) })}
+                            className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[12px]"
+                          >
+                            {Array.from({ length: 13 }, (_, h) => h + 5).map((h) => (
+                              <option key={h} value={h * 60}>
+                                {h % 12 === 0 ? 12 : h % 12} {h < 12 ? 'AM' : 'PM'}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Day ends
+                          <select
+                            value={settings.dayEndMin}
+                            onChange={(e) => patchSettings({ dayEndMin: Number(e.target.value) })}
+                            className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[12px]"
+                          >
+                            {Array.from({ length: 12 }, (_, k) => k + 12).map((h) => (
+                              <option key={h} value={h * 60}>
+                                {h % 12 === 0 ? 12 : h % 12} {h < 12 ? 'AM' : 'PM'}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Planned work ceiling
+                          <select
+                            value={settings.maxDailyPlannedMin}
+                            onChange={(e) => patchSettings({ maxDailyPlannedMin: Number(e.target.value) })}
+                            className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[12px]"
+                          >
+                            {[180, 240, 330, 390, 480].map((m) => (
+                              <option key={m} value={m}>
+                                {(m / 60).toFixed(1).replace('.0', '')} h/day
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Longest sitting
+                          <select
+                            value={settings.maxSessionMin}
+                            onChange={(e) => patchSettings({ maxSessionMin: Number(e.target.value) })}
+                            className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[12px]"
+                          >
+                            {[45, 60, 90, 120].map((m) => (
+                              <option key={m} value={m}>
+                                {m} min
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Breathing room
+                          <select
+                            value={settings.gapMin}
+                            onChange={(e) => patchSettings({ gapMin: Number(e.target.value) })}
+                            className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[12px]"
+                          >
+                            {[5, 10, 15, 20].map((m) => (
+                              <option key={m} value={m}>
+                                {m} min between blocks
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="fb-t-caption text-[var(--ink-30)]">
+                          The planner reads these next time you plan. Saved on this device.
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {(proposals || planNote) && (
                   <div className="flex items-center gap-3 rounded-xl border border-dashed border-accent/50 bg-accent/[0.05] px-3 py-2">
@@ -582,6 +744,9 @@ export default function CalendarView(): JSX.Element {
               <WeekTimeGrid
                 weekStart={rangeStart}
                 days={MODE_DAYS[mode]}
+                filterQueue={classFilter === 'all' ? undefined : classFilter}
+                onBlockDragOut={handleBlockDragOut}
+                onBlockDragActive={setBlockDragging}
                 ghosts={ghosts}
                 onGhostRemove={(itemId) =>
                   setProposals((cur) => {

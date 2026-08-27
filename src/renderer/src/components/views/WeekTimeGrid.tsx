@@ -41,6 +41,9 @@ function fmtTime(ms: number): string {
 interface Composer {
   dayIndex: number
   startMs: number
+  /** DEC-053 — set when a drag selected a span; the composer opens at that
+   *  exact length instead of its default. */
+  initialDurationMin?: number
   // A node (task or folder) dragged onto the grid — booked directly without
   // the picker.
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
@@ -59,7 +62,10 @@ export default function WeekTimeGrid({
   days = 7,
   compact = false,
   ghosts,
-  onGhostRemove
+  onGhostRemove,
+  filterQueue,
+  onBlockDragOut,
+  onBlockDragActive
 }: {
   weekStart: Date
   /** How many day columns to render from weekStart (7 = week, 3, 1 = day). */
@@ -70,6 +76,14 @@ export default function WeekTimeGrid({
    *  Nothing here is written; the caller owns the preview-confirm. */
   ghosts?: GridGhost[]
   onGhostRemove?: (itemId: string) => void
+  /** DEC-053 — show only one classification's deadlines (undefined = all). */
+  filterQueue?: string
+  /** DEC-053 — a block pointer-dragged and RELEASED outside the grid: return
+   *  true to consume the drop (the caller unschedules); false = normal move. */
+  onBlockDragOut?: (block: TimeBlock, clientX: number, clientY: number) => boolean
+  /** Fires when a block pointer-drag starts/ends, so the caller can light an
+   *  unschedule zone. */
+  onBlockDragActive?: (active: boolean) => void
 }): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const blocks = useTimeBlockStore((s) => s.blocks)
@@ -118,6 +132,7 @@ export default function WeekTimeGrid({
     const m = new Map<number, FbNode[]>()
     for (const i of workItems) {
       if (!i.dueAt || isTerminalState(i.workItemState) || i.detachedFromId != null) continue
+      if (filterQueue && queueOf(i) !== filterQueue) continue
       const t = Date.parse(i.dueAt)
       if (Number.isNaN(t) || t < weekFrom || t >= weekTo) continue
       const dayIndex = Math.floor((t - weekFrom) / DAY_MS)
@@ -126,7 +141,7 @@ export default function WeekTimeGrid({
     for (const list of m.values())
       list.sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
     return m
-  }, [workItems, weekFrom, weekTo])
+  }, [workItems, weekFrom, weekTo, filterQueue])
   const tasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
 
   // Open the node a block links to: tasks open in the canvas, folders open the
@@ -143,6 +158,11 @@ export default function WeekTimeGrid({
   }
 
   const [composer, setComposer] = useState<Composer | null>(null)
+  // DEC-053 — Google-style drag-to-create: press on empty grid, drag a span
+  // (15-min snap), release → the composer opens for exactly that span. A
+  // press that never travels stays a plain click-to-create.
+  const [sel, setSel] = useState<{ dayIndex: number; startMs: number; endMs: number } | null>(null)
+  const selRef = useRef<{ dayIndex: number; anchorMs: number; moved: boolean } | null>(null)
   // "Add to calendar" menu for a meeting block — anchored at the click point.
   const [calMenu, setCalMenu] = useState<{ block: TimeBlock; x: number; y: number } | null>(null)
   const [drag, setDrag] = useState<{ id: string; previewStart: number; previewDur: number } | null>(
@@ -152,6 +172,8 @@ export default function WeekTimeGrid({
     id: string
     mode: 'move' | 'resize' | 'resize-top'
     startClientY: number
+    lastClientX: number
+    lastClientY: number
     origStartMs: number
     origDur: number
     origDayIndex: number
@@ -166,11 +188,46 @@ export default function WeekTimeGrid({
     return base + (y / hourPx) * 3_600_000
   }
 
-  function onColumnClick(e: React.MouseEvent, dayIndex: number): void {
-    // Ignore clicks that landed on a block (those stopPropagation).
+  function onColumnPointerDown(e: React.PointerEvent, dayIndex: number): void {
+    // Blocks stopPropagation on their own pointerdown, so reaching here means
+    // empty grid. Left button only; ignore while a composer is open.
+    if (e.button !== 0 || composer) return
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const y = e.clientY - rect.top
-    setComposer({ dayIndex, startMs: snapMs(yToMs(dayIndex, y)) })
+    const anchorMs = snapMs(yToMs(dayIndex, y))
+    selRef.current = { dayIndex, anchorMs, moved: false }
+    const onMove = (ev: PointerEvent): void => {
+      const cur = selRef.current
+      if (!cur) return
+      const yy = ev.clientY - rect.top
+      const at = snapMs(yToMs(cur.dayIndex, yy))
+      if (at !== cur.anchorMs) cur.moved = true
+      setSel({
+        dayIndex: cur.dayIndex,
+        startMs: Math.min(cur.anchorMs, at),
+        endMs: Math.max(cur.anchorMs, at) + (at === cur.anchorMs ? 0 : 0)
+      })
+    }
+    const onUp = (ev: PointerEvent): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      const cur = selRef.current
+      selRef.current = null
+      setSel(null)
+      if (!cur) return
+      const yy = ev.clientY - rect.top
+      const at = snapMs(yToMs(cur.dayIndex, yy))
+      if (!cur.moved || at === cur.anchorMs) {
+        // A plain click: composer at the pressed slot, default length.
+        setComposer({ dayIndex: cur.dayIndex, startMs: cur.anchorMs })
+        return
+      }
+      const startMs = Math.min(cur.anchorMs, at)
+      const durationMin = Math.max(SNAP_MIN, Math.round((Math.abs(at - cur.anchorMs)) / 60000))
+      setComposer({ dayIndex: cur.dayIndex, startMs, initialDurationMin: durationMin })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
   // Dragging a task or folder from the sidebar onto a day column opens the
@@ -223,10 +280,13 @@ export default function WeekTimeGrid({
       id: block.id,
       mode,
       startClientY: e.clientY,
+      lastClientX: e.clientX,
+      lastClientY: e.clientY,
       origStartMs: block.startMs,
       origDur: block.durationMin,
       origDayIndex: Math.floor((block.startMs - weekFrom) / DAY_MS)
     }
+    if (mode === 'move') onBlockDragActive?.(true)
     setDrag({ id: block.id, previewStart: block.startMs, previewDur: block.durationMin })
     window.addEventListener('pointermove', onDragMove)
     window.addEventListener('pointerup', onDragEnd, { once: true })
@@ -235,6 +295,8 @@ export default function WeekTimeGrid({
   function onDragMove(e: PointerEvent): void {
     const d = dragRef.current
     if (!d) return
+    d.lastClientX = e.clientX
+    d.lastClientY = e.clientY
     const deltaY = e.clientY - d.startClientY
     const deltaMs = (deltaY / hourPx) * 3_600_000
     if (d.mode === 'move') {
@@ -266,6 +328,16 @@ export default function WeekTimeGrid({
     window.removeEventListener('pointermove', onDragMove)
     const d = dragRef.current
     dragRef.current = null
+    if (d?.mode === 'move') onBlockDragActive?.(false)
+    // DEC-053 — released OUTSIDE the grid (over the queue rail): the caller
+    // may consume the drop as an UNSCHEDULE instead of a move.
+    if (d && d.mode === 'move' && onBlockDragOut) {
+      const block = blocks.find((b) => b.id === d.id)
+      if (block && onBlockDragOut(block, d.lastClientX, d.lastClientY)) {
+        setDrag(null)
+        return
+      }
+    }
     setDrag((cur) => {
       if (d && cur && cur.id === d.id) {
         if (cur.previewStart !== d.origStartMs || cur.previewDur !== d.origDur) {
@@ -298,7 +370,13 @@ export default function WeekTimeGrid({
             style={{ height: hourPx }}
             className="fb-t-caption font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
           >
-            {compact ? START_HOUR + i : `${START_HOUR + i}:00`}
+            {(() => {
+              // DEC-053 — 12-hour cycle, per operator ruling (no military time).
+              const h = START_HOUR + i
+              const h12 = h % 12 === 0 ? 12 : h % 12
+              const mer = h < 12 ? 'AM' : 'PM'
+              return compact ? `${h12}${mer === 'AM' ? 'a' : 'p'}` : `${h12} ${mer}`
+            })()}
           </div>
         ))}
       </div>
@@ -368,11 +446,11 @@ export default function WeekTimeGrid({
                 ref={(el) => (colRefs.current[dayIndex] = el)}
                 className={`relative rounded-[var(--radius-row)] border ${
                   isToday
-                    ? 'border-accent/40 bg-accent/[0.03]'
+                    ? 'border-transparent bg-[var(--surface-raised)] ring-2 ring-[rgba(var(--accent),0.45)]'
                     : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
                 }`}
                 style={{ height: gridHeight }}
-                onClick={(e) => onColumnClick(e, dayIndex)}
+                onPointerDown={(e) => onColumnPointerDown(e, dayIndex)}
                 onDragOver={onColumnDragOver}
                 onDrop={(e) => onColumnDrop(e, dayIndex)}
                 data-testid={`day-col-${dayIndex}`}
@@ -543,6 +621,18 @@ export default function WeekTimeGrid({
                   )
                 })}
 
+                {sel && sel.dayIndex === dayIndex && sel.endMs > sel.startMs && (
+                  <div
+                    data-testid="drag-select"
+                    className="absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] border-[1.5px] border-accent/70 bg-accent/15 pointer-events-none z-10 px-1.5 py-0.5 fb-t-caption text-[var(--ink-80)]"
+                    style={{
+                      top: ((sel.startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * hourPx,
+                      height: Math.max(10, ((sel.endMs - sel.startMs) / 3_600_000) * hourPx)
+                    }}
+                  >
+                    {fmtTime(sel.startMs)} – {fmtTime(sel.endMs)}
+                  </div>
+                )}
                 {(ghosts ?? [])
                   .filter((g) => g.startMs >= dStart && g.startMs < dStart + DAY_MS)
                   .map((g) => {
@@ -584,6 +674,7 @@ export default function WeekTimeGrid({
       {composer && (
         <BlockComposer
           startMs={composer.startMs}
+          initialDurationMin={composer.initialDurationMin}
           tasks={tasks.filter((t) => t.status !== 'done')}
           prefillNode={composer.prefillNode}
           onCancel={() => setComposer(null)}
@@ -670,12 +761,14 @@ export default function WeekTimeGrid({
 
 function BlockComposer({
   startMs,
+  initialDurationMin,
   tasks,
   prefillNode,
   onCancel,
   onCreate
 }: {
   startMs: number
+  initialDurationMin?: number
   tasks: FbNode[]
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
   onCancel: () => void
@@ -689,7 +782,7 @@ function BlockComposer({
 }): JSX.Element {
   const [taskId, setTaskId] = useState<string>('')
   const [title, setTitle] = useState('')
-  const [duration, setDuration] = useState(60)
+  const [duration, setDuration] = useState(initialDurationMin ?? 60)
   const [repeat, setRepeat] = useState<TimeBlockRecurrence | ''>('')
   const [busy, setBusy] = useState(false)
   const [isMeeting, setIsMeeting] = useState(false)
