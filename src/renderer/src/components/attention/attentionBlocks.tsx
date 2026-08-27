@@ -1,24 +1,27 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import { useAssistantChrome } from '../../stores/assistantChrome'
+import { useTimeBlockStore } from '../../stores/timeBlocks'
 import Icon from '../Icon'
 import { QUEUE_COLOR, QUEUE_ICON, queueOf, queueTint } from '../../lib/attentionQueues'
 import {
   pulseCounts,
   overdueRadar,
-  agendaItems,
   activityFeed,
   statusBreakdown,
   trendLines,
-  startRecommendations
+  startRecommendations,
+  kpiMetrics,
+  dayTimeline,
+  type KpiKey
 } from '../../lib/attentionAnalytics'
 import { startPromptForItem } from '../../lib/startPrompt'
 
-// DEC-048 — the command-center blocks. ONE component per widget with a
-// `variant` prop (compact | full) — never a compact fork and a full fork.
+// DEC-048/049 — the command-center blocks. ONE component per widget with a
+// `variant` prop (compact | full | band) — never a fork per surface.
 // Same data, same styles, branching only where the display genuinely
 // differs, so a fix propagates to every surface (the Attention page, the
 // home dashboard, the desk widget) and the variants cannot drift.
@@ -26,7 +29,10 @@ import { startPromptForItem } from '../../lib/startPrompt'
 // Every block reads the ATTENTION layer (useWorkItemStore) — these replace
 // the home widgets that were wired to the legacy desk-task data.
 
-export type BlockVariant = 'compact' | 'full'
+// DEC-049 — a third variant, 'band': the wide, across-the-top shape the
+// command center's header region uses (KPI tiles, the AI strip). Same
+// component, same data, one more display branch — never a separate widget.
+export type BlockVariant = 'compact' | 'full' | 'band'
 
 export function useAttentionData(): FbNode[] {
   const items = useWorkItemStore((s) => s.items)
@@ -44,6 +50,7 @@ function BlockShell({
   tone,
   count,
   variant,
+  trailing,
   children
 }: {
   title: string
@@ -52,12 +59,14 @@ function BlockShell({
   tone: string
   count?: number
   variant: BlockVariant
+  /** Header-right control (a disclosure, a filter reset…). */
+  trailing?: React.ReactNode
   children: React.ReactNode
 }): JSX.Element {
   return (
     <section
       className={`rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] ${
-        variant === 'full' ? 'p-4' : 'p-3'
+        variant === 'compact' ? 'p-3' : 'p-4'
       } flex flex-col min-h-0`}
     >
       <div className="flex items-center gap-2 mb-2">
@@ -71,6 +80,7 @@ function BlockShell({
         {count !== undefined && (
           <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
         )}
+        {trailing}
       </div>
       <div className="flex-1 min-h-0">{children}</div>
     </section>
@@ -186,18 +196,78 @@ export function OverdueRadarBlock({ variant }: { variant: BlockVariant }): JSX.E
 export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element {
   const items = useAttentionData()
   const goAttention = useGoAttention()
+  const goCalendar = useViewStore((s) => s.goCalendar)
   const nowMs = Date.now()
-  const agenda = useMemo(() => agendaItems(items, nowMs), [items, nowMs])
-  const shown = variant === 'full' ? 8 : 4
+  // DEC-049 — the day's REAL shape: the calendar's own blocks for today
+  // merged with the work that is due in it. The block loads today only when
+  // the store's window doesn't already cover it, so the Calendar view's own
+  // (wider) range is never clobbered.
+  const blocks = useTimeBlockStore((s) => s.blocks)
+  const rangeFrom = useTimeBlockStore((s) => s.rangeFrom)
+  const rangeTo = useTimeBlockStore((s) => s.rangeTo)
+  const loadRange = useTimeBlockStore((s) => s.loadRange)
+  useEffect(() => {
+    const from = new Date()
+    from.setHours(0, 0, 0, 0)
+    const to = new Date()
+    to.setHours(23, 59, 59, 999)
+    if (rangeFrom == null || rangeTo == null || rangeFrom > from.getTime() || rangeTo < to.getTime())
+      void loadRange(from.getTime(), to.getTime())
+  }, [rangeFrom, rangeTo, loadRange])
+
+  const timeline = useMemo(() => dayTimeline(items, blocks, nowMs), [items, blocks, nowMs])
+  const shown = variant === 'compact' ? 4 : 9
+  const hhmm = (ms: number): string =>
+    new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   return (
-    <BlockShell title="Today's agenda" icon="event" tone="#10b981" count={agenda.length} variant={variant}>
-      {agenda.length === 0 ? (
-        <div className="text-[11.5px] text-[var(--ink-30)]">Nothing dated through tomorrow.</div>
+    <BlockShell
+      title="Today"
+      icon="event"
+      tone="#10b981"
+      count={timeline.length || undefined}
+      variant={variant}
+      trailing={
+        variant !== 'compact' ? (
+          <button
+            onClick={goCalendar}
+            title="Open the calendar"
+            className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+          >
+            Calendar
+          </button>
+        ) : undefined
+      }
+    >
+      {timeline.length === 0 ? (
+        <div className="text-[11.5px] text-[var(--ink-30)]">Nothing scheduled or due today.</div>
       ) : (
         <div className="flex flex-col">
-          {agenda.slice(0, shown).map((i) => (
-            <MiniRow key={i.id} i={i} nowMs={nowMs} onOpen={goAttention} />
-          ))}
+          {timeline.slice(0, shown).map((e) =>
+            e.kind === 'event' ? (
+              <button
+                key={`ev:${e.id}`}
+                onClick={goCalendar}
+                className="w-full flex items-center gap-2 py-1 text-left fb-press min-w-0"
+              >
+                <Icon
+                  name={e.isMeeting ? 'videocam' : 'schedule'}
+                  size={12}
+                  className="shrink-0 text-[var(--ink-40)]"
+                />
+                <span className="text-[12px] text-[var(--ink-90)] truncate flex-1">{e.title}</span>
+                <span className="text-[10.5px] text-[var(--ink-40)] shrink-0 fb-tabular">
+                  {hhmm(e.atMs)}
+                </span>
+              </button>
+            ) : (
+              <MiniRow key={`it:${e.id}`} i={e.item} nowMs={nowMs} onOpen={goAttention} />
+            )
+          )}
+          {timeline.length > shown && (
+            <div className="fb-t-caption text-[var(--ink-30)] pt-1">
+              +{timeline.length - shown} more today
+            </div>
+          )}
         </div>
       )}
     </BlockShell>
@@ -242,12 +312,151 @@ export function RecentActivityBlock({ variant }: { variant: BlockVariant }): JSX
 
 // ── Analytics: breakdown + trends ───────────────────────────────────────────
 
-export function AnalyticsBlock({ variant }: { variant: BlockVariant }): JSX.Element {
+export function AnalyticsBlock({
+  variant,
+  /** DEC-049 — the band's tiles double as filters. The active key is owned by
+   *  the page (it filters the queues); the block just reflects and reports. */
+  activeKpi,
+  onPickKpi
+}: {
+  variant: BlockVariant
+  activeKpi?: KpiKey | null
+  onPickKpi?: (k: KpiKey) => void
+}): JSX.Element {
   const items = useAttentionData()
   const nowMs = Date.now()
   const rows = useMemo(() => statusBreakdown(items, nowMs), [items, nowMs])
   const trends = useMemo(() => trendLines(items, nowMs), [items, nowMs])
-  const shown = variant === 'full' ? rows : rows.slice(0, 3)
+  const shown = variant === 'compact' ? rows.slice(0, 3) : rows
+  const kpis = useMemo(() => kpiMetrics(items, nowMs), [items, nowMs])
+  const pulse = useMemo(() => pulseCounts(items, nowMs), [items, nowMs])
+  const [openBreakdown, setOpenBreakdown] = useState(false)
+
+  // ── The band: KPI tiles across the top, CRM-dashboard style ───────────────
+  if (variant === 'band') {
+    const max = Math.max(1, ...pulse.closedByDay)
+    return (
+      <BlockShell
+        title="Analytics"
+        icon="insights"
+        tone="#0ea5e9"
+        variant={variant}
+        trailing={
+          <button
+            onClick={() => setOpenBreakdown((v) => !v)}
+            className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press inline-flex items-center gap-1"
+          >
+            <Icon name={openBreakdown ? 'expand_less' : 'expand_more'} size={13} />
+            Breakdown
+          </button>
+        }
+      >
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
+          {kpis.map((m) => {
+            const on = activeKpi === m.key
+            return (
+              <button
+                key={m.key}
+                onClick={() => onPickKpi?.(m.key)}
+                title={
+                  onPickKpi
+                    ? on
+                      ? 'Showing only these — press again to clear'
+                      : `Show only ${m.label.toLowerCase()}`
+                    : undefined
+                }
+                className={`rounded-lg px-3 py-2.5 text-left fb-press transition-shadow ${
+                  on ? 'shadow-[inset_0_0_0_1.5px_currentColor]' : ''
+                }`}
+                style={{
+                  backgroundColor: queueTint(m.tone, on ? 0.16 : 0.08),
+                  color: m.tone
+                }}
+              >
+                <div className="text-[22px] leading-none font-semibold fb-tabular text-[var(--ink-100)]">
+                  {m.value}
+                </div>
+                <div className="fb-t-caption text-[var(--ink-60)] mt-1 truncate">{m.label}</div>
+                {m.hint && (
+                  <div className="fb-t-caption text-[var(--ink-30)] truncate">{m.hint}</div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        {(trends.length > 0 || pulse.closedByDay.some((n) => n > 0)) && (
+          <div className="mt-3 flex items-center gap-5 flex-wrap">
+            {pulse.closedByDay.some((n) => n > 0) && (
+              <div
+                className="flex items-center gap-2 shrink-0"
+                title={`Closed per day: ${pulse.closedByDay.join(', ')}`}
+              >
+                <div className="flex items-end gap-[3px] h-7 w-[104px]">
+                  {pulse.closedByDay.map((n, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-[1px] self-end"
+                      style={{
+                        height: n === 0 ? '2px' : `${Math.max(14, (n / max) * 100)}%`,
+                        backgroundColor: queueTint('#10b981', n === 0 ? 0.18 : 0.55)
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="fb-t-caption text-[var(--ink-30)] whitespace-nowrap">
+                  closed · 14d
+                </span>
+              </div>
+            )}
+            {trends.length > 0 && (
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                {trends.slice(0, 2).map((t) => (
+                  <div key={t} className="flex items-start gap-1.5 text-[11.5px] text-[var(--ink-60)]">
+                    <Icon name="trending_up" size={12} className="mt-0.5 shrink-0 text-[var(--ink-30)]" />
+                    <span className="truncate">{t}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {openBreakdown && (
+          <div className="mt-3 pt-3 border-t border-[var(--edge-soft)] grid gap-x-6 gap-y-1.5 md:grid-cols-2">
+            {rows.length === 0 ? (
+              <div className="text-[11.5px] text-[var(--ink-30)]">Numbers appear as items do.</div>
+            ) : (
+              rows.map((r) => {
+                const activeN = r.notStarted + r.inProgress + r.waiting
+                const denom = Math.max(1, activeN + r.done7d)
+                const seg = (n: number): string => `${(n / denom) * 100}%`
+                return (
+                  <div key={r.queue} className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="fb-t-caption text-[var(--ink-60)] w-20 truncate">{r.label}</span>
+                      <div className="flex-1 h-2 rounded-full overflow-hidden flex bg-[var(--surface-sunken)]">
+                        <div style={{ width: seg(r.done7d), backgroundColor: queueTint('#10b981', 0.7) }} />
+                        <div style={{ width: seg(r.inProgress), backgroundColor: queueTint('#0ea5e9', 0.7) }} />
+                        <div style={{ width: seg(r.waiting), backgroundColor: queueTint('#f59e0b', 0.6) }} />
+                        <div style={{ width: seg(r.notStarted), backgroundColor: queueTint('#64748b', 0.35) }} />
+                      </div>
+                      <span className="fb-t-caption fb-tabular text-[var(--ink-40)] w-6 text-right">
+                        {activeN}
+                      </span>
+                    </div>
+                    <div className="fb-t-caption text-[var(--ink-30)] ml-[88px]">
+                      {r.done7d} done · {r.inProgress} in progress · {r.waiting} waiting ·{' '}
+                      {r.notStarted} not started
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+      </BlockShell>
+    )
+  }
+
   return (
     <BlockShell title="Analytics" icon="insights" tone="#0ea5e9" variant={variant}>
       {shown.length === 0 ? (
@@ -306,16 +515,19 @@ export function StartHereBlock({ variant }: { variant: BlockVariant }): JSX.Elem
   const openAssistant = useAssistantChrome((s) => s.openPanel)
   const nowMs = Date.now()
   const recs = useMemo(
-    () => startRecommendations(items, nowMs, variant === 'full' ? 3 : 2),
+    () => startRecommendations(items, nowMs, variant === 'compact' ? 2 : 3),
     [items, nowMs, variant]
   )
   const nodesById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
+  const [ask, setAsk] = useState('')
 
-  const start = (i: FbNode): void => {
-    const prompt = startPromptForItem(i, nodesById)
-    if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
-      setActive(i.parentId)
-      goTask(i.parentId)
+  /** Every hand-off STAGES the composer and never sends (DEC-038): the
+   *  assistant must not start acting because the operator glanced at a
+   *  dashboard. He reads it, edits it, presses send. */
+  const stagePrompt = (prompt: string, deskId?: string | null): void => {
+    if (deskId && nodes.some((n) => n.id === deskId && n.kind === 'task')) {
+      setActive(deskId)
+      goTask(deskId)
     }
     useAssistantChrome.getState().setTab('chat')
     openAssistant()
@@ -324,6 +536,82 @@ export function StartHereBlock({ variant }: { variant: BlockVariant }): JSX.Elem
     }
     stage()
     setTimeout(stage, 400)
+  }
+
+  const start = (i: FbNode): void => {
+    const prompt = startPromptForItem(i, nodesById)
+    stagePrompt(prompt, i.parentId)
+  }
+
+  /** The band's prompt box: the question travels WITH the queue's shape, so
+   *  the assistant answers about the real backlog rather than in the
+   *  abstract. Still staged, never sent. */
+  const askPlexii = (): void => {
+    const q = ask.trim()
+    if (!q) return
+    const top = recs.map((r, n) => `${n + 1}. ${r.item.title} — ${r.reason}`).join('\n')
+    const prompt = top
+      ? `${q}\n\nMy attention queue right now, most pressing first:\n${top}`
+      : q
+    stagePrompt(prompt)
+    setAsk('')
+  }
+
+  if (variant === 'band') {
+    return (
+      <BlockShell title="Start here" icon="auto_awesome" tone="#f59e0b" variant={variant}>
+        <div className="flex items-center gap-2">
+          <input
+            value={ask}
+            onChange={(e) => setAsk(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') askPlexii()
+            }}
+            placeholder="Ask Plexii about your queue — “what should I do before 3pm?”"
+            className="fb-field flex-1 min-w-0 bg-[var(--surface-sunken)] px-3 py-2 text-[13px]"
+          />
+          <button
+            onClick={askPlexii}
+            disabled={!ask.trim()}
+            title="Opens a chat prefilled with your question and your top items — nothing is sent until you press send"
+            className="inline-flex items-center gap-1.5 h-9 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-40 shrink-0"
+          >
+            <Icon name="auto_awesome" size={14} />
+            Ask
+          </button>
+        </div>
+        {recs.length === 0 ? (
+          <div className="mt-2 text-[11.5px] text-[var(--ink-30)]">
+            Nothing needs you. Capture with ⌘K.
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            {recs.map((r, idx) => (
+              <button
+                key={r.item.id}
+                onClick={() => start(r.item)}
+                title="Start it with Plexii — a chat prefilled from this capture"
+                className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-left fb-press min-w-0 flex items-start gap-2"
+              >
+                <span
+                  className="fb-t-caption fb-tabular shrink-0 mt-0.5 h-4 w-4 rounded inline-flex items-center justify-center"
+                  style={{ backgroundColor: queueTint('#f59e0b', 0.18), color: '#f59e0b' }}
+                >
+                  {idx + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12.5px] text-[var(--ink-90)] truncate">
+                    {r.item.title}
+                  </span>
+                  <span className="block fb-t-caption text-[var(--ink-40)] truncate">{r.reason}</span>
+                </span>
+                <Icon name="auto_awesome" size={13} className="shrink-0 mt-0.5 text-[var(--ink-30)]" />
+              </button>
+            ))}
+          </div>
+        )}
+      </BlockShell>
+    )
   }
 
   return (

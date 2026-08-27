@@ -7,7 +7,11 @@ import {
   activityFeed,
   statusBreakdown,
   trendLines,
-  startRecommendations
+  startRecommendations,
+  kpiMetrics,
+  KPI_FILTERS,
+  dayTimeline,
+  type KpiKey
 } from '../../src/renderer/src/lib/attentionAnalytics'
 
 // DEC-048 — the command center's numbers. Every claim derivable from
@@ -129,5 +133,99 @@ describe('startRecommendations', () => {
     const sug = wi({ workItemState: 'suggested', dueAt: new Date(NOW - DAY).toISOString() })
     const plain = wi({})
     expect(startRecommendations([sug, plain], NOW, 2).map((r) => r.item.id)).toEqual([plain.id])
+  })
+})
+
+describe('DEC-049 — the KPI band', () => {
+  it('every tile COUNTS by the same predicate its click FILTERS by', () => {
+    // The honesty property: press "Overdue 3" and you get exactly those 3.
+    const items = [
+      wi({ dueAt: new Date(NOW - DAY).toISOString() }), // overdue
+      wi({ dueAt: new Date(NOW + 2 * 60 * 60 * 1000).toISOString() }), // due today
+      wi({ workItemState: 'in_progress' }),
+      wi({ workItemState: 'waiting' }),
+      wi({ workItemState: 'completed', updatedAt: NOW - DAY }),
+      wi({})
+    ]
+    for (const m of kpiMetrics(items, NOW)) {
+      const rows = items.filter((i) => KPI_FILTERS[m.key](i, NOW))
+      expect(rows.length, m.key).toBe(m.value)
+    }
+  })
+
+  it('reports the six command-center metrics with honest values', () => {
+    const items = [
+      wi({ dueAt: new Date(NOW - DAY).toISOString() }),
+      wi({ dueAt: new Date(NOW + 60_000).toISOString() }),
+      wi({ workItemState: 'delegated' }),
+      wi({ workItemState: 'blocked' }),
+      wi({ workItemState: 'completed', updatedAt: NOW - 2 * DAY })
+    ]
+    const by = Object.fromEntries(kpiMetrics(items, NOW).map((m) => [m.key, m.value])) as Record<
+      KpiKey,
+      number
+    >
+    expect(by.open).toBe(4) // the completed one is not open
+    expect(by.overdue).toBe(1)
+    expect(by.due_today).toBe(1)
+    expect(by.in_progress).toBe(1) // delegated projects as in progress
+    expect(by.waiting).toBe(1) // blocked counts as waiting
+    expect(by.closed_7d).toBe(1)
+  })
+
+  it('an overdue item is NOT also counted as due today', () => {
+    const od = wi({ dueAt: new Date(NOW - 3 * 60 * 60 * 1000).toISOString() })
+    expect(KPI_FILTERS.overdue(od, NOW)).toBe(true)
+    expect(KPI_FILTERS.due_today(od, NOW)).toBe(false)
+  })
+
+  it('dismissed and archived items never count as closed work', () => {
+    const dropped = wi({ workItemState: 'dismissed', updatedAt: NOW - DAY })
+    const shelved = wi({ workItemState: 'archived', updatedAt: NOW - DAY })
+    expect(KPI_FILTERS.closed_7d(dropped, NOW)).toBe(false)
+    expect(KPI_FILTERS.closed_7d(shelved, NOW)).toBe(false)
+    // …nor as open (they are closed out of the queues).
+    expect(KPI_FILTERS.open(dropped, NOW)).toBe(false)
+  })
+
+  it('a hint only appears when the comparison is real', () => {
+    const thin = kpiMetrics([wi({})], NOW).find((m) => m.key === 'closed_7d')!
+    expect(thin.hint).toBeUndefined() // no prior week to compare against
+  })
+})
+
+describe('DEC-049 — dayTimeline (today\'s calendar + dated work)', () => {
+  const block = (over: Partial<{ id: string; title: string; startMs: number; durationMin: number; meeting: unknown }>) => ({
+    id: 'b1',
+    title: 'Block',
+    startMs: NOW,
+    durationMin: 30,
+    ...over
+  })
+
+  it('merges calendar blocks with dated items in time order', () => {
+    const early = block({ id: 'b-early', title: 'Standup', startMs: NOW - 3 * 60 * 60 * 1000 })
+    const late = block({ id: 'b-late', title: 'Review', startMs: NOW + 4 * 60 * 60 * 1000 })
+    const due = wi({ dueAt: new Date(NOW + 60 * 60 * 1000).toISOString() })
+    const t = dayTimeline([due], [late, early], NOW)
+    expect(t.map((e) => (e.kind === 'event' ? e.title : 'ITEM'))).toEqual([
+      'Standup',
+      'ITEM',
+      'Review'
+    ])
+  })
+
+  it('ignores blocks outside today and sorts undated work last', () => {
+    const tomorrow = block({ id: 'b-tom', startMs: NOW + 2 * DAY })
+    const meetItem = wi({ intentClass: 'to_meet' }) // undated, still agenda-worthy
+    const dated = wi({ dueAt: new Date(NOW + 60_000).toISOString() })
+    const t = dayTimeline([meetItem, dated], [tomorrow], NOW)
+    expect(t.some((e) => e.kind === 'event')).toBe(false)
+    expect(t[t.length - 1].id).toBe(meetItem.id)
+  })
+
+  it('marks meeting blocks so the row can offer to join', () => {
+    const t = dayTimeline([], [block({ meeting: { roomId: 'r1' } })], NOW)
+    expect(t[0].kind === 'event' && t[0].isMeeting).toBe(true)
   })
 })

@@ -62,6 +62,131 @@ export function pulseCounts(items: FbNode[], nowMs: number, days = 14): PulseCou
   }
 }
 
+// ── KPI band (DEC-049) ──────────────────────────────────────────────────────
+//
+// The headline numbers, CRM-dashboard style, across the top of the command
+// center. Each tile's count comes from the SAME predicate the tile's click
+// filters by — so the number you press and the rows you get can never
+// disagree. That equality is unit-pinned.
+
+export type KpiKey = 'open' | 'due_today' | 'overdue' | 'in_progress' | 'waiting' | 'closed_7d'
+
+const IN_PROGRESS_STATES = ['in_progress', 'delegated', 'needs_review', 'needs_approval']
+const WAITING_STATES = ['waiting', 'blocked']
+
+export const KPI_FILTERS: Record<KpiKey, (i: FbNode, nowMs: number) => boolean> = {
+  open: (i) => active(i),
+  due_today: (i, now) => {
+    if (!active(i) || !i.dueAt) return false
+    const end = new Date(now)
+    end.setHours(23, 59, 59, 999)
+    const t = Date.parse(i.dueAt)
+    return t >= now && t <= end.getTime()
+  },
+  overdue: (i, now) => active(i) && !!i.dueAt && Date.parse(i.dueAt) < now,
+  in_progress: (i) => active(i) && IN_PROGRESS_STATES.includes(i.workItemState ?? ''),
+  waiting: (i) => active(i) && WAITING_STATES.includes(i.workItemState ?? ''),
+  closed_7d: (i, now) => closedMeaningfully(i) && now - i.updatedAt < 7 * DAY
+}
+
+export interface KpiMetric {
+  key: KpiKey
+  label: string
+  value: number
+  tone: string
+  /** A short, honest sub-line — omitted when the data cannot support one. */
+  hint?: string
+}
+
+export function kpiMetrics(items: FbNode[], nowMs: number): KpiMetric[] {
+  const n = (k: KpiKey): number => items.filter((i) => KPI_FILTERS[k](i, nowMs)).length
+  const closedPrev = items.filter(
+    (i) =>
+      closedMeaningfully(i) &&
+      nowMs - i.updatedAt >= 7 * DAY &&
+      nowMs - i.updatedAt < 14 * DAY
+  ).length
+  const closed = n('closed_7d')
+  const arrivedWeek = items.filter((i) => nowMs - i.createdAt < 7 * DAY).length
+  const out: KpiMetric[] = [
+    {
+      key: 'open',
+      label: 'Open',
+      value: n('open'),
+      tone: '#0ea5e9',
+      hint: arrivedWeek > 0 ? `${arrivedWeek} new this week` : undefined
+    },
+    { key: 'due_today', label: 'Due today', value: n('due_today'), tone: '#f59e0b' },
+    { key: 'overdue', label: 'Overdue', value: n('overdue'), tone: '#ef4444' },
+    { key: 'in_progress', label: 'In progress', value: n('in_progress'), tone: '#8b5cf6' },
+    { key: 'waiting', label: 'Waiting', value: n('waiting'), tone: '#eab308' },
+    {
+      key: 'closed_7d',
+      label: 'Closed · 7d',
+      value: closed,
+      tone: '#10b981',
+      hint:
+        closedPrev > 0
+          ? `${closed >= closedPrev ? '+' : ''}${closed - closedPrev} vs prior week`
+          : undefined
+    }
+  ]
+  return out
+}
+
+// ── Today's calendar + dated work, merged (DEC-049) ─────────────────────────
+
+export interface CalendarBlockLike {
+  id: string
+  title: string
+  startMs: number
+  durationMin: number
+  taskId?: string | null
+  meeting?: unknown
+}
+
+export type TimelineEntry =
+  | { kind: 'event'; id: string; title: string; atMs: number; endMs: number; isMeeting: boolean }
+  | { kind: 'item'; id: string; item: FbNode; atMs: number | null }
+
+/**
+ * Today's shape in one ordered list: real calendar blocks that start today
+ * merged with dated work due today (and undated Meet items behind them).
+ * Times order the list; undated work sorts last, in ranked order as given.
+ */
+export function dayTimeline(
+  items: FbNode[],
+  blocks: CalendarBlockLike[],
+  nowMs: number
+): TimelineEntry[] {
+  const start = new Date(nowMs)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(nowMs)
+  end.setHours(23, 59, 59, 999)
+  const events: TimelineEntry[] = blocks
+    .filter((b) => b.startMs >= start.getTime() && b.startMs <= end.getTime())
+    .map((b) => ({
+      kind: 'event' as const,
+      id: b.id,
+      title: b.title,
+      atMs: b.startMs,
+      endMs: b.startMs + b.durationMin * 60000,
+      isMeeting: !!b.meeting
+    }))
+  const work: TimelineEntry[] = agendaItems(items, nowMs).map((i) => ({
+    kind: 'item' as const,
+    id: i.id,
+    item: i,
+    atMs: i.dueAt ? Date.parse(i.dueAt) : null
+  }))
+  return [...events, ...work].sort((a, b) => {
+    if (a.atMs == null && b.atMs == null) return 0
+    if (a.atMs == null) return 1
+    if (b.atMs == null) return -1
+    return a.atMs - b.atMs
+  })
+}
+
 // ── Overdue radar ───────────────────────────────────────────────────────────
 
 export function overdueRadar(

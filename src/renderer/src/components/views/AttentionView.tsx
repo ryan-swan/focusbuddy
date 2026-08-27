@@ -15,13 +15,13 @@ import { serializeTags } from '../../lib/itemTags'
 import { parseMentions, serializeMentions, mentionKey, MENTION_ICON, type ItemMention } from '../../lib/itemMentions'
 import { CAPTURE_STATES } from '@shared/workItems'
 import {
-  AttentionPulseBlock,
   OverdueRadarBlock,
   AgendaBlock,
   RecentActivityBlock,
   AnalyticsBlock,
   StartHereBlock
 } from '../attention/attentionBlocks'
+import { KPI_FILTERS, type KpiKey } from '../../lib/attentionAnalytics'
 import {
   itemContext,
   urgencyOf,
@@ -86,6 +86,16 @@ const GROUP_DWELL_MS = 700
 /** Desk status labels — prefixed "Desk:" wherever shown, because All-Desks'
  *  "To Do" group and the item class To Do are different facts wearing one
  *  word (analysis/23's naming caution). */
+/** DEC-049 — how a KPI tile names itself once it is the active filter. */
+const KPI_LABEL: Record<string, string> = {
+  open: 'open items',
+  due_today: 'items due today',
+  overdue: 'overdue items',
+  in_progress: 'work in progress',
+  waiting: 'waiting / blocked work',
+  closed_7d: 'recently closed'
+}
+
 const DESK_STATUS_LABEL: Record<string, string> = {
   open: 'to do',
   in_progress: 'in progress',
@@ -150,6 +160,10 @@ export default function AttentionView(): JSX.Element {
   // DEC-037 — filtering by a chosen tag. One at a time: the point is to narrow
   // to a thread of work, not to build a query language.
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  // DEC-049 — the KPI band's tiles double as filters: press "Overdue 3" and
+  // the queues below narrow to exactly those three (same predicate, so the
+  // number and the rows can never disagree).
+  const [kpiFilter, setKpiFilter] = useState<KpiKey | null>(null)
   // DEC-038 — selection mode. The Attention page's own bulk pattern, matching
   // the index pages' Select/Select-all shape (DEC-022) so the muscle memory
   // carries. Its one bulk action today is handing the set to Plexii.
@@ -488,10 +502,11 @@ export default function AttentionView(): JSX.Element {
     return () => clearInterval(t)
   }, [refresh])
 
-  const visible = useMemo(
-    () => (tagFilter ? items.filter((i) => hasTag(i, tagFilter)) : items),
-    [items, tagFilter]
-  )
+  const visible = useMemo(() => {
+    let out = tagFilter ? items.filter((i) => hasTag(i, tagFilter)) : items
+    if (kpiFilter) out = out.filter((i) => KPI_FILTERS[kpiFilter](i, nowMs))
+    return out
+  }, [items, tagFilter, kpiFilter, nowMs])
   const allQueues = useMemo(
     () =>
       lens === 'due'
@@ -1202,8 +1217,28 @@ export default function AttentionView(): JSX.Element {
             </div>
           </div>
         )}
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        {/* DEC-049 — the dashboard region. Analytics KPIs run across the top
+            of the working column (CRM-style), the AI strip sits with them,
+            and the day's calendar takes the top right, directly under the
+            banner. The rail below it is SHORT and sticky, so nothing
+            important is a long scroll away. */}
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] items-start">
         <div className="min-w-0">
+        <div className="flex flex-col gap-4 mb-5">
+          <AnalyticsBlock
+            variant="band"
+            activeKpi={kpiFilter}
+            onPickKpi={(k) => {
+              if (k === 'closed_7d') {
+                setShowClosed(true)
+                setKpiFilter(null)
+                return
+              }
+              setKpiFilter((cur) => (cur === k ? null : k))
+            }}
+          />
+          <StartHereBlock variant="band" />
+        </div>
         <div className="mb-3 flex items-center gap-1 flex-wrap">
           {(['all', ...QUEUE_ORDER] as string[]).map((t) => {
             const active = queueTab === t
@@ -1337,6 +1372,22 @@ export default function AttentionView(): JSX.Element {
             >
               <Icon name="auto_awesome" size={14} />
               Get started with Plexii
+            </button>
+          </div>
+        )}
+        {kpiFilter && (
+          /* DEC-049 — a narrowed queue always SAYS it is narrowed, with the
+             escape right there. */
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full fb-t-label bg-[rgba(var(--accent),0.12)] text-[var(--ink-80)]">
+              <Icon name="filter_alt" size={13} />
+              Showing {KPI_LABEL[kpiFilter]} only
+            </span>
+            <button
+              onClick={() => setKpiFilter(null)}
+              className="fb-t-label text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
+            >
+              Clear
             </button>
           </div>
         )}
@@ -1551,6 +1602,10 @@ export default function AttentionView(): JSX.Element {
                 </div>
               </section>
             )}
+            {/* DEC-049 — recent activity is history, so it sits at the FOOT of
+                the working column beside the other history shelves, not in
+                the rail where live work belongs. */}
+            <RecentActivityBlock variant="full" />
             {closed.length > 0 && (
               <section>
                 <button
@@ -1617,13 +1672,9 @@ export default function AttentionView(): JSX.Element {
           </div>
         )}
         </div>
-        <aside className="hidden xl:flex flex-col gap-4 min-w-0">
-          <StartHereBlock variant="full" />
-          <OverdueRadarBlock variant="full" />
+        <aside className="hidden xl:flex flex-col gap-4 min-w-0 xl:sticky xl:top-0 self-start">
           <AgendaBlock variant="full" />
-          <AnalyticsBlock variant="full" />
-          <AttentionPulseBlock variant="full" />
-          <RecentActivityBlock variant="full" />
+          <OverdueRadarBlock variant="full" />
         </aside>
         </div>
       </div>

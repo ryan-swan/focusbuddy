@@ -1102,4 +1102,46 @@ workItemsVerbs guard block rewritten for depth/cycle/subtree; analytics 9);
 typecheck clean; live CDP smoke — zero console errors, blocks live, real
 nested data rendering, collapse verified.
 
+---
+
+## DEC-049 — Command-center LAYOUT: KPI band, the day top-right, a short rail
+**Date:** 2026-08-26 · **Status:** RULED (operator, on the DEC-048 build:
+"way too many widgets along the right-hand column… you have to scroll down too
+far… analytics should be across the top, think KPI metrics on a CRM
+dashboard… top right should be today's agenda or today's calendar, underneath
+the primary banner header… with analytics is where the start here section
+should be — that should be the AI prompt and recommendation") + IMPLEMENTED
+**The arrangement** (pinned in tests so it cannot silently drift):
+- **Analytics across the top** as a `variant="band"` — six KPI tiles (Open,
+  Due today, Overdue, In progress, Waiting, Closed·7d) with a closed-per-day
+  sparkline and any honest trend lines beneath, plus a "Breakdown" disclosure
+  that opens the per-class stacked bars two-up. Pulse is GONE from this page:
+  its numbers ARE the KPI tiles, so the widget count drops instead of
+  duplicating (Pulse still serves the home dashboard compact).
+- **Start here sits with analytics**, directly beneath the band, and is now an
+  AI strip: a prompt box ("Ask Plexii about your queue") that stages the
+  question together with the ranked top-3 and their reasons, plus the three
+  recommendation cards. Staged, never sent (DEC-038 holds).
+- **Today, top right, under the banner** — and it is the real CALENDAR now:
+  `dayTimeline` merges today's time blocks (meeting blocks marked) with the
+  work due in the day. It loads today's range ONLY when the store's window
+  doesn't already cover it, so the Calendar view's own range is never
+  clobbered.
+- **The rail is two blocks and STICKY** (Today + Overdue radar, ~180px): it
+  no longer scrolls away, which is what made the old six-widget column feel
+  long. Recent activity moved to the FOOT of the working column beside the
+  other history shelves (Recently closed, Archived) — history belongs with
+  history, live work belongs in the rail.
+**KPI tiles are filters.** Pressing a tile narrows the queues; the count and
+the rows come from the SAME predicate (`KPI_FILTERS`, exported and used by
+both), so they can never disagree — unit-pinned. A narrowed queue always says
+"Showing <what> only" with a Clear beside it. Closed·7d opens the
+Recently-closed shelf instead (it is not a queue filter).
+**Variant rule extended:** `BlockVariant` gains `'band'` — still ONE component
+per widget, one more display branch, never a per-surface fork.
+**Gates:** 2,974 green (KPI/timeline math + count-equals-filter honesty +
+layout pins); typecheck clean; live CDP — 6 tiles, ask box, 3 recommendations,
+rail computed `position: sticky` at 181px, tile-click filter verified against
+its own count, zero console errors.
+
 <!-- Append below; increment DEC-NNN. -->

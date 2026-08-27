@@ -315,3 +315,40 @@ describe('DEC-047 — desk ⇄ attention, the derived shape (analysis/23 execute
     expect(shared).toContain("['open', 'in_progress', 'waiting', 'blocked'] as const")
   })
 })
+
+describe('DEC-049 — the command-center layout (file-level pins)', () => {
+  const view = read('src/renderer/src/components/views/AttentionView.tsx')
+  // The arrangement the operator ruled: KPIs across the top, the AI strip
+  // with them, the day's calendar top-right under the banner, and a SHORT
+  // sticky rail — no long scroll to reach anything.
+  it('analytics runs across the top of the working column, with Start here beneath it', () => {
+    const band = view.indexOf('<AnalyticsBlock')
+    const start = view.indexOf('<StartHereBlock')
+    const tabs = view.indexOf("QUEUE_ORDER] as string[]).map")
+    expect(band).toBeGreaterThan(-1)
+    expect(view.slice(band, band + 200)).toContain('variant="band"')
+    expect(view.slice(start, start + 120)).toContain('variant="band"')
+    expect(band).toBeLessThan(start) // KPIs first…
+    expect(start).toBeLessThan(tabs) // …then the AI strip, then the queues
+  })
+
+  it('the rail holds ONLY the day and the radar, and it sticks', () => {
+    const aside = view.slice(view.indexOf('<aside'), view.indexOf('</aside>'))
+    expect(aside).toContain('<AgendaBlock variant="full" />')
+    expect(aside).toContain('<OverdueRadarBlock variant="full" />')
+    expect(aside).toContain('xl:sticky')
+    // Everything else was moved out of the column the operator called too long.
+    expect(aside).not.toContain('AnalyticsBlock')
+    expect(aside).not.toContain('StartHereBlock')
+    expect(aside).not.toContain('RecentActivityBlock')
+    expect(aside).not.toContain('AttentionPulseBlock')
+  })
+
+  it('a KPI tile filters by the SAME predicate that counted it', () => {
+    // The number you press and the rows you get cannot disagree, because the
+    // view filters through the exported KPI_FILTERS map itself.
+    expect(view).toContain('KPI_FILTERS[kpiFilter](i, nowMs)')
+    // …and a narrowed queue always says so, with an escape.
+    expect(view).toContain('Showing {KPI_LABEL[kpiFilter]} only')
+  })
+})
