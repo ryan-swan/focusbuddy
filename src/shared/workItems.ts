@@ -30,6 +30,10 @@ export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
   // Exactly one level: a group leader never itself carries a group_id, so a
   // group can never become a tree.
   { column: 'group_id', attr: 'groupId', ddl: 'TEXT', rendererEmitted: true },
+  // DEC-037 — free-form tags, comma-delimited and normalized (see
+  // renderer/lib/itemTags.ts). Never mandatory: the value of a tag is that it
+  // was chosen, so nothing in the layer requires one.
+  { column: 'tags', attr: 'tags', ddl: 'TEXT', rendererEmitted: true },
   { column: 'originator_id', attr: 'originatorId', ddl: 'TEXT', rendererEmitted: true },
   { column: 'recipient_id', attr: 'recipientId', ddl: 'TEXT', rendererEmitted: true },
   // ISO-8601 string — collision-proof vs the numeric desk due_date (§2.2)

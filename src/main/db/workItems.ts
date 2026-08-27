@@ -697,6 +697,7 @@ const PATCHABLE: Record<string, string> = {
   intentClass: 'intent_class',
   intentSub: 'intent_sub',
   groupId: 'group_id',
+  tags: 'tags',
   // DEC-035: manual placement within a queue. A base `nodes` column that
   // already rides the sync body, so a hand-ordered queue travels between
   // devices without joining the work_item manifest.

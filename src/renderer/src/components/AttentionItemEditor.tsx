@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../stores/workItems'
 import { CLASS_CHOICES, queueOf } from '../lib/attentionQueues'
+import { URGENCY_LEVELS, parseTags, serializeTags, urgencyOf } from '../lib/itemTags'
 import Icon from './Icon'
 
 // DEC-036 — the item editor. Double-clicking a queue row opens the WHOLE item
@@ -39,6 +40,9 @@ export default function AttentionItemEditor({
   const [cls, setCls] = useState(queueOf(item))
   const [due, setDue] = useState(isoToInputDate(item.dueAt))
   const [deskId, setDeskId] = useState(item.parentId ?? '')
+  // DEC-037 — the chosen context. Never mandatory.
+  const [urgency, setUrgency] = useState<string>(urgencyOf(item) ?? 'normal')
+  const [tagText, setTagText] = useState(parseTags(item.tags).join(', '))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement | null>(null)
@@ -65,6 +69,10 @@ export default function AttentionItemEditor({
       if (cls !== queueOf(item)) patch.intentClass = cls
       const nextDue = due ? new Date(`${due}T17:00:00`).toISOString() : null
       if (nextDue !== (item.dueAt ?? null)) patch.dueAt = nextDue
+      const nextUrgency = urgency === 'normal' ? null : urgency
+      if (nextUrgency !== (item.wiUrgency ?? null)) patch.wiUrgency = nextUrgency
+      const nextTags = serializeTags(tagText.split(','))
+      if (nextTags !== (item.tags ?? null)) patch.tags = nextTags
       let changed = Object.keys(patch).length > 0
       if (changed) await updateFields(item.id, patch)
 
@@ -184,6 +192,39 @@ export default function AttentionItemEditor({
             </select>
           </label>
         </div>
+
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div>
+            <span className="fb-t-caption text-[var(--ink-40)]">Urgency</span>
+            <div className="mt-1 flex items-center gap-1">
+              {URGENCY_LEVELS.map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setUrgency(u)}
+                  className={`px-2.5 h-7 fb-t-label fb-press rounded-full capitalize ${
+                    urgency === u
+                      ? 'bg-[rgb(var(--accent))] text-white'
+                      : 'bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <label className="block mt-3">
+          <span className="fb-t-caption text-[var(--ink-40)]">
+            Tags <span className="text-[var(--ink-30)]">— optional, comma separated</span>
+          </span>
+          <input
+            value={tagText}
+            onChange={(e) => setTagText(e.target.value)}
+            placeholder="client, rush, q3"
+            className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-3 py-2 text-[12.5px]"
+          />
+        </label>
 
         {error && <div className="mt-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
 

@@ -59,3 +59,37 @@ describe('DEC-035 follow-ups — the drag gestures the operator asked for', () =
     expect(view).toContain('crossQueue ? targetQueue : undefined')
   })
 })
+
+describe('DEC-037 — context at a glance, and the two doors back', () => {
+  const view = read('src/renderer/src/components/views/AttentionView.tsx')
+  const editor = read('src/renderer/src/components/AttentionItemEditor.tsx')
+
+  it('rows show the desk, the plan, the marked source, urgency and tags', () => {
+    expect(view).toContain('itemContext(i, nodesById)')
+    expect(view).toContain('urgencyOf(i)')
+    expect(view).toContain('parseTags(i.tags)')
+    // The plan chip opens the plan; the desk chip opens the desk.
+    expect(view).toContain('goProject(ctx.plan!.id)')
+    expect(view).toContain('onClick={() => openSource(i)}')
+  })
+
+  it('offers BOTH doors: the object itself in Plexi, and the whole desk', () => {
+    // Marking a Notion tool and pressing "desk" launched the external Notion
+    // app. Focus Mode is the in-Plexi door; the desk button is the other.
+    expect(view).toContain('function openHere')
+    expect(view).toContain('setFocusedWidget')
+    expect(view).toContain('Open it here')
+    expect(view).toContain('Open the whole desk it came from')
+    // Only offered when there IS a marked object to open.
+    expect(view).toContain("i.sourceRef && i.sourceType !== 'note'")
+  })
+
+  it('tags filter the queue, and are editable — but never required', () => {
+    expect(view).toContain('tagFilter')
+    expect(view).toContain('hasTag(i, tagFilter)')
+    expect(view).toContain('tagVocabulary(items)')
+    expect(editor).toContain('URGENCY_LEVELS.map')
+    expect(editor).toContain('serializeTags(tagText.split')
+    expect(editor).toContain('optional, comma separated')
+  })
+})

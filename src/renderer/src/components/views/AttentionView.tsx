@@ -7,6 +7,15 @@ import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
 import AttentionItemEditor from '../AttentionItemEditor'
+import { useWidgetStore } from '../../stores/widgets'
+import {
+  itemContext,
+  urgencyOf,
+  parseTags,
+  sourceLabel,
+  hasTag,
+  tagVocabulary
+} from '../../lib/itemTags'
 import {
   groupIntoQueues,
   groupByDue,
@@ -79,6 +88,7 @@ export default function AttentionView(): JSX.Element {
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
   const openConsole = useCaptureConsole((s) => s.openConsole)
+  const setFocusedWidget = useWidgetStore((s) => s.setFocused)
   const [nowMs, setNowMs] = useState(() => Date.now())
   // SPEC-017 lenses: the same active set through three groupings, persisted.
   const [lens, setLens] = useState<'queue' | 'due' | 'origin'>(
@@ -89,6 +99,9 @@ export default function AttentionView(): JSX.Element {
     setLens(l)
   }
   const [showClosed, setShowClosed] = useState(false)
+  // DEC-037 — filtering by a chosen tag. One at a time: the point is to narrow
+  // to a thread of work, not to build a query language.
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
 
   // DEC-035 — the six-dot handle: rearrange, attach one item to another, or
   // move between classifications. Native HTML5 drag (the house pattern; there
@@ -242,15 +255,20 @@ export default function AttentionView(): JSX.Element {
     return () => clearInterval(t)
   }, [refresh])
 
+  const visible = useMemo(
+    () => (tagFilter ? items.filter((i) => hasTag(i, tagFilter)) : items),
+    [items, tagFilter]
+  )
   const queues = useMemo(
     () =>
       lens === 'due'
-        ? groupByDue(items, nowMs)
+        ? groupByDue(visible, nowMs)
         : lens === 'origin'
-          ? groupByOrigin(items, nowMs)
-          : groupIntoQueues(items, nowMs),
-    [items, nowMs, lens]
+          ? groupByOrigin(visible, nowMs)
+          : groupIntoQueues(visible, nowMs),
+    [visible, nowMs, lens]
   )
+  const nodesById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
   const detached = useMemo(() => detachedItems(items), [items])
   const closed = useMemo(() => recentlyClosed(items, nowMs), [items, nowMs])
   // DEC-024: the Archived shelf — kept, out of the way, no clock.
@@ -334,11 +352,26 @@ export default function AttentionView(): JSX.Element {
     }
   }
 
+  /** Open the DESK the item lives on — the whole canvas, in context. */
   function openSource(i: FbNode): void {
     if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
       setActive(i.parentId)
       goTask(i.parentId)
     }
+  }
+
+  /** DEC-037 — open the marked OBJECT itself, inside Plexi, full-screen.
+   *  Marking a Notion tool and then pressing the desk button launched the
+   *  external Notion app (operator live QA): the desk button opens a canvas,
+   *  and whatever that canvas hosts does its own thing. This is the other
+   *  door — go to the desk, then put that one widget into Focus Mode, so the
+   *  item can be dealt with in a single app without leaving Plexi. */
+  function openHere(i: FbNode): void {
+    if (!i.parentId || !i.sourceRef) return
+    setActive(i.parentId)
+    goTask(i.parentId)
+    // After the canvas mounts, hand it the widget to focus.
+    setTimeout(() => setFocusedWidget(i.sourceRef as string), 250)
   }
 
   function row(
@@ -486,6 +519,78 @@ export default function AttentionView(): JSX.Element {
               {notes}
             </div>
           )}
+          {(() => {
+            // DEC-037 — what this item is ABOUT, at a glance. Derived chips
+            // (desk, plan, source) are facts and can never go stale; chosen
+            // chips (urgency, tags) are optional by design.
+            const ctx = itemContext(i, nodesById)
+            const urg = urgencyOf(i)
+            const tags = parseTags(i.tags)
+            if (!ctx.desk && !ctx.plan && !ctx.source && !urg && tags.length === 0) return null
+            return (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                {urg && (
+                  <span
+                    title="Urgency"
+                    className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] ${
+                      urg === 'urgent'
+                        ? 'bg-red-500/12 text-red-600 dark:text-red-400'
+                        : urg === 'high'
+                          ? 'bg-amber-500/12 text-amber-700 dark:text-amber-400'
+                          : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
+                    }`}
+                  >
+                    <Icon name="priority_high" size={10} />
+                    {urg}
+                  </span>
+                )}
+                {ctx.plan && (
+                  <button
+                    onClick={() => goProject(ctx.plan!.id)}
+                    title="Open the plan"
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[var(--surface-sunken)] text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press max-w-[160px]"
+                  >
+                    <Icon name="account_tree" size={10} />
+                    <span className="truncate">{ctx.plan.title}</span>
+                  </button>
+                )}
+                {ctx.desk && (
+                  <button
+                    onClick={() => openSource(i)}
+                    title="Open the desk"
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[var(--surface-sunken)] text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press max-w-[160px]"
+                  >
+                    <Icon name="desk" size={10} />
+                    <span className="truncate">{ctx.desk.title}</span>
+                  </button>
+                )}
+                {ctx.source && (
+                  <span
+                    title={sourceLabel(ctx.source.type)}
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[var(--surface-sunken)] text-[var(--ink-40)]"
+                  >
+                    <Icon name="widgets" size={10} />
+                    {ctx.source.type}
+                  </span>
+                )}
+                {tags.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTagFilter((f) => (f === t ? null : t))}
+                    title={tagFilter === t ? 'Clear this filter' : `Show only “${t}”`}
+                    className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] fb-press ${
+                      tagFilter === t
+                        ? 'bg-[rgb(var(--accent))] text-white'
+                        : 'bg-[rgba(var(--accent),0.10)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                    }`}
+                  >
+                    <Icon name="sell" size={10} />
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
           {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
           {group && group.childCount > 0 && (
             <div className="text-[11px] text-[var(--ink-40)] mt-0.5">
@@ -526,10 +631,19 @@ export default function AttentionView(): JSX.Element {
             </button>
           ) : (
             <>
+              {hasDesk && i.sourceRef && i.sourceType !== 'note' && (
+                <button
+                  onClick={() => openHere(i)}
+                  title="Open it here — the object itself, full screen inside Plexi"
+                  className="icon-btn !h-7 !w-7"
+                >
+                  <Icon name="open_in_full" size={14} />
+                </button>
+              )}
               {hasDesk && (
                 <button
                   onClick={() => openSource(i)}
-                  title="Open its desk"
+                  title="Open the whole desk it came from"
                   className="icon-btn !h-7 !w-7"
                 >
                   <Icon name="desk" size={14} />
@@ -696,6 +810,37 @@ export default function AttentionView(): JSX.Element {
             </button>
           ))}
         </div>
+        {(() => {
+          const vocab = tagVocabulary(items)
+          if (vocab.length === 0) return null
+          return (
+            <div className="mb-4 flex items-center gap-1 flex-wrap">
+              <span className="fb-t-label text-[var(--ink-40)] mr-1">Tags</span>
+              {vocab.slice(0, 10).map(({ tag, count }) => (
+                <button
+                  key={tag}
+                  onClick={() => setTagFilter((f) => (f === tag ? null : tag))}
+                  className={`inline-flex items-center gap-1 px-2 h-6 rounded-full fb-t-label fb-press ${
+                    tagFilter === tag
+                      ? 'bg-[rgb(var(--accent))] text-white'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+                  }`}
+                >
+                  {tag}
+                  <span className="opacity-60 fb-tabular">{count}</span>
+                </button>
+              ))}
+              {tagFilter && (
+                <button
+                  onClick={() => setTagFilter(null)}
+                  className="text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press ml-1"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )
+        })()}
         {loaded && total === 0 && detached.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Icon name="check_circle" size={28} className="text-[var(--ink-30)] mb-3" />

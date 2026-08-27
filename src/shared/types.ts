@@ -179,6 +179,8 @@ export interface FbNode {
   intentSub?: string | null
   /** DEC-035: the item LEADING this item's group (a sibling ref, one level). */
   groupId?: string | null
+  /** DEC-037: comma-delimited normalized tags. Optional, always. */
+  tags?: string | null
   originatorId?: string | null
   recipientId?: string | null
   dueAt?: string | null
