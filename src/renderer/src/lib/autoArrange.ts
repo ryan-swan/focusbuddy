@@ -37,6 +37,34 @@ export interface TidyOptions {
   rows?: number
 }
 
+/**
+ * DEC-038 — the tidy modes, in the order they are offered.
+ *
+ * ONE catalogue, because Tidy now lives in exactly one place: the top pill.
+ * It used to be duplicated as a submenu on the desk right-click menu, which
+ * meant two lists that could drift and two places to learn the same thing.
+ *
+ * `icon` is the whole affordance in the pill's menu — the operator asked for
+ * "just the images", so `label` survives only as the hover tooltip and the
+ * accessible name.
+ */
+export interface TidyModeDef {
+  opts: TidyOptions
+  icon: string
+  label: string
+}
+
+export const TIDY_MODES: readonly TidyModeDef[] = [
+  { opts: { mode: 'square' }, icon: 'grid_view', label: 'Square grid' },
+  { opts: { mode: 'vertical' }, icon: 'view_agenda', label: 'Single column (vertical)' },
+  { opts: { mode: 'horizontal' }, icon: 'view_column', label: 'Single row (horizontal)' },
+  { opts: { mode: 'mosaic' }, icon: 'dashboard', label: 'Mosaic' },
+  { opts: { mode: 'flow' }, icon: 'reorder', label: 'Rows of the canvas (flow)' }
+] as const
+
+/** The counts offered for an explicit column/row count. */
+export const TIDY_COUNTS = [2, 3, 4, 5, 6] as const
+
 // Place items (in the given order) according to a tidy mode. Pure and
 // deterministic — the caller applies the returned x/y. `flowWidth` is the usable
 // canvas width for the wrapping 'flow' mode.
