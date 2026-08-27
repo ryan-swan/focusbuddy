@@ -781,4 +781,62 @@ item would be unforgivable. Pinned by test.
 **Scope:** Queue lens only; Due and Origin answer a different question and stay
 ranked. Deferred: multi-select drag, cross-queue grouping.
 
+
+
+---
+
+## DEC-036 — Double-click opens the whole item for editing
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Decision:** double-clicking a queue row opens an editor over the ENTIRE item —
+title, notes, classification, due date, urgency, tags, and the desk it lives on.
+Closes the oldest Layer-0 gap (analysis/21 §12 "no post-creation editing").
+Only CHANGED fields are written, so editing one field can never restamp another;
+the desk change is a node MOVE (the Detached-shelf recovery's own call), not a
+work-item field. Guard lesson: "ignore double-clicks on buttons" blocked nearly
+the whole row (the title and expander ARE buttons) — the exemption is scoped to
+the action cluster only, pinned by test.
+
+---
+
+## DEC-037 — Context chips (derived) + tags/urgency (chosen), and the two doors
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Decision:** every row shows what it is ABOUT, in two deliberately different
+kinds. **DERIVED** (never typed, never stale): the desk it lives on, the PLAN
+enclosing that desk, what it was marked from — plan chip opens the plan, desk
+chip opens the desk. **CHOSEN** (never mandatory): `wi_urgency`
+(low/normal/high/urgent — 'normal' renders NO chip; a badge every row wears
+says nothing) and free-form `tags` (new manifest column; comma-delimited,
+normalized, capped; empty = NULL). A tag bar shows the vocabulary in use with
+counts; one tag filters at a time — narrowing to a thread of work, not a query
+language. **The two doors (the Notion finding):** the desk button opens a
+CANVAS, and what the canvas hosts does its own thing — marking a Notion tool
+and pressing "desk" launched the external Notion app. "Open it here" now puts
+the marked object into Focus Mode full-screen inside Plexi; the desk button
+remains the whole-canvas door. Verification note for the record: a manifest
+column can EXIST in the DB while main still runs pre-column code — reads come
+back undefined and look like a write failure; restart first.
+
+---
+
+## DEC-038 — "Start it with Plexii" = a PREFILLED CHAT, staged never sent
+**Date:** 2026-08-26 · **Status:** RULED (operator: "start it should open a
+prefilled chat") + IMPLEMENTED
+**Decision:** the bridge from a captured intent to the work itself. Each row
+gains "Start it with Plexii"; a Select mode (the index pages' own bulk shape)
+gains "Get started with Plexii" over a multi-selection. The prompt is composed
+from what was ALREADY captured — title, notes verbatim, desk, plan, due,
+urgency, tags — with a PER-CLASS ask (deciding is not doing: to_decide lays
+out options and costs, to_respond drafts a reply, to_review says what to look
+at first…). No model call builds it; it works with the key removed.
+**The hard rule:** it is STAGED in the composer (fb:composer-stage — the same
+seam Expand uses) and NEVER auto-sent; the assistant must not start acting
+because the operator glanced at his queue. Pinned by test (the hand-off
+contains no .send call). A single-item start navigates to the item's desk
+first so the chat carries that desk's context; a multi-start lists the items
+with their context and asks for sequencing, deliberately NOT inlining N
+notes-paragraphs. **Verification:** prompt composer + stage-not-send are
+unit/pin-tested; the live click-through was not visually confirmed — the
+operator was actively using the app and driving it further would have
+interrupted him.
+
 <!-- Append below; increment DEC-NNN. -->

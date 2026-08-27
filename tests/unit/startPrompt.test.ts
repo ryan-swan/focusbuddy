@@ -78,3 +78,21 @@ describe('startPromptForMany', () => {
     expect(startPromptForMany([], byId)).toBe('')
   })
 })
+
+describe('the wiring (file-level pins)', () => {
+  it('the hand-off STAGES the prompt — it must never auto-send', async () => {
+    const { readFileSync } = await import('fs')
+    const view = readFileSync('src/renderer/src/components/views/AttentionView.tsx', 'utf8')
+    expect(view).toContain('startWithPlexii')
+    expect(view).toContain("fb:composer-stage")
+    // The chat store's send() must NOT be called by the hand-off.
+    const fn = view.slice(view.indexOf('function startWithPlexii'), view.indexOf('/** Open the DESK'))
+    expect(fn).not.toContain('.send(')
+    // Single-item starts go to the item's desk first, for desk context.
+    expect(fn).toContain('goTask(deskId)')
+    // Both entry points exist: the per-row action and the selection bar.
+    expect(view).toContain('Start it with Plexii')
+    expect(view).toContain('Get started with Plexii')
+    expect(view).toContain('Select all')
+  })
+})

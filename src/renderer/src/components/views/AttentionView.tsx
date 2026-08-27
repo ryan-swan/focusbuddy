@@ -389,8 +389,9 @@ export default function AttentionView(): JSX.Element {
     }
     useAssistantChrome.getState().setTab('chat')
     openAssistant()
-    const stage = (): void =>
+    const stage = (): void => {
       window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: prompt }))
+    }
     stage()
     // The panel may still be mounting; the second dispatch covers that (same
     // belt-and-braces the capture console uses).
