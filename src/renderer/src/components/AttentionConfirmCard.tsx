@@ -31,6 +31,7 @@ interface ConfirmState {
 export default function AttentionConfirmCard({
   text,
   deskCtx,
+  source,
   onFiled,
   onCancel,
   cancelLabel = '← Edit text'
@@ -39,6 +40,10 @@ export default function AttentionConfirmCard({
   text: string
   /** DEC-023 desk-context parenting, resolved by the host at its own moment. */
   deskCtx: { id: string; title: string } | null
+  /** CR-09 D-A: set when this capture came from MARKING an object. The item
+   *  then points at that object (sourceType/sourceRef) and opens on the class
+   *  the preset table chose — deterministic, no model call. */
+  source?: { sourceType: string; sourceRef: string; intentClass?: string } | null
   /** Fired once everything is filed: a human summary + how many items. */
   onFiled: (summary: string, count: number, primaryId: string) => void
   onCancel: () => void
@@ -61,6 +66,23 @@ export default function AttentionConfirmCard({
     setCleanupUsed(false)
     setConfirmDate('')
     setError(null)
+    // A MARKED object already knows what it is — the preset table decided,
+    // so the classifier is skipped entirely (no latency, no model, works with
+    // the key removed). Typed captures still classify.
+    if (source?.intentClass) {
+      setConfirm({
+        picked: source.intentClass,
+        confidence: 1,
+        title: text.length > 120 ? `${text.slice(0, 117)}…` : text,
+        dueAt: null,
+        needsDate: false,
+        phrase: null,
+        secondaries: []
+      })
+      return () => {
+        alive = false
+      }
+    }
     void window.api.workItems
       .classify(text)
       .then((c) => {
@@ -94,7 +116,7 @@ export default function AttentionConfirmCard({
       alive = false
       cleanupSeq.current++
     }
-  }, [text])
+  }, [text, source?.intentClass])
 
   function cycleClass(dir: 1 | -1): void {
     if (!confirm) return
@@ -127,7 +149,8 @@ export default function AttentionConfirmCard({
         dueAt,
         confidence: confirm.confidence,
         approvalState: 'auto', // user-authored: submitting IS the approval
-        sourceType: 'note',
+        sourceType: source?.sourceType ?? 'note',
+        sourceRef: source?.sourceRef ?? null,
         wiOrigin: 'human'
       })
       for (const s of extras) {

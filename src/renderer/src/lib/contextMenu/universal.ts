@@ -7,6 +7,8 @@
 import type { WidgetKind } from '@shared/types'
 import { MenuSection, type MenuContribution, type MenuContext } from './types'
 import { CREATE_AND_CONNECT_MENU } from '../createConnectedTool'
+import { presetForWidget, presetForMulti } from '../attentionPresets'
+import { workItemsEnabled } from '../workItemsCapability'
 import {
   createWidget,
   convertWidget,
@@ -41,6 +43,59 @@ const CONVERT_TARGETS: Array<{ kind: WidgetKind; label: string; icon: string }> 
 ]
 
 const seedText = (ctx: MenuContext): string => workingText(ctx).text
+
+// ── Attention (CR-09 D-A) ───────────────────────────────────────────────────
+// The FIRST row on every object menu, by operator ruling: marking a thing is
+// the most common reason to open this menu at all. Deterministic — a preset
+// table names it and picks its class, the standard confirm card (DEC-028)
+// takes it from there, and the filed item POINTS at the object
+// (sourceType/sourceRef) rather than copying it.
+export function buildAttention(ctx: MenuContext): MenuContribution | null {
+  if (!workItemsEnabled()) return null
+  const obj = ctx.object
+  if (obj.type === 'empty-canvas') return null
+
+  const openMark = (text: string, intentClass: string, ref: string, type: string): void => {
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-work-item', {
+        detail: {
+          captureText: text,
+          source: { sourceType: type, sourceRef: ref, intentClass, deskId: ctx.taskId }
+        }
+      })
+    )
+  }
+
+  if (obj.type === 'multi') {
+    const n = obj.widgets.length
+    return {
+      id: 'core/attention',
+      section: MenuSection.Context,
+      priority: -1000, // above every other Context row
+      label: `Add ${n} to Attention…`,
+      icon: 'notifications',
+      onSelect: () => {
+        const p = presetForMulti(n)
+        openMark(p.text, p.intentClass, obj.widgets.map((w) => w.id).join(','), 'widgets')
+      }
+    }
+  }
+
+  const w = obj.widget
+  return {
+    id: 'core/attention',
+    section: MenuSection.Context,
+    priority: -1000,
+    label: 'Add to Attention…',
+    icon: 'notifications',
+    shortcut: undefined,
+    onSelect: () => {
+      const p = presetForWidget(w.kind, w.title ?? '', seedText(ctx))
+      openMark(p.text, p.intentClass, w.id, 'widget')
+    }
+  }
+}
+
 
 export function buildCreate(ctx: MenuContext): MenuContribution[] {
   const seed = seedText(ctx)

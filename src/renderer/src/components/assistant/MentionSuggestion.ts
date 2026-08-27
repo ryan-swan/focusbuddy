@@ -19,6 +19,7 @@ import { Extension } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
 import { ReactRenderer } from '@tiptap/react'
 import MentionList from './MentionList'
+import { mentionReplaceRange } from '../../lib/mentionRange'
 import type { MentionListHandle } from './MentionList'
 import { useNodeStore } from '../../stores/nodes'
 import { personMentionCandidates, usePeopleStore } from '../../lib/peopleDirectory'
@@ -176,6 +177,18 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
         },
         command: ({ editor, range, props }) => {
           const ref = props as unknown as MentionRef
+          // Reconcile the plugin's range against the live caret before either
+          // branch inserts: a lagging range left the typed query behind
+          // ("@att" + Tab → "att @attention"). One computation, both branches.
+          const caret = editor.state.selection.from
+          const WINDOW = 120
+          const textBefore = editor.state.doc.textBetween(
+            Math.max(0, caret - WINDOW),
+            caret,
+            '\n',
+            '\ufffc'
+          )
+          const replace = mentionReplaceRange(caret, textBefore, range)
           // DEC-027/028: the command row inserts a VISUAL chip (the Slack-
           // style cue that routing is armed) but NEVER a stored reference —
           // onPick is skipped, so the resolver and the conversation's
@@ -186,7 +199,7 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
             editor
               .chain()
               .focus()
-              .deleteRange(range)
+              .deleteRange(replace)
               .insertContent([
                 {
                   type: 'mention',
@@ -212,7 +225,7 @@ export const MentionSuggestion = Extension.create<{ hooks: MentionSuggestionHook
           editor
             .chain()
             .focus()
-            .deleteRange(range)
+            .deleteRange(replace)
             .insertContent([
               {
                 type: 'mention',

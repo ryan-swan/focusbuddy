@@ -17,6 +17,7 @@ import { MenuSection, type MenuContext, type MenuContribution, type WidgetContri
 import { collectWidgetContribution, collectPluginContributions } from './registry'
 import { buildAiAssistContribution } from './aiAssist'
 import {
+  buildAttention,
   buildCreate,
   buildConvert,
   buildOrganise,
@@ -126,6 +127,12 @@ export function resolveMenu(ctx: MenuContext): CtxMenuItem[] {
   const suppress = wc.suppress ?? {}
 
   const slots: CtxMenuItem[] = []
+
+  // 0. Attention — FIRST, above everything (CR-09 D-A, operator ruling).
+  // Marking the object you just right-clicked is the most common reason to
+  // open this menu; burying it under Create/Convert made it unreachable.
+  const attn = buildAttention(ctx)
+  if (attn && !suppress['attention']) slots.push(toItem(attn, ctx))
 
   // 1. Context — kind-specific header extras (a widget's own rows) first, then
   // the registered context-band rows.

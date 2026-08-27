@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useWorkItemStore } from '../stores/workItems'
-import { useCaptureConsole } from '../stores/captureConsole'
+import { useCaptureConsole, type CaptureSource } from '../stores/captureConsole'
 import PlexiiLogo from './PlexiiLogo'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
@@ -216,11 +216,14 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
     // console PREFILLED (the @attention path); a bare dispatch opens it empty.
     function onNewWorkItem(e: Event): void {
       const detail = (e as CustomEvent).detail as
-        | { title?: string; captureText?: string }
+        | { title?: string; captureText?: string; source?: CaptureSource | null }
         | undefined
       const title = detail?.title?.trim()
       if (!title) {
-        useCaptureConsole.getState().openConsole(detail?.captureText?.trim() || '')
+        // CR-09 D-A: a MARK carries its object through to the confirm card.
+        useCaptureConsole
+          .getState()
+          .openConsole(detail?.captureText?.trim() || '', detail?.source ?? null)
         return
       }
       void useWorkItemStore

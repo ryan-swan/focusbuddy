@@ -25,6 +25,7 @@ type Mode = 'routed' | 'unrouted' | 'expand'
 export default function CaptureConsole(): JSX.Element | null {
   const open = useCaptureConsole((s) => s.open)
   const initialText = useCaptureConsole((s) => s.initialText)
+  const source = useCaptureConsole((s) => s.source)
   const close = useCaptureConsole((s) => s.close)
   const createItem = useWorkItemStore((s) => s.create)
   const openAssistant = useAssistantChrome((s) => s.openPanel)
@@ -57,7 +58,12 @@ export default function CaptureConsole(): JSX.Element | null {
       // classify step", DEC-019's own words). "← Edit text" drops back to
       // the textarea with the text intact. A bare open stays a textarea.
       setConfirmText(t ? t : null)
-      setDeskCtx(deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes))
+      const marked = useCaptureConsole.getState().source
+      setDeskCtx(
+        marked?.deskId
+          ? { id: marked.deskId, title: marked.deskTitle || 'this desk' }
+          : deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
+      )
       if (!t) setTimeout(() => fieldRef.current?.focus(), 0)
     }
   }, [open, initialText])
@@ -216,6 +222,7 @@ export default function CaptureConsole(): JSX.Element | null {
             <AttentionConfirmCard
               text={confirmText}
               deskCtx={deskCtx}
+              source={source}
               onFiled={(summary, _count, id) => {
                 setFiled(summary)
                 setFiledId(id)
