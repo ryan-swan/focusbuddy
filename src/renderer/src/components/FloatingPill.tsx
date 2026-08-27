@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { collectMenuRects, resolveCenteredTop } from '../lib/floatingChrome'
 import { motion } from 'framer-motion'
 import Icon from './Icon'
-import { TIDY_MODES, TIDY_COUNTS, type TidyOptions } from '../lib/autoArrange'
+import { TIDY_MODES, type TidyOptions } from '../lib/autoArrange'
 import LoadMeter from './LoadMeter'
 import { useCognitiveLoad } from '../lib/useCognitiveLoad'
 
@@ -134,36 +134,6 @@ function TidyControl({
               </button>
             ))}
           </div>
-          {/* An exact column/row count cannot be an icon on its own, so the
-              icon leads and the numerals do the choosing — still no labels. */}
-          {(
-            [
-              { icon: 'view_week', key: 'cols' as const, label: 'columns' },
-              { icon: 'table_rows', key: 'rows' as const, label: 'rows' }
-            ]
-          ).map((row) => (
-            <div key={row.key} className="mt-1 flex items-center gap-0.5">
-              <span
-                title={`Exact number of ${row.label}`}
-                className="inline-flex items-center justify-center h-6 w-7 text-[var(--ink-30)]"
-              >
-                <Icon name={row.icon} size={14} />
-              </span>
-              {TIDY_COUNTS.map((n) => (
-                <button
-                  key={n}
-                  role="menuitem"
-                  onClick={() => pick({ mode: 'custom', [row.key]: n } as TidyOptions)}
-                  title={`${n} ${row.label}`}
-                  aria-label={`${n} ${row.label}`}
-                  data-testid={`tidy-${row.key}-${n}`}
-                  className="inline-flex items-center justify-center h-6 w-6 rounded-md text-[11px] tabular-nums text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] fb-press transition-colors"
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          ))}
         </div>
       )}
     </div>

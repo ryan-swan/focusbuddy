@@ -62,8 +62,57 @@ export const TIDY_MODES: readonly TidyModeDef[] = [
   { opts: { mode: 'flow' }, icon: 'reorder', label: 'Rows of the canvas (flow)' }
 ] as const
 
-/** The counts offered for an explicit column/row count. */
-export const TIDY_COUNTS = [2, 3, 4, 5, 6] as const
+// DEC-040: the explicit column/row count buttons were removed from the menu.
+// "I shouldn't need to select the amount" — square grid now derives a balanced
+// shape from the item count (balancedColumns). The 'custom' MODE survives in
+// tidyPositions for programmatic callers; nothing in the UI offers it.
+
+/**
+ * DEC-040 — how far tidy may GROW a widget.
+ *
+ * Tidy resizes to remove wasted space, but it used to size every widget to its
+ * column's widest and its row's tallest member. One browser at 1200px turned
+ * every sticky beside it into a 1200px sticky — "it stretches my apps really
+ * wide, well beyond the necessary limits" (operator live QA, with a screenshot
+ * of a note stretched across half the canvas).
+ *
+ * A widget may now grow at most this much past its natural size. Small
+ * mismatches still close up, so a tidy grid still reads as a grid; a widget
+ * that is genuinely narrow stays narrow.
+ */
+export const MAX_TIDY_GROWTH = 1.25
+
+/** Grow `natural` toward `cell`, but never past the cap, and never shrink. */
+function grow(natural: number, cell: number): number {
+  return Math.round(Math.max(natural, Math.min(cell, natural * MAX_TIDY_GROWTH)))
+}
+
+/**
+ * DEC-040 — the column count for "square grid", chosen from the item count.
+ *
+ * Not simply ceil(sqrt(n)): that leaves ragged last rows (10 items became
+ * 4+4+2). The operator's ask was "as close to a square as you can get with the
+ * amount of apps on screen" — 10 as 5+5, 9 as 3x3, 4 as 2x2.
+ *
+ * So the cost balances two defects: empty cells in the last row (weighted
+ * double, because a hole is what you actually see) and departure from square.
+ * Ties go to MORE columns, since canvases are wider than they are tall.
+ */
+export function balancedColumns(n: number): number {
+  if (n <= 1) return 1
+  let best = 1
+  let bestCost = Number.POSITIVE_INFINITY
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols)
+    const empty = cols * rows - n
+    const cost = empty * 2 + Math.abs(cols - rows)
+    if (cost < bestCost || (cost === bestCost && cols > best)) {
+      best = cols
+      bestCost = cost
+    }
+  }
+  return best
+}
 
 // Place items (in the given order) according to a tidy mode. Pure and
 // deterministic — the caller applies the returned x/y. `flowWidth` is the usable
@@ -88,7 +137,7 @@ export function tidyPositions(
       : opts.mode === 'horizontal'
         ? n
         : opts.mode === 'square'
-          ? Math.ceil(Math.sqrt(n))
+          ? balancedColumns(n)
           : columnsFor(opts, n) // custom
   return gridPlace(items, columns, gap, padding)
 }
@@ -130,8 +179,10 @@ function flowRows(items: TidyItem[], flowWidth: number, gap: number, padding: nu
     const extraPerItem = Math.max(0, flowWidth - naturalW) / r.length
     let x = padding
     for (const it of r) {
-      const w = Math.round(it.w + extraPerItem)
-      out.push({ id: it.id, x: Math.round(x), y: Math.round(y), w, h: rowMaxH })
+      // Capped: a row reaches for the full width, but never by inflating one
+      // small widget to several times its size.
+      const w = grow(it.w, it.w + extraPerItem)
+      out.push({ id: it.id, x: Math.round(x), y: Math.round(y), w, h: grow(it.h, rowMaxH) })
       x += w + gap
     }
     y += rowMaxH + gap
@@ -165,14 +216,15 @@ function gridPlace(items: TidyItem[], columns: number, gap: number, padding: num
     rowY[r] = y
     y += rowH[r] + gap
   }
-  // Each widget grows to fill its whole cell (column width × row height), so an
-  // aligned grid has no gaps around a smaller-than-its-neighbours widget.
+  // Each widget grows TOWARD its cell (column width × row height) so an aligned
+  // grid closes up small gaps — but only within MAX_TIDY_GROWTH, so a narrow
+  // widget sharing a column with a browser is no longer stretched to match it.
   return items.map((it, i) => ({
     id: it.id,
     x: Math.round(colX[i % cols]),
     y: Math.round(rowY[Math.floor(i / cols)]),
-    w: colW[i % cols],
-    h: rowH[Math.floor(i / cols)]
+    w: grow(it.w, colW[i % cols]),
+    h: grow(it.h, rowH[Math.floor(i / cols)])
   }))
 }
 
@@ -188,9 +240,10 @@ function masonry(items: TidyItem[], columns: number, gap: number, padding: numbe
     const x = padding + c * (colWidth + gap)
     const y = colHeights[c]
     colHeights[c] += it.h + gap
-    // Grow each item to the column width so the columns are flush; heights are
-    // left alone because varying heights packing tightly is the point of mosaic.
-    return { id: it.id, x: Math.round(x), y: Math.round(y), w: colWidth }
+    // Grow each item TOWARD the column width so the columns read as flush,
+    // capped so the widest item cannot drag every other one out to its size.
+    // Heights are left alone — varying heights packing tightly IS mosaic.
+    return { id: it.id, x: Math.round(x), y: Math.round(y), w: grow(it.w, colWidth) }
   })
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { TIDY_MODES, TIDY_COUNTS } from '../../src/renderer/src/lib/autoArrange'
+import { TIDY_MODES } from '../../src/renderer/src/lib/autoArrange'
 
 // DEC-038 — Tidy has ONE home (the top pill) and its modes are offered as
 // icons, not labels.
@@ -18,7 +18,6 @@ describe('the catalogue', () => {
       // The label survives ONLY as a tooltip / accessible name.
       expect(m.label).toBeTruthy()
     }
-    expect([...TIDY_COUNTS]).toEqual([2, 3, 4, 5, 6])
   })
 })
 
@@ -47,11 +46,19 @@ describe('one home', () => {
     expect(pill).not.toContain('onClick={onTidy} disabled={tidyDisabled}')
   })
 
+  it('the exact column/row count buttons are gone (DEC-040)', () => {
+    // "I shouldn't need to select the amount" — square grid derives a balanced
+    // shape from the item count instead.
+    const pill = read('src/renderer/src/components/FloatingPill.tsx')
+    expect(pill).not.toContain('TIDY_COUNTS')
+    expect(pill).not.toContain('tidy-cols-')
+    expect(pill).not.toContain('tidy-rows-')
+  })
+
   it('the modes render as ICONS — labels only as tooltip/aria', () => {
     const pill = read('src/renderer/src/components/FloatingPill.tsx')
     // Driven from the catalogue, so a new mode cannot appear in one place only.
     expect(pill).toContain('TIDY_MODES.map')
-    expect(pill).toContain('TIDY_COUNTS.map')
     expect(pill).toContain('title={m.label}')
     expect(pill).toContain('aria-label={m.label}')
     expect(pill).toContain('<Icon name={m.icon}')

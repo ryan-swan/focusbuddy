@@ -228,9 +228,12 @@ test('(c) Tidy > Square grid lays 4 widgets into a 2x2, columns aligned', async 
 })
 
 // ---------------------------------------------------------------------------
-// (d) Tidy > Columns... > 3 columns
+// (d) DEC-040: square grid derives its own shape — 6 widgets → 3 columns.
+// This scenario used to drive "Columns... > 3 columns"; those explicit count
+// buttons were removed ("I shouldn't need to select the amount"), and
+// balancedColumns(6) === 3, so the expected geometry is unchanged.
 // ---------------------------------------------------------------------------
-test('(d) Tidy > Columns... > 3 columns spreads 6 widgets across three x values', async () => {
+test('(d) square grid spreads 6 widgets across three x values', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -244,7 +247,7 @@ test('(d) Tidy > Columns... > 3 columns spreads 6 widgets across three x values'
     { title: 'w5', x: 1700, y: 650 }
   ])
   await openTask(window, /Tidy columns test/)
-  await pickTidy(window, 'tidy-cols-3')
+  await pickTidy(window, 'tidy-mode-square')
 
   const pos = await widgetPositions(window, ids)
   expect(Object.keys(pos)).toHaveLength(6)
