@@ -1767,6 +1767,12 @@ const api = {
         dueAt: string | null
       }>
     }> => ipcRenderer.invoke('workItems:classify', text),
+    /** DEC-052 B3 — intent-driven plan selection (ids ordered best-first). */
+    planSelect: (
+      intent: string,
+      candidates: Array<{ id: string; title: string; context: string }>
+    ): Promise<{ ids: string[]; note: string | null; via: 'model' | 'fallback' }> =>
+      ipcRenderer.invoke('planner:selectItems', intent, candidates),
     // DEC-026: the opt-in tidy — null unless the capture is messy enough AND
     // the model produced a faithful title+gist. Approve-before-apply.
     proposeCleanup: (

@@ -100,6 +100,7 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
+import { selectItemsForPlan } from '../ai/planSelect'
 import { proposeCleanup } from '../ai/cleanupRewrite'
 import {
   isWorkItemsEnabled,
@@ -739,6 +740,20 @@ export function registerIpcHandlers(): void {
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  // DEC-052 (B3, intent mode) — pick + order the items an intent names. Pure
+  // selection: placement and the preview-confirm stay in the renderer.
+  ipcMain.handle('planner:selectItems', (_e, intent: string, candidates: unknown) =>
+    selectItemsForPlan(
+      String(intent ?? ''),
+      Array.isArray(candidates)
+        ? (candidates as Array<{ id?: unknown; title?: unknown; context?: unknown }>).map((c) => ({
+            id: String(c.id ?? ''),
+            title: String(c.title ?? ''),
+            context: String(c.context ?? '')
+          }))
+        : []
+    )
+  )
   // DEC-026 (Δ6): the opt-in tidy proposal — gated on the deterministic
   // messiness test inside, null on any failure, never blocks a capture.
   ipcMain.handle('workItems:proposeCleanup', (_e, text: string, notes?: string) =>

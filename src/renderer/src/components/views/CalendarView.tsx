@@ -5,7 +5,17 @@ import { useWorkItemStore } from '../../stores/workItems'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
-import WeekTimeGrid from './WeekTimeGrid'
+import WeekTimeGrid, { type GridGhost } from './WeekTimeGrid'
+import {
+  loadPlannerSettings,
+  planDay,
+  schedulableItems,
+  sweepMissed,
+  type PlannedProposal
+} from '../../lib/attentionPlanner'
+import { parseTags } from '../../lib/itemTags'
+import { parseMentions } from '../../lib/itemMentions'
+import { useActionHistory } from '../../stores/actionHistory'
 import {
   QUEUE_COLOR,
   queueOf,
@@ -64,6 +74,8 @@ export default function CalendarView(): JSX.Element {
   const refreshItems = useWorkItemStore((s) => s.refresh)
   const updateFields = useWorkItemStore((s) => s.updateFields)
   const blocks = useTimeBlockStore((s) => s.blocks)
+  const createBlock = useTimeBlockStore((s) => s.create)
+  const updateBlock = useTimeBlockStore((s) => s.update)
   const nodes = useNodeStore((s) => s.nodes)
   const goAttention = useViewStore((s) => s.goAttention)
 
@@ -128,6 +140,130 @@ export default function CalendarView(): JSX.Element {
       return rankScore(b, nowMs) - rankScore(a, nowMs)
     })
   }, [active, query, scheduledIds, nowMs])
+
+  // ── DEC-052 B3/B4 — the planner: preview-first, always ──────────────────
+  const [intent, setIntent] = useState('')
+  const [proposals, setProposals] = useState<PlannedProposal[] | null>(null)
+  const [planNote, setPlanNote] = useState<string | null>(null)
+  const [planBusy, setPlanBusy] = useState(false)
+
+  /** The day being planned: the visible day, or today when the week shows. */
+  const planDayMs = useMemo(() => {
+    if (mode === 'week' || mode === 'month') {
+      const t = dayMs(new Date())
+      const end = rangeStart.getTime() + (mode === 'week' ? 7 : 31) * 86_400_000
+      return t >= rangeStart.getTime() && t < end ? t : rangeStart.getTime()
+    }
+    return rangeStart.getTime()
+  }, [mode, rangeStart])
+
+  const deskTitles = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const n of nodes) if (n.kind === 'task') m.set(n.id, n.title || 'Untitled desk')
+    return m
+  }, [nodes])
+
+  async function runPlan(): Promise<void> {
+    if (planBusy) return
+    setPlanBusy(true)
+    setPlanNote(null)
+    try {
+      const opts = { placedIds: scheduledIds, deskTitles }
+      const settings = loadPlannerSettings()
+      let out: PlannedProposal[]
+      if (intent.trim()) {
+        // Intent mode: the model (or its keyword fallback) picks + orders;
+        // placement stays deterministic and local.
+        const candidates = schedulableItems(items, nowMs)
+          .filter((i) => !scheduledIds.has(i.id))
+          .map((i) => ({
+            id: i.id,
+            title: i.title || '',
+            context: [
+              ...parseTags(i.tags),
+              ...parseMentions(i.mentions).map((mn) => mn.title),
+              i.parentId ? deskTitles.get(i.parentId) ?? '' : ''
+            ]
+              .filter(Boolean)
+              .join(', ')
+          }))
+        const sel = await window.api.workItems.planSelect(intent, candidates)
+        if (!sel.ids.length) {
+          setPlanNote('Nothing in the queue matches that. Try different words, or leave it empty to let Plexii pick.')
+          setProposals(null)
+          return
+        }
+        out = planDay(items, blocks, settings, planDayMs, nowMs, { ...opts, onlyItemIds: sel.ids })
+        setPlanNote(sel.note)
+      } else {
+        out = planDay(items, blocks, settings, planDayMs, nowMs, opts)
+      }
+      setProposals(out.length ? out : null)
+      if (!out.length)
+        setPlanNote(
+          'Nothing to place — the day is full, or everything left is waiting on someone else.'
+        )
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  /** B4 — replan undone: mark slipped blocks missed (the record stays; nothing
+   *  moves) and re-propose their items into what's left of the day. */
+  async function replanUndone(): Promise<void> {
+    if (planBusy) return
+    setPlanBusy(true)
+    setPlanNote(null)
+    try {
+      const missed = sweepMissed(blocks, nowMs)
+      if (!missed.length) {
+        setPlanNote('Nothing slipped. Clean slate.')
+        setProposals(null)
+        return
+      }
+      for (const b of missed) await updateBlock(b.id, { status: 'missed' })
+      const itemIds = [...new Set(missed.map((b) => b.taskId).filter((x): x is string => !!x))]
+      const out = planDay(items, blocks, loadPlannerSettings(), planDayMs, nowMs, {
+        onlyItemIds: itemIds,
+        deskTitles
+      })
+      setProposals(out.length ? out : null)
+      setPlanNote(
+        out.length
+          ? `${missed.length} block${missed.length === 1 ? '' : 's'} slipped — marked missed (the record stays), fresh time proposed below.`
+          : `${missed.length} slipped block${missed.length === 1 ? '' : 's'} marked missed — no room left today to re-propose.`
+      )
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  async function acceptPlan(): Promise<void> {
+    if (!proposals) return
+    // One gesture, one undo: the whole accepted plan reverses with a single
+    // ⌘Z (the batch seam the AI "Apply all" uses).
+    useActionHistory.getState().beginBatch()
+    try {
+      for (const p of proposals) {
+        await createBlock({
+          taskId: p.itemId,
+          title: '',
+          startMs: p.startMs,
+          durationMin: p.durationMin,
+          origin: 'auto'
+        })
+      }
+    } finally {
+      useActionHistory.getState().endBatch(`Planned ${proposals.length} blocks`)
+    }
+    setProposals(null)
+    setPlanNote(null)
+  }
+
+  const ghosts: GridGhost[] = useMemo(
+    () => (proposals ?? []).map((p) => ({ ...p })),
+    [proposals]
+  )
 
   // ── Month data: due work items (primary) + due desks (secondary) ──────────
   const monthDays = useMemo(() => monthGrid(rangeStart), [rangeStart])
@@ -290,6 +426,70 @@ export default function CalendarView(): JSX.Element {
           </aside>
 
           <div className="min-w-0">
+            {mode !== 'month' && (
+              <div className="mb-3 flex flex-col gap-2" data-testid="plan-bar">
+                <div className="flex items-center gap-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] pl-3 pr-2 py-2">
+                  <Icon name="auto_awesome" size={15} className="shrink-0 text-[rgb(var(--accent))]" />
+                  <input
+                    value={intent}
+                    onChange={(e) => setIntent(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void runPlan()
+                    }}
+                    placeholder="What's this day about? (optional — leave empty and Plexii picks by priority)"
+                    className="flex-1 bg-transparent outline-none text-[13px] text-[var(--ink-90)] placeholder:text-[var(--ink-30)]"
+                  />
+                  <button
+                    onClick={() => void runPlan()}
+                    disabled={planBusy}
+                    className="h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50 shrink-0"
+                  >
+                    {planBusy ? 'Planning…' : 'Plan my day'}
+                  </button>
+                  <button
+                    onClick={() => void replanUndone()}
+                    disabled={planBusy}
+                    title="Sweep blocks that slipped past (they stay on the record as missed) and propose fresh time for their items"
+                    className="h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] disabled:opacity-50 shrink-0"
+                  >
+                    Replan undone
+                  </button>
+                </div>
+                {(proposals || planNote) && (
+                  <div className="flex items-center gap-3 rounded-xl border border-dashed border-accent/50 bg-accent/[0.05] px-3 py-2">
+                    <Icon name="draw" size={14} className="shrink-0 text-[rgb(var(--accent))]" />
+                    <span className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0 truncate">
+                      {proposals
+                        ? `${proposals.length} block${proposals.length === 1 ? '' : 's'} proposed · ${proposals.reduce((n, x) => n + x.durationMin, 0)} min${planNote ? ` — ${planNote}` : ''}`
+                        : planNote}
+                    </span>
+                    {proposals && (
+                      <>
+                        <span className="fb-t-caption text-[var(--ink-40)] shrink-0 hidden lg:inline">
+                          Nothing is booked until you accept
+                        </span>
+                        <button
+                          onClick={() => void acceptPlan()}
+                          className="h-7 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] shrink-0"
+                        >
+                          Accept all
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        setProposals(null)
+                        setPlanNote(null)
+                      }}
+                      className="icon-btn !h-7 !w-7 shrink-0"
+                      title="Clear"
+                    >
+                      <Icon name="close" size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {mode === 'month' ? (
               <div>
                 <div className="grid grid-cols-7 gap-1 mb-1">
@@ -379,7 +579,17 @@ export default function CalendarView(): JSX.Element {
                 </div>
               </div>
             ) : (
-              <WeekTimeGrid weekStart={rangeStart} days={MODE_DAYS[mode]} />
+              <WeekTimeGrid
+                weekStart={rangeStart}
+                days={MODE_DAYS[mode]}
+                ghosts={ghosts}
+                onGhostRemove={(itemId) =>
+                  setProposals((cur) => {
+                    const next = (cur ?? []).filter((p) => p.itemId !== itemId)
+                    return next.length ? next : null
+                  })
+                }
+              />
             )}
           </div>
         </div>

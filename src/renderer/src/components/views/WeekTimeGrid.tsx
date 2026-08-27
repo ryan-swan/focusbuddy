@@ -46,16 +46,30 @@ interface Composer {
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
 }
 
+export interface GridGhost {
+  itemId: string
+  title: string
+  startMs: number
+  durationMin: number
+  reason: string
+}
+
 export default function WeekTimeGrid({
   weekStart,
   days = 7,
-  compact = false
+  compact = false,
+  ghosts,
+  onGhostRemove
 }: {
   weekStart: Date
   /** How many day columns to render from weekStart (7 = week, 3, 1 = day). */
   days?: number
   /** Narrow-surface mode (the Attention rail): tighter rows, smaller gutter. */
   compact?: boolean
+  /** DEC-052 B3 — PROPOSED blocks, rendered dashed until the person accepts.
+   *  Nothing here is written; the caller owns the preview-confirm. */
+  ghosts?: GridGhost[]
+  onGhostRemove?: (itemId: string) => void
 }): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const blocks = useTimeBlockStore((s) => s.blocks)
@@ -526,6 +540,39 @@ export default function WeekTimeGrid({
                     </div>
                   )
                 })}
+
+                {(ghosts ?? [])
+                  .filter((g) => g.startMs >= dStart && g.startMs < dStart + DAY_MS)
+                  .map((g) => {
+                    const top =
+                      ((g.startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * hourPx
+                    const height = (g.durationMin / 60) * hourPx
+                    return (
+                      <div
+                        key={`ghost:${g.itemId}`}
+                        data-testid="plan-ghost"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 py-1 fb-t-caption overflow-hidden border-[1.5px] border-dashed border-accent/60 bg-accent/[0.06] text-[var(--ink-80)] group/ghost"
+                        style={{ top: Math.max(0, top), height: Math.max(16, height) }}
+                        title={`${g.title} — ${g.reason} (proposed; accept to book)`}
+                      >
+                        <div className="font-medium truncate">{g.title}</div>
+                        <div className="text-[9px] opacity-70 truncate">{g.reason}</div>
+                        {onGhostRemove && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onGhostRemove(g.itemId)
+                            }}
+                            className="absolute top-0.5 right-0.5 hidden group-hover/ghost:inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
+                            title="Drop this proposal"
+                          >
+                            <Icon name="close" size={9} />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )

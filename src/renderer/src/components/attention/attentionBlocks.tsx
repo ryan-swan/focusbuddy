@@ -590,7 +590,21 @@ export function StartHereBlock({ variant }: { variant: BlockVariant }): JSX.Elem
 
   if (variant === 'band') {
     return (
-      <BlockShell title="Start here" icon="auto_awesome" tone="#f59e0b" variant={variant}>
+      <BlockShell
+        title="Start here"
+        icon="auto_awesome"
+        tone="#f59e0b"
+        variant={variant}
+        trailing={
+          <button
+            onClick={() => useViewStore.getState().goCalendar()}
+            title="Open the calendar and let Plexii lay the day out — preview first, nothing books itself"
+            className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+          >
+            Plan my day →
+          </button>
+        }
+      >
         <div className="flex items-center gap-2">
           <input
             value={ask}

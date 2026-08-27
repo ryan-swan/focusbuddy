@@ -119,3 +119,34 @@ describe('DEC-052 foundation — the columns the planner and connector need', ()
     expect(tb).not.toContain("['origin'")
   })
 })
+
+describe('DEC-052 B3/B4 — the planner is preview-first, always', () => {
+  const view = read('src/renderer/src/components/views/CalendarView.tsx')
+  const grid = read('src/renderer/src/components/views/WeekTimeGrid.tsx')
+
+  it('proposals render as dashed GHOSTS; nothing books without Accept', () => {
+    expect(grid).toContain('data-testid="plan-ghost"')
+    expect(grid).toContain('border-dashed')
+    expect(view).toContain('Nothing is booked until you accept')
+    // The write happens only in acceptPlan, with the auto origin.
+    expect(view).toContain("origin: 'auto'")
+  })
+
+  it('an accepted plan reverses as ONE undo unit', () => {
+    expect(view).toContain('beginBatch()')
+    expect(view).toContain('endBatch(`Planned ${proposals.length} blocks`)')
+  })
+
+  it('replan-undone marks missed (the record stays) and re-proposes — never moves', () => {
+    expect(view).toContain("await updateBlock(b.id, { status: 'missed' })")
+    // No startMs patch anywhere in the replan path: blocks are never moved.
+    expect(view).not.toContain('updateBlock(b.id, { startMs')
+  })
+
+  it('the intent mode selects via IPC with a keyword floor; empty selection is honest', () => {
+    expect(view).toContain('window.api.workItems.planSelect(intent, candidates)')
+    const sel = read('src/main/ai/planSelect.ts')
+    expect(sel).toContain('return fallback()')
+    expect(sel).toContain('an empty selection is a valid answer')
+  })
+})
