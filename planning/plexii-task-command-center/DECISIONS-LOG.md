@@ -1430,4 +1430,43 @@ updated to the new chrome); typecheck clean for these files.
 *(The React max-update-depth warning from the CRDT sync layer is being fixed
 in a separate session — untouched here.)*
 
+---
+
+## DEC-055 — The queue box, the tight left edge, the rail panel
+**Date:** 2026-08-27 · **Status:** RULED (operator live QA, five items) + IMPLEMENTED
+
+**(1) One box around the queue, (2) rows touching with a hairline between**
+— reversing DEC-050's spaced cards, and this time fixing the CAUSE rather
+than working around it. The first divider attempt drew nothing because
+`clusterByDesk` wrapped rows in per-desk `<div>`s: `divide-y` on the list
+then only fell BETWEEN clusters, so a queue with one cluster had no lines at
+all (DEC-050 shipped spacing instead). The per-desk grouping is now a
+**Fragment**, so every row is a direct child of the box and the dividers
+reach all of them. Rows lost their own card, gap and hover-lift; the box owns
+the surface, the row owns a hover tint.
+
+**(3) The dead space left of the checkbox** was a column reserved for a
+hover-only affordance: the drag handle sat in the flex flow at all times,
+even at opacity 0. It is now absolutely placed in the spine gutter, the
+chevron slot narrowed to 3.5, and the row's left padding dropped — the
+completion circle now sits near the edge where the eye expects it.
+Nesting moved from `marginLeft` to `paddingLeft` so an indented row still
+spans the full box and its divider runs edge to edge; the spine and the
+floating handle step in with the indent so hierarchy still reads.
+
+**(4) The calendar's queue rail is a solid panel** — new `.fb-glass-panel`
+(the same family as the card, but sitting on `--surface-raised` at 94%
+rather than a translucent fill), so a standing column of items reads as its
+own surface instead of text lying on the dotted paper.
+
+**(5) The rail filters by CLASSIFICATION, not free text.** The "Filter items…"
+input is gone, replaced by a dropdown (All open items + the eight classes).
+It writes the SAME `classFilter` the header control shows — one truth, two
+places to reach it — so the two can never disagree, and the empty state names
+the class it filtered to.
+
+Suite 3,061 green (three DEC-055 pins; the DEC-050 card and indent pins
+rewritten to the superseding truth, keeping the divider-bug history in the
+comment); typecheck clean.
+
 <!-- Append below; increment DEC-NNN. -->

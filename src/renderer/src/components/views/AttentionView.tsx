@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
@@ -732,11 +732,11 @@ export default function AttentionView(): JSX.Element {
               }
             : undefined
         }
-        style={{ marginLeft: `${Math.min(group?.indent ?? 0, 3) * 26}px` }}
-        className={`group relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-lg fb-glass-row transition-all ${
+        style={{ paddingLeft: `${8 + Math.min(group?.indent ?? 0, 3) * 22}px` }}
+        className={`group relative flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors ${
           selected.has(i.id) && selectMode
-            ? 'ring-2 ring-[rgba(var(--accent),0.45)]'
-            : 'hover:bg-[rgba(var(--accent),0.05)] hover:-translate-y-px'
+            ? 'bg-[rgba(var(--accent),0.08)]'
+            : 'hover:bg-[rgba(var(--accent),0.05)]'
         } ${
           dragId === i.id || (dragMulti && dragId && selected.has(i.id)) ? 'opacity-40' : ''
         } ${
@@ -753,8 +753,11 @@ export default function AttentionView(): JSX.Element {
             which kind of work this is, readable without reading. */}
         <span
           aria-hidden
-          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
-          style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55) }}
+          className="absolute top-0 bottom-0 w-[3px]"
+          style={{
+            left: `${Math.min(group?.indent ?? 0, 3) * 22}px`,
+            backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55)
+          }}
         />
         {selectMode && !inDetached && (
           <button
@@ -797,14 +800,18 @@ export default function AttentionView(): JSX.Element {
                 ? `Drag to move all ${selected.size} selected — drop ON an item to nest them as its subtasks`
                 : 'Drag to reorder, attach to another item, or move to another section'
             }
-            className="shrink-0 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
+            /* DEC-055 — absolutely placed in the spine gutter: reserving a
+               column for a hover-only affordance was the dead space to the
+               left of the checkbox. */
+            style={{ left: `${5 + Math.min(group?.indent ?? 0, 3) * 22}px` }}
+            className="absolute top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <Icon name="drag_indicator" size={16} />
           </button>
         )}
         {/* A fixed slot for the subtask chevron, so every title starts at the
             same x whether or not the row has children. */}
-        <span className="shrink-0 w-4 flex items-center justify-center">
+        <span className="shrink-0 w-3.5 flex items-center justify-center">
           {hasKids && (
             <button
               data-row-action
@@ -1519,15 +1526,18 @@ export default function AttentionView(): JSX.Element {
                       <span className="fb-t-caption text-[rgb(var(--accent))]">move here</span>
                     )}
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  {/* DEC-055 — ONE box holds the queue; rows sit flush inside
+                      it, separated by a hairline. The per-desk grouping is a
+                      FRAGMENT, not a wrapper div: a wrapper made every row a
+                      grandchild, so `divide-y` only ever drew between desk
+                      clusters (the reason the first divider attempt showed
+                      nothing at all). */}
+                  <div className="rounded-[var(--radius-card)] fb-glass-card overflow-hidden divide-y divide-[var(--edge-soft)]">
                     {shown && grouped
                       ? clusterByDesk(shown).map((cluster, ci) => {
                           const desk = cluster.deskId ? nodesById.get(cluster.deskId) : null
                           return (
-                            <div
-                              key={cluster.deskId ?? `flat-${ci}`}
-                              className="flex flex-col gap-1.5"
-                            >
+                            <Fragment key={cluster.deskId ?? `flat-${ci}`}>
                               {desk && (
                                 /* DEC-047 D-2 — the desk header: DERIVED from
                                    parentId, never stored. Title · the desk's
@@ -1539,7 +1549,7 @@ export default function AttentionView(): JSX.Element {
                                     setActive(desk.id)
                                     goTask(desk.id)
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(var(--accent),0.05)] ring-1 ring-inset ring-[var(--edge-hairline)] text-left fb-press mt-1 backdrop-blur-sm"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 bg-[rgba(var(--accent),0.06)] text-left fb-press"
                                 >
                                   <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
                                   <span className="fb-t-label text-[var(--ink-70)] truncate">
@@ -1574,7 +1584,7 @@ export default function AttentionView(): JSX.Element {
                                   queue: q.queue
                                 })
                               )}
-                            </div>
+                            </Fragment>
                           )
                         })
                       : q.items.map((i) => row(i, false))}
@@ -1638,7 +1648,7 @@ export default function AttentionView(): JSX.Element {
                 <p className="text-[11px] text-[var(--ink-40)] mb-2">
                   Their desks were removed or moved — the items were kept. Give each a new home.
                 </p>
-                <div className="flex flex-col gap-1.5">
+                <div className="rounded-[var(--radius-card)] fb-glass-card overflow-hidden divide-y divide-[var(--edge-soft)]">
                   {detached.map((i) => row(i, true))}
                 </div>
               </section>

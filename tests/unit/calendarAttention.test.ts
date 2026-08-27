@@ -251,3 +251,30 @@ describe('DEC-054 — one visual system across Home, Attention and Calendar', ()
     expect(grid).toContain("compact ? 'w-8' : 'w-14'")
   })
 })
+
+describe('DEC-055 — the queue box, the tight left edge, the rail panel', () => {
+  const att = read('src/renderer/src/components/views/AttentionView.tsx')
+  const cal = read('src/renderer/src/components/views/CalendarView.tsx')
+  const css = read('src/renderer/src/styles/globals.css')
+
+  it('the drag handle floats in the spine gutter instead of reserving a column', () => {
+    // That reserved column WAS the dead space to the left of the checkbox.
+    expect(att).toContain('absolute top-1/2 -translate-y-1/2 cursor-grab')
+    expect(att).not.toContain('shrink-0 cursor-grab')
+  })
+
+  it('the rail is a solid panel with a CLASS dropdown — the text filter is gone', () => {
+    expect(css).toContain('.fb-glass-panel {')
+    expect(cal).toContain('fb-glass-panel')
+    expect(cal).toContain('data-testid="rail-class-filter"')
+    expect(cal).toContain('All open items')
+    // The free-text box and its state are retired.
+    expect(cal).not.toContain("placeholder=\"Filter items…\"")
+    expect(cal).not.toContain('const [query, setQuery]')
+  })
+
+  it('both filter controls write ONE truth, so they can never disagree', () => {
+    expect(cal.match(/pickClass\(e\.target\.value\)/g)?.length).toBe(2)
+    expect(cal.match(/const \[classFilter, setClassFilter\]/g)?.length).toBe(1)
+  })
+})

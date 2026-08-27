@@ -555,6 +555,31 @@ body {
       0 18px 44px -14px oklch(0% 0 0 / 0.55),
       var(--shadow-inset-highlight);
   }
+  /* DEC-055 — a MORE SOLID panel for a standing column (the calendar's queue
+     rail). Same family as .fb-glass-card, but it sits on the raised surface
+     rather than a translucent fill, so a long list reads as its own panel
+     instead of text floating on the dotted paper. */
+  .fb-glass-panel {
+    background-color: color-mix(in oklab, var(--surface-raised) 94%, transparent);
+    backdrop-filter: var(--glass-pillow-blur);
+    -webkit-backdrop-filter: var(--glass-pillow-blur);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(20% 0.01 264 / 0.05),
+      0 8px 20px -8px oklch(20% 0.01 264 / 0.12),
+      0 22px 48px -18px oklch(20% 0.01 264 / 0.15),
+      var(--shadow-inset-highlight);
+  }
+  html.dark .fb-glass-panel {
+    background-color: color-mix(in oklab, var(--surface-raised) 92%, transparent);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(0% 0 0 / 0.35),
+      0 8px 20px -8px oklch(0% 0 0 / 0.5),
+      0 22px 52px -18px oklch(0% 0 0 / 0.6),
+      var(--shadow-inset-highlight);
+  }
+
   /* A quieter sibling for rows INSIDE a glass card (queue rows, rail items):
      the same family, one depth step down, so a list reads as content on the
      card rather than a stack of competing cards. */

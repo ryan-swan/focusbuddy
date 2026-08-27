@@ -101,7 +101,6 @@ export default function CalendarView(): JSX.Element {
     setMode(m)
   }
   const [anchor, setAnchor] = useState<Date>(() => dayStart(today))
-  const [query, setQuery] = useState('')
   // DEC-053 — one classification at a time, or all. Persisted like the mode.
   const [classFilter, setClassFilter] = useState<string>(
     () => localStorage.getItem('calendar.classFilter') || 'all'
@@ -159,15 +158,13 @@ export default function CalendarView(): JSX.Element {
     return set
   }, [blocks, nowMs])
   const railItems = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const list = q ? active.filter((i) => (i.title || '').toLowerCase().includes(q)) : active
-    return [...list].sort((a, b) => {
+    return [...active].sort((a, b) => {
       const as = scheduledIds.has(a.id) ? 1 : 0
       const bs = scheduledIds.has(b.id) ? 1 : 0
       if (as !== bs) return as - bs
       return rankScore(b, nowMs) - rankScore(a, nowMs)
     })
-  }, [active, query, scheduledIds, nowMs])
+  }, [active, scheduledIds, nowMs])
 
   // ── DEC-052 B3/B4 — the planner: preview-first, always ──────────────────
   const [intent, setIntent] = useState('')
@@ -482,32 +479,49 @@ export default function CalendarView(): JSX.Element {
               blockDragging ? 'ring-2 ring-[rgba(var(--accent),0.45)] ring-offset-4 ring-offset-[var(--surface-base)]' : ''
             }`}
           >
-            <div className="flex items-center gap-2">
-              <Icon name="notifications" size={14} className="text-[var(--ink-40)]" />
-              <span className="fb-t-label text-[var(--ink-70)] flex-1">
-                {blockDragging ? 'Drop here to unschedule' : 'To schedule'}
-              </span>
-              <button
-                onClick={goAttention}
-                className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] fb-press"
+            {/* DEC-055 — the panel is a SOLID glass surface, not a list lying
+                on the dotted paper, and it filters by CLASSIFICATION (the
+                free-text box is gone). The dropdown writes the same one
+                filter the header shows, so there is a single truth with two
+                places to reach it. */}
+            <div className="rounded-[var(--radius-card)] fb-glass-panel p-3 flex flex-col gap-2.5 min-h-0">
+              <div className="flex items-center gap-2">
+                <Icon name="notifications" size={14} className="text-[var(--ink-40)]" />
+                <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">
+                  {blockDragging ? 'Drop here to unschedule' : 'To schedule'}
+                </span>
+                <button
+                  onClick={goAttention}
+                  className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] fb-press shrink-0"
+                >
+                  Open Attention
+                </button>
+              </div>
+              <select
+                value={classFilter}
+                onChange={(e) => pickClass(e.target.value)}
+                title="Filter this list by classification"
+                data-testid="rail-class-filter"
+                className="fb-field w-full bg-[var(--surface-sunken)] px-2.5 py-1.5 text-[12.5px] text-[var(--ink-80)]"
               >
-                Open Attention
-              </button>
-            </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter items…"
-              className="fb-field w-full bg-[var(--surface-sunken)] px-3 py-1.5 text-[12px]"
-            />
-            <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[calc(100vh-220px)] pr-0.5">
-              {railItems.length === 0 ? (
-                <div className="text-[11px] text-[var(--ink-30)] py-4 text-center">
-                  {query ? 'Nothing matches.' : 'Nothing needs scheduling. Clear runway.'}
-                </div>
-              ) : (
-                railItems.map(railRow)
-              )}
+                <option value="all">All open items</option>
+                {QUEUE_ORDER.map((q) => (
+                  <option key={q} value={q}>
+                    {QUEUE_LABEL[q]}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[calc(100vh-268px)] pr-0.5 -mr-0.5">
+                {railItems.length === 0 ? (
+                  <div className="text-[11.5px] text-[var(--ink-30)] py-6 text-center leading-relaxed">
+                    {classFilter === 'all'
+                      ? 'Nothing needs scheduling. Clear runway.'
+                      : `Nothing open in ${QUEUE_LABEL[classFilter] ?? 'this class'}.`}
+                  </div>
+                ) : (
+                  railItems.map(railRow)
+                )}
+              </div>
             </div>
           </aside>
 

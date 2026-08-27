@@ -365,18 +365,18 @@ describe('DEC-050 — the item rows read like a project tool', () => {
   const view = read('src/renderer/src/components/views/AttentionView.tsx')
   const pill = read('src/renderer/src/components/attention/ItemStatusPill.tsx')
 
-  it('rows are SEPARATED cards, not a seamless stack', () => {
-    // The bug this replaces: `divide-y` on the list drew nothing, because
-    // clusterByDesk wraps rows in per-desk divs — the dividers fell between
-    // CLUSTERS, so a queue with one cluster had no lines at all.
-    expect(view).not.toContain('divide-y divide-[var(--edge-firm)]')
-    expect(view).toContain('<div className="flex flex-col gap-1.5">')
-    // Each row is its own surface that lifts on hover. DEC-053 centred and
-    // tightened it; DEC-054 moved it onto the home page's glass material so
-    // every surface in the app reads as one system.
-    expect(view).toContain('items-center gap-2 pl-3 pr-2.5 py-1.5 min-h-[42px] rounded-lg fb-glass-row')
+  it('the queue is ONE box whose rows touch, divided by a hairline (DEC-055)', () => {
+    // History worth keeping: the first divider attempt drew nothing, because
+    // clusterByDesk wrapped rows in per-desk DIVS — `divide-y` then only fell
+    // between clusters. DEC-050 worked around it with spaced cards; DEC-055
+    // fixed the cause by making the per-desk grouping a FRAGMENT, so every
+    // row is a direct child and the dividers reach all of them.
+    expect(view).toContain('fb-glass-card overflow-hidden divide-y divide-[var(--edge-soft)]')
+    expect(view).toContain('<Fragment key={cluster.deskId ?? `flat-${ci}`}>')
+    // Rows are flush inside that box — no per-row card, no gap, no lift.
+    expect(view).toContain('flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors')
     expect(view).toContain('hover:bg-[rgba(var(--accent),0.05)]')
-    expect(view).toContain('hover:-translate-y-px')
+    expect(view).not.toContain('rounded-lg fb-glass-row transition-all')
   })
 
   it('every row has the project-tool anatomy', () => {
@@ -385,8 +385,10 @@ describe('DEC-050 — the item rows read like a project tool', () => {
     expect(view).toContain('subtaskProgress(i.id, items') // the "2/5" progress
     expect(view).toContain("name=\"flag\"") // priority
     expect(view).toContain('assignees.slice(0, 3)') // who is on it
-    // Nesting reads as indentation, capped with the depth rule.
-    expect(view).toContain('Math.min(group?.indent ?? 0, 3) * 26')
+    // Nesting reads as indentation, capped with the depth rule. DEC-055 moved
+    // it from margin to PADDING so an indented row still spans the box and
+    // its divider runs edge to edge.
+    expect(view).toContain('paddingLeft: `${8 + Math.min(group?.indent ?? 0, 3) * 22}px`')
   })
 
   it('the status pill offers the honest set and closes with the QUEUE verb', () => {
