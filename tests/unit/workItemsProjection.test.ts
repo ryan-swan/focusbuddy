@@ -5,7 +5,8 @@ import {
   WORK_ITEM_COLUMNS,
   WORK_ITEM_SCHEMA_EPOCH,
   WORK_ITEM_STATES,
-  statusForWorkItemState
+  statusForWorkItemState,
+  initialWorkItemState
 } from '../../src/shared/workItems'
 import {
   ensureWorkItemSchema,
@@ -215,5 +216,20 @@ describe('satellites (§2.4) + orphan reconciliation (R017) + the detach hook', 
       detached_from_id: string
     }
     expect(local.detached_from_id).toBe('desk')
+  })
+})
+
+describe('DEC-047 (D-5) — capture-time birth state', () => {
+  it('active states are honored; terminal and garbage fall to open; suggested wins', () => {
+    expect(initialWorkItemState(undefined, 'in_progress')).toBe('in_progress')
+    expect(initialWorkItemState(undefined, 'waiting')).toBe('waiting')
+    expect(initialWorkItemState(undefined, 'blocked')).toBe('blocked')
+    expect(initialWorkItemState(undefined, undefined)).toBe('open')
+    // Terminal at birth would skip closure notifications — refused.
+    expect(initialWorkItemState(undefined, 'completed')).toBe('open')
+    expect(initialWorkItemState(undefined, 'archived')).toBe('open')
+    expect(initialWorkItemState(undefined, 'nonsense')).toBe('open')
+    // The approval gate outranks any request.
+    expect(initialWorkItemState('suggested', 'in_progress')).toBe('suggested')
   })
 })

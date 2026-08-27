@@ -150,6 +150,22 @@ export function normalizeIntentClass(v: unknown): string | undefined {
   return canonicalIntentClass(v)
 }
 
+/** DEC-047 (D-5) — states an item may be BORN in: the active subset a person
+ *  would honestly tag at capture time. Terminal states at birth would skip
+ *  closure notifications and pollute Recently closed, so they remain
+ *  setState-only (the closing verbs). 'suggested' stays approval-driven. */
+export const CAPTURE_STATES = ['open', 'in_progress', 'waiting', 'blocked'] as const
+
+export function initialWorkItemState(
+  approvalState: string | undefined,
+  requested: string | undefined
+): WorkItemState {
+  if (approvalState === 'suggested') return 'suggested'
+  return (CAPTURE_STATES as readonly string[]).includes(requested ?? '')
+    ? (requested as WorkItemState)
+    : 'open'
+}
+
 /** §2.3 (A-02): the derived coarse projection. Computed at every write and
  *  recomputed at every sync apply — never authoritative, never written from
  *  the wire. Dismissed/reclassified → 'parked', NEVER 'done'. The 'open'

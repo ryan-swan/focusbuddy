@@ -24,6 +24,7 @@ interface WorkItemStore {
     notes?: string
     parentId?: string | null
     intentClass?: string
+    state?: string
     dueAt?: string | null
     wiUrgency?: string | null
     tags?: string | null

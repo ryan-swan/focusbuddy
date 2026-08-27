@@ -167,6 +167,55 @@ function isActionableIntent(c: string | null | undefined): boolean {
   return q === 'to_do' || q === 'to_review' || q === 'to_meet' || q === 'to_decide' || q === 'to_respond'
 }
 
+/** DEC-047 (D-1) — desk clusters in the Queue lens, DERIVED from parentId
+ *  (analysis/23: never stored — a stored mirror of parentId is the drift
+ *  trap). Rows keep their given order; a desk becomes a cluster only when it
+ *  holds ≥2 rows in this section (a single item's chips already name its
+ *  desk — a header over one row is noise). Cluster order = first appearance,
+ *  so the ranker still decides what leads. */
+export interface DeskCluster<R> {
+  deskId: string | null
+  rows: R[]
+}
+
+export function clusterByDesk<R extends { item: Pick<FbNode, 'parentId'> }>(
+  rows: R[]
+): DeskCluster<R>[] {
+  const byDesk = new Map<string, R[]>()
+  for (const r of rows) {
+    const d = r.item.parentId ?? ''
+    byDesk.set(d, [...(byDesk.get(d) ?? []), r])
+  }
+  const out: DeskCluster<R>[] = []
+  const emitted = new Set<string>()
+  for (const r of rows) {
+    const d = r.item.parentId ?? ''
+    if (emitted.has(d)) continue
+    const group = byDesk.get(d)!
+    if (d && group.length >= 2) {
+      emitted.add(d)
+      out.push({ deskId: d, rows: group })
+    } else if (!d) {
+      // Standalone items collect into ONE trailing pseudo-cluster in order.
+      if (!emitted.has('')) {
+        emitted.add('')
+        out.push({ deskId: null, rows: byDesk.get('')! })
+      }
+    } else {
+      emitted.add(d)
+      out.push({ deskId: null, rows: group }) // single-item desk: render flat
+    }
+  }
+  // Merge the flat clusters (null deskId) preserving order of appearance.
+  const merged: DeskCluster<R>[] = []
+  for (const c of out) {
+    const last = merged[merged.length - 1]
+    if (c.deskId === null && last && last.deskId === null) last.rows.push(...c.rows)
+    else merged.push({ ...c })
+  }
+  return merged
+}
+
 /** DEC-045 — the desk-widget scope. Items whose home is THIS desk; when the
  *  desk holds no ACTIVE item the widget falls back to everything (the
  *  operator's ruling: "if there are none, it can default to all") and says

@@ -12,6 +12,7 @@ import {
   isTerminalState,
   rankScore,
   scopeItemsForDesk,
+  clusterByDesk,
   PRIMARY_ACTION,
   QUEUE_ORDER
 } from '../../src/renderer/src/lib/attentionQueues'
@@ -236,5 +237,34 @@ describe('DEC-045 — the desk-widget scope', () => {
   it('a detached item does not keep an empty desk from falling back', () => {
     const items = [wi({ id: 'det', parentId: 'd1', detachedFromId: 'gone' }), deskItem('b', 'd2')]
     expect(scopeItemsForDesk(items, 'd1').fellBack).toBe(true)
+  })
+})
+
+describe('DEC-047 (D-1) — desk clusters, derived from parentId', () => {
+  const row = (id: string, parentId: string | null) => ({ item: wi({ id, parentId }) })
+
+  it('a desk with 2+ rows in the section clusters; order of appearance holds', () => {
+    const rows = [row('a', 'd1'), row('b', 'd2'), row('c', 'd1'), row('d', null)]
+    const cs = clusterByDesk(rows)
+    expect(cs.map((c) => c.deskId)).toEqual(['d1', null])
+    expect(cs[0].rows.map((r) => r.item.id)).toEqual(['a', 'c'])
+    // d2 (single) and the standalone flow together, flat, in order.
+    expect(cs[1].rows.map((r) => r.item.id)).toEqual(['b', 'd'])
+  })
+
+  it('a single-item desk renders FLAT — its chips already name the desk', () => {
+    const cs = clusterByDesk([row('a', 'd1'), row('b', null)])
+    expect(cs).toHaveLength(1)
+    expect(cs[0].deskId).toBeNull()
+    expect(cs[0].rows.map((r) => r.item.id)).toEqual(['a', 'b'])
+  })
+
+  it('the ranker still leads: the first-ranked row decides cluster position', () => {
+    const cs = clusterByDesk([row('top', null), row('a', 'd1'), row('b', 'd1')])
+    expect(cs.map((c) => c.deskId)).toEqual([null, 'd1'])
+  })
+
+  it('empty in, empty out', () => {
+    expect(clusterByDesk([])).toEqual([])
   })
 })

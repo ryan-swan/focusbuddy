@@ -270,3 +270,46 @@ describe('DEC-046 — a highlighted list becomes several items, previewed first'
     expect(cleanup).toContain('short "- " bullet lines')
   })
 })
+
+describe('DEC-047 — desk ⇄ attention, the derived shape (analysis/23 executed)', () => {
+  const view = read('src/renderer/src/components/views/AttentionView.tsx')
+
+  it('D-1/D-2: desk headers are DERIVED in the render — no stored grouping anywhere', () => {
+    expect(view).toContain('clusterByDesk(grouped)')
+    // Header anatomy: title, "Desk:"-prefixed status (the naming caution),
+    // due, count, click-opens-desk.
+    expect(view).toContain('Desk: {DESK_STATUS_LABEL[desk.status]')
+    expect(view).toContain('cluster.rows.length')
+    // The trap analysis/23 rejected must stay rejected: clustering never
+    // writes groupId.
+    const clusterFn = read('src/renderer/src/lib/attentionQueues.ts')
+    const body = clusterFn.slice(clusterFn.indexOf('export function clusterByDesk'))
+    expect(body.slice(0, body.indexOf('\n}\n'))).not.toContain('groupId')
+  })
+
+  it('D-3: closing the last item OFFERS desk-done — a suggestion, never an auto-write', () => {
+    expect(view).toContain('closeWithOffer')
+    expect(view).toContain('Mark the desk done')
+    // Only fires on a still-open desk with nothing else active.
+    expect(view).toContain("desk.status === 'done' || desk.status === 'parked'")
+    expect(view).toContain('if (remaining.length > 0) return')
+    // Accepting uses the ordinary user-owned node update.
+    expect(view).toContain("updateNode(desk.id, { status: 'done' })")
+  })
+
+  it('D-4: All-Desks cards carry the attention signal; status groups untouched', () => {
+    const desks = read('src/renderer/src/components/views/DesksView.tsx')
+    expect(desks).toContain('attentionByDesk')
+    expect(desks).toContain('open${attn.due ?')
+    expect(desks).toContain("(['open', 'in_progress', 'done', 'parked']")
+  })
+
+  it('D-5: capture-time status on card AND form — ACTIVE states only', () => {
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    expect(card).toContain('CAPTURE_STATES.map')
+    expect(card).toContain("state: birthState === 'open' ? undefined : birthState")
+    expect(view).toContain('CAPTURE_STATES.map')
+    const shared = read('src/shared/workItems.ts')
+    expect(shared).toContain("['open', 'in_progress', 'waiting', 'blocked'] as const")
+  })
+})

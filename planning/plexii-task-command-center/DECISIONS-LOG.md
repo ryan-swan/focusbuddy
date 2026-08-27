@@ -1015,4 +1015,33 @@ prose notes (the chat-summary case) now request the tidy too, for its
 formatting: the note lands as bullets, the preset title stands, and operator-
 edited notes are never overwritten.
 
+
+
+---
+
+## DEC-047 — Desk ⇄ Attention: the derived shape (analysis/23 D-1…D-6, ruled "proceed with all")
+**Date:** 2026-08-26 · **Status:** RULED (operator: "your plan is better, proceed
+with all your recommendations") + IMPLEMENTED
+**D-1/D-2 — desk clusters, DERIVED:** in the Queue lens, items sharing a
+`parentId` render under a desk header (title · "Desk: <status>" — prefixed per
+the naming caution · due · open count · click opens the desk). A desk clusters
+only at ≥2 rows in a section (a single item's chips already name its desk).
+Pure `clusterByDesk` over the already-ordered rows — the ranker still decides
+what leads; storage untouched; the rejected stored-grouping trap is PINNED
+rejected (the cluster function provably never writes groupId).
+**D-3 — suggestions, never writes:** closing the LAST active item on a
+still-open desk offers "mark the desk done?" once, right then; accepting uses
+the same user-owned status write every desk surface uses. Plan-promotion at
+accumulation stays with CR-09 D-C (its threshold is that brainstorm's DEC).
+**D-4 — All-Desks reverse signal:** each desk card's meta line gains
+"N open · M due" (48h window), derived with the queues' own active-set rules;
+the status groups are untouched.
+**D-5 — capture-time status:** items can be BORN open / in progress / waiting /
+blocked (`CAPTURE_STATES` + `initialWorkItemState`, unit-pinned: terminal at
+birth refused — it would skip closure notifications; 'suggested' still
+approval-driven). Compact status rows on the confirm card and the manual form.
+**D-6 — coordination:** desk `status` remains user-owned; nothing here
+auto-writes it, and any future change to how it is WRITTEN goes to Caleb first
+(core-surface field, preservation doctrine).
+
 <!-- Append below; increment DEC-NNN. -->

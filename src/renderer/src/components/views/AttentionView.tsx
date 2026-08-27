@@ -13,6 +13,7 @@ import { startPromptForItem, startPromptForMany } from '../../lib/startPrompt'
 import TagMentionInput from '../TagMentionInput'
 import { serializeTags } from '../../lib/itemTags'
 import { parseMentions, serializeMentions, mentionKey, MENTION_ICON, type ItemMention } from '../../lib/itemMentions'
+import { CAPTURE_STATES } from '@shared/workItems'
 import {
   itemContext,
   urgencyOf,
@@ -33,6 +34,7 @@ import {
   isTerminalState,
   queueOf,
   rankScore,
+  clusterByDesk,
   PRIMARY_ACTION,
   QUEUE_ICON,
   QUEUE_ORDER,
@@ -67,6 +69,16 @@ import {
  *  rather than "drop near this". A deliberate pause, not a twitch. */
 const GROUP_DWELL_MS = 700
 
+/** Desk status labels — prefixed "Desk:" wherever shown, because All-Desks'
+ *  "To Do" group and the item class To Do are different facts wearing one
+ *  word (analysis/23's naming caution). */
+const DESK_STATUS_LABEL: Record<string, string> = {
+  open: 'to do',
+  in_progress: 'in progress',
+  done: 'done',
+  parked: 'parked'
+}
+
 function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
   if (!i.dueAt) return null
   const overdue = Date.parse(i.dueAt) < nowMs
@@ -94,6 +106,7 @@ export default function AttentionView(): JSX.Element {
   const updateFields = useWorkItemStore((s) => s.updateFields)
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
+  const updateNode = useNodeStore((s) => s.update)
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goRoom)
@@ -206,6 +219,35 @@ export default function AttentionView(): JSX.Element {
     await writeAll(planMoveToQueue(id, queue, rows))
   }
 
+  /** DEC-047 D-3 — a SUGGESTION, never a write: closing the last open item
+   *  on a still-open desk offers "mark the desk done?" once, right then.
+   *  Accepting uses the same user-owned status write every desk surface uses
+   *  (D-6: the app never auto-writes desk status). */
+  async function closeWithOffer(i: FbNode, state: string): Promise<void> {
+    await setState(i.id, state)
+    const deskId = i.parentId
+    if (!deskId) return
+    const desk = nodes.find((n) => n.id === deskId && n.kind === 'task')
+    if (!desk || desk.status === 'done' || desk.status === 'parked') return
+    const remaining = items.filter(
+      (x) =>
+        x.id !== i.id &&
+        x.parentId === deskId &&
+        !isTerminalState(x.workItemState) &&
+        x.detachedFromId == null
+    )
+    if (remaining.length > 0) return
+    const pick = await promptText({
+      title: 'Desk complete?',
+      label: `Everything on “${desk.title || 'this desk'}” is closed.`,
+      choices: [
+        { value: 'done', label: 'Mark the desk done' },
+        { value: 'no', label: 'Leave it as is' }
+      ]
+    })
+    if (pick === 'done') await updateNode(desk.id, { status: 'done' })
+  }
+
   async function ungroup(id: string): Promise<void> {
     await writeAll(planUngroup(id))
   }
@@ -251,6 +293,7 @@ export default function AttentionView(): JSX.Element {
   const [newBusy, setNewBusy] = useState(false)
   const [newTags, setNewTags] = useState<string[]>([])
   const [newNotes, setNewNotes] = useState('')
+  const [newState, setNewState] = useState('open')
   const [newMentions, setNewMentions] = useState<ItemMention[]>([])
   const [newFiled, setNewFiled] = useState<string | null>(null)
 
@@ -274,6 +317,7 @@ export default function AttentionView(): JSX.Element {
         dueAt: newDate ? new Date(`${newDate}T17:00:00`).toISOString() : null,
         tags: serializeTags(newTags),
         mentions: serializeMentions(newMentions),
+        state: newState === 'open' ? undefined : newState,
         confidence: 1, // human-stated, not inferred
         approvalState: 'auto',
         sourceType: 'note',
@@ -284,6 +328,7 @@ export default function AttentionView(): JSX.Element {
       setNewTags([])
       setNewMentions([])
       setNewNotes('')
+      setNewState('open')
       setNewFiled(item.title)
       setTimeout(() => setNewFiled(null), 2500)
       await refresh()
@@ -789,7 +834,7 @@ export default function AttentionView(): JSX.Element {
                 <Icon name="archive" size={14} />
               </button>
               <button
-                onClick={() => void setState(i.id, primary.state)}
+                onClick={() => void closeWithOffer(i, primary.state)}
                 className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)]"
               >
                 {primary.label}
@@ -877,6 +922,22 @@ export default function AttentionView(): JSX.Element {
               placeholder="Notes (optional)"
               className="fb-field mt-2 w-full bg-[var(--surface-sunken)] px-3 py-2 text-[12px] resize-y text-[var(--ink-70)]"
             />
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              <span className="fb-t-caption text-[var(--ink-40)] mr-1">Status</span>
+              {CAPTURE_STATES.map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setNewState(st)}
+                  className={`px-2 h-6 fb-t-label fb-press rounded-full ${
+                    newState === st
+                      ? 'bg-[var(--surface-raised)] text-[var(--ink-100)] shadow-[inset_0_0_0_1px_var(--edge-soft)]'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+                  }`}
+                >
+                  {st.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-1">
               {CLASS_CHOICES.map((c) => (
                 <button
@@ -1135,14 +1196,55 @@ export default function AttentionView(): JSX.Element {
                   </div>
                   <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
                     {grouped
-                      ? grouped.map((g) =>
-                          row(g.item, false, {
-                            isChild: g.isChild,
-                            childCount: g.childCount,
-                            rows: grouped,
-                            queue: q.queue
-                          })
-                        )
+                      ? clusterByDesk(grouped).map((cluster, ci) => {
+                          const desk = cluster.deskId ? nodesById.get(cluster.deskId) : null
+                          return (
+                            <div key={cluster.deskId ?? `flat-${ci}`}>
+                              {desk && (
+                                /* DEC-047 D-2 — the desk header: DERIVED from
+                                   parentId, never stored. Title · the desk's
+                                   OWN status (labeled "Desk:" so it cannot be
+                                   read as an item class) · due · open count.
+                                   Click opens the desk. */
+                                <button
+                                  onClick={() => {
+                                    setActive(desk.id)
+                                    goTask(desk.id)
+                                  }}
+                                  className="w-full flex items-center gap-2 px-4 py-1.5 bg-[var(--surface-sunken)] text-left fb-press"
+                                >
+                                  <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
+                                  <span className="fb-t-label text-[var(--ink-70)] truncate">
+                                    {desk.title || 'Untitled desk'}
+                                  </span>
+                                  <span className="fb-t-caption text-[var(--ink-40)]">
+                                    Desk: {DESK_STATUS_LABEL[desk.status] ?? desk.status}
+                                  </span>
+                                  {desk.dueDate != null && (
+                                    <span className="fb-t-caption text-[var(--ink-40)]">
+                                      due{' '}
+                                      {new Date(desk.dueDate).toLocaleDateString(undefined, {
+                                        month: 'short',
+                                        day: 'numeric'
+                                      })}
+                                    </span>
+                                  )}
+                                  <span className="fb-t-caption fb-tabular text-[var(--ink-30)] ml-auto">
+                                    {cluster.rows.length}
+                                  </span>
+                                </button>
+                              )}
+                              {cluster.rows.map((g) =>
+                                row(g.item, false, {
+                                  isChild: g.isChild || !!desk,
+                                  childCount: g.childCount,
+                                  rows: grouped,
+                                  queue: q.queue
+                                })
+                              )}
+                            </div>
+                          )
+                        })
                       : q.items.map((i) => row(i, false))}
                   </div>
                 </section>

@@ -4,6 +4,7 @@ import { CLASS_CHOICES, CLASS_LABEL, QUEUE_ICON } from '../lib/attentionQueues'
 import Icon from './Icon'
 import TagMentionInput from './TagMentionInput'
 import { URGENCY_LEVELS } from '../lib/itemTags'
+import { CAPTURE_STATES } from '@shared/workItems'
 import { serializeTags } from '../lib/itemTags'
 import { serializeMentions, type ItemMention } from '../lib/itemMentions'
 import { parseSelectionList, normalizeSelectionText } from '../lib/selectionList'
@@ -89,6 +90,9 @@ export default function AttentionConfirmCard({
   // DEC-039 — chosen context at CAPTURE time: urgency + tags/mentions ride
   // the preview screen, so an item can arrive in the queue already tagged.
   const [urgency, setUrgency] = useState<string>('normal')
+  // DEC-047 D-5: an ACTIVE birth state ("waiting on Bob" is real at capture
+  // time). Terminal states stay with the closing verbs.
+  const [birthState, setBirthState] = useState<string>('open')
   const [capTags, setCapTags] = useState<string[]>([])
   const [capMentions, setCapMentions] = useState<ItemMention[]>([])
   // DEC-040: notes are editable ON the preview. The chat's inline card and
@@ -109,6 +113,7 @@ export default function AttentionConfirmCard({
     setError(null)
     setArmed(false)
     setUrgency('normal')
+    setBirthState('open')
     setCapTags([])
     setCapMentions([])
     setNotesEdited(false)
@@ -313,6 +318,7 @@ export default function AttentionConfirmCard({
         intentClass: confirm.picked,
         dueAt,
         wiUrgency: urgency === 'normal' ? null : urgency,
+        state: birthState === 'open' ? undefined : birthState,
         tags: serializeTags(capTags),
         mentions: serializeMentions(capMentions),
         confidence: confirm.confidence,
@@ -515,7 +521,21 @@ export default function AttentionConfirmCard({
         </div>
       )}
       <div className="mt-2.5 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] text-[var(--ink-40)] mr-1">Urgency</span>
+        <span className="text-[11px] text-[var(--ink-40)] mr-1">Status</span>
+        {CAPTURE_STATES.map((st) => (
+          <button
+            key={st}
+            onClick={() => setBirthState(st)}
+            className={`px-2 h-6 fb-t-label fb-press rounded-full ${
+              birthState === st
+                ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)] shadow-[inset_0_0_0_1px_var(--edge-soft)]'
+                : 'bg-[var(--surface-raised)] text-[var(--ink-50)] hover:text-[var(--ink-100)]'
+            }`}
+          >
+            {st.replace('_', ' ')}
+          </button>
+        ))}
+        <span className="text-[11px] text-[var(--ink-40)] ml-2 mr-1">Urgency</span>
         {URGENCY_LEVELS.map((u) => (
           <button
             key={u}

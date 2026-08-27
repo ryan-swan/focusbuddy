@@ -33,6 +33,7 @@ import {
   TERMINAL_WORK_ITEM_STATES,
   DEFAULT_INTENT_CLASS,
   canonicalIntentClass,
+  initialWorkItemState,
   statusForWorkItemState,
   type WorkItemState
 } from '@shared/workItems'
@@ -117,6 +118,9 @@ export interface WorkItemDraft {
   intentClass?: string
   dueAt?: string | null
   wiUrgency?: string | null
+  /** DEC-047 D-5: an ACTIVE birth state (open/in_progress/waiting/blocked);
+   *  anything else falls to 'open'. Terminal states stay setState-only. */
+  state?: string
   tags?: string | null
   mentions?: string | null
   sourceRef?: string | null
@@ -187,7 +191,7 @@ export function createWorkItemCore(
       throw new WorkItemWriteRefusedError('WORK_ITEM_PARENT_REFUSED', 'Nothing nests under a work item.')
   }
   const id = draft.id ?? randomUUID()
-  const state: WorkItemState = draft.approvalState === 'suggested' ? 'suggested' : 'open'
+  const state: WorkItemState = initialWorkItemState(draft.approvalState, draft.state)
   const now = Date.now()
   d.prepare(
     `INSERT INTO nodes (
