@@ -132,6 +132,24 @@ export function orderWithGroups(
 }
 
 /**
+ * DEC-050 — a parent's subtask progress, the "3/5" every project tool shows.
+ * Counts the WHOLE subtree (a sub-subtask is still work under this item), and
+ * takes the closed-predicate as an argument so this module stays free of the
+ * state machine.
+ */
+export function subtaskProgress(
+  id: string,
+  items: FbNode[],
+  isClosed: (i: FbNode) => boolean
+): { done: number; total: number } {
+  const ids = subtreeIds(id, items)
+  ids.delete(id)
+  let done = 0
+  for (const i of items) if (ids.has(i.id) && isClosed(i)) done++
+  return { done, total: ids.size }
+}
+
+/**
  * Collapse filter: rows whose ancestor (in the rendered tree) is in
  * `collapsed` are hidden. Pure over the flat depth-annotated list, so the
  * view stays a thin mapper and the rule is testable.

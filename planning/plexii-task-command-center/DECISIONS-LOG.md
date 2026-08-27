@@ -1144,4 +1144,50 @@ layout pins); typecheck clean; live CDP — 6 tiles, ask box, 3 recommendations,
 rail computed `position: sticky` at 181px, tile-click filter verified against
 its own count, zero console errors.
 
+---
+
+## DEC-050 — Item rows get real project-tool anatomy (ClickUp/Jira grammar)
+**Date:** 2026-08-27 · **Status:** RULED (operator: "the items shouldn't be
+stacked seamlessly together… there needs to be either a line or even a tiny
+bit of spacing… it should look and feel more like a true project management
+app like ClickUp or Jira — incorporate those UI/UX elements") + IMPLEMENTED
+**The bug underneath the complaint.** The list DID carry
+`divide-y divide-[var(--edge-firm)]` — and drew nothing. `clusterByDesk`
+wraps rows in one div PER DESK, so the dividers landed between clusters; a
+queue rendering a single cluster (the common case) got zero lines. Separation
+was never a taste question — it was broken and invisible in review because
+the class looked correct.
+**Rows are now cards.** Each row is its own rounded, bordered surface with a
+6px rhythm between them, a hover lift (a low-alpha accent wash — `sunken`
+would read as recessed on a raised card, and no `--surface-hover` token
+exists), and a 3px spine down the left edge in the QUEUE's colour, so what
+kind of work a row is stays readable without reading. Nesting reads as a
+26px indent per level (capped with the DEC-048 depth rule). The desk-signals
+shelf and the detached shelf follow the same rhythm — one page, one grammar.
+**The anatomy, borrowed deliberately:**
+- **Completion circle first** (the ClickUp gesture): closes with the QUEUE's
+  own verb, so one click never mislabels a Meet item as "done".
+- **Subtask chevron in a fixed slot** so every title starts at the same x
+  whether or not the row has children, plus a **progress bar + "2/5
+  subtasks"** counted over the WHOLE subtree (`subtaskProgress`, pure and
+  tested).
+- **An always-visible meta rail** aligned down the right: priority flag ·
+  interactive status pill · due chip · assignee avatars (initials from person
+  mentions, +N overflow). Always visible — not hover-only — because a list
+  you cannot scan is not a command center.
+- **Status changes in place** (`ItemStatusPill`): Not started / In progress /
+  Waiting / Blocked / Delegated, plus the queue's own closing verb. Colours
+  come from the derived projection, so a state added later can never render
+  unstyled. Picking the closing verb routes through `closeWithOffer`, so the
+  desk-done offer and the open-subtask accounting fire the same as the
+  circle — a status change can never bypass them.
+- Hover actions (copy, open here, desk, Plexii, snooze, archive, open) stay
+  where they were; the old duplicate "Done" button retired, since the circle
+  and the pill both close.
+**Gates:** 2,977 green (subtask progress + row-anatomy and pill pins);
+typecheck clean; live CDP — 8 card rows at 6px separation with correct
+indents, 8 pills, 2 progress bars, the pill menu opened with REAL mouse input
+and a full round-trip verified (menu click → db write → re-render), zero
+console errors.
+
 <!-- Append below; increment DEC-NNN. -->

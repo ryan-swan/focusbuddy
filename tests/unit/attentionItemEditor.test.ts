@@ -352,3 +352,45 @@ describe('DEC-049 — the command-center layout (file-level pins)', () => {
     expect(view).toContain('Showing {KPI_LABEL[kpiFilter]} only')
   })
 })
+
+describe('DEC-050 — the item rows read like a project tool', () => {
+  const view = read('src/renderer/src/components/views/AttentionView.tsx')
+  const pill = read('src/renderer/src/components/attention/ItemStatusPill.tsx')
+
+  it('rows are SEPARATED cards, not a seamless stack', () => {
+    // The bug this replaces: `divide-y` on the list drew nothing, because
+    // clusterByDesk wraps rows in per-desk divs — the dividers fell between
+    // CLUSTERS, so a queue with one cluster had no lines at all.
+    expect(view).not.toContain('divide-y divide-[var(--edge-firm)]')
+    expect(view).toContain('<div className="flex flex-col gap-1.5">')
+    // Each row carries its own border + radius, and lifts on hover.
+    expect(view).toContain('rounded-lg border bg-[var(--surface-raised)]')
+    expect(view).toContain('hover:bg-[rgba(var(--accent),0.045)]')
+  })
+
+  it('every row has the project-tool anatomy', () => {
+    expect(view).toContain('<ItemStatusPill') // status you can change in place
+    expect(view).toContain('close this item') // the completion circle
+    expect(view).toContain('subtaskProgress(i.id, items') // the "2/5" progress
+    expect(view).toContain("name=\"flag\"") // priority
+    expect(view).toContain('assignees.slice(0, 3)') // who is on it
+    // Nesting reads as indentation, capped with the depth rule.
+    expect(view).toContain('Math.min(group?.indent ?? 0, 3) * 26')
+  })
+
+  it('the status pill offers the honest set and closes with the QUEUE verb', () => {
+    // Only states an open item can truthfully sit in, plus the queue's own
+    // closing verb — never a generic "Done" pasted over every class.
+    expect(pill).toContain("{ state: 'in_progress', label: 'In progress' }")
+    expect(pill).toContain("{ state: 'waiting', label: 'Waiting' }")
+    expect(pill).toContain("{ state: 'blocked', label: 'Blocked' }")
+    expect(pill).toContain('closeChoice')
+    expect(view).toContain('closeChoice={{ state: primary.state, label: primary.label }}')
+    // Closing through the pill runs the same accounting as the circle
+    // (desk-done offer + open-subtask offer), never a bare setState.
+    expect(view).toContain('if (next === primary.state) void closeWithOffer(i, next)')
+    // The pill colours itself from the derived projection, so a state we add
+    // later can never render unstyled.
+    expect(pill).toContain('statusForWorkItemState')
+  })
+})

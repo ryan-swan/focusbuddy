@@ -22,6 +22,7 @@ import {
   StartHereBlock
 } from '../attention/attentionBlocks'
 import { KPI_FILTERS, type KpiKey } from '../../lib/attentionAnalytics'
+import ItemStatusPill from '../attention/ItemStatusPill'
 import {
   itemContext,
   urgencyOf,
@@ -59,6 +60,7 @@ import {
   planMoveToQueue,
   planMoveToQueueMulti,
   planUngroup,
+  subtaskProgress,
   subtreeHeight,
   subtreeIds,
   visibleRows,
@@ -708,6 +710,14 @@ export default function AttentionView(): JSX.Element {
     const hasMore = notes.length > 0 || i.title.length > 60
     const canDrag = !!group && !inDetached
     const isOver = over?.id === i.id
+    // DEC-050 — the project-tool anatomy: does it have subtasks, how far
+    // along are they, how urgent is it, and who is on it.
+    const hasKids = !!group && (group.childCount > 0 || (isCollapsed && group.descendants > 0))
+    const progress = hasKids
+      ? subtaskProgress(i.id, items, (x) => isTerminalState(x.workItemState))
+      : null
+    const urgency = urgencyOf(i)
+    const assignees = parseMentions(i.mentions).filter((m) => m.kind === 'person')
     return (
       <div
         key={i.id}
@@ -773,20 +783,30 @@ export default function AttentionView(): JSX.Element {
               }
             : undefined
         }
-        className={`group flex items-start gap-2 px-4 py-2.5 bg-[var(--surface-raised)] ${
-          ['', 'pl-10', 'pl-16', 'pl-[5.5rem]'][Math.min(group?.indent ?? 0, 3)]
+        style={{ marginLeft: `${Math.min(group?.indent ?? 0, 3) * 26}px` }}
+        className={`group relative flex items-start gap-2.5 pl-3 pr-3 py-2.5 rounded-lg border bg-[var(--surface-raised)] transition-colors ${
+          selected.has(i.id) && selectMode
+            ? 'border-[rgba(var(--accent),0.5)] bg-[rgba(var(--accent),0.05)]'
+            : 'border-[var(--edge-soft)] hover:border-[var(--edge-firm)] hover:bg-[rgba(var(--accent),0.045)]'
         } ${
           dragId === i.id || (dragMulti && dragId && selected.has(i.id)) ? 'opacity-40' : ''
         } ${
           isOver && over?.pos === 'into'
             ? 'shadow-[inset_0_0_0_2px_rgba(var(--accent),0.5)]'
             : isOver && over?.pos === 'before'
-              ? 'shadow-[inset_0_2px_0_rgb(var(--accent))]'
+              ? 'shadow-[0_-2px_0_rgb(var(--accent))]'
               : isOver && over?.pos === 'after'
-                ? 'shadow-[inset_0_-2px_0_rgb(var(--accent))]'
+                ? 'shadow-[0_2px_0_rgb(var(--accent))]'
                 : ''
         }`}
       >
+        {/* DEC-050 — the queue's colour as a spine down the row's left edge:
+            which kind of work this is, readable without reading. */}
+        <span
+          aria-hidden
+          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
+          style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55) }}
+        />
         {selectMode && !inDetached && (
           <button
             onClick={() => toggleSelected(i.id)}
@@ -829,20 +849,35 @@ export default function AttentionView(): JSX.Element {
             <Icon name="drag_indicator" size={16} />
           </button>
         )}
-        <button
-          onClick={() => hasMore && toggleExpanded(i.id)}
-          title={hasMore ? (isOpen ? 'Collapse' : 'Show the full text') : undefined}
-          aria-expanded={isOpen}
-          disabled={!hasMore}
-          className={`shrink-0 mt-0.5 ${hasMore ? 'fb-press cursor-pointer' : 'cursor-default'}`}
-        >
-          <Icon
-            name={hasMore ? (isOpen ? 'expand_more' : 'chevron_right') : (QUEUE_ICON[queueOf(i)] ?? 'check_circle')}
-            size={16}
-            className="text-[var(--ink-30)]"
-            style={!hasMore && QUEUE_COLOR[queueOf(i)] ? { color: queueTint(QUEUE_COLOR[queueOf(i)], 0.75) } : undefined}
-          />
-        </button>
+        {/* A fixed slot for the subtask chevron, so every title starts at the
+            same x whether or not the row has children. */}
+        <span className="shrink-0 w-4 mt-0.5 flex items-center justify-center">
+          {hasKids && (
+            <button
+              data-row-action
+              onClick={() => toggleCollapsed(i.id)}
+              title={isCollapsed ? 'Show its subtasks' : 'Collapse its subtasks'}
+              aria-expanded={!isCollapsed}
+              className="h-4 w-4 flex items-center justify-center rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] fb-press"
+            >
+              <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={15} />
+            </button>
+          )}
+        </span>
+        {!inDetached && (
+          /* DEC-050 — the completion circle every task app puts first. It
+             closes with the QUEUE's own verb (Done / Scheduled / Answered…),
+             so one click never mislabels what happened. The queue's identity
+             lives in the row's coloured spine, so no icon competes with it. */
+          <button
+            data-row-action
+            onClick={() => void closeWithOffer(i, primary.state)}
+            title={`${primary.label} — close this item`}
+            className="shrink-0 mt-[2px] h-[19px] w-[19px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
+          >
+            <Icon name="check" size={13} />
+          </button>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <button
@@ -854,7 +889,6 @@ export default function AttentionView(): JSX.Element {
             >
               {i.title}
             </button>
-            {dueChip(i, nowMs)}
           </div>
           {isOpen && notes && (
             <div className="mt-1.5 text-[12px] text-[var(--ink-70)] whitespace-pre-wrap break-words select-text">
@@ -866,28 +900,13 @@ export default function AttentionView(): JSX.Element {
             // (desk, plan, source) are facts and can never go stale; chosen
             // chips (urgency, tags) are optional by design.
             const ctx = itemContext(i, nodesById)
-            const urg = urgencyOf(i)
             const tags = parseTags(i.tags)
-            const ments = parseMentions(i.mentions)
-            if (!ctx.desk && !ctx.plan && !ctx.source && !urg && tags.length === 0 && ments.length === 0)
+            // People render as avatars in the meta rail; the rest stay chips.
+            const ments = parseMentions(i.mentions).filter((m) => m.kind !== 'person')
+            if (!ctx.desk && !ctx.plan && !ctx.source && tags.length === 0 && ments.length === 0)
               return null
             return (
               <div className="mt-1 flex flex-wrap items-center gap-1">
-                {urg && (
-                  <span
-                    title="Urgency"
-                    className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] ${
-                      urg === 'urgent'
-                        ? 'bg-red-500/12 text-red-600 dark:text-red-400'
-                        : urg === 'high'
-                          ? 'bg-amber-500/12 text-amber-700 dark:text-amber-400'
-                          : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
-                    }`}
-                  >
-                    <Icon name="priority_high" size={10} />
-                    {urg}
-                  </span>
-                )}
                 {ctx.plan && (
                   <button
                     onClick={() => goProject(ctx.plan!.id)}
@@ -959,20 +978,84 @@ export default function AttentionView(): JSX.Element {
             )
           })()}
           {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
-          {group && (group.childCount > 0 || (isCollapsed && group.descendants > 0)) && (
-            /* DEC-048 — the parent's fold. Collapsed keeps the row, hides the
-               subtree, and says how much is tucked away. */
+          {progress && progress.total > 0 && (
+            /* DEC-048/050 — subtask progress, the "2/5" a project tool shows,
+               with a bar. The chevron beside the title does the folding. */
             <button
               data-row-action
               onClick={() => toggleCollapsed(i.id)}
               title={isCollapsed ? 'Show its subtasks' : 'Collapse its subtasks'}
-              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+              className="mt-1.5 inline-flex items-center gap-2 fb-press group/prog"
             >
-              <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={12} />
-              {isCollapsed
-                ? `${group.descendants} subtask${group.descendants === 1 ? '' : 's'} hidden`
-                : `${group.childCount} subtask${group.childCount === 1 ? '' : 's'}`}
+              <span className="h-1 w-16 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${(progress.done / progress.total) * 100}%`,
+                    backgroundColor: queueTint('#10b981', 0.75)
+                  }}
+                />
+              </span>
+              <span className="fb-t-caption fb-tabular text-[var(--ink-40)] group-hover/prog:text-[var(--ink-70)]">
+                {progress.done}/{progress.total} subtask{progress.total === 1 ? '' : 's'}
+                {isCollapsed ? ' · hidden' : ''}
+              </span>
             </button>
+          )}
+        </div>
+        {/* DEC-050 — the meta rail: the columns a project tool aligns down the
+            right of every row. Always visible (unlike the hover actions), so
+            the list can be SCANNED: priority, status, date, who. */}
+        <div className="flex items-center gap-1.5 shrink-0 mt-[1px]">
+          {urgency && (
+            <span
+              title={`Priority: ${urgency}`}
+              className={`inline-flex items-center justify-center h-6 w-6 rounded ${
+                urgency === 'urgent'
+                  ? 'text-red-500 bg-red-500/10'
+                  : urgency === 'high'
+                    ? 'text-amber-500 bg-amber-500/10'
+                    : 'text-[var(--ink-30)]'
+              }`}
+            >
+              <Icon name="flag" size={13} />
+            </span>
+          )}
+          {!inDetached && (
+            <ItemStatusPill
+              state={i.workItemState}
+              closeChoice={{ state: primary.state, label: primary.label }}
+              onPick={(next) => {
+                // The queue's closing verb runs through the SAME path the
+                // completion circle uses, so the desk-done offer and the
+                // subtask accounting fire either way.
+                if (next === primary.state) void closeWithOffer(i, next)
+                else void setState(i.id, next)
+              }}
+            />
+          )}
+          {i.dueAt && dueChip(i, nowMs)}
+          {assignees.length > 0 && (
+            <span className="flex items-center -space-x-1.5 pl-0.5">
+              {assignees.slice(0, 3).map((m) => (
+                <span
+                  key={mentionKey(m)}
+                  title={`${m.title} — mentioned`}
+                  className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-semibold uppercase text-[var(--ink-70)] bg-[var(--surface-sunken)] ring-1 ring-[var(--surface-raised)]"
+                >
+                  {(m.title || '?')
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join('')}
+                </span>
+              ))}
+              {assignees.length > 3 && (
+                <span className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] text-[var(--ink-50)] bg-[var(--surface-sunken)] ring-1 ring-[var(--surface-raised)]">
+                  +{assignees.length - 3}
+                </span>
+              )}
+            </span>
           )}
         </div>
         <div
@@ -1048,10 +1131,11 @@ export default function AttentionView(): JSX.Element {
                 <Icon name="archive" size={14} />
               </button>
               <button
-                onClick={() => void closeWithOffer(i, primary.state)}
-                className="h-7 px-2.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)]"
+                onClick={() => setEditing(i)}
+                title="Open the item"
+                className="icon-btn !h-7 !w-7"
               >
-                {primary.label}
+                <Icon name="open_in_new" size={14} />
               </button>
             </>
           )}
@@ -1482,12 +1566,15 @@ export default function AttentionView(): JSX.Element {
                       <span className="fb-t-caption text-[rgb(var(--accent))]">move here</span>
                     )}
                   </div>
-                  <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
+                  <div className="flex flex-col gap-1.5">
                     {shown && grouped
                       ? clusterByDesk(shown).map((cluster, ci) => {
                           const desk = cluster.deskId ? nodesById.get(cluster.deskId) : null
                           return (
-                            <div key={cluster.deskId ?? `flat-${ci}`}>
+                            <div
+                              key={cluster.deskId ?? `flat-${ci}`}
+                              className="flex flex-col gap-1.5"
+                            >
                               {desk && (
                                 /* DEC-047 D-2 — the desk header: DERIVED from
                                    parentId, never stored. Title · the desk's
@@ -1499,7 +1586,7 @@ export default function AttentionView(): JSX.Element {
                                     setActive(desk.id)
                                     goTask(desk.id)
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-1.5 bg-[var(--surface-sunken)] text-left fb-press"
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-sunken)] text-left fb-press mt-1"
                                 >
                                   <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
                                   <span className="fb-t-label text-[var(--ink-70)] truncate">
@@ -1548,11 +1635,11 @@ export default function AttentionView(): JSX.Element {
                   <span className="fb-t-label text-[var(--ink-70)]">From your desks</span>
                   <span className="fb-t-label text-[var(--ink-30)] fb-tabular">{signals.length}</span>
                 </div>
-                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
+                <div className="flex flex-col gap-1.5">
                   {signals.map((s) => (
                     <div
                       key={s.key}
-                      className="group flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
+                      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] transition-colors"
                     >
                       <Icon
                         name={s.kind === 'desk-due' ? 'schedule' : s.kind === 'plan-due' ? 'account_tree' : 'bedtime'}
@@ -1597,7 +1684,7 @@ export default function AttentionView(): JSX.Element {
                 <p className="text-[11px] text-[var(--ink-40)] mb-2">
                   Their desks were removed or moved — the items were kept. Give each a new home.
                 </p>
-                <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
+                <div className="flex flex-col gap-1.5">
                   {detached.map((i) => row(i, true))}
                 </div>
               </section>
