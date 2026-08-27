@@ -961,4 +961,24 @@ standalone; sticky/note need a canvas). Class call worth recording: an AI-chat
 selection routes to the DEFAULT to_do, not chat→to_respond — a highlighted AI
 answer is something to act on; nobody awaits words back from a bot.
 
+
+
+---
+
+## DEC-045 — The Attention widget on any desk (CR-09 D-B, ruled)
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Decision:** 'attention' becomes a real CANVAS widget kind — catalog entry
+(Tools, 380×340), picker row, renderer case — so the home screen's
+command-center face is placeable on any desk. **Scope:** defaults to THIS
+desk's items; a two-chip header control (This desk · N / All) widens it, and
+the choice persists per-widget in `widget.content` ({"scope":"desk"|"all"}).
+**The fallback is the operator's own rule:** a desk holding no active item
+shows everything with an honest "nothing here yet — showing all" line, never
+a blank box beside a full queue. **One component, not a fork:** the desk
+variant WRAPS the home AttentionWidget (itemsOverride + per-widget section
+storageKey), so look-and-feel cannot drift. Stale-desks (a global feeder)
+hides in desk scope per CR-09's own lean — a desk's widget reporting that
+desk's staleness is circular. Cross-version: old builds render an unknown
+kind as nothing; the row itself syncs like any widget.
+
 <!-- Append below; increment DEC-NNN. -->

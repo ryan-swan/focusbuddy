@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
+import { useWidgetStore } from '../../stores/widgets'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
-import { isTerminalState, itemReason, queueOf, QUEUE_ICON } from '../../lib/attentionQueues'
+import { isTerminalState, itemReason, queueOf, scopeItemsForDesk, QUEUE_ICON } from '../../lib/attentionQueues'
 import type { WidgetSize } from './homeWidgetDefs'
 
 // The Attention widget family (S6, SPEC-014): the command center's face on the
@@ -224,17 +225,32 @@ const LEGACY_SECTION: Record<string, string> = {
   acknowledgment: 'to_respond'
 }
 
-export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Element {
-  const items = useAttentionItems()
+export function AttentionWidget({
+  size = 'md',
+  itemsOverride,
+  showStale = true,
+  storageKey = 'attention.widget.section'
+}: {
+  size?: WidgetSize
+  /** DEC-045: the desk widget hands in a pre-scoped set; the home widget
+   *  keeps reading everything. */
+  itemsOverride?: FbNode[]
+  /** Stale desks are a GLOBAL feeder — hidden in desk scope (CR-09 lean:
+   *  a desk's widget showing that desk's own staleness is circular). */
+  showStale?: boolean
+  storageKey?: string
+}): JSX.Element {
+  const allItems = useAttentionItems()
+  const items = itemsOverride ?? allItems
   const goAttention = useViewStore((s) => s.goAttention)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
   const [section, setSection] = useState<string>(() => {
-    const stored = localStorage.getItem('attention.widget.section') || 'all'
+    const stored = localStorage.getItem(storageKey) || 'all'
     return LEGACY_SECTION[stored] ?? stored
   })
   const pick = (k: string): void => {
-    localStorage.setItem('attention.widget.section', k)
+    localStorage.setItem(storageKey, k)
     setSection(k)
   }
   const [stale, setStale] = useState<Array<{ id: string; title: string; daysQuiet: number }>>([])
@@ -326,7 +342,7 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
   return (
     <div className="w-full h-full flex flex-col p-3">
       <div className="flex items-center gap-1.5">
-        {SECTIONS.map((s) => (
+        {SECTIONS.filter((s) => showStale || s.key !== 'stale').map((s) => (
           <button
             key={s.key}
             onClick={() => pick(s.key)}
@@ -424,6 +440,75 @@ export function StaleDesksWidget({ size = 'sm' }: { size?: WidgetSize }): JSX.El
             </button>
           ))
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── The desk-placed Attention widget (DEC-045, CR-09 D-B) ───────────────────
+// The SAME face as the home widget, scoped to the desk it sits on. Scope
+// persists in widget.content ({"scope":"desk"|"all"}); "desk" with an empty
+// desk falls back to everything and says so, rather than sitting blank next
+// to a full queue.
+
+export function DeskAttentionWidget({
+  widget
+}: {
+  widget: { id: string; taskId: string; content: string | null }
+}): JSX.Element {
+  const items = useAttentionItems()
+  const update = useWidgetStore((s) => s.update)
+  const scope = useMemo<'desk' | 'all'>(() => {
+    try {
+      const c = JSON.parse(widget.content || '{}') as { scope?: string }
+      return c.scope === 'all' ? 'all' : 'desk'
+    } catch {
+      return 'desk'
+    }
+  }, [widget.content])
+  const pickScope = (next: 'desk' | 'all'): void => {
+    void update(widget.id, { content: JSON.stringify({ scope: next }) })
+  }
+  const { scoped, fellBack } = useMemo(
+    () => scopeItemsForDesk(items, widget.taskId),
+    [items, widget.taskId]
+  )
+  const effective = scope === 'all' ? items : scoped
+  const deskCount = fellBack ? 0 : scoped.length
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex items-center gap-1 px-3 pt-2.5">
+        {(
+          [
+            ['desk', `This desk${deskCount ? ` · ${deskCount}` : ''}`],
+            ['all', 'All']
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => pickScope(k)}
+            className={`px-2 h-6 rounded-full fb-t-caption fb-press ${
+              scope === k
+                ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
+                : 'text-[var(--ink-40)] hover:text-[var(--ink-80)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        {scope === 'desk' && fellBack && (
+          <span className="fb-t-caption text-[var(--ink-30)] truncate">
+            nothing here yet — showing all
+          </span>
+        )}
+      </div>
+      <div className="flex-1 min-h-0">
+        <AttentionWidget
+          size="lg"
+          itemsOverride={effective}
+          showStale={scope === 'all'}
+          storageKey={`attention.widget.section:${widget.id}`}
+        />
       </div>
     </div>
   )

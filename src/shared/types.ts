@@ -70,6 +70,10 @@ export type WidgetKind =
   // BR, but it's a regular widget the user can resize, unpin, drag to the
   // canvas, delete, or re-add via the widget picker like anything else.
   | 'minimap'
+  // DEC-045 (CR-09 D-B) — the Attention widget ON A DESK. Scope lives in
+  // widget.content as JSON {"scope":"desk"|"all"}; defaults to the desk it
+  // sits on and falls back to all when that desk holds nothing.
+  | 'attention'
   // Voice / video recorder — captures audio (and later webcam video) via
   // MediaRecorder, persists the blob through the files store, and runs
   // it through Whisper (OpenAI) for transcription, then Anthropic for

@@ -205,3 +205,26 @@ describe('DEC-044 — the highlight travels the WHOLE path to the notes', () => 
     expect(menu).not.toContain('disabled: noTask')
   })
 })
+
+describe('DEC-045 — the Attention widget on any desk', () => {
+  it('is a real canvas kind: union, catalog, renderer case', () => {
+    expect(read('src/shared/types.ts')).toContain("| 'attention'")
+    const cat = read('src/renderer/src/lib/widgetCatalog.ts')
+    expect(cat).toContain("kind: 'attention'")
+    expect(cat).toContain('{"scope":"desk"}') // desk is the DEFAULT
+    expect(read('src/renderer/src/components/Canvas.tsx')).toContain('<DeskAttentionWidget widget={w} />')
+  })
+
+  it('same look as home (one component), scope persisted per widget', () => {
+    const w = read('src/renderer/src/components/views/attentionWidgets.tsx')
+    // The desk variant WRAPS the home widget rather than forking it.
+    expect(w).toContain('itemsOverride={effective}')
+    expect(w).toContain("storageKey={`attention.widget.section:${widget.id}`}")
+    // Scope round-trips through widget.content.
+    expect(w).toContain("content: JSON.stringify({ scope: next })")
+    // Stale desks (a global feeder) hide in desk scope.
+    expect(w).toContain("showStale={scope === 'all'}")
+    // The fallback is honest, not silent.
+    expect(w).toContain('nothing here yet — showing all')
+  })
+})

@@ -167,6 +167,20 @@ function isActionableIntent(c: string | null | undefined): boolean {
   return q === 'to_do' || q === 'to_review' || q === 'to_meet' || q === 'to_decide' || q === 'to_respond'
 }
 
+/** DEC-045 — the desk-widget scope. Items whose home is THIS desk; when the
+ *  desk holds no ACTIVE item the widget falls back to everything (the
+ *  operator's ruling: "if there are none, it can default to all") and says
+ *  so, rather than sitting empty next to a full queue. */
+export function scopeItemsForDesk(
+  items: FbNode[],
+  deskId: string
+): { scoped: FbNode[]; fellBack: boolean } {
+  const mine = items.filter((i) => i.parentId === deskId)
+  const active = mine.filter((i) => !isTerminalState(i.workItemState) && i.detachedFromId == null)
+  if (active.length === 0) return { scoped: items, fellBack: true }
+  return { scoped: mine, fellBack: false }
+}
+
 /** The Detached shelf (F-M6/F-M7″): park-local items whose desk was purged or
  *  org-moved. Primary recovery is MOVE; they never mix into the queues. */
 export function detachedItems(items: FbNode[]): FbNode[] {

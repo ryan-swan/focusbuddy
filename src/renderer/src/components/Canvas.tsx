@@ -31,6 +31,7 @@ import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
 import StreamDeckWidget from './widgets/StreamDeckWidget'
 import WidgetFocusMode from './WidgetFocusMode'
+import { DeskAttentionWidget } from './views/attentionWidgets'
 import ExtensionPrompt from './ExtensionPrompt'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
@@ -232,6 +233,9 @@ function renderWidgetInner(w: Widget): JSX.Element | null {
       // showing twice" bug. The migration effect below also deletes them from
       // storage; this guarantees they are invisible even before that runs.
       return null
+    case 'attention':
+      // DEC-045: the desk-scoped command-center face (CR-09 D-B).
+      return <DeskAttentionWidget widget={w} />
     case 'voice-recorder':
       return <VoiceRecorderWidget widget={w} />
     case 'mindmap':

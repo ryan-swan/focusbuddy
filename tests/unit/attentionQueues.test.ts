@@ -11,6 +11,7 @@ import {
   itemFullText,
   isTerminalState,
   rankScore,
+  scopeItemsForDesk,
   PRIMARY_ACTION,
   QUEUE_ORDER
 } from '../../src/renderer/src/lib/attentionQueues'
@@ -211,5 +212,29 @@ describe('itemFullText — the whole capture, for reading and copying', () => {
   it('does NOT truncate — the point is the unedited text', () => {
     const long = 'x'.repeat(500)
     expect(itemFullText({ title: long, description: long })).toHaveLength(1002)
+  })
+})
+
+describe('DEC-045 — the desk-widget scope', () => {
+  const deskItem = (id: string, parentId: string | null, state = 'open'): FbNode =>
+    wi({ id, parentId, workItemState: state })
+
+  it('scopes to the desk when it holds active items', () => {
+    const items = [deskItem('a', 'd1'), deskItem('b', 'd2'), deskItem('c', null)]
+    const r = scopeItemsForDesk(items, 'd1')
+    expect(r.fellBack).toBe(false)
+    expect(r.scoped.map((i) => i.id)).toEqual(['a'])
+  })
+
+  it('falls back to ALL when the desk holds nothing active — and says so', () => {
+    const items = [deskItem('done', 'd1', 'completed'), deskItem('b', 'd2')]
+    const r = scopeItemsForDesk(items, 'd1')
+    expect(r.fellBack).toBe(true)
+    expect(r.scoped).toHaveLength(2) // everything, terminal rows included for the shelves
+  })
+
+  it('a detached item does not keep an empty desk from falling back', () => {
+    const items = [wi({ id: 'det', parentId: 'd1', detachedFromId: 'gone' }), deskItem('b', 'd2')]
+    expect(scopeItemsForDesk(items, 'd1').fellBack).toBe(true)
   })
 })
