@@ -981,4 +981,38 @@ hides in desk scope per CR-09's own lean — a desk's widget reporting that
 desk's staleness is circular. Cross-version: old builds render an unknown
 kind as nothing; the row itself syncs like any widget.
 
+
+
+---
+
+## DEC-046 — A highlighted LIST becomes several items (pressure-tested shape); the tidy formats
+**Date:** 2026-08-26 · **Status:** RULED (operator, with an explicit "decline if
+problematic" bar) + IMPLEMENTED in the shape that survived the pressure test
+**The pressure test, and what it killed:** rendered lists (pages, the AI chat)
+usually arrive FLATTENED — the browser's selection serializer strips markers
+and indentation, so header-vs-child structure is unrecoverable there. A model
+could guess it, but that fails BOTH of the operator's stated bars (as fast as
+today; high accuracy). Model inference was therefore rejected.
+**The shape that shipped — deterministic, previewed, capped:**
+- Markdown-source selections (markers + indentation survive): header bullets
+  → PRIMARY items, sub-bullets → CHILDREN grouped under them via DEC-035's
+  one-level sibling grouping. Numbered lists, checkboxes, continuation lines,
+  and mid-list orphan children (promoted, never dropped) all handled.
+- Flattened selections: 3+ short entry-like lines → SIBLINGS. Nesting is
+  never guessed.
+- PROSE never splits (short/punctuated-line heuristics, tested).
+- Cap 12; over it falls back to one item + full notes.
+- The split ALWAYS renders as the confirm card's pre-checked chips (DEC-025's
+  pattern) before anything files — a wrong split costs one uncheck, not a
+  wrong item. Filing preserves the previewed structure: children group under
+  the item their header created; a child whose header was unchecked stands
+  alone. List rows inherit the primary's class chip and the marked source.
+**Formatting (the second finding):** selection notes are whitespace-normalized
+deterministically (the "two or three spaces between items" complaint), and the
+tidy prompt now treats FORMATTING as part of the job — multi-point notes come
+back as "- " bullet lines, not a paragraph. Marked captures with substantial
+prose notes (the chat-summary case) now request the tidy too, for its
+formatting: the note lands as bullets, the preset title stands, and operator-
+edited notes are never overwritten.
+
 <!-- Append below; increment DEC-NNN. -->

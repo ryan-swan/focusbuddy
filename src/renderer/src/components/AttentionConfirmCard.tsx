@@ -6,6 +6,7 @@ import TagMentionInput from './TagMentionInput'
 import { URGENCY_LEVELS } from '../lib/itemTags'
 import { serializeTags } from '../lib/itemTags'
 import { serializeMentions, type ItemMention } from '../lib/itemMentions'
+import { parseSelectionList, normalizeSelectionText } from '../lib/selectionList'
 
 // The ONE confirm stop (DEC-019), extracted so every capture surface renders
 // the SAME flow (DEC-028): the console overlay and the chat's inline card are
@@ -36,6 +37,12 @@ interface ConfirmState {
     title: string
     dueAt: string | null
     checked: boolean
+    /** DEC-046: -1 = grouped under the primary; n ≥ 0 = under secondary n;
+     *  undefined = a plain sibling (typed-compound behavior unchanged). */
+    parentIdx?: number
+    /** List-derived rows follow the primary's class chip at filing time —
+     *  one highlighted list is one kind of work. */
+    listDerived?: boolean
   }>
 }
 
@@ -64,6 +71,7 @@ export default function AttentionConfirmCard({
   cancelLabel?: string
 }): JSX.Element {
   const createItem = useWorkItemStore((s) => s.create)
+  const updateFieldsStore = useWorkItemStore((s) => s.updateFields)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [confirmDate, setConfirmDate] = useState('')
   const [busy, setBusy] = useState(false)
@@ -109,16 +117,77 @@ export default function AttentionConfirmCard({
     // so the classifier is skipped entirely (no latency, no model, works with
     // the key removed). Typed captures still classify.
     if (source?.intentClass) {
+      // DEC-046: a marked SELECTION that is a LIST becomes several items —
+      // deterministically (markers/indentation only; flattened lists split
+      // as siblings; prose never splits) and always PREVIEWED here as the
+      // pre-checked chips before anything files. Headers become primaries,
+      // sub-bullets group under them via DEC-035's sibling grouping.
+      const list = parseSelectionList(rawNotes.trim() || text)
+      if (list && list.lines.length >= 2) {
+        const [head, ...rest] = list.lines
+        let lastPrimary = -1 // -1 = the head item
+        setConfirm({
+          picked: source.intentClass,
+          confidence: 1,
+          title: head.text.length > 120 ? `${head.text.slice(0, 117)}…` : head.text,
+          notes: '',
+          dueAt: null,
+          needsDate: false,
+          phrase: null,
+          secondaries: rest.map((l, idx) => {
+            const parentIdx = l.depth === 1 ? lastPrimary : undefined
+            if (l.depth === 0) lastPrimary = idx
+            return {
+              text: l.text,
+              intentClass: source.intentClass!,
+              title: l.text.length > 120 ? `${l.text.slice(0, 117)}…` : l.text,
+              dueAt: null,
+              checked: true,
+              parentIdx,
+              listDerived: true
+            }
+          })
+        })
+        return () => {
+          alive = false
+        }
+      }
+      const markedTitle = text.length > 120 ? `${text.slice(0, 117)}…` : text
       setConfirm({
         picked: source.intentClass,
         confidence: 1,
-        title: text.length > 120 ? `${text.slice(0, 117)}…` : text,
-        notes: rawNotes.trim(),
+        title: markedTitle,
+        notes: normalizeSelectionText(rawNotes),
         dueAt: null,
         needsDate: false,
         phrase: null,
         secondaries: []
       })
+      // DEC-046: a marked capture with SUBSTANTIAL prose notes (the chat
+      // summary case) still gets the tidy — for its FORMATTING: the model
+      // breaks a paragraph into bullet lines. The preset title stands; only
+      // the notes land, and only if the operator has not edited them.
+      const prose = normalizeSelectionText(rawNotes)
+      if (prose.length >= 80) {
+        const seq = ++cleanupSeq.current
+        const tidy = window.api.workItems
+          .proposeCleanup(markedTitle, prose)
+          .then((p) => {
+            if (alive && p && p.note && cleanupSeq.current === seq) {
+              setCleanup({ title: markedTitle, note: p.note, originalTitle: markedTitle })
+              setCleanupUsed(true)
+              setConfirm((prev) =>
+                prev && !notesEdited ? { ...prev, notes: p.note } : prev
+              )
+            }
+            return p
+          })
+          .catch(() => null)
+          .finally(() => {
+            if (tidyPending.current === tidy) tidyPending.current = null
+          })
+        tidyPending.current = tidy
+      }
       return () => {
         alive = false
       }
@@ -210,6 +279,8 @@ export default function AttentionConfirmCard({
           : null
         : confirm.dueAt
       const extras = confirm.secondaries.filter((s) => s.checked)
+      // (extras counts the summary; the filing loop below walks the full
+      // secondary list so parentIdx indexing stays stable.)
       // The verbatim capture is NEVER lost (DEC-026): a tidied item keeps the
       // original under an "as captured" rule, and "Enter as is" files the
       // operator's own words as the item itself.
@@ -250,18 +321,34 @@ export default function AttentionConfirmCard({
         sourceRef: source?.sourceRef ?? null,
         wiOrigin: 'human'
       })
-      for (const s of extras) {
-        await createItem({
+      // DEC-046: filing preserves the previewed structure. createdBySecIdx
+      // maps each secondary's ORIGINAL index to its created id, so a child
+      // groups under the item its header actually produced — and a child
+      // whose header was UNCHECKED stands alone rather than vanishing.
+      const createdBySecIdx = new Map<number, string>()
+      for (const s of confirm.secondaries) {
+        if (!s.checked) continue
+        const idx = confirm.secondaries.indexOf(s)
+        const parentId =
+          s.parentIdx === undefined
+            ? null
+            : s.parentIdx === -1
+              ? item.id
+              : (createdBySecIdx.get(s.parentIdx) ?? null)
+        const child = await createItem({
           title: s.title,
           notes: s.text.trim() === s.title ? undefined : s.text.trim(),
           parentId: deskCtx?.id ?? null,
-          intentClass: s.intentClass,
+          intentClass: s.listDerived ? confirm.picked : s.intentClass,
           dueAt: s.dueAt,
-          confidence: 0.95,
+          confidence: s.listDerived ? 1 : 0.95,
           approvalState: 'auto',
-          sourceType: 'note',
+          sourceType: s.listDerived ? (source?.sourceType ?? 'note') : 'note',
+          sourceRef: s.listDerived ? (source?.sourceRef ?? null) : null,
           wiOrigin: 'human'
         })
+        createdBySecIdx.set(idx, child.id)
+        if (parentId) await updateFieldsStore(child.id, { groupId: parentId })
       }
       const summary =
         `${CLASS_LABEL[confirm.picked] ?? confirm.picked} — “${item.title}”` +

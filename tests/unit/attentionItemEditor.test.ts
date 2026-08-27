@@ -228,3 +228,35 @@ describe('DEC-045 — the Attention widget on any desk', () => {
     expect(w).toContain('nothing here yet — showing all')
   })
 })
+
+describe('DEC-046 — a highlighted list becomes several items, previewed first', () => {
+  const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+
+  it('the split happens on the CARD as pre-checked chips — never silently', () => {
+    expect(card).toContain('parseSelectionList(rawNotes.trim() || text)')
+    expect(card).toContain('listDerived: true')
+    // Headers → primaries; sub-bullets carry parentIdx into the grouping.
+    expect(card).toContain("const parentIdx = l.depth === 1 ? lastPrimary : undefined")
+  })
+
+  it('filing preserves the previewed structure via DEC-035 grouping', () => {
+    expect(card).toContain('createdBySecIdx')
+    expect(card).toContain("updateFieldsStore(child.id, { groupId: parentId })")
+    // A child whose header was unchecked STANDS ALONE — never vanishes.
+    expect(card).toContain('(createdBySecIdx.get(s.parentIdx) ?? null)')
+    // List rows inherit the primary's class chip and the marked source.
+    expect(card).toContain('s.listDerived ? confirm.picked : s.intentClass')
+    expect(card).toContain("s.listDerived ? (source?.sourceType ?? 'note') : 'note'")
+  })
+
+  it('notes are whitespace-normalized, and prose notes get the FORMATTING tidy', () => {
+    expect(card).toContain('normalizeSelectionText(rawNotes)')
+    // The chat-summary case: substantial prose notes request a tidy whose
+    // NOTE lands (bullets), while the preset title stands.
+    expect(card).toContain('if (prose.length >= 80)')
+    expect(card).toContain('prev && !notesEdited ? { ...prev, notes: p.note } : prev')
+    const cleanup = read('src/main/ai/cleanupRewrite.ts')
+    expect(cleanup).toContain('FORMATTING MATTERS AS MUCH AS WORDING')
+    expect(cleanup).toContain('short "- " bullet lines')
+  })
+})
