@@ -9,7 +9,8 @@ import {
   splitCompound,
   secondaryCaptures,
   MAX_SECONDARY_INTENTS,
-  needsCleanup
+  needsCleanup,
+  qualifiesForTidy
 } from '../../src/main/ai/intentRules'
 
 // Attention S5 — the deterministic classifier rules (R011's fast path: these
@@ -224,5 +225,24 @@ describe('DEC-026 — the cleanup gate (deterministic, pure)', () => {
         'need to grab the numbers from finance then fold them into the deck before the call with the team'
       )
     ).toBe(true)
+  })
+})
+
+describe('DEC-040 — when the preview attempts a tidy at all', () => {
+  it('anything with real content qualifies — the old gate left medium captures raw', () => {
+    // 8+ words: the operator's ordinary captures.
+    expect(qualifiesForTidy('draft the cetra pitch deck for friday with pricing tiers')).toBe(true)
+    // Multi-sentence, even when short.
+    expect(qualifiesForTidy('Call Bob. He has the numbers.')).toBe(true)
+    // Notes attached always qualify — there is something to clean.
+    expect(qualifiesForTidy('call Bob', 'he wants the revised pricing tiers before the board call')).toBe(true)
+    // The classic messiness signs still qualify on their own.
+    expect(qualifiesForTidy('so basically we need the thing, you know, for the launch')).toBe(true)
+  })
+
+  it('tiny fragments still skip — "call Bob Thursday" IS its own tidy', () => {
+    expect(qualifiesForTidy('call Bob Thursday')).toBe(false)
+    expect(qualifiesForTidy('')).toBe(false)
+    expect(qualifiesForTidy('   ')).toBe(false)
   })
 })

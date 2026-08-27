@@ -291,6 +291,26 @@ export function needsCleanup(text: string): boolean {
   return false
 }
 
+/** DEC-040 — when the preview should ATTEMPT a tidy at all. The old gate
+ *  (needsCleanup alone) only fired on genuinely messy text, so medium
+ *  captures showed raw with no tidy and the preview felt inconsistent
+ *  ("sometimes I get the tidied up version, other times I don't"). The
+ *  preview now attempts a tidy for anything with real content: 8+ words,
+ *  more than one sentence, notes attached, or the classic messiness signs.
+ *  Tiny fragments still skip — "call Bob Thursday" IS its own tidy, and a
+ *  model call there returns the input at latency cost. */
+export function qualifiesForTidy(text: string, notes?: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if ((notes ?? '').trim()) return true
+  if (needsCleanup(t)) return true
+  const words = t.split(/\s+/).length
+  if (words >= 8) return true
+  // Sentence punctuation anywhere before the final character = more than
+  // one segment (same trick as needsCleanup's run-on test).
+  return /[.!?;\n]/.test(t.slice(0, -1))
+}
+
 /** The secondaries a compound capture carries beyond its primary. Rules-only:
  *  a segment with no hard trigger of its own is NOT offered (it stays part of
  *  the primary's context rather than becoming a speculative item). */

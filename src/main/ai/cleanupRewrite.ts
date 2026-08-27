@@ -15,7 +15,7 @@ import { getSharedAiClient } from './anthropic'
 import { resolveModel } from './modelRouting'
 import { recordAiUsage } from '../db/telemetry'
 import { extractJson } from './chatJson'
-import { needsCleanup } from './intentRules'
+import { qualifiesForTidy } from './intentRules'
 
 export interface CleanupProposal {
   /** A crisp title, ≤90 chars, stating the actual ask/fact. */
@@ -33,7 +33,7 @@ export async function proposeCleanup(
   // up any notes (if there are any)". The messiness gate reads BOTH, so a
   // crisp task line with a rambling note still qualifies.
   const n = (notes ?? '').trim()
-  if (!needsCleanup(n ? `${t}\n\n${n}` : t)) return null
+  if (!qualifiesForTidy(t, n)) return null
   try {
     // Credits-aware (F-8 family): the tidy works on PlexiDesk credits too.
     const client = getSharedAiClient()

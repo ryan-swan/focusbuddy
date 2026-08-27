@@ -237,6 +237,7 @@ export default function AttentionView(): JSX.Element {
   const [newDeskId, setNewDeskId] = useState('')
   const [newBusy, setNewBusy] = useState(false)
   const [newTags, setNewTags] = useState<string[]>([])
+  const [newNotes, setNewNotes] = useState('')
   const [newMentions, setNewMentions] = useState<ItemMention[]>([])
   const [newFiled, setNewFiled] = useState<string | null>(null)
 
@@ -254,6 +255,7 @@ export default function AttentionView(): JSX.Element {
     try {
       const item = await createItem({
         title,
+        notes: newNotes.trim() || undefined,
         parentId: newDeskId || null,
         intentClass: newClass,
         dueAt: newDate ? new Date(`${newDate}T17:00:00`).toISOString() : null,
@@ -268,6 +270,7 @@ export default function AttentionView(): JSX.Element {
       setNewDate('')
       setNewTags([])
       setNewMentions([])
+      setNewNotes('')
       setNewFiled(item.title)
       setTimeout(() => setNewFiled(null), 2500)
       await refresh()
@@ -849,6 +852,18 @@ export default function AttentionView(): JSX.Element {
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="What needs you?"
               className="fb-field mt-2 w-full bg-[var(--surface-sunken)] px-3 py-2 text-[13px]"
+            />
+            <textarea
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter makes a newline here; the form's Enter-to-file lives
+                // on the container and must not fire mid-note.
+                if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) e.stopPropagation()
+              }}
+              rows={2}
+              placeholder="Notes (optional)"
+              className="fb-field mt-2 w-full bg-[var(--surface-sunken)] px-3 py-2 text-[12px] resize-y text-[var(--ink-70)]"
             />
             <div className="mt-2 flex flex-wrap items-center gap-1">
               {CLASS_CHOICES.map((c) => (

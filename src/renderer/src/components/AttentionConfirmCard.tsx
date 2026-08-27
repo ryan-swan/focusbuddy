@@ -83,6 +83,12 @@ export default function AttentionConfirmCard({
   const [urgency, setUrgency] = useState<string>('normal')
   const [capTags, setCapTags] = useState<string[]>([])
   const [capMentions, setCapMentions] = useState<ItemMention[]>([])
+  // DEC-040: notes are editable ON the preview. The chat's inline card and
+  // every prefilled console open render the card directly — the console's
+  // notes stage never appears on those paths, which is where the operator
+  // "lost the ability to add a note". Card-typed notes are HIS words: both
+  // Enter and "Enter as is" keep them.
+  const [notesEdited, setNotesEdited] = useState(false)
   // The tidy in flight, so Enter can WAIT for it rather than racing it.
   const tidyPending = useRef<Promise<unknown> | null>(null)
 
@@ -97,6 +103,7 @@ export default function AttentionConfirmCard({
     setUrgency('normal')
     setCapTags([])
     setCapMentions([])
+    setNotesEdited(false)
     tidyPending.current = null
     // A MARKED object already knows what it is — the preset table decided,
     // so the classifier is skipped entirely (no latency, no model, works with
@@ -147,7 +154,15 @@ export default function AttentionConfirmCard({
               setCleanup({ title: p.title, note: p.note, originalTitle: c.title })
               setCleanupUsed(true)
               setConfirm((prev) =>
-                prev ? { ...prev, title: p.title, notes: p.note || prev.notes } : prev
+                prev
+                  ? {
+                      ...prev,
+                      title: p.title,
+                      // Never overwrite notes the operator typed in the card —
+                      // the tidy proposes; his words stand.
+                      notes: notesEdited ? prev.notes : p.note || prev.notes
+                    }
+                  : prev
               )
             }
             return p
@@ -208,9 +223,10 @@ export default function AttentionConfirmCard({
       // silently discarded the rest of what was typed.
       const verbatim = typed === confirm.title ? '' : typed
       const notes = asIs
-        ? // "Enter as is" IS the verbatim path — the operator's own words are
-          // the item, so no marker is needed to say so.
-          ownNotes || (typed === rawTitle ? undefined : typed)
+        ? // "Enter as is" reverts the AI's rewording — but notes typed in the
+          // CARD are the operator's own words and stand on every path.
+          (notesEdited ? confirm.notes : ownNotes) ||
+          (typed === rawTitle ? undefined : typed)
         : cleanupUsed && cleanup
           ? // A tidied save is CLEAN (operator ruling): no "— as captured —"
             // block trailing the notes. The two recovery paths sit BEFORE the
@@ -338,11 +354,22 @@ export default function AttentionConfirmCard({
                 </span>
               )}
             </div>
-            {confirm.notes && (
-              <div className="mt-1 text-[12px] text-[var(--ink-60)] whitespace-pre-wrap break-words">
-                {confirm.notes}
-              </div>
-            )}
+            <textarea
+              value={confirm.notes}
+              onChange={(e) => {
+                setNotesEdited(true)
+                setConfirm({ ...confirm, notes: e.target.value })
+              }}
+              onKeyDown={(e) => {
+                // Enter here makes a NEWLINE; only ⌘/Ctrl+Enter bubbles up to
+                // file. Without the stop, typing a note would file the item.
+                if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) e.stopPropagation()
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.stopPropagation()
+              }}
+              rows={confirm.notes ? Math.min(5, confirm.notes.split('\n').length + 1) : 1}
+              placeholder="Add notes — context worth keeping with it…"
+              className="mt-1 w-full bg-transparent outline-none resize-y text-[12px] text-[var(--ink-60)] placeholder:text-[var(--ink-30)]"
+            />
             {deskCtx && (
               <div className="mt-1 text-[11px] text-[var(--ink-40)]">on {deskCtx.title}</div>
             )}

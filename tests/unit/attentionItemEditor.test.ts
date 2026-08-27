@@ -95,6 +95,29 @@ describe('DEC-037 — context at a glance, and the two doors back', () => {
   })
 })
 
+describe('DEC-040 — notes exist on EVERY capture path, not only the bare console', () => {
+  it('the preview card itself carries an editable notes area', () => {
+    // The chat inline card and every prefilled console open render the card
+    // DIRECTLY — the console's notes stage never appears there, which is
+    // where the operator "lost the ability to add a note".
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    expect(card).toContain('Add notes — context worth keeping with it')
+    expect(card).toContain('setNotesEdited(true)')
+    // Enter inside the notes makes a NEWLINE, never files the item.
+    expect(card).toContain("if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) e.stopPropagation()")
+    // Card-typed notes are the operator's words: the tidy must not clobber
+    // them, and "Enter as is" keeps them too.
+    expect(card).toContain('notesEdited ? prev.notes : p.note || prev.notes')
+    expect(card).toContain('(notesEdited ? confirm.notes : ownNotes)')
+  })
+
+  it('the bare manual form has notes too (it never did)', () => {
+    const view = read('src/renderer/src/components/views/AttentionView.tsx')
+    expect(view).toContain("placeholder=\"Notes (optional)\"")
+    expect(view).toContain('notes: newNotes.trim() || undefined')
+  })
+})
+
 describe('DEC-039 — capture-time context + the one input everywhere', () => {
   it('the confirm card carries urgency and tags/mentions on the preview screen', () => {
     const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
