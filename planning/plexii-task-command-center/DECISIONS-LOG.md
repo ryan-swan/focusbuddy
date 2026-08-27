@@ -1044,4 +1044,62 @@ approval-driven). Compact status rows on the confirm card and the manual form.
 auto-writes it, and any future change to how it is WRITTEN goes to Caleb first
 (core-surface field, preservation doctrine).
 
+---
+
+## DEC-048 — The Attention COMMAND CENTER (overhaul, operator-ruled 8-part spec)
+**Date:** 2026-08-26 · **Status:** IMPLEMENTED (both parts)
+**The ruling:** the Attention page becomes a personal dashboard/command center
+— wide grid, widget blocks, analytics, bulk operations, real nesting — "the
+most useful personalized command center possible: everything needing
+attention, prioritized, most important first, including AI recommendations on
+where to start."
+
+**Part 1 — layout, blocks, analytics (commit `DEC-048 (part 1)`):**
+- Two-column grid (queue column at a readable measure + 340px block rail);
+  firmer row dividers (`--edge-firm`) and more row breathing room.
+- ONE component per widget, `variant="compact" | "full"`
+  (`attentionBlocks.tsx`): Pulse, Overdue radar, Today's agenda, Recent
+  activity, Analytics, Start here. The Attention page renders full; the home
+  dashboard's four cases render the SAME components compact — the legacy
+  task-data-backed renderers are gone, so the surfaces cannot drift.
+- `attentionAnalytics.ts`: every number derives from work_item_state +
+  timestamps only (no pretend event history). Honesty rule: a claim that
+  would need a real event log is NOT made. Status breakdown per class ×
+  state; plain-language trends (closing streaks, week-over-week class swings,
+  arrival/closure balance, oldest untouched); `startRecommendations` = the
+  queues' own ranker, top-3 with reasons, one-click Start-with-Plexii.
+
+**Part 2 — nesting + bulk (this commit). SUPERSEDES DEC-035/DEC-047's
+one-level rule by explicit operator instruction:**
+- **Nesting to depth 3** (`MAX_GROUP_DEPTH` in shared/workItems.ts). The db
+  guard walks UP from the new parent (level + cycle refusal) and DOWN through
+  the item's own subtree (it rides along): `level + height ≤ 3` or the write
+  refuses — whatever writes it (drag, agent, sync replay). Dropping onto a
+  child now genuinely nests (the DEC-035 flatten is gone).
+- `orderWithGroups` renders the tree (depth 0/1/2, childCount, descendants);
+  an absent parent PROMOTES its subtree (never hides), cycles render flat.
+- **Collapsible parents:** "N subtasks" fold on every parent row, persisted;
+  `visibleRows` is the pure filter. Verified live (8→7→8 rows).
+- **Drop planners mirror the cap:** planDrop/planDropMulti refuse over-deep
+  or cyclic drops, and the dwell affordance never ARMS an illegal nest
+  (`canNestUnder`). Cross-queue drops reclassify the WHOLE subtree — children
+  follow their parent, never strand.
+- **Marquee selection:** Shift+drag sweeps a rectangle (Shift because bare
+  drag = reorder); auto-enters Select mode; the post-sweep click is
+  swallowed.
+- **Bulk verbs:** Complete all (each item's OWN queue verb — honest record),
+  Dismiss all, Archive all. "Delete" maps to dismiss BY DESIGN: work items
+  have no hard delete; parked and recoverable.
+- **Bulk drag:** dragging a selected row moves the whole selection — reorder,
+  reclassify, or drop ON an item to nest them all as its subtasks (selection
+  tops re-parent; internal structure rides).
+- **Parent completion accounts for subtasks:** closing a parent with open
+  descendants offers close-all-with-it / just-this-one / cancel — an offer,
+  never a silent cascade, and closures use each child's own queue verb.
+
+**Gates:** suite 2,963 green (attentionGrouping rewritten, 30 tests;
+workItemsVerbs guard block rewritten for depth/cycle/subtree; analytics 9);
+typecheck clean; live CDP smoke — zero console errors, blocks live, real
+nested data rendering, collapse verified.
+
 <!-- Append below; increment DEC-NNN. -->

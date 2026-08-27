@@ -156,6 +156,12 @@ export function normalizeIntentClass(v: unknown): string | undefined {
  *  setState-only (the closing verbs). 'suggested' stays approval-driven. */
 export const CAPTURE_STATES = ['open', 'in_progress', 'waiting', 'blocked'] as const
 
+/** DEC-048 — grouping may nest, but never deeper than this many LEVELS
+ *  (a root, a subtask, a sub-subtask = 3). Enforced at the db write path and
+ *  mirrored by every drop planner, so no surface can exceed it. Supersedes
+ *  DEC-035/047's one-level rule by operator instruction. */
+export const MAX_GROUP_DEPTH = 3
+
 export function initialWorkItemState(
   approvalState: string | undefined,
   requested: string | undefined

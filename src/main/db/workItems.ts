@@ -32,6 +32,7 @@ import {
   ACTIVE_WORK_ITEM_STATES,
   TERMINAL_WORK_ITEM_STATES,
   DEFAULT_INTENT_CLASS,
+  MAX_GROUP_DEPTH,
   canonicalIntentClass,
   initialWorkItemState,
   statusForWorkItemState,
@@ -735,25 +736,46 @@ export function updateWorkItemFieldsCore(
     patch = { ...patch, intentClass: canonical }
   }
   if (patch.groupId !== undefined && patch.groupId !== null) {
-    // DEC-035 — the one-level rule, enforced HERE and not only in the UI: a
-    // group must never become a tree, whatever writes it (drag, a future
-    // agent, a peer's sync arrival replayed through this path).
-    const leaderId = String(patch.groupId)
-    if (leaderId === id) return false // never its own leader
-    const leader = d.prepare('SELECT kind, group_id FROM nodes WHERE id = ?').get(leaderId) as
-      | { kind: string; group_id: string | null }
+    // DEC-048 — nesting is real (supersedes DEC-035's one-level flattening),
+    // capped at MAX_GROUP_DEPTH levels and enforced HERE, not only in the UI:
+    // whatever writes group_id (a drag, an agent, a peer's sync arrival
+    // replayed through this path) meets the same wall. Grouping under a child
+    // now genuinely nests under that child.
+    const parentId = String(patch.groupId)
+    if (parentId === id) return false // never its own parent
+    const parentRow = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(parentId) as
+      | { kind: string }
       | undefined
-    if (leader?.kind !== 'work_item') return false
-    // This item already leads others — grouping it would nest two groups.
-    const kids = d
-      .prepare(`SELECT 1 FROM nodes WHERE kind = 'work_item' AND group_id = ? LIMIT 1`)
-      .get(id)
-    if (kids) return false
-    // Grouping under a CHILD means "join that child's group" — flattened, so
-    // the stored shape stays exactly one level deep.
-    const resolved = leader.group_id && leader.group_id !== leaderId ? leader.group_id : leaderId
-    if (resolved === id) return false
-    patch = { ...patch, groupId: resolved }
+    if (parentRow?.kind !== 'work_item') return false
+    // Walk UP from the new parent: its level, refusing a cycle (the walk
+    // reaching the item being grouped) and any over-deep legacy chain.
+    const up = d.prepare(`SELECT group_id FROM nodes WHERE id = ? AND kind = 'work_item'`)
+    const seen = new Set<string>([id])
+    let level = 1
+    let cursor: string | null = parentId
+    while (cursor) {
+      if (seen.has(cursor)) return false // would close a cycle
+      seen.add(cursor)
+      const r = up.get(cursor) as { group_id: string | null } | undefined
+      const next = r?.group_id && r.group_id !== cursor ? r.group_id : null
+      if (!next) break
+      level++
+      cursor = next
+      if (level >= MAX_GROUP_DEPTH) return false // parent already at the floor
+    }
+    // Walk DOWN from the item: its own subtree rides along, so the deepest
+    // resulting level is parent-level + subtree-height.
+    const kidsOf = d.prepare(
+      `SELECT id FROM nodes WHERE kind = 'work_item' AND group_id = ? AND id != ?`
+    )
+    const height = (nodeId: string, depth: number): number => {
+      if (depth >= MAX_GROUP_DEPTH) return depth
+      let h = depth
+      for (const k of kidsOf.all(nodeId, nodeId) as Array<{ id: string }>)
+        h = Math.max(h, height(k.id, depth + 1))
+      return h
+    }
+    if (level + height(id, 1) > MAX_GROUP_DEPTH) return false
   }
   const sets: string[] = []
   const params: Record<string, unknown> = { id, now: Date.now() }

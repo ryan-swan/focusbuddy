@@ -275,7 +275,9 @@ describe('DEC-047 — desk ⇄ attention, the derived shape (analysis/23 execute
   const view = read('src/renderer/src/components/views/AttentionView.tsx')
 
   it('D-1/D-2: desk headers are DERIVED in the render — no stored grouping anywhere', () => {
-    expect(view).toContain('clusterByDesk(grouped)')
+    // DEC-048: clustering runs over the collapse-FILTERED rows — still a
+    // pure render derivation, never stored.
+    expect(view).toContain('clusterByDesk(shown)')
     // Header anatomy: title, "Desk:"-prefixed status (the naming caution),
     // due, count, click-opens-desk.
     expect(view).toContain('Desk: {DESK_STATUS_LABEL[desk.status]')

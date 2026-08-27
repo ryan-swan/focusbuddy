@@ -52,10 +52,16 @@ import {
   CLASS_CHOICES
 } from '../../lib/attentionQueues'
 import {
+  MAX_GROUP_DEPTH,
   orderWithGroups,
   planDrop,
+  planDropMulti,
   planMoveToQueue,
+  planMoveToQueueMulti,
   planUngroup,
+  subtreeHeight,
+  subtreeIds,
+  visibleRows,
   type DropPosition
 } from '../../lib/attentionGrouping'
 import {
@@ -157,12 +163,86 @@ export default function AttentionView(): JSX.Element {
       return next
     })
   }
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  // DEC-048 — collapsed parents. View state, persisted so an outline the
+  // operator folded stays folded across restarts.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('attention.collapsed') || '[]') as string[])
+    } catch {
+      return new Set()
+    }
+  })
+  const toggleCollapsed = (id: string): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      localStorage.setItem('attention.collapsed', JSON.stringify([...next]))
+      return next
+    })
+
+  // DEC-048 — marquee selection: Shift+drag sweeps a rectangle over the
+  // queues and selects every row it touches (Shift, because a bare drag is
+  // already the reorder gesture). Viewport-space rect, drawn fixed.
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(
+    null
+  )
+  const marqueeBase = useRef<Set<string>>(new Set())
+  const marqueeMoved = useRef(false)
+  const startMarquee = (e: React.MouseEvent): void => {
+    if (!e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    marqueeBase.current = new Set(selected)
+    marqueeMoved.current = false
+    const x0 = e.clientX
+    const y0 = e.clientY
+    setMarquee({ x0, y0, x1: x0, y1: y0 })
+    const onMove = (ev: MouseEvent): void => {
+      const rect = {
+        left: Math.min(x0, ev.clientX),
+        right: Math.max(x0, ev.clientX),
+        top: Math.min(y0, ev.clientY),
+        bottom: Math.max(y0, ev.clientY)
+      }
+      if (rect.right - rect.left + (rect.bottom - rect.top) > 8) marqueeMoved.current = true
+      setMarquee({ x0, y0, x1: ev.clientX, y1: ev.clientY })
+      const hit = new Set(marqueeBase.current)
+      document.querySelectorAll<HTMLElement>('[data-item-row][data-item-id]').forEach((el) => {
+        const r = el.getBoundingClientRect()
+        if (r.left < rect.right && r.right > rect.left && r.top < rect.bottom && r.bottom > rect.top)
+          hit.add(el.dataset.itemId!)
+      })
+      setSelected(hit)
+      if (hit.size > 0) setSelectMode(true)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      setMarquee(null)
+      // A real sweep must not ALSO fire the click under the cursor.
+      if (marqueeMoved.current) {
+        const swallow = (ce: Event): void => {
+          ce.stopPropagation()
+          ce.preventDefault()
+        }
+        window.addEventListener('click', swallow, { capture: true, once: true })
+        setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0)
+      }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   // DEC-035 — the six-dot handle: rearrange, attach one item to another, or
   // move between classifications. Native HTML5 drag (the house pattern; there
   // is no dnd library in this codebase). `over` is the row being hovered and
   // where; `overSection` is a whole-section target.
   const [dragId, setDragId] = useState<string | null>(null)
+  // DEC-048 — dragging a SELECTED row in select mode drags the whole
+  // selection: one gesture nests or moves them all.
+  const [dragMulti, setDragMulti] = useState(false)
   const [over, setOver] = useState<{ id: string; pos: DropPosition } | null>(null)
   const [overSection, setOverSection] = useState<string | null>(null)
   // Dwell-to-group: hovering a row for a beat means "attach to this", which is
@@ -188,50 +268,107 @@ export default function AttentionView(): JSX.Element {
 
   const endDrag = (): void => {
     setDragId(null)
+    setDragMulti(false)
     setOver(null)
     setOverSection(null)
     clearDwell()
   }
 
+  /** The ids riding the current drag: the selection when a selected row is
+   *  dragged in select mode, otherwise just the grabbed row. */
+  const draggedIds = (): string[] =>
+    dragMulti && dragId ? [...new Set([...selected, dragId])] : dragId ? [dragId] : []
+
+  /** Can the current drag NEST under a row at this rendered depth? Mirrors
+   *  the planner's cap so the dwell affordance never offers a drop the write
+   *  path would refuse (the db guard remains the backstop). */
+  const canNestUnder = (targetId: string, targetDepth: number): boolean => {
+    const ids = draggedIds()
+    if (!ids.length || ids.includes(targetId)) return false
+    for (const id of ids) if (subtreeIds(id, items).has(targetId)) return false
+    const maxH = Math.max(...ids.map((id) => subtreeHeight(id, items)))
+    return targetDepth + 1 + maxH <= MAX_GROUP_DEPTH
+  }
+
   /** A drop ONTO a row. When that row lives in a different queue the same
-   *  gesture reclassifies the item — dragging between classifications was
-   *  silently doing nothing, because the dragged row was not in the target
-   *  queue's list at all (operator live QA). */
+   *  gesture reclassifies — the whole subtree crosses with its parent, and a
+   *  multi-drag applies the one gesture to every selected item (DEC-048). */
   async function applyDrop(
     targetId: string,
     pos: DropPosition,
     rows: ReturnType<typeof orderWithGroups>,
     targetQueue: string
   ): Promise<void> {
-    const id = dragId
+    const ids = draggedIds()
+    const multi = dragMulti
     endDrag()
-    if (!id) return
-    const dragged = items.find((x) => x.id === id)
-    if (!dragged) return
-    const crossQueue = queueOf(dragged) !== targetQueue
-    await writeAll(planDrop(dragged, targetId, pos, rows, crossQueue ? targetQueue : undefined))
+    if (!ids.length) return
+    const list = items.filter((x) => ids.includes(x.id))
+    if (!list.length) return
+    const crossQueue = list.some((x) => queueOf(x) !== targetQueue)
+    const intoQueue = crossQueue ? targetQueue : undefined
+    const writes =
+      multi && list.length > 1
+        ? planDropMulti(ids, targetId, pos, rows, intoQueue, items)
+        : planDrop(list[0], targetId, pos, rows, intoQueue, items)
+    await writeAll(writes)
   }
 
   /** Dropping on a section's header or empty space: reclassify into it and
-   *  land at the end. The item leaves its old group — the group belonged to
-   *  the queue it came from. */
+   *  land at the end. Roots detach from their old parents, but each moved
+   *  item's OWN subtree crosses with it. */
   async function moveToSection(
     queue: string,
     rows: ReturnType<typeof orderWithGroups>
   ): Promise<void> {
-    const id = dragId
+    const ids = draggedIds()
+    const multi = dragMulti
     endDrag()
-    if (!id) return
-    const item = items.find((x) => x.id === id)
-    if (!item || queueOf(item) === queue) return
-    await writeAll(planMoveToQueue(id, queue, rows))
+    if (!ids.length) return
+    const movers = items.filter((x) => ids.includes(x.id) && queueOf(x) !== queue)
+    if (!movers.length) return
+    const writes =
+      multi && ids.length > 1
+        ? planMoveToQueueMulti(ids, queue, rows, items)
+        : planMoveToQueue(movers[0].id, queue, rows, items)
+    await writeAll(writes)
   }
 
   /** DEC-047 D-3 — a SUGGESTION, never a write: closing the last open item
    *  on a still-open desk offers "mark the desk done?" once, right then.
    *  Accepting uses the same user-owned status write every desk surface uses
-   *  (D-6: the app never auto-writes desk status). */
+   *  (D-6: the app never auto-writes desk status).
+   *
+   *  DEC-048 — completing a PARENT accounts for its subtasks: open
+   *  descendants surface as an offer (close them with it / leave them), never
+   *  a silent cascade — their closure is each queue's own honest verb. */
   async function closeWithOffer(i: FbNode, state: string): Promise<void> {
+    const openKids = [...subtreeIds(i.id, items)]
+      .filter((id) => id !== i.id)
+      .map((id) => items.find((x) => x.id === id))
+      .filter(
+        (x): x is FbNode => !!x && !isTerminalState(x.workItemState) && x.detachedFromId == null
+      )
+    if (openKids.length > 0) {
+      const pick = await promptText({
+        title: 'Close its subtasks too?',
+        label: `“${i.title || 'This item'}” still has ${openKids.length} open subtask${
+          openKids.length === 1 ? '' : 's'
+        }.`,
+        choices: [
+          { value: 'all', label: `Close all ${openKids.length} with it` },
+          { value: 'one', label: 'Just this one — subtasks stay open' },
+          { value: 'cancel', label: 'Cancel' }
+        ]
+      })
+      if (pick === 'cancel' || pick == null) return
+      if (pick === 'all') {
+        for (const k of openKids) {
+          const verb = PRIMARY_ACTION[queueOf(k)] ?? PRIMARY_ACTION.to_do
+          await setState(k.id, verb.state)
+        }
+      }
+    }
     await setState(i.id, state)
     const deskId = i.parentId
     if (!deskId) return
@@ -484,6 +621,30 @@ export default function AttentionView(): JSX.Element {
     setSelected(new Set())
   }
 
+  /** DEC-048 — bulk closing verbs for the selection. "Complete" uses each
+   *  item's OWN queue verb (a Meet item schedules, a Decide item decides…)
+   *  so the record stays honest; "Dismiss" is the delete-shaped verb — items
+   *  park recoverable, nothing is destroyed (work items have no hard delete
+   *  by design). */
+  async function bulkClose(kind: 'primary' | 'dismissed' | 'archived'): Promise<void> {
+    const list = items.filter(
+      (i) => selected.has(i.id) && !isTerminalState(i.workItemState) && i.detachedFromId == null
+    )
+    if (!list.length || bulkBusy) return
+    setBulkBusy(true)
+    try {
+      for (const i of list) {
+        const state =
+          kind === 'primary' ? (PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do).state : kind
+        await setState(i.id, state)
+      }
+      await refresh()
+    } finally {
+      setBulkBusy(false)
+      setSelected(new Set())
+    }
+  }
+
   /** Open the DESK the item lives on — the whole canvas, in context. */
   function openSource(i: FbNode): void {
     if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
@@ -512,10 +673,17 @@ export default function AttentionView(): JSX.Element {
     group?: {
       isChild: boolean
       childCount: number
+      /** STORAGE nesting depth (0 = root) — what the cap is measured against. */
+      depth: number
+      /** Rendered indent level: storage depth plus the desk-cluster offset. */
+      indent: number
+      /** Rows hidden while this one is collapsed. */
+      descendants: number
       rows: ReturnType<typeof orderWithGroups>
       queue: string
     }
   ): JSX.Element {
+    const isCollapsed = collapsed.has(i.id)
     const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
     const reason = itemReason(i, nowMs)
     const hasDesk = !!(i.parentId && nodes.some((n) => n.id === i.parentId))
@@ -529,6 +697,7 @@ export default function AttentionView(): JSX.Element {
       <div
         key={i.id}
         data-item-row
+        data-item-id={inDetached ? undefined : i.id}
         onDoubleClick={(e) => {
           // Only the ACTION cluster is off-limits — double-clicking Archive
           // should archive, not open an editor behind it. The title and the
@@ -557,12 +726,16 @@ export default function AttentionView(): JSX.Element {
                 if (dwell.current?.id !== i.id) {
                   clearDwell()
                   setOver({ id: i.id, pos: 'after' })
-                  dwell.current = {
-                    id: i.id,
-                    timer: window.setTimeout(
-                      () => setOver({ id: i.id, pos: 'into' }),
-                      GROUP_DWELL_MS
-                    )
+                  // DEC-048 — the UI never offers a nest the cap would refuse:
+                  // no dwell arm on a row the drag cannot legally land under.
+                  if (canNestUnder(i.id, group?.depth ?? 0)) {
+                    dwell.current = {
+                      id: i.id,
+                      timer: window.setTimeout(
+                        () => setOver({ id: i.id, pos: 'into' }),
+                        GROUP_DWELL_MS
+                      )
+                    }
                   }
                 }
               }
@@ -586,8 +759,10 @@ export default function AttentionView(): JSX.Element {
             : undefined
         }
         className={`group flex items-start gap-2 px-4 py-2.5 bg-[var(--surface-raised)] ${
-          group?.isChild ? 'pl-10' : ''
-        } ${dragId === i.id ? 'opacity-40' : ''} ${
+          ['', 'pl-10', 'pl-16', 'pl-[5.5rem]'][Math.min(group?.indent ?? 0, 3)]
+        } ${
+          dragId === i.id || (dragMulti && dragId && selected.has(i.id)) ? 'opacity-40' : ''
+        } ${
           isOver && over?.pos === 'into'
             ? 'shadow-[inset_0_0_0_2px_rgba(var(--accent),0.5)]'
             : isOver && over?.pos === 'before'
@@ -610,7 +785,7 @@ export default function AttentionView(): JSX.Element {
             />
           </button>
         )}
-        {canDrag && !selectMode && (
+        {canDrag && (
           <button
             draggable
             onDragStart={(e) => {
@@ -624,10 +799,16 @@ export default function AttentionView(): JSX.Element {
                 e.dataTransfer.setDragImage(rowEl, e.clientX - r.left, e.clientY - r.top)
               }
               setDragId(i.id)
+              // DEC-048 — grabbing a SELECTED row moves the whole selection.
+              setDragMulti(selectMode && selected.has(i.id) && selected.size > 1)
               e.dataTransfer.effectAllowed = 'move'
             }}
             onDragEnd={endDrag}
-            title="Drag to reorder, attach to another item, or move to another section"
+            title={
+              selectMode && selected.has(i.id) && selected.size > 1
+                ? `Drag to move all ${selected.size} selected — drop ON an item to nest them as its subtasks`
+                : 'Drag to reorder, attach to another item, or move to another section'
+            }
             className="shrink-0 mt-0.5 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <Icon name="drag_indicator" size={16} />
@@ -763,10 +944,20 @@ export default function AttentionView(): JSX.Element {
             )
           })()}
           {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
-          {group && group.childCount > 0 && (
-            <div className="text-[11px] text-[var(--ink-40)] mt-0.5">
-              {group.childCount} related item{group.childCount === 1 ? '' : 's'}
-            </div>
+          {group && (group.childCount > 0 || (isCollapsed && group.descendants > 0)) && (
+            /* DEC-048 — the parent's fold. Collapsed keeps the row, hides the
+               subtree, and says how much is tucked away. */
+            <button
+              data-row-action
+              onClick={() => toggleCollapsed(i.id)}
+              title={isCollapsed ? 'Show its subtasks' : 'Collapse its subtasks'}
+              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+            >
+              <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={12} />
+              {isCollapsed
+                ? `${group.descendants} subtask${group.descendants === 1 ? '' : 's'} hidden`
+                : `${group.childCount} subtask${group.childCount === 1 ? '' : 's'}`}
+            </button>
           )}
         </div>
         <div
@@ -1108,7 +1299,37 @@ export default function AttentionView(): JSX.Element {
                 Clear
               </button>
             )}
+            <span className="fb-t-caption text-[var(--ink-40)] hidden lg:inline">
+              Shift+drag sweeps a selection · drag a selected row onto an item to nest
+            </span>
             <div className="flex-1" />
+            <button
+              onClick={() => void bulkClose('primary')}
+              disabled={selected.size === 0 || bulkBusy}
+              title="Close each with its own queue’s verb — done, scheduled, answered…"
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-40"
+            >
+              <Icon name="done_all" size={14} />
+              Complete all
+            </button>
+            <button
+              onClick={() => void bulkClose('dismissed')}
+              disabled={selected.size === 0 || bulkBusy}
+              title="Dismiss the selection — parked and recoverable, nothing is destroyed"
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] disabled:opacity-40"
+            >
+              <Icon name="delete_sweep" size={14} />
+              Dismiss all
+            </button>
+            <button
+              onClick={() => void bulkClose('archived')}
+              disabled={selected.size === 0 || bulkBusy}
+              title="Archive the selection — kept, out of the way"
+              className="inline-flex items-center gap-1.5 h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)] disabled:opacity-40"
+            >
+              <Icon name="archive" size={14} />
+              Archive all
+            </button>
             <button
               onClick={() => startWithPlexii(items.filter((i) => selected.has(i.id)))}
               disabled={selected.size === 0}
@@ -1159,13 +1380,15 @@ export default function AttentionView(): JSX.Element {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
+          /* DEC-048 — Shift+drag anywhere over the queues sweeps a marquee. */
+          <div className="flex flex-col gap-6" onMouseDown={startMarquee}>
             {queues.map((q) => {
               // DEC-035: in the Queue lens the rows carry grouping + manual
               // order; the other lenses (Due/Origin) answer a different
               // question, so they stay ranked and undraggable.
               const grouped =
                 lens === 'queue' ? orderWithGroups(q.items, (x) => rankScore(x, nowMs)) : null
+              const shown = grouped ? visibleRows(grouped, collapsed) : null
               return (
                 <section
                   key={q.queue}
@@ -1209,8 +1432,8 @@ export default function AttentionView(): JSX.Element {
                     )}
                   </div>
                   <div className="rounded-xl border border-[var(--edge-soft)] divide-y divide-[var(--edge-firm)] overflow-hidden">
-                    {grouped
-                      ? clusterByDesk(grouped).map((cluster, ci) => {
+                    {shown && grouped
+                      ? clusterByDesk(shown).map((cluster, ci) => {
                           const desk = cluster.deskId ? nodesById.get(cluster.deskId) : null
                           return (
                             <div key={cluster.deskId ?? `flat-${ci}`}>
@@ -1252,6 +1475,9 @@ export default function AttentionView(): JSX.Element {
                                 row(g.item, false, {
                                   isChild: g.isChild || !!desk,
                                   childCount: g.childCount,
+                                  depth: g.depth,
+                                  indent: g.depth + (desk ? 1 : 0),
+                                  descendants: g.descendants,
                                   rows: grouped,
                                   queue: q.queue
                                 })
@@ -1401,6 +1627,17 @@ export default function AttentionView(): JSX.Element {
         </aside>
         </div>
       </div>
+      {marquee && (
+        <div
+          className="fixed z-50 pointer-events-none rounded-sm border border-[rgba(var(--accent),0.6)] bg-[rgba(var(--accent),0.08)]"
+          style={{
+            left: Math.min(marquee.x0, marquee.x1),
+            top: Math.min(marquee.y0, marquee.y1),
+            width: Math.abs(marquee.x1 - marquee.x0),
+            height: Math.abs(marquee.y1 - marquee.y0)
+          }}
+        />
+      )}
       {editing && (
         <AttentionItemEditor
           item={editing}

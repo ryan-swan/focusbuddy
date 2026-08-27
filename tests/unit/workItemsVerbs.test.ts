@@ -157,42 +157,54 @@ describe('DEC-039 — creation carries the chosen context (file-level pins)', ()
   })
 })
 
-describe('DEC-035 — grouping is one level, enforced at the db', () => {
-  it('groups an item under a leader, and flattens a group-under-a-child', () => {
+describe('DEC-048 — grouping nests to MAX depth 3, enforced at the db', () => {
+  const gid = (raw: ReturnType<typeof freshDb>['raw'], id: string): string | null =>
+    (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get(id) as { group_id: string | null })
+      .group_id
+
+  it('builds a 3-level chain and REFUSES the 4th level', () => {
     const { raw, db } = freshDb()
-    wi(raw, 'lead')
+    wi(raw, 'root')
     wi(raw, 'kid')
-    wi(raw, 'other')
-    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })).toBe(true)
-    expect(
-      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('kid') as { group_id: string })
-        .group_id
-    ).toBe('lead')
-    // Dropping onto a CHILD joins that child's group — never a second level.
-    expect(updateWorkItemFieldsCore(db, 'other', { groupId: 'kid' })).toBe(true)
-    expect(
-      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('other') as { group_id: string })
-        .group_id
-    ).toBe('lead')
+    wi(raw, 'grandkid')
+    wi(raw, 'toodeep')
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'root' })).toBe(true)
+    // Grouping under a CHILD now genuinely nests (supersedes DEC-035's flatten).
+    expect(updateWorkItemFieldsCore(db, 'grandkid', { groupId: 'kid' })).toBe(true)
+    expect(gid(raw, 'grandkid')).toBe('kid')
+    // Level 4 hits the wall.
+    expect(updateWorkItemFieldsCore(db, 'toodeep', { groupId: 'grandkid' })).toBe(false)
+    expect(gid(raw, 'toodeep')).toBeNull()
   })
 
-  it('refuses self-grouping, a non-item leader, and grouping a LEADER', () => {
+  it('counts the SUBTREE the item brings with it', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'a1')
+    wi(raw, 'a2')
+    wi(raw, 'b1')
+    wi(raw, 'b2')
+    updateWorkItemFieldsCore(db, 'a2', { groupId: 'a1' }) // a1 is 2 tall
+    updateWorkItemFieldsCore(db, 'b2', { groupId: 'b1' }) // b1 is 2 tall
+    // 2-tall subtree under a level-2 item → level 4: refused.
+    expect(updateWorkItemFieldsCore(db, 'b1', { groupId: 'a2' })).toBe(false)
+    // Under a ROOT it fits exactly (1 + 2 = 3).
+    expect(updateWorkItemFieldsCore(db, 'b1', { groupId: 'a1' })).toBe(true)
+    expect(gid(raw, 'b1')).toBe('a1')
+    expect(gid(raw, 'b2')).toBe('b1') // internal structure untouched
+  })
+
+  it('refuses self-grouping, a non-item parent, a missing parent, and a CYCLE', () => {
     const { raw, db } = freshDb()
     wi(raw, 'lead')
     wi(raw, 'kid')
-    wi(raw, 'other')
     raw.prepare("INSERT INTO nodes (id, kind, title) VALUES ('desk', 'task', 'D')").run()
     expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'lead' })).toBe(false)
     expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'desk' })).toBe(false)
     expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'missing' })).toBe(false)
-    // 'lead' now leads someone…
     expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })).toBe(true)
-    // …so it can no longer be grouped itself.
-    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'other' })).toBe(false)
-    expect(
-      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('lead') as { group_id: string | null })
-        .group_id
-    ).toBeNull()
+    // Grouping the parent under its own child would close a cycle — refused.
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'kid' })).toBe(false)
+    expect(gid(raw, 'lead')).toBeNull()
   })
 
   it('ungroup clears the reference', () => {
