@@ -8,6 +8,7 @@ import {
   archivedItems,
   detachedItems,
   itemReason,
+  itemFullText,
   isTerminalState,
   rankScore,
   PRIMARY_ACTION,
@@ -191,5 +192,24 @@ describe('closing verbs + reasons', () => {
     ).toContain('Due')
     expect(itemReason(wi({ reasonCode: 'decayed' }), NOW)).toBe('Faded out quietly')
     expect(itemReason(wi({}), NOW)).toBeNull()
+  })
+})
+
+describe('itemFullText — the whole capture, for reading and copying', () => {
+  it('joins title and notes verbatim, with a blank line between', () => {
+    expect(itemFullText({ title: 'Short title', description: 'The long note.' })).toBe(
+      'Short title\n\nThe long note.'
+    )
+  })
+
+  it('omits an empty half rather than leaving stray blank lines', () => {
+    expect(itemFullText({ title: 'Only a title', description: '' })).toBe('Only a title')
+    expect(itemFullText({ title: 'Only a title', description: '   ' })).toBe('Only a title')
+    expect(itemFullText({ title: '', description: 'Only notes' })).toBe('Only notes')
+  })
+
+  it('does NOT truncate — the point is the unedited text', () => {
+    const long = 'x'.repeat(500)
+    expect(itemFullText({ title: long, description: long })).toHaveLength(1002)
   })
 })

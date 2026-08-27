@@ -246,6 +246,13 @@ export function archivedItems(items: FbNode[]): FbNode[] {
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
+/** The item's full, unedited text for reading or copying: the title, then the
+ *  notes verbatim. A queue row truncates for scannability, so this is the ONE
+ *  place the whole capture is reconstituted — expand and copy both use it. */
+export function itemFullText(i: Pick<FbNode, 'title' | 'description'>): string {
+  return [i.title?.trim(), (i.description ?? '').trim()].filter(Boolean).join('\n\n')
+}
+
 /** One plain-language reason per item (SPEC-018 v1): due proximity beats
  *  origin; reason_code (e.g. 'decayed') is honored when present. */
 export function itemReason(i: FbNode, nowMs: number): string | null {

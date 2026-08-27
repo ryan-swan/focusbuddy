@@ -14,6 +14,7 @@ import {
   archivedItems,
   detachedItems,
   itemReason,
+  itemFullText,
   queueOf,
   PRIMARY_ACTION,
   QUEUE_ICON,
@@ -74,6 +75,31 @@ export default function AttentionView(): JSX.Element {
     setLens(l)
   }
   const [showClosed, setShowClosed] = useState(false)
+
+  // Full text on demand: a queue row truncates by design (scannability), but
+  // the capture behind it is often a paragraph — and until now there was NO
+  // way to read or copy it without opening the DB (operator live QA). Expand
+  // shows the untouched title + notes; Copy puts them on the clipboard.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const toggleExpanded = (id: string): void =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  async function copyItem(i: FbNode): Promise<void> {
+    // Title + notes, verbatim — what the operator actually needs to paste.
+    const body = itemFullText(i)
+    try {
+      await navigator.clipboard.writeText(body)
+      setCopiedId(i.id)
+      setTimeout(() => setCopiedId((c) => (c === i.id ? null : c)), 1600)
+    } catch {
+      /* clipboard denied — the expanded text is still selectable by hand */
+    }
+  }
 
   // The bare manual form (Layer 0, taxonomy alignment stage): a full by-hand
   // path — title, class picked from the eight primaries, optional date and
@@ -229,24 +255,62 @@ export default function AttentionView(): JSX.Element {
     const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
     const reason = itemReason(i, nowMs)
     const hasDesk = !!(i.parentId && nodes.some((n) => n.id === i.parentId))
+    const isOpen = expanded.has(i.id)
+    const notes = (i.description || '').trim()
+    // Worth opening when the title is long enough to clip, or notes exist.
+    const hasMore = notes.length > 0 || i.title.length > 60
     return (
       <div
         key={i.id}
-        className="group flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
+        className="group flex items-start gap-3 px-4 py-2.5 bg-[var(--surface-raised)]"
       >
-        <Icon
-          name={QUEUE_ICON[queueOf(i)] ?? 'check_circle'}
-          size={16}
-          className="text-[var(--ink-30)] shrink-0"
-        />
+        <button
+          onClick={() => hasMore && toggleExpanded(i.id)}
+          title={hasMore ? (isOpen ? 'Collapse' : 'Show the full text') : undefined}
+          aria-expanded={isOpen}
+          disabled={!hasMore}
+          className={`shrink-0 mt-0.5 ${hasMore ? 'fb-press cursor-pointer' : 'cursor-default'}`}
+        >
+          <Icon
+            name={hasMore ? (isOpen ? 'expand_more' : 'chevron_right') : (QUEUE_ICON[queueOf(i)] ?? 'check_circle')}
+            size={16}
+            className="text-[var(--ink-30)]"
+          />
+        </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="fb-t-body font-medium text-[var(--ink-100)] truncate">{i.title}</span>
+            <button
+              onClick={() => hasMore && toggleExpanded(i.id)}
+              title={hasMore && !isOpen ? i.title : undefined}
+              className={`fb-t-body font-medium text-[var(--ink-100)] text-left min-w-0 ${
+                isOpen ? 'whitespace-pre-wrap break-words' : 'truncate'
+              } ${hasMore ? 'fb-press' : 'cursor-default'}`}
+            >
+              {i.title}
+            </button>
             {dueChip(i, nowMs)}
           </div>
+          {isOpen && notes && (
+            <div className="mt-1.5 text-[12px] text-[var(--ink-70)] whitespace-pre-wrap break-words select-text">
+              {notes}
+            </div>
+          )}
           {reason && <div className="text-[11px] text-[var(--ink-40)] mt-0.5">{reason}</div>}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          className={`flex items-center gap-1 transition-opacity ${
+            isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          {hasMore && (
+            <button
+              onClick={() => void copyItem(i)}
+              title="Copy the full text"
+              className="icon-btn !h-7 !w-7"
+            >
+              <Icon name={copiedId === i.id ? 'check' : 'content_copy'} size={14} />
+            </button>
+          )}
           {inDetached ? (
             <button
               onClick={() => void moveDetached(i)}
