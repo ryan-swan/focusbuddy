@@ -66,7 +66,7 @@ import {
   subtreeIds,
   visibleRows,
   type DropPosition
-} from '../../lib/attentionGrouping'
+, hasFollowingSibling } from '../../lib/attentionGrouping'
 import {
   feederSignals,
   loadMutes,
@@ -122,6 +122,13 @@ function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
     </span>
   )
 }
+
+// DEC-062 — the indent step. Was 22px, which at one level of nesting read as a
+// slightly ragged left edge rather than a hierarchy; the operator asked for the
+// whole sub-item row to sit further in. 28px is wide enough to be unmistakable
+// and still leaves the third level inside the box at normal widths.
+const INDENT_PX = 28
+const MAX_INDENT = 3
 
 export default function AttentionView(): JSX.Element {
   const items = useWorkItemStore((s) => s.items)
@@ -367,6 +374,18 @@ export default function AttentionView(): JSX.Element {
   const [editing, setEditing] = useState<FbNode | null>(null)
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // DEC-062 — which desk clusters are folded shut. Session-scoped by design:
+  // a fold is a "get this out of my way for now", not a preference worth
+  // persisting across launches, and an item that reappears tomorrow is the
+  // point of the queue.
+  const [deskFolded, setDeskFolded] = useState<Set<string>>(new Set())
+  const toggleDeskFold = (deskId: string): void =>
+    setDeskFolded((prev) => {
+      const next = new Set(prev)
+      if (next.has(deskId)) next.delete(deskId)
+      else next.add(deskId)
+      return next
+    })
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const toggleExpanded = (id: string): void =>
     setExpanded((prev) => {
@@ -667,6 +686,21 @@ export default function AttentionView(): JSX.Element {
       : null
     const urgency = urgencyOf(i)
     const assignees = parseMentions(i.mentions).filter((m) => m.kind === 'person')
+    // DEC-062 — the elbow's geometry. `indentLevel` is the row's rendered
+    // indent (storage depth plus the desk-cluster offset), clamped to the cap;
+    // `elbowColor` is this row's own queue colour so the corner reads as part
+    // of the same spine it joins; `moreSiblings` decides whether the parent's
+    // trunk continues past the corner to reach the next child.
+    const indentLevel = Math.min(group?.indent ?? 0, MAX_INDENT)
+    // DEC-062 — the elbow keys off STORAGE depth, not rendered indent. A desk
+    // cluster also indents its rows (indent = depth + 1), so keying off indent
+    // drew a corner beside every item that merely sits on a desk — a ladder of
+    // brackets down the cluster claiming a parent-child relationship that does
+    // not exist. Only a genuine sub-item gets the corner.
+    const isSubItem = (group?.depth ?? 0) > 0
+    const elbowColor = queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.45)
+    const myIndex = group ? group.rows.findIndex((r) => r.item.id === i.id) : -1
+    const moreSiblings = myIndex >= 0 && hasFollowingSibling(group!.rows, myIndex)
     return (
       <div
         key={i.id}
@@ -732,7 +766,7 @@ export default function AttentionView(): JSX.Element {
               }
             : undefined
         }
-        style={{ paddingLeft: `${8 + Math.min(group?.indent ?? 0, 3) * 22}px` }}
+        style={{ paddingLeft: `${8 + indentLevel * INDENT_PX}px` }}
         className={`group relative flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors ${
           selected.has(i.id) && selectMode
             ? 'bg-[rgba(var(--accent),0.08)]'
@@ -755,10 +789,46 @@ export default function AttentionView(): JSX.Element {
           aria-hidden
           className="absolute top-0 bottom-0 w-[3px]"
           style={{
-            left: `${Math.min(group?.indent ?? 0, 3) * 22}px`,
+            left: `${indentLevel * INDENT_PX}px`,
             backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55)
           }}
         />
+        {/* DEC-062 — the elbow. A sub-item used to sit at a deeper indent with
+            its own free-floating spine, which reads as "another row, further
+            right" rather than "this belongs to the one above". The corner joins
+            the two: down the parent's line, a rounded bend inward, then across
+            to where the child's own spine begins. */}
+        {isSubItem && (
+          <span
+            aria-hidden
+            className="absolute pointer-events-none"
+            style={{
+              left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
+              top: 0,
+              height: '50%',
+              width: `${INDENT_PX - 1}px`,
+              borderLeft: `2px solid ${elbowColor}`,
+              borderBottom: `2px solid ${elbowColor}`,
+              borderBottomLeftRadius: '9px'
+            }}
+          />
+        )}
+        {/* ...and when siblings follow, the parent's trunk carries on past the
+            corner to reach them. Without this the last-but-one child's line
+            appears to stop mid-row. */}
+        {isSubItem && moreSiblings && (
+          <span
+            aria-hidden
+            className="absolute pointer-events-none"
+            style={{
+              left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
+              top: '50%',
+              bottom: 0,
+              width: '2px',
+              backgroundColor: elbowColor
+            }}
+          />
+        )}
         {selectMode && !inDetached && (
           <button
             onClick={() => toggleSelected(i.id)}
@@ -803,15 +873,20 @@ export default function AttentionView(): JSX.Element {
             /* DEC-055 — absolutely placed in the spine gutter: reserving a
                column for a hover-only affordance was the dead space to the
                left of the checkbox. */
-            style={{ left: `${5 + Math.min(group?.indent ?? 0, 3) * 22}px` }}
-            className="absolute top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ left: `${indentLevel * INDENT_PX}px` }}
+            className="absolute z-0 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <Icon name="drag_indicator" size={16} />
           </button>
         )}
         {/* A fixed slot for the subtask chevron, so every title starts at the
             same x whether or not the row has children. */}
-        <span className="shrink-0 w-3.5 flex items-center justify-center">
+        {/* DEC-062 — `relative z-10`: the drag handle is absolutely positioned in
+            this same gutter, and a positioned element paints above a static one
+            whatever the DOM order, so the handle was swallowing every click
+            meant for this chevron. The chevron is a persistent control and the
+            handle a hover-only one, so the chevron wins the overlap. */}
+        <span className="relative z-10 shrink-0 w-3.5 flex items-center justify-center">
           {hasKids && (
             <button
               data-row-action
@@ -1545,13 +1620,59 @@ export default function AttentionView(): JSX.Element {
                                    read as an item class) · due · open count.
                                    Click opens the desk. */
                                 <button
-                                  onClick={() => {
-                                    setActive(desk.id)
-                                    goTask(desk.id)
+                                  /* DEC-062 — the header now FOLDS its cluster.
+                                     The operator: "when I click lakedash it
+                                     hides all the items associated and if i
+                                     click again it expands the full list".
+                                     Opening the desk moved onto the icon, which
+                                     keeps that reachable without stealing the
+                                     click he asked for. */
+                                  onClick={() => toggleDeskFold(desk.id)}
+                                  aria-expanded={!deskFolded.has(desk.id)}
+                                  title={
+                                    deskFolded.has(desk.id)
+                                      ? `Show the ${cluster.rows.length} items on this desk`
+                                      : 'Hide this desk’s items'
+                                  }
+                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left fb-press"
+                                  style={{
+                                    /* DEC-062 — tinted in the QUEUE's colour, not
+                                       the generic accent: the operator asked for
+                                       an obvious cue for what kind of work sits
+                                       under the header (to-do blue, meet green).
+                                       Kept faint — it is a band behind a whole
+                                       cluster, so it carries further than the
+                                       3px spine at the same alpha would. */
+                                    backgroundColor: queueTint(
+                                      QUEUE_COLOR[q.queue] ?? '#64748b',
+                                      0.1
+                                    )
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 bg-[rgba(var(--accent),0.06)] text-left fb-press"
                                 >
-                                  <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
+                                  <Icon
+                                    name={deskFolded.has(desk.id) ? 'chevron_right' : 'expand_more'}
+                                    size={14}
+                                    className="text-[var(--ink-40)] shrink-0"
+                                  />
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    title="Open this desk"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setActive(desk.id)
+                                      goTask(desk.id)
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key !== 'Enter' && e.key !== ' ') return
+                                      e.stopPropagation()
+                                      setActive(desk.id)
+                                      goTask(desk.id)
+                                    }}
+                                    className="shrink-0 flex items-center rounded hover:bg-[var(--surface-sunken)] p-0.5 fb-press"
+                                  >
+                                    <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
+                                  </span>
                                   <span className="fb-t-label text-[var(--ink-70)] truncate">
                                     {desk.title || 'Untitled desk'}
                                   </span>
@@ -1572,7 +1693,7 @@ export default function AttentionView(): JSX.Element {
                                   </span>
                                 </button>
                               )}
-                              {cluster.rows.map((g) =>
+                              {(desk && deskFolded.has(desk.id) ? [] : cluster.rows).map((g) =>
                                 row(g.item, false, {
                                   isChild: g.isChild || !!desk,
                                   childCount: g.childCount,

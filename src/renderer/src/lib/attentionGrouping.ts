@@ -29,6 +29,30 @@ export interface GroupedRow {
   descendants: number
 }
 
+/**
+ * DEC-062 — does the row at `index` have another sibling BELOW it?
+ *
+ * The tree elbow needs this. A child row draws a corner from its parent's spine
+ * across to its own; but when more siblings follow, the parent's trunk also has
+ * to continue PAST the corner to reach them, or the last sibling's elbow looks
+ * like the line simply stopped.
+ *
+ * The list is a flattened depth-first tree, so the answer is the next row at
+ * this row's own depth or shallower: equal depth means a sibling follows,
+ * shallower (or nothing) means this was the last one. Rows in between are this
+ * row's own descendants and say nothing about its siblings.
+ */
+export function hasFollowingSibling(rows: { depth: number }[], index: number): boolean {
+  const depth = rows[index]?.depth
+  if (depth === undefined) return false
+  for (let i = index + 1; i < rows.length; i++) {
+    const d = rows[i].depth
+    if (d > depth) continue // a descendant of this row
+    return d === depth
+  }
+  return false
+}
+
 const parentOf = (i: FbNode): string | null =>
   i.groupId && i.groupId !== i.id ? i.groupId : null
 

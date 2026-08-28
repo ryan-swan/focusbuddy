@@ -259,8 +259,48 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
 
   it('the drag handle floats in the spine gutter instead of reserving a column', () => {
     // That reserved column WAS the dead space to the left of the checkbox.
-    expect(att).toContain('absolute top-1/2 -translate-y-1/2 cursor-grab')
+    // DEC-062 kept the float and added a z-order: sharing the gutter is fine,
+    // swallowing the chevron's clicks was not.
+    expect(att).toContain('absolute z-0 top-1/2 -translate-y-1/2 cursor-grab')
     expect(att).not.toContain('shrink-0 cursor-grab')
+  })
+
+  it('DEC-062 — a sub-item joins its parent with an elbow, not a floating spine', () => {
+    // The corner: down the parent's line, a rounded bend inward, then across to
+    // where the child's own spine starts. Without it a sub-item read as
+    // "another row, further right" rather than as belonging to the one above.
+    expect(att).toContain('borderBottomLeftRadius')
+    // Keyed on STORAGE depth, never rendered indent: a desk cluster also
+    // indents its rows, and keying off indent drew a corner beside every item
+    // that merely sits on a desk.
+    expect(att).toContain('const isSubItem = (group?.depth ?? 0) > 0')
+    expect(att).toContain('{isSubItem && (')
+    // ...and the trunk continues past the corner when more siblings follow,
+    // which is the case that only shows up with MULTIPLE sub-items.
+    expect(att).toContain('moreSiblings')
+    expect(att).toContain('hasFollowingSibling')
+  })
+
+  it('DEC-062 — the desk header is tinted by its QUEUE, and folds its cluster', () => {
+    // The tint is the cue for what kind of work sits under the header (to-do
+    // blue, meet green), so it must read the queue — not the generic accent.
+    expect(att).toContain('QUEUE_COLOR[q.queue]')
+    // Scoped to the header: the generic accent wash is still right elsewhere,
+    // it was only wrong as the cue for which QUEUE a cluster holds.
+    const header = att.slice(att.indexOf('onClick={() => toggleDeskFold'))
+    expect(header.slice(0, 1400)).not.toContain('bg-[rgba(var(--accent),0.06)]')
+    // Clicking the header folds; opening the desk moved to the icon so the
+    // fold could own the click without losing the capability.
+    expect(att).toContain('toggleDeskFold')
+    expect(att).toContain('deskFolded.has(desk.id) ? [] : cluster.rows')
+    expect(att).toContain('Open this desk')
+  })
+
+  it('DEC-062 — the chevron outranks the handle they share a gutter with', () => {
+    // A positioned element paints above a static one whatever the DOM order,
+    // so without this the hover-only handle ate every click meant for the
+    // persistent expander and subtasks could not be folded.
+    expect(att).toContain('relative z-10 shrink-0 w-3.5')
   })
 
   it('the rail is a solid panel with a CLASS dropdown — the text filter is gone', () => {

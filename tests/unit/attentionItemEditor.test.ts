@@ -386,9 +386,13 @@ describe('DEC-050 — the item rows read like a project tool', () => {
     expect(view).toContain("name=\"flag\"") // priority
     expect(view).toContain('assignees.slice(0, 3)') // who is on it
     // Nesting reads as indentation, capped with the depth rule. DEC-055 moved
-    // it from margin to PADDING so an indented row still spans the box and
-    // its divider runs edge to edge.
-    expect(view).toContain('paddingLeft: `${8 + Math.min(group?.indent ?? 0, 3) * 22}px`')
+    // it from margin to PADDING so an indented row still spans the box and its
+    // divider runs edge to edge — DEC-062 kept that and widened the step,
+    // routing every indent through one constant so the row, the spine, the
+    // handle and the elbow cannot drift apart.
+    expect(view).toContain('paddingLeft: `${8 + indentLevel * INDENT_PX}px`')
+    expect(view).not.toContain('marginLeft') // still padding, not margin
+    expect(view).toMatch(/const INDENT_PX = \d+/)
   })
 
   it('the status pill offers the honest set and closes with the QUEUE verb', () => {
