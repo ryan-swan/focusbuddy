@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { isoToLocalParts, localPartsToIso, formatMeetWhen } from '../lib/meetWhen'
+import { joinUrlOf, meetProviderLabel } from '../lib/meetInvite'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../stores/workItems'
 import { CLASS_CHOICES, queueOf } from '../lib/attentionQueues'
@@ -46,6 +48,16 @@ export default function AttentionItemEditor({
   const [urgency, setUrgency] = useState<string>(urgencyOf(item) ?? 'normal')
   const [tagList, setTagList] = useState<string[]>(parseTags(item.tags))
   const [mentionList, setMentionList] = useState<ItemMention[]>(parseMentions(item.mentions))
+  // DEC-064 — the meeting a Meet item points at. Held in local wall-clock parts
+  // because that is what the person types; converted to an instant on save.
+  const initialWhen = isoToLocalParts(item.meetStartAt)
+  const [meetDate, setMeetDate] = useState(initialWhen.date)
+  const [meetTime, setMeetTime] = useState(initialWhen.time)
+  const [meetDur, setMeetDur] = useState<number | ''>(item.meetDurationMin ?? '')
+  const [meetUrl, setMeetUrl] = useState(item.meetUrl ?? '')
+  const [meetLoc, setMeetLoc] = useState(item.meetLocation ?? '')
+  const [meetWho, setMeetWho] = useState(item.meetAttendees ?? '')
+  const [meetRsvp, setMeetRsvp] = useState<string>(item.meetRsvp ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement | null>(null)
@@ -78,6 +90,25 @@ export default function AttentionItemEditor({
       if (nextTags !== (item.tags ?? null)) patch.tags = nextTags
       const nextMentions = serializeMentions(mentionList)
       if (nextMentions !== (item.mentions ?? null)) patch.mentions = nextMentions
+
+      // DEC-064 — the meeting. Only sent when the item IS a Meet: the fields
+      // are hidden for every other class, so writing them from a stale state
+      // would store a meeting nobody can see or edit. Switching a Meet item to
+      // another class leaves the values ALONE rather than deleting them —
+      // reclassifying is not the same as saying the meeting never happened, and
+      // switching back must not have silently destroyed the details.
+      if (cls === 'to_meet') {
+        const nextStart = localPartsToIso(meetDate, meetTime)
+        if (nextStart !== (item.meetStartAt ?? null)) patch.meetStartAt = nextStart
+        const nextDur = meetDur === '' ? null : Number(meetDur)
+        if (nextDur !== (item.meetDurationMin ?? null)) patch.meetDurationMin = nextDur
+        const nz = (v: string): string | null => (v.trim() ? v.trim() : null)
+        if (nz(meetUrl) !== (item.meetUrl ?? null)) patch.meetUrl = nz(meetUrl)
+        if (nz(meetLoc) !== (item.meetLocation ?? null)) patch.meetLocation = nz(meetLoc)
+        if (nz(meetWho) !== (item.meetAttendees ?? null)) patch.meetAttendees = nz(meetWho)
+        const nextRsvp = meetRsvp || null
+        if (nextRsvp !== (item.meetRsvp ?? null)) patch.meetRsvp = nextRsvp
+      }
       let changed = Object.keys(patch).length > 0
       if (changed) await updateFields(item.id, patch)
 
@@ -159,6 +190,164 @@ export default function AttentionItemEditor({
             ))}
           </div>
         </div>
+
+        {/* DEC-064 — the meeting, when the item IS one. Shown by the class
+            rather than by a toggle: choosing "Meet" above is already the
+            statement that this is a meeting, and asking twice would be asking
+            the same question in two places. Every field is optional — an item
+            can be "meet with Sam" long before any of it is known, and the queue
+            only dresses it as an invitation once something is. */}
+        {cls === 'to_meet' && (
+          <div className="mt-3 rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Icon name="event" size={13} className="text-[var(--ink-40)]" />
+              <span className="fb-t-caption uppercase tracking-wider font-medium text-[var(--ink-50)]">
+                The meeting
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="fb-t-caption text-[var(--ink-40)]">When</span>
+                <div className="mt-1 flex items-center gap-1">
+                  <input
+                    type="date"
+                    value={meetDate}
+                    onChange={(e) => setMeetDate(e.target.value)}
+                    className="fb-field bg-[var(--surface-sunken)] px-2 py-1.5 text-[12px]"
+                    data-testid="meet-date"
+                  />
+                  <input
+                    type="time"
+                    value={meetTime}
+                    onChange={(e) => setMeetTime(e.target.value)}
+                    className="fb-field bg-[var(--surface-sunken)] px-2 py-1.5 text-[12px]"
+                    data-testid="meet-time"
+                  />
+                  {(meetDate || meetTime) && (
+                    <button
+                      onClick={() => {
+                        setMeetDate('')
+                        setMeetTime('')
+                      }}
+                      title="Clear the time — an invitation can be unscheduled"
+                      className="icon-btn !h-7 !w-7"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  )}
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="fb-t-caption text-[var(--ink-40)]">Length</span>
+                <select
+                  value={meetDur}
+                  onChange={(e) => setMeetDur(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="fb-field bg-[var(--surface-sunken)] mt-1 px-2 py-1.5 text-[12px]"
+                  data-testid="meet-duration"
+                >
+                  <option value="">Not set</option>
+                  {[15, 30, 45, 60, 90, 120].map((m) => (
+                    <option key={m} value={m}>
+                      {m} min
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {/* The read-back. The fields say what was typed; this says what it
+                MEANS — the same sentence the queue row will show. */}
+            {localPartsToIso(meetDate, meetTime) && (
+              <div className="mt-2 fb-t-caption text-[var(--ink-45)] fb-tabular">
+                {formatMeetWhen(
+                  Date.parse(localPartsToIso(meetDate, meetTime) as string),
+                  meetDur === '' ? null : Number(meetDur),
+                  Date.now()
+                )}
+              </div>
+            )}
+
+            <label className="block mt-3">
+              <span className="fb-t-caption text-[var(--ink-40)]">Join link</span>
+              <input
+                value={meetUrl}
+                onChange={(e) => setMeetUrl(e.target.value)}
+                placeholder="Google Meet, Zoom, Teams…"
+                className="fb-field bg-[var(--surface-sunken)] mt-1 px-2 py-1.5 text-[12px] w-full"
+                data-testid="meet-url"
+              />
+              {/* Honest about a link that will not open: the queue refuses to
+                  show a Join button for anything that is not http(s), so the
+                  editor says so here rather than letting it fail silently. */}
+              {meetUrl.trim() !== '' && (
+                <span className="fb-t-caption mt-1 block">
+                  {joinUrlOf(meetUrl) ? (
+                    <span className="text-[var(--ink-45)]">
+                      Opens as {meetProviderLabel(joinUrlOf(meetUrl))}
+                    </span>
+                  ) : (
+                    <span className="text-amber-600">
+                      That is not a web link — the queue will not offer a Join button for it.
+                    </span>
+                  )}
+                </span>
+              )}
+            </label>
+
+            <label className="block mt-3">
+              <span className="fb-t-caption text-[var(--ink-40)]">Location</span>
+              <input
+                value={meetLoc}
+                onChange={(e) => setMeetLoc(e.target.value)}
+                placeholder="An address, a room, or where to meet"
+                className="fb-field bg-[var(--surface-sunken)] mt-1 px-2 py-1.5 text-[12px] w-full"
+                data-testid="meet-location"
+              />
+            </label>
+
+            <label className="block mt-3">
+              <span className="fb-t-caption text-[var(--ink-40)]">Others coming</span>
+              <input
+                value={meetWho}
+                onChange={(e) => setMeetWho(e.target.value)}
+                placeholder="sam@acme.com, alex@acme.com"
+                className="fb-field bg-[var(--surface-sunken)] mt-1 px-2 py-1.5 text-[12px] w-full"
+                data-testid="meet-attendees"
+              />
+            </label>
+
+            {/* The answer owed. "Waiting on you" is the state that makes an
+                invitation interrupt at all, and it is what ruled out modelling
+                a Meet item AS a time block — an unanswered invite is not on
+                your calendar yet. */}
+            <div className="mt-3">
+              <span className="fb-t-caption text-[var(--ink-40)]">Your answer</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {[
+                  { v: '', label: 'None asked' },
+                  { v: 'needed', label: 'Waiting on you' },
+                  { v: 'yes', label: 'Yes' },
+                  { v: 'maybe', label: 'Maybe' },
+                  { v: 'no', label: 'No' }
+                ].map((o) => (
+                  <button
+                    key={o.v || 'none'}
+                    onClick={() => setMeetRsvp(o.v)}
+                    className={`px-2.5 h-7 fb-t-label fb-press rounded-full ${
+                      meetRsvp === o.v
+                        ? 'bg-[rgb(var(--accent))] text-white'
+                        : 'bg-[var(--surface-sunken)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="block">

@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { WORK_ITEM_COLUMNS } from '@shared/workItems'
 import { getDb } from './database'
 import { getActiveOrgId, PERSONAL_ORG_ID } from './activeOrg'
 import { emitAutomationEvent } from './automationEvents'
@@ -109,24 +110,24 @@ function rowToNode(row: NodeRow): FbNode {
     sharedRootId: row.shared_root_id ?? null,
     // work_item fields (S2): undefined-collapsed to null; only meaningful on
     // kind='work_item' rows.
-    workItemState: row.work_item_state ?? null,
-    intentClass: row.intent_class ?? null,
-    intentSub: row.intent_sub ?? null,
-    groupId: row.group_id ?? null,
-    tags: row.tags ?? null,
-    mentions: row.mentions ?? null,
-    originatorId: row.originator_id ?? null,
-    recipientId: row.recipient_id ?? null,
-    dueAt: row.due_at ?? null,
-    wiUrgency: row.wi_urgency ?? null,
-    sourceRef: row.source_ref ?? null,
-    sourceType: row.source_type ?? null,
-    confidence: row.confidence ?? null,
-    approvalState: row.approval_state ?? null,
-    reasonCode: row.reason_code ?? null,
-    wiOrigin: row.wi_origin ?? null,
-    schemaEpoch: row.schema_epoch ?? null
-  }
+    //
+    // DEC-064 — READ FROM THE MANIFEST, not from a hand-kept list. This block
+    // used to name all seventeen columns by hand, so adding one to
+    // WORK_ITEM_COLUMNS gave it DDL, sync and emit but NOT a way back out: the
+    // value stored fine and read as undefined forever. `source_url` (DEC-052)
+    // had been in exactly that state since it shipped — write-only, unnoticed
+    // only because nothing had stored one yet. The manifest is the single
+    // source of truth or it is decoration.
+    ...workItemAttrsOf(row)
+  } as FbNode
+}
+
+/** Every manifest column, under its attribute name, null-collapsed. */
+function workItemAttrsOf(row: NodeRow): Record<string, unknown> {
+  const r = row as unknown as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const def of WORK_ITEM_COLUMNS) out[def.attr] = r[def.column] ?? null
+  return out
 }
 
 let purgedTrashThisSession = false

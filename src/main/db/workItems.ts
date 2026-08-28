@@ -702,23 +702,38 @@ export function applyRemoteWorkItemTrash(id: string, trashed: boolean): void {
 /** Fields a caller may patch through updateFields. State changes go through
  *  setWorkItemState ONLY (the projection recompute lives there); status is
  *  never patchable (derived). */
+//
+// DEC-064 — DERIVED from the manifest, minus an explicit refusal list. This was
+// a hand-kept map, so a new manifest column got DDL, sync and emit but was
+// silently un-writable: updateFields dropped the unknown key without erroring,
+// the caller saw success, and the value never landed. Deriving it inverts the
+// default — a new column is patchable unless somebody says why not, and the
+// why-not is written down here rather than implied by an omission.
+const NOT_PATCHABLE: Record<string, string> = {
+  // State changes go through setWorkItemState ONLY — the status projection is
+  // recomputed there, and a bare UPDATE would leave it lying.
+  work_item_state: 'setWorkItemState owns the state machine and its projection',
+  // Provenance and routing identity: written once at creation, never edited.
+  originator_id: 'who raised it is history, not a field',
+  recipient_id: 'routing identity — SPEC-027 owns it',
+  source_ref: 'where it came from is history',
+  source_type: 'where it came from is history',
+  wi_origin: 'how it was born is history',
+  confidence: "the classifier's own number; a human editing it would be a lie",
+  // The writer's schema version. Stamped by the writer, read by the receiver.
+  schema_epoch: 'stamped by the writer, never by a caller'
+}
+
 const PATCHABLE: Record<string, string> = {
   title: 'title',
   notes: 'description',
-  intentClass: 'intent_class',
-  sourceUrl: 'source_url',
-  intentSub: 'intent_sub',
-  groupId: 'group_id',
-  tags: 'tags',
-  mentions: 'mentions',
   // DEC-035: manual placement within a queue. A base `nodes` column that
   // already rides the sync body, so a hand-ordered queue travels between
   // devices without joining the work_item manifest.
   sortOrder: 'sort_order',
-  dueAt: 'due_at',
-  wiUrgency: 'wi_urgency',
-  reasonCode: 'reason_code',
-  approvalState: 'approval_state'
+  ...Object.fromEntries(
+    WORK_ITEM_COLUMNS.filter((c) => !(c.column in NOT_PATCHABLE)).map((c) => [c.attr, c.column])
+  )
 }
 
 export function updateWorkItemFieldsCore(

@@ -151,9 +151,33 @@ describe('DEC-039 — creation carries the chosen context (file-level pins)', ()
     expect(src).toContain('due_at, wi_urgency, tags, mentions, source_ref')
     expect(src).toContain('draft.tags ?? null')
     expect(src).toContain('draft.mentions ?? null')
-    // …and both stay patchable after creation.
-    expect(src).toContain("tags: 'tags'")
-    expect(src).toContain("mentions: 'mentions'")
+    // …and both stay patchable after creation. DEC-064 derives PATCHABLE from
+    // the manifest instead of hand-listing it, so the pin is now on the RULE —
+    // a manifest column is patchable unless explicitly refused — rather than on
+    // a literal that a derivation legitimately removes.
+    expect(src).toContain('WORK_ITEM_COLUMNS.filter((c) => !(c.column in NOT_PATCHABLE))')
+    const refusals = src.slice(src.indexOf('const NOT_PATCHABLE'), src.indexOf('const PATCHABLE'))
+    expect(refusals).not.toContain('tags:')
+    expect(refusals).not.toContain('mentions:')
+  })
+
+  it('DEC-064 — every manifest column is readable and writable unless refused', () => {
+    // The bug this pins: PATCHABLE and rowToNode both hand-listed the manifest,
+    // so a new column got DDL, sync and emit but no way in or out. `source_url`
+    // sat write-only from DEC-052 until DEC-064 — stored fine, read as
+    // undefined, unnoticed only because nothing had written one yet.
+    const nodes = readFileSync(join(process.cwd(), 'src/main/db/nodes.ts'), 'utf8')
+    expect(nodes).toContain('for (const def of WORK_ITEM_COLUMNS) out[def.attr]')
+    // Refusals must say WHY, so an omission can never masquerade as a decision.
+    const src2 = readFileSync(join(process.cwd(), 'src/main/db/workItems.ts'), 'utf8')
+    const refusals = src2.slice(src2.indexOf('const NOT_PATCHABLE'), src2.indexOf('const PATCHABLE'))
+    const entries = refusals.match(/^\s{2}\w+:/gm) ?? []
+    expect(entries.length).toBeGreaterThan(0)
+    // Either quote style — one reason contains an apostrophe and is written
+    // with double quotes, which is the correct way to write it.
+    for (const e of entries) {
+      expect(refusals).toMatch(new RegExp(e.trim() + ` ('[^']{10,}'|"[^"]{10,}")`))
+    }
   })
 })
 

@@ -149,3 +149,41 @@ describe('dec_063 — the calendar composer can express a real meeting', () => {
     expect(att).toContain("updateFields(i.id, { meetRsvp: answer })") // answer in place
   })
 })
+
+// DEC-064 — the editor's date/time pair ↔ the stored instant. A meeting written
+// to the wrong hour is worse than one never written: it puts a person in the
+// wrong place, confidently.
+describe('dec_064 — local wall-clock in, absolute instant out', () => {
+  it('dec_064_round_trips_through_the_local_zone', async () => {
+    const { isoToLocalParts, localPartsToIso } = await import('../../src/renderer/src/lib/meetWhen')
+    const iso = localPartsToIso('2026-09-02', '14:30')
+    expect(iso).not.toBeNull()
+    expect(isoToLocalParts(iso)).toEqual({ date: '2026-09-02', time: '14:30' })
+  })
+
+  it('dec_064_keeps_the_day_the_user_picked_whatever_the_offset', async () => {
+    const { isoToLocalParts, localPartsToIso } = await import('../../src/renderer/src/lib/meetWhen')
+    // Late-evening local time is the case where toISOString().slice(0,10)
+    // silently rolls the date forward for anyone west of UTC.
+    expect(isoToLocalParts(localPartsToIso('2026-09-02', '23:45')).date).toBe('2026-09-02')
+    // ...and early morning is where it rolls BACK for anyone east of it.
+    expect(isoToLocalParts(localPartsToIso('2026-09-02', '00:15')).date).toBe('2026-09-02')
+  })
+
+  it('dec_064_a_time_with_no_date_is_not_a_moment', async () => {
+    const { localPartsToIso } = await import('../../src/renderer/src/lib/meetWhen')
+    expect(localPartsToIso('', '14:30')).toBeNull()
+    expect(localPartsToIso('not-a-date', '14:30')).toBeNull()
+  })
+
+  it('dec_064_a_date_with_no_time_defaults_rather_than_refusing', async () => {
+    const { isoToLocalParts, localPartsToIso } = await import('../../src/renderer/src/lib/meetWhen')
+    expect(isoToLocalParts(localPartsToIso('2026-09-02', '')).time).toBe('09:00')
+  })
+
+  it('dec_064_a_missing_or_broken_instant_yields_empty_fields', async () => {
+    const { isoToLocalParts } = await import('../../src/renderer/src/lib/meetWhen')
+    expect(isoToLocalParts(null)).toEqual({ date: '', time: '' })
+    expect(isoToLocalParts('nonsense')).toEqual({ date: '', time: '' })
+  })
+})
