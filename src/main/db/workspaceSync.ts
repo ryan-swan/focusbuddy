@@ -653,6 +653,21 @@ function emitRemoteChangeEvents(changes: RemoteApplied[], orgId?: string): void 
   }
 }
 
+// DEC-059 — should this tombstone be written, or do we already hold it?
+//
+// Extracted so the rule can be tested directly: the bug it fixes was invisible
+// in `applyRemote` because the damage happened one layer down, in a trigger.
+export function shouldApplyTombstone(
+  local: { sync_rev: number | null; trashed_at: number | null } | undefined,
+  itemRev: number
+): boolean {
+  if (!local) return false // a tombstone for a row this device never had
+  // Already trashed at this rev or newer: re-writing it is a no-op UPDATE, and
+  // a no-op UPDATE is what marks the row dirty and restarts the push loop.
+  if ((local.sync_rev ?? -1) >= itemRev && local.trashed_at != null) return false
+  return true
+}
+
 export function applyRemote(items: RemoteItem[]): { applied: number } {
   const db = getDb()
   // Nodes first: widgets and time blocks may reference them by foreign key.
@@ -668,14 +683,35 @@ export function applyRemote(items: RemoteItem[]): { applied: number } {
       if (!table) continue
       if (item.deleted) {
         // Soft-delete locally if the row exists; keep an existing trash timestamp.
-        const exists = db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(item.id)
-        if (exists) {
-          db.prepare(
-            `UPDATE ${table} SET trashed_at = COALESCE(trashed_at, ?), sync_rev = ?, needs_sync = 0 WHERE id = ?`
-          ).run(Date.now(), item.rev, item.id)
-          applied++
-          changes.push({ id: item.id, itemType: item.itemType, deleted: true, deskId: null })
-        }
+        const local = db.prepare(`SELECT sync_rev, trashed_at FROM ${table} WHERE id = ?`).get(item.id) as
+          | { sync_rev: number | null; trashed_at: number | null }
+          | undefined
+        // Nothing here to delete: a tombstone for a row this device never had.
+        if (!shouldApplyTombstone(local, item.rev)) continue
+        // DEC-059 — ECHO SUPPRESSION, the same guard the upsert below already
+        // has, and its absence here was an unbounded sync loop.
+        //
+        // The pull window re-sends tombstones this device already holds. Writing
+        // one again looks harmless — trashed_at is COALESCEd, sync_rev and
+        // needs_sync are rewritten to the values they already have — but it is a
+        // no-op UPDATE, and a no-op UPDATE is exactly what `widgets_mark_dirty`
+        // fires on: its WHEN clause asks for NEW.needs_sync = OLD.needs_sync AND
+        // NEW.sync_rev = OLD.sync_rev AND OLD.needs_sync = 0, which is precisely
+        // true when re-applying an already-applied tombstone. The trigger is
+        // right — it exists so local edits are pushed and sync writes are not —
+        // but re-applying an echo is indistinguishable from a local edit.
+        //
+        // So the row was marked dirty, pushed as a delete, the server bumped its
+        // rev, the next pull returned the tombstone at the new rev, and it went
+        // round again: one server write per widget per cycle, forever. Measured
+        // on the operator's machine before this fix: sync_rev 7,319 on one
+        // minimap and 7,214 on one webview, both trashed and still flagged
+        // needs_sync = 1, with 136 widgets past rev 1,000.
+        db.prepare(
+          `UPDATE ${table} SET trashed_at = COALESCE(trashed_at, ?), sync_rev = ?, needs_sync = 0 WHERE id = ?`
+        ).run(Date.now(), item.rev, item.id)
+        applied++
+        changes.push({ id: item.id, itemType: item.itemType, deleted: true, deskId: null })
         continue
       }
       if (!item.body || typeof item.body !== 'object') continue
