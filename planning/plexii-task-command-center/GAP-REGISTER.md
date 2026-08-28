@@ -172,3 +172,39 @@ crossroads ruling CR-01..07, IQ-1 (missing bug-report sections 7/8/13/14/17).
 2. When the closing work ships + its gate passes, mark CLOSED (keep the entry).
 3. New gaps discovered during execution → append, increment GAP-NNN.
 4. A phase isn't done until its assigned gaps are CLOSED.
+
+## GAP-017 — "Respond" may want to be "Messages", but the messaging surface is unmapped
+**Severity:** MEDIUM · **Closes in:** a designated investigation, then a ruling · **Status:** OPEN (logged 2026-08-28, operator)
+
+The operator, ruling on Meet-as-invite (DEC-062), raised the sibling question and
+**explicitly deferred it**: "before making any changes to the 'Respond' items, we will
+need to do a designated investigation into the current messaging features, so just log
+this as something to come back to."
+
+**The thought, recorded verbatim in substance:** `to_respond` items read as tasks, the
+same defect Meet has. They might instead read as MESSAGES — rename the queue to
+"Messages" so it can carry actual messages from Plexii's own messaging capability, and
+let the user reply **directly from the attention queue**, or jump to the real thread.
+
+**Why it is not actionable yet.** Nobody has mapped what Plexii's messaging actually is
+today. A first look found `src/renderer/src/components/views/MessagesView.tsx` and a
+`mail/` stack (IMAP + app-specific passwords, `mailAccount.ts`) — so there is at least
+one message surface and one mail transport, but their model, storage, threading and
+identity story are unexamined. Ruling on a rename before that is known would be
+deciding the shape of a thing we have not looked at.
+
+**What the investigation must answer before any ruling:**
+1. What message sources exist (in-app messaging? IMAP mail? Slack via webview?), and
+   which of them have a durable local model versus a rendered-only view.
+2. Whether a thread has a stable id an attention item could point at — the same
+   question `source_url` answers for other queues.
+3. Whether replying can be done in-place without owning the composer for every source,
+   or whether "open the thread" is the honest affordance for some sources.
+4. Whether "Messages" is the right NAME for a queue that must also hold non-message
+   responses (a form to fill, a comment to answer) — or whether those belong elsewhere.
+5. The DEC-062 precedent: Meet earns its invite treatment because a meeting has an
+   agreed shape (when / where / who / join). Does a "response" have an equivalent one?
+
+**Do not** rename the queue, change `to_respond` semantics, or touch the taxonomy until
+this is investigated and ruled. The eight primaries are a migrated, spec-traced
+vocabulary (DEC-029a); renaming one is a schema and migration event, not a label edit.
