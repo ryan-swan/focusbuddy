@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import type { PruneDb } from './activity'
 import { getActiveOrgId } from './activeOrg'
 import type { BrowsingHistoryEntry } from '@shared/types'
 
@@ -90,12 +91,36 @@ export function getRecentHistory(limit = 12, taskId?: string | null): BrowsingHi
   return rows.map(rowToEntry)
 }
 
-// Lightweight purge: keep most recent 500 entries to bound the table.
-export function pruneHistory(keep = 500): void {
-  const db = getDb()
-  db.prepare(
-    `DELETE FROM browsing_history WHERE url NOT IN (
-       SELECT url FROM browsing_history ORDER BY last_visited_at DESC LIMIT ?
-     )`
-  ).run(keep)
+// ── Retention (DEC-057) ──────────────────────────────────────────────────────
+// Bound the history table to its most recent entries per organisation. Like
+// `pruneActivity()`, this cap was declared and then never called from anywhere
+// (see db/retention.ts); unlike it, the table it guards is genuinely small —
+// 814 rows / 0.27 MB live, against a declared cap of 500. Wiring it is about
+// closing the last uncalled cap rather than reclaiming space.
+//
+// `url` is this table's PRIMARY KEY, so selecting on it is selecting on the
+// row identity — there is no separate `id` column to prefer.
+//
+// The change from the original: PARTITION BY org_id. Reads here are scoped
+// `WHERE org_id = ?` (see `getTopHistory` above), so a table-wide cap lets one
+// organisation's browsing evict another's entirely (PLX-SEC-010/011). The
+// `last_visited_at DESC, url DESC` tie-break keeps the retained set stable
+// across runs when timestamps collide.
+export const HISTORY_KEEP = 500
+
+export function pruneHistory(keep: number = HISTORY_KEEP, db: PruneDb = getDb() as unknown as PruneDb): number {
+  const info = db
+    .prepare(
+      `DELETE FROM browsing_history
+        WHERE url NOT IN (
+          SELECT url FROM (
+            SELECT url, ROW_NUMBER() OVER (
+                     PARTITION BY org_id ORDER BY last_visited_at DESC, url DESC
+                   ) AS rn
+              FROM browsing_history
+          ) WHERE rn <= ?
+        )`
+    )
+    .run(keep)
+  return Number((info as { changes?: number } | undefined)?.changes ?? 0)
 }
