@@ -279,6 +279,21 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     // which is the case that only shows up with MULTIPLE sub-items.
     expect(att).toContain('moreSiblings')
     expect(att).toContain('hasFollowingSibling')
+    // The corner hugs the parent's bottom edge. At 50% of the child's height it
+    // cut across the sub-item's own row and read as a line THROUGH it rather
+    // than a branch off the row above.
+    expect(att).toContain('height: `${ELBOW_DROP_PX}px`')
+    expect(att).not.toContain("height: '50%'")
+  })
+
+  it('DEC-062b — an indented row is its own inset block, not a padded slab', () => {
+    // Edge-to-edge surface and divider made an indented row read as the same
+    // slab as its parent with the text pushed over. The gutter now shows the
+    // card's fill with nothing on it but the elbow, and the row's surface and
+    // divider start at the indent. Keyed on INDENT, so desk-clustered rows get
+    // the break too — the elbow stays keyed on real nesting.
+    expect(att).toContain('{indentLevel > 0 && (')
+    expect(att).toContain('!border-t-0')
   })
 
   it('DEC-062 — the desk header is tinted by its QUEUE, and folds its cluster', () => {

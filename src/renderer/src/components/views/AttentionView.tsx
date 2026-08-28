@@ -128,6 +128,9 @@ function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
 // whole sub-item row to sit further in. 28px is wide enough to be unmistakable
 // and still leaves the third level inside the box at normal widths.
 const INDENT_PX = 28
+// How far the elbow falls before it turns. Small on purpose: the corner belongs
+// against the bottom of the row above, not in the middle of the row it labels.
+const ELBOW_DROP_PX = 14
 const MAX_INDENT = 3
 
 export default function AttentionView(): JSX.Element {
@@ -768,6 +771,12 @@ export default function AttentionView(): JSX.Element {
         }
         style={{ paddingLeft: `${8 + indentLevel * INDENT_PX}px` }}
         className={`group relative flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors ${
+          // The box draws divide-y across every child; a sub-item supplies its
+          // own inset divider above instead, so this one must not also fire.
+          indentLevel > 0
+            ? '!border-t-0 [&>*:not([aria-hidden])]:relative [&>*:not([aria-hidden])]:z-[1]'
+            : ''
+        } ${
           selected.has(i.id) && selectMode
             ? 'bg-[rgba(var(--accent),0.08)]'
             : 'hover:bg-[rgba(var(--accent),0.05)]'
@@ -783,6 +792,31 @@ export default function AttentionView(): JSX.Element {
                 : ''
         }`}
       >
+        {/* DEC-062b — a sub-item is its own block, inset by its indent.
+            Before this the row's surface (and the divider above it) ran edge to
+            edge, so an indented row read as the same slab as its parent with
+            the text pushed over. The operator asked for "a true break": the
+            gutter now shows the card's own fill with nothing on it but the
+            elbow, and the sub-item's surface — and its divider — start at the
+            indent. DEC-055 moved indentation to padding so dividers reached the
+            box edge; that was right for TOP-LEVEL rows and is exactly what a
+            sub-item must not do, so the inset is drawn rather than padded and
+            the row's own divider is suppressed.
+
+            Keyed on INDENT, not on nesting: a row under a desk header is
+            indented too, and the operator asked for the same break there —
+            "emphasizing that it is a sub-item of whatever is above it, in this
+            case the desk reference". The ELBOW stays keyed on real nesting,
+            because a desk-clustered row is a child of the HEADER, not of
+            another item, and drawing corners there made a ladder of brackets
+            claiming parent-child links that do not exist. */}
+        {indentLevel > 0 && (
+          <span
+            aria-hidden
+            className="absolute inset-y-0 right-0 pointer-events-none border-t border-[var(--edge-soft)] bg-[var(--surface-raised)]"
+            style={{ left: `${indentLevel * INDENT_PX}px` }}
+          />
+        )}
         {/* DEC-050 — the queue's colour as a spine down the row's left edge:
             which kind of work this is, readable without reading. */}
         <span
@@ -805,11 +839,16 @@ export default function AttentionView(): JSX.Element {
             style={{
               left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
               top: 0,
-              height: '50%',
+              // DEC-062b — the corner wraps the BOTTOM OF THE PARENT, not the
+              // middle of the child. At 50% the horizontal leg cut across the
+              // sub-item's own row and read as a line through it rather than a
+              // branch off the row above; ELBOW_DROP_PX lands it just under the
+              // divider, where the parent actually ends.
+              height: `${ELBOW_DROP_PX}px`,
               width: `${INDENT_PX - 1}px`,
               borderLeft: `2px solid ${elbowColor}`,
               borderBottom: `2px solid ${elbowColor}`,
-              borderBottomLeftRadius: '9px'
+              borderBottomLeftRadius: '10px'
             }}
           />
         )}
@@ -822,7 +861,7 @@ export default function AttentionView(): JSX.Element {
             className="absolute pointer-events-none"
             style={{
               left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
-              top: '50%',
+              top: 0,
               bottom: 0,
               width: '2px',
               backgroundColor: elbowColor
