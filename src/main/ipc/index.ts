@@ -168,7 +168,7 @@ import {
 import { plexiId } from '@shared/plexiId'
 import type { MaterialityInput } from '../context/materiality'
 import { isRealCreate, isRealDelete, stateChanged } from '../context/objectEventGuards'
-import type { WriteOrigin } from '../../shared/workItems'
+import type { WriteOrigin } from '../../shared/writeOrigin'
 import {
   bringToFront,
   createWidget,

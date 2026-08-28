@@ -1,4 +1,4 @@
-import type { WriteOrigin } from '../shared/workItems'
+import type { WriteOrigin } from '../shared/writeOrigin'
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   ActionProposal,
