@@ -40,7 +40,34 @@ function isRecordableUrl(url: string): boolean {
   return true
 }
 
-export function recordVisit(url: string, title: string, taskId: string | null): void {
+/**
+ * DEC-061 — record a page visit.
+ *
+ * `countsAsVisit` separates "this is a new visit" from "here is better metadata
+ * about the page you are already on", and the two genuinely differ. The browser
+ * core funnels four webview events into one nav callback, so one page load
+ * arrives several times, each pass carrying a more mature `getTitle()` — the
+ * first often the raw URL, the last the real title. The upsert below is built
+ * for exactly that: it takes the better title each time it sees one. Only 35 of
+ * 814 rows on the operator's machine still held a URL-ish title, so the
+ * mechanism works and must be preserved.
+ *
+ * What could not be preserved was counting every one of those passes as a
+ * visit. Ungated, one Slack channel reached 14,096 "visits" — a number that is
+ * user-visible (the NewNodeDialog badge) and rendered into LLM prompts, so it
+ * was not merely untidy, it was telling the model something false.
+ *
+ * Hence the split rather than a gate on the whole call: gating the call would
+ * have frozen every title at the first event's value, which is the raw URL.
+ * Recency updates too — you ARE still on the page, and last_visited_at is about
+ * where you are, not how many times you arrived.
+ */
+export function recordVisit(
+  url: string,
+  title: string,
+  taskId: string | null,
+  countsAsVisit = true
+): void {
   if (!isRecordableUrl(url)) return
   const db = getDb()
   const now = Date.now()
@@ -52,10 +79,21 @@ export function recordVisit(url: string, title: string, taskId: string | null): 
      ON CONFLICT(url) DO UPDATE SET
        title = CASE WHEN excluded.title != '' THEN excluded.title ELSE browsing_history.title END,
        last_visited_at = excluded.last_visited_at,
-       visit_count = browsing_history.visit_count + 1,
+       visit_count = browsing_history.visit_count + @increment,
        task_id = COALESCE(excluded.task_id, browsing_history.task_id),
        org_id = excluded.org_id`
-  ).run({ url, title: cleanTitle, host, taskId, now, orgId: getActiveOrgId() })
+  ).run({
+    url,
+    title: cleanTitle,
+    host,
+    taskId,
+    now,
+    // A first sighting always counts as one, even when the gate is closed:
+    // otherwise a brand-new row would land at zero visits and read as never
+    // visited by the very code that just recorded visiting it.
+    increment: countsAsVisit ? 1 : 0,
+    orgId: getActiveOrgId()
+  })
 }
 
 export function getRecentHistory(limit = 12, taskId?: string | null): BrowsingHistoryEntry[] {

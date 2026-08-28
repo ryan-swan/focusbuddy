@@ -9,7 +9,6 @@ import { catalogFor } from '../../lib/widgetCatalog'
 import { registerWebview, unregisterWebviewByWidgetId } from '../../lib/webviewRegistry'
 import { autofillWebview } from '../../lib/vaultAutofill'
 import { normalizeUrl, sanitizeWebviewUrl } from '../../lib/browserUrl'
-import { navTrailGate } from '@shared/navTrail'
 import BrowserSurface, {
   hostnameOf,
   type BrowserNavState,
@@ -173,8 +172,11 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
   // remounts browser widgets, so a per-mount trail would be cleared by the very
   // thing it exists to absorb. The gate is module-scoped and bounds its own
   // memory with an LRU over widget ids.
-  function handleNav({ url, title }: BrowserNavState): void {
-    if (navTrailGate.admit({ widgetId: widget.id, url }, Date.now())) {
+  function handleNav({ url, title, admitted }: BrowserNavState): void {
+    // DEC-061 — the verdict rides the event now. Calling admit() again here
+    // would consume the gate a second time for one navigation and answer false,
+    // silently dropping the trail row this branch exists to write.
+    if (admitted) {
       void window.api.trail.record({
         taskId: widget.taskId,
         kind: 'browser_nav',
@@ -563,6 +565,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
         </form>
       ) : (
         <BrowserSurface
+          surfaceId={widget.id}
           src={webviewSrc}
           partition={partition}
           taskId={widget.taskId}
