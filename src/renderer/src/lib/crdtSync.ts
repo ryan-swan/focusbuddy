@@ -829,6 +829,25 @@ function emitLinkAttrs(linkId: string, taskId: string, patch: { type?: string; v
 // a large enough burst tripped React's nested-update guard on every reload
 // ("Maximum update depth exceeded" via forceStoreRerender ← zustand setState).
 //
+// VERIFIED 2026-08-28, after an earlier claim was retracted. The first attempt
+// measured a hot-swap artifact: path-stashing this module makes the FIRST
+// reload log a burst whichever version is loaded, so a clean 27 → 0 was
+// measuring the swap. A later attempt found 0 in both arms — also wrong, and
+// wrong in the more dangerous direction: the sidebar was collapsed, which
+// unmounts the node-store subscriber, and forceStoreRerender only fires for a
+// MOUNTED subscriber. The bug cannot appear on a view that is not listening,
+// so that run proved the harness was idle, not that the code was sound.
+//
+// The conditions matter as much as the fix, so they are recorded here. Sidebar
+// EXPANDED (localStorage fb.sidebar.minimized = '0', which survives reload) so
+// the tree and SyncIndicator are mounted; then one reload discarded to clear
+// the swap artifact, and the SECOND reload measured. Under those conditions,
+// identical in both arms:
+//
+//   without this coalescer   14 × "Maximum update depth exceeded"
+//   with it                   0   (0 again on a re-run after restoring)
+//
+//
 // During a sync pass every applier therefore still runs its full per-id path —
 // the work_item trash router, and each window.api write (whose main-side cascade
 // + detach hooks, workItemDetachHook / normalizeAppliedWorkItem, are per call) —
