@@ -159,6 +159,7 @@ import {
 import { plexiId } from '@shared/plexiId'
 import type { MaterialityInput } from '../context/materiality'
 import { isRealCreate, isRealDelete, stateChanged } from '../context/objectEventGuards'
+import type { WriteOrigin } from '../../shared/workItems'
 import {
   bringToFront,
   createWidget,
@@ -796,7 +797,7 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
-  ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => {
+  ipcMain.handle('nodes:create', (_e, draft: NodeDraft, origin?: WriteOrigin) => {
     // Work_items never travel the nodes:* namespace (F008 one-code-path):
     // their creator is workItems:create (S3), which wraps the dedicated
     // db-module function. This protocol-boundary refusal is additional to
@@ -811,7 +812,7 @@ export function registerIpcHandlers(): void {
     const node = createNode(draft)
     // Live projection: a real ObjectCreated Event on a real user action.
     // (Binary ternary is safe: work_item was refused above.)
-    if (isRealCreate(preexisting)) {
+    if (origin !== 'sync' && isRealCreate(preexisting)) {
       emitObjectEvent({
       eventType: node.kind === 'folder' ? 'RoomCreated' : 'DeskCreated',
       category: 'user',
@@ -827,11 +828,11 @@ export function registerIpcHandlers(): void {
     }
     return node
   })
-  ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => {
+  ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch, origin?: WriteOrigin) => {
     const before = getNode(id)
     const node = updateNode(id, patch)
     // DEC-059 — a write that changed nothing is not an update.
-    if (node && stateChanged(before as never, node as never)) {
+    if (origin !== 'sync' && node && stateChanged(before as never, node as never)) {
       emitObjectEvent({
         eventType: node.status === 'done' && before?.status !== 'done' ? 'DeskCompleted' : 'DeskUpdated',
         category: 'user',
@@ -847,11 +848,11 @@ export function registerIpcHandlers(): void {
   // Trash surfacing (lifecycle L1): the Trash view's list + subtree restore.
   ipcMain.handle('nodes:listTrash', () => listTrash())
   ipcMain.handle('nodes:restoreTree', (_e, rootId: string) => restoreTree(rootId))
-  ipcMain.handle('nodes:delete', (_e, id: string) => {
+  ipcMain.handle('nodes:delete', (_e, id: string, origin?: WriteOrigin) => {
     const before = getNode(id)
     const removed = deleteNode(id)
     // DEC-059 — deleting an id that is already gone is not a transition.
-    if (isRealDelete(before)) {
+    if (origin !== 'sync' && isRealDelete(before)) {
       emitObjectEvent({
         eventType: 'DeskDeleted',
         category: 'user',
@@ -947,14 +948,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:get', (_e, id: string) => getWidget(id))
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
-  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => {
+  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft, origin?: WriteOrigin) => {
     const preexistingWidget = draft.id ? getWidget(draft.id) : null
     const widget = createWidget(draft)
     // Widgets are first-class Context-Engine objects (PLX-APP-002): a real create
     // emits an Event on the widget's object id so its Context Health can be derived.
     // DEC-059 — createWidget is idempotent by id ("so a replayed/echoed create
     // never duplicates"); the event layer has to honour the same contract.
-    if (isRealCreate(preexistingWidget)) {
+    if (origin !== 'sync' && isRealCreate(preexistingWidget)) {
       emitObjectEvent({
         eventType: 'WidgetCreated',
         category: 'user',
@@ -972,7 +973,7 @@ export function registerIpcHandlers(): void {
   // Tolerant variant for auto-spawned chrome (minimap): no-op if the task is gone.
   // Chrome is not user content, so it emits no Object Event.
   ipcMain.handle('widgets:createOptional', (_e, draft: WidgetDraft) => createWidgetIfTaskExists(draft))
-  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => {
+  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch, origin?: WriteOrigin) => {
     const beforeWidget = getWidget(id)
     const widget = updateWidget(id, patch)
     // Emit only for content-meaningful changes. Pure geometry/layout moves are not
@@ -983,6 +984,7 @@ export function registerIpcHandlers(): void {
     // A replay re-sends the content it already stored, so presence alone let one
     // sticky mint six identical Events inside 2ms. Check the outcome too.
     if (
+      origin !== 'sync' &&
       widget &&
       ('content' in patch || 'title' in patch) &&
       stateChanged(beforeWidget as never, widget as never)
@@ -1001,7 +1003,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:delete', (_e, id: string) => {
     const before = getWidget(id)
     const removed = deleteWidget(id)
-    if (isRealDelete(before)) {
+    if (origin !== 'sync' && isRealDelete(before)) {
       emitObjectEvent({
         eventType: 'WidgetDeleted',
         category: 'user',

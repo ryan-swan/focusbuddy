@@ -813,6 +813,14 @@ function emitLinkAttrs(linkId: string, taskId: string, patch: { type?: string; v
 
 // ── Apply (remote events) ─────────────────────────────────────────────────────
 
+// DEC-059 — every window.api write below passes 'sync' as its origin. These
+// appliers reuse the user-facing IPC (that is the point: one code path, so the
+// main-side cascades and hooks fire identically), but the write is a replay of
+// something that already happened elsewhere, not something the person at the
+// keyboard just did. Without the marker, main cannot tell the difference and
+// mints a permanent "user did this" Object Event for each one — 811 per boot
+// across 28 widgets, in a store that PLX-EVT-030 forbids ever pruning.
+
 // ── Pass-scoped commit coalescing ─────────────────────────────────────────────
 // A crdtJoin replays the partition's whole log in one crdtSync frame, and every
 // applier used to reflect its event into the renderer stores the moment its IPC
@@ -999,7 +1007,7 @@ function applyCreateGuarded(key: string, attempt: () => Promise<boolean>): Promi
 // updates the open view in place.
 async function applyGeomToWidget(id: string, geom: WidgetGeom): Promise<void> {
   try {
-    await window.api.widgets.update(id, geom)
+    await window.api.widgets.update(id, geom, 'sync')
   } catch {
     /* not on this device's open task; the base write still lands */
   }
@@ -1020,7 +1028,7 @@ async function tryCreateWidget(snapshot: Record<string, unknown>): Promise<boole
   try {
     // create-if-missing by id (main honours the provided id + returns the existing
     // row if it is already there), so a replayed/echoed create never duplicates.
-    created = await window.api.widgets.create(snapshot as never)
+    created = await window.api.widgets.create(snapshot as never, 'sync')
   } catch {
     return false // parent task not present locally yet — keep buffered, retry
   }
@@ -1041,7 +1049,7 @@ async function tryCreateWidget(snapshot: Record<string, unknown>): Promise<boole
 async function applyWidgetDelete(id: string): Promise<void> {
   tombstoned.add(id)
   try {
-    await window.api.widgets.delete(id) // soft-delete (recoverable), matches local remove()
+    await window.api.widgets.delete(id, 'sync') // soft-delete (recoverable), matches local remove()
   } catch {
     /* not present locally — the tombstone still guards against a later create */
   }
@@ -1056,7 +1064,7 @@ async function applyWidgetField(id: string, field: CrdtField, value: unknown): P
   else if (field === 'status') patch.status = value
   else if (field === 'order') patch.zIndex = value
   try {
-    await window.api.widgets.update(id, patch)
+    await window.api.widgets.update(id, patch, 'sync')
   } catch {
     /* not on this device's open task; base write still lands */
   }
@@ -1067,7 +1075,7 @@ async function applyWidgetField(id: string, field: CrdtField, value: unknown): P
 
 async function applyMemberToWidget(id: string, section: string | null): Promise<void> {
   try {
-    await window.api.widgets.update(id, { parentSectionId: section })
+    await window.api.widgets.update(id, { parentSectionId: section }, 'sync')
   } catch {
     /* not on the open task; base write still lands */
   }
@@ -1078,7 +1086,7 @@ async function applyMemberToWidget(id: string, section: string | null): Promise<
 
 async function applyNodeTitle(id: string, title: string): Promise<void> {
   try {
-    await window.api.nodes.update(id, { title })
+    await window.api.nodes.update(id, { title }, 'sync')
   } catch {
     /* best effort; the poll remains the safety net */
   }
@@ -1138,7 +1146,7 @@ async function tryCreateNode(snapshot: Record<string, unknown>): Promise<boolean
   if (tombstoned.has(id)) return true
   let created: FbNode | null = null
   try {
-    created = await window.api.nodes.create(snapshot as never)
+    created = await window.api.nodes.create(snapshot as never, 'sync')
   } catch {
     return false // parent node not present yet — keep buffered
   }
@@ -1164,7 +1172,7 @@ async function applyNodeDelete(id: string): Promise<void> {
   tombstoned.add(id)
   let removed: string[] = [id]
   try {
-    removed = (await window.api.nodes.delete(id)) ?? [id]
+    removed = (await window.api.nodes.delete(id, 'sync')) ?? [id]
   } catch {
     /* not present locally — tombstone still guards a later create */
   }
@@ -1185,7 +1193,7 @@ async function applyNodeAttr(id: string, attr: string, value: unknown): Promise<
     return
   }
   try {
-    await window.api.nodes.update(id, { [attr]: value } as never)
+    await window.api.nodes.update(id, { [attr]: value } as never, 'sync')
   } catch {
     /* not present locally — the poll reconciles it */
   }

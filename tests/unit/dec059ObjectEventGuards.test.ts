@@ -84,3 +84,23 @@ describe('dec_059 — an update Event requires that a field actually moved', () 
     expect(stateChanged({ id: 'n1', dueAt: null }, { id: 'n1', dueAt: null })).toBe(false)
   })
 })
+
+// DEC-059 — the origin marker, pinned structurally.
+describe('dec_059 — replayed writes declare themselves as sync', () => {
+  it('dec_059_every_crdtsync_write_passes_the_sync_origin', async () => {
+    // crdtSync deliberately reuses the user-facing IPC so the main-side
+    // cascades and hooks fire identically. That is exactly why each call has to
+    // say it is a replay: without the marker main cannot tell, and mints a
+    // permanent Event for a change the user did not make. A new applier added
+    // without the marker silently reopens the churn, so assert on the calls.
+    const fs = await import('node:fs/promises')
+    const src = await fs.readFile(
+      new URL('../../src/renderer/src/lib/crdtSync.ts', import.meta.url),
+      'utf8'
+    )
+    const calls = src.match(/window\.api\.(?:nodes|widgets)\.(?:create|update|delete)\([^\n]*/g) ?? []
+    expect(calls.length).toBeGreaterThan(0)
+    const unmarked = calls.filter((c) => !c.includes("'sync'"))
+    expect(unmarked).toEqual([])
+  })
+})
