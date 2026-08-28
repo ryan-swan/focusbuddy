@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
 import { getActiveOrgId } from './activeOrg'
+import { navTrailGate, type NavTrailGate } from '@shared/navTrail'
 import type { ActivityEvent, ActivityRecordDraft } from '@shared/types'
 
 interface ActivityRow {
@@ -30,20 +31,60 @@ function rowToEvent(row: ActivityRow): ActivityEvent {
   }
 }
 
-export function recordActivity(draft: ActivityRecordDraft): void {
-  const db = getDb()
-  const id = randomUUID()
-  const now = Date.now()
+/** The slice of a database handle the write path needs. See `PruneDb` below. */
+export interface ActivityWriteDb {
+  prepare(sql: string): { run: (...args: (string | number | null)[]) => unknown }
+}
+
+/** Injection seams, all defaulting to production. Tests supply them; nobody else does. */
+export interface RecordActivityDeps {
+  db?: ActivityWriteDb
+  gate?: NavTrailGate
+  now?: number
+  orgId?: string
+  id?: string
+}
+
+// Should this draft become a row? Everything that is not navigation always
+// does; `browser_nav` is asked, because it is the only kind a machine can emit
+// on a loop (DEC-058 — see shared/navTrail.ts for the 39,762-row forensics).
+//
+// An unkeyable payload — no widgetId, no url — is admitted rather than dropped.
+// The gate removes noise; it must never be the reason a navigation vanished.
+export function admitsNavRow(
+  draft: ActivityRecordDraft,
+  gate: NavTrailGate,
+  now: number
+): boolean {
+  if (draft.kind !== NAV_KIND) return true
+  const payload = draft.payload
+  const widgetId = typeof payload?.widgetId === 'string' ? payload.widgetId : ''
+  const url = typeof payload?.url === 'string' ? payload.url : ''
+  return gate.admit({ widgetId, url }, now)
+}
+
+/**
+ * Write one activity row. Returns whether it was written — `false` means the
+ * navigation trail coalesced it into a row that already exists, which is a
+ * normal outcome and not an error.
+ */
+export function recordActivity(draft: ActivityRecordDraft, deps: RecordActivityDeps = {}): boolean {
+  const now = deps.now ?? Date.now()
+  if (!admitsNavRow(draft, deps.gate ?? navTrailGate, now)) return false
+  const db = deps.db ?? (getDb() as unknown as ActivityWriteDb)
+  // Positional binding, matching the reads below: it is the form the tests can
+  // drive through node:sqlite, since better-sqlite3 cannot load in the runner.
   db.prepare(
-    `INSERT INTO activity_log (id, task_id, ts, kind, payload, org_id) VALUES (@id, @taskId, @ts, @kind, @payload, @orgId)`
-  ).run({
-    id,
-    taskId: draft.taskId,
-    ts: now,
-    kind: draft.kind,
-    payload: draft.payload ? JSON.stringify(draft.payload) : null,
-    orgId: getActiveOrgId()
-  })
+    `INSERT INTO activity_log (id, task_id, ts, kind, payload, org_id) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    deps.id ?? randomUUID(),
+    draft.taskId,
+    now,
+    draft.kind,
+    draft.payload ? JSON.stringify(draft.payload) : null,
+    deps.orgId ?? getActiveOrgId()
+  )
+  return true
 }
 
 export function getRecentActivity(opts: {
