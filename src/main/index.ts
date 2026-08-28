@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { config as loadEnv } from 'dotenv'
 import { closeDb, getDb } from './db/database'
+import { markUiVisible } from './db/account'
 import { runRetentionSweep } from './db/retention'
 import { autoBackupOnLaunch } from './db/backup'
 import { registerIpcHandlers } from './ipc'
@@ -279,7 +280,28 @@ function createCommandCenter(): BrowserWindow {
     }
   })
 
-  win.on('ready-to-show', () => win.show())
+  win.on('ready-to-show', () => {
+    win.show()
+    markUiVisible()
+  })
+
+  // DEC-060 — safety-net reveal. `ready-to-show` fires when the renderer has
+  // painted its first frame; if it never does, a window created with
+  // show:false stays invisible forever and the app looks dead with no clue why.
+  // Showing it anyway after a grace period turns a silent failure into a
+  // visible one you can actually debug.
+  //
+  // Honest about the limit: this is a timer, so it cannot rescue a BLOCKED main
+  // thread — nothing fires then. It covers the renderer-side half. The
+  // main-thread half is prevented at the source by keeping the boot path off
+  // the OS keychain (see db/account.ts).
+  setTimeout(() => {
+    if (!win.isDestroyed() && !win.isVisible()) {
+      console.warn('[window] ready-to-show never fired after 10s — revealing anyway (DEC-060)')
+      win.show()
+      markUiVisible()
+    }
+  }, 10_000)
 
   win.webContents.setWindowOpenHandler((details) => {
     // Validate the scheme before handing the URL to the OS. Content rendered in
