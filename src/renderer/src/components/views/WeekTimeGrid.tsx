@@ -546,7 +546,12 @@ export default function WeekTimeGrid({
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
+                              // An external link wins: if someone pasted a Zoom
+                              // URL, that is the meeting — the minted Plexii
+                              // room is the fallback, not the destination.
+                              const ext = block.meeting?.joinUrl
+                              if (ext) void window.api.files.openExternal(ext)
+                              else void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                             className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"
@@ -818,6 +823,10 @@ function BlockComposer({
   const [busy, setBusy] = useState(false)
   const [isMeeting, setIsMeeting] = useState(false)
   const [invitees, setInvitees] = useState('')
+  // DEC-063 — the two things the composer could not express: where to be, and
+  // a link that is not Plexii's own room.
+  const [location, setLocation] = useState('')
+  const [joinUrl, setJoinUrl] = useState('')
   const [inviteNote, setInviteNote] = useState<string | null>(null)
 
   useEffect(() => {
@@ -842,7 +851,12 @@ function BlockComposer({
     setBusy(true)
     try {
       const meeting: TimeBlockMeeting | null = isMeeting
-        ? { roomId: newMeetingRoomId(), invitees: parsedInvitees() }
+        ? {
+            roomId: newMeetingRoomId(),
+            invitees: parsedInvitees(),
+            joinUrl: joinUrl.trim() || null,
+            location: location.trim() || null
+          }
         : null
       // A dragged node books directly against that node; otherwise use the
       // picker (a chosen task, or a labelled generic focus block).
@@ -974,6 +988,38 @@ function BlockComposer({
           </div>
         )}
 
+        {/* DEC-063 — where to be, and how to get in. Shown only for a meeting:
+            focus time has no location and no link, and offering the fields
+            anyway would ask a question the block cannot answer. */}
+        {isMeeting && (
+          <>
+            <label className="block">
+              <span className="fb-t-caption uppercase tracking-wider font-medium">
+                Meeting link
+              </span>
+              <input
+                value={joinUrl}
+                onChange={(e) => setJoinUrl(e.target.value)}
+                placeholder="Paste a Google Meet, Zoom or Teams link — or leave blank for a Plexii room"
+                className="fb-field fb-t-body mt-1"
+                data-testid="block-join-url"
+              />
+            </label>
+            <label className="block">
+              <span className="fb-t-caption uppercase tracking-wider font-medium">
+                Location
+              </span>
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="An address, a room, or where to meet"
+                className="fb-field fb-t-body mt-1"
+                data-testid="block-location"
+              />
+            </label>
+          </>
+        )}
+
         <label className="block">
           <span className="fb-t-caption uppercase tracking-wider font-medium">
             Length
@@ -989,6 +1035,18 @@ function BlockComposer({
               </option>
             ))}
           </select>
+          {/* DEC-063 — say when it ENDS, not just how long it runs. "60 min" is
+              arithmetic the person has to do against a start time they can no
+              longer see; the end time is the thing they are actually checking
+              against the rest of their day. */}
+          <span className="fb-t-caption text-[var(--ink-40)] mt-1 block fb-tabular">
+            {new Date(startMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+            {' – '}
+            {new Date(startMs + duration * 60_000).toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit'
+            })}
+          </span>
         </label>
 
         <label className="block">

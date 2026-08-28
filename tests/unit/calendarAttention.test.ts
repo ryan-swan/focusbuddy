@@ -282,7 +282,10 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     // The corner hugs the parent's bottom edge. At 50% of the child's height it
     // cut across the sub-item's own row and read as a line THROUGH it rather
     // than a branch off the row above.
-    expect(att).toContain('height: `${ELBOW_DROP_PX}px`')
+    expect(att).toContain('height: `${ELBOW_RISE_PX}px`')
+    // Negative top: the corner turns ON the parent/child boundary, not inside
+    // the child's row.
+    expect(att).toContain('top: `-${ELBOW_RISE_PX}px`')
     expect(att).not.toContain("height: '50%'")
   })
 

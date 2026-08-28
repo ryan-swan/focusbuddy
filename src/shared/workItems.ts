@@ -54,6 +54,35 @@ export const WORK_ITEM_COLUMNS: readonly WorkItemColumnDef[] = [
   { column: 'approval_state', attr: 'approvalState', ddl: 'TEXT', rendererEmitted: true },
   { column: 'reason_code', attr: 'reasonCode', ddl: 'TEXT', rendererEmitted: true },
   { column: 'wi_origin', attr: 'wiOrigin', ddl: 'TEXT', rendererEmitted: true },
+  // ── DEC-063 — a Meet item POINTS AT a meeting ─────────────────────────────
+  // The operator ruled option 2 over "a Meet item IS a time block", and the
+  // deciding case was his own: "the RSVP if it is for responding to". An
+  // invitation you have not answered is a meeting that is NOT on your calendar
+  // — there is no block to be. So the item carries the meeting's own shape and
+  // links to a block only once something is actually scheduled.
+  //
+  // A meeting has an agreed shape — when, where, who, how to join — which is
+  // exactly what earns Meet its invite treatment where `to_respond` (GAP-017)
+  // has to be investigated first: a "response" has no equivalent shape.
+  //
+  // `meet_start_at` is deliberately NOT due_at. A meeting's start is not a
+  // deadline: nothing is late at 2pm because the meeting begins at 2pm, and
+  // collapsing the two would put every invitation into the overdue radar.
+  { column: 'meet_start_at', attr: 'meetStartAt', ddl: 'TEXT', rendererEmitted: true },
+  { column: 'meet_duration_min', attr: 'meetDurationMin', ddl: 'INTEGER', rendererEmitted: true },
+  // The join link, whoever hosts it — Google Meet, Zoom, Teams, or Plexii's own
+  // room. Stored as the URL rather than a provider enum: a link that opens is
+  // worth more than a taxonomy of links, and the provider is readable from it.
+  { column: 'meet_url', attr: 'meetUrl', ddl: 'TEXT', rendererEmitted: true },
+  // Where to physically be. Free text, because an address, a room name and
+  // "the coffee place on 3rd" are all answers a person acts on.
+  { column: 'meet_location', attr: 'meetLocation', ddl: 'TEXT', rendererEmitted: true },
+  // Who else. Comma-delimited emails for people outside Plexii; internal people
+  // ride `mentions`, which already resolves to real records.
+  { column: 'meet_attendees', attr: 'meetAttendees', ddl: 'TEXT', rendererEmitted: true },
+  // The answer you owe, when one is owed: 'needed' | 'yes' | 'no' | 'maybe'.
+  // Null means no RSVP was ever asked for — a meeting you called yourself.
+  { column: 'meet_rsvp', attr: 'meetRsvp', ddl: 'TEXT', rendererEmitted: true },
   // Writer's schema version — forward-compat receiver guard (F-M5″): a device
   // at epoch N parks a row stamped N+1 instead of mis-applying it.
   { column: 'schema_epoch', attr: 'schemaEpoch', ddl: 'INTEGER', rendererEmitted: false }

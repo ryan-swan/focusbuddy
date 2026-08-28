@@ -67,6 +67,8 @@ import {
   visibleRows,
   type DropPosition
 , hasFollowingSibling } from '../../lib/attentionGrouping'
+import { meetingOf, meetingEnded, meetProviderLabel } from '../../lib/meetInvite'
+import { formatMeetWhen } from '../../lib/meetWhen'
 import {
   feederSignals,
   loadMutes,
@@ -128,9 +130,13 @@ function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
 // whole sub-item row to sit further in. 28px is wide enough to be unmistakable
 // and still leaves the third level inside the box at normal widths.
 const INDENT_PX = 28
-// How far the elbow falls before it turns. Small on purpose: the corner belongs
-// against the bottom of the row above, not in the middle of the row it labels.
-const ELBOW_DROP_PX = 14
+// How far the elbow reaches UP into the parent's row before it turns. The
+// corner's horizontal leg has to land ON the boundary between the two rows —
+// the operator, twice: "the horizontal line should lay on top of the horizontal
+// line from the item above it… so that it runs along the bottom of the parent
+// item". Dropping into the child's own row, however slightly, reads as a line
+// through the child instead of a branch off its parent.
+const ELBOW_RISE_PX = 13
 const MAX_INDENT = 3
 
 export default function AttentionView(): JSX.Element {
@@ -702,6 +708,10 @@ export default function AttentionView(): JSX.Element {
     // not exist. Only a genuine sub-item gets the corner.
     const isSubItem = (group?.depth ?? 0) > 0
     const elbowColor = queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.45)
+    // DEC-063 — only Meet items carry an invitation. Computing it for every row
+    // would be cheap but dishonest: a to_do that happens to have a stray
+    // meet_url is not a meeting.
+    const invite = queueOf(i) === 'to_meet' ? meetingOf(i) : null
     const myIndex = group ? group.rows.findIndex((r) => r.item.id === i.id) : -1
     const moreSiblings = myIndex >= 0 && hasFollowingSibling(group!.rows, myIndex)
     return (
@@ -838,13 +848,13 @@ export default function AttentionView(): JSX.Element {
             className="absolute pointer-events-none"
             style={{
               left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
-              top: 0,
-              // DEC-062b — the corner wraps the BOTTOM OF THE PARENT, not the
-              // middle of the child. At 50% the horizontal leg cut across the
-              // sub-item's own row and read as a line through it rather than a
-              // branch off the row above; ELBOW_DROP_PX lands it just under the
-              // divider, where the parent actually ends.
-              height: `${ELBOW_DROP_PX}px`,
+              // DEC-062c — the corner sits ABOVE this row, so its bottom
+              // border lands exactly on the parent/child boundary rather than
+              // anywhere inside the child. Negative top, matching height: the
+              // span occupies the last slice of the parent's row and turns at
+              // its bottom edge.
+              top: `-${ELBOW_RISE_PX}px`,
+              height: `${ELBOW_RISE_PX}px`,
               width: `${INDENT_PX - 1}px`,
               borderLeft: `2px solid ${elbowColor}`,
               borderBottom: `2px solid ${elbowColor}`,
@@ -861,7 +871,9 @@ export default function AttentionView(): JSX.Element {
             className="absolute pointer-events-none"
             style={{
               left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
-              top: 0,
+              // Starts where the corner does, so the trunk and the elbow are
+              // one continuous line rather than two segments with a seam.
+              top: `-${ELBOW_RISE_PX}px`,
               bottom: 0,
               width: '2px',
               backgroundColor: elbowColor
@@ -1051,6 +1063,69 @@ export default function AttentionView(): JSX.Element {
               </div>
             )
           })()}
+          {/* DEC-063 — a Meet item reads as an INVITATION, not a task: when it
+              is, where it is, who else is coming, and the answer you owe. Only
+              when the item actually knows some of that — `isInvite` is false
+              for a bare "meet with Sam", and dressing that as an invitation
+              would claim knowledge the item does not have. */}
+          {invite?.isInvite ? (
+            <div className="mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 text-[11px] text-[var(--ink-50)]">
+              {invite.startAtMs !== null && (
+                <span className="fb-tabular">{formatMeetWhen(invite.startAtMs, invite.durationMin, nowMs)}</span>
+              )}
+              {invite.place.url && !meetingEnded(invite, nowMs) && (
+                <button
+                  data-row-action
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void window.api.files.openExternal(invite.place.url as string)
+                  }}
+                  title={invite.place.url}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-[rgba(var(--accent),0.1)] text-[rgb(var(--accent))] hover:bg-[rgba(var(--accent),0.16)] fb-press"
+                >
+                  <Icon name="videocam" size={12} />
+                  {meetProviderLabel(invite.place.url)}
+                </button>
+              )}
+              {invite.place.location && (
+                <span className="inline-flex items-center gap-1 text-[var(--ink-45)]" title={invite.place.location}>
+                  <Icon name="place" size={12} />
+                  <span className="truncate max-w-[220px]">{invite.place.location}</span>
+                </span>
+              )}
+              {invite.attendees.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-[var(--ink-45)]" title={invite.attendees.join(', ')}>
+                  <Icon name="group" size={12} />
+                  {invite.attendees.length}
+                </span>
+              )}
+              {/* The answer you owe. This is what makes an invitation worth
+                  interrupting for, so it sits inline rather than behind a menu —
+                  and it is the case that ruled out "a Meet item IS a block". */}
+              {invite.awaitingRsvp ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-[var(--ink-40)]">RSVP</span>
+                  {(['yes', 'maybe', 'no'] as const).map((answer) => (
+                    <button
+                      key={answer}
+                      data-row-action
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void updateFields(i.id, { meetRsvp: answer })
+                      }}
+                      className="rounded px-1.5 py-0.5 border border-[var(--edge-soft)] text-[var(--ink-60)] hover:bg-[var(--surface-sunken)] fb-press capitalize"
+                    >
+                      {answer}
+                    </button>
+                  ))}
+                </span>
+              ) : (
+                invite.rsvp && (
+                  <span className="text-[var(--ink-40)] capitalize">Replied {invite.rsvp}</span>
+                )
+              )}
+            </div>
+          ) : null}
           {reason && <div className="text-[11px] text-[var(--ink-40)] mt-px leading-tight">{reason}</div>}
           {progress && progress.total > 0 && (
             /* DEC-048/050 — subtask progress, the "2/5" a project tool shows,

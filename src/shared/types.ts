@@ -193,6 +193,14 @@ export interface FbNode {
   wiUrgency?: string | null
   sourceRef?: string | null
   sourceUrl?: string | null
+  // DEC-063 — the meeting a `to_meet` item points at. Optional throughout: an
+  // item can be a bare "meet with Sam" long before any of it is known.
+  meetStartAt?: string | null
+  meetDurationMin?: number | null
+  meetUrl?: string | null
+  meetLocation?: string | null
+  meetAttendees?: string | null
+  meetRsvp?: MeetRsvp | null
   sourceType?: string | null
   confidence?: number | null
   approvalState?: string | null
@@ -287,6 +295,10 @@ export interface NodePatch {
 // DEC-052: 'missed' (the slot passed, work not done — what "replan undone"
 // sweeps) and 'skipped' (deliberately let go) join the union. The db CHECK was
 // dropped (migrateTimeBlocksStatusCheck); this union is the guard.
+// DEC-063 — the answer owed on an invitation. `needed` is the state that makes
+// a Meet item worth surfacing at all: somebody is waiting on you.
+export type MeetRsvp = 'needed' | 'yes' | 'no' | 'maybe'
+
 export type TimeBlockStatus = 'planned' | 'done' | 'missed' | 'skipped'
 
 // When a time block is a scheduled meeting, it carries the room to join and the
@@ -296,6 +308,17 @@ export type TimeBlockStatus = 'planned' | 'done' | 'missed' | 'skipped'
 export interface TimeBlockMeeting {
   roomId: string
   invitees: string[] // email addresses the invite was sent to
+  // DEC-063 — a meeting is not always Plexii's own room, and is not always
+  // online. `joinUrl` is an EXTERNAL link (Google Meet, Zoom, Teams) that takes
+  // precedence over the built-in room when set; `location` is where to
+  // physically be. Both optional, and not exclusive: a hybrid meeting has both.
+  //
+  // roomId stays required and is still minted for every meeting: it costs
+  // nothing, and it means a meeting that started as in-person can always be
+  // joined remotely without editing anything. The payload is stored as JSON on
+  // the block, so adding these needed no migration.
+  joinUrl?: string | null
+  location?: string | null
 }
 
 export type TimeBlockRecurrence = 'daily' | 'weekly' | 'monthly'
