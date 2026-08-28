@@ -1740,8 +1740,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'history:record',
-    (_e, url: string, title: string, taskId: string | null) =>
-      recordVisit(url, title, taskId)
+    (_e, url: string, title: string, taskId: string | null, countsAsVisit?: boolean) =>
+      recordVisit(url, title, taskId, countsAsVisit ?? true)
   )
   ipcMain.handle('history:recent', (_e, limit: number, taskId?: string | null) =>
     getRecentHistory(limit, taskId ?? null)

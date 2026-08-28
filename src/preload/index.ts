@@ -714,8 +714,8 @@ const api = {
     }> => ipcRenderer.invoke('ai:topUpCredits', amountUsd)
   },
   history: {
-    record: (url: string, title: string, taskId: string | null): Promise<void> =>
-      ipcRenderer.invoke('history:record', url, title, taskId),
+    record: (url: string, title: string, taskId: string | null, countsAsVisit?: boolean): Promise<void> =>
+      ipcRenderer.invoke('history:record', url, title, taskId, countsAsVisit),
     recent: (limit: number, taskId?: string | null): Promise<BrowsingHistoryEntry[]> =>
       ipcRenderer.invoke('history:recent', limit, taskId ?? null)
   },

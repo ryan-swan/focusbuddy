@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { migrateNodesKindCheckV2, type NodesKindMigrationResult } from './migrateNodesKind'
 import { migrateIntentTaxonomyV2 } from './migrateIntentTaxonomy'
+import { repairBrowsingHistoryCounts } from './migrateBrowsingHistoryCounts'
 import { ensureWorkItemSchema } from './workItems'
 import { ensureNotificationSchema } from '../notifications/substrate'
 
@@ -591,6 +592,27 @@ export function getDb(): Database.Database {
   // primaries (pre-imaged in wi_intent_taxonomy_backup; idempotent; re-run
   // every startup so peer-pushed legacy values converge). After BOTH ensure
   // calls above — it touches nodes.intent_class and wi_notifications.queue.
+  // DEC-061 — repair browsing_history.visit_count from the navigation log.
+  // Guarded and idempotent: a row is touched only when its raw browser_nav
+  // count equals its stored visit_count, which is what proves the log is
+  // complete for that URL. After a repair the two no longer match, so a second
+  // run declines; where retention has already capped the log they never match,
+  // and the row is left exactly as it is.
+  try {
+    const hist = repairBrowsingHistoryCounts(db as never)
+    if (hist.repaired > 0) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `[migrateBrowsingHistoryCounts] repaired ${hist.repaired} rows ` +
+          `(${hist.visitsRemoved} phantom visits removed, ` +
+          `${hist.skippedNoEvidence} left alone for want of evidence)`
+      )
+    }
+  } catch (err) {
+    // Housekeeping must never take the app down with it.
+    console.warn('[migrateBrowsingHistoryCounts] skipped (non-fatal):', (err as Error).message)
+  }
+
   const taxonomy = migrateIntentTaxonomyV2(db)
   if (taxonomy.ran && Object.keys(taxonomy.renamed).length > 0) {
     // eslint-disable-next-line no-console
