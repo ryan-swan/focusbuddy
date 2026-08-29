@@ -821,11 +821,30 @@ export default function AttentionView(): JSX.Element {
             another item, and drawing corners there made a ladder of brackets
             claiming parent-child links that do not exist. */}
         {indentLevel > 0 && (
-          <span
-            aria-hidden
-            className="absolute inset-y-0 right-0 pointer-events-none border-t border-[var(--edge-soft)] bg-[var(--surface-raised)]"
-            style={{ left: `${indentLevel * INDENT_PX}px` }}
-          />
+          <>
+            {/* DEC-066 — the gutter reads as EMPTY, not as more card. The row's
+                surface starting at the indent was only half of it: the strip to
+                its left still showed the queue box's own fill, so an indented
+                row looked like the same white slab with its content pushed
+                over. The operator: "I don't want to see the white section, i
+                want there to be a noticeable indent/gap".
+
+                Painted in the page's own base colour rather than punched
+                through: the box is one card with one fill (DEC-055), and
+                hollowing it so the page genuinely shows through would mean
+                every row painting its own surface — a large change to reverse a
+                ruling that is still right. This lands the same read. */}
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0 pointer-events-none bg-[var(--surface-base)]"
+              style={{ width: `${indentLevel * INDENT_PX}px` }}
+            />
+            <span
+              aria-hidden
+              className="absolute inset-y-0 right-0 pointer-events-none border-t border-[var(--edge-soft)] bg-[var(--surface-raised)]"
+              style={{ left: `${indentLevel * INDENT_PX}px` }}
+            />
+          </>
         )}
         {/* DEC-050 — the queue's colour as a spine down the row's left edge:
             which kind of work this is, readable without reading. */}

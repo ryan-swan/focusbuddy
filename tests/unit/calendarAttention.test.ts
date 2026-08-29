@@ -299,6 +299,17 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     expect(att).toContain('!border-t-0')
   })
 
+  it('DEC-066 — the gutter reads as empty page, not as more card', () => {
+    // Starting the row's surface at the indent was only half of it: the strip
+    // to its LEFT still showed the queue box's own fill, so an indented row
+    // looked like the same white slab with its content pushed over. The gutter
+    // now carries the page's own base colour, so the indent reads as a gap.
+    expect(att).toContain('bg-[var(--surface-base)]')
+    // A token, not a literal — the gap has to follow the theme like everything
+    // else, and a hard-coded white would be a light-mode-only fix.
+    expect(att).not.toMatch(/bg-\[#(fff|ffffff)\]/i)
+  })
+
   it('DEC-062 — the desk header is tinted by its QUEUE, and folds its cluster', () => {
     // The tint is the cue for what kind of work sits under the header (to-do
     // blue, meet green), so it must read the queue — not the generic accent.
