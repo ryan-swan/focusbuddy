@@ -283,6 +283,16 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     // cut across the sub-item's own row and read as a line THROUGH it rather
     // than a branch off the row above.
     expect(att).toContain('height: `${ELBOW_RISE_PX}px`')
+    // DEC-067 — the elbow IS the parent's spine continued, so it reads from the
+    // same width constant and starts at the same x. It used to sit 1px right of
+    // the spine and be drawn 2px against its 3px: the same line at a different
+    // weight, which is what made the join look like a seam. And the horizontal
+    // runs THROUGH the child's spine — two strokes meeting at a single corner
+    // point antialias into a visible break; an overlap cannot.
+    expect(att).toContain('const SPINE_PX = 3')
+    expect(att).toContain('borderLeft: `${SPINE_PX}px solid ${elbowColor}`')
+    expect(att).toContain('width: `${INDENT_PX + SPINE_PX}px`')
+    expect(att).not.toContain('(indentLevel - 1) * INDENT_PX + 1')
     // Negative top: the corner turns ON the parent/child boundary, not inside
     // the child's row.
     expect(att).toContain('top: `-${ELBOW_RISE_PX}px`')

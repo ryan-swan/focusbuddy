@@ -137,6 +137,9 @@ const INDENT_PX = 28
 // item". Dropping into the child's own row, however slightly, reads as a line
 // through the child instead of a branch off its parent.
 const ELBOW_RISE_PX = 13
+// The queue spine's width. The elbow continues that exact line, so both read
+// from here — a 2px elbow against a 3px spine is what made the join a seam.
+const SPINE_PX = 3
 const MAX_INDENT = 3
 
 export default function AttentionView(): JSX.Element {
@@ -850,9 +853,10 @@ export default function AttentionView(): JSX.Element {
             which kind of work this is, readable without reading. */}
         <span
           aria-hidden
-          className="absolute top-0 bottom-0 w-[3px]"
+          className="absolute top-0 bottom-0"
           style={{
             left: `${indentLevel * INDENT_PX}px`,
+            width: `${SPINE_PX}px`,
             backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55)
           }}
         />
@@ -866,18 +870,25 @@ export default function AttentionView(): JSX.Element {
             aria-hidden
             className="absolute pointer-events-none"
             style={{
-              left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
-              // DEC-062c — the corner sits ABOVE this row, so its bottom
-              // border lands exactly on the parent/child boundary rather than
-              // anywhere inside the child. Negative top, matching height: the
-              // span occupies the last slice of the parent's row and turns at
-              // its bottom edge.
+              // DEC-067 — the elbow IS the parent's spine, continued. It used
+              // to start 1px to the right of it and be drawn 2px wide against
+              // the spine's 3px, so the "same line" was a different line at a
+              // different weight: the join read as a seam. Same x, same width.
+              left: `${(indentLevel - 1) * INDENT_PX}px`,
+              // The corner sits ABOVE this row, so its bottom edge lands on the
+              // parent/child boundary rather than inside the child.
               top: `-${ELBOW_RISE_PX}px`,
               height: `${ELBOW_RISE_PX}px`,
-              width: `${INDENT_PX - 1}px`,
-              borderLeft: `2px solid ${elbowColor}`,
-              borderBottom: `2px solid ${elbowColor}`,
-              borderBottomLeftRadius: '10px'
+              // ...and runs THROUGH the child's spine rather than stopping at
+              // its left edge. Two strokes meeting at a single corner point
+              // antialias into a visible break; an overlap cannot.
+              width: `${INDENT_PX + SPINE_PX}px`,
+              borderLeft: `${SPINE_PX}px solid ${elbowColor}`,
+              borderBottom: `${SPINE_PX}px solid ${elbowColor}`,
+              // Gentle enough to read as a bend, tight enough that most of the
+              // horizontal run is actually straight — the operator asked for a
+              // straight line, not a hook.
+              borderBottomLeftRadius: '7px'
             }}
           />
         )}
@@ -889,12 +900,13 @@ export default function AttentionView(): JSX.Element {
             aria-hidden
             className="absolute pointer-events-none"
             style={{
-              left: `${(indentLevel - 1) * INDENT_PX + 1}px`,
+              // Same x and same width as the spine it continues (DEC-067).
+              left: `${(indentLevel - 1) * INDENT_PX}px`,
               // Starts where the corner does, so the trunk and the elbow are
               // one continuous line rather than two segments with a seam.
               top: `-${ELBOW_RISE_PX}px`,
               bottom: 0,
-              width: '2px',
+              width: `${SPINE_PX}px`,
               backgroundColor: elbowColor
             }}
           />
