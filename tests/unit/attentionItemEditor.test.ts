@@ -361,6 +361,30 @@ describe('DEC-049 — the command-center layout (file-level pins)', () => {
   })
 })
 
+describe('DEC-065 — the editor fits the screen it opens on', () => {
+  const src = readFileSync(join(process.cwd(), 'src/renderer/src/components/AttentionItemEditor.tsx'), 'utf8')
+
+  it('DEC-065_is_centred_and_bounded_by_the_viewport', () => {
+    // It used to be pinned 14vh from the top with no height cap, so a Meet item
+    // — once DEC-064 gave it a meeting section — ran 172px off the bottom of a
+    // 997px laptop viewport with its Save button unreachable. Measured.
+    expect(src).toContain('items-center justify-center p-6')
+    expect(src).not.toContain('items-start justify-center pt-[14vh]')
+    // Content that cannot be reached is worse than content that scrolls, so the
+    // max-height is the floor beneath the sizing — not a substitute for it.
+    expect(src).toContain('max-h-full overflow-y-auto')
+  })
+
+  it('DEC-065_the_two_single_line_meeting_fields_share_a_row', () => {
+    // Stacked they cost a row each. Neither needs full width to be usable, and
+    // that pairing is most of the 105px that brought the form back on screen.
+    const meeting = src.slice(src.indexOf("cls === 'to_meet'"), src.indexOf('Others coming'))
+    expect(meeting).toContain('grid grid-cols-2 gap-3')
+    expect(meeting).toContain('Join link')
+    expect(meeting).toContain('Location')
+  })
+})
+
 describe('DEC-050 — the item rows read like a project tool', () => {
   const view = read('src/renderer/src/components/views/AttentionView.tsx')
   const pill = read('src/renderer/src/components/attention/ItemStatusPill.tsx')

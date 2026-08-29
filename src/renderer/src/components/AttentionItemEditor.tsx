@@ -129,7 +129,14 @@ export default function AttentionItemEditor({
 
   return (
     <div
-      className="fb-scrim fixed inset-0 z-[320] flex items-start justify-center pt-[14vh]"
+      /* DEC-065 — centred, and bounded by the viewport. It used to be pinned
+         14vh from the top with no height cap, so a tall item (a Meet, once
+         DEC-064 gave it a meeting section) simply ran off the bottom of a
+         laptop screen with its Save button unreachable. Content that cannot be
+         reached is worse than content that scrolls, so there is a max-height
+         and an internal scroll as the floor — but the section below is sized so
+         that on a normal laptop it never comes to that. */
+      className="fb-scrim fixed inset-0 z-[320] flex items-center justify-center p-6"
       onMouseDown={() => onClose(false)}
     >
       <div
@@ -141,7 +148,7 @@ export default function AttentionItemEditor({
           if (e.key === 'Escape') onClose(false)
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save()
         }}
-        className="fb-card w-[min(620px,94vw)] p-4"
+        className="fb-card w-[min(620px,94vw)] p-4 max-h-full overflow-y-auto"
       >
         <div className="flex items-center justify-between">
           <div className="text-[14px] font-semibold text-[var(--ink-100)]">Edit item</div>
@@ -165,7 +172,7 @@ export default function AttentionItemEditor({
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={5}
+            rows={4}
             placeholder="Context, links, anything worth keeping with it…"
             className="fb-field mt-1 w-full bg-[var(--surface-raised)] px-3 py-2 text-[12.5px] resize-y"
           />
@@ -198,7 +205,7 @@ export default function AttentionItemEditor({
             can be "meet with Sam" long before any of it is known, and the queue
             only dresses it as an invitation once something is. */}
         {cls === 'to_meet' && (
-          <div className="mt-3 rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-3">
+          <div className="mt-3 rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5">
             <div className="flex items-center gap-1.5 mb-2">
               <Icon name="event" size={13} className="text-[var(--ink-40)]" />
               <span className="fb-t-caption uppercase tracking-wider font-medium text-[var(--ink-50)]">
@@ -269,7 +276,11 @@ export default function AttentionItemEditor({
               </div>
             )}
 
-            <label className="block mt-3">
+            {/* DEC-065 — two single-line fields side by side. Stacked, they
+                cost a row each and pushed the Save button off a laptop screen;
+                neither needs full width to be usable. */}
+            <div className="mt-2 grid grid-cols-2 gap-3">
+            <label className="block">
               <span className="fb-t-caption text-[var(--ink-40)]">Join link</span>
               <input
                 value={meetUrl}
@@ -296,7 +307,7 @@ export default function AttentionItemEditor({
               )}
             </label>
 
-            <label className="block mt-3">
+            <label className="block">
               <span className="fb-t-caption text-[var(--ink-40)]">Location</span>
               <input
                 value={meetLoc}
@@ -307,7 +318,9 @@ export default function AttentionItemEditor({
               />
             </label>
 
-            <label className="block mt-3">
+            </div>
+
+            <label className="block mt-2">
               <span className="fb-t-caption text-[var(--ink-40)]">Others coming</span>
               <input
                 value={meetWho}
@@ -322,7 +335,7 @@ export default function AttentionItemEditor({
                 invitation interrupt at all, and it is what ruled out modelling
                 a Meet item AS a time block — an unanswered invite is not on
                 your calendar yet. */}
-            <div className="mt-3">
+            <div className="mt-2">
               <span className="fb-t-caption text-[var(--ink-40)]">Your answer</span>
               <div className="mt-1 flex flex-wrap gap-1">
                 {[
