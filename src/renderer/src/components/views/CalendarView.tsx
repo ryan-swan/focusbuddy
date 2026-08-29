@@ -170,6 +170,25 @@ export default function CalendarView(): JSX.Element {
   const [intent, setIntent] = useState('')
   const [proposals, setProposals] = useState<PlannedProposal[] | null>(null)
   const [planNote, setPlanNote] = useState<string | null>(null)
+  // DEC-071 — the proposal is REVIEWABLE before it is accepted. A summary line
+  // that truncates ("3 blocks proposed · 82 min — Top creative items: Update
+  // Chan…") is an assurance, not an explanation: it cannot say WHICH items,
+  // WHEN each lands, or WHY it chose them, and the ghosts on the grid cannot be
+  // clicked because nothing is booked yet. So the plan opens in a review pane.
+  const [reviewOpen, setReviewOpen] = useState(false)
+  // The prompt that produced the current proposal, echoed in the review so the
+  // plan can be judged against what was actually asked for.
+  const [planIntent, setPlanIntent] = useState('')
+  const intentRef = useRef<HTMLTextAreaElement | null>(null)
+  // Measure-then-set: collapse to auto first so the field can SHRINK when text
+  // is deleted, not just grow. Capped to match the max-h so the scroll takes
+  // over instead of the box running away.
+  useEffect(() => {
+    const el = intentRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 152)}px`
+  }, [intent])
   const [planBusy, setPlanBusy] = useState(false)
 
   /** The day being planned: the visible day, or today when the week shows. */
@@ -224,6 +243,12 @@ export default function CalendarView(): JSX.Element {
         out = planDay(items, blocks, settings, planDayMs, nowMs, opts)
       }
       setProposals(out.length ? out : null)
+      // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
+      // truncated line. Nothing is booked by opening it.
+      if (out.length) {
+        setPlanIntent(intent.trim())
+        setReviewOpen(true)
+      }
       if (!out.length)
         setPlanNote(
           'Nothing to place — the day is full, or everything left is waiting on someone else.'
@@ -253,6 +278,12 @@ export default function CalendarView(): JSX.Element {
         deskTitles
       })
       setProposals(out.length ? out : null)
+      // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
+      // truncated line. Nothing is booked by opening it.
+      if (out.length) {
+        setPlanIntent(intent.trim())
+        setReviewOpen(true)
+      }
       setPlanNote(
         out.length
           ? `${missed.length} block${missed.length === 1 ? '' : 's'} slipped — marked missed (the record stays), fresh time proposed below.`
@@ -279,13 +310,14 @@ export default function CalendarView(): JSX.Element {
     return true
   }
 
-  async function acceptPlan(): Promise<void> {
-    if (!proposals) return
+  async function acceptPlan(only?: PlannedProposal[]): Promise<void> {
+    const take = only ?? proposals
+    if (!take || take.length === 0) return
     // One gesture, one undo: the whole accepted plan reverses with a single
     // ⌘Z (the batch seam the AI "Apply all" uses).
     useActionHistory.getState().beginBatch()
     try {
-      for (const p of proposals) {
+      for (const p of take) {
         await createBlock({
           taskId: p.itemId,
           title: '',
@@ -295,10 +327,24 @@ export default function CalendarView(): JSX.Element {
         })
       }
     } finally {
-      useActionHistory.getState().endBatch(`Planned ${proposals.length} blocks`)
+      useActionHistory.getState().endBatch(`Planned ${take.length} blocks`)
     }
     setProposals(null)
     setPlanNote(null)
+    setReviewOpen(false)
+  }
+
+  /** Drop one block from the proposal without touching the rest. */
+  function dropProposal(itemId: string, startMs: number): void {
+    setProposals((prev) => {
+      const next = (prev ?? []).filter((p) => !(p.itemId === itemId && p.startMs === startMs))
+      if (next.length > 0) return next
+      // Emptying the set is the same as discarding it — leaving an empty
+      // review open would be a dialog about nothing.
+      setReviewOpen(false)
+      setPlanNote(null)
+      return null
+    })
   }
 
   const ghosts: GridGhost[] = useMemo(
@@ -528,16 +574,30 @@ export default function CalendarView(): JSX.Element {
           <div className="min-w-0">
             {mode !== 'month' && (
               <div className="mb-3 flex flex-col gap-2" data-testid="plan-bar">
-                <div className="flex items-center gap-2 rounded-[var(--radius-card)] fb-glass-card pl-3.5 pr-2 py-2">
+                <div className="flex items-start gap-2 rounded-[var(--radius-card)] fb-glass-card pl-3.5 pr-2 py-2">
                   <Icon name="auto_awesome" size={15} className="shrink-0 text-[rgb(var(--accent))]" />
-                  <input
+                  {/* DEC-071 — a textarea that grows with what you type. It
+                      was a single-line input, so a real intent prompt ("I'm
+                      feeling extra creative right now. Good ideas are flowing,
+                      so review all of my rooms, desks, and…") scrolled out of
+                      sight while being written. You cannot check the sentence
+                      you are asking the planner to act on if you can only see
+                      the last third of it. Enter still plans; Shift+Enter is a
+                      newline. Capped at ~7 lines, then it scrolls — the field
+                      must not push the calendar off the screen. */}
+                  <textarea
+                    ref={intentRef}
+                    rows={1}
                     value={intent}
                     onChange={(e) => setIntent(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') void runPlan()
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        void runPlan()
+                      }
                     }}
                     placeholder="What's this day about? (optional — leave empty and Plexii picks by priority)"
-                    className="flex-1 bg-transparent outline-none text-[13px] text-[var(--ink-90)] placeholder:text-[var(--ink-30)]"
+                    className="flex-1 min-w-0 resize-none bg-transparent outline-none text-[13px] leading-[1.45] py-1 max-h-[152px] text-[var(--ink-90)] placeholder:text-[var(--ink-30)]"
                   />
                   <button
                     onClick={() => void runPlan()}
@@ -646,11 +706,22 @@ export default function CalendarView(): JSX.Element {
                 {(proposals || planNote) && (
                   <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-accent/50 bg-accent/[0.06] px-3.5 py-2 backdrop-blur-sm">
                     <Icon name="draw" size={14} className="shrink-0 text-[rgb(var(--accent))]" />
-                    <span className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0 truncate">
-                      {proposals
-                        ? `${proposals.length} block${proposals.length === 1 ? '' : 's'} proposed · ${proposals.reduce((n, x) => n + x.durationMin, 0)} min${planNote ? ` — ${planNote}` : ''}`
-                        : planNote}
-                    </span>
+                    {/* DEC-071 — the bar carries the COUNT; the review carries
+                        the content. It used to append a truncated note here,
+                        which read as an explanation while being unable to
+                        finish a sentence. Clicking it reopens the review. */}
+                    {proposals ? (
+                      <button
+                        onClick={() => setReviewOpen(true)}
+                        className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0 text-left hover:text-[var(--ink-100)] fb-press"
+                      >
+                        {proposals.length} block{proposals.length === 1 ? '' : 's'} proposed ·{' '}
+                        {proposals.reduce((n, x) => n + x.durationMin, 0)} min
+                        <span className="text-[rgb(var(--accent))] ml-1.5">Review</span>
+                      </button>
+                    ) : (
+                      <span className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0">{planNote}</span>
+                    )}
                     {proposals && (
                       <>
                         <span className="fb-t-caption text-[var(--ink-40)] shrink-0 hidden lg:inline">
@@ -787,6 +858,169 @@ export default function CalendarView(): JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* DEC-071 — the plan review. Centre-peek, same shape as the item editor
+          (DEC-065): centred, bounded by the viewport, scrolls internally rather
+          than running off a laptop screen.
+
+          It exists because a proposal was previously un-inspectable. The
+          summary line truncated, and the ghosts on the grid are not real blocks
+          — nothing is booked until accept — so there was nothing to click. You
+          could see THAT three blocks were proposed and never which items, when
+          each landed, or why the planner chose them. Every one of those facts
+          already existed on PlannedProposal; none of them were shown. */}
+      {reviewOpen && proposals && proposals.length > 0 && (
+        <div
+          className="fb-scrim fixed inset-0 z-[320] flex items-center justify-center p-6"
+          onMouseDown={() => setReviewOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Review the proposed plan"
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setReviewOpen(false)
+            }}
+            className="fb-card w-[min(680px,94vw)] p-4 max-h-full overflow-y-auto"
+          >
+            <div className="flex items-start gap-2">
+              <Icon name="auto_awesome" size={16} className="mt-0.5 text-[rgb(var(--accent))]" />
+              <div className="min-w-0 flex-1">
+                <div className="fb-t-h3 text-[var(--ink-100)]">The plan Plexii proposes</div>
+                <div className="fb-t-caption text-[var(--ink-45)] mt-0.5">
+                  {proposals.length} block{proposals.length === 1 ? '' : 's'} ·{' '}
+                  {proposals.reduce((n, x) => n + x.durationMin, 0)} min · nothing is booked until
+                  you accept
+                </div>
+              </div>
+              <button onClick={() => setReviewOpen(false)} className="icon-btn !h-7 !w-7 shrink-0">
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+
+            {/* What was actually asked for, echoed in full — the prompt is the
+                thing the plan has to be judged against, and it is the text that
+                used to scroll out of the single-line field. */}
+            {planIntent && (
+              <div className="mt-3 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-3 py-2">
+                <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-40)]">
+                  You asked for
+                </div>
+                <div className="fb-t-body text-[var(--ink-70)] mt-1 whitespace-pre-wrap break-words">
+                  {planIntent}
+                </div>
+              </div>
+            )}
+
+            {/* The planner's own note, in full rather than truncated into the bar. */}
+            {planNote && (
+              <div className="mt-3 fb-t-body text-[var(--ink-60)] whitespace-pre-wrap break-words">
+                {planNote}
+              </div>
+            )}
+
+            {/* Grouped by day, because a plan routinely spans several and a flat
+                list makes "when" the hardest thing to read off it. */}
+            <div className="mt-3 flex flex-col gap-3">
+              {Array.from(
+                proposals.reduce((m, p) => {
+                  const key = new Date(p.startMs).toDateString()
+                  const arr = m.get(key) ?? []
+                  arr.push(p)
+                  m.set(key, arr)
+                  return m
+                }, new Map<string, PlannedProposal[]>())
+              ).map(([day, ps]) => (
+                <div key={day}>
+                  <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-40)] mb-1">
+                    {new Date(ps[0].startMs).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                    <span className="ml-2 fb-tabular normal-case tracking-normal text-[var(--ink-30)]">
+                      {ps.reduce((n, x) => n + x.durationMin, 0)} min
+                    </span>
+                  </div>
+                  <div className="rounded-[var(--radius-card)] border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                    {ps
+                      .slice()
+                      .sort((a, b) => a.startMs - b.startMs)
+                      .map((pr) => (
+                        <div
+                          key={`${pr.itemId}-${pr.startMs}`}
+                          className="group flex items-start gap-3 px-3 py-2.5 bg-[var(--surface-raised)]"
+                        >
+                          <span className="fb-t-caption fb-tabular text-[var(--ink-50)] shrink-0 w-[112px] pt-0.5">
+                            {new Date(pr.startMs).toLocaleTimeString(undefined, {
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                            {' – '}
+                            {new Date(
+                              pr.startMs + pr.durationMin * 60_000
+                            ).toLocaleTimeString(undefined, {
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="fb-t-body text-[var(--ink-90)] break-words">
+                              {pr.title}
+                            </div>
+                            {/* The WHY. It was on the proposal all along and had
+                                nowhere to be shown. */}
+                            {pr.reason && (
+                              <div className="fb-t-caption text-[var(--ink-45)] mt-0.5 break-words">
+                                {pr.reason}
+                              </div>
+                            )}
+                          </div>
+                          <span className="fb-t-caption fb-tabular text-[var(--ink-40)] shrink-0 pt-0.5">
+                            {pr.durationMin}m
+                          </span>
+                          <button
+                            onClick={() => dropProposal(pr.itemId, pr.startMs)}
+                            title="Drop this block from the plan"
+                            className="icon-btn !h-6 !w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Icon name="close" size={12} />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-2">
+              <span className="fb-t-caption text-[var(--ink-40)] flex-1">
+                Accepting books {proposals.length} block{proposals.length === 1 ? '' : 's'} — ⌘Z
+                undoes the whole plan.
+              </span>
+              <button
+                onClick={() => {
+                  setProposals(null)
+                  setPlanNote(null)
+                  setReviewOpen(false)
+                }}
+                className="h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)]"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => void acceptPlan()}
+                className="btn-primary"
+                data-testid="plan-review-accept"
+              >
+                <Icon name="check" size={14} />
+                <span>Accept all</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

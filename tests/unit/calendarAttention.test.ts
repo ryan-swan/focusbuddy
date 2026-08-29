@@ -134,7 +134,12 @@ describe('DEC-052 B3/B4 — the planner is preview-first, always', () => {
 
   it('an accepted plan reverses as ONE undo unit', () => {
     expect(view).toContain('beginBatch()')
-    expect(view).toContain('endBatch(`Planned ${proposals.length} blocks`)')
+    // DEC-071 renamed the variable only: acceptPlan now takes an optional
+    // SUBSET so the review can drop a block, and the batch counts what was
+    // actually taken. The property pinned here is unchanged — one accepted
+    // plan is one undo unit.
+    expect(view).toContain('endBatch(`Planned ${take.length} blocks`)')
+    expect(view).toContain('async function acceptPlan(only?: PlannedProposal[])')
   })
 
   it('replan-undone marks missed (the record stays) and re-proposes — never moves', () => {

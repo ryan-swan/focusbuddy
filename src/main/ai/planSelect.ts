@@ -36,6 +36,30 @@ const STOPWORDS = new Set([
   'work', 'working', 'stuff', 'things', 'motivated', 'focus', 'day'
 ])
 
+// DEC-071 — how much of the model's note survives, and how it is cut.
+//
+// It was a bare `.slice(0, 120)`: a DISPLAY limit enforced at the DATA layer,
+// sized for the one-line plan bar that used to be the note's only home. With a
+// review pane there is room for a real sentence, and 120 characters was cutting
+// mid-word — the operator's own plan ended "…Cetra pitch deck—all high-cr".
+//
+// A bound is still required: this is model output, and an unbounded string
+// reaches the renderer and the database. So: a wider cap, cut on a word
+// boundary, and an ellipsis so a truncated note LOOKS truncated instead of
+// looking like the model stopped mid-thought.
+export const PLAN_NOTE_MAX = 400
+
+export function trimNote(raw: string): string | null {
+  const t = raw.trim()
+  if (!t) return null
+  if (t.length <= PLAN_NOTE_MAX) return t
+  const cut = t.slice(0, PLAN_NOTE_MAX)
+  const lastSpace = cut.lastIndexOf(' ')
+  // Fall back to the hard cut when there is no space to break on — a single
+  // 400-character token is not a sentence, and half of one is no worse.
+  return `${(lastSpace > PLAN_NOTE_MAX * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`
+}
+
 export function selectByKeywords(intent: string, candidates: PlanCandidate[]): string[] {
   const tokens = intent
     .toLowerCase()
@@ -99,7 +123,7 @@ export async function selectItemsForPlan(
     if (!ids.length) return fallback()
     return {
       ids,
-      note: typeof parsed.note === 'string' ? parsed.note.slice(0, 120) : null,
+      note: typeof parsed.note === 'string' ? trimNote(parsed.note) : null,
       via: 'model'
     }
   } catch {
