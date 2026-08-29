@@ -66,7 +66,7 @@ import {
   subtreeIds,
   visibleRows,
   type DropPosition
-, hasFollowingSibling } from '../../lib/attentionGrouping'
+, isFirstOfSiblings } from '../../lib/attentionGrouping'
 import { meetingOf, meetingEnded, meetProviderLabel } from '../../lib/meetInvite'
 import { formatMeetWhen } from '../../lib/meetWhen'
 import {
@@ -716,7 +716,11 @@ export default function AttentionView(): JSX.Element {
     // meet_url is not a meeting.
     const invite = queueOf(i) === 'to_meet' ? meetingOf(i) : null
     const myIndex = group ? group.rows.findIndex((r) => r.item.id === i.id) : -1
-    const moreSiblings = myIndex >= 0 && hasFollowingSibling(group!.rows, myIndex)
+    // DEC-069 — only the FIRST child bends. Every sub-item still carries the
+    // vertical down its indented edge, so the line is continuous; what does not
+    // repeat is the horizontal, which says "the list steps in here" and is true
+    // exactly once.
+    const isFirstChild = myIndex >= 0 && isFirstOfSiblings(group!.rows, myIndex)
     return (
       <div
         key={i.id}
@@ -865,7 +869,7 @@ export default function AttentionView(): JSX.Element {
             right" rather than "this belongs to the one above". The corner joins
             the two: down the parent's line, a rounded bend inward, then across
             to where the child's own spine begins. */}
-        {isSubItem && (
+        {isSubItem && isFirstChild && (
           <span
             aria-hidden
             className="absolute pointer-events-none"
@@ -895,16 +899,17 @@ export default function AttentionView(): JSX.Element {
         {/* ...and when siblings follow, the parent's trunk carries on past the
             corner to reach them. Without this the last-but-one child's line
             appears to stop mid-row. */}
-        {isSubItem && moreSiblings && (
+        {isSubItem && (
           <span
             aria-hidden
             className="absolute pointer-events-none"
             style={{
               // Same x and same width as the spine it continues (DEC-067).
               left: `${(indentLevel - 1) * INDENT_PX}px`,
-              // Starts where the corner does, so the trunk and the elbow are
-              // one continuous line rather than two segments with a seam.
-              top: `-${ELBOW_RISE_PX}px`,
+              // The first child picks the line up from inside the parent's row,
+              // where the bend starts; a later sibling picks it up at its own
+              // top, so the segments meet edge to edge and read as one line.
+              top: isFirstChild ? `-${ELBOW_RISE_PX}px` : 0,
               bottom: 0,
               width: `${SPINE_PX}px`,
               backgroundColor: elbowColor

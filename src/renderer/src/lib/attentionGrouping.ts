@@ -30,27 +30,29 @@ export interface GroupedRow {
 }
 
 /**
- * DEC-062 — does the row at `index` have another sibling BELOW it?
+ * DEC-069 — is the row at `index` the FIRST child of its parent?
  *
- * The tree elbow needs this. A child row draws a corner from its parent's spine
- * across to its own; but when more siblings follow, the parent's trunk also has
- * to continue PAST the corner to reach them, or the last sibling's elbow looks
- * like the line simply stopped.
+ * Only the first sub-item draws the bend. The operator: "there should only be 1
+ * horizontal line. Not a horizontal line for each sub-item. Just one horizontal
+ * line for the visual representation that there is an indent… then the vertical
+ * lines go along the indented edges for however many sub-items there are."
  *
- * The list is a flattened depth-first tree, so the answer is the next row at
- * this row's own depth or shallower: equal depth means a sibling follows,
- * shallower (or nothing) means this was the last one. Rows in between are this
- * row's own descendants and say nothing about its siblings.
+ * He is right, and it is also what a tree means: the horizontal says "the list
+ * steps in here", which is true once. Drawing it per child said it four times
+ * and turned a hierarchy into a stack of brackets.
+ *
+ * The list is a flattened depth-first tree, so the first child is simply the
+ * row whose immediate predecessor is its parent — one level shallower. Any
+ * other row at this depth is a later sibling, whatever sits between them.
+ *
+ * (This replaces DEC-062's `hasFollowingSibling`, which answered the question
+ * the per-child elbow needed and nothing now asks.)
  */
-export function hasFollowingSibling(rows: { depth: number }[], index: number): boolean {
-  const depth = rows[index]?.depth
-  if (depth === undefined) return false
-  for (let i = index + 1; i < rows.length; i++) {
-    const d = rows[i].depth
-    if (d > depth) continue // a descendant of this row
-    return d === depth
-  }
-  return false
+export function isFirstOfSiblings(rows: { depth: number }[], index: number): boolean {
+  const row = rows[index]
+  if (!row || row.depth === 0) return false
+  const prev = rows[index - 1]
+  return !!prev && prev.depth === row.depth - 1
 }
 
 const parentOf = (i: FbNode): string | null =>

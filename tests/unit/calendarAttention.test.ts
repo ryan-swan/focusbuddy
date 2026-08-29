@@ -277,8 +277,12 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     expect(att).toContain('{isSubItem && (')
     // ...and the trunk continues past the corner when more siblings follow,
     // which is the case that only shows up with MULTIPLE sub-items.
-    expect(att).toContain('moreSiblings')
-    expect(att).toContain('hasFollowingSibling')
+    // DEC-069 — one bend, at the first child only; the vertical still runs down
+    // every sub-item's indented edge so the line is continuous.
+    expect(att).toContain('{isSubItem && isFirstChild && (')
+    expect(att).toContain('isFirstOfSiblings')
+    expect(att).toContain('top: isFirstChild ? `-${ELBOW_RISE_PX}px` : 0')
+    expect(att).not.toContain('hasFollowingSibling')
     // The corner hugs the parent's bottom edge. At 50% of the child's height it
     // cut across the sub-item's own row and read as a line THROUGH it rather
     // than a branch off the row above.
