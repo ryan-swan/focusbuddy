@@ -66,7 +66,11 @@ import {
   subtreeIds,
   visibleRows,
   type DropPosition
-, isFirstOfSiblings } from '../../lib/attentionGrouping'
+,
+  nestRows,
+  type NestedRow
+} from '../../lib/attentionGrouping'
+import { motion, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion'
 import { meetingOf, meetingEnded, meetProviderLabel } from '../../lib/meetInvite'
 import { formatMeetWhen } from '../../lib/meetWhen'
 import {
@@ -130,16 +134,14 @@ function dueChip(i: FbNode, nowMs: number): JSX.Element | null {
 // whole sub-item row to sit further in. 28px is wide enough to be unmistakable
 // and still leaves the third level inside the box at normal widths.
 const INDENT_PX = 28
-// How far the elbow reaches UP into the parent's row before it turns. The
-// corner's horizontal leg has to land ON the boundary between the two rows —
-// the operator, twice: "the horizontal line should lay on top of the horizontal
-// line from the item above it… so that it runs along the bottom of the parent
-// item". Dropping into the child's own row, however slightly, reads as a line
-// through the child instead of a branch off its parent.
-const ELBOW_RISE_PX = 13
-// The queue spine's width. The elbow continues that exact line, so both read
-// from here — a 2px elbow against a 3px spine is what made the join a seam.
+// The queue spine's width — the solid colour bar on TOP-LEVEL rows.
 const SPINE_PX = 3
+// DEC-070 — where a group's dashed connector sits, relative to the PARENT's
+// content edge: just right of the parent's chevron slot, clear of everything a
+// child row draws. One dashed line per expanded group is the entire hierarchy
+// cue now; per-row segments (the DEC-062…069 elbow) are gone, and with them
+// the whole category of seam bugs — a single element has no joins to misalign.
+const CONNECTOR_INSET_PX = 6
 const MAX_INDENT = 3
 
 export default function AttentionView(): JSX.Element {
@@ -398,6 +400,51 @@ export default function AttentionView(): JSX.Element {
       else next.add(deskId)
       return next
     })
+  // DEC-070 — the motion, ported from the inspiration component and tuned to
+  // feel native: a group opens by growing (height 0 → auto) while its children
+  // rise in with a slight stagger, and closes the same way in reverse.
+  // AnimatePresence keeps the exiting subtree alive until the collapse
+  // finishes, which is what lets the dashed connector visibly shrink WITH the
+  // group — "the more you expand… the dotted lines grow with it", and the
+  // reverse on the way shut. Honours prefers-reduced-motion throughout.
+  const reducedMotion = useReducedMotion()
+  const foldVariants: Variants = useMemo(
+    () => ({
+      hidden: { height: 0, opacity: 0, overflow: 'hidden' },
+      visible: {
+        height: 'auto',
+        opacity: 1,
+        transition: {
+          duration: reducedMotion ? 0.15 : 0.28,
+          ease: [0.2, 0.65, 0.3, 0.9],
+          when: 'beforeChildren',
+          staggerChildren: reducedMotion ? 0 : 0.045
+        },
+        transitionEnd: { overflow: 'visible' }
+      },
+      exit: {
+        height: 0,
+        opacity: 0,
+        overflow: 'hidden',
+        transition: { duration: reducedMotion ? 0.1 : 0.22, ease: [0.2, 0.65, 0.3, 0.9] }
+      }
+    }),
+    [reducedMotion]
+  )
+  const riseVariants: Variants = useMemo(
+    () => ({
+      hidden: { opacity: 0, x: reducedMotion ? 0 : -8 },
+      visible: {
+        opacity: 1,
+        x: 0,
+        transition: reducedMotion
+          ? { duration: 0.12 }
+          : { type: 'spring', stiffness: 500, damping: 28 }
+      },
+      exit: { opacity: 0, transition: { duration: 0.1 } }
+    }),
+    [reducedMotion]
+  )
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const toggleExpanded = (id: string): void =>
     setExpanded((prev) => {
@@ -698,29 +745,14 @@ export default function AttentionView(): JSX.Element {
       : null
     const urgency = urgencyOf(i)
     const assignees = parseMentions(i.mentions).filter((m) => m.kind === 'person')
-    // DEC-062 — the elbow's geometry. `indentLevel` is the row's rendered
-    // indent (storage depth plus the desk-cluster offset), clamped to the cap;
-    // `elbowColor` is this row's own queue colour so the corner reads as part
-    // of the same spine it joins; `moreSiblings` decides whether the parent's
-    // trunk continues past the corner to reach the next child.
+    // The row's rendered indent: storage depth plus the desk-cluster offset,
+    // clamped to the cap. Indentation is the row's ONLY per-row hierarchy cue
+    // now (DEC-070) — the connector line belongs to the group, not the row.
     const indentLevel = Math.min(group?.indent ?? 0, MAX_INDENT)
-    // DEC-062 — the elbow keys off STORAGE depth, not rendered indent. A desk
-    // cluster also indents its rows (indent = depth + 1), so keying off indent
-    // drew a corner beside every item that merely sits on a desk — a ladder of
-    // brackets down the cluster claiming a parent-child relationship that does
-    // not exist. Only a genuine sub-item gets the corner.
-    const isSubItem = (group?.depth ?? 0) > 0
-    const elbowColor = queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.45)
     // DEC-063 — only Meet items carry an invitation. Computing it for every row
     // would be cheap but dishonest: a to_do that happens to have a stray
     // meet_url is not a meeting.
     const invite = queueOf(i) === 'to_meet' ? meetingOf(i) : null
-    const myIndex = group ? group.rows.findIndex((r) => r.item.id === i.id) : -1
-    // DEC-069 — only the FIRST child bends. Every sub-item still carries the
-    // vertical down its indented edge, so the line is continuous; what does not
-    // repeat is the horizontal, which says "the list steps in here" and is true
-    // exactly once.
-    const isFirstChild = myIndex >= 0 && isFirstOfSiblings(group!.rows, myIndex)
     return (
       <div
         key={i.id}
@@ -788,12 +820,6 @@ export default function AttentionView(): JSX.Element {
         }
         style={{ paddingLeft: `${8 + indentLevel * INDENT_PX}px` }}
         className={`group relative flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors ${
-          // The box draws divide-y across every child; a sub-item supplies its
-          // own inset divider above instead, so this one must not also fire.
-          indentLevel > 0
-            ? '!border-t-0 [&>*:not([aria-hidden])]:relative [&>*:not([aria-hidden])]:z-[1]'
-            : ''
-        } ${
           selected.has(i.id) && selectMode
             ? 'bg-[rgba(var(--accent),0.08)]'
             : 'hover:bg-[rgba(var(--accent),0.05)]'
@@ -809,110 +835,18 @@ export default function AttentionView(): JSX.Element {
                 : ''
         }`}
       >
-        {/* DEC-062b — a sub-item is its own block, inset by its indent.
-            Before this the row's surface (and the divider above it) ran edge to
-            edge, so an indented row read as the same slab as its parent with
-            the text pushed over. The operator asked for "a true break": the
-            gutter now shows the card's own fill with nothing on it but the
-            elbow, and the sub-item's surface — and its divider — start at the
-            indent. DEC-055 moved indentation to padding so dividers reached the
-            box edge; that was right for TOP-LEVEL rows and is exactly what a
-            sub-item must not do, so the inset is drawn rather than padded and
-            the row's own divider is suppressed.
-
-            Keyed on INDENT, not on nesting: a row under a desk header is
-            indented too, and the operator asked for the same break there —
-            "emphasizing that it is a sub-item of whatever is above it, in this
-            case the desk reference". The ELBOW stays keyed on real nesting,
-            because a desk-clustered row is a child of the HEADER, not of
-            another item, and drawing corners there made a ladder of brackets
-            claiming parent-child links that do not exist. */}
-        {indentLevel > 0 && (
-          <>
-            {/* DEC-066 — the gutter reads as EMPTY, not as more card. The row's
-                surface starting at the indent was only half of it: the strip to
-                its left still showed the queue box's own fill, so an indented
-                row looked like the same white slab with its content pushed
-                over. The operator: "I don't want to see the white section, i
-                want there to be a noticeable indent/gap".
-
-                Painted in the page's own base colour rather than punched
-                through: the box is one card with one fill (DEC-055), and
-                hollowing it so the page genuinely shows through would mean
-                every row painting its own surface — a large change to reverse a
-                ruling that is still right. This lands the same read. */}
-            <span
-              aria-hidden
-              className="absolute inset-y-0 left-0 pointer-events-none bg-[var(--surface-base)]"
-              style={{ width: `${indentLevel * INDENT_PX}px` }}
-            />
-            <span
-              aria-hidden
-              className="absolute inset-y-0 right-0 pointer-events-none border-t border-[var(--edge-soft)] bg-[var(--surface-raised)]"
-              style={{ left: `${indentLevel * INDENT_PX}px` }}
-            />
-          </>
-        )}
         {/* DEC-050 — the queue's colour as a spine down the row's left edge:
-            which kind of work this is, readable without reading. */}
-        <span
-          aria-hidden
-          className="absolute top-0 bottom-0"
-          style={{
-            left: `${indentLevel * INDENT_PX}px`,
-            width: `${SPINE_PX}px`,
-            backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55)
-          }}
-        />
-        {/* DEC-062 — the elbow. A sub-item used to sit at a deeper indent with
-            its own free-floating spine, which reads as "another row, further
-            right" rather than "this belongs to the one above". The corner joins
-            the two: down the parent's line, a rounded bend inward, then across
-            to where the child's own spine begins. */}
-        {isSubItem && isFirstChild && (
+            which kind of work this is, readable without reading. DEC-070 scopes
+            it to TOP-LEVEL rows: an indented row's colour cue is its group's
+            dashed connector, and giving it a solid bar as well put two vertical
+            lines beside every sub-item — the clutter the reset was for. */}
+        {indentLevel === 0 && (
           <span
             aria-hidden
-            className="absolute pointer-events-none"
+            className="absolute top-0 bottom-0 left-0"
             style={{
-              // DEC-067 — the elbow IS the parent's spine, continued. It used
-              // to start 1px to the right of it and be drawn 2px wide against
-              // the spine's 3px, so the "same line" was a different line at a
-              // different weight: the join read as a seam. Same x, same width.
-              left: `${(indentLevel - 1) * INDENT_PX}px`,
-              // The corner sits ABOVE this row, so its bottom edge lands on the
-              // parent/child boundary rather than inside the child.
-              top: `-${ELBOW_RISE_PX}px`,
-              height: `${ELBOW_RISE_PX}px`,
-              // ...and runs THROUGH the child's spine rather than stopping at
-              // its left edge. Two strokes meeting at a single corner point
-              // antialias into a visible break; an overlap cannot.
-              width: `${INDENT_PX + SPINE_PX}px`,
-              borderLeft: `${SPINE_PX}px solid ${elbowColor}`,
-              borderBottom: `${SPINE_PX}px solid ${elbowColor}`,
-              // Gentle enough to read as a bend, tight enough that most of the
-              // horizontal run is actually straight — the operator asked for a
-              // straight line, not a hook.
-              borderBottomLeftRadius: '7px'
-            }}
-          />
-        )}
-        {/* ...and when siblings follow, the parent's trunk carries on past the
-            corner to reach them. Without this the last-but-one child's line
-            appears to stop mid-row. */}
-        {isSubItem && (
-          <span
-            aria-hidden
-            className="absolute pointer-events-none"
-            style={{
-              // Same x and same width as the spine it continues (DEC-067).
-              left: `${(indentLevel - 1) * INDENT_PX}px`,
-              // The first child picks the line up from inside the parent's row,
-              // where the bend starts; a later sibling picks it up at its own
-              // top, so the segments meet edge to edge and read as one line.
-              top: isFirstChild ? `-${ELBOW_RISE_PX}px` : 0,
-              bottom: 0,
               width: `${SPINE_PX}px`,
-              backgroundColor: elbowColor
+              backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55)
             }}
           />
         )}
@@ -957,11 +891,16 @@ export default function AttentionView(): JSX.Element {
                 ? `Drag to move all ${selected.size} selected — drop ON an item to nest them as its subtasks`
                 : 'Drag to reorder, attach to another item, or move to another section'
             }
-            /* DEC-055 — absolutely placed in the spine gutter: reserving a
-               column for a hover-only affordance was the dead space to the
-               left of the checkbox. */
-            style={{ left: `${indentLevel * INDENT_PX}px` }}
-            className="absolute z-0 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity"
+            /* DEC-055 kept it out of the flex flow (a reserved column was the
+               dead space left of the checkbox); DEC-070 fixes WHERE it floats.
+               It used to sit at the indent column — a coordinate that belongs
+               to the previous depth — so on sub-items it hung misaligned in
+               the parent's gutter. It now rides 22px left of its own row's
+               content at every depth, clamped so depth 0 stays inside the box,
+               with a surface chip so hovering over the group's dashed line
+               reads as a control sitting ON the line, not tangled in it. */
+            style={{ left: `${Math.max(2, 8 + indentLevel * INDENT_PX - 22)}px` }}
+            className="absolute z-0 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity rounded bg-[var(--surface-raised)]"
           >
             <Icon name="drag_indicator" size={16} />
           </button>
@@ -982,7 +921,11 @@ export default function AttentionView(): JSX.Element {
               aria-expanded={!isCollapsed}
               className="h-4 w-4 flex items-center justify-center rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] fb-press"
             >
-              <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={15} />
+              <Icon
+                name="chevron_right"
+                size={15}
+                className={`transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+              />
             </button>
           )}
         </span>
@@ -1751,111 +1694,187 @@ export default function AttentionView(): JSX.Element {
                       <span className="fb-t-caption text-[rgb(var(--accent))]">move here</span>
                     )}
                   </div>
-                  {/* DEC-055 — ONE box holds the queue; rows sit flush inside
-                      it, separated by a hairline. The per-desk grouping is a
-                      FRAGMENT, not a wrapper div: a wrapper made every row a
-                      grandchild, so `divide-y` only ever drew between desk
-                      clusters (the reason the first divider attempt showed
-                      nothing at all). */}
+                  {/* DEC-055 — ONE box holds the queue. DEC-070 restructures
+                      what sits inside it: a parent and its whole subtree are
+                      one unit, a desk cluster is one unit, and each unit owns
+                      its own interior. The box's `divide-y` then separates
+                      UNITS — so a hairline lands between items, never inside a
+                      subtree, and the old per-row divider suppression hacks are
+                      gone because there is nothing left to suppress. */}
                   <div className="rounded-[var(--radius-card)] fb-glass-card overflow-hidden divide-y divide-[var(--edge-soft)]">
                     {shown && grouped
                       ? clusterByDesk(shown).map((cluster, ci) => {
                           const desk = cluster.deskId ? nodesById.get(cluster.deskId) : null
-                          return (
-                            <Fragment key={cluster.deskId ?? `flat-${ci}`}>
-                              {desk && (
-                                /* DEC-047 D-2 — the desk header: DERIVED from
-                                   parentId, never stored. Title · the desk's
-                                   OWN status (labeled "Desk:" so it cannot be
-                                   read as an item class) · due · open count.
-                                   Click opens the desk. */
-                                <button
-                                  /* DEC-062 — the header now FOLDS its cluster.
-                                     The operator: "when I click lakedash it
-                                     hides all the items associated and if i
-                                     click again it expands the full list".
-                                     Opening the desk moved onto the icon, which
-                                     keeps that reachable without stealing the
-                                     click he asked for. */
-                                  onClick={() => toggleDeskFold(desk.id)}
-                                  aria-expanded={!deskFolded.has(desk.id)}
-                                  title={
-                                    deskFolded.has(desk.id)
-                                      ? `Show the ${cluster.rows.length} items on this desk`
-                                      : 'Hide this desk’s items'
-                                  }
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left fb-press"
-                                  style={{
-                                    /* DEC-062 — tinted in the QUEUE's colour, not
-                                       the generic accent: the operator asked for
-                                       an obvious cue for what kind of work sits
-                                       under the header (to-do blue, meet green).
-                                       Kept faint — it is a band behind a whole
-                                       cluster, so it carries further than the
-                                       3px spine at the same alpha would. */
-                                    backgroundColor: queueTint(
-                                      QUEUE_COLOR[q.queue] ?? '#64748b',
-                                      0.1
-                                    )
-                                  }}
-                                >
-                                  <Icon
-                                    name={deskFolded.has(desk.id) ? 'chevron_right' : 'expand_more'}
-                                    size={14}
-                                    className="text-[var(--ink-40)] shrink-0"
-                                  />
-                                  <span
-                                    role="button"
-                                    tabIndex={0}
-                                    title="Open this desk"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setActive(desk.id)
-                                      goTask(desk.id)
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key !== 'Enter' && e.key !== ' ') return
-                                      e.stopPropagation()
-                                      setActive(desk.id)
-                                      goTask(desk.id)
-                                    }}
-                                    className="shrink-0 flex items-center rounded hover:bg-[var(--surface-sunken)] p-0.5 fb-press"
-                                  >
-                                    <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
-                                  </span>
-                                  <span className="fb-t-label text-[var(--ink-70)] truncate">
-                                    {desk.title || 'Untitled desk'}
-                                  </span>
-                                  <span className="fb-t-caption text-[var(--ink-40)]">
-                                    Desk: {DESK_STATUS_LABEL[desk.status] ?? desk.status}
-                                  </span>
-                                  {desk.dueDate != null && (
-                                    <span className="fb-t-caption text-[var(--ink-40)]">
-                                      due{' '}
-                                      {new Date(desk.dueDate).toLocaleDateString(undefined, {
-                                        month: 'short',
-                                        day: 'numeric'
-                                      })}
-                                    </span>
-                                  )}
-                                  <span className="fb-t-caption fb-tabular text-[var(--ink-30)] ml-auto">
-                                    {cluster.rows.length}
-                                  </span>
-                                </button>
-                              )}
-                              {(desk && deskFolded.has(desk.id) ? [] : cluster.rows).map((g) =>
-                                row(g.item, false, {
+                          const folded = !!desk && deskFolded.has(desk.id)
+                          const units = nestRows(cluster.rows)
+                          /* DEC-070 — one renderer for every level. The row,
+                             then — when it has children — ONE animated group
+                             holding ONE dashed connector and the children.
+                             The connector is a single element spanning the
+                             group, so the seams that four rounds of per-row
+                             segments produced are impossible by construction,
+                             and because it lives inside the height-animated
+                             wrapper it grows and shrinks with the expansion. */
+                          const renderNode = (
+                            node: NestedRow<(typeof cluster.rows)[number]>
+                          ): JSX.Element => {
+                            const g = node.row
+                            const ind = g.depth + (desk ? 1 : 0)
+                            return (
+                              <div key={g.item.id}>
+                                {row(g.item, false, {
                                   isChild: g.isChild || !!desk,
                                   childCount: g.childCount,
                                   clusterDeskId: desk?.id ?? null,
                                   depth: g.depth,
-                                  indent: g.depth + (desk ? 1 : 0),
+                                  indent: ind,
                                   descendants: g.descendants,
                                   rows: grouped,
                                   queue: q.queue
-                                })
-                              )}
-                            </Fragment>
+                                })}
+                                <AnimatePresence initial={false}>
+                                  {node.children.length > 0 && (
+                                    <motion.div
+                                      key="subtree"
+                                      className="relative"
+                                      variants={foldVariants}
+                                      initial="hidden"
+                                      animate="visible"
+                                      exit="exit"
+                                    >
+                                      <span
+                                        aria-hidden
+                                        className="absolute top-0 bottom-1.5 border-l-2 border-dashed pointer-events-none"
+                                        style={{
+                                          left: `${8 + ind * INDENT_PX + CONNECTOR_INSET_PX}px`,
+                                          borderColor: queueTint(
+                                            QUEUE_COLOR[queueOf(g.item)] ?? '#64748b',
+                                            0.5
+                                          )
+                                        }}
+                                      />
+                                      {node.children.map((c) => (
+                                        <motion.div key={c.row.item.id} variants={riseVariants}>
+                                          {renderNode(c)}
+                                        </motion.div>
+                                      ))}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            )
+                          }
+                          if (!desk) {
+                            /* Miscellaneous items with no desk — allowed, and
+                               first-class: each unit is a direct child of the
+                               box, so the box's own hairlines separate them. */
+                            return (
+                              <Fragment key={`flat-${ci}`}>
+                                {units.map((u) => renderNode(u))}
+                              </Fragment>
+                            )
+                          }
+                          return (
+                            <div key={desk.id}>
+                              {/* DEC-047 D-2 — the desk header: DERIVED from
+                                  parentId, never stored. DEC-062 made it FOLD
+                                  its cluster (opening the desk lives on the
+                                  icon); DEC-070 animates the fold and puts the
+                                  cluster's run on the same dashed-connector
+                                  language as subtasks. */}
+                              <button
+                                onClick={() => toggleDeskFold(desk.id)}
+                                aria-expanded={!folded}
+                                title={
+                                  folded
+                                    ? `Show the ${cluster.rows.length} items on this desk`
+                                    : 'Hide this desk’s items'
+                                }
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-left fb-press"
+                                style={{
+                                  backgroundColor: queueTint(
+                                    QUEUE_COLOR[q.queue] ?? '#64748b',
+                                    0.1
+                                  )
+                                }}
+                              >
+                                <Icon
+                                  name="chevron_right"
+                                  size={14}
+                                  className={`text-[var(--ink-40)] shrink-0 transition-transform duration-200 ${
+                                    folded ? '' : 'rotate-90'
+                                  }`}
+                                />
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  title="Open this desk"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setActive(desk.id)
+                                    goTask(desk.id)
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key !== 'Enter' && e.key !== ' ') return
+                                    e.stopPropagation()
+                                    setActive(desk.id)
+                                    goTask(desk.id)
+                                  }}
+                                  className="shrink-0 flex items-center rounded hover:bg-[var(--surface-sunken)] p-0.5 fb-press"
+                                >
+                                  <Icon name="desk" size={13} className="text-[var(--ink-40)]" />
+                                </span>
+                                <span className="fb-t-label text-[var(--ink-70)] truncate">
+                                  {desk.title || 'Untitled desk'}
+                                </span>
+                                <span className="fb-t-caption text-[var(--ink-40)]">
+                                  Desk: {DESK_STATUS_LABEL[desk.status] ?? desk.status}
+                                </span>
+                                {desk.dueDate != null && (
+                                  <span className="fb-t-caption text-[var(--ink-40)]">
+                                    due{' '}
+                                    {new Date(desk.dueDate).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
+                                  </span>
+                                )}
+                                <span className="fb-t-caption fb-tabular text-[var(--ink-30)] ml-auto">
+                                  {cluster.rows.length}
+                                </span>
+                              </button>
+                              <AnimatePresence initial={false}>
+                                {!folded && (
+                                  <motion.div
+                                    key="cluster-rows"
+                                    className="relative border-t border-[var(--edge-soft)]"
+                                    variants={foldVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                    exit="exit"
+                                  >
+                                    <span
+                                      aria-hidden
+                                      className="absolute top-0 bottom-1.5 border-l-2 border-dashed pointer-events-none"
+                                      style={{
+                                        left: `${8 + CONNECTOR_INSET_PX}px`,
+                                        borderColor: queueTint(
+                                          QUEUE_COLOR[q.queue] ?? '#64748b',
+                                          0.45
+                                        )
+                                      }}
+                                    />
+                                    <div className="divide-y divide-[var(--edge-soft)]">
+                                      {units.map((u) => (
+                                        <motion.div key={u.row.item.id} variants={riseVariants}>
+                                          {renderNode(u)}
+                                        </motion.div>
+                                      ))}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
                           )
                         })
                       : q.items.map((i) => row(i, false))}

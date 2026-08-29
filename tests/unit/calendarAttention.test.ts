@@ -265,63 +265,50 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     expect(att).not.toContain('shrink-0 cursor-grab')
   })
 
-  it('DEC-062 — a sub-item joins its parent with an elbow, not a floating spine', () => {
-    // The corner: down the parent's line, a rounded bend inward, then across to
-    // where the child's own spine starts. Without it a sub-item read as
-    // "another row, further right" rather than as belonging to the one above.
-    expect(att).toContain('borderBottomLeftRadius')
-    // Keyed on STORAGE depth, never rendered indent: a desk cluster also
-    // indents its rows, and keying off indent drew a corner beside every item
-    // that merely sits on a desk.
-    expect(att).toContain('const isSubItem = (group?.depth ?? 0) > 0')
-    expect(att).toContain('{isSubItem && (')
-    // ...and the trunk continues past the corner when more siblings follow,
-    // which is the case that only shows up with MULTIPLE sub-items.
-    // DEC-069 — one bend, at the first child only; the vertical still runs down
-    // every sub-item's indented edge so the line is continuous.
-    expect(att).toContain('{isSubItem && isFirstChild && (')
-    expect(att).toContain('isFirstOfSiblings')
-    expect(att).toContain('top: isFirstChild ? `-${ELBOW_RISE_PX}px` : 0')
-    expect(att).not.toContain('hasFollowingSibling')
-    // The corner hugs the parent's bottom edge. At 50% of the child's height it
-    // cut across the sub-item's own row and read as a line THROUGH it rather
-    // than a branch off the row above.
-    expect(att).toContain('height: `${ELBOW_RISE_PX}px`')
-    // DEC-067 — the elbow IS the parent's spine continued, so it reads from the
-    // same width constant and starts at the same x. It used to sit 1px right of
-    // the spine and be drawn 2px against its 3px: the same line at a different
-    // weight, which is what made the join look like a seam. And the horizontal
-    // runs THROUGH the child's spine — two strokes meeting at a single corner
-    // point antialias into a visible break; an overlap cannot.
-    expect(att).toContain('const SPINE_PX = 3')
-    expect(att).toContain('borderLeft: `${SPINE_PX}px solid ${elbowColor}`')
-    expect(att).toContain('width: `${INDENT_PX + SPINE_PX}px`')
-    expect(att).not.toContain('(indentLevel - 1) * INDENT_PX + 1')
-    // Negative top: the corner turns ON the parent/child boundary, not inside
-    // the child's row.
-    expect(att).toContain('top: `-${ELBOW_RISE_PX}px`')
-    expect(att).not.toContain("height: '50%'")
+  it('DEC-070 — one dashed connector per group, and no per-row segments at all', () => {
+    // The reset. Four rounds (DEC-062 → 069) tried to draw the hierarchy as
+    // per-row line segments — an elbow here, a trunk there — and every round
+    // produced a new seam, because segments drawn by different rows can never
+    // be guaranteed to join. The re-baseline (operator ruling, from the
+    // inspiration component): the subtree is ONE animated group holding ONE
+    // dashed connector. A single element has no joins to misalign, so the
+    // whole category of bug is gone — pinned by the ABSENCE of the machinery.
+    expect(att).not.toContain('borderBottomLeftRadius')
+    expect(att).not.toContain('ELBOW_RISE_PX')
+    expect(att).not.toContain('isFirstOfSiblings')
+    expect(att).not.toContain('isFirstChild')
+    // The connector: dashed, one per group, in the group's queue colour, and
+    // positioned off the PARENT's content edge inside the animated wrapper —
+    // so it grows and shrinks with the expansion.
+    expect(att).toContain('border-l-2 border-dashed')
+    expect(att).toContain('CONNECTOR_INSET_PX')
+    expect(att).toContain('nestRows(cluster.rows)')
+    // The motion: framer, height 0 ↔ auto with staggered children, exits kept
+    // alive by AnimatePresence so a collapse animates rather than snaps, and
+    // reduced-motion honoured.
+    expect(att).toContain('AnimatePresence')
+    expect(att).toContain('useReducedMotion')
+    expect(att).toContain("height: 'auto'")
+    expect(att).toContain('staggerChildren')
   })
 
-  it('DEC-062b — an indented row is its own inset block, not a padded slab', () => {
-    // Edge-to-edge surface and divider made an indented row read as the same
-    // slab as its parent with the text pushed over. The gutter now shows the
-    // card's fill with nothing on it but the elbow, and the row's surface and
-    // divider start at the indent. Keyed on INDENT, so desk-clustered rows get
-    // the break too — the elbow stays keyed on real nesting.
-    expect(att).toContain('{indentLevel > 0 && (')
-    expect(att).toContain('!border-t-0')
+  it('DEC-070 — sub-items carry no chrome of their own', () => {
+    // The solid queue spine is a TOP-LEVEL cue; an indented row's colour cue
+    // is its group's connector. Both at once put two vertical lines beside
+    // every sub-item — the clutter the reset was for. The inset-surface and
+    // gutter-paint hacks (DEC-062b/066) die with the segments they patched.
+    expect(att).toContain('{indentLevel === 0 && (')
+    expect(att).not.toContain('!border-t-0')
+    expect(att).not.toContain('bg-[var(--surface-base)]')
   })
 
-  it('DEC-066 — the gutter reads as empty page, not as more card', () => {
-    // Starting the row's surface at the indent was only half of it: the strip
-    // to its LEFT still showed the queue box's own fill, so an indented row
-    // looked like the same white slab with its content pushed over. The gutter
-    // now carries the page's own base colour, so the indent reads as a gap.
-    expect(att).toContain('bg-[var(--surface-base)]')
-    // A token, not a literal — the gap has to follow the theme like everything
-    // else, and a hard-coded white would be a light-mode-only fix.
-    expect(att).not.toMatch(/bg-\[#(fff|ffffff)\]/i)
+  it('DEC-070 — the drag handle aligns to its OWN row at every depth', () => {
+    // It used to float at the indent column — a coordinate belonging to the
+    // previous depth — so on sub-items it hung misaligned in the parent's
+    // gutter (the operator's screenshot). Now: 22px left of its own row's
+    // content, clamped so depth 0 stays inside the box, with a surface chip so
+    // it reads as a control sitting ON the connector.
+    expect(att).toContain('Math.max(2, 8 + indentLevel * INDENT_PX - 22)')
   })
 
   it('DEC-062 — the desk header is tinted by its QUEUE, and folds its cluster', () => {
@@ -335,7 +322,11 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     // Clicking the header folds; opening the desk moved to the icon so the
     // fold could own the click without losing the capability.
     expect(att).toContain('toggleDeskFold')
-    expect(att).toContain('deskFolded.has(desk.id) ? [] : cluster.rows')
+    // DEC-070 — the fold renders (or exits) the animated wrapper; the rows are
+    // no longer swapped for an empty array, which is what lets the collapse
+    // animate instead of snapping.
+    expect(att).toContain('{!folded && (')
+    expect(att).not.toContain('deskFolded.has(desk.id) ? [] : cluster.rows')
     expect(att).toContain('Open this desk')
   })
 

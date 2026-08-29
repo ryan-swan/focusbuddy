@@ -30,29 +30,39 @@ export interface GroupedRow {
 }
 
 /**
- * DEC-069 — is the row at `index` the FIRST child of its parent?
+ * DEC-070 — the flat, depth-annotated row list as a TREE.
  *
- * Only the first sub-item draws the bend. The operator: "there should only be 1
- * horizontal line. Not a horizontal line for each sub-item. Just one horizontal
- * line for the visual representation that there is an indent… then the vertical
- * lines go along the indented edges for however many sub-items there are."
+ * The reset ruling. Four rounds of per-row connector chrome (DEC-062 → 069)
+ * tried to draw a hierarchy by making each row paint its own segment of line,
+ * and every round produced a new seam, because segments drawn by different
+ * rows can never be guaranteed to join. The operator ruled a re-baseline on
+ * the inspiration component: the subtree renders as ONE group with ONE dashed
+ * connector spanning it — an element that cannot have seams because it has no
+ * segments — and the group animates open and closed as a unit, so the line
+ * literally grows with the expansion.
  *
- * He is right, and it is also what a tree means: the horizontal says "the list
- * steps in here", which is true once. Drawing it per child said it four times
- * and turned a hierarchy into a stack of brackets.
- *
- * The list is a flattened depth-first tree, so the first child is simply the
- * row whose immediate predecessor is its parent — one level shallower. Any
- * other row at this depth is a later sibling, whatever sits between them.
- *
- * (This replaces DEC-062's `hasFollowingSibling`, which answered the question
- * the per-child elbow needed and nothing now asks.)
+ * That needs the renderer to know where a subtree STARTS and ENDS, which a
+ * flat list makes every consumer re-derive. This does it once. Order is
+ * preserved exactly (depth-first, as flattened), and a malformed depth jump
+ * attaches to the nearest real ancestor instead of throwing — a bad row must
+ * not take the queue down.
  */
-export function isFirstOfSiblings(rows: { depth: number }[], index: number): boolean {
-  const row = rows[index]
-  if (!row || row.depth === 0) return false
-  const prev = rows[index - 1]
-  return !!prev && prev.depth === row.depth - 1
+export interface NestedRow<T> {
+  row: T
+  children: NestedRow<T>[]
+}
+
+export function nestRows<T extends { depth: number }>(rows: readonly T[]): NestedRow<T>[] {
+  const roots: NestedRow<T>[] = []
+  const stack: NestedRow<T>[] = []
+  for (const r of rows) {
+    const node: NestedRow<T> = { row: r, children: [] }
+    while (stack.length > r.depth) stack.pop()
+    if (stack.length === 0) roots.push(node)
+    else stack[stack.length - 1].children.push(node)
+    stack.push(node)
+  }
+  return roots
 }
 
 const parentOf = (i: FbNode): string | null =>

@@ -392,11 +392,14 @@ describe('DEC-050 — the item rows read like a project tool', () => {
   it('the queue is ONE box whose rows touch, divided by a hairline (DEC-055)', () => {
     // History worth keeping: the first divider attempt drew nothing, because
     // clusterByDesk wrapped rows in per-desk DIVS — `divide-y` then only fell
-    // between clusters. DEC-050 worked around it with spaced cards; DEC-055
-    // fixed the cause by making the per-desk grouping a FRAGMENT, so every
-    // row is a direct child and the dividers reach all of them.
+    // between clusters, and DEC-055 fixed it with a Fragment so every row was
+    // a direct child. DEC-070 restructures on purpose: a parent + its subtree
+    // is one UNIT (so a hairline never cuts through a subtree), desk clusters
+    // own their interior dividers, and only DESK-LESS items still use the
+    // Fragment so the box's own hairlines separate them.
     expect(view).toContain('fb-glass-card overflow-hidden divide-y divide-[var(--edge-soft)]')
-    expect(view).toContain('<Fragment key={cluster.deskId ?? `flat-${ci}`}>')
+    expect(view).toContain('<Fragment key={`flat-${ci}`}>')
+    expect(view).toContain('divide-y divide-[var(--edge-soft)]">')
     // Rows are flush inside that box — no per-row card, no gap, no lift.
     expect(view).toContain('flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors')
     expect(view).toContain('hover:bg-[rgba(var(--accent),0.05)]')
