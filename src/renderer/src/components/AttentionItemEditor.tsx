@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { isoToLocalParts, localPartsToIso, formatMeetWhen } from '../lib/meetWhen'
 import { joinUrlOf, meetProviderLabel } from '../lib/meetInvite'
+import { blockDraftForMeeting, blockForItem } from '../lib/meetSchedule'
+import { newMeetingRoomId } from '../lib/startMeeting'
+import type { TimeBlock } from '@shared/types'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../stores/workItems'
 import { CLASS_CHOICES, queueOf } from '../lib/attentionQueues'
@@ -58,6 +61,12 @@ export default function AttentionItemEditor({
   const [meetLoc, setMeetLoc] = useState(item.meetLocation ?? '')
   const [meetWho, setMeetWho] = useState(item.meetAttendees ?? '')
   const [meetRsvp, setMeetRsvp] = useState<string>(item.meetRsvp ?? '')
+  // DEC-068 — the block that already reserves time for this meeting, if one
+  // does. Looked up by the LINK (taskId), never by time: a block dragged to
+  // another day is still this meeting's block, and matching on time would offer
+  // to schedule again and quietly create a duplicate.
+  const [linkedBlock, setLinkedBlock] = useState<TimeBlock | null>(null)
+  const [schedNote, setSchedNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement | null>(null)
@@ -65,6 +74,62 @@ export default function AttentionItemEditor({
   useEffect(() => {
     setTimeout(() => titleRef.current?.focus(), 0)
   }, [])
+
+  // Look across a wide window rather than "around now": a meeting can be
+  // scheduled months out, and a narrow query would report it unscheduled and
+  // offer to double-book it.
+  useEffect(() => {
+    let live = true
+    const YEAR = 365 * 24 * 3600 * 1000
+    void window.api.timeBlocks
+      .list(Date.now() - YEAR, Date.now() + YEAR)
+      .then((bs) => {
+        if (live) setLinkedBlock(blockForItem(bs, item.id))
+      })
+      .catch(() => {
+        /* the editor still works without knowing; the button just offers */
+      })
+    return () => {
+      live = false
+    }
+  }, [item.id])
+
+  async function putOnCalendar(): Promise<void> {
+    setSchedNote(null)
+    // Schedule from what is IN THE FORM, not from what was last saved —
+    // otherwise a time typed a moment ago is silently ignored and the block
+    // lands at the old one.
+    const pending = {
+      ...item,
+      meetStartAt: localPartsToIso(meetDate, meetTime),
+      meetDurationMin: meetDur === '' ? null : Number(meetDur),
+      meetUrl: meetUrl.trim() || null,
+      meetLocation: meetLoc.trim() || null,
+      meetAttendees: meetWho.trim() || null
+    }
+    const out = blockDraftForMeeting(pending, newMeetingRoomId)
+    if (!out.ok) {
+      setSchedNote(out.reason)
+      return
+    }
+    try {
+      if (linkedBlock) {
+        const updated = await window.api.timeBlocks.update(linkedBlock.id, {
+          title: out.draft.title,
+          startMs: out.draft.startMs,
+          durationMin: out.draft.durationMin,
+          meeting: out.draft.meeting
+        })
+        setLinkedBlock(updated ?? linkedBlock)
+        setSchedNote('Calendar updated.')
+      } else {
+        setLinkedBlock(await window.api.timeBlocks.create(out.draft))
+        setSchedNote('On your calendar.')
+      }
+    } catch (err) {
+      setSchedNote(err instanceof Error ? err.message : 'Could not reach the calendar.')
+    }
+  }
 
   async function save(): Promise<void> {
     if (busy) return
@@ -358,6 +423,28 @@ export default function AttentionItemEditor({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* DEC-068 — the link to the calendar. The item is the record of the
+                meeting; the block is a reservation of time for it, so this
+                reads as putting it somewhere rather than converting it. */}
+            <div className="mt-3 pt-2.5 border-t border-[var(--edge-soft)] flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => void putOnCalendar()}
+                className="btn-soft !h-7 fb-t-label"
+                data-testid="meet-schedule"
+              >
+                <Icon name="event_available" size={13} />
+                <span>{linkedBlock ? 'Update the calendar' : 'Put on calendar'}</span>
+              </button>
+              {linkedBlock && !schedNote && (
+                <span className="fb-t-caption text-[var(--ink-45)] fb-tabular">
+                  On your calendar · {formatMeetWhen(linkedBlock.startMs, linkedBlock.durationMin, Date.now())}
+                </span>
+              )}
+              {schedNote && (
+                <span className="fb-t-caption text-[var(--ink-50)]">{schedNote}</span>
+              )}
             </div>
           </div>
         )}
