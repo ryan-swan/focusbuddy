@@ -1,10 +1,16 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-30, end of the Attention/Calendar + platform-stability build.
-**Branch:** `ryan-command-center` — clean, **71 commits ahead of `origin/main`**, pushed to
-BOTH remotes (`fork` = ryan-swan, `origin` = saasmouth) at `4dc603de`.
-**Suite:** 3,196 tests / 304 files green. Both typechecks clean.
-**Live app:** boots in ~3s (was hanging indefinitely — DEC-060).
+**Last updated:** 2026-08-30 (late) — through DEC-086 (GAP-018 closed — the accent sweep + the off-scale-modifier lock). This file's §0 carries the
+day's rounds; DECISIONS-LOG carries DEC-072…085 in full (reason ladder, the
+four-feature round + its refinements, Book time, Plexii naming, the Meet
+video root-cause + meeting-linked items, the Capture rebuild).
+**Branch:** `ryan-command-center` — clean at `e41810e8`, **90 commits ahead of
+`origin/main`** (push state: check both remotes before assuming).
+**Suite:** 3,332 tests / 311 files green. Full typecheck clean.
+**Operator action still owed (DEC-082):** grant Camera to the app Plexii is
+launched from (System Settings → Privacy & Security → Camera) — until then
+Meet tiles show the honest "Camera blocked by macOS" note.
+**Gated on the operator's go:** the Fireflies-level transcript UI rebuild.
 
 ## <<<PROMPT BEGIN>>>
 
@@ -14,8 +20,8 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…071**, append-only. The last four
-   entries (DEC-062…071) carry the most load-bearing lessons of the recent build.
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…086**, append-only. DEC-072…086 carry
+   the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 is the live one (Respond → Messages)
 
 Pre-flight:
@@ -51,26 +57,6 @@ and *why*, before anything is booked.
 ---
 
 ## What is next (priority order)
-
-00. **NEWER (2026-08-30 pm): DEC-078 calendar QA round DONE** — taller hours
-   (56px) in their own scroll window (pinned headers, `overscroll-contain`,
-   opens at the current hour; page scroll untouched — measured), uniform day
-   columns, today = a light `ring-accent/35` outline alone. **Discovery:
-   `rgba(var(--accent),…)` arbitrary values are INVALID CSS and never
-   painted** (DEC-053's ring included) — this round's files converted;
-   **GAP-018** holds the ~10-file sweep (do it AFTER 077 commits — several
-   files overlap its working set).
-
-0. **NEW (2026-08-30 pm): DEC-073…076 COMMITTED (`e781d7d8`); DEC-077
-   refinements built + live-verified, UNCOMMITTED** — bell fills solid, ONE
-   CompleteCircle on all four surfaces (visible circles on grid blocks),
-   bell+circle beside the widget title, six-dot handle retired from both
-   queues (whole-row drag; an EXPANDED row deliberately does not drag so its
-   notes stay selectable — collapse first), drop-to-nest lights the whole
-   target row. Smokes: open a desk with a marked widget → bell SOLID beside
-   the title → circle completes both ways; check a grid block's circle;
-   drag a collapsed queue row from anywhere and dwell over another row;
-   the missed-items triage prompt (4 real slipped blocks await it).
 
 1. **The operator's live QA pass.** This has been the highest-yield loop all build —
    DEC-053, 055, 062, 065, 066, 067, 069, 070 and 071 all came from him looking at the

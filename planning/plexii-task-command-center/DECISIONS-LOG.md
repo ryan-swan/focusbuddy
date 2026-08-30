@@ -1878,6 +1878,31 @@ model — the yield now covers every Attention mention via one shared
 `attnAddressed` predicate. Live-proven with focus-asserted input both ways;
 the full Esc chain closes clean; zero strays.
 
+## DEC-086 — GAP-018 swept: the accent color always paints
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator: "do the GAP-018 sweep")
+
+43 `rgba(var(--accent),…)` occurrences converted across 9 files — the
+register's census had missed **globals.css**, where fourteen of them were
+the futuristic/gemstone theme glows: accent-tinted background gradients,
+card glows and grid lines that have NEVER painted. Stylesheet instances
+became `rgb(var(--accent) / X)`; class utilities became the slash forms;
+embedded shadow/style occurrences became `rgb(var(--accent)/X)`.
+
+**The sweep exposed a sibling bug of the same species:** Tailwind's opacity
+modifier scale is multiples of 5 — `bg-accent/14` generates NO utility and
+paints nothing, silently (measured: transparent probe, no rule in the
+sheet; `/35` and `/45` work because they are on the scale). The sweep's own
+first pass produced seventeen such bare off-scale modifiers — caught by the
+live probe before commit and converted to arbitrary form (`accent/[0.14]`).
+Files that already used the arbitrary form (LiveDeskSharing, LiveDocSharing,
+NewNodeDialog) were correct all along and untouched.
+
+Both classes are grep-locked (`tests/unit/accentColorLock.test.ts`): no
+`rgba(var(--accent` anywhere in ts/tsx/css, and no bare non-÷5 accent
+modifier, ever again. Verified live: `/[0.14]`, `/10`, `/5` probes all
+computed real rgba values; zero old-pattern classes in the mounted DOM.
+Four superseded pins rewritten with history. Suite 3,334 / 312.
+
 <!-- Append below; increment DEC-NNN. -->
 
 ## DEC-056…061 — The platform arc (one investigation, six landings)

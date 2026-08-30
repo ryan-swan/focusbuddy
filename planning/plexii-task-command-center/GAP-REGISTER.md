@@ -211,7 +211,7 @@ vocabulary (DEC-029a); renaming one is a schema and migration event, not a label
 
 
 ## GAP-018 — `rgba(var(--accent),…)` arbitrary values are INVALID CSS and paint nothing
-**Severity:** MEDIUM (visual, app-wide, invisible to tests) · **Closes in:** one mechanical sweep round · **Status:** OPEN (found 2026-08-30, DEC-078 verification)
+**Severity:** MEDIUM (visual, app-wide, invisible to tests) · **Status: CLOSED 2026-08-30 (DEC-086)** — 43 occurrences swept across 9 files INCLUDING globals.css (the register's census missed it — the futuristic/gemstone theme glows never painted); plus the sibling bug the sweep exposed: bare non-multiple-of-5 opacity modifiers (`accent/14`) generate NO utility — the sweep's own first pass minted 17, caught by live probe and converted to arbitrary form. Both classes grep-locked in tests/unit/accentColorLock.test.ts.
 
 `--accent` is a space-separated triplet (`124 58 237`), so
 `rgba(var(--accent),0.14)` substitutes to `rgba(124 58 237,0.14)` — invalid
