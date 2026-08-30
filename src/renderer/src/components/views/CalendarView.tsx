@@ -146,6 +146,33 @@ export default function CalendarView(): JSX.Element {
     setAnchor(a)
   }
 
+  // DEC-079 — trackpad horizontal swipe pages the range: one swipe, one
+  // shift(), whatever the mode (day/3-day/week page by their span, month by
+  // month — shift() already knows). A trackpad streams dozens of wheel
+  // events per gesture, so: only horizontal-DOMINANT deltas count (vertical
+  // belongs to the time window), they accumulate to a threshold, the shift
+  // fires ONCE, and the rest of the gesture — including its momentum tail —
+  // is swallowed until the stream goes quiet. Swipe left = forward in time
+  // (natural scrolling's reading direction).
+  const swipeAcc = useRef(0)
+  const swipeLocked = useRef(false)
+  const swipeQuiet = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function onRangeWheel(e: React.WheelEvent): void {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
+    if (swipeQuiet.current) clearTimeout(swipeQuiet.current)
+    swipeQuiet.current = setTimeout(() => {
+      swipeAcc.current = 0
+      swipeLocked.current = false
+    }, 250)
+    if (swipeLocked.current) return
+    swipeAcc.current += e.deltaX
+    if (Math.abs(swipeAcc.current) >= 120) {
+      shift(swipeAcc.current > 0 ? 1 : -1)
+      swipeAcc.current = 0
+      swipeLocked.current = true
+    }
+  }
+
   const nowMs = Date.now()
 
   // ── The queue rail: what could be scheduled ───────────────────────────────
@@ -611,7 +638,7 @@ export default function CalendarView(): JSX.Element {
             </div>
           </aside>
 
-          <div className="min-w-0">
+          <div className="min-w-0" onWheel={onRangeWheel}>
             {mode !== 'month' && (
               <div className="mb-3 flex flex-col gap-2" data-testid="plan-bar">
                 <div className="flex items-start gap-2 rounded-[var(--radius-card)] fb-glass-card pl-3.5 pr-2 py-2">

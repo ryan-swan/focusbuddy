@@ -24,7 +24,9 @@ import Icon from '../Icon'
 // DEC-078 — the hours live in their OWN scroll window (Google-style): day
 // headers + deadline chips stay pinned while the time area scrolls beneath
 // them, so a wheel over the grid moves through the day and the page never
-// budges. The rail's compact mode keeps its full-height habit.
+// budges. DEC-079: the rail's compact mode windows too — twelve hours on
+// screen, the rest a scroll away — since midnight-to-midnight made its
+// full-height habit a 720px column of mostly night.
 
 // DEC-078 follow-up (operator): the day runs midnight to midnight. The old
 // 6am–10pm window silently HID anything booked outside it — an early flight
@@ -222,7 +224,6 @@ export default function WeekTimeGrid({
   // person owns the scroll position after that.
   const timeScrollRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    if (compact) return
     const el = timeScrollRef.current
     if (!el) return
     const h = new Date().getHours() + new Date().getMinutes() / 60
@@ -487,13 +488,15 @@ export default function WeekTimeGrid({
           })}
         </div>
       </div>
-      {/* DEC-078 — the hours scroll in their own window: hover the grid and a
-          wheel moves through the day, never the page (overscroll contained).
-          Compact (the rail) renders full height as before — its card owns it. */}
+      {/* DEC-078/079 — the hours scroll in their own window: hover the grid
+          and a wheel moves through the day, never the page (overscroll
+          contained). The rail's compact window is twelve hours. pt-2 is the
+          12 AM fix: the first gutter label translates 6px up to sit ON its
+          line, and with no headroom the top half clipped at the scroll edge. */}
       <div
         ref={timeScrollRef}
-        className={`flex ${compact ? '' : 'overflow-y-auto overscroll-contain'}`}
-        style={compact ? undefined : { maxHeight: 'max(280px, calc(100vh - 380px))' }}
+        className="flex overflow-y-auto overscroll-contain pt-2"
+        style={{ maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
       >
       {/* Hour gutter */}
       <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`}>

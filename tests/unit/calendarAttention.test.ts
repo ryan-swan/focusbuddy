@@ -197,19 +197,38 @@ describe('DEC-053 — the calendar QA round (operator live QA)', () => {
     // The pinned band above it holds the day headers + deadline chips — which
     // also fixes the old layout where a tall chip stack pushed its own
     // column's canvas out of line with the others.
-    expect(grid).toContain("overflow-y-auto overscroll-contain'}`}")
-    expect(grid).toContain("maxHeight: 'max(280px, calc(100vh - 380px))'")
+    expect(grid).toContain('className="flex overflow-y-auto overscroll-contain pt-2"')
     expect(grid).toContain('el.scrollTop = Math.max(0, (h - START_HOUR - 1) * hourPx)')
     // Taller hours — 44px showed all seventeen rows cramped; the window owns
     // how many are visible now.
     expect(grid).toContain('const HOUR_PX = 56')
-    // The rail (compact) keeps its full-height habit: no scroller.
-    expect(grid).toContain('compact ? undefined :')
+    // DEC-079 superseded DEC-078's rail exemption: midnight-to-midnight made
+    // full-height a 720px column of mostly night, so the rail windows TWELVE
+    // hours and scrolls for the rest — and it opens at the current hour like
+    // the big grid (the compact guard left the autoscroll effect).
+    expect(grid).toContain("maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))'")
+    expect(grid).not.toContain('if (compact) return')
+    // The 12 AM fix: the first gutter label translates 6px up to sit ON its
+    // line; pt-2 is the headroom that stops the scroll edge clipping it.
+    expect(grid).toContain('overflow-y-auto overscroll-contain pt-2')
     // Follow-up ruling: the day runs MIDNIGHT TO MIDNIGHT. The old 6am–10pm
     // window silently hid anything booked outside it; the scroll window is
     // what decides how many of the 24 hours are visible.
     expect(grid).toContain('const START_HOUR = 0')
     expect(grid).toContain('const END_HOUR = 24')
+  })
+
+  it('DEC-079 — a horizontal trackpad swipe pages the range, once per gesture', () => {
+    const cal = read('src/renderer/src/components/views/CalendarView.tsx')
+    // Horizontal-DOMINANT only (vertical belongs to the time window)…
+    expect(cal).toContain('if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return')
+    // …accumulated to a threshold, fired ONCE through the same shift() the
+    // chevrons use (so day/3-day/week/month all page by their own span)…
+    expect(cal).toContain("shift(swipeAcc.current > 0 ? 1 : -1)")
+    expect(cal).toContain('swipeLocked.current = true')
+    // …and the momentum tail is swallowed until the stream goes quiet.
+    expect(cal).toContain('}, 250)')
+    expect(cal).toContain('onWheel={onRangeWheel}')
   })
 
   it('a block dragged onto the rail unschedules — locked blocks refuse', () => {
