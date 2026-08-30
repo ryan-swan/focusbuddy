@@ -273,7 +273,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
                           <Icon name="auto_awesome" size={10} filled />
                         </span>
                         <span className="text-[10px] font-mono uppercase tracking-[0.09em] text-[var(--ink-50)]">
-                          Plexi
+                          Plexii
                         </span>
                       </div>
                       {blocks.map((block, bi) => (

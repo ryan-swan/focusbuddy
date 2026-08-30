@@ -14,12 +14,12 @@ import { sanitizeWebviewUrl } from '../../lib/browserUrl'
 // for the window's lifetime — the panel is the surface those runs drive.
 import '../../stores/browserAgentRuns'
 
-// The in-app browser panel (A2, AI-03, R4/R13): the web never leaves Plexi.
+// The in-app browser panel (A2, AI-03, R4/R13): the web never leaves Plexii.
 // One right-side panel serves citations, omnibar URLs, and search results —
 // Claude-style, over the content, dismissed with Esc or its close control.
 // Since the desk-browser unification it renders the SAME BrowserSurface core
 // as the desk's browser widget: one toolbar grammar, one cookie jar
-// (persist:webview-default — sign in once, signed in everywhere in Plexi),
+// (persist:webview-default — sign in once, signed in everywhere in Plexii),
 // one browsing history. This wrapper owns only panel chrome: the portal, the
 // fullscreen connected-app rectangle, Esc stepping down, send-to-desk, close.
 

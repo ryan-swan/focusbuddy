@@ -18,8 +18,8 @@ import { SEARCH_ENGINES, type SearchEngineId } from '../../lib/omniIntent'
 
 const ENGINE_BLURBS: Record<SearchEngineId, string> = {
   duckduckgo: 'Private and keyless — the default',
-  google: 'Google results in the Plexi browser',
-  bing: 'Bing results in the Plexi browser',
+  google: 'Google results in the Plexii browser',
+  bing: 'Bing results in the Plexii browser',
   brave: 'Independent index, no tracking',
   perplexity: 'AI answers with cited sources'
 }

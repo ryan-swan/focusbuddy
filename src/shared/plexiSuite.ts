@@ -494,7 +494,7 @@ export const PLEXI_PRODUCTS: PlexiProduct[] = [
     status: 'planned',
     icon: 'corporate_fare',
     accent: '#14b8a6',
-    about: 'The business-management layer of Plexi: marketing, CRM, accounting, payroll, inventory and MRP, all sharing the same data, identity and AI as the rest of your workspace. Over time, an entire business runs on Plexi.',
+    about: 'The business-management layer of Plexii: marketing, CRM, accounting, payroll, inventory and MRP, all sharing the same data, identity and AI as the rest of your workspace. Over time, an entire business runs on Plexii.',
     edges: [
       'One system for the work and the business that surrounds it.',
       'CRM, finance and operations sharing the same source of truth.',

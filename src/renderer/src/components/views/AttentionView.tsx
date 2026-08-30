@@ -695,12 +695,12 @@ export default function AttentionView(): JSX.Element {
     }
   }
 
-  /** DEC-037 — open the marked OBJECT itself, inside Plexi, full-screen.
+  /** DEC-037 — open the marked OBJECT itself, inside Plexii, full-screen.
    *  Marking a Notion tool and then pressing the desk button launched the
    *  external Notion app (operator live QA): the desk button opens a canvas,
    *  and whatever that canvas hosts does its own thing. This is the other
    *  door — go to the desk, then put that one widget into Focus Mode, so the
-   *  item can be dealt with in a single app without leaving Plexi. */
+   *  item can be dealt with in a single app without leaving Plexii. */
   function openHere(i: FbNode): void {
     if (!i.parentId || !i.sourceRef) return
     setActive(i.parentId)
@@ -1204,7 +1204,7 @@ export default function AttentionView(): JSX.Element {
               {hasDesk && i.sourceRef && i.sourceType !== 'note' && (
                 <button
                   onClick={() => openHere(i)}
-                  title="Open it here — the object itself, full screen inside Plexi"
+                  title="Open it here — the object itself, full screen inside Plexii"
                   className="icon-btn !h-6 !w-6"
                 >
                   <Icon name="open_in_full" size={14} />

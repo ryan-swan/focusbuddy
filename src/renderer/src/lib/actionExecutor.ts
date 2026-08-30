@@ -212,7 +212,7 @@ export async function ensureDependencies(
   return { ok: true, appliedParents }
 }
 
-// ── The suite-wide actions (Plexi 3.0): the AI acts beyond the canvas ────────
+// ── The suite-wide actions (Plexii 3.0): the AI acts beyond the canvas ────────
 
 // Minimal markdown-ish text → Tiptap nodes: '#'-prefixed lines become headings,
 // blank-line-separated runs become paragraphs. Deliberately simple — rich
@@ -730,7 +730,7 @@ async function applyOpenUrl(
   if (!/^https?:\/\//i.test(p.url)) {
     return { ok: false, message: 'Skipped — URL must start with https://' }
   }
-  // R4/R13: the web never leaves Plexi and never demands a canvas. With no
+  // R4/R13: the web never leaves Plexii and never demands a canvas. With no
   // desk open, the in-app browser panel is the destination — the old
   // "Open a task first" refusal was the pre-panel behaviour and read as
   // clunk the moment Caleb hit it from Home. With a desk open, the loved

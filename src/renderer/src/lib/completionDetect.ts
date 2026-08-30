@@ -49,7 +49,7 @@ function offerFor(signal: CompletionSignal, item: FbNode, reason: string, confid
  * candidates would be a nag by volume). Rules, strongest first:
  *
  * - block_completed / focus_finished with a work-item target: the person
- *   finished the time they booked FOR this item — the strongest in-Plexi
+ *   finished the time they booked FOR this item — the strongest in-Plexii
  *   evidence there is.
  * - chat_message_sent: an active item captured FROM that conversation
  *   (sourceType 'chat', sourceRef = the conversation id) — the loop the item

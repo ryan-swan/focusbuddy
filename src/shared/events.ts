@@ -1,8 +1,8 @@
-// Plexi event contracts (spec §35 Event Entity, §64 Event Contracts).
+// Plexii event contracts (spec §35 Event Entity, §64 Event Contracts).
 //
 // This is the pure, DB-free contract layer: the canonical Event shape, the eight
 // event categories (§48.2), the past-tense naming rule (§64.2), the payload-size
-// ceiling, and the mapping to a CloudEvents v1.0.2 envelope with the Plexi
+// ceiling, and the mapping to a CloudEvents v1.0.2 envelope with the Plexii
 // extension attributes (§64.1). The append-only store that persists these lives
 // in src/main/db/eventStore.ts.
 

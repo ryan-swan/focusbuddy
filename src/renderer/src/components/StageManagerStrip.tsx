@@ -11,7 +11,7 @@ import { deskLifecycleMenuItems } from '../lib/deskLifecycleMenu'
 // Apple WWDC23 Stage Manager spring — measured from Archeon research
 const SPRING = { type: 'spring' as const, stiffness: 158, damping: 25, mass: 1 }
 
-// Small branded "Plexi grid" mark for empty desks — 2×2 rounded squares
+// Small branded "Plexii grid" mark for empty desks — 2×2 rounded squares
 function PlexiMark({ size = 28 }: { size?: number }): JSX.Element {
   const s = size / 4
   const gap = s * 0.45

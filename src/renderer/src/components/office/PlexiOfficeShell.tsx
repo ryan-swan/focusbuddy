@@ -310,7 +310,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
     if (busy) return
     setBusy(true)
     try {
-      const doc = await createBlank(app.docType, app.label.replace('Plexi', '') + ' draft')
+      const doc = await createBlank(app.docType, app.label.replace('Plexii', '') + ' draft')
       await refresh()
       setActiveComms(null)
       setOpenDocId(doc.id)
@@ -556,7 +556,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                               <Icon name={ti.icon} size={16} className={ti.tint} />
                               <span className="truncate">{d.title || 'Untitled'}</span>
                             </span>
-                            <span className="text-[var(--ink-60)] whitespace-nowrap">{appLabel(d.docType).replace('Plexi', '')}</span>
+                            <span className="text-[var(--ink-60)] whitespace-nowrap">{appLabel(d.docType).replace('Plexii', '')}</span>
                             <span className="text-[var(--ink-60)] whitespace-nowrap fb-tabular">{relTime(d.updatedAt)}</span>
                             <span className="flex items-center gap-1">
                               <button onClick={(e) => { e.stopPropagation(); toggleStar(d.id) }} className={starred.has(d.id) ? 'text-amber-400' : 'text-[var(--ink-40)] hover:text-amber-400'} title="Star">

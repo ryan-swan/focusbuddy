@@ -7,7 +7,7 @@ import { personDisplayName, personInitials } from '../lib/personName'
 // PlexiMeet live room, mounted once at the app root. Two presentations:
 //  - 'stage': the classic fullscreen room (video gallery + controls).
 //  - 'collaborate': the meeting docks to one edge as a movable panel so the rest
-//    of Plexi stays the focus and the user can navigate anywhere while the call
+//    of Plexii stays the focus and the user can navigate anywhere while the call
 //    keeps running (the room lives in a global store, so it survives navigation).
 // Nothing is faked: a tile shows "connecting" until its peer connection is up,
 // and a peer that drops is removed rather than frozen.
@@ -117,7 +117,7 @@ export default function MeetingOverlay(): JSX.Element | null {
   )
 
   // Escape leaves the meeting ONLY in stage mode. In collaborate mode the user is
-  // navigating Plexi with the meeting docked, so Escape must not drop the call.
+  // navigating Plexii with the meeting docked, so Escape must not drop the call.
   useEffect(() => {
     if (status === 'idle' || layout !== 'stage') return
     function onKey(e: KeyboardEvent): void {
@@ -281,7 +281,7 @@ export default function MeetingOverlay(): JSX.Element | null {
     </div>
   )
 
-  // ── Collaborate: docked panel on the chosen edge, Plexi stays interactive ──
+  // ── Collaborate: docked panel on the chosen edge, Plexii stays interactive ──
   if (collaborate) {
     const sideCls: Record<DockSide, string> = {
       left: 'top-0 bottom-0 left-0 w-[300px] flex-col border-r',

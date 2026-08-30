@@ -67,7 +67,7 @@ export const useTimeBlockStore = create<TimeBlockStore>((set, get) => ({
   update: async (id, patch) => {
     const updated = await window.api.timeBlocks.update(id, patch)
     // DEC-052 Track D — a block ticked done for a linked item is the
-    // strongest in-Plexi completion evidence; observe it (offer, never write).
+    // strongest in-Plexii completion evidence; observe it (offer, never write).
     if (patch.status === 'done' && updated?.taskId) {
       void useCompletionOffer.getState().observe({
         kind: 'block_completed',

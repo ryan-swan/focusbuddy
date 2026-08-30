@@ -749,9 +749,9 @@ export default function CommandCenter({
                 : `Ask Plexii — “${query.trim()}”`,
           hint:
             intent.kind === 'url'
-              ? 'Opens in Plexi'
+              ? 'Opens in Plexii'
               : intent.kind === 'search'
-                ? 'Web results in Plexi'
+                ? 'Web results in Plexii'
                 : 'Plexii answers in the side panel',
           icon: intent.kind === 'url' ? 'language' : intent.kind === 'search' ? 'travel_explore' : 'forum',
           kind: 'action',

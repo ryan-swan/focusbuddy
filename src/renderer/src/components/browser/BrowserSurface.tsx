@@ -6,7 +6,7 @@ import { useWebPanel } from '../../stores/webPanel'
 import { searchUrl as engineSearchUrl } from '../../lib/omniIntent'
 import { resolveAddressInput } from '../../lib/browserUrl'
 
-// The ONE browser inside Plexi (A2 desk-browser unification, Caleb's picks
+// The ONE browser inside Plexii (A2 desk-browser unification, Caleb's picks
 // 2026-08-23): the desk's browser widget and the panel/fullscreen surface
 // share this core — one webview shape, one toolbar grammar (back/forward/
 // reload, an address bar that navigates or searches the pinned engine, the
@@ -212,7 +212,7 @@ export default function BrowserSurface({
 
   // target=_blank links: main forwards them over IPC with the source
   // webContents id. 'navigate' surfaces load them in place — no tabs, the
-  // page is the surface (R4: the web never leaves Plexi).
+  // page is the surface (R4: the web never leaves Plexii).
   useEffect(() => {
     if (linkClicks !== 'navigate') return
     const off = window.api.webview.onLinkClicked(({ sourceWebContentsId, url }) => {

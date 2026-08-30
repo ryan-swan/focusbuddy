@@ -187,9 +187,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'PlexiDesk 3.9.8 — screen share in meetings, Design on your desk, and the desk build wizard is back',
     tag: 'feature',
     summary:
-      'Meetings can now share a screen, with a collaborative mode that docks the meeting to the side so you can keep moving around Plexi while you present. PlexiDesign joins Documents, Spreadsheets, Slides and Maps as something you can drop straight onto a desk. Starting a new desk opens the build wizard again, so you name it, describe it, and set importance and a due date up front. And the floating tool menu now stays put beside the assistant instead of hiding behind it.',
+      'Meetings can now share a screen, with a collaborative mode that docks the meeting to the side so you can keep moving around Plexii while you present. PlexiDesign joins Documents, Spreadsheets, Slides and Maps as something you can drop straight onto a desk. Starting a new desk opens the build wizard again, so you name it, describe it, and set importance and a due date up front. And the floating tool menu now stays put beside the assistant instead of hiding behind it.',
     highlights: [
-      'Share your screen in a meeting, and keep navigating Plexi while you present in collaborative screen-share mode.',
+      'Share your screen in a meeting, and keep navigating Plexii while you present in collaborative screen-share mode.',
       'PlexiDesign is now a desk tool alongside Documents, Spreadsheets, Slides and Maps.',
       'Starting a new desk opens the build wizard again: name, notes, room, urgency, importance, duration and due date.',
       'The floating tool menu stays visible beside the assistant panel instead of sliding under it.'
@@ -1011,7 +1011,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'v2.5.118 — sparklines, a richer Slides editor, and AI for Design',
     tag: 'feature',
     summary:
-      'Three upgrades across PlexiOffice. PlexiSheets gets sparklines, a tiny trend chart you draw right inside a cell with =SPARKLINE of a range, as a line or as bars, and a toolbar button puts one next to a row of numbers for you. PlexiSlides gets the side panel its mockup promised, an AI Assistant with ideas for the current slide alongside Slide and Layout tabs that show the real layout, background, theme colours and font, and a proper speaker-notes editor. PlexiDesign gets the same kind of AI Assistant as Docs and Sheets, able to improve your copy, shorten it, suggest a headline or write a caption from the text you actually have on the canvas. As everywhere in Plexi, the assistant works from your real content and shows an honest message when there is nothing to act on or when something goes wrong.',
+      'Three upgrades across PlexiOffice. PlexiSheets gets sparklines, a tiny trend chart you draw right inside a cell with =SPARKLINE of a range, as a line or as bars, and a toolbar button puts one next to a row of numbers for you. PlexiSlides gets the side panel its mockup promised, an AI Assistant with ideas for the current slide alongside Slide and Layout tabs that show the real layout, background, theme colours and font, and a proper speaker-notes editor. PlexiDesign gets the same kind of AI Assistant as Docs and Sheets, able to improve your copy, shorten it, suggest a headline or write a caption from the text you actually have on the canvas. As everywhere in Plexii, the assistant works from your real content and shows an honest message when there is nothing to act on or when something goes wrong.',
     highlights: [
       'PlexiSheets: =SPARKLINE(range) draws a line or bar trend chart inside a cell, with a one-click insert button.',
       'PlexiSlides: a right-side panel with per-slide AI ideas, real Slide and Layout properties, and a speaker-notes editor.',
@@ -1345,7 +1345,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'v2.5.93 — your spreadsheets, slides and documents survive the trip to Office',
     tag: 'feature',
     summary:
-      'Export fidelity, so a file you send to someone on real Microsoft Office looks the way you made it. Spreadsheets now keep their visual formatting on export, bold cells, fills, text colour, alignment, number formats like currency and percent, frozen panes and column widths, not just the raw numbers. Slides keep element rotation, drop shadows and rounded corners. And Word exports come out as a proper document with a real font, one-inch margins, page numbers and visible table borders. The earlier loss of formatting when a file left Plexi was the fastest way to look unprofessional; this fixes it.',
+      'Export fidelity, so a file you send to someone on real Microsoft Office looks the way you made it. Spreadsheets now keep their visual formatting on export, bold cells, fills, text colour, alignment, number formats like currency and percent, frozen panes and column widths, not just the raw numbers. Slides keep element rotation, drop shadows and rounded corners. And Word exports come out as a proper document with a real font, one-inch margins, page numbers and visible table borders. The earlier loss of formatting when a file left Plexii was the fastest way to look unprofessional; this fixes it.',
     highlights: [
       'Spreadsheets export with their formatting intact: bold, fills, text colour and alignment, number formats (currency, percent, dates), frozen panes and column widths all carry into Excel, where before only the values came across.',
       'Slides keep their design on export: an element that is rotated, has a drop shadow, or has rounded corners now exports to PowerPoint that way instead of flattening to a plain box.',
@@ -1358,7 +1358,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'v2.5.92 — your workspace follows you, an audit log you can read, and flows that talk to the world',
     tag: 'feature',
     summary:
-      'Three foundations for working across devices and with other tools. Your own tasks and canvas widgets now sync across the devices you sign in on, so a second machine no longer starts empty. Organization admins get a readable audit log, including who signed in and who changed roles, the record an auditor asks for. And PlexiFlow can now reach outside Plexi: a flow can call any webhook or API, and an incoming webhook can trigger a flow, so a completed task can post to Slack and an outside event can start an automation.',
+      'Three foundations for working across devices and with other tools. Your own tasks and canvas widgets now sync across the devices you sign in on, so a second machine no longer starts empty. Organization admins get a readable audit log, including who signed in and who changed roles, the record an auditor asks for. And PlexiFlow can now reach outside Plexii: a flow can call any webhook or API, and an incoming webhook can trigger a flow, so a completed task can post to Slack and an outside event can start an automation.',
     highlights: [
       'Multi-device sync: the tasks and canvas widgets in your personal workspace now follow you across the devices you sign in on, syncing in the background. Changes merge with last-write-wins and deletes propagate, so your second machine stays in step instead of starting blank.',
       'A readable audit log: the organization admin console now shows the audit trail, membership and role changes plus sign-in, sign-out, password-reset and two-factor activity, each as a clear "when, who, what" line for admins.',
@@ -1467,7 +1467,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Sign documents without leaving your workspace, and watch the whole suite settle into one design. PlexiSign collects signatures with a real audit trail, and PlexiBrain, PlexiMeet, PlexiBuild and PlexiForms now share the same look and adapt to every theme.',
     highlights: [
       'PlexiSign: create an agreement, collect typed or drawn signatures from a set of signers in order, and keep an append-only audit trail with a tamper-evident completion certificate. No per-envelope DocuSign bill, and it is now live in the launcher.',
-      'One consistent look: PlexiBrain, PlexiMeet, PlexiBuild and PlexiForms were rebuilt onto the shared Plexi design system, so they feel like one product and read correctly in light, dark and the futuristic themes rather than each carrying its own colours.',
+      'One consistent look: PlexiBrain, PlexiMeet, PlexiBuild and PlexiForms were rebuilt onto the shared Plexii design system, so they feel like one product and read correctly in light, dark and the futuristic themes rather than each carrying its own colours.',
       'PlexiForms is live in the launcher too: design a form, fill it, and every response lands as a row in a real table you can chart in PlexiDash.'
     ]
   },

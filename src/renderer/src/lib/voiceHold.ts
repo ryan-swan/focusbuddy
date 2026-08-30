@@ -13,7 +13,7 @@ import { useChatStore, NEW_CHAT_KEY } from '../stores/chat'
 // spoken word runs the SAME intent routing as every typed door. Two survivors
 // from the old FAB, kept deliberately: dictation (an editable was focused
 // when the hold began → the transcript types in verbatim, Whisper's words,
-// never an AI echo) and the wake word ("Plexi, …" / "Hey Plexi, …" addresses
+// never an AI echo) and the wake word ("Plexii, …" / "Hey Plexii, …" addresses
 // the assistant even from inside a text field; the prefix is stripped).
 //
 // Hard-won capture rules carried from the FAB (do not relearn):
@@ -38,7 +38,7 @@ export const useVoiceHold = create<VoiceHoldState>((set) => ({
   clearError: () => set({ error: null })
 }))
 
-const WAKE = /^\s*(hey\s+)?plexi\b[,:]?\s*/i
+const WAKE = /^\s*(hey\s+)?plexii?\b[,:]?\s*/i
 
 // Module-level capture state — one capture at a time, by design.
 let capturing = false

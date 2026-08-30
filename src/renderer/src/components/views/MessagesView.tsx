@@ -1384,7 +1384,7 @@ export function BriefingPanel({ onClose }: { onClose: () => void }): JSX.Element
                   <Row
                     key={p.messageId}
                     testid="briefing-proposal"
-                    title="Plexi proposed an action"
+                    title="Plexii proposed an action"
                     sub={p.conversationTitle}
                     onClick={() => go(p.conversationId, p.messageId)}
                   />
@@ -1792,7 +1792,7 @@ export function SchedulesPanel({ conversationId, onClose }: { conversationId: st
 
         <div className="px-4 pt-3 pb-2 border-b border-[var(--edge-soft)]">
           <p className="text-[11px] text-[var(--ink-50)] leading-snug mb-1.5">
-            Plexi runs these on a timer, even when everyone is offline, and posts the result here. It needs the org&apos;s
+            Plexii runs these on a timer, even when everyone is offline, and posts the result here. It needs the org&apos;s
             AI key set (Channels, AI member).
           </p>
           <textarea

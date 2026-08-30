@@ -21,7 +21,7 @@ export const SLIDE_H = 720
 export const BUILTIN_THEMES: DeckTheme[] = [
   {
     id: 'plexi-default',
-    name: 'Plexi',
+    name: 'Plexii',
     background: '#ffffff',
     fontHeading: 'Inter, system-ui, sans-serif',
     fontBody: 'Inter, system-ui, sans-serif',

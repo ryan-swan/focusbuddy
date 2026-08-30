@@ -1,6 +1,6 @@
 // Context Engine model (spec §12 Cognitive Context, §38 Context Entity).
 //
-// The "brain" of Plexi 4.0. This is the contextual-awareness data model the
+// The "brain" of Plexii 4.0. This is the contextual-awareness data model the
 // Event Store feeds and the Context Health / decision-alert surfaces read from.
 // Its central discipline: any value the system INFERS must be labelled as such
 // and carry its confidence and evidence, so inference is never shown as fact

@@ -344,7 +344,7 @@ export interface TimeBlock {
   // (a person) or 'auto' (the planner); replan may only move 'auto' blocks.
   // locked: never moved by any scheduler — set by hand, or automatically when
   // an external edit is detected (the honour-and-pin convention). pushPolicy:
-  // whether this block ever leaves Plexi for an external calendar ('local' is
+  // whether this block ever leaves Plexii for an external calendar ('local' is
   // the default and the convention).
   origin: 'manual' | 'auto'
   locked: boolean
@@ -753,7 +753,7 @@ export interface AgentActionOutcome {
 
 // ── Situational proactivity (workspace radar) ────────────────────────────────
 // A cheap, deterministic (no-LLM) detector surfaces actionable situations across
-// the user's REAL work in Plexi — tasks, inbound mail, and the calendar — as
+// the user's REAL work in Plexii — tasks, inbound mail, and the calendar — as
 // one-tap suggestions they can act on or dismiss.
 export type RadarKind = 'overdue' | 'due_soon' | 'stalled' | 'reply_needed' | 'meeting_soon'
 

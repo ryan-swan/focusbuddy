@@ -6,7 +6,7 @@ import { useQuickCreate } from '../../stores/quickCreate'
 import type { PlexiSignRequest, Signer, SignStatus, SignatureKind } from '@shared/sign'
 
 // PlexiSign — send a document for signature, collect approvals in order, keep a
-// tamper-evident trail. Built on the Plexi primitives. No fabricated data: an
+// tamper-evident trail. Built on the Plexii primitives. No fabricated data: an
 // empty workspace shows an honest empty state.
 
 const STATUS_TONE: Record<SignStatus, 'stone' | 'sky' | 'emerald' | 'rose'> = {

@@ -1,4 +1,11 @@
-# Plexi / focusbuddy — working context
+# Plexii / focusbuddy — working context
+
+**The name is spelled "Plexii" — two i's — everywhere, always** (operator
+ruling, 2026-08-30). "Plexii Meet", "inside Plexii", "Plexii 4.0", the wake
+word, a11y labels — all of it. Fused legacy product identifiers (PlexiDesk,
+PlexiSuite, PlexiOffice…) are separate names and stay single-i unless ruled
+otherwise. A grep-lock test in tests/unit/bookTimeDialog.test.ts enforces the
+standalone spelling; new user-facing copy must respect it.
 
 Electron + React 18 + zustand + TipTap desktop app. `better-sqlite3` in main;
 `node:sqlite` in tests. Dev via electron-vite.

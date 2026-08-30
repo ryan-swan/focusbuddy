@@ -49,7 +49,7 @@ export interface MeetingInvite {
 
 // How the live meeting is presented. 'stage' is the classic fullscreen room;
 // 'collaborate' docks the meeting to one edge as a movable panel so the rest of
-// Plexi stays the focus and the user can navigate around while the call runs.
+// Plexii stays the focus and the user can navigate around while the call runs.
 export type MeetingLayout = 'stage' | 'collaborate'
 export type DockSide = 'left' | 'right' | 'top' | 'bottom'
 
@@ -490,7 +490,7 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     // Share a screen or window into the meeting. Opens the OS picker (via the
     // main-process display-media handler), then adds the screen track to every
     // peer and renegotiates. Switches to collaborate mode so the user can keep
-    // navigating Plexi while it is shared, which is the point of sharing your
+    // navigating Plexii while it is shared, which is the point of sharing your
     // own workspace. Nothing is faked: if the user cancels the picker or denies
     // the OS permission, we surface that and stay unshared.
     startScreenShare: async () => {

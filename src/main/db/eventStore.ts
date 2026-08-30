@@ -1,6 +1,6 @@
 // Append-only Event Store (spec §35, §49, ADR-0001).
 //
-// The system of record for Plexi 4.0. Events are immutable and append-only,
+// The system of record for Plexii 4.0. Events are immutable and append-only,
 // enforced by SQLite triggers, not convention (PLX-EVT-010, PLX-EVT-030). Each
 // append assigns a UUIDv7 id, an ingestion time distinct from occurrence time,
 // and a monotonic per-partition sequence (PLX-EVT-013, PLX-EVT-022). State

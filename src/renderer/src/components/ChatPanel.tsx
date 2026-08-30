@@ -863,7 +863,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         break
       case 'url':
         // A web source opens in the in-app browser panel (A2, R4/R13): the
-        // web never leaves Plexi. The panel's toolbar carries the explicit
+        // web never leaves Plexii. The panel's toolbar carries the explicit
         // system-browser escape.
         useWebPanel.getState().openWeb(target.url)
         break
@@ -1677,7 +1677,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             <MentionComposer
               placeholder={
                 composerMode === 'search'
-                  ? 'Search the web — results open in Plexi'
+                  ? 'Search the web — results open in Plexii'
                   : discovering
                     ? 'Start anywhere — an idea, a question, a hunch…'
                     : ctx.placeholder
@@ -1801,7 +1801,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                     m.id === 'auto'
                       ? 'Smart: URLs open, take-me-to navigates, everything else asks'
                       : m.id === 'search'
-                        ? 'Type straight into your search engine — results open in Plexi'
+                        ? 'Type straight into your search engine — results open in Plexii'
                         : 'Everything goes to Plexii'
                   }
                   onClick={() => {
