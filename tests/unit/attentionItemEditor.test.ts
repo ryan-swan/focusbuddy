@@ -42,9 +42,12 @@ describe('DEC-036 — double-click opens the whole item for editing', () => {
 describe('DEC-035 follow-ups — the drag gestures the operator asked for', () => {
   const view = read('src/renderer/src/components/views/AttentionView.tsx')
 
-  it('drags the WHOLE ROW as its ghost, not a bare handle', () => {
-    expect(view).toContain('setDragImage')
-    expect(view).toContain("closest(\n                '[data-item-row]'\n              )")
+  it('drags the WHOLE ROW — DEC-077 made it the drag source itself', () => {
+    // DEC-035 faked this with setDragImage from the handle; DEC-077 removed
+    // the handle, so the row IS the drag source and the browser renders the
+    // row as the ghost natively — no image plumbing left to drift.
+    expect(view).not.toContain('setDragImage')
+    expect(view).toContain('draggable={canDrag && !isOpen}')
   })
 
   it('resting on a row means ATTACH (dwell), edges mean place', () => {

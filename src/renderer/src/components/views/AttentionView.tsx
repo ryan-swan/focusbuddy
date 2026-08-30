@@ -7,6 +7,7 @@ import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
 import AttentionItemEditor from '../AttentionItemEditor'
+import CompleteCircle from '../attention/CompleteCircle'
 import { useWidgetStore } from '../../stores/widgets'
 import { useAssistantChrome } from '../../stores/assistantChrome'
 import { startPromptForItem, startPromptForMany } from '../../lib/startPrompt'
@@ -766,7 +767,30 @@ export default function AttentionView(): JSX.Element {
           if ((e.target as HTMLElement).closest('[data-row-action]')) return
           setEditing(i)
         }}
-        title="Double-click to edit"
+        title={
+          canDrag && !isOpen
+            ? 'Drag to reorder or nest · double-click to edit'
+            : 'Double-click to edit'
+        }
+        // DEC-077 — the whole row is the drag surface; the six-dot handle is
+        // gone. An EXPANDED row opts out so its selectable notes (DEC-030's
+        // read/copy) still select instead of dragging — collapse to move it.
+        draggable={canDrag && !isOpen}
+        onDragStart={
+          canDrag && !isOpen
+            ? (e) => {
+                setDragId(i.id)
+                // DEC-048 — grabbing a SELECTED row moves the whole selection.
+                setDragMulti(selectMode && selected.has(i.id) && selected.size > 1)
+                // DEC-052 — the same drag can land OUTSIDE the queues: the rail
+                // day grid (and the Calendar page) read this payload to book
+                // the item. Internal reorder/nest handlers keep using state.
+                e.dataTransfer.setData('text/fb-workitem', i.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }
+            : undefined
+        }
+        onDragEnd={canDrag && !isOpen ? endDrag : undefined}
         onDragOver={
           canDrag
             ? (e) => {
@@ -820,19 +844,26 @@ export default function AttentionView(): JSX.Element {
         }
         style={{ paddingLeft: `${8 + indentLevel * INDENT_PX}px` }}
         className={`group relative flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors ${
-          selected.has(i.id) && selectMode
-            ? 'bg-[rgba(var(--accent),0.08)]'
-            : 'hover:bg-[rgba(var(--accent),0.05)]'
+          canDrag && !isOpen ? 'cursor-grab active:cursor-grabbing' : ''
+        } ${
+          // DEC-077 — nesting feedback is the WHOLE row: while a drag dwells
+          // "into", the row lights up (tint + inset ring), unmistakably
+          // different from the before/after placement lines. One bg class per
+          // state — two bg-* utilities on one element resolve by stylesheet
+          // order, not intent.
+          isOver && over?.pos === 'into'
+            ? 'bg-[rgba(var(--accent),0.14)] shadow-[inset_0_0_0_2px_rgba(var(--accent),0.55)]'
+            : selected.has(i.id) && selectMode
+              ? 'bg-[rgba(var(--accent),0.08)]'
+              : 'hover:bg-[rgba(var(--accent),0.05)]'
         } ${
           dragId === i.id || (dragMulti && dragId && selected.has(i.id)) ? 'opacity-40' : ''
         } ${
-          isOver && over?.pos === 'into'
-            ? 'shadow-[inset_0_0_0_2px_rgba(var(--accent),0.5)]'
-            : isOver && over?.pos === 'before'
-              ? 'shadow-[0_-2px_0_rgb(var(--accent))]'
-              : isOver && over?.pos === 'after'
-                ? 'shadow-[0_2px_0_rgb(var(--accent))]'
-                : ''
+          isOver && over?.pos === 'before'
+            ? 'shadow-[0_-2px_0_rgb(var(--accent))]'
+            : isOver && over?.pos === 'after'
+              ? 'shadow-[0_2px_0_rgb(var(--accent))]'
+              : ''
         }`}
       >
         {/* DEC-050 — the queue's colour as a spine down the row's left edge:
@@ -863,55 +894,10 @@ export default function AttentionView(): JSX.Element {
             />
           </button>
         )}
-        {canDrag && (
-          <button
-            draggable
-            onDragStart={(e) => {
-              // Drag the whole row, not a bare handle — the operator should
-              // see the item itself move.
-              const rowEl = (e.currentTarget as HTMLElement).closest(
-                '[data-item-row]'
-              ) as HTMLElement | null
-              if (rowEl) {
-                const r = rowEl.getBoundingClientRect()
-                e.dataTransfer.setDragImage(rowEl, e.clientX - r.left, e.clientY - r.top)
-              }
-              setDragId(i.id)
-              // DEC-048 — grabbing a SELECTED row moves the whole selection.
-              setDragMulti(selectMode && selected.has(i.id) && selected.size > 1)
-              // DEC-052 — the same drag can land OUTSIDE the queues: the rail
-              // day grid (and the Calendar page) read this payload to book
-              // the item. Internal reorder/nest handlers keep using state.
-              e.dataTransfer.setData('text/fb-workitem', i.id)
-              e.dataTransfer.effectAllowed = 'move'
-            }}
-            onDragEnd={endDrag}
-            title={
-              selectMode && selected.has(i.id) && selected.size > 1
-                ? `Drag to move all ${selected.size} selected — drop ON an item to nest them as its subtasks`
-                : 'Drag to reorder, attach to another item, or move to another section'
-            }
-            /* DEC-055 kept it out of the flex flow (a reserved column was the
-               dead space left of the checkbox); DEC-070 fixes WHERE it floats.
-               It used to sit at the indent column — a coordinate that belongs
-               to the previous depth — so on sub-items it hung misaligned in
-               the parent's gutter. It now rides 22px left of its own row's
-               content at every depth, clamped so depth 0 stays inside the box,
-               with a surface chip so hovering over the group's dashed line
-               reads as a control sitting ON the line, not tangled in it. */
-            style={{ left: `${Math.max(2, 8 + indentLevel * INDENT_PX - 22)}px` }}
-            className="absolute z-0 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-[var(--ink-20)] hover:text-[var(--ink-50)] opacity-0 group-hover:opacity-100 transition-opacity rounded bg-[var(--surface-raised)]"
-          >
-            <Icon name="drag_indicator" size={16} />
-          </button>
-        )}
         {/* A fixed slot for the subtask chevron, so every title starts at the
-            same x whether or not the row has children. */}
-        {/* DEC-062 — `relative z-10`: the drag handle is absolutely positioned in
-            this same gutter, and a positioned element paints above a static one
-            whatever the DOM order, so the handle was swallowing every click
-            meant for this chevron. The chevron is a persistent control and the
-            handle a hover-only one, so the chevron wins the overlap. */}
+            same x whether or not the row has children. (The z-10 predates
+            DEC-077 — it kept the chevron above the old floating drag handle;
+            harmless now the handle is gone, and the whole row drags.) */}
         <span className="relative z-10 shrink-0 w-3.5 flex items-center justify-center">
           {hasKids && (
             <button
@@ -934,14 +920,10 @@ export default function AttentionView(): JSX.Element {
              closes with the QUEUE's own verb (Done / Scheduled / Answered…),
              so one click never mislabels what happened. The queue's identity
              lives in the row's coloured spine, so no icon competes with it. */
-          <button
-            data-row-action
+          <CompleteCircle
             onClick={() => void closeWithOffer(i, primary.state)}
             title={`${primary.label} — close this item`}
-            className="shrink-0 h-[18px] w-[18px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
-          >
-            <Icon name="check" size={13} />
-          </button>
+          />
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">

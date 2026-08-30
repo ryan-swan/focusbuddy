@@ -316,12 +316,16 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
   const cal = read('src/renderer/src/components/views/CalendarView.tsx')
   const css = read('src/renderer/src/styles/globals.css')
 
-  it('the drag handle floats in the spine gutter instead of reserving a column', () => {
-    // That reserved column WAS the dead space to the left of the checkbox.
-    // DEC-062 kept the float and added a z-order: sharing the gutter is fine,
-    // swallowing the chevron's clicks was not.
-    expect(att).toContain('absolute z-0 top-1/2 -translate-y-1/2 cursor-grab')
-    expect(att).not.toContain('shrink-0 cursor-grab')
+  it('DEC-077 — the six-dot handle is gone; the WHOLE row is the drag surface', () => {
+    // History: DEC-055 floated the handle out of the flex flow, DEC-062 gave
+    // it a z-order, DEC-070 aligned it to its own depth — and DEC-077 removed
+    // it. The row itself is draggable now, so there is no handle to misalign,
+    // and no gutter control for the chevron to fight.
+    expect(att).not.toContain('drag_indicator')
+    expect(att).toContain('draggable={canDrag && !isOpen}')
+    // An EXPANDED row opts out so its selectable notes (DEC-030 read/copy)
+    // still select text instead of starting a drag.
+    expect(att).toContain('cursor-grab active:cursor-grabbing')
   })
 
   it('DEC-070 — one dashed connector per group, and no per-row segments at all', () => {
@@ -361,13 +365,12 @@ describe('DEC-055 — the queue box, the tight left edge, the rail panel', () =>
     expect(att).not.toContain('bg-[var(--surface-base)]')
   })
 
-  it('DEC-070 — the drag handle aligns to its OWN row at every depth', () => {
-    // It used to float at the indent column — a coordinate belonging to the
-    // previous depth — so on sub-items it hung misaligned in the parent's
-    // gutter (the operator's screenshot). Now: 22px left of its own row's
-    // content, clamped so depth 0 stays inside the box, with a surface chip so
-    // it reads as a control sitting ON the connector.
-    expect(att).toContain('Math.max(2, 8 + indentLevel * INDENT_PX - 22)')
+  it('DEC-077 — no handle geometry remains to misalign', () => {
+    // DEC-070's fix pinned the handle 22px off its own row's content. With
+    // the handle removed (DEC-077) that geometry must not linger: the only
+    // per-row left-offset is the row's own indent padding.
+    expect(att).not.toContain('Math.max(2, 8 + indentLevel * INDENT_PX - 22)')
+    expect(att).toContain('paddingLeft: `${8 + indentLevel * INDENT_PX}px`')
   })
 
   it('DEC-062 — the desk header is tinted by its QUEUE, and folds its cluster', () => {

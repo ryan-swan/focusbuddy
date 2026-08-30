@@ -9,9 +9,9 @@ import { futuristicPowerOn } from '../../lib/audioBeep'
 import { blockFit } from '../../lib/calendarGeometry'
 import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
 import AttentionItemEditor from '../AttentionItemEditor'
+import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
-import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
-import { sendMeetingInvites } from '../../lib/meetingInvite'
+import { joinMeetingRoom } from '../../lib/startMeeting'
 import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
@@ -572,6 +572,11 @@ export default function WeekTimeGrid({
                   const isTaskBlock = !block.taskId || linked?.kind === 'task'
                   const wiHue = isWorkItem ? QUEUE_COLOR[queueOf(linked!)] ?? '#64748b' : null
                   const done = block.status === 'done'
+                  // DEC-077 — an ACTIVE work-item block completes via the same
+                  // circle every other surface uses; the hover cluster's check
+                  // then only serves plain blocks (and done-undo).
+                  const itemCompletable =
+                    isWorkItem && !done && !!linked && !isTerminalState(linked.workItemState)
                   const isPast = startMs + durMin * 60000 < now
                   // A short block cannot hold padded text. The caption line is
                   // ~15px on its own, so py-1's 4px top and bottom crop it
@@ -589,7 +594,12 @@ export default function WeekTimeGrid({
                       onClick={(e) => e.stopPropagation()}
                       onDoubleClick={(e) => {
                         e.stopPropagation()
-                        if (isWorkItem) setEditItem(linked!)
+                        // A meeting block (whatever it links) and a plain
+                        // block open the FULL dialog with every detail —
+                        // guests, where, agenda, time — seeded for editing.
+                        // Work-item and desk links keep their DEC-074 routes.
+                        if (block.meeting || !block.taskId) setEditBlockState(block)
+                        else if (isWorkItem) setEditItem(linked!)
                         else if (linked) jumpToNode(linked)
                       }}
                       className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 ${
@@ -613,18 +623,64 @@ export default function WeekTimeGrid({
                       }}
                       title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
                     >
-                      <div
-                        className={`min-w-0 flex-1 font-medium leading-[1.25] ${done ? 'line-through' : ''} ${
-                          height < 34 ? 'truncate' : 'line-clamp-2'
-                        }`}
-                      >
-                        {block.title || linked?.title || 'Focus time'}
-                      </div>
-                      {height >= 34 && (
-                        <div className="text-[9.5px] opacity-70 tabular-nums mt-px">
-                          {fmtTime(startMs)}
+                      <div className={`flex gap-1 min-w-0 ${tight ? 'items-center flex-1' : 'items-start'}`}>
+                        {itemCompletable && (
+                          <CompleteCircle
+                            size={12}
+                            className={tight ? '' : 'mt-[2px]'}
+                            onClick={() => void completeItemAndBlock(block, linked!)}
+                            title={`${(PRIMARY_ACTION[queueOf(linked!)] ?? PRIMARY_ACTION.to_do).label} — complete the item and this block`}
+                            dataTestId="block-complete-circle"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          {inlineEdit?.blockId === block.id ? (
+                            /* Step 9 — the name typed in place. Enter/blur
+                               keep, Esc removes the block, Cmd+Enter promotes
+                               to the full dialog with the draft carried. */
+                            <input
+                              autoFocus
+                              value={inlineEdit.draft}
+                              data-testid="inline-title-input"
+                              placeholder={block.title}
+                              onChange={(e) =>
+                                setInlineEdit((ie) => (ie ? { ...ie, draft: e.target.value } : ie))
+                              }
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                              onDoubleClick={(e) => e.stopPropagation()}
+                              onBlur={() => void finishInline(true)}
+                              onKeyDown={(e) => {
+                                e.stopPropagation()
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                  e.preventDefault()
+                                  void promoteInline()
+                                } else if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  void finishInline(true)
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault()
+                                  void cancelInline()
+                                }
+                              }}
+                              className="w-full bg-transparent outline-none [&:focus-visible]:outline-none font-medium leading-[1.25] text-inherit placeholder:text-[var(--ink-40)] border-b border-[rgb(var(--accent))]"
+                            />
+                          ) : (
+                          <div
+                            className={`font-medium leading-[1.25] ${done ? 'line-through' : ''} ${
+                              height < 34 ? 'truncate' : 'line-clamp-2'
+                            }`}
+                          >
+                            {block.title || linked?.title || 'Focus time'}
+                          </div>
+                          )}
+                          {height >= 34 && (
+                            <div className="text-[9.5px] opacity-70 tabular-nums mt-px">
+                              {fmtTime(startMs)}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
 
                       {/* hover actions — z-raised above the resize handles,
                           whose top strip otherwise overlaps these buttons'
@@ -691,33 +747,25 @@ export default function WeekTimeGrid({
                             <Icon name="bolt" size={9} />
                           </button>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // DEC-074 — on a work-item block the check completes
-                            // the ITEM (its own queue verb, the one close path)
-                            // and then the block. Undo on a done block stays
-                            // calendar-local: it revives the BLOCK only — the
-                            // item reopens from Attention, not from here.
-                            if (!done && isWorkItem && linked && !isTerminalState(linked.workItemState)) {
-                              void completeItemAndBlock(block, linked)
-                              return
-                            }
-                            void updateBlock(block.id, { status: done ? 'planned' : 'done' })
-                          }}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
-                          title={
-                            done
-                              ? 'Mark not done'
-                              : isWorkItem && linked && !isTerminalState(linked.workItemState)
-                                ? `${(PRIMARY_ACTION[queueOf(linked)] ?? PRIMARY_ACTION.to_do).label} — complete the item and this block`
-                                : 'Mark done'
-                          }
-                          data-testid="block-complete"
-                        >
-                          <Icon name={done ? 'undo' : 'check'} size={9} />
-                        </button>
+                        {!itemCompletable && (
+                          /* DEC-074/077 — an active work-item block completes
+                             via its visible circle instead; this check serves
+                             plain blocks and the done-undo. Undo stays
+                             calendar-local: it revives the BLOCK only — the
+                             item reopens from Attention, not from here. */
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void updateBlock(block.id, { status: done ? 'planned' : 'done' })
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            title={done ? 'Mark not done' : 'Mark done'}
+                            data-testid="block-complete"
+                          >
+                            <Icon name={done ? 'undo' : 'check'} size={9} />
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation()

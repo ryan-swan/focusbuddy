@@ -48,7 +48,7 @@ describe('dec_074 — calendar items open and complete in place', () => {
   })
 
   it('dec_074_the_block_check_closes_the_ITEM_through_the_one_path', () => {
-    expect(grid).toContain('completeItemAndBlock(block, linked)')
+    expect(grid).toContain('completeItemAndBlock(block, linked!)')
     expect(grid).toContain('useCloseWorkItem')
     // …and only marks the block done if the close actually happened
     // (the subtask offer can be cancelled).
@@ -93,7 +93,11 @@ describe('dec_075 — missed items greet the launch, never silently drop', () =>
 describe('dec_076 — the widget bell', () => {
   it('dec_076_bell_state_is_derived_from_the_queue_rows', () => {
     expect(frame).toContain('liveItemForWidget(workItems, widget.id)')
-    expect(frame).toContain('filled={!!attentionItem}')
+    // DEC-077: the brand bell is a line SVG whose Icon `filled` prop is a
+    // deliberate no-op — the active state fills the SAME path solid instead.
+    expect(frame).toContain('<BellIcon size={13} active={!!attentionItem} />')
+    expect(frame).toContain("fill={active ? 'currentColor' : 'none'}")
+    expect(frame).toContain("PLEXII_ICONS['notifications']")
   })
 
   it('dec_076_outlined_click_runs_the_same_flow_as_the_menu', () => {
@@ -105,8 +109,10 @@ describe('dec_076 — the widget bell', () => {
   })
 
   it('dec_076_the_check_appears_only_when_there_is_something_to_complete', () => {
-    expect(frame).toContain('attentionOn && attentionItem && (')
+    expect(frame).toContain('attentionOn && attentionItem && !titleEditing && (')
     expect(frame).toContain('closeWorkItem(')
+    // DEC-077: it is the one shared completion circle, beside the title.
+    expect(frame).toContain('<CompleteCircle')
   })
 
   it('dec_076_respects_the_workItems_flag_like_the_menu_does', () => {

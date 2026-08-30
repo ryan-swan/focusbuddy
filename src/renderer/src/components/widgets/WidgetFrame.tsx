@@ -40,6 +40,8 @@ import { workItemsEnabled } from '../../lib/workItemsCapability'
 import { presetForWidget } from '../../lib/attentionPresets'
 import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import CompleteCircle from '../attention/CompleteCircle'
+import { PLEXII_ICONS } from '../icons/plexiiIcons'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -1042,9 +1044,13 @@ export default function WidgetFrame({
                 {widgetDisplayName(widget, headerLabel)}
               </span>
             )}
-          </span>
-          <div className="flex items-center gap-0.5">
-            {attentionOn && (
+            {/* DEC-076/077 — bell + completion, ADJACENT TO THE TITLE, away
+                from the right-side control array where they got lost. The
+                bell fills SOLID when a live item points at this widget (the
+                brand icon is a line SVG whose `filled` prop is a no-op — it
+                fills here explicitly); the circle is the one completion
+                form factor every surface shares. */}
+            {attentionOn && !titleEditing && (
               <button
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
@@ -1052,10 +1058,10 @@ export default function WidgetFrame({
                   if (attentionItem) goAttention()
                   else markWidgetForAttention()
                 }}
-                className={`widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
+                className={`widget-nodrag ml-1 h-5 w-5 rounded inline-flex items-center justify-center shrink-0 transition-colors ${
                   attentionItem
                     ? 'text-accent hover:bg-[var(--surface-sunken)]/60'
-                    : 'text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
+                    : 'text-[var(--ink-40)] opacity-60 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
                 }`}
                 aria-label={attentionItem ? 'In Attention — open the queue' : 'Add to Attention'}
                 title={
@@ -1065,27 +1071,25 @@ export default function WidgetFrame({
                 }
                 data-testid={`widget-bell-${widget.id}`}
               >
-                <Icon name="notifications" size={13} filled={!!attentionItem} />
+                <BellIcon size={13} active={!!attentionItem} />
               </button>
             )}
-            {attentionOn && attentionItem && (
-              <button
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation()
+            {attentionOn && attentionItem && !titleEditing && (
+              <CompleteCircle
+                size={14}
+                className="widget-nodrag shrink-0"
+                onClick={() =>
                   void closeWorkItem(
                     attentionItem,
                     (PRIMARY_ACTION[queueOf(attentionItem)] ?? PRIMARY_ACTION.to_do).state
                   )
-                }}
-                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-emerald-500/10 hover:text-emerald-600 transition-colors"
-                aria-label="Complete this attention item"
+                }
                 title={`${(PRIMARY_ACTION[queueOf(attentionItem)] ?? PRIMARY_ACTION.to_do).label} — complete “${attentionItem.title || 'this item'}”`}
-                data-testid={`widget-attn-complete-${widget.id}`}
-              >
-                <Icon name="check" size={13} />
-              </button>
+                dataTestId={`widget-attn-complete-${widget.id}`}
+              />
             )}
+          </span>
+          <div className="flex items-center gap-0.5">
             {!titleEditing && (
               <button
                 onMouseDown={(e) => e.stopPropagation()}
@@ -1244,6 +1248,31 @@ export default function WidgetFrame({
         />
       )}
     </Rnd>
+  )
+}
+
+// ── The bell (DEC-076/077) ──────────────────────────────────────────────────
+//
+// The brand 'notifications' icon is a line SVG on currentColor; Icon's
+// `filled` prop deliberately does not apply to brand icons, which is why the
+// active bell only changed colour. Active state here fills the SAME brand
+// path solid — one path source (PLEXII_ICONS), two renderings.
+
+function BellIcon({ size, active }: { size: number; active: boolean }): JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={active ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: PLEXII_ICONS['notifications'] }}
+    />
   )
 }
 

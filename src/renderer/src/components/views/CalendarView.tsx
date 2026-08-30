@@ -28,6 +28,7 @@ import {
   isTerminalState
 } from '../../lib/attentionQueues'
 import AttentionItemEditor from '../AttentionItemEditor'
+import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import {
@@ -461,26 +462,15 @@ export default function CalendarView(): JSX.Element {
           className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full"
           style={{ backgroundColor: queueTint(hue, 0.55) }}
         />
-        <button
-          onClick={(e) => {
-            // DEC-074 — complete straight from the rail, with the item's own
-            // closing verb. draggable parent: stop the gesture cold.
-            e.preventDefault()
-            e.stopPropagation()
+        {/* DEC-074/077 — the one completion circle; the six-dot handle is
+            gone (the whole row drags, and always did). */}
+        <CompleteCircle
+          size={15}
+          onClick={() =>
             void closeWorkItem(i, (PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do).state)
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-          draggable={false}
+          }
           title={`${(PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do).label} — close this item`}
-          data-testid={`rail-complete-${i.id}`}
-          className="shrink-0 h-[15px] w-[15px] rounded-full border-[1.5px] border-[var(--ink-30)] hover:border-emerald-500 hover:bg-emerald-500/15 fb-press transition-colors"
-          aria-label="Complete this item"
-        />
-        <Icon
-          name="drag_indicator"
-          size={13}
-          className="shrink-0 text-[var(--ink-20)] group-hover:text-[var(--ink-50)]"
+          dataTestId={`rail-complete-${i.id}`}
         />
         <span className="min-w-0 flex-1 text-[12px] text-[var(--ink-90)] truncate">{i.title}</span>
         {i.dueAt && (
