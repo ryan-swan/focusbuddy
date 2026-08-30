@@ -205,6 +205,11 @@ describe('DEC-053 — the calendar QA round (operator live QA)', () => {
     expect(grid).toContain('const HOUR_PX = 56')
     // The rail (compact) keeps its full-height habit: no scroller.
     expect(grid).toContain('compact ? undefined :')
+    // Follow-up ruling: the day runs MIDNIGHT TO MIDNIGHT. The old 6am–10pm
+    // window silently hid anything booked outside it; the scroll window is
+    // what decides how many of the 24 hours are visible.
+    expect(grid).toContain('const START_HOUR = 0')
+    expect(grid).toContain('const END_HOUR = 24')
   })
 
   it('a block dragged onto the rail unschedules — locked blocks refuse', () => {

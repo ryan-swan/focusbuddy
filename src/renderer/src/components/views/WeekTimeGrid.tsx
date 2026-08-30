@@ -15,18 +15,23 @@ import { sendMeetingInvites } from '../../lib/meetingInvite'
 import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
-// Week time-grid — the time-blocking surface. Seventeen hour rows × seven day
-// columns. Click an empty slot to book a block (tie it to a task or leave it as
-// generic focus time), drag a block to reschedule, drag its bottom edge to
-// change its length, and start a focus session straight from a block.
+// Week time-grid — the time-blocking surface. Twenty-four hour rows × seven
+// day columns, midnight to midnight. Click an empty slot to book a block (tie
+// it to a task or leave it as generic focus time), drag a block to reschedule,
+// drag its bottom edge to change its length, and start a focus session
+// straight from a block.
 //
 // DEC-078 — the hours live in their OWN scroll window (Google-style): day
 // headers + deadline chips stay pinned while the time area scrolls beneath
 // them, so a wheel over the grid moves through the day and the page never
 // budges. The rail's compact mode keeps its full-height habit.
 
-const START_HOUR = 6
-const END_HOUR = 23 // exclusive-ish; we render rows START_HOUR..END_HOUR-1
+// DEC-078 follow-up (operator): the day runs midnight to midnight. The old
+// 6am–10pm window silently HID anything booked outside it — an early flight
+// or a late call rendered off-canvas with no hint it existed. All 24 hours
+// exist now; the scroll window (below) decides how many are on screen.
+const START_HOUR = 0
+const END_HOUR = 24 // exclusive-ish; we render rows START_HOUR..END_HOUR-1
 // DEC-078 — taller hours, fewer on screen. 44px showed all seventeen rows at
 // once and every one of them was cramped; 56px gives each hour real room and
 // lets the scroll window own how many are visible.
