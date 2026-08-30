@@ -114,7 +114,7 @@ const MentionList = forwardRef<MentionListHandle, Props>(function MentionList(
           // highlight"). Tint + an accent left bar + full-strength ink.
           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-left ${
             i === selected
-              ? 'bg-[rgba(var(--accent),0.14)] shadow-[inset_2px_0_0_rgb(var(--accent))]'
+              ? 'bg-accent/[0.14] shadow-[inset_2px_0_0_rgb(var(--accent))]'
               : 'hover:bg-[var(--surface-sunken)]'
           }`}
         >

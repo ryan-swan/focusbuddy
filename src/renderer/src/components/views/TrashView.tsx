@@ -241,7 +241,7 @@ export default function TrashView(): JSX.Element {
                 className={`flex items-center gap-3 px-4 py-3 ${
                   selecting
                     ? selected.has(e.id)
-                      ? 'bg-[rgba(var(--accent),0.08)] cursor-pointer'
+                      ? 'bg-accent/[0.08] cursor-pointer'
                       : 'bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] cursor-pointer'
                     : 'bg-[var(--surface-raised)]'
                 }`}

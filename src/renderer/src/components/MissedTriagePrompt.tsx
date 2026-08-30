@@ -270,7 +270,7 @@ export default function MissedTriagePrompt(): JSX.Element | null {
                 disabled={busy}
                 title="Move it to today's first opening"
                 data-testid="missed-today"
-                className="h-7 px-2 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-caption text-[var(--ink-70)] hover:bg-[rgba(var(--accent),0.08)]"
+                className="h-7 px-2 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-caption text-[var(--ink-70)] hover:bg-accent/[0.08]"
               >
                 Today
               </button>
@@ -279,7 +279,7 @@ export default function MissedTriagePrompt(): JSX.Element | null {
                   onClick={() => setDayPickFor((cur) => (cur === b.id ? null : b.id))}
                   disabled={busy}
                   title="Pick a day this week"
-                  className="h-7 px-1.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-caption text-[var(--ink-70)] hover:bg-[rgba(var(--accent),0.08)]"
+                  className="h-7 px-1.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-caption text-[var(--ink-70)] hover:bg-accent/[0.08]"
                 >
                   <Icon name="calendar_month" size={13} />
                 </button>
@@ -292,7 +292,7 @@ export default function MissedTriagePrompt(): JSX.Element | null {
                           setDayPickFor(null)
                           void moveToDay(b, d.dayMs)
                         }}
-                        className="h-7 px-2 rounded-[var(--radius-field)] fb-t-caption text-[var(--ink-70)] hover:bg-[rgba(var(--accent),0.1)] whitespace-nowrap"
+                        className="h-7 px-2 rounded-[var(--radius-field)] fb-t-caption text-[var(--ink-70)] hover:bg-accent/10 whitespace-nowrap"
                       >
                         {d.label}
                       </button>

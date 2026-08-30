@@ -797,10 +797,10 @@ export default function AttentionView(): JSX.Element {
           // state — two bg-* utilities on one element resolve by stylesheet
           // order, not intent.
           isOver && over?.pos === 'into'
-            ? 'bg-[rgba(var(--accent),0.14)] shadow-[inset_0_0_0_2px_rgba(var(--accent),0.55)]'
+            ? 'bg-accent/[0.14] shadow-[inset_0_0_0_2px_rgb(var(--accent)/0.55)]'
             : selected.has(i.id) && selectMode
-              ? 'bg-[rgba(var(--accent),0.08)]'
-              : 'hover:bg-[rgba(var(--accent),0.05)]'
+              ? 'bg-accent/[0.08]'
+              : 'hover:bg-accent/5'
         } ${
           dragId === i.id || (dragMulti && dragId && selected.has(i.id)) ? 'opacity-40' : ''
         } ${
@@ -958,7 +958,7 @@ export default function AttentionView(): JSX.Element {
                         ? `${m.title} — mentioned (notifications arrive with routing)`
                         : `Open ${m.title}`
                     }
-                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[rgba(var(--accent),0.10)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press max-w-[150px]"
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-accent/10 text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press max-w-[150px]"
                   >
                     <Icon name={MENTION_ICON[m.kind]} size={10} />
                     <span className="truncate">{m.title}</span>
@@ -972,7 +972,7 @@ export default function AttentionView(): JSX.Element {
                     className={`inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] fb-press ${
                       tagFilter === t
                         ? 'bg-[rgb(var(--accent))] text-white'
-                        : 'bg-[rgba(var(--accent),0.10)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                        : 'bg-accent/10 text-[var(--ink-60)] hover:text-[var(--ink-100)]'
                     }`}
                   >
                     <Icon name="sell" size={10} />
@@ -1000,7 +1000,7 @@ export default function AttentionView(): JSX.Element {
                     void window.api.files.openExternal(invite.place.url as string)
                   }}
                   title={invite.place.url}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-[rgba(var(--accent),0.1)] text-[rgb(var(--accent))] hover:bg-[rgba(var(--accent),0.16)] fb-press"
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-accent/10 text-[rgb(var(--accent))] hover:bg-accent/[0.16] fb-press"
                 >
                   <Icon name="videocam" size={12} />
                   {meetProviderLabel(invite.place.url)}
@@ -1347,7 +1347,7 @@ export default function AttentionView(): JSX.Element {
           ))}
         </div>
         {selectMode && (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-[rgba(var(--accent),0.35)] bg-[rgba(var(--accent),0.06)] px-3 py-2">
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-accent/35 bg-accent/[0.06] px-3 py-2">
             <span className="fb-t-label text-[var(--ink-70)]">
               {selected.size} selected
             </span>
@@ -1410,7 +1410,7 @@ export default function AttentionView(): JSX.Element {
           /* DEC-049 — a narrowed queue always SAYS it is narrowed, with the
              escape right there. */
           <div className="mb-3 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full fb-t-label bg-[rgba(var(--accent),0.12)] text-[var(--ink-80)]">
+            <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full fb-t-label bg-accent/[0.12] text-[var(--ink-80)]">
               <Icon name="filter_alt" size={13} />
               Showing {KPI_LABEL[kpiFilter]} only
             </span>
@@ -1496,7 +1496,7 @@ export default function AttentionView(): JSX.Element {
                   }
                   className={`rounded-lg ${
                     overSection === q.queue && dragId
-                      ? 'ring-2 ring-[rgba(var(--accent),0.45)] ring-offset-4 ring-offset-[var(--surface-base)]'
+                      ? 'ring-2 ring-accent/45 ring-offset-4 ring-offset-[var(--surface-base)]'
                       : ''
                   }`}
                 >
@@ -1712,7 +1712,7 @@ export default function AttentionView(): JSX.Element {
                   {signals.map((s) => (
                     <div
                       key={s.key}
-                      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg fb-glass-row hover:bg-[rgba(var(--accent),0.05)] transition-colors"
+                      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg fb-glass-row hover:bg-accent/5 transition-colors"
                     >
                       <Icon
                         name={s.kind === 'desk-due' ? 'schedule' : s.kind === 'plan-due' ? 'account_tree' : 'bedtime'}
@@ -1840,7 +1840,7 @@ export default function AttentionView(): JSX.Element {
       </div>
       {marquee && (
         <div
-          className="fixed z-50 pointer-events-none rounded-sm border border-[rgba(var(--accent),0.6)] bg-[rgba(var(--accent),0.08)]"
+          className="fixed z-50 pointer-events-none rounded-sm border border-accent/60 bg-accent/[0.08]"
           style={{
             left: Math.min(marquee.x0, marquee.x1),
             top: Math.min(marquee.y0, marquee.y1),

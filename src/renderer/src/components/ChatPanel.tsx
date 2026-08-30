@@ -1612,9 +1612,9 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             </div>
           )}
           {inlineCapture && (
-            <div className="mb-2 rounded-[var(--radius-field)] border border-[rgba(var(--accent),0.35)] bg-[var(--surface-raised)] p-2.5">
+            <div className="mb-2 rounded-[var(--radius-field)] border border-accent/35 bg-[var(--surface-raised)] p-2.5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded bg-[rgba(var(--accent),0.14)] text-[rgb(var(--accent))] fb-t-caption font-medium">
+                <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded bg-accent/[0.14] text-[rgb(var(--accent))] fb-t-caption font-medium">
                   @attention
                 </span>
                 <span className="fb-t-caption text-[var(--ink-50)] truncate flex-1">

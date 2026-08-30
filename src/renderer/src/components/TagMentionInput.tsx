@@ -103,7 +103,7 @@ export default function TagMentionInput({
                 ? `${m.title} — mentioned (notifications arrive with routing)`
                 : m.title
             }
-            className="inline-flex items-center gap-1 pl-1.5 pr-1 h-6 rounded-full text-[11px] bg-[rgba(var(--accent),0.12)] text-[var(--ink-90)]"
+            className="inline-flex items-center gap-1 pl-1.5 pr-1 h-6 rounded-full text-[11px] bg-accent/[0.12] text-[var(--ink-90)]"
           >
             <Icon name={MENTION_ICON[m.kind]} size={11} />
             <span className="max-w-[140px] truncate">{m.title}</span>
@@ -187,7 +187,7 @@ export default function TagMentionInput({
               onClick={() => addMention(c)}
               className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left ${
                 i === selected
-                  ? 'bg-[rgba(var(--accent),0.14)] shadow-[inset_2px_0_0_rgb(var(--accent))]'
+                  ? 'bg-accent/[0.14] shadow-[inset_2px_0_0_rgb(var(--accent))]'
                   : 'hover:bg-[var(--surface-sunken)]'
               }`}
             >

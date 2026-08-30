@@ -107,7 +107,7 @@ function ItemLines({
         return (
           <div
             key={i.id}
-            className="group relative flex items-center gap-2 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] hover:bg-[rgba(var(--accent),0.045)] transition-colors pl-2.5 pr-2 py-1.5"
+            className="group relative flex items-center gap-2 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] hover:bg-accent/[0.045] transition-colors pl-2.5 pr-2 py-1.5"
           >
             <span
               aria-hidden
