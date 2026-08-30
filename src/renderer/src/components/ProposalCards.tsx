@@ -77,6 +77,10 @@ interface ProposalCardsProps {
   // meeting wrap-up files deliverables into the meeting folder). Threaded to the
   // applier; ignored by proposals that don't create documents.
   destinationFolderId?: string | null
+  // DEC-079 — provenance stamped on any create-work-item this surface applies
+  // (the meeting wrap-up passes its meeting id; other hosts omit it). The
+  // toFiles document path below deliberately omits it: it never files items.
+  workItemSource?: { sourceType: string; sourceRef: string }
   // Applied-card state keyed by proposal id (from the host surface's store).
   // Omitted → no card is ever shown as applied (see onApplied).
   appliedProposals?: Record<string, AppliedProposal>
@@ -98,6 +102,7 @@ export default function ProposalCards({
   proposals,
   activeTaskId,
   destinationFolderId = null,
+  workItemSource,
   appliedProposals = NO_APPLIED,
   onApplied,
   onConsume,
@@ -191,7 +196,7 @@ export default function ProposalCards({
     // card stays for a retry.
     let result: { ok: boolean; message: string }
     try {
-      result = await applyProposal(p, { activeTaskId: target, resolvedIds: ids, destinationFolderId })
+      result = await applyProposal(p, { activeTaskId: target, resolvedIds: ids, destinationFolderId, workItemSource })
     } catch (err) {
       result = { ok: false, message: err instanceof Error ? err.message : 'Could not apply that action.' }
     }
@@ -271,7 +276,7 @@ export default function ProposalCards({
           if (dep.ok) {
             for (const parent of dep.appliedParents) recordApplied(parent.proposal, parent.message, ids)
           }
-          const result = await applyProposal(p, { activeTaskId: deskId, resolvedIds: ids, destinationFolderId })
+          const result = await applyProposal(p, { activeTaskId: deskId, resolvedIds: ids, destinationFolderId, workItemSource })
           if (result.ok) recordApplied(p, result.message, ids)
           else setToast({ id: p.id, ok: false, message: result.message })
         } catch (err) {

@@ -144,6 +144,8 @@ export function sourceLabel(type: string): string {
       return 'From several widgets'
     case 'desk':
       return 'From a desk'
+    case 'meeting':
+      return 'From a meeting — open it to review the transcript'
     default:
       return `From ${type}`
   }

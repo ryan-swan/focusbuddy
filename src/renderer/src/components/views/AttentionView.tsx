@@ -156,6 +156,7 @@ export default function AttentionView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
+  const goMeetings = useViewStore((s) => s.goMeetings)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goRoom)
   const openConsole = useCaptureConsole((s) => s.openConsole)
@@ -688,6 +689,17 @@ export default function AttentionView(): JSX.Element {
   }
 
   /** Open the DESK the item lives on — the whole canvas, in context. */
+  /** DEC-079 — jump to the meeting an item came from: open PlexiMeet, then
+   *  hand it the meeting to select once the view has mounted (the same
+   *  post-navigation handoff pattern openHere uses for widgets). */
+  function openMeeting(meetingId: string): void {
+    goMeetings()
+    setTimeout(
+      () => window.dispatchEvent(new CustomEvent('fb:open-meeting', { detail: { id: meetingId } })),
+      250
+    )
+  }
+
   function openSource(i: FbNode): void {
     if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
       setActive(i.parentId)
@@ -974,7 +986,20 @@ export default function AttentionView(): JSX.Element {
                     <span className="truncate">{ctx.desk.title}</span>
                   </button>
                 )}
-                {ctx.source && (
+                {ctx.source && ctx.source.type === 'meeting' ? (
+                  /* DEC-079 — an item born from a meeting transcript links BACK
+                     to that meeting, so the full context is one click away. */
+                  <button
+                    data-row-action
+                    onClick={() => openMeeting(ctx.source!.ref)}
+                    title={sourceLabel(ctx.source.type)}
+                    data-testid="item-meeting-link"
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[var(--surface-sunken)] text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
+                  >
+                    <Icon name="groups" size={10} />
+                    meeting
+                  </button>
+                ) : ctx.source ? (
                   <span
                     title={sourceLabel(ctx.source.type)}
                     className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[var(--surface-sunken)] text-[var(--ink-40)]"
@@ -982,7 +1007,7 @@ export default function AttentionView(): JSX.Element {
                     <Icon name="widgets" size={10} />
                     {ctx.source.type}
                   </span>
-                )}
+                ) : null}
                 {ments.map((m) => (
                   <button
                     key={mentionKey(m)}

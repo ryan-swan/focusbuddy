@@ -70,6 +70,11 @@ export async function applyProposal(
     // dropped on a desk as a widget. Only generate-document acts on it today;
     // create-document already lives in Files, and desk-only kinds never see it.
     toFiles?: boolean
+    // DEC-079 — provenance for created work items. The meeting wrap-up passes
+    // {sourceType:'meeting', sourceRef:<meeting id>} so an approved action item
+    // points back at the meeting whose transcript produced it; every other
+    // surface keeps the 'chat' default.
+    workItemSource?: { sourceType: string; sourceRef: string }
   }
 ): Promise<ApplyResult> {
   switch (proposal.kind) {
@@ -88,7 +93,7 @@ export async function applyProposal(
     case 'create-task':
       return applyCreateTask(proposal, ctx)
     case 'create-work-item':
-      return applyCreateWorkItem(proposal)
+      return applyCreateWorkItem(proposal, ctx)
     case 'start-focus-session':
       return applyStartFocusSession(proposal, ctx)
     case 'delete-widget':
@@ -877,7 +882,8 @@ async function applyStartFocusSession(
 // code path (the store → workItems module), origin 'ai', approval recorded.
 // The typed refusals (capability off / un-migrated device) surface honestly.
 async function applyCreateWorkItem(
-  p: Extract<ActionProposal, { kind: 'create-work-item' }>
+  p: Extract<ActionProposal, { kind: 'create-work-item' }>,
+  ctx: { workItemSource?: { sourceType: string; sourceRef: string } }
 ): Promise<ApplyResult> {
   try {
     const { useWorkItemStore } = await import('../stores/workItems')
@@ -887,7 +893,9 @@ async function applyCreateWorkItem(
       intentClass: p.intentClass,
       wiOrigin: 'ai',
       approvalState: 'approved',
-      sourceType: 'chat'
+      // DEC-079 — the wrap-up names the meeting; everything else stays 'chat'.
+      sourceType: ctx.workItemSource?.sourceType ?? 'chat',
+      sourceRef: ctx.workItemSource?.sourceRef
     })
     return { ok: true, message: `Filed "${item.title}" to Attention` }
   } catch (err) {

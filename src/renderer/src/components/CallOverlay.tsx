@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import Icon from './Icon'
 import { useCallStore } from '../stores/call'
+import { useVideoBlocked, CAMERA_BLOCKED_HINT } from '../lib/useVideoBlocked'
 import { personDisplayName, personInitials } from '../lib/personName'
 
 // PlexiCam call overlay: the floating call window and the incoming-call card.
@@ -12,7 +13,22 @@ function Video({ stream, muted, mirrored }: { stream: MediaStream | null; muted?
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     const el = ref.current
-    if (el && el.srcObject !== stream) el.srcObject = stream
+    if (!el) return
+    if (el.srcObject !== stream) el.srcObject = stream
+    // DEC-078 — autoPlay alone does NOT start playback in this Electron build
+    // when srcObject lands after mount: the element stayed paused at
+    // readyState 0 with a live, enabled track attached (measured over CDP),
+    // which is exactly "video never turns on". VoiceRecorderWidget learned
+    // the same lesson earlier and plays explicitly; these tiles now do too.
+    if (stream) {
+      void el.play().catch(() => {
+        // A rejected play (rare) retries once metadata arrives.
+        el.onloadedmetadata = () => {
+          el.onloadedmetadata = null
+          void el.play().catch(() => {})
+        }
+      })
+    }
   }, [stream])
   return (
     <video
@@ -70,6 +86,8 @@ export default function CallOverlay(): JSX.Element | null {
   const hangup = useCallStore((s) => s.hangup)
   const toggleMute = useCallStore((s) => s.toggleMute)
   const toggleCamera = useCallStore((s) => s.toggleCamera)
+  // DEC-078 — OS-refused frames render as an honest note, not a black box.
+  const cameraBlocked = useVideoBlocked(localStream)
 
   if (status === 'idle') return null
 
@@ -134,8 +152,17 @@ export default function CallOverlay(): JSX.Element | null {
 
         {/* Local self-view */}
         {media === 'video' && localStream && !cameraOff && (
-          <div className="absolute bottom-2 right-2 h-[72px] w-[108px] rounded-lg overflow-hidden border border-white/20 bg-stone-800">
-            <Video stream={localStream} muted mirrored />
+          <div
+            className="absolute bottom-2 right-2 h-[72px] w-[108px] rounded-lg overflow-hidden border border-white/20 bg-stone-800"
+            title={cameraBlocked ? CAMERA_BLOCKED_HINT : undefined}
+          >
+            {cameraBlocked ? (
+              <div className="absolute inset-0 flex items-center justify-center" data-testid="camera-blocked-note">
+                <Icon name="videocam_off" size={16} className="text-amber-300/90" />
+              </div>
+            ) : (
+              <Video stream={localStream} muted mirrored />
+            )}
           </div>
         )}
 
