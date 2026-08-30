@@ -152,8 +152,11 @@ describe('S5 wiring locks (file-level)', () => {
     expect(panel).toContain("from '../lib/attentionCommand'")
     expect(panel).toContain('parseAttentionCommand(content)')
     expect(panel).toContain('setInlineCapture')
-    // ⌘K and the home bar both arm the Slack-style pill on Tab.
-    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('attnArmed')
+    // History: ⌘K armed a Slack-style pill on Tab (DEC-028c) — retired by
+    // operator ruling 2026-08-30: selecting Attention in ⌘K OPENS the Capture
+    // window, typing happens there. The home bar keeps its pill.
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).not.toContain('attnArmed')
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('Attention — open Capture')
     const home = read('src/renderer/src/components/views/StartOrAskPlexi.tsx')
     expect(home).toContain("'capture:attention'")
     expect(home).toContain('armAttention')
@@ -190,7 +193,13 @@ describe('S5 wiring locks (file-level)', () => {
     // ⌘K: an inline token outranks everything, exactly like a leading one.
     const ck = read('src/renderer/src/components/CommandCenter.tsx')
     expect(ck).toContain('attnInline')
-    expect(ck).toContain('attnArmed || attnPrefix || attnInline')
+    // (attnArmed left with the retired ⌘K pill; the explicit-address rule
+    // stands on the two grammar forms.)
+    expect(ck).toContain('attnPrefix || attnInline')
+    // …and the omni rows yield to EVERY Attention mention (plain "attention"
+    // included), so Enter opens Capture instead of asking the model.
+    expect(ck).toContain("if (q !== '' && !attnAddressed) {")
+    expect(ck).toContain('const attnAddressed =')
     // Chat: an inline token captures AND still sends the stripped message.
     const panel = read('src/renderer/src/components/ChatPanel.tsx')
     expect(panel).toContain("attn.mode === 'inline' && attn.messageText")
@@ -198,7 +207,10 @@ describe('S5 wiring locks (file-level)', () => {
     expect(panel).toContain('hasAttentionCommand(draft)')
     // ⌘K's omni rows ("Ask Plexii" hard-scores 2000) must yield too, or they
     // outrank the capture entry and the token reaches the model instead.
-    expect(ck).toContain("q !== '' && !hasAttentionCommand(q)")
+    // History: the omni suppression keyed on the literal token only; the
+    // 2026-08-30 ruling widened it to every Attention mention (attnAddressed
+    // — which itself includes hasAttentionCommand(q)).
+    expect(ck).toContain('hasAttentionCommand(q) ||')
     // The last mile: send() itself intercepts, so the direct callers that
     // bypass the composer (⌘K Ask, home bar, voice) cannot leak a token to
     // the model. The composer strips first, so this never double-captures.
