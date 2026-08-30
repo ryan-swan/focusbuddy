@@ -466,11 +466,11 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
         <div className="ml-auto flex items-center">
           <button
             onClick={requestCreateDesk}
-            title="New room"
+            title="New desk — opens set-up with today's date pre-filled; Enter creates and opens it"
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
             <Icon name="add" size={14} />
-            <span>New</span>
+            <span>New Desk</span>
           </button>
           {/* The minimise control is window chrome, not a desk action — a
               hairline and real spacing keep it from reading as part of New. */}

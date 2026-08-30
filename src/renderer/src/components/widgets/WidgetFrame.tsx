@@ -33,6 +33,13 @@ import { chimeIn, chimeOut } from '../../lib/audioBeep'
 import { useZonePosition } from '../../lib/pinLayout'
 import { LinkDragContext } from '../../lib/linkDragContext'
 import { widgetDisplayName } from '../../lib/widgetDisplayName'
+import { useWorkItemStore } from '../../stores/workItems'
+import { useViewStore } from '../../stores/view'
+import { liveItemForWidget } from '../../lib/widgetAttention'
+import { workItemsEnabled } from '../../lib/workItemsCapability'
+import { presetForWidget } from '../../lib/attentionPresets'
+import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -142,6 +149,40 @@ export default function WidgetFrame({
   const [shareOpen, setShareOpen] = useState(false)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const zoom = useWidgetStore((s) => s.zoom)
+  // DEC-076 — the header bell. Outlined = not in Attention; filled = a LIVE
+  // work item points at this widget (derived from the queue's own rows via
+  // liveItemForWidget, so the two surfaces cannot disagree). Clicking an
+  // outlined bell runs the SAME flow as the menu's "Add to Attention…" —
+  // the preset text into the standard confirm console, item POINTS at the
+  // widget (sourceType/sourceRef), nothing files without the person's Enter.
+  // A filled bell opens the queue. The check beside it closes the item with
+  // its own queue verb through the one close path.
+  const attentionOn = workItemsEnabled()
+  const workItems = useWorkItemStore((s) => s.items)
+  const wiLoaded = useWorkItemStore((s) => s.loaded)
+  const refreshWorkItems = useWorkItemStore((s) => s.refresh)
+  useEffect(() => {
+    if (attentionOn && !wiLoaded) void refreshWorkItems()
+  }, [attentionOn, wiLoaded, refreshWorkItems])
+  const attentionItem = attentionOn ? liveItemForWidget(workItems, widget.id) : null
+  const goAttention = useViewStore((s) => s.goAttention)
+  const closeWorkItem = useCloseWorkItem()
+  function markWidgetForAttention(): void {
+    const p = presetForWidget(widget.kind, widget.title ?? '', widget.content ?? '')
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-work-item', {
+        detail: {
+          captureText: p.text,
+          source: {
+            sourceType: 'widget',
+            sourceRef: widget.id,
+            intentClass: p.intentClass,
+            deskId: widget.taskId
+          }
+        }
+      })
+    )
+  }
   // Per-widget Context Health frame (plexi-4.0, UX-022). Reads the pre-review
   // "since your last visit" snapshot captured on desk open; `current` -> no frame.
   const health = useContextHealthStore((s) => s.lastVisit[widget.id])
@@ -1003,6 +1044,48 @@ export default function WidgetFrame({
             )}
           </span>
           <div className="flex items-center gap-0.5">
+            {attentionOn && (
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (attentionItem) goAttention()
+                  else markWidgetForAttention()
+                }}
+                className={`widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
+                  attentionItem
+                    ? 'text-accent hover:bg-[var(--surface-sunken)]/60'
+                    : 'text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
+                }`}
+                aria-label={attentionItem ? 'In Attention — open the queue' : 'Add to Attention'}
+                title={
+                  attentionItem
+                    ? `In Attention: “${attentionItem.title || 'this widget'}” — click to open the queue`
+                    : 'Add to Attention'
+                }
+                data-testid={`widget-bell-${widget.id}`}
+              >
+                <Icon name="notifications" size={13} filled={!!attentionItem} />
+              </button>
+            )}
+            {attentionOn && attentionItem && (
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void closeWorkItem(
+                    attentionItem,
+                    (PRIMARY_ACTION[queueOf(attentionItem)] ?? PRIMARY_ACTION.to_do).state
+                  )
+                }}
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] hover:bg-emerald-500/10 hover:text-emerald-600 transition-colors"
+                aria-label="Complete this attention item"
+                title={`${(PRIMARY_ACTION[queueOf(attentionItem)] ?? PRIMARY_ACTION.to_do).label} — complete “${attentionItem.title || 'this item'}”`}
+                data-testid={`widget-attn-complete-${widget.id}`}
+              >
+                <Icon name="check" size={13} />
+              </button>
+            )}
             {!titleEditing && (
               <button
                 onMouseDown={(e) => e.stopPropagation()}

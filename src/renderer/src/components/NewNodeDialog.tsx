@@ -11,6 +11,8 @@ import { computeVelocity, predictForEstimate } from '../lib/velocityStats'
 import { STARTER_TEMPLATES } from '../lib/starterTemplates'
 import AxisPicker from './AxisPicker'
 import Icon from './Icon'
+import { defaultDeskTitle } from '../lib/deskDefaults'
+import { useViewStore } from '../stores/view'
 import { fieldInputClass, FieldLabel, FormField } from './plexi/forms'
 
 interface Props {
@@ -99,7 +101,12 @@ export default function NewNodeDialog({
   const [jumpQuery, setJumpQuery] = useState('')
   const jumpRef = useRef<HTMLDivElement | null>(null)
 
-  const [title, setTitle] = useState(node?.title ?? '')
+  // DEC-073 — a new Desk pre-fills its title with the moment of creation, so a
+  // bare Enter files something findable; the input selects it all on focus so
+  // typing replaces it in one keystroke. Rooms and edits keep their own text.
+  const [title, setTitle] = useState(
+    node?.title ?? (!node && (kindProp ?? 'task') === 'task' ? defaultDeskTitle() : '')
+  )
   const [description, setDescription] = useState(node?.description ?? '')
   const [priority, setPriority] = useState<AxisValue>(node?.priority ?? 3)
   // Interest is no longer surfaced in the UI (two-axis model — see POSITIONING.md §11.5),
@@ -241,6 +248,9 @@ export default function NewNodeDialog({
           }
         }
         setActive(created.id)
+        // DEC-073 — creation OPENS the desk. Previously the desk was created
+        // and the user stayed put, left to find it under All Desks.
+        useViewStore.getState().goTask(created.id)
         if (autoSuggestAI && onRequestAISetup) {
           // Close this dialog and hand off to parent so the AI Setup modal opens cleanly.
           onClose()
@@ -328,6 +338,7 @@ export default function NewNodeDialog({
             data-testid="newnode-name"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             placeholder={effectiveKind === 'folder' ? 'Name this Room…' : 'What needs to happen?'}
             className="w-full bg-transparent border-0 p-0 text-[20px] font-semibold text-[var(--ink-100)] placeholder:text-[var(--ink-30)] placeholder:font-medium focus:outline-none focus:ring-0"
           />

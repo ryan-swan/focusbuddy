@@ -18,6 +18,7 @@ import { parseMentions } from '../../lib/itemMentions'
 import { useActionHistory } from '../../stores/actionHistory'
 import { useRef } from 'react'
 import {
+  PRIMARY_ACTION,
   QUEUE_COLOR,
   QUEUE_LABEL,
   QUEUE_ORDER,
@@ -26,6 +27,8 @@ import {
   rankScore,
   isTerminalState
 } from '../../lib/attentionQueues'
+import AttentionItemEditor from '../AttentionItemEditor'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import {
   savePlannerSettings,
@@ -87,6 +90,16 @@ export default function CalendarView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const goAttention = useViewStore((s) => s.goAttention)
   const openConsole = useCaptureConsole((s) => s.openConsole)
+  // DEC-074 — item details + inline completion, without leaving the calendar.
+  // Double-click (rail row or grid block) opens the same editor the Attention
+  // page uses (DEC-036); the checkbox closes with the item's own queue verb
+  // through the ONE close path (subtask + desk-complete offers included).
+  const closeWorkItem = useCloseWorkItem()
+  const [editItem, setEditItem] = useState<FbNode | null>(null)
+  const deskChoices = useMemo(
+    () => nodes.filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId),
+    [nodes]
+  )
 
   useEffect(() => {
     if (!wiLoaded) void refreshItems()
@@ -405,15 +418,37 @@ export default function CalendarView(): JSX.Element {
           e.dataTransfer.setData('text/fb-workitem', i.id)
           e.dataTransfer.effectAllowed = 'copy'
         }}
+        onDoubleClick={(e) => {
+          // DEC-074 — the row opens for reading/editing, same as the queue page.
+          e.preventDefault()
+          e.stopPropagation()
+          setEditItem(i)
+        }}
         className={`group relative flex items-center gap-2 rounded-lg fb-glass-row pl-3 pr-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-[rgba(var(--accent),0.05)] hover:-translate-y-px transition-all ${
           placed ? 'opacity-60' : ''
         }`}
-        title={placed ? `${i.title} — already on the calendar` : `Drag onto the calendar to schedule: ${i.title}`}
+        title={placed ? `${i.title} — already on the calendar` : `Drag onto the calendar to schedule: ${i.title} (double-click for details)`}
       >
         <span
           aria-hidden
           className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full"
           style={{ backgroundColor: queueTint(hue, 0.55) }}
+        />
+        <button
+          onClick={(e) => {
+            // DEC-074 — complete straight from the rail, with the item's own
+            // closing verb. draggable parent: stop the gesture cold.
+            e.preventDefault()
+            e.stopPropagation()
+            void closeWorkItem(i, (PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do).state)
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          draggable={false}
+          title={`${(PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do).label} — close this item`}
+          data-testid={`rail-complete-${i.id}`}
+          className="shrink-0 h-[15px] w-[15px] rounded-full border-[1.5px] border-[var(--ink-30)] hover:border-emerald-500 hover:bg-emerald-500/15 fb-press transition-colors"
+          aria-label="Complete this item"
         />
         <Icon
           name="drag_indicator"
@@ -874,6 +909,16 @@ export default function CalendarView(): JSX.Element {
           could see THAT three blocks were proposed and never which items, when
           each landed, or why the planner chose them. Every one of those facts
           already existed on PlannedProposal; none of them were shown. */}
+      {editItem && (
+        <AttentionItemEditor
+          item={editItem}
+          desks={deskChoices}
+          onClose={(changed) => {
+            setEditItem(null)
+            if (changed) void refreshItems()
+          }}
+        />
+      )}
       {reviewOpen && proposals && proposals.length > 0 && (
         <div
           className="fb-scrim fixed inset-0 z-[320] flex items-center justify-center p-6"

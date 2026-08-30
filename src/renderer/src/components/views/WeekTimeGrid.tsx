@@ -7,7 +7,9 @@ import { useFocusSessionStore } from '../../stores/focusSession'
 import { useViewStore } from '../../stores/view'
 import { futuristicPowerOn } from '../../lib/audioBeep'
 import { blockFit } from '../../lib/calendarGeometry'
-import { QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
+import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
+import AttentionItemEditor from '../AttentionItemEditor'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
 import { sendMeetingInvites } from '../../lib/meetingInvite'
 import { googleCalendarUrl } from '@shared/ics'
@@ -155,6 +157,26 @@ export default function WeekTimeGrid({
       goTask(node.id)
     } else {
       goProject(node.id)
+    }
+  }
+
+  // DEC-074 — details + completion without leaving the grid. Double-click a
+  // work-item block (or a deadline chip) → the DEC-036 editor; the check on a
+  // work-item block closes the ITEM with its queue's verb through the one
+  // close path, then marks the block done — but only if the close actually
+  // happened (the subtask offer can be cancelled; the store's setState
+  // refreshes the row before resolving, so re-reading it is authoritative).
+  const closeWorkItem = useCloseWorkItem()
+  const [editItem, setEditItem] = useState<FbNode | null>(null)
+  const deskChoices = useMemo(
+    () => nodes.filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId),
+    [nodes]
+  )
+  async function completeItemAndBlock(block: TimeBlock, item: FbNode): Promise<void> {
+    await closeWorkItem(item, (PRIMARY_ACTION[queueOf(item)] ?? PRIMARY_ACTION.to_do).state)
+    const after = useWorkItemStore.getState().items.find((x) => x.id === item.id)
+    if (after && isTerminalState(after.workItemState)) {
+      await updateBlock(block.id, { status: 'done' })
     }
   }
 
@@ -423,7 +445,11 @@ export default function WeekTimeGrid({
                         e.stopPropagation()
                         goAttention()
                       }}
-                      title={`Due: ${i.title} — open Attention`}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        setEditItem(i)
+                      }}
+                      title={`Due: ${i.title} — open Attention (double-click for details)`}
                       className={`relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2.5 pr-1.5 py-1 fb-press bg-[var(--surface-raised)] ${
                         compact ? 'text-[10.5px]' : 'text-[11px]'
                       } leading-snug`}
@@ -504,6 +530,11 @@ export default function WeekTimeGrid({
                       data-testid="time-block"
                       onPointerDown={(e) => beginDrag(e, block, 'move')}
                       onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        if (isWorkItem) setEditItem(linked!)
+                        else if (linked) jumpToNode(linked)
+                      }}
                       className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 ${
                         tight ? 'py-0 flex items-center' : 'py-1'
                       } fb-t-caption overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
@@ -606,11 +637,27 @@ export default function WeekTimeGrid({
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
+                            // DEC-074 — on a work-item block the check completes
+                            // the ITEM (its own queue verb, the one close path)
+                            // and then the block. Undo on a done block stays
+                            // calendar-local: it revives the BLOCK only — the
+                            // item reopens from Attention, not from here.
+                            if (!done && isWorkItem && linked && !isTerminalState(linked.workItemState)) {
+                              void completeItemAndBlock(block, linked)
+                              return
+                            }
                             void updateBlock(block.id, { status: done ? 'planned' : 'done' })
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
-                          title={done ? 'Mark not done' : 'Mark done'}
+                          title={
+                            done
+                              ? 'Mark not done'
+                              : isWorkItem && linked && !isTerminalState(linked.workItemState)
+                                ? `${(PRIMARY_ACTION[queueOf(linked)] ?? PRIMARY_ACTION.to_do).label} — complete the item and this block`
+                                : 'Mark done'
+                          }
+                          data-testid="block-complete"
                         >
                           <Icon name={done ? 'undo' : 'check'} size={9} />
                         </button>
@@ -707,6 +754,16 @@ export default function WeekTimeGrid({
         })}
       </div>
 
+      {editItem && (
+        <AttentionItemEditor
+          item={editItem}
+          desks={deskChoices}
+          onClose={(changed) => {
+            setEditItem(null)
+            if (changed) void refreshItems()
+          }}
+        />
+      )}
       {composer && (
         <BlockComposer
           startMs={composer.startMs}
