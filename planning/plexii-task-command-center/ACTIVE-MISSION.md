@@ -33,8 +33,33 @@ launch triage (derived never stored, Later costs nothing, add-all-back = one
 undo batch — fired live on remount and found 4 genuinely-slipped Thursday
 blocks), and the widget bell + complete (state derived from the queue's own
 rows; outlined-click = the menu's exact capture flow; filled-click opens the
-queue — interpretive choice flagged in the DEC). Suite 3,196 → **3,244**;
-both typechecks clean. COMMITTED on the operator's order (2026-08-30): DEC-072 = `d5a47571` · the parallel session's DEC-073…076 = `e781d7d8` · docs (analysis/25+26, this file, the log, the prompt) in the commit after.
+queue — interpretive choice flagged in the DEC). ⑤ **DEC-077 EXECUTED — the
+operator's refinement round on ④:** the bell FILLS solid (root cause: brand
+line icons no-op Icon's `filled` by design — the same PLEXII path renders
+filled at the call site), ONE `CompleteCircle` component adopted by all four
+completion surfaces (grid blocks got a VISIBLE 12px circle; the hover check
+narrows to plain blocks + undo), bell+circle moved beside the widget title,
+the six-dot handle retired from BOTH queues with whole-row drag kept
+(expanded rows opt out so notes stay selectable), and drop-to-nest lights
+the whole target row (bg ternary consolidated — one owner per state). Suite
+→ **3,254**; both typechecks clean; live-verified by real-DOM drive
+(Attention: 15 rows / 14 draggable / 0 handles / 18px circles; Calendar:
+15 rail circles / 4 block circles on 10 blocks / 0 handles), view restored
+after. Earlier rounds COMMITTED on the operator's order: DEC-072 =
+`d5a47571` · DEC-073…076 = `e781d7d8` · docs = `1e3ecae1`. **DEC-077 is
+UNCOMMITTED — awaiting operator review.** ⑥ **DEC-078 EXECUTED — the
+calendar breathes (operator QA, three asks):** HOUR_PX 44→56; the hours in
+their OWN scroll window (pinned header band above — which also ends the
+per-column deadline-band misalignment; `overscroll-contain`; opens at the
+current hour; the rail's compact mode untouched); uniform raised day
+columns with today as a light `ring-accent/35` outline ALONE. **Found while
+verifying: `rgba(var(--accent),…)` arbitrary values are INVALID CSS and
+have never painted** — DEC-053's today ring silently never rendered;
+converted this round's nine occurrences to the configured slash pattern;
+the ~10-file remainder is **GAP-018** (its own sweep — several files sit in
+077's working set). All measured live over CDP: 150px commanded = 150px
+moved, header pinned, page scroll untouched, ring computes
+rgba(124,58,237,0.35). Suite → **3,255**.
 
 **THIS BUILD (2026-08-27 → 08-30), 22 commits, DEC-056…071 — see DECISIONS-LOG:**
 

@@ -52,12 +52,25 @@ and *why*, before anything is booked.
 
 ## What is next (priority order)
 
-0. **NEW (2026-08-30 pm): DEC-073…076 built, tested, live-verified, UNCOMMITTED**
-   — New Desk flow, calendar dblclick-details + inline complete, missed-items
-   launch triage, widget bell. The operator's smokes: click New Desk → Enter →
-   lands IN the desk; double-click a rail row and a grid block; check off a
-   work-item block; the triage prompt (4 real slipped blocks await it); open a
-   desk with a marked widget → bell filled → check completes it both ways.
+00. **NEWER (2026-08-30 pm): DEC-078 calendar QA round DONE** — taller hours
+   (56px) in their own scroll window (pinned headers, `overscroll-contain`,
+   opens at the current hour; page scroll untouched — measured), uniform day
+   columns, today = a light `ring-accent/35` outline alone. **Discovery:
+   `rgba(var(--accent),…)` arbitrary values are INVALID CSS and never
+   painted** (DEC-053's ring included) — this round's files converted;
+   **GAP-018** holds the ~10-file sweep (do it AFTER 077 commits — several
+   files overlap its working set).
+
+0. **NEW (2026-08-30 pm): DEC-073…076 COMMITTED (`e781d7d8`); DEC-077
+   refinements built + live-verified, UNCOMMITTED** — bell fills solid, ONE
+   CompleteCircle on all four surfaces (visible circles on grid blocks),
+   bell+circle beside the widget title, six-dot handle retired from both
+   queues (whole-row drag; an EXPANDED row deliberately does not drag so its
+   notes stay selectable — collapse first), drop-to-nest lights the whole
+   target row. Smokes: open a desk with a marked widget → bell SOLID beside
+   the title → circle completes both ways; check a grid block's circle;
+   drag a collapsed queue row from anywhere and dwell over another row;
+   the missed-items triage prompt (4 real slipped blocks await it).
 
 1. **The operator's live QA pass.** This has been the highest-yield loop all build —
    DEC-053, 055, 062, 065, 066, 067, 069, 070 and 071 all came from him looking at the

@@ -208,3 +208,34 @@ deciding the shape of a thing we have not looked at.
 **Do not** rename the queue, change `to_respond` semantics, or touch the taxonomy until
 this is investigated and ruled. The eight primaries are a migrated, spec-traced
 vocabulary (DEC-029a); renaming one is a schema and migration event, not a label edit.
+
+
+## GAP-018 — `rgba(var(--accent),…)` arbitrary values are INVALID CSS and paint nothing
+**Severity:** MEDIUM (visual, app-wide, invisible to tests) · **Closes in:** one mechanical sweep round · **Status:** OPEN (found 2026-08-30, DEC-078 verification)
+
+`--accent` is a space-separated triplet (`124 58 237`), so
+`rgba(var(--accent),0.14)` substitutes to `rgba(124 58 237,0.14)` — invalid
+(space-separated components with a comma alpha). Chrome rejects it at
+computed-value time: backgrounds render transparent, rings/shadows compute
+`none`. Proven live: a resting `bg-[rgba(var(--accent),0.14)]` element
+measured `backgroundColor: rgba(0,0,0,0)`; DEC-053's today ring never
+painted. Every accent wash/ring/inset written this way has been silently
+absent since it shipped, and the suite stayed green because source-pins pin
+strings, not paint.
+
+**The fix pattern (sanctioned, already in the config):**
+`accent: 'rgb(var(--accent) / <alpha-value>)'` → `bg-accent/10`,
+`ring-accent/35`, `bg-accent/[0.14]`; inside arbitrary shadows use
+`rgb(var(--accent)/0.3)`. DEC-078 converted the nine occurrences in
+WeekTimeGrid + CalendarView and pinned `not.toContain('rgba(var(--accent)')`
+for that file.
+
+**Remaining census (2026-08-30):** occurrences in ~10 files —
+TagMentionInput, AttentionConfirmCard, ChatPanel, MissedTriagePrompt,
+assistant/MentionList, TrashView, attentionWidgets, RoomsDesksIndex,
+AttentionView (+ WidgetFrame via the 077 round). Some are PINNED by tests
+(attentionItemEditor.test.ts:408, dec077Refinements.test.ts:76/88,
+workItemsCapture.test.ts:246) — the sweep must rewrite those pins to the
+superseding truth, never delete them. Also check `--accent-hover` for the
+same pattern. Verify-command:
+`grep -rn "rgba(var(--accent)" src/renderer/src --include="*.tsx"`.

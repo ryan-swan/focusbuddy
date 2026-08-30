@@ -1566,6 +1566,103 @@ behaviour, observed. Widget bells: no desk canvas was mounted at verify time —
 23 live widget-marked items exist, so bells will light on first desk open;
 pinned by tests, awaiting the operator's eyes.
 
+## DEC-077 — The refinement round: one circle, a bell that fills, rows that drag themselves
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator QA on DEC-073…076) · UNCOMMITTED
+
+**(a) The bell now actually fills.** Root cause was a brand-system collision:
+`Icon`'s `filled` prop is a deliberate no-op for Plexii brand icons (they are
+line SVGs; "state is carried by color at the call site") — and 'notifications'
+maps to one, so the active bell only recoloured its outline. Fix: `BellIcon`
+in WidgetFrame renders the SAME brand path (one source, `PLEXII_ICONS`) with
+`fill: currentColor` when active. Icon itself is untouched — honoring `filled`
+globally would have restyled every brand-mapped `filled` call site in the app.
+
+**(b) ONE completion circle.** The queue's DEC-050 form factor is extracted to
+`attention/CompleteCircle.tsx` and adopted by all four surfaces — the
+Attention queue (byte-identical rendering), the Calendar rail, grid blocks
+(now a VISIBLE 12px circle on active work-item blocks; the hover cluster's
+check narrows to plain blocks + done-undo), and the widget header. The
+component swallows mousedown/pointerdown/dblclick because every host is a
+gesture surface — a completion click must never start a drag or open an
+editor.
+
+**(c) Bell + circle moved beside the title** in the widget header, out of the
+right-side control array where they got lost — the pair reads as the widget's
+attention state, not two more chrome buttons.
+
+**(d) The six-dot handle is RETIRED from both queues; the row drags itself.**
+Calendar rail: the icon was decoration (the row was already draggable).
+Attention queue: the handle owned dragstart — `draggable` moved to the row,
+payload contract unchanged (`text/fb-workitem` — the calendar still reads
+it), DEC-048 multi-drag preserved, and DEC-035's setDragImage plumbing died
+with the handle (the row IS the source, so the browser ghosts it natively).
+**Boundary: an EXPANDED row does not drag** — its notes are selectable
+(DEC-030 read/copy) and a draggable ancestor would eat the selection;
+collapse to move. Three DEC-055/070/035 pins rewritten to this superseding
+truth, histories kept in their comments.
+
+**(e) Nesting feedback lights the WHOLE target row** — accent tint + inset
+ring while the drag dwells "into", unmistakable against the before/after
+placement lines. Found while wiring: the row could carry TWO bg-* utilities
+at once (select-mode + into), resolved by stylesheet order, not intent — the
+backgrounds now live in one ternary chain, one owner per state.
+
+**Gates:** suite 3,244 → **3,254** (net +10; 4 superseded pins rewritten,
+dec077Refinements adds 9), both typechecks clean. **Live (CDP, real DOM,
+view driven and then RESTORED via the real Back button):** Attention — 15
+rows, 14 draggable (the non-draggable one is expanded/detached, the designed
+opt-outs), ZERO six-dot handles, 15 circles at 18×18 round; Calendar — 15
+rail circles at 15×15, 10 blocks with 4 carrying the visible circle (exactly
+the active work-item ones), zero handles. Bell fill awaits the operator's
+desk (no canvas was mounted); the mechanics are pinned.
+
+## DEC-078 — The calendar breathes: its own scroll window, uniform days, a real outline
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator QA, three verbatim asks)
+
+**(1) Taller hours, fewer on screen.** `HOUR_PX` 44 → 56. Forty-four showed
+all seventeen rows at once and every one was cramped; the scroll window owns
+how many are visible now (eleven at the operator's viewport).
+
+**(2) The hours scroll in their OWN window (Google-style).** The grid split
+into a pinned band (day headers + deadline chips) over a time area that is
+its own scroll container — `overflow-y-auto overscroll-contain`, bounded
+`max(280px, calc(100vh − 380px))`, opening with the current hour one row
+below the top edge. Hover the grid and the wheel moves through the day;
+outside it, the page scrolls as before. Side effect worth naming: the
+deadline band used to live INSIDE each column, so a tall chip stack pushed
+its own column's canvas out of line with the others — pinned, that class of
+misalignment is gone. The rail's compact mode keeps its full-height habit
+(no scroller; its card owns it).
+
+**(3) No graying; today is an outline ALONE.** Every day column is the same
+raised surface now; the sunken wash that made the week read as
+six-sevenths disabled is gone, and today carries a light accent outline
+(`ring-accent/35`) as its only column-level differentiator.
+
+**Found while verifying (3): DEC-053's today ring NEVER painted.** The class
+was `ring-[rgba(var(--accent),0.45)]`, which substitutes to
+`rgba(124 58 237,0.45)` — space-separated RGB with a comma alpha, invalid
+CSS — so the ring's box-shadow computed to `none` from the day it shipped.
+The suite stayed green throughout because source-pins pin strings, not
+paint. Measurement over CDP caught it (the DEC-056 lesson shape again). The
+sanctioned form is the CONFIGURED accent with slash opacity
+(`accent: 'rgb(var(--accent) / <alpha-value>)'` → `ring-accent/35`); all
+nine `rgba(var(--accent),…)` occurrences in this round's two files were
+converted (rings, hover washes, the mode-switcher active state, an inset
+shadow). **The same broken pattern exists in ~10 more files → GAP-018** —
+registered for its own sweep, not absorbed mid-round (several sit in the
+parallel session's working set).
+
+**Verification (live, CDP, by measurement):** hour row 56.0px · scroller
+`overflow-y: auto` + `overscroll-behavior: contain`, window 618px = 11.0
+hours · auto-open scrollTop 334.7 vs 335 expected (clamped at max,
+mid-afternoon) · commanded −150px moved the columns exactly −150px while
+the header band's y held and the PAGE scroll position was unchanged ·
+all day columns computed the same background (one distinct value) · today's
+ring computes `rgba(124,58,237,0.35) 0 0 0 2px` — it paints. Suite 3,255
+(one net new pin; the DEC-053 ring pin rewritten to the superseding truth
+with its history).
+
 <!-- Append below; increment DEC-NNN. -->
 
 ## DEC-056…061 — The platform arc (one investigation, six landings)
