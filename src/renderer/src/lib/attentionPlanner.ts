@@ -148,6 +148,11 @@ export interface PlanDayOptions {
   placedIds?: Set<string>
   /** Desk titles for human-readable momentum reasons. */
   deskTitles?: Map<string, string>
+  /** Why this run exists — colours the reason FALLBACK only (an item's own
+   *  facts still outrank it): 'intent' = the person described the day and
+   *  planSelect picked the pool; 'replan' = missed blocks being re-proposed.
+   *  Both callers pass onlyItemIds, so the mode cannot be inferred from it. */
+  source?: 'intent' | 'replan'
 }
 
 /**
@@ -193,6 +198,17 @@ export function planDay(
   let slotIdx = 0
   let cursor = slots.length ? slots[0].startMs : 0
 
+  // Reason context (DEC-072): who else has a claim on this day. Computed over
+  // ALL schedulable items (not just the pool) so drag-placed due items still
+  // count as "handled" rather than vanishing from the sentence.
+  const dueByDayEnd = new Set(
+    schedulableItems(items, nowMs)
+      .filter((i) => i.dueAt != null && Date.parse(i.dueAt) < dayMs + DAY)
+      .map((i) => i.id)
+  )
+  const dayWord = wordForDay(dayMs, nowMs)
+  const proposedIds = new Set<string>()
+
   for (const item of pool) {
     if (budgetMin < MIN_USEFUL_MIN) break
     // Find room for at least a useful sitting.
@@ -203,13 +219,20 @@ export function planDay(
       const roomMin = Math.floor((slot.endMs - start) / MIN)
       if (roomMin >= MIN_USEFUL_MIN) {
         durMin = Math.min(durMin, roomMin)
+        const othersDue = [...dueByDayEnd].filter((id) => id !== item.id)
         out.push({
           itemId: item.id,
           title: item.title,
           startMs: start,
           durationMin: durMin,
-          reason: reasonFor(item, nowMs, momentum, opts.deskTitles)
+          reason: reasonFor(item, nowMs, momentum, opts.deskTitles, {
+            source: opts.source,
+            dayWord,
+            anyOthersDue: othersDue.length > 0,
+            othersDueHandled: othersDue.every((id) => placed.has(id) || proposedIds.has(id))
+          })
         })
+        proposedIds.add(item.id)
         budgetMin -= durMin
         cursor = start + (durMin + settings.gapMin) * MIN
         break
@@ -222,18 +245,56 @@ export function planDay(
   return out
 }
 
+/** 'today' / 'tomorrow' / the weekday name, for reasons about the planned day. */
+function wordForDay(dayMs: number, nowMs: number): string {
+  const d = new Date(dayMs)
+  if (d.toDateString() === new Date(nowMs).toDateString()) return 'today'
+  if (d.toDateString() === new Date(nowMs + DAY).toDateString()) return 'tomorrow'
+  return d.toLocaleDateString(undefined, { weekday: 'long' })
+}
+
+interface ReasonContext {
+  source?: 'intent' | 'replan'
+  dayWord: string
+  /** Another schedulable item is due by the end of the planned day. */
+  anyOthersDue: boolean
+  /** …and every one of them already has a block (dragged or proposed). */
+  othersDueHandled: boolean
+}
+
+// DEC-072 — the reason a block exists, stated as the item's strongest
+// CHECKABLE fact, strongest first: deadline → the person's own urgency call →
+// desk momentum → already-started → time waited → why-this-plan-exists. Every
+// string is derivable from the inputs; nothing here speculates. The generic
+// tail is reachable only when an item has none of those facts AND the day's
+// due landscape is mixed — by construction, rare.
 function reasonFor(
   i: FbNode,
   nowMs: number,
   momentum: Map<string, number>,
-  deskTitles?: Map<string, string>
+  deskTitles: Map<string, string> | undefined,
+  ctx: ReasonContext
 ): string {
+  // 1 — deadlines. The ranker's biggest weight, so also the likeliest truth.
   if (i.dueAt) {
     const t = Date.parse(i.dueAt)
-    if (t < nowMs) return 'Overdue'
-    if (t < nowMs + DAY) return 'Due today'
-    if (t < nowMs + 2 * DAY) return 'Due tomorrow'
+    if (!Number.isNaN(t)) {
+      if (t < nowMs) {
+        const daysLate = Math.floor((nowMs - t) / DAY)
+        if (daysLate < 1) return 'Was due earlier today'
+        return daysLate === 1 ? 'Overdue by a day' : `Overdue by ${daysLate} days`
+      }
+      if (t < nowMs + DAY) return 'Due today'
+      if (t < nowMs + 2 * DAY) return 'Due tomorrow'
+      if (t < nowMs + 7 * DAY)
+        return `Due ${new Date(t).toLocaleDateString(undefined, { weekday: 'long' })}`
+      // A far-off due date is not why it is on TODAY's plan — fall through.
+    }
   }
+  // 2 — the person's own urgency call (DEC-037: chosen, so it outranks derived).
+  if (i.wiUrgency === 'urgent') return 'You marked it urgent'
+  if (i.wiUrgency === 'high') return 'You marked it high priority'
+  // 3 — momentum (strings pinned since DEC-052; deliberately unchanged).
   const closures = momentum.get(i.parentId ?? '') ?? 0
   if (closures >= 2) {
     const desk = deskTitles?.get(i.parentId ?? '')
@@ -241,7 +302,17 @@ function reasonFor(
       ? `Riding your momentum on ${desk} (${closures} closed lately)`
       : `Riding your momentum (${closures} closed on this desk lately)`
   }
-  return 'Top of the queue'
+  // 4 — already started: an open loop beats a fresh start.
+  if (i.workItemState === 'in_progress') return 'Already started — finish it'
+  // 5 — time waited (mirrors the queue's 3-day threshold).
+  const quietDays = Math.floor((nowMs - i.updatedAt) / DAY)
+  if (quietDays >= 3) return `Waiting ${quietDays} days`
+  // 6 — no item-level fact: say why the PLAN chose it.
+  if (ctx.source === 'replan') return 'Slipped earlier — proposing a fresh slot'
+  if (ctx.source === 'intent') return 'Matches your intent'
+  if (!ctx.anyOthersDue) return `Nothing else needs ${ctx.dayWord}`
+  if (ctx.othersDueHandled) return 'Everything due already has a slot'
+  return 'Next by rank'
 }
 
 /**

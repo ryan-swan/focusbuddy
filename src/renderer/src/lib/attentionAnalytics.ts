@@ -352,8 +352,18 @@ export function startRecommendations(
     .map((i) => ({ i, score: rankScore(i, nowMs) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, n)
-    .map(({ i }) => ({
+    .map(({ i }, k) => ({
       item: i,
-      reason: itemReason(i, nowMs) ?? (i.updatedAt < nowMs - 3 * DAY ? 'Waiting the longest' : 'Top of the queue')
+      reason: itemReason(i, nowMs) ?? startFallbackReason(i, nowMs, k)
     }))
+}
+
+/** DEC-072 — the strip's fallback, honest per card. The old strings claimed
+ *  'Waiting the longest' on up to three cards at once (a superlative only one
+ *  of them can hold) and 'Top of the queue' on cards #2–3. Day counts are
+ *  always true; the rank phrasing only ever names #1 as the top. */
+function startFallbackReason(i: FbNode, nowMs: number, index: number): string {
+  const quietDays = Math.floor((nowMs - i.updatedAt) / DAY)
+  if (quietDays >= 3) return `Waiting ${quietDays} days`
+  return index === 0 ? 'Top of your queue' : 'Next in your queue'
 }

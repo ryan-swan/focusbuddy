@@ -181,6 +181,108 @@ describe('planDay', () => {
   })
 })
 
+describe('reasonFor — every string is a checkable fact (DEC-072)', () => {
+  const DAYMS = 24 * H
+  const now = DAY0 + 9 * H
+  const one = (items: FbNode[], opts = {}, dayMs = DAY0) =>
+    planDay(items, [], S, dayMs, now, opts)
+
+  it('overdue counts the days; same-day lateness says so without a count', () => {
+    const late = one([wi({ id: 'x', dueAt: new Date(now - 3 * DAYMS).toISOString() })])
+    expect(late[0].reason).toBe('Overdue by 3 days')
+    const singular = one([wi({ id: 'y', dueAt: new Date(now - 1 * DAYMS).toISOString() })])
+    expect(singular[0].reason).toBe('Overdue by a day')
+    const today = one([wi({ id: 'z', dueAt: new Date(now - 2 * H).toISOString() })])
+    expect(today[0].reason).toBe('Was due earlier today')
+  })
+
+  it('a due date this week is named by weekday, not dropped to the fallback', () => {
+    const out = one([wi({ id: 'x', dueAt: new Date(now + 3 * DAYMS).toISOString() })])
+    expect(out[0].reason).toMatch(/^Due \w+day$/)
+    expect(out[0].reason).not.toBe('Due today')
+  })
+
+  it('a far-off due date is NOT the reason for a slot today', () => {
+    const out = one([wi({ id: 'x', dueAt: new Date(now + 30 * DAYMS).toISOString() })])
+    expect(out[0].reason).not.toMatch(/^Due/)
+  })
+
+  it("the person's chosen urgency outranks momentum", () => {
+    const items = [
+      wi({ id: 'u', parentId: 'desk1', wiUrgency: 'urgent' } as Partial<FbNode> & { id: string }),
+      wi({ id: 'c1', parentId: 'desk1', workItemState: 'completed', updatedAt: now - H }),
+      wi({ id: 'c2', parentId: 'desk1', workItemState: 'completed', updatedAt: now - 2 * H })
+    ]
+    const out = planDay(items, [], S, DAY0, now, { deskTitles: new Map([['desk1', 'CETRA']]) })
+    expect(out[0].reason).toBe('You marked it urgent')
+  })
+
+  it('an item already in progress says finish it', () => {
+    const out = one([wi({ id: 'x', workItemState: 'in_progress' })])
+    expect(out[0].reason).toBe('Already started — finish it')
+  })
+
+  it('a quiet item states its waited days', () => {
+    const out = one([wi({ id: 'x', updatedAt: now - 5 * DAYMS })])
+    expect(out[0].reason).toBe('Waiting 5 days')
+  })
+
+  it('a bare item alone on the day: nothing else needs today', () => {
+    const out = one([wi({ id: 'x' })])
+    expect(out[0].reason).toBe('Nothing else needs today')
+  })
+
+  it('planning tomorrow, the day word follows the plan', () => {
+    const out = one([wi({ id: 'x' })], {}, DAY0 + DAYMS)
+    expect(out[0].reason).toBe('Nothing else needs tomorrow')
+  })
+
+  it('behind a due item, the bare item credits the handled deadline', () => {
+    const items = [
+      wi({ id: 'plain' }),
+      wi({ id: 'due', dueAt: new Date(now + 2 * H).toISOString() })
+    ]
+    const out = one(items)
+    expect(out[0].reason).toBe('Due today')
+    expect(out[1].reason).toBe('Everything due already has a slot')
+  })
+
+  it('a drag-placed due item still counts as handled', () => {
+    const items = [
+      wi({ id: 'plain' }),
+      wi({ id: 'due', dueAt: new Date(now + 2 * H).toISOString() })
+    ]
+    const out = planDay(items, [], S, DAY0, now, { placedIds: new Set(['due']) })
+    expect(out.map((p) => p.itemId)).toEqual(['plain'])
+    expect(out[0].reason).toBe('Everything due already has a slot')
+  })
+
+  it('the intent fallback says so — and never claims queue rank', () => {
+    const out = planDay([wi({ id: 'a' })], [], S, DAY0, now, {
+      onlyItemIds: ['a'],
+      source: 'intent'
+    })
+    expect(out[0].reason).toBe('Matches your intent')
+  })
+
+  it('a replanned item says it slipped, not that it matched an intent', () => {
+    const out = planDay([wi({ id: 'a' })], [], S, DAY0, now, {
+      onlyItemIds: ['a'],
+      source: 'replan'
+    })
+    expect(out[0].reason).toBe('Slipped earlier — proposing a fresh slot')
+  })
+
+  it('item facts outrank the mode: a due item in intent mode still says due', () => {
+    const out = planDay(
+      [wi({ id: 'a', dueAt: new Date(now + 2 * H).toISOString() })],
+      [], S, DAY0, now,
+      { onlyItemIds: ['a'], source: 'intent' }
+    )
+    expect(out[0].reason).toBe('Due today')
+  })
+})
+
 describe('sweepMissed — replan never moves anything', () => {
   it('only PAST planned blocks past the one-hour grace are swept', () => {
     const now = DAY0 + 12 * H

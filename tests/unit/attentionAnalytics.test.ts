@@ -129,6 +129,20 @@ describe('startRecommendations', () => {
     expect(recs.every((r) => r.reason.length > 0)).toBe(true)
   })
 
+  it('the fallback is honest per card: only #1 claims the top (DEC-072)', () => {
+    const a = wi({ updatedAt: NOW - 2 * 60 * 60 * 1000 })
+    const b = wi({ updatedAt: NOW - 60 * 60 * 1000 })
+    const recs = startRecommendations([a, b], NOW, 2)
+    expect(recs[0].reason).toBe('Top of your queue')
+    expect(recs[1].reason).toBe('Next in your queue')
+  })
+
+  it('a card that has waited states its days instead of a superlative (DEC-072)', () => {
+    const waited = wi({ updatedAt: NOW - 9 * DAY })
+    const recs = startRecommendations([waited], NOW, 1)
+    expect(recs[0].reason).toBe('Waiting 9 days')
+  })
+
   it('suggested (unapproved) items never lead the strip', () => {
     const sug = wi({ workItemState: 'suggested', dueAt: new Date(NOW - DAY).toISOString() })
     const plain = wi({})

@@ -237,7 +237,11 @@ export default function CalendarView(): JSX.Element {
           setProposals(null)
           return
         }
-        out = planDay(items, blocks, settings, planDayMs, nowMs, { ...opts, onlyItemIds: sel.ids })
+        out = planDay(items, blocks, settings, planDayMs, nowMs, {
+          ...opts,
+          onlyItemIds: sel.ids,
+          source: 'intent'
+        })
         setPlanNote(sel.note)
       } else {
         out = planDay(items, blocks, settings, planDayMs, nowMs, opts)
@@ -275,7 +279,8 @@ export default function CalendarView(): JSX.Element {
       const itemIds = [...new Set(missed.map((b) => b.taskId).filter((x): x is string => !!x))]
       const out = planDay(items, blocks, loadPlannerSettings(), planDayMs, nowMs, {
         onlyItemIds: itemIds,
-        deskTitles
+        deskTitles,
+        source: 'replan'
       })
       setProposals(out.length ? out : null)
       // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
