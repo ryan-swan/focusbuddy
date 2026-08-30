@@ -10,6 +10,19 @@
 green; both typechecks clean; app boots in ~3s.
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
 
+**SESSION 2026-08-30 (evening) — Plexi Meet round (DEC-082/083, UNCOMMITTED):**
+video diagnosed to the root (macOS TCC denies camera to the LAUNCHING app's
+identity — com.anthropic.claude-code, "Policy disallows prompt"; operator must
+grant it in System Settings or launch dev from Terminal) + two real defects
+fixed (tiles never called play(); OS-muted tracks rendered as silent black —
+now an honest "Camera blocked by macOS" note, verified live against the
+blocked camera). Meeting-born attention items now carry
+sourceType 'meeting' → the queue chip links back to the meeting, transcript
+on screen (driven live end-to-end). Suite **3,332**, full typecheck clean.
+The Fireflies-level transcript UI rebuild is GATED on the operator's go —
+not started, per instruction.
+
+
 **SESSION 2026-08-30 (this doc's own update):** ① SPEC-002 "The Attendant"
 written up — spec recovered verbatim from the transcript into
 [analysis/25](analysis/25-SPEC-002-ATTENDANT-RAW.md), comparison REBUILT
@@ -71,7 +84,15 @@ Book time dialog rebuilt to the operator's spec (steps 1–9 + edit mode +
 the option-B token grammar; BlockComposer deleted; drag-highlight opens the
 FULL dialog by ruling, inline create flagged OFF) and ⑨ **DEC-081** — the
 name is Plexii, 70 fixes across 36 files, wake-word fix, grep-locked +
-CLAUDE.md convention. ALL ROUNDS COMMITTED: DEC-077 = `e88ee5c3` (parallel
+CLAUDE.md convention. ⑩ **DEC-082/083** (parallel session) — Plexii Meet camera root-caused to
+the launcher's TCC identity (OS verdict, surfaced honestly in-app) +
+meeting-born items link back to their meeting — committed `4f5e92c2`.
+⑪ **DEC-084** — Capture rebuilt as Book time's sibling (tab bar gone, two
+labelled fields + rotating placeholder, four-pill confirm with drawers,
+honest confidence accents, New-item form DELETED) — `5b88490c`.
+⑫ **DEC-085** — ⌘K → Attention opens Capture (armed pill retired from ⌘K;
+the omni yield widened — plain "attention" no longer asks the model) —
+`f31c7e24`. Suite → **3,332 / 311**. ALL ROUNDS COMMITTED: DEC-077 = `e88ee5c3` (parallel
 session, attributed) · DEC-080 = `34feaab1` · DEC-081 = `327523f4`. Suite
 → **3,310**; both typechecks clean; tree clean.
 

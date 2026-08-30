@@ -1768,6 +1768,116 @@ single-i pending their own ruling. Enforcement is mechanical: a grep-lock
 test fails on any standalone Plexi in src, and the root CLAUDE.md carries
 the convention for every future session (plus the operator's memory).
 
+## DEC-082 — Plexii Meet video: two real defects and one OS verdict
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator: "root cause unknown… needs investigation") · committed `4f5e92c2`
+
+The investigation, all measured live over CDP against the running app:
+
+**The OS verdict (not a Plexii bug, and the reason nothing "turned on"):**
+camera permission looked granted — because our own `setPermissionCheckHandler`
+answers granted for anything not denylisted, so `navigator.permissions` was
+never evidence. The TCC log has the truth: the dev app launched from inside
+Claude Code inherits the LAUNCHING app's TCC identity
+(`com.anthropic.claude-code` as the responsible process), and that identity is
+**denied kTCCServiceCamera with "Policy disallows prompt"** — every capture
+silently refused at the OS layer. getUserMedia still resolves: the track
+arrives readyState 'live', enabled, and **muted forever** (zero frames — the
+requestVideoFrameCallback probe counted none from either camera). Mic works
+because Claude Code holds microphone permission; camera it does not.
+**Operator's move (I cannot change security settings):** System Settings →
+Privacy & Security → Camera → enable the app Plexii was launched from — or
+launch the dev app from Terminal so TCC attributes to Terminal and prompts.
+Packaged builds are unaffected (NSCameraUsageDescription already declared).
+
+**Defect 1 — tiles never played (fixed).** Even with frames, the meeting and
+call tiles could stay black: `autoPlay` does not start playback in this
+Electron build when `srcObject` lands after mount — measured `paused: true`,
+readyState 0, live track attached. VoiceRecorderWidget had already learned
+this and plays explicitly; MeetingOverlay + CallOverlay tiles now do too,
+with a loadedmetadata retry.
+
+**Defect 2 — the silent black tile (fixed).** An OS-muted track rendered as a
+pure black rectangle with no error anywhere. `useVideoBlocked` (new lib)
+listens to the track's mute/unmute — Chromium's own "no frames" signal — and
+both overlays now show the avatar plus an amber "Camera blocked by macOS"
+note whose tooltip names the System Settings path. Verified live against the
+currently-blocked camera: note rendered, ZERO black video tiles; the moment
+the grant lands, unmute flips the hook and the play() fix takes over.
+
+---
+
+## DEC-083 — Meeting-born items link back to their meeting
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator ask #2) · committed `4f5e92c2`
+
+An action item approved from the end-of-meeting wrap-up now POINTS at the
+meeting whose transcript produced it, and the queue links back.
+
+**Write side.** The wrap-up's Meeting record was created fire-and-forget, so
+its id was unknowable at approve time — now awaited (`wrapup.meetingId`; a
+failed save degrades to the old unlinked behaviour, never blocks the review).
+`applyProposal` gained `ctx.workItemSource`; the executor stamps
+`sourceType/sourceRef` from it with 'chat' as the unchanged default, so the
+model contract and every other surface are untouched. ProposalCards threads
+the prop (the toFiles document path deliberately omits it — it never files
+items), and WrapupOverlay passes `{sourceType:'meeting', sourceRef}`.
+
+**Read side.** The queue's source chip, for meeting-born items only, is now a
+LINK (groups icon, data-testid item-meeting-link): `openMeeting()` navigates
+via `goMeetings()` and hands the meeting id to PlexiMeetView with the same
+post-navigation handoff pattern `openHere` uses for widgets
+(`fb:open-meeting`, 250ms); the view selects it even if its list is still
+loading. `sourceLabel('meeting')` says what the click does. A deleted
+meeting degrades to the view's own empty selection — never a crash.
+
+**Gates:** suite → **3,332** (dec078_079Meet adds 9; a parallel session's
+capture rebuild landed alongside), full typecheck clean. **Live:** the exact
+`openMeeting` flow driven through the app's own `__fbView` store against a
+real meeting — PlexiMeet mounted, the meeting selected, transcript visible,
+operator's view restored. **Deliberately NOT started:** the Fireflies-level
+transcript UI rebuild — the operator gated it on this report.
+
+## DEC-084 — Capture rebuilt as Book time's sibling
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator spec) · committed `5b88490c`
+
+The Attention capture window rebuilt: no tab bar (Enter classifies,
+Cmd+Enter files verbatim — destinations on the commit, not modes; Expand
+left the dialog), two labelled fields with the rotating category
+placeholder (built — the old one was static), and the confirm step as FOUR
+labelled pills (CATEGORY/URGENCY/WHEN/DESK) opening one question-led drawer
+at a time on the SHARED AttentionConfirmCard (DEC-028 — chat's inline
+confirm inherits the look). Number keys 1–8; two-stage Esc; "back to your
+words" refocuses the words. CONFIDENCE is honest: accent = machine-guessed
+(category / inferred when / context desk); urgency can never light because
+nothing infers it. Status removed from capture (supersedes DEC-047 D-5 —
+a new item is open; W covers waiting). The @ input lives in the Desk drawer
+on the DEC-039 grammar. "File it" toasts with an R008-honest Undo. The New
+item button + inline form DELETED — capture is the only door. Title
+scaffolding ("remind me to…", "todo:") stripped from derived titles
+(main-process; takes effect on restart). Mid-verification the card was
+found deaf to keyboards (the rebuild dropped the old chip-autofocus) — it
+now takes focus on mount. Five superseded pins rewritten with history.
+
+**Recorded honestly:** during verification, a re-drive script skipped its
+surface assertions and typed into the operator's live Messages composer —
+two stray messages sent to a real conversation (operator handling them).
+The standing rule since: NO synthetic keystroke without an asserted,
+focused target — the corrected drives abort otherwise, and one such abort
+fired correctly the same hour.
+
+---
+
+## DEC-085 — Selecting Attention in ⌘K opens the Capture window
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator ruling) · committed `f31c7e24`
+
+⌘K → mention Attention (typed or clicked) → Capture opens; typing happens
+there. The DEC-028c armed pill is RETIRED from ⌘K (chat + home bar keep
+theirs; "@attention <text>" still files directly per DEC-031). The drive
+exposed the real bug underneath: the omni "Ask Plexii" row (score 2000)
+only yielded to the literal token, so Enter on plain "attention" asked the
+model — the yield now covers every Attention mention via one shared
+`attnAddressed` predicate. Live-proven with focus-asserted input both ways;
+the full Esc chain closes clean; zero strays.
+
 <!-- Append below; increment DEC-NNN. -->
 
 ## DEC-056…061 — The platform arc (one investigation, six landings)
