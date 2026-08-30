@@ -3,13 +3,51 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-26 (taxonomy alignment stage EXECUTED) · **State:**
-🏁 **LANDED on main** (PR #4, main @ `c0e32a0c`, main CI green, default-OFF) →
-**POST-LANDING ITERATION, round 1 done** — the category alignment stage shipped
-on the branch (commit `0ae275bf`, both remotes; NOT yet PR'd to main — the
-operator chooses the landing round). Next up: the operator's detailed pass and
-the CR-09 brainstorm (D-A…D-K → DEC-031+).
+**Last updated:** 2026-08-30 (Attention/Calendar + platform-stability build) ·
+**State:** 🏁 **LANDED on main** (PR #4, main @ `c0e32a0c`, default-OFF) →
+**POST-LANDING ITERATION.** Branch `ryan-command-center` @ `4dc603de`, clean,
+**71 commits ahead of main**, pushed to both remotes. Suite **3,196 / 304 files**
+green; both typechecks clean; app boots in ~3s.
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
+
+**THIS BUILD (2026-08-27 → 08-30), 22 commits, DEC-056…071 — see DECISIONS-LOG:**
+
+**Platform stability (DEC-056…061) — shipped SEPARATELY to main as PR #5, still
+OPEN + MERGEABLE.** Deliberately carries no Attention/Calendar work so the team
+inherits the fixes without the feature branch. Six defects, one shape: *a guard
+that checked the request instead of the outcome.* An unbounded tombstone sync
+loop (10 server writes/minute, forever, `sync_rev 7,319` on one widget); ~2,500
+Events per boot in an append-only store PLX-EVT-030 forbids pruning (clean boot
+now **4**); a synchronous Keychain call on the boot path that hung the app behind
+an invisible OS prompt (**indefinite → 3s**); retention caps that had zero call
+sites since the initial commit; a nav fan-in writing 39,762 rows in 19 hours; and
+`visit_count` corruption user-visible AND fed to the LLM (Slack at 14,096
+"visits"), repaired from its exact provenance. **All six were invisible to a
+green suite and were found by measuring the live database.**
+
+**Attention/Calendar (DEC-062…071).** Meet items now POINT AT a meeting (operator
+ruled option 2 — an unanswered RSVP is a meeting not on your calendar, so it
+cannot BE a block): six manifest columns, invite-shaped rows, a capture flow, and
+a link to a real block. The day plan became reviewable before acceptance — a
+centre-peek pane showing which items, when, and *why*, using a `reason` field the
+planner had computed all along and never displayed.
+
+**The queue's hierarchy was RE-BASELINED (DEC-070).** Four rounds of per-row
+connector segments (DEC-062…069) each fixed a seam and produced another; the
+operator called a reset and supplied an inspiration component. A subtree is now
+ONE animated group with ONE dashed connector — seams impossible *by construction
+rather than by care*. **The tests pin the ABSENCE of the old segment machinery.**
+
+**A manifest gap surfaced while building (DEC-064):** `PATCHABLE` and `rowToNode`
+both hand-listed `WORK_ITEM_COLUMNS`, so a new column got DDL, sync, CRDT
+allowlists and emit but no way in or out — `source_url` had been **write-only
+since DEC-052**. Both now derive from the manifest.
+
+**Analysis delivered, not yet a doc:** a full side-by-side of SPEC-002 "The
+Attendant" against the built system, including two spec claims that assert
+capability PlexiDesk does not have (§3.7 velocity/estimate accuracy — the stated
+differentiator vs Motion; §3.10 engaged-time-vs-plan). Summary is in
+NEXT-SESSION-PROMPT §3; **writing it up properly is an open task.**
 
 **QA ROUND 3 + DEC-034/035 EXECUTED (2026-08-26, commits `ba3b518c`,
 `2e7e210e`, `14419286`):** the operator captured his next asks INTO the layer

@@ -1470,3 +1470,159 @@ rewritten to the superseding truth, keeping the divider-bug history in the
 comment); typecheck clean.
 
 <!-- Append below; increment DEC-NNN. -->
+
+## DEC-056…061 — The platform arc (one investigation, six landings)
+**Date:** 2026-08-27 → 08-28 · **Status:** EXECUTED · **Shipped separately to `main` as PR #5**
+
+Began as "the app won't boot" and became six defects, all one shape: **a guard
+that checked the request instead of the outcome.**
+
+- **DEC-056** (`1253aac3`) — the remote-change emitter fired one Event per
+  cascade-delete descendant. 596,754 of 768,169 Events were WidgetDeleted /
+  DeskDeleted that nothing can consume (a deleted object has no "changed since
+  your last visit" frame to light). Deletions now emit nothing; updates emit once
+  per object per pass. `pruneOutbox()` added — the outbox is delivery
+  bookkeeping, not history, so capping it destroys nothing PLX-EVT-030 protects.
+- **DEC-057** (`690aba29`) — `pruneActivity`/`pruneHistory` had **zero call
+  sites** since the initial commit. Wired, but only after a policy change: a
+  table-wide cap would have evicted 2,088 rows of real history to make room for
+  telemetry. Per-kind + per-org instead (`browser_nav` 2,000/org, 90-day ceiling).
+- **DEC-058** (`674ed227`) — the nav fan-in. Four webview events into one
+  unguarded recorder wrote 39,762 rows in 19 hours. `navTrail.ts` dedupes.
+- **DEC-059** (`4af921c1`, `7c363379`) — **the launch blocker.** `applyRemote`'s
+  tombstone branch had no echo suppression though the upsert branch three lines
+  below does. Re-applying a held tombstone is a no-op UPDATE, which is exactly
+  what `widgets_mark_dirty` fires on → dirty → pushed → server bumps rev →
+  tombstone returns. Measured at `sync_rev 7,319` on one widget and **10 server
+  writes/minute, forever**. Fixed with the guard the upsert branch already had.
+  Part 2: replayed writes declare `WriteOrigin`, so a replay stops minting
+  "user did this" Events. Clean boot went ~2,500 → **4 Events**.
+- **DEC-060** (`0bd8a77b`) — the boot hang. `emitObjectEvent → localActor() →
+  loadAccountState() → safeStorage`: every Event did a synchronous macOS
+  Keychain decrypt, to read `cachedEmail` — a field stored in PLAINTEXT. The
+  first one blocked the main thread behind an authorization prompt with no
+  visible parent. Cold boot: indefinite hang → **3s**, verified over three restarts.
+- **DEC-061** (`0e5d8a4e`) — `browsing_history.visit_count` corrupt from the same
+  handler (one Slack channel at 14,096 "visits", a number that is user-visible
+  AND fed to the LLM). Counter gated; counts repaired from the activity log,
+  which is their exact provenance (763 rows matched, zero disagreed).
+
+**The load-bearing lesson, recorded because it recurred:** every one of these
+was invisible to the test suite, which was green throughout. They were found by
+*measuring the live database*, not by reasoning about the code.
+
+---
+
+## DEC-062…067 — Sub-item chrome: four rounds that were the wrong approach
+**Date:** 2026-08-28 → 08-29 · **Status:** SUPERSEDED BY DEC-070 — kept for the lesson
+
+Operator QA on the queue's sub-item rows. Shipped in order: a clickable expander
+(the drag handle was absolutely positioned in the chevron's gutter and swallowed
+its clicks); an elbow connector; desk-cluster folding; queue-coloured desk
+headers; an inset block per indented row; a page-coloured gutter; the elbow
+raised onto the parent/child boundary; the elbow aligned to the parent's spine.
+
+**Each round fixed a seam and produced another.** The cause was structural and
+took four rounds to see: *the hierarchy was drawn as per-row line SEGMENTS*, and
+segments painted by different rows cannot be guaranteed to join. 1px offsets,
+corner touches that antialias into breaks, a bend repeated once per child.
+DEC-070 is the reset.
+
+**What survived the reset:** the expander z-order fix, desk-cluster folding, and
+queue-coloured desk headers. Those were real and are still in.
+
+---
+
+## DEC-063/064/068 — Meet items point at a meeting
+**Date:** 2026-08-28 → 08-29 · **Status:** RULED (operator: "go with option 2") + EXECUTED
+
+Operator ruling: a Meet item **points at** a meeting rather than **being** a time
+block. His own case decided it — *"the RSVP if it is for responding to"* is a
+meeting that is not on your calendar, so there is no block for it to be.
+
+- **DEC-063** (`9205d56d`) — six manifest columns (start, duration, join URL,
+  location, attendees, RSVP). `meet_start_at` is deliberately NOT `due_at`: a
+  meeting's start is not a deadline, and collapsing them would drop every
+  invitation into the overdue radar. Rows render as invitations — time, a Join
+  button labelled by provider read from the link, address, attendee count, and
+  the RSVP inline. Guarded by `isInvite`: a bare "meet with Sam" stays a plain row.
+- **DEC-064** (`48e5f8f3`) — the capture flow, and **the manifest gap it
+  uncovered**: `PATCHABLE` and `rowToNode` both hand-listed the manifest, so a
+  new column got DDL, sync, CRDT allowlists and emit — but no way in or out.
+  `source_url` had been **write-only since DEC-052**. Both now derive from
+  `WORK_ITEM_COLUMNS`, with an explicit `NOT_PATCHABLE` refusal list that must
+  state its reasons.
+- **DEC-068** (`ac8dcd0c`) — the calendar link. `TimeBlock.taskId` already
+  pointed at a node, so the association needed nothing new; the translation is
+  `meetSchedule.ts`. Refuses rather than guesses (no start time → nothing to
+  reserve), and matches "already scheduled" on the LINK, never the time.
+
+---
+
+## DEC-065 — The item editor fits the screen it opens on
+**Date:** 2026-08-29 · **Status:** EXECUTED (`a590ce86`)
+
+Regression from DEC-064: the dialog was pinned 14vh from the top with no height
+cap, so a Meet item ran **172px past the bottom** of a 997px laptop viewport with
+Save unreachable. Centring alone could not fix it — content was taller than the
+screen — so Join link and Location were paired onto one row and Notes trimmed.
+1029px → 924px. The max-height with internal scroll is the FLOOR beneath the
+sizing, not the fix: content that cannot be reached is worse than content that
+scrolls.
+
+---
+
+## DEC-069/070 — The re-baseline: one animated group, one dashed connector
+**Date:** 2026-08-29 · **Status:** RULED (operator called the reset) + EXECUTED (`72cd7199`)
+
+Operator, after four rounds: *"this colored vertical / horizontal line thing is
+really starting to piss me off… we need to refresh and reset to get this down
+right from the beginning"* — with an inspiration component supplied.
+
+**The re-baseline.** A parent and its subtree are now ONE animated group holding
+ONE dashed connector spanning it. A single element has no joins to misalign, so
+the seam category is gone *by construction rather than by care*, and because the
+connector lives inside the height-animated wrapper it grows and shrinks WITH the
+expansion.
+
+What it bought beyond the bug: `nestRows()` turns the flat depth list into a tree
+once instead of every consumer re-deriving it; the box's `divide-y` now separates
+UNITS so a hairline never cuts through a subtree; desk clusters get the same
+connector language as subtasks (one grammar for "these belong together"); the
+solid queue spine became a TOP-LEVEL cue only, since an indented row's colour cue
+is its group's connector and having both put two vertical lines beside every
+sub-item. Motion: height 0 ↔ auto, staggered children, `AnimatePresence` so a
+collapse animates rather than snaps, `prefers-reduced-motion` honoured.
+
+Also fixed the drag handle, which floated at the INDENT column — a coordinate
+belonging to the previous depth — so on sub-items it hung in the parent's gutter.
+
+**The pins now assert the ABSENCE of the segment machinery**, so nobody
+reintroduces it.
+
+---
+
+## DEC-071 — The day plan is reviewable before it is accepted
+**Date:** 2026-08-29 · **Status:** EXECUTED (`4dc603de`)
+
+Three failures in one flow, all the same shape: the plan had the information and
+nowhere to put it.
+
+The intent prompt was a single-line `<input>`, so a real sentence scrolled out of
+sight while being written — now a textarea that grows and shrinks, capped at ~7
+lines, Enter plans / Shift+Enter newlines. The summary line truncated, which made
+it *an assurance wearing the clothes of an explanation*. And the ghosts on the
+grid are not real blocks, so the plan was un-inspectable **by construction** — a
+proposal you cannot examine is a prompt to trust it.
+
+A landed plan now opens a centre-peek review (DEC-065's shape) showing the prompt
+in full, the note in full, and every block grouped by day with time, duration and
+**the `reason` the planner had computed all along and never displayed**. Blocks
+can be dropped individually; accept takes what remains, still ONE undo batch.
+Opening it books nothing — DEC-052's propose-never-apply stance holds.
+
+Also: the note's `slice(0, 120)` was a DISPLAY limit at the DATA layer, cutting
+mid-word ("…Cetra pitch deck—all high-cr"). Widened, word-boundary aware,
+ellipsised, still bounded because it is model output.
+
+---

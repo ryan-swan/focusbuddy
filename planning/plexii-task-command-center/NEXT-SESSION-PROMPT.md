@@ -1,122 +1,116 @@
-# Next Session — Resume Prompt (post-alignment handoff)
+# Next Session — Resume Prompt
 
-**Last updated:** 2026-08-26, end of the taxonomy-alignment session. **The Attention
-layer is LANDED on `saasmouth/focusbuddy` main** (PR #4, main @ `c0e32a0c`, CI green,
-default-OFF via `workItems.enabled`; the operator's device has it ON). **Post-landing
-round 1 is DONE on the branch:** the category alignment stage (eight primaries, migration,
-manual form) shipped as `0ae275bf` — branch only, both remotes; **not yet PR'd to main**
-(the operator chooses when a round lands, DEC-030). He still owes Michael + Caleb the WIP
-framing note ("off by default, don't toggle yet").
+**Last updated:** 2026-08-30, end of the Attention/Calendar + platform-stability build.
+**Branch:** `ryan-command-center` — clean, **71 commits ahead of `origin/main`**, pushed to
+BOTH remotes (`fork` = ryan-swan, `origin` = saasmouth) at `4dc603de`.
+**Suite:** 3,196 tests / 304 files green. Both typechecks clean.
+**Live app:** boots in ~3s (was hanging indefinitely — DEC-060).
 
 ## <<<PROMPT BEGIN>>>
 
-You are resuming **plexii-task-command-center** — the initiative that built and LANDED
-the Attention layer (work_items) in Plexii/PlexiDesk, now iterating post-landing in
-PR-sized rounds. You have no memory of prior sessions; everything lives in the repo's
-planning docs. Read in order: [ACTIVE-MISSION.md](ACTIVE-MISSION.md) (source of truth,
-newest at top) → [DECISIONS-LOG.md](DECISIONS-LOG.md) (DEC-001…030, append-only) →
-[phases/HANDOFFS/taxonomy-alignment.md](phases/HANDOFFS/taxonomy-alignment.md) (the
-just-executed round: eight primaries, the sync-revert incident + convergence rule, new
-baseline). For the open analysis threads read
-[analysis/21-CR09-CONTEXTUAL-ATTENTION.md](analysis/21-CR09-CONTEXTUAL-ATTENTION.md) and
-[analysis/22-CATEGORY-MODEL-REVIEW.md](analysis/22-CATEGORY-MODEL-REVIEW.md).
+You are resuming **plexii-task-command-center** — the Attention layer (work_items) plus the
+Calendar surface, iterating post-landing in PR-sized rounds under the operator's live QA.
+You have no memory of prior sessions; everything lives in the repo's planning docs.
+
+Read in order:
+1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…071**, append-only. The last four
+   entries (DEC-062…071) carry the most load-bearing lessons of the recent build.
+3. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 is the live one (Respond → Messages)
 
 Pre-flight:
 ```bash
-cd ~/focusbuddy-plexi && git fetch origin --prune && git fetch fork --prune && git status --short --branch && git rev-list --left-right --count ryan-command-center...origin/main && npm run typecheck
+cd ~/focusbuddy-plexi && git fetch origin --prune && git fetch fork --prune && git status --short --branch && npm run typecheck && npx vitest run tests/unit
 ```
-(Left side = our unmerged round(s) + planning commits; right side = team commits on main —
-log any, merge only by decision.)
 
-### Where we left off → what is next (priority order)
+---
 
-1. **The operator's own detailed pass through the layer.** His stated focus — now
-   INCLUDING the renamed queues (To Do / Review / Decide / Respond / Meet / Discuss /
-   Remember / Know) and the new bare manual form. Live QA notes come in → reproduce →
-   fix in-stage → gates → commit. The standing loop.
-2. **CR-09 brainstorm → DEC-031+.** Decision list **D-A…D-K** in analysis/21 (Part I:
-   object-marking presets — note the preset table's classes now read in the NEW
-   vocabulary (slack→to_respond/follow-up, doc→to_review, sticky→to_remember…) —
-   widget scoping desk/room/all, the plan boundary "items point · scopes group · plans
-   are CHOSEN", context-menu IA; Part II: the two-layer LAW, pull-not-push, the
-   ProposalTray, Living-Doc + Meetings observers, the D-I Layer-0 gap ORDER). NOTHING
-   from CR-09 gets built until the operator rules.
-3. **Landing round decision (operator's call):** PR the alignment round (`0ae275bf` +
-   planning) to main when he wants it live for the team — branch push + PR +
-   `gh pr merge` as `ryanswan313` is the proven pattern. Until then main still speaks
-   the OLD schema values; that is fine (flag-OFF for the team, and the branch's
-   apply-site canonicalization converges anything they might someday push).
-4. **Layer-0 gaps remaining** (analysis/21 Part II §12): post-creation item **editing
-   UI** (db `updateFields` exists — now also validates classes; no surface) ·
-   Attention-page **selection mode** (index engine's bulk pattern is reusable). The
-   bare manual form SHIPPED with the alignment. D-I asks the operator to confirm this
-   order.
-5. **Observers:** Living Doc first (extract → `approval_state='suggested'` →
-   ProposalTray), Meetings second (vocabulary + `meeting_end` purpose shipped;
-   owner/due extraction missing). Blocked on the CR-09 rulings (D-G/D-H).
-6. **R-04 (notifications-as-items) needs its own analysis doc** before any ruling;
-   **R-05** (Meet dual-axis, Discuss batch discharge) lands with the `intent_sub`
-   UI / SPEC-027 era.
-7. **Outstanding hand-smokes:** chat @attention → Tab → type → Enter → inline card
-   (end-to-end feel) · the shared-desk menu branch next time a desk is shared · a
-   capture wearing the NEW classes end-to-end with the AI key (model fallback path —
-   rules paths are CDP-verified).
-8. **Housekeeping:** the operator may bulk-dismiss the SMOKE-prefixed artifacts (one
-   NEW one sits on the Archived shelf: "SMOKE-taxonomy bare form") · hand Caleb
-   UPSTREAM-PR-PACKAGE.md §4 (F-1 initial-pull truncation matters most) · the WIP
-   framing note to Michael + Caleb (drafted, unsent) · the sync-wake PR item is MOOT
-   (PRs #1–4 all merged, none open).
-9. **SPEC-027 / P1 era (later):** recipient routing, the clarification lane +
-   per-class question sets (needs scoped DEC-016/019 amendments RULED), delegation
-   ownership (R-02), the migrated-peer attestation gate (built, waiting), the frozen
-   retention rule.
+## Where we left off
 
-### Environment + protocols (the operational contract)
+**The platform is healthy and that was not free.** Six defects (DEC-056…061) were found
+by *measuring the live database*, not by reading code — the suite was green the whole
+time. Headlines: an unbounded sync loop costing 10 server writes/minute forever; ~2,500
+Events per boot in a store that PLX-EVT-030 forbids ever pruning; a Keychain call on the
+boot path that hung the app behind an invisible OS prompt. All fixed, all measured before
+and after. **These shipped separately to `main` as [PR #5](https://github.com/saasmouth/focusbuddy/pull/5) — still OPEN and MERGEABLE**, deliberately carrying no
+Attention/Calendar work so Caleb and Michael can inherit the fixes without the feature branch.
 
-- **Repo:** `~/focusbuddy-plexi`, branch `ryan-command-center`. Remotes: `origin` =
-  saasmouth/focusbuddy (shared, main ships to users), `fork` = ryan-swan/focusbuddy.
-  Commit to the branch and push to BOTH remotes' same-named branch. **Landing on main =
-  branch push + PR + `gh pr merge` as `ryanswan313`** — raw `git push origin …:main` is
-  classifier-blocked for the assistant (operator-run only). Never commit
-  `package-lock.json`, logs, or DB files.
-- **Accounts:** `gh` holds `ryan-swan` (fork owner, HAS `workflow` scope, usually
-  active) and `ryanswan313` (saasmouth WRITE, NO `workflow` scope). `gh auth switch
-  --user ryanswan313` for saasmouth pushes; switch back after. Browser GitHub sessions
-  default to ryan-swan. Memory: `plexii-repo-ownership-and-push-rules`.
-- **Live app:** dev app runs on the operator's REAL DB
-  (`~/Library/Application Support/focusbuddy/focusbuddy.db`) — SACRED: reads only via
-  `sqlite3 "file:...?mode=ro"`, writes only through the app. Restart:
-  `kill $(lsof -t "$DB")` → relaunch. **CDP smoke driving:**
-  `env -u ELECTRON_RUN_AS_NODE npx electron-vite dev -- --remote-debugging-port=9223`;
-  `puppeteer-core` is NOT installed — a raw client on the repo's own `ws` module +
-  `Runtime.evaluate` works (pattern in the taxonomy-alignment ledger); beware the
-  feature-tour popup and sync churn.
-- **Gates on every change:** `npm run typecheck` (0 errors) · `npx vitest run`
-  (baseline **2,778 / 274 files**) · live app verification · commit. Tests touching
-  node:sqlite need `// @vitest-environment node` as line 1.
-- **Worktree for fix-splits:** `~/focusbuddy-groundwork` (branch `groundwork-fixes`).
+**The queue's hierarchy was re-baselined (DEC-070).** Four rounds of per-row connector
+segments (DEC-062…069) each fixed a seam and produced another. The operator called a
+reset and supplied an inspiration component. A subtree is now ONE animated group with ONE
+dashed connector — seams are impossible by construction rather than by care. **The tests
+now pin the ABSENCE of the old segment machinery. Do not reintroduce per-row line
+segments.**
 
-Close discipline: end every session by updating ACTIVE-MISSION.md, regenerating this
-file, and dropping a handoff note in `phases/HANDOFFS/`.
+**Meet items point at a meeting (DEC-063/064/068)** — operator ruled option 2. Six manifest
+columns, invite-shaped rows, capture flow in the editor, and a link to a real calendar block.
 
-Locked decisions (don't relitigate — full text in DECISIONS-LOG): DEC-007 work items
-are nodes · **DEC-011 the entity is `work_item`; "task" means DESK in all AI
-vocabulary** · DEC-012 the surface is "Attention" · DEC-016 F008 one-code-path (all
-work_item writes via `db/workItems.ts`; CI grep-locks the four sanctioned delete
-sites) · DEC-021/022 delete contract · DEC-024 quiet archive · DEC-028
-AttentionConfirmCard is THE one confirm stop · **DEC-029a taxonomy tests T-1…T-5 +
-anti-collision are LAW; the alignment stage they sequenced is now EXECUTED — schema
-classes are `to_do/to_review/to_decide/to_respond/to_meet/to_discuss/to_remember/
-to_know`, legacy values map forward via `LEGACY_INTENT_CLASS_MAP`, and
-`normalizeAppliedWorkItem` canonicalizes ON APPLY (the anti-revert convergence rule —
-do not remove it; a 409 conflict-apply regressed the rename live without it)** ·
-**DEC-030 leave it landed; iteration in PR-sized rounds; restate big irreversible
-actions concretely + get fresh confirmation — never act on a codeword alone; DEC-031+
-reserved for the CR-09 brainstorm.**
+**The day plan is reviewable (DEC-071)** — a centre-peek pane showing which items, when,
+and *why*, before anything is booked.
 
-Absolute constraints: the live DB is read-only outside the app · ambiguity becomes a
-logged question, never a guess · every "verified" claim carries its verify-command ·
-PRESERVATION-DOCTRINE governs: core Plexii functionality is inviolable,
-rebuild-vs-preserve crossroads go to the operator.
+---
+
+## What is next (priority order)
+
+1. **The operator's live QA pass.** This has been the highest-yield loop all build —
+   DEC-053, 055, 062, 065, 066, 067, 069, 070 and 071 all came from him looking at the
+   screen. Notes come in → reproduce → fix in-stage → gates → commit.
+
+2. **Reason text quality (cheap, visible).** DEC-071 surfaced `PlannedProposal.reason` for
+   the first time and it reads thin — both blocks in the operator's test came back "Top of
+   the queue". The plumbing is done; the strings are generic. Make them say something
+   ("nothing else needs Thursday morning", "your momentum is on LakeDash").
+
+3. **SPEC-002 "The Attendant" comparison — analysis delivered, rulings not made.**
+   A full side-by-side against the built system was produced this session (in the
+   transcript, not yet a doc — **worth writing up**). Summary of that analysis:
+   - **Already built:** the 8 categories, reference-don't-own, propose-never-apply,
+     a rate-capped notification substrate (`QUEUE_HOURLY_CAP = 5`, overflow collapses
+     to one summary banner), `EscalationLayer = ambient|inbox|interruptive`, the S7
+     "one proactive trigger" restraint doctrine, human-in-loop completion,
+     `attentionPrecision()`, quiet-wins analytics.
+   - **Two spec claims are WRONG and should be corrected before any ruling:** §3.7 says
+     PlexiDesk already tracks estimate accuracy / velocity — it does not (the raw material
+     exists in `estimate_minutes` + `focus_sessions.planned_seconds`; nothing computes it),
+     and it is used as the stated differentiator vs Motion. §3.10 says engaged-time-vs-plan
+     is measured — it is recorded, not measured.
+   - **Recommended take:** export (non-negotiable, cheap on SQLite, absent today);
+     single-key verbs; the four-test interrupt gate (cheap — the substrate already has
+     caps and layers); desk staging (the thing no calendar-first competitor can copy);
+     P3's mute-agent shadow log.
+   - **Recommended refuse:** M5/M6 act-silently (contradicts the operator's own DEC-052
+     ruling that the human stays in the loop); the mandate grid as specified (the spec
+     lists "needs managing" as a bad-EA failure mode and then specs one);
+     send-on-behalf; two-way calendar write.
+   - **Open structural question:** the spec's Inbox↔Today wall does not exist in Plexi.
+
+4. **GAP-017 — Respond → Messages.** Operator explicitly deferred: investigate the
+   messaging surface FIRST. Do not rename a taxonomy primary; it is a schema and
+   migration event, not a label edit.
+
+5. **Still open from DEC-052:** Track C (external calendar sync — foundation laid, build
+   deferred by ruling) and Track D tiers 3a/3b (email completion signals over the existing
+   IMAP, then Slack behind an OAuth layer that does not exist yet — audit confirmed).
+
+6. **Landing decision (operator's call):** 71 commits sit unmerged to `main`, flag-OFF for
+   the team. PR #5 already carries the platform fixes, so nothing is blocked on this.
+
+---
+
+## Working rules that earned their place this build
+
+- **Measure the live DB before believing the code.** Every platform defect was invisible to
+  a green suite. `sqlite3 "file:$DB?mode=ro"` — always read-only, always back up first.
+- **Verify by measurement, not screenshots.** The queue re-renders and scrolls between
+  positioning and capture; clipped screenshots repeatedly landed on the wrong rows and
+  twice produced a *confidently wrong* conclusion. `getBoundingClientRect` /
+  `getComputedStyle` over CDP is the reliable evidence. Full-viewport shots don't drift; clips do.
+- **A pin that a legitimate change breaks should be rewritten to the superseding truth,
+  never deleted.** Several were, and each carries its history in the comment.
+- **Main-process edits need an Electron restart**, not HMR. Renderer edits hot-reload.
+- **Dual-remote push:** `git push fork …` as ryan-swan, then `gh auth switch -u ryanswan313`
+  → `git push origin …` → switch back.
+- **Disclose live-data changes.** Test values were written to real items three times this
+  build and cleared each time; the record is in the transcript and the commits.
 
 ## <<<PROMPT END>>>
