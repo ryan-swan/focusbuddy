@@ -424,7 +424,7 @@ export default function CalendarView(): JSX.Element {
           e.stopPropagation()
           setEditItem(i)
         }}
-        className={`group relative flex items-center gap-2 rounded-lg fb-glass-row pl-3 pr-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-[rgba(var(--accent),0.05)] hover:-translate-y-px transition-all ${
+        className={`group relative flex items-center gap-2 rounded-lg fb-glass-row pl-3 pr-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-accent/5 hover:-translate-y-px transition-all ${
           placed ? 'opacity-60' : ''
         }`}
         title={placed ? `${i.title} — already on the calendar` : `Drag onto the calendar to schedule: ${i.title} (double-click for details)`}
@@ -505,7 +505,7 @@ export default function CalendarView(): JSX.Element {
               <button
                 onClick={() => openConsole()}
                 title="Capture a new attention item"
-                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-label text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-[rgba(var(--accent),0.06)] transition-colors"
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-label text-[var(--ink-80)] hover:text-[var(--ink-100)] hover:bg-accent/[0.06] transition-colors"
               >
                 <Icon name="add" size={15} /> New
               </button>
@@ -527,8 +527,8 @@ export default function CalendarView(): JSX.Element {
                   onClick={() => pickMode(m)}
                   className={`min-w-[62px] px-3 h-8 fb-t-label fb-press rounded-[calc(var(--radius-field)-3px)] whitespace-nowrap transition-colors ${
                     mode === m
-                      ? 'bg-[rgba(var(--accent),0.14)] text-[var(--ink-100)] shadow-[inset_0_0_0_1px_rgba(var(--accent),0.3)]'
-                      : 'text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-[rgba(var(--accent),0.06)]'
+                      ? 'bg-accent/[0.14] text-[var(--ink-100)] shadow-[inset_0_0_0_1px_rgb(var(--accent)/0.3)]'
+                      : 'text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:bg-accent/[0.06]'
                   }`}
                 >
                   {label}
@@ -542,7 +542,7 @@ export default function CalendarView(): JSX.Element {
               </button>
               <button
                 onClick={() => setAnchor(dayStart(new Date()))}
-                className="h-9 px-3.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-label text-[var(--ink-80)] hover:bg-[rgba(var(--accent),0.06)] transition-colors"
+                className="h-9 px-3.5 rounded-[var(--radius-field)] fb-glass-row fb-press fb-t-label text-[var(--ink-80)] hover:bg-accent/[0.06] transition-colors"
               >
                 Today
               </button>
@@ -562,7 +562,7 @@ export default function CalendarView(): JSX.Element {
           <aside
             ref={railRef}
             className={`fb-cq-rail flex-col gap-2 sticky top-0 rounded-xl transition-shadow ${
-              blockDragging ? 'ring-2 ring-[rgba(var(--accent),0.45)] ring-offset-4 ring-offset-[var(--surface-base)]' : ''
+              blockDragging ? 'ring-2 ring-accent/45 ring-offset-4 ring-offset-[var(--surface-base)]' : ''
             }`}
           >
             {/* DEC-055 — the panel is a SOLID glass surface, not a list lying
@@ -822,7 +822,7 @@ export default function CalendarView(): JSX.Element {
                         }}
                         className={`min-h-[104px] rounded-lg p-2 flex flex-col gap-1 transition-colors ${
                           isToday
-                            ? 'fb-glass-row ring-2 ring-[rgba(var(--accent),0.45)]'
+                            ? 'fb-glass-row ring-2 ring-accent/45'
                             : 'fb-glass-row'
                         } ${inMonth ? '' : 'opacity-40'}`}
                       >

@@ -173,8 +173,38 @@ describe('DEC-053 — the calendar QA round (operator live QA)', () => {
     expect(grid).toContain('useState(initialDurationMin ?? 60)')
   })
 
-  it("today is a raised column with a ring — not a purple wash", () => {
-    expect(grid).toContain("'border-transparent bg-[var(--surface-raised)] ring-2 ring-[rgba(var(--accent),0.45)]'")
+  it('DEC-078 — every day is the same raised surface; today is an outline ALONE', () => {
+    // History: DEC-053 made today a raised column with a 0.45 ring while the
+    // other six days sat on a sunken wash — which read as six-sevenths
+    // disabled. DEC-078 (operator QA): uniform raised columns, and today's
+    // only differentiator is a LIGHTER accent outline.
+    // The ring uses the CONFIGURED accent (slash-opacity). The old
+    // ring-[rgba(var(--accent),0.45)] form substituted to an invalid color
+    // (space-separated RGB + comma alpha), so DEC-053's ring NEVER painted —
+    // box-shadow computed to none. Found by measurement (DEC-078); the
+    // repo-wide census of that broken pattern is GAP-018.
+    expect(grid).toContain("'border-transparent bg-[var(--surface-raised)] ring-2 ring-accent/35'")
+    expect(grid).not.toContain('rgba(var(--accent)')
+    expect(grid).toContain("'border-[var(--edge-soft)] bg-[var(--surface-raised)]'")
+    // The sunken canvas is gone from the day columns entirely.
+    expect(grid).not.toContain("bg-[var(--surface-sunken)]'")
+  })
+
+  it('DEC-078 — the hours scroll in their own window; headers stay pinned', () => {
+    // Hover the grid and the wheel moves through the day, never the page:
+    // the time area is its own scroll container with overscroll contained
+    // (Google-style), bounded to the viewport, opening near the current hour.
+    // The pinned band above it holds the day headers + deadline chips — which
+    // also fixes the old layout where a tall chip stack pushed its own
+    // column's canvas out of line with the others.
+    expect(grid).toContain("overflow-y-auto overscroll-contain'}`}")
+    expect(grid).toContain("maxHeight: 'max(280px, calc(100vh - 380px))'")
+    expect(grid).toContain('el.scrollTop = Math.max(0, (h - START_HOUR - 1) * hourPx)')
+    // Taller hours — 44px showed all seventeen rows cramped; the window owns
+    // how many are visible now.
+    expect(grid).toContain('const HOUR_PX = 56')
+    // The rail (compact) keeps its full-height habit: no scroller.
+    expect(grid).toContain('compact ? undefined :')
   })
 
   it('a block dragged onto the rail unschedules — locked blocks refuse', () => {

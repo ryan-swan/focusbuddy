@@ -19,10 +19,18 @@ import Icon from '../Icon'
 // columns. Click an empty slot to book a block (tie it to a task or leave it as
 // generic focus time), drag a block to reschedule, drag its bottom edge to
 // change its length, and start a focus session straight from a block.
+//
+// DEC-078 — the hours live in their OWN scroll window (Google-style): day
+// headers + deadline chips stay pinned while the time area scrolls beneath
+// them, so a wheel over the grid moves through the day and the page never
+// budges. The rail's compact mode keeps its full-height habit.
 
 const START_HOUR = 6
 const END_HOUR = 23 // exclusive-ish; we render rows START_HOUR..END_HOUR-1
-const HOUR_PX = 44
+// DEC-078 — taller hours, fewer on screen. 44px showed all seventeen rows at
+// once and every one of them was cramped; 56px gives each hour real room and
+// lets the scroll window own how many are visible.
+const HOUR_PX = 56
 const SNAP_MIN = 15
 const DAY_MS = 86_400_000
 
@@ -204,6 +212,17 @@ export default function WeekTimeGrid({
   // Live refs to each day column so a move-drag can hit-test the pointer's X and
   // reschedule a block onto another day (Google-Calendar-style cross-day drag).
   const colRefs = useRef<(HTMLDivElement | null)[]>([])
+  // DEC-078 — the time window opens where the day actually is: on mount,
+  // scroll so the current hour sits one row below the top edge. Once; the
+  // person owns the scroll position after that.
+  const timeScrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (compact) return
+    const el = timeScrollRef.current
+    if (!el) return
+    const h = new Date().getHours() + new Date().getMinutes() / 60
+    el.scrollTop = Math.max(0, (h - START_HOUR - 1) * hourPx)
+  }, [compact, hourPx])
 
   // Convert a y offset within a day column to an absolute time for that day.
   function yToMs(dayIndex: number, y: number): number {
@@ -384,9 +403,95 @@ export default function WeekTimeGrid({
   const now = Date.now()
 
   return (
-    <div className="flex" data-testid="week-time-grid">
+    <div className="flex flex-col" data-testid="week-time-grid">
+      {/* DEC-078 — the pinned band: day headers + deadline chips stay put
+          while the hours scroll beneath them. Living up here (not inside each
+          column) also means a tall chip stack can no longer push its own
+          column's canvas out of line with the others. */}
+      <div className="flex">
+        <div className={`${compact ? 'w-8' : 'w-14'} shrink-0`} />
+        <div
+          className={`grid flex-1 min-w-0 ${compact ? 'gap-1' : 'gap-1.5'}`}
+          style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: days }, (_, dayIndex) => {
+            const dStart = dayStartMs(weekStart, dayIndex)
+            const label = new Date(dStart).toLocaleDateString(undefined, { weekday: 'short' })
+            const isToday = new Date(dStart).toDateString() === new Date().toDateString()
+            return (
+              <div key={dayIndex} className="flex flex-col min-w-0">
+                <div
+                  className={`text-center py-1.5 mb-1 rounded-[var(--radius-chip)] truncate ${
+                    isToday
+                      ? 'text-accent font-semibold bg-accent/10'
+                      : 'text-[var(--ink-50)] font-medium'
+                  } ${compact ? 'text-[11px]' : 'text-[12px]'}`}
+                  title={new Date(dStart).toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                >
+                  {label} {new Date(dStart).getDate()}
+                </div>
+                {(dueByDay.get(dayIndex)?.length ?? 0) > 0 && (
+                  <div className="flex flex-col gap-0.5 pb-1" data-testid="deadline-band">
+                    {(dueByDay.get(dayIndex) ?? []).slice(0, compact ? 2 : 4).map((i) => (
+                      <button
+                        key={i.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goAttention()
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          setEditItem(i)
+                        }}
+                        title={`Due: ${i.title} — open Attention (double-click for details)`}
+                        className={`relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2.5 pr-1.5 py-1 fb-press bg-[var(--surface-raised)] ${
+                          compact ? 'text-[10.5px]' : 'text-[11px]'
+                        } leading-snug`}
+                        style={{
+                          borderColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.6),
+                          color: 'var(--ink-70)'
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full"
+                          style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.7) }}
+                        />
+                        {i.title}
+                      </button>
+                    ))}
+                    {(dueByDay.get(dayIndex)?.length ?? 0) > (compact ? 2 : 4) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goAttention()
+                        }}
+                        className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] text-left pl-2 fb-press"
+                      >
+                        +{(dueByDay.get(dayIndex)?.length ?? 0) - (compact ? 2 : 4)} more due
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {/* DEC-078 — the hours scroll in their own window: hover the grid and a
+          wheel moves through the day, never the page (overscroll contained).
+          Compact (the rail) renders full height as before — its card owns it. */}
+      <div
+        ref={timeScrollRef}
+        className={`flex ${compact ? '' : 'overflow-y-auto overscroll-contain'}`}
+        style={compact ? undefined : { maxHeight: 'max(280px, calc(100vh - 380px))' }}
+      >
       {/* Hour gutter */}
-      <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`} style={{ paddingTop: 30 }}>
+      <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`}>
         {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
           <div
             key={i}
@@ -410,9 +515,6 @@ export default function WeekTimeGrid({
         style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: days }, (_, dayIndex) => {
-          const label = new Date(dayStartMs(weekStart, dayIndex)).toLocaleDateString(undefined, {
-            weekday: 'short'
-          })
           const dStart = dayStartMs(weekStart, dayIndex)
           const isToday = new Date(dStart).toDateString() === new Date().toDateString()
           // A block being dragged is placed by its PREVIEW start, so a cross-day
@@ -422,69 +524,16 @@ export default function WeekTimeGrid({
           const dayBlocks = blocks.filter((b) => effStart(b) >= dStart && effStart(b) < dStart + DAY_MS)
           return (
             <div key={dayIndex} className="flex flex-col min-w-0">
-              <div
-                className={`text-center py-1.5 mb-1 rounded-[var(--radius-chip)] truncate ${
-                  isToday
-                    ? 'text-accent font-semibold bg-[rgba(var(--accent),0.10)]'
-                    : 'text-[var(--ink-50)] font-medium'
-                } ${compact ? 'text-[11px]' : 'text-[12px]'}`}
-                title={new Date(dStart).toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              >
-                {label} {new Date(dStart).getDate()}
-              </div>
-              {(dueByDay.get(dayIndex)?.length ?? 0) > 0 && (
-                <div className="flex flex-col gap-0.5 pb-1" data-testid="deadline-band">
-                  {(dueByDay.get(dayIndex) ?? []).slice(0, compact ? 2 : 4).map((i) => (
-                    <button
-                      key={i.id}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        goAttention()
-                      }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation()
-                        setEditItem(i)
-                      }}
-                      title={`Due: ${i.title} — open Attention (double-click for details)`}
-                      className={`relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2.5 pr-1.5 py-1 fb-press bg-[var(--surface-raised)] ${
-                        compact ? 'text-[10.5px]' : 'text-[11px]'
-                      } leading-snug`}
-                      style={{
-                        borderColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.6),
-                        color: 'var(--ink-70)'
-                      }}
-                    >
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full"
-                        style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.7) }}
-                      />
-                      {i.title}
-                    </button>
-                  ))}
-                  {(dueByDay.get(dayIndex)?.length ?? 0) > (compact ? 2 : 4) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        goAttention()
-                      }}
-                      className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] text-left pl-2 fb-press"
-                    >
-                      +{(dueByDay.get(dayIndex)?.length ?? 0) - (compact ? 2 : 4)} more due
-                    </button>
-                  )}
-                </div>
-              )}
+              {/* DEC-078 — no graying: every day is the same raised surface,
+                  and today is marked by a light accent outline ALONE. The old
+                  sunken wash on non-today columns made the week read as
+                  sixth-sevenths disabled. */}
               <div
                 ref={(el) => (colRefs.current[dayIndex] = el)}
                 className={`relative rounded-[var(--radius-row)] border ${
                   isToday
-                    ? 'border-transparent bg-[var(--surface-raised)] ring-2 ring-[rgba(var(--accent),0.45)]'
-                    : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
+                    ? 'border-transparent bg-[var(--surface-raised)] ring-2 ring-accent/35'
+                    : 'border-[var(--edge-soft)] bg-[var(--surface-raised)]'
                 }`}
                 style={{ height: gridHeight }}
                 onPointerDown={(e) => onColumnPointerDown(e, dayIndex)}
@@ -752,6 +801,7 @@ export default function WeekTimeGrid({
             </div>
           )
         })}
+      </div>
       </div>
 
       {editItem && (
