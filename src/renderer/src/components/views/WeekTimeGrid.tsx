@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FbNode, TimeBlock, TimeBlockMeeting, TimeBlockRecurrence } from '@shared/types'
+import type { FbNode, TimeBlock } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
@@ -9,6 +9,16 @@ import { futuristicPowerOn } from '../../lib/audioBeep'
 import { blockFit } from '../../lib/calendarGeometry'
 import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
 import AttentionItemEditor from '../AttentionItemEditor'
+import BookTimeDialog from '../BookTimeDialog'
+import { useActionHistory } from '../../stores/actionHistory'
+import { loadPlannerSettings } from '../../lib/attentionPlanner'
+import {
+  resolvePlaceholder,
+  scheduleInviteHold,
+  fmtTimeRange,
+  HOLD_INVITES_MS,
+  type InviteHold
+} from '../../lib/bookTime'
 import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { joinMeetingRoom } from '../../lib/startMeeting'
@@ -65,6 +75,10 @@ interface Composer {
   // A node (task or folder) dragged onto the grid — booked directly without
   // the picker.
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
+  /** Inline create's Cmd+Enter carries the typed draft into the dialog. */
+  initialTitle?: string
+  /** Step 8 — the Attendant-proposed state (manual trigger only today). */
+  proposal?: { reason: string; autoBookAtMs: number }
 }
 
 export interface GridGhost {
@@ -160,7 +174,6 @@ export default function WeekTimeGrid({
       list.sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
     return m
   }, [workItems, weekFrom, weekTo, filterQueue])
-  const tasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
 
   // Open the node a block links to: tasks open in the canvas, folders open the
   // project dashboard.
@@ -183,6 +196,45 @@ export default function WeekTimeGrid({
   // refreshes the row before resolving, so re-reading it is authoritative).
   const closeWorkItem = useCloseWorkItem()
   const [editItem, setEditItem] = useState<FbNode | null>(null)
+  // Step 9 — inline create: the block exists already; this is just its name
+  // being typed in place on the calendar.
+  // A booked block double-clicked open for full editing — the Book time
+  // dialog is the edit surface (its own step-9 charter).
+  const [editBlock, setEditBlockState] = useState<TimeBlock | null>(null)
+  const [inlineEdit, setInlineEdit] = useState<{
+    blockId: string
+    dayIndex: number
+    startMs: number
+    durationMin: number
+    draft: string
+  } | null>(null)
+  // Step 8 — hold-time doesn't exist yet, so the proposed state fires from a
+  // manual trigger: window.__plexiiProposeBlock({ inMin, durationMin,
+  // autoBookInMin, reason }) opens the SAME dialog pre-filled with the banner.
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__plexiiProposeBlock = (opts?: {
+      inMin?: number
+      durationMin?: number
+      autoBookInMin?: number
+      reason?: string
+    }) => {
+      const startMs = snapMs(Date.now() + (opts?.inMin ?? 60) * 60_000)
+      setComposer({
+        dayIndex: 0,
+        startMs,
+        initialDurationMin: opts?.durationMin ?? 30,
+        proposal: {
+          reason:
+            opts?.reason ??
+            'Plexii held this for you. Free window before your 4:30. Change anything, or leave it — it books itself in 20 minutes.',
+          autoBookAtMs: Date.now() + (opts?.autoBookInMin ?? 20) * 60_000
+        }
+      })
+    }
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__plexiiProposeBlock
+    }
+  }, [])
   const deskChoices = useMemo(
     () => nodes.filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId),
     [nodes]
@@ -272,6 +324,30 @@ export default function WeekTimeGrid({
       }
       const startMs = Math.min(cur.anchorMs, at)
       const durationMin = Math.max(SNAP_MIN, Math.round((Math.abs(at - cur.anchorMs)) / 60000))
+      // Step 9 (flagged) — a drag books instantly, named by the SAME
+      // placeholder resolution the dialog uses, with the title in inline
+      // edit right on the block. The dialog stays the edit/proposal surface;
+      // it just stops being what greets a drag. Flag OFF = the DEC-053 path,
+      // verbatim, seed and all.
+      if (loadPlannerSettings().inlineCreate) {
+        const title = resolvePlaceholder({
+          mode: 'focus',
+          attachedTitle: null,
+          guests: [],
+          roomName: null
+        })
+        void createBlock({
+          taskId: null,
+          title,
+          startMs,
+          durationMin,
+          meeting: null,
+          recurrence: null
+        }).then((b) =>
+          setInlineEdit({ blockId: b.id, dayIndex: cur.dayIndex, startMs, durationMin, draft: '' })
+        )
+        return
+      }
       setComposer({ dayIndex: cur.dayIndex, startMs, initialDurationMin: durationMin })
     }
     window.addEventListener('pointermove', onMove)
@@ -403,6 +479,35 @@ export default function WeekTimeGrid({
       setActive(block.taskId)
       goTask(block.taskId)
     }
+  }
+
+  /** Inline create endings: Enter/blur keep the block (typed name wins,
+   *  resolved name stays if empty) · Esc removes it · Cmd+Enter promotes to
+   *  the full dialog with everything carried over (the block is re-made by
+   *  the dialog's own commit, so it is removed here first). */
+  async function finishInline(keepDraft: boolean): Promise<void> {
+    const ie = inlineEdit
+    if (!ie) return
+    setInlineEdit(null)
+    if (keepDraft && ie.draft.trim()) await updateBlock(ie.blockId, { title: ie.draft.trim() })
+  }
+  async function cancelInline(): Promise<void> {
+    const ie = inlineEdit
+    if (!ie) return
+    setInlineEdit(null)
+    await removeBlock(ie.blockId)
+  }
+  async function promoteInline(): Promise<void> {
+    const ie = inlineEdit
+    if (!ie) return
+    setInlineEdit(null)
+    await removeBlock(ie.blockId)
+    setComposer({
+      dayIndex: ie.dayIndex,
+      startMs: ie.startMs,
+      initialDurationMin: ie.durationMin,
+      initialTitle: ie.draft
+    })
   }
 
   const gridHeight = (END_HOUR - START_HOUR) * hourPx
@@ -870,35 +975,83 @@ export default function WeekTimeGrid({
           }}
         />
       )}
+      {editBlock && (
+        <BookTimeDialog
+          startMs={editBlock.startMs}
+          initialDurationMin={editBlock.durationMin}
+          editBlock={editBlock}
+          prefillNode={(() => {
+            const n = editBlock.taskId
+              ? nodesById.get(editBlock.taskId) ?? itemsById.get(editBlock.taskId)
+              : null
+            return n ? { id: n.id, title: n.title, kind: n.kind } : undefined
+          })()}
+          onCancel={() => setEditBlockState(null)}
+          onSave={async (patch) => {
+            const prev = editBlock
+            setEditBlockState(null)
+            await updateBlock(prev.id, patch)
+            useActionHistory.getState().recordWithToast({
+              label: `Saved \u201c${patch.title ?? prev.title}\u201d \u00b7 ${fmtTimeRange(
+                patch.startMs ?? prev.startMs,
+                patch.durationMin ?? prev.durationMin
+              )}`,
+              undo: async () => {
+                await updateBlock(prev.id, {
+                  taskId: prev.taskId,
+                  title: prev.title,
+                  startMs: prev.startMs,
+                  durationMin: prev.durationMin,
+                  meeting: prev.meeting ?? null
+                })
+              },
+              redo: async () => {
+                await updateBlock(prev.id, patch)
+              }
+            })
+          }}
+        />
+      )}
+      {/* Book time (spec pass 1, steps 1–3) — replaces BlockComposer at the
+          mount. The old composer stays below as the steps‑4–9 reference
+          (guests / where / agenda / invites) and is deleted at step 9.
+          Drop-books-immediately never reaches this mount, unchanged. */}
       {composer && (
-        <BlockComposer
+        <BookTimeDialog
           startMs={composer.startMs}
           initialDurationMin={composer.initialDurationMin}
-          tasks={tasks.filter((t) => t.status !== 'done')}
+          initialTitle={composer.initialTitle}
           prefillNode={composer.prefillNode}
+          proposal={composer.proposal}
           onCancel={() => setComposer(null)}
-          onCreate={async (taskId, title, durationMin, meeting, recurrence) => {
-            await createBlock({ taskId, title, startMs: composer.startMs, durationMin, meeting, recurrence })
-            if (!meeting || meeting.invitees.length === 0) return { inviteNote: null }
-            // Send the join details to the invitees over the connected mailbox,
-            // and report the honest outcome (sent / partial / no mailbox).
-            const r = await sendMeetingInvites({
-              title: title || 'Meeting',
-              startMs: composer.startMs,
-              durationMin,
-              roomId: meeting.roomId,
-              invitees: meeting.invitees
-            })
-            if (r.noAccount) {
-              return {
-                inviteNote:
-                  'Meeting saved. Connect a mailbox in Mail to email the invites; the join link is on the calendar block.'
+          onCreate={async (taskId, title, startMs, durationMin, meeting, recurrence) => {
+            // Step 7 — closes IMMEDIATELY; no spinner, no confirmation step.
+            // The create is a local write; the toast is where regret goes.
+            setComposer(null)
+            const draft = { taskId, title, startMs, durationMin, meeting, recurrence }
+            const block = await createBlock(draft)
+            // The stated hold: outbound invites wait a window Undo can
+            // cancel. Nothing sends today (CR-08/CR-09 — no outbound path,
+            // no hosted links); the expiry callback is the future send site.
+            const hold: InviteHold | null =
+              meeting && meeting.invitees.length > 0
+                ? scheduleInviteHold(() => {
+                    /* future: sendMeetingInvites(...) — deliberately silent */
+                  }, HOLD_INVITES_MS)
+                : null
+            const verb = meeting ? 'Scheduled' : 'Booked'
+            useActionHistory.getState().recordWithToast({
+              label: `${verb} “${title}” · ${fmtTimeRange(startMs, durationMin)}${
+                hold ? ` · invites hold ${HOLD_INVITES_MS / 1000}s` : ''
+              }`,
+              undo: async () => {
+                hold?.cancel()
+                await removeBlock(block.id)
+              },
+              redo: async () => {
+                await createBlock(draft)
               }
-            }
-            if (r.failed.length > 0) {
-              return { inviteNote: `Meeting saved. Invited ${r.sent}; could not email ${r.failed.join(', ')}.` }
-            }
-            return { inviteNote: `Meeting saved and invites sent to ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` }
+            })
           }}
         />
       )}
@@ -954,305 +1107,6 @@ export default function WeekTimeGrid({
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-function BlockComposer({
-  startMs,
-  initialDurationMin,
-  tasks,
-  prefillNode,
-  onCancel,
-  onCreate
-}: {
-  startMs: number
-  initialDurationMin?: number
-  tasks: FbNode[]
-  prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
-  onCancel: () => void
-  onCreate: (
-    taskId: string | null,
-    title: string,
-    durationMin: number,
-    meeting: TimeBlockMeeting | null,
-    recurrence: TimeBlockRecurrence | null
-  ) => Promise<{ inviteNote: string | null }>
-}): JSX.Element {
-  const [taskId, setTaskId] = useState<string>('')
-  const [title, setTitle] = useState('')
-  const [duration, setDuration] = useState(initialDurationMin ?? 60)
-  const [repeat, setRepeat] = useState<TimeBlockRecurrence | ''>('')
-  const [busy, setBusy] = useState(false)
-  const [isMeeting, setIsMeeting] = useState(false)
-  const [invitees, setInvitees] = useState('')
-  // DEC-063 — the two things the composer could not express: where to be, and
-  // a link that is not Plexii's own room.
-  const [location, setLocation] = useState('')
-  const [joinUrl, setJoinUrl] = useState('')
-  const [inviteNote, setInviteNote] = useState<string | null>(null)
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
-  // A meeting block gets a stable room id now so the same link works for the
-  // host and every invitee. Emails are split on commas, spaces, and newlines.
-  function parsedInvitees(): string[] {
-    return invitees
-      .split(/[\s,;]+/)
-      .map((e) => e.trim().toLowerCase())
-      .filter((e) => e.includes('@'))
-  }
-
-  async function submit(): Promise<void> {
-    if (busy) return
-    setBusy(true)
-    try {
-      const meeting: TimeBlockMeeting | null = isMeeting
-        ? {
-            roomId: newMeetingRoomId(),
-            invitees: parsedInvitees(),
-            joinUrl: joinUrl.trim() || null,
-            location: location.trim() || null
-          }
-        : null
-      // A dragged node books directly against that node; otherwise use the
-      // picker (a chosen task, or a labelled generic focus block).
-      let result: { inviteNote: string | null }
-      if (prefillNode) {
-        result = await onCreate(prefillNode.id, '', duration, meeting, repeat || null)
-      } else {
-        const label = taskId ? '' : title.trim() || (isMeeting ? 'Meeting' : 'Focus time')
-        result = await onCreate(taskId || null, label, duration, meeting, repeat || null)
-      }
-      // If invites went out (or couldn't), show the honest note and keep the
-      // panel open so the user reads it; otherwise close straight away.
-      if (result.inviteNote) {
-        setInviteNote(result.inviteNote)
-      } else {
-        onCancel()
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div
-      className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center"
-      onClick={onCancel}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="fb-card fb-press w-[340px] rounded-[var(--radius-card)] fb-pop-in p-4 space-y-3"
-        data-testid="block-composer"
-      >
-        <div className="flex items-center gap-2">
-          <Icon name="schedule" size={16} className="text-accent" />
-          <h3 className="fb-t-title text-[var(--ink-100)]">Book time</h3>
-          <span className="ml-auto fb-t-caption font-mono">
-            {fmtTime(startMs)}
-          </span>
-        </div>
-
-        {prefillNode ? (
-          <div
-            className="flex items-center gap-2 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-2 py-1.5"
-            data-testid="composer-prefill"
-          >
-            <Icon
-              name={prefillNode.kind === 'folder' ? 'folder' : 'task_alt'}
-              size={14}
-              className="text-accent shrink-0"
-            />
-            <span className="fb-t-body text-[var(--ink-90)] truncate">
-              {prefillNode.title}
-            </span>
-          </div>
-        ) : (
-          <>
-            <label className="block">
-              <span className="fb-t-caption uppercase tracking-wider font-medium">
-                Task
-              </span>
-              <select
-                value={taskId}
-                onChange={(e) => setTaskId(e.target.value)}
-                className="fb-field fb-t-body mt-1"
-                data-testid="composer-task"
-              >
-                <option value="">Focus time (no task)</option>
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {!taskId && (
-              <label className="block">
-                <span className="fb-t-caption uppercase tracking-wider font-medium">
-                  Label (optional)
-                </span>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Focus time"
-                  className="fb-field fb-t-body mt-1"
-                />
-              </label>
-            )}
-          </>
-        )}
-
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isMeeting}
-            onChange={(e) => setIsMeeting(e.target.checked)}
-            className="accent-accent"
-            data-testid="composer-meeting-toggle"
-          />
-          <Icon name="videocam" size={14} className="text-accent" />
-          <span className="fb-t-body text-[var(--ink-90)]">Video meeting</span>
-        </label>
-
-        {isMeeting && (
-          <label className="block">
-            <span className="fb-t-caption uppercase tracking-wider font-medium">
-              Invite people (emails)
-            </span>
-            <textarea
-              value={invitees}
-              onChange={(e) => setInvitees(e.target.value)}
-              placeholder="alex@acme.com, sam@acme.com"
-              rows={2}
-              className="fb-field fb-t-body mt-1 resize-none"
-              data-testid="composer-invitees"
-            />
-            <span className="mt-1 block fb-t-caption">
-              Each invitee gets an email with the time and a link to join in PlexiDesk.
-            </span>
-          </label>
-        )}
-
-        {inviteNote && (
-          <div
-            className="rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-2.5 py-2 fb-t-label text-[var(--ink-70)]"
-            data-testid="composer-invite-note"
-          >
-            {inviteNote}
-          </div>
-        )}
-
-        {/* DEC-063 — where to be, and how to get in. Shown only for a meeting:
-            focus time has no location and no link, and offering the fields
-            anyway would ask a question the block cannot answer. */}
-        {isMeeting && (
-          <>
-            <label className="block">
-              <span className="fb-t-caption uppercase tracking-wider font-medium">
-                Meeting link
-              </span>
-              <input
-                value={joinUrl}
-                onChange={(e) => setJoinUrl(e.target.value)}
-                placeholder="Paste a Google Meet, Zoom or Teams link — or leave blank for a Plexii room"
-                className="fb-field fb-t-body mt-1"
-                data-testid="block-join-url"
-              />
-            </label>
-            <label className="block">
-              <span className="fb-t-caption uppercase tracking-wider font-medium">
-                Location
-              </span>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="An address, a room, or where to meet"
-                className="fb-field fb-t-body mt-1"
-                data-testid="block-location"
-              />
-            </label>
-          </>
-        )}
-
-        <label className="block">
-          <span className="fb-t-caption uppercase tracking-wider font-medium">
-            Length
-          </span>
-          <select
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="fb-field fb-t-body mt-1"
-          >
-            {[15, 25, 30, 45, 60, 90, 120].map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
-          {/* DEC-063 — say when it ENDS, not just how long it runs. "60 min" is
-              arithmetic the person has to do against a start time they can no
-              longer see; the end time is the thing they are actually checking
-              against the rest of their day. */}
-          <span className="fb-t-caption text-[var(--ink-40)] mt-1 block fb-tabular">
-            {new Date(startMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-            {' – '}
-            {new Date(startMs + duration * 60_000).toLocaleTimeString(undefined, {
-              hour: 'numeric',
-              minute: '2-digit'
-            })}
-          </span>
-        </label>
-
-        <label className="block">
-          <span className="fb-t-caption uppercase tracking-wider font-medium">
-            Repeats
-          </span>
-          <select
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value as TimeBlockRecurrence | '')}
-            className="fb-field fb-t-body mt-1"
-            data-testid="block-repeat"
-          >
-            <option value="">Does not repeat</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-
-        <div className="flex justify-end gap-2 pt-1">
-          {inviteNote ? (
-            <button onClick={onCancel} className="btn-primary" data-testid="composer-done">
-              <Icon name="check" size={14} />
-              <span>Done</span>
-            </button>
-          ) : (
-            <>
-              <button onClick={onCancel} className="btn-ghost">
-                Cancel
-              </button>
-              <button
-                onClick={() => void submit()}
-                disabled={busy}
-                className="btn-primary"
-                data-testid="composer-create"
-              >
-                <Icon name={isMeeting ? 'videocam' : 'add'} size={14} />
-                <span>{isMeeting ? 'Schedule meeting' : 'Book it'}</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

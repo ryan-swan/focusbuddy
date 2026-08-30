@@ -169,8 +169,10 @@ describe('DEC-053 — the calendar QA round (operator live QA)', () => {
     expect(grid).toContain('data-testid="drag-select"')
     expect(grid).toContain("if (!cur.moved || at === cur.anchorMs) {")
     expect(grid).toContain('initialDurationMin: durationMin')
-    // The composer opens at exactly the dragged length.
-    expect(grid).toContain('useState(initialDurationMin ?? 60)')
+    // The dialog opens at exactly the dragged length (the seed moved into
+    // BookTimeDialog with the spec-pass-1 rebuild; the pin moved with it).
+    const bookTime = read('src/renderer/src/components/BookTimeDialog.tsx')
+    expect(bookTime).toContain('useState(initialDurationMin ?? 60)')
   })
 
   it('DEC-078 — every day is the same raised surface; today is an outline ALONE', () => {

@@ -726,6 +726,18 @@ export default function CalendarView(): JSX.Element {
                           </select>
                         </label>
                         <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Drag books instantly
+                          {/* Step 9's off switch — flag OFF restores the
+                              dialog as what greets a drag (DEC-053 path). */}
+                          <input
+                            type="checkbox"
+                            checked={settings.inlineCreate}
+                            onChange={(e) => patchSettings({ inlineCreate: e.target.checked })}
+                            data-testid="inline-create-toggle"
+                            className="h-4 w-4 accent-[rgb(var(--accent))]"
+                          />
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
                           Longest sitting
                           <select
                             value={settings.maxSessionMin}

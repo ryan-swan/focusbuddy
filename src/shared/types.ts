@@ -319,6 +319,9 @@ export interface TimeBlockMeeting {
   // the block, so adding these needed no migration.
   joinUrl?: string | null
   location?: string | null
+  /** Book-time step 7 — what this meeting needs to settle. Same free ride as
+   *  joinUrl/location above: the payload is JSON on the block, no migration. */
+  agenda?: string | null
 }
 
 export type TimeBlockRecurrence = 'daily' | 'weekly' | 'monthly'

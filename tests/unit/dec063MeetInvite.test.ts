@@ -115,14 +115,17 @@ describe('dec_063 — the calendar composer can express a real meeting', () => {
     require('node:fs').readFileSync(new URL(rel, import.meta.url), 'utf8') as string
 
   it('dec_063_link_location_and_end_time_are_offered', () => {
-    const grid = read('../../src/renderer/src/components/views/WeekTimeGrid.tsx')
-    expect(grid).toContain('block-join-url')
-    expect(grid).toContain('block-location')
-    // The end time, not just the duration: "60 min" is arithmetic against a
-    // start time the person can no longer see.
-    expect(grid).toContain('startMs + duration * 60_000')
+    // History: pinned against BlockComposer, which the Book time dialog
+    // replaced (its step 9 deleted the old composer). The DEC-063 substance
+    // survives on the new surface: a link input, a location input, the END
+    // time shown (not just a duration), and all of it meeting-only.
+    const dlg = read('../../src/renderer/src/components/BookTimeDialog.tsx')
+    expect(dlg).toContain('where-link-input')
+    expect(dlg).toContain('where-inperson-input')
+    // The end time, not just the duration: the end chip renders the clock.
+    expect(dlg).toContain('fmtTimeChip(startMs + durationMin * 60_000)')
     // ...and only for a meeting. Focus time has no location and no link.
-    expect(grid).toContain('{isMeeting && (')
+    expect(dlg).toContain("mode === 'meeting' && (")
   })
 
   it('dec_063_an_external_link_beats_the_minted_plexii_room', () => {

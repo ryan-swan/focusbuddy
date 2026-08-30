@@ -31,6 +31,11 @@ export interface PlannerSettings {
   gapMin: number
   /** Ceiling on TOTAL planned minutes in a day (existing blocks count). */
   maxDailyPlannedMin: number
+  /** Step 9 — drag-select creates the block instantly with inline naming,
+   *  instead of opening the dialog. Operator ruling (2026-08-30, after using
+   *  it): a drag-highlight should open the FULL dialog to specify details —
+   *  so this defaults OFF, and the switch opts into inline. */
+  inlineCreate: boolean
 }
 
 export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
@@ -39,7 +44,8 @@ export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
   defaultBlockMin: 30,
   maxSessionMin: 90,
   gapMin: 10,
-  maxDailyPlannedMin: 330
+  maxDailyPlannedMin: 330,
+  inlineCreate: false
 }
 
 const SETTINGS_KEY = 'planner.settings'
