@@ -104,7 +104,9 @@ describe('DEC-040 — notes exist on EVERY capture path, not only the bare conso
     // DIRECTLY — the console's notes stage never appears there, which is
     // where the operator "lost the ability to add a note".
     const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
-    expect(card).toContain('Add notes — context worth keeping with it')
+    // Capture-rebuild: the card's notes placeholder tightened to 'Add notes…'
+    // (the mock's copy); the editable area itself is the DEC-040 substance.
+    expect(card).toContain('placeholder="Add notes…"')
     expect(card).toContain('setNotesEdited(true)')
     // Enter inside the notes makes a NEWLINE, never files the item.
     expect(card).toContain("if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) e.stopPropagation()")
@@ -114,10 +116,14 @@ describe('DEC-040 — notes exist on EVERY capture path, not only the bare conso
     expect(card).toContain('(notesEdited ? confirm.notes : ownNotes)')
   })
 
-  it('the bare manual form has notes too (it never did)', () => {
+  it('the bare manual form is GONE — capture is the only door (capture rebuild)', () => {
+    // History: DEC-040 gave the manual form a notes field. The capture
+    // rebuild (operator spec, 2026-08-30) then deleted the form entirely —
+    // "two doors to the same room is the problem we're fixing" — and its
+    // fields were absorbed into the confirm step's pills. Not behind a flag.
     const view = read('src/renderer/src/components/views/AttentionView.tsx')
-    expect(view).toContain("placeholder=\"Notes (optional)\"")
-    expect(view).toContain('notes: newNotes.trim() || undefined')
+    expect(view).not.toContain('New item')
+    expect(view).not.toContain('fileNewItem')
   })
 })
 
@@ -132,13 +138,14 @@ describe('DEC-039 — capture-time context + the one input everywhere', () => {
     expect(card).toContain("wiUrgency: urgency === 'normal' ? null : urgency")
   })
 
-  it('all three surfaces share ONE input, so the @ grammar cannot fork', () => {
-    for (const f of [
-      'src/renderer/src/components/AttentionConfirmCard.tsx',
-      'src/renderer/src/components/AttentionItemEditor.tsx',
-      'src/renderer/src/components/views/AttentionView.tsx'
-    ])
-      expect(read(f)).toContain('TagMentionInput')
+  it('the @ grammar cannot fork: ONE input, now inside the Desk drawer', () => {
+    // History: card + manual form + editor all rendered TagMentionInput.
+    // The form is deleted (capture rebuild); the card keeps the one input —
+    // moved into the expanded Desk drawer per the spec, not a standing row.
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    const editor = read('src/renderer/src/components/AttentionItemEditor.tsx')
+    expect(card).toContain('TagMentionInput')
+    expect(editor).toContain('TagMentionInput')
   })
 
   it('mention chips render on rows; desk/room/plan navigate, person is honest', () => {
@@ -313,13 +320,14 @@ describe('DEC-047 — desk ⇄ attention, the derived shape (analysis/23 execute
     expect(desks).toContain("(['open', 'in_progress', 'done', 'parked']")
   })
 
-  it('D-5: capture-time status on card AND form — ACTIVE states only', () => {
+  it('D-5 SUPERSEDED: status is removed from capture (capture rebuild)', () => {
+    // History: DEC-047 D-5 put an active birth state on the capture card.
+    // The rebuild removed it — "in progress / waiting / blocked at the
+    // moment of intake is a state you almost never intend", and waiting is
+    // one keystroke (W) away in Attention. A new item is open, always.
     const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
-    expect(card).toContain('CAPTURE_STATES.map')
-    expect(card).toContain("state: birthState === 'open' ? undefined : birthState")
-    expect(view).toContain('CAPTURE_STATES.map')
-    const shared = read('src/shared/workItems.ts')
-    expect(shared).toContain("['open', 'in_progress', 'waiting', 'blocked'] as const")
+    expect(card).not.toContain('CAPTURE_STATES')
+    expect(card).toContain('a new item is open')
   })
 })
 

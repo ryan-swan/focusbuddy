@@ -239,7 +239,14 @@ export function lightTidyTitle(raw: string): string {
 /** A short title from a capture: first sentence-ish, trimmed, capped. */
 export function titleFromCapture(text: string): string {
   const first = text.trim().split(/(?<=[.!?])\s+|\n/)[0] ?? ''
-  const t = lightTidyTitle(first.replace(/^(fyi|note to self|for the record)\b[:,]?\s*/i, '').trim())
+  // Capture scaffolding exists to tell the AI what you meant; it shouldn't
+  // survive into the item ("remind me to call Doug" files as "Call Doug").
+  const t = lightTidyTitle(
+    first
+      .replace(/^(fyi|note to self|for the record|todo|to-do)\b[:,]?\s*/i, '')
+      .replace(/^(remind me to|i need to|i have to|don'?t forget to)\s+/i, '')
+      .trim()
+  )
   return (t.length > 120 ? `${t.slice(0, 117)}…` : t) || 'Untitled work item'
 }
 

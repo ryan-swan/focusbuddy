@@ -1,20 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useWorkItemStore } from '../stores/workItems'
-import { CLASS_CHOICES, CLASS_LABEL, QUEUE_ICON } from '../lib/attentionQueues'
+import { useNodeStore } from '../stores/nodes'
+import { useActionHistory } from '../stores/actionHistory'
+import { CLASS_CHOICES, CLASS_LABEL } from '../lib/attentionQueues'
 import Icon from './Icon'
 import TagMentionInput from './TagMentionInput'
 import { URGENCY_LEVELS } from '../lib/itemTags'
-import { CAPTURE_STATES } from '@shared/workItems'
 import { serializeTags } from '../lib/itemTags'
 import { serializeMentions, type ItemMention } from '../lib/itemMentions'
 import { parseSelectionList, normalizeSelectionText } from '../lib/selectionList'
 
 // The ONE confirm stop (DEC-019), extracted so every capture surface renders
 // the SAME flow (DEC-028): the console overlay and the chat's inline card are
-// two hosts of this single component — classify, the pre-highlighted class
-// chips (←/→ cycle, Enter files), DEC-025's secondary chips, DEC-026's tidy
-// offer, and the Q1 date question all live here and nowhere else. The class
-// choice set lives with the queue semantics (attentionQueues) — one copy.
+// two hosts of this single component. Rebuilt as Book time's sibling: a
+// stated default, fully editable in place, one keystroke to accept. Four
+// labelled pills (CATEGORY / URGENCY / WHEN / DESK) that VISIBLY open — one
+// drawer at a time, each led by its question; number keys 1–8 set the
+// category directly; Esc closes an open drawer first and only then leaves.
+// CONFIDENCE: a value Plexii inferred renders in accent; a default, or a
+// value the user changed by hand, renders in ink — accent means "a machine
+// guessed this, look at it". (The classifier carries confidence for the
+// CATEGORY and an inferred date for WHEN; urgency is never inferred, so its
+// pill honestly never lights.) Status is gone from capture — a new item is
+// open; waiting is reachable with W in Attention. Classification, the tidy,
+// DEC-025's secondaries and DEC-046's list splitting are untouched — this is
+// how the output is presented, not what it decides.
 
 export { CLASS_CHOICES, CLASS_LABEL }
 
@@ -72,9 +83,26 @@ export default function AttentionConfirmCard({
   cancelLabel?: string
 }): JSX.Element {
   const createItem = useWorkItemStore((s) => s.create)
+  const nodes = useNodeStore((s) => s.nodes)
+  const reduceMotion = useReducedMotion()
   const updateFieldsStore = useWorkItemStore((s) => s.updateFields)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
-  const [confirmDate, setConfirmDate] = useState('')
+  /** One drawer at a time — same rule as Where in Book time. */
+  const [openDrawer, setOpenDrawer] = useState<'category' | 'urgency' | 'when' | 'desk' | null>(
+    null
+  )
+  const [catTouched, setCatTouched] = useState(false)
+  const [whenTouched, setWhenTouched] = useState(false)
+  /** 'someday' = no date (the honest default; filing semantics unchanged). */
+  const [whenChoice, setWhenChoice] = useState<'someday' | 'today' | 'tomorrow' | 'week' | 'date'>(
+    'someday'
+  )
+  const [customDate, setCustomDate] = useState('')
+  const [whenInferred, setWhenInferred] = useState(false)
+  /** undefined = follow the DEC-023 desk context; null = explicitly no desk. */
+  const [deskPick, setDeskPick] = useState<{ id: string; title: string } | null | undefined>(
+    undefined
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // DEC-026: the tidy — requested AFTER the screen is up, seq-guarded.
@@ -90,9 +118,6 @@ export default function AttentionConfirmCard({
   // DEC-039 — chosen context at CAPTURE time: urgency + tags/mentions ride
   // the preview screen, so an item can arrive in the queue already tagged.
   const [urgency, setUrgency] = useState<string>('normal')
-  // DEC-047 D-5: an ACTIVE birth state ("waiting on Bob" is real at capture
-  // time). Terminal states stay with the closing verbs.
-  const [birthState, setBirthState] = useState<string>('open')
   const [capTags, setCapTags] = useState<string[]>([])
   const [capMentions, setCapMentions] = useState<ItemMention[]>([])
   // DEC-040: notes are editable ON the preview. The chat's inline card and
@@ -103,17 +128,30 @@ export default function AttentionConfirmCard({
   const [notesEdited, setNotesEdited] = useState(false)
   // The tidy in flight, so Enter can WAIT for it rather than racing it.
   const tidyPending = useRef<Promise<unknown> | null>(null)
+  // The card OWNS the keyboard from the moment it appears: number keys, the
+  // two-stage Esc, and the armed Enter all listen on this container, so it
+  // takes focus on mount (the old build did this via an autofocused chip —
+  // without it, keys land on <body> and the card is deaf until a click).
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (confirm) cardRef.current?.focus()
+  }, [confirm != null])
 
   useEffect(() => {
     let alive = true
     setConfirm(null)
     setCleanup(null)
     setCleanupUsed(false)
-    setConfirmDate('')
     setError(null)
     setArmed(false)
     setUrgency('normal')
-    setBirthState('open')
+    setOpenDrawer(null)
+    setCatTouched(false)
+    setWhenTouched(false)
+    setWhenChoice('someday')
+    setCustomDate('')
+    setWhenInferred(false)
+    setDeskPick(undefined)
     setCapTags([])
     setCapMentions([])
     setNotesEdited(false)
@@ -217,6 +255,23 @@ export default function AttentionConfirmCard({
             checked: true
           }))
         })
+        // The WHEN pill: an inferred date renders in accent and lands on the
+        // matching choice; a deadline question auto-opens the drawer.
+        if (c.dueAt) {
+          const d = new Date(c.dueAt)
+          const today = new Date()
+          const tomorrow = new Date()
+          tomorrow.setDate(today.getDate() + 1)
+          setWhenInferred(true)
+          if (d.toDateString() === today.toDateString()) setWhenChoice('today')
+          else if (d.toDateString() === tomorrow.toDateString()) setWhenChoice('tomorrow')
+          else {
+            setWhenChoice('date')
+            setCustomDate(c.dueAt.slice(0, 10))
+          }
+        } else if (c.clarify != null) {
+          setOpenDrawer('when')
+        }
         const seq = ++cleanupSeq.current
         // The tidy is still requested AFTER the screen is up — a capture never
         // waits on it (R011) — but it now lands INTO the preview rather than
@@ -278,11 +333,33 @@ export default function AttentionConfirmCard({
           new Promise((r) => setTimeout(r, TIDY_WAIT_CAP_MS))
         ])
       }
-      const dueAt = confirm.needsDate
-        ? confirmDate
-          ? new Date(`${confirmDate}T17:00:00`).toISOString()
-          : null
-        : confirm.dueAt
+      // WHEN → a real instant (the house 5pm convention). 'This week' means
+      // the upcoming Friday (today, if today is Friday). Someday = no date —
+      // the default writes nothing, exactly as before this redesign.
+      const at5 = (d: Date): string => {
+        d.setHours(17, 0, 0, 0)
+        return d.toISOString()
+      }
+      const dueAt = ((): string | null => {
+        switch (whenChoice) {
+          case 'today':
+            return at5(new Date())
+          case 'tomorrow': {
+            const d = new Date()
+            d.setDate(d.getDate() + 1)
+            return at5(d)
+          }
+          case 'week': {
+            const d = new Date()
+            d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7))
+            return at5(d)
+          }
+          case 'date':
+            return customDate ? new Date(`${customDate}T17:00:00`).toISOString() : null
+          default:
+            return null
+        }
+      })()
       const extras = confirm.secondaries.filter((s) => s.checked)
       // (extras counts the summary; the filing loop below walks the full
       // secondary list so parentIdx indexing stays stable.)
@@ -311,14 +388,15 @@ export default function AttentionConfirmCard({
             // and always visible, rather than archived into the notes.
             confirm.notes || undefined
           : [confirm.notes, verbatim].filter(Boolean).join('\n\n') || undefined
+      const parentDeskId = deskPick === undefined ? (deskCtx?.id ?? null) : (deskPick?.id ?? null)
       const item = await createItem({
         title,
         notes,
-        parentId: deskCtx?.id ?? null,
+        parentId: parentDeskId,
         intentClass: confirm.picked,
         dueAt,
         wiUrgency: urgency === 'normal' ? null : urgency,
-        state: birthState === 'open' ? undefined : birthState,
+        // Status is removed from capture: a new item is open, always.
         tags: serializeTags(capTags),
         mentions: serializeMentions(capMentions),
         confidence: confirm.confidence,
@@ -344,7 +422,7 @@ export default function AttentionConfirmCard({
         const child = await createItem({
           title: s.title,
           notes: s.text.trim() === s.title ? undefined : s.text.trim(),
-          parentId: deskCtx?.id ?? null,
+          parentId: parentDeskId,
           intentClass: s.listDerived ? confirm.picked : s.intentClass,
           dueAt: s.dueAt,
           confidence: s.listDerived ? 1 : 0.95,
@@ -357,8 +435,22 @@ export default function AttentionConfirmCard({
         if (parentId) await updateFieldsStore(child.id, { groupId: parentId })
       }
       const summary =
-        `${CLASS_LABEL[confirm.picked] ?? confirm.picked} — “${item.title}”` +
+        `Filed to ${CLASS_LABEL[confirm.picked] ?? confirm.picked} — “${item.title}”` +
         (extras.length > 0 ? ` · +${extras.length} more` : '')
+      // The action keeps its name: "File it" → "Filed to …", with Undo. Work
+      // items are never hard-deleted (R008), so Undo dismisses — revivable,
+      // honest — and redo reopens.
+      const filedIds = [item.id, ...createdBySecIdx.values()]
+      const store = useWorkItemStore.getState()
+      useActionHistory.getState().recordWithToast({
+        label: summary,
+        undo: async () => {
+          for (const id of filedIds) await store.setState(id, 'dismissed')
+        },
+        redo: async () => {
+          for (const id of filedIds) await store.setState(id, 'open')
+        }
+      })
       onFiled(summary, 1 + extras.length, item.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
@@ -385,32 +477,142 @@ export default function AttentionConfirmCard({
     )
   }
 
+  const eyebrow = 'text-[10.5px] font-semibold tracking-wider text-[var(--ink-40)] mb-1'
+  const catAccent = !catTouched
+  const whenAccent = whenInferred && !whenTouched
+  const deskAccent = deskPick === undefined && !!deskCtx
+  const deskValue =
+    deskPick === undefined ? (deskCtx?.title ?? 'No desk') : (deskPick?.title ?? 'No desk')
+  const whenValue =
+    whenChoice === 'someday'
+      ? 'Someday'
+      : whenChoice === 'today'
+        ? 'Today'
+        : whenChoice === 'tomorrow'
+          ? 'Tomorrow'
+          : whenChoice === 'week'
+            ? 'This week'
+            : customDate
+              ? new Date(`${customDate}T12:00:00`).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric'
+                })
+              : 'Pick a date'
+  const recentDesks = nodes
+    .filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 5)
+
+  const revealTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const }
+
+  function pickOption(apply: () => void): void {
+    apply()
+    // Selecting answers the question — the drawer closes itself (~150ms so
+    // the chosen pill is seen landing).
+    setTimeout(() => setOpenDrawer(null), 150)
+  }
+
+  const pill = (
+    key: 'category' | 'urgency' | 'when' | 'desk',
+    labelTxt: string,
+    value: string,
+    accent: boolean
+  ): JSX.Element => (
+    <div className="min-w-0">
+      <div className={eyebrow}>{labelTxt}</div>
+      <button
+        type="button"
+        data-testid={`pill-${key}`}
+        aria-expanded={openDrawer === key}
+        onClick={() => setOpenDrawer((d) => (d === key ? null : key))}
+        className={`w-full h-10 px-3 rounded-[var(--radius-field)] border inline-flex items-center justify-between gap-1.5 text-[14px] font-medium fb-press transition-colors ${
+          openDrawer === key
+            ? 'border-[rgb(var(--accent))] bg-accent/10'
+            : 'border-[var(--edge-strong)] bg-[var(--surface-raised)] hover:border-[rgb(var(--accent))] hover:bg-accent/10'
+        }`}
+      >
+        <span
+          className={`truncate ${accent ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-100)]'}`}
+        >
+          {value}
+        </span>
+        <Icon
+          name="expand_more"
+          size={16}
+          className={`shrink-0 text-[var(--ink-40)] transition-transform ${
+            openDrawer === key ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+    </div>
+  )
+
+  const option = (selected: boolean, onPick: () => void, children: React.ReactNode, key?: string): JSX.Element => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => pickOption(onPick)}
+      className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-[13px] fb-press transition-colors ${
+        selected
+          ? 'bg-[rgb(var(--accent))] text-white font-semibold'
+          : 'bg-[var(--surface-raised)] text-[var(--ink-90)] hover:text-[var(--ink-100)]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+
   return (
     <div
-      className="rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2.5"
+      ref={cardRef}
+      tabIndex={-1}
+      data-testid="capture-confirm"
+      className="outline-none [&:focus-visible]:outline-none"
       onKeyUp={(e) => {
         // The release of the Enter that opened this card arms it.
         if (e.key === 'Enter') setArmed(true)
       }}
       onKeyDown={(e) => {
-        if (e.key === 'ArrowRight') cycleClass(1)
-        if (e.key === 'ArrowLeft') cycleClass(-1)
+        const tag = (e.target as HTMLElement).tagName
+        const typing = tag === 'TEXTAREA' || tag === 'INPUT'
+        // Number keys 1–8 set the category directly, drawer open or not.
+        if (!typing && /^[1-8]$/.test(e.key)) {
+          const c = CLASS_CHOICES[Number(e.key) - 1]
+          if (c && confirm) {
+            setConfirm({ ...confirm, picked: c.value })
+            setCatTouched(true)
+          }
+          return
+        }
+        if (e.key === 'ArrowRight' && !typing) cycleClass(1)
+        if (e.key === 'ArrowLeft' && !typing) cycleClass(-1)
         if (e.key === 'Enter') {
           e.preventDefault()
           if (!armed) return // the keystroke that got us here
           void fileConfirmed()
         }
-        if (e.key === 'Escape') onCancel()
+        if (e.key === 'Escape') {
+          // Two-stage: an open drawer closes first; only the second press
+          // leaves. Esc never destroys work on the first press.
+          if (openDrawer) {
+            e.stopPropagation()
+            setOpenDrawer(null)
+            return
+          }
+          e.stopPropagation()
+          onCancel()
+        }
       }}
     >
-      {/* DEC-034: the second screen is a PREVIEW of the finished item, laid
-          out the way it will sit in the queue — tidied title, tidied notes,
-          the recommended class — so the decision is "does this look right?"
-          rather than "what will this become?". Enter accepts; Enter as is
-          keeps the operator's own words. */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] text-[var(--ink-70)]">
-          This is how it will file — Enter to confirm.
+        <span className="text-[13px] text-[var(--ink-70)]">
+          Plexii read it like this.{' '}
+          <span className="font-semibold text-[var(--ink-100)]">
+            Click any field below to change it
+          </span>{' '}
+          — or press Enter to file.
         </span>
         {cleanupUsed && cleanup && (
           <button
@@ -425,72 +627,174 @@ export default function AttentionConfirmCard({
           </button>
         )}
       </div>
-      <div className="mt-2 rounded-xl border border-[var(--edge-soft)] bg-[var(--surface-raised)] px-3 py-2.5">
-        <div className="flex items-start gap-2.5">
-          <Icon
-            name={QUEUE_ICON[confirm.picked] ?? 'check_circle'}
-            size={16}
-            className="text-[var(--ink-30)] shrink-0 mt-0.5"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0 flex-wrap">
-              <span className="fb-t-body font-medium text-[var(--ink-100)] break-words">
-                {confirm.title}
-              </span>
-              {confirm.dueAt && (
-                <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[11px] bg-[var(--surface-sunken)] text-[var(--ink-50)]">
-                  <Icon name="schedule" size={11} />
-                  {new Date(confirm.dueAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span>
+
+      {/* The draft — the item as it will sit in the queue. */}
+      <div className="mt-2.5 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3.5 py-2.5">
+        <div className="text-[16px] font-semibold text-[var(--ink-100)] break-words">
+          {confirm.title}
+        </div>
+        <textarea
+          value={confirm.notes}
+          onChange={(e) => {
+            setNotesEdited(true)
+            setConfirm({ ...confirm, notes: e.target.value })
+          }}
+          onKeyDown={(e) => {
+            // Enter here makes a NEWLINE; only ⌘/Ctrl+Enter bubbles to file.
+            if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) e.stopPropagation()
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.stopPropagation()
+          }}
+          rows={confirm.notes ? Math.min(5, confirm.notes.split('\n').length + 1) : 1}
+          placeholder="Add notes…"
+          className="mt-0.5 w-full bg-transparent outline-none [&:focus-visible]:outline-none resize-y text-[13px] text-[var(--ink-70)] placeholder:text-[var(--ink-40)]"
+        />
+      </div>
+
+      {/* The four dimensions — labelled pills that visibly open. */}
+      <div className="mt-3 grid grid-cols-2 min-[560px]:grid-cols-4 gap-2.5">
+        {pill('category', 'CATEGORY', CLASS_LABEL[confirm.picked] ?? confirm.picked, catAccent)}
+        {pill('urgency', 'URGENCY', urgency[0].toUpperCase() + urgency.slice(1), false)}
+        {pill('when', 'WHEN', whenValue, whenAccent)}
+        {pill('desk', 'DESK', deskValue, deskAccent)}
+      </div>
+
+      {/* One drawer at a time, each led by its question. */}
+      <AnimatePresence initial={false}>
+        {openDrawer && (
+          <motion.div
+            key={openDrawer}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={revealTransition}
+            className="overflow-hidden"
+            data-testid={`drawer-${openDrawer}`}
+          >
+            <div className="mt-2.5 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3.5 py-3">
+              <div className="text-[12.5px] text-[var(--ink-50)] mb-2">
+                {openDrawer === 'category' && 'What is this item asking you to do?'}
+                {openDrawer === 'urgency' && 'How hard is it pushing?'}
+                {openDrawer === 'when' &&
+                  (confirm.phrase
+                    ? `When should this come back to you? (“${confirm.phrase}”)`
+                    : 'When should this come back to you?')}
+                {openDrawer === 'desk' && 'Where does this work already live?'}
+              </div>
+              {openDrawer === 'category' && (
+                <div className="flex flex-wrap gap-1.5">
+                  {CLASS_CHOICES.map((c, i) =>
+                    option(
+                      confirm.picked === c.value,
+                      () => {
+                        setConfirm({ ...confirm, picked: c.value })
+                        setCatTouched(true)
+                      },
+                      <>
+                        <span
+                          className={`text-[11px] ${
+                            confirm.picked === c.value ? 'text-white/70' : 'text-[var(--ink-40)]'
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                        {c.label}
+                      </>,
+                      c.value
+                    )
+                  )}
+                </div>
+              )}
+              {openDrawer === 'urgency' && (
+                <div className="flex flex-wrap gap-1.5">
+                  {URGENCY_LEVELS.map((u) =>
+                    option(
+                      urgency === u,
+                      () => setUrgency(u),
+                      u[0].toUpperCase() + u.slice(1),
+                      u
+                    )
+                  )}
+                </div>
+              )}
+              {openDrawer === 'when' && (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(
+                      [
+                        ['today', 'Today'],
+                        ['tomorrow', 'Tomorrow'],
+                        ['week', 'This week'],
+                        ['someday', 'Someday']
+                      ] as const
+                    ).map(([v, labelTxt]) =>
+                      option(
+                        whenChoice === v,
+                        () => {
+                          setWhenChoice(v)
+                          setWhenTouched(true)
+                        },
+                        labelTxt,
+                        v
+                      )
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={customDate}
+                    onChange={(e) => {
+                      setCustomDate(e.target.value)
+                      setWhenChoice('date')
+                      setWhenTouched(true)
+                    }}
+                    className="mt-2 w-full h-9 px-3 rounded-full bg-[var(--surface-raised)] outline-none [&:focus-visible]:outline-none text-[13px] text-[var(--ink-90)]"
+                  />
+                </>
+              )}
+              {openDrawer === 'desk' && (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {option(
+                      deskValue === 'No desk',
+                      () => setDeskPick(null),
+                      'No desk',
+                      'none'
+                    )}
+                    {(deskCtx && !recentDesks.some((d) => d.id === deskCtx.id)
+                      ? [{ id: deskCtx.id, title: deskCtx.title }, ...recentDesks]
+                      : recentDesks
+                    ).map((d) =>
+                      option(
+                        deskPick === undefined ? deskCtx?.id === d.id : deskPick?.id === d.id,
+                        () => setDeskPick({ id: d.id, title: d.title }),
+                        <span className="max-w-[180px] truncate">{d.title}</span>,
+                        d.id
+                      )
+                    )}
+                  </div>
+                  {/* The product-wide @ grammar (DEC-039): a person, a desk, a
+                      room or a plan — plus free tags. Lives here, not as a
+                      standing row. */}
+                  <div className="mt-2">
+                    <TagMentionInput
+                      tags={capTags}
+                      mentions={capMentions}
+                      onTags={setCapTags}
+                      onMentions={setCapMentions}
+                    />
+                  </div>
+                </>
               )}
             </div>
-            <textarea
-              value={confirm.notes}
-              onChange={(e) => {
-                setNotesEdited(true)
-                setConfirm({ ...confirm, notes: e.target.value })
-              }}
-              onKeyDown={(e) => {
-                // Enter here makes a NEWLINE; only ⌘/Ctrl+Enter bubbles up to
-                // file. Without the stop, typing a note would file the item.
-                if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) e.stopPropagation()
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.stopPropagation()
-              }}
-              rows={confirm.notes ? Math.min(5, confirm.notes.split('\n').length + 1) : 1}
-              placeholder="Add notes — context worth keeping with it…"
-              className="mt-1 w-full bg-transparent outline-none resize-y text-[12px] text-[var(--ink-60)] placeholder:text-[var(--ink-30)]"
-            />
-            {deskCtx && (
-              <div className="mt-1 text-[11px] text-[var(--ink-40)]">on {deskCtx.title}</div>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-1">
-        {CLASS_CHOICES.map((c) => (
-          <button
-            key={c.value}
-            autoFocus={c.value === confirm.picked}
-            onClick={() => setConfirm({ ...confirm, picked: c.value })}
-            title={c.hint}
-            className={`px-2.5 h-7 fb-t-label fb-press rounded-full ${
-              confirm.picked === c.value
-                ? 'bg-[rgb(var(--accent))] text-white'
-                : 'bg-[var(--surface-raised)] text-[var(--ink-60)] hover:text-[var(--ink-100)]'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {confirm.secondaries.length > 0 && (
         <div className="mt-2.5">
           <div className="text-[11px] text-[var(--ink-40)]">
-            Also caught {confirm.secondaries.length === 1 ? 'another' : `${confirm.secondaries.length} more`} — filed
-            together unless unchecked:
+            Also caught{' '}
+            {confirm.secondaries.length === 1 ? 'another' : `${confirm.secondaries.length} more`} —
+            filed together unless unchecked:
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {confirm.secondaries.map((s, idx) => (
@@ -507,7 +811,7 @@ export default function AttentionConfirmCard({
                 title={s.text}
                 className={`inline-flex items-center gap-1.5 pl-1.5 pr-2.5 h-7 fb-t-label fb-press rounded-full ${
                   s.checked
-                    ? 'bg-[rgba(var(--accent),0.12)] text-[var(--ink-100)] shadow-[0_0_0_1px_rgba(var(--accent),0.4)]'
+                    ? 'bg-accent/10 text-[var(--ink-100)] shadow-[0_0_0_1px_rgb(var(--accent)/0.4)]'
                     : 'bg-[var(--surface-raised)] text-[var(--ink-40)] line-through'
                 }`}
               >
@@ -520,66 +824,16 @@ export default function AttentionConfirmCard({
           </div>
         </div>
       )}
-      <div className="mt-2.5 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] text-[var(--ink-40)] mr-1">Status</span>
-        {CAPTURE_STATES.map((st) => (
-          <button
-            key={st}
-            onClick={() => setBirthState(st)}
-            className={`px-2 h-6 fb-t-label fb-press rounded-full ${
-              birthState === st
-                ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)] shadow-[inset_0_0_0_1px_var(--edge-soft)]'
-                : 'bg-[var(--surface-raised)] text-[var(--ink-50)] hover:text-[var(--ink-100)]'
-            }`}
-          >
-            {st.replace('_', ' ')}
-          </button>
-        ))}
-        <span className="text-[11px] text-[var(--ink-40)] ml-2 mr-1">Urgency</span>
-        {URGENCY_LEVELS.map((u) => (
-          <button
-            key={u}
-            onClick={() => setUrgency(u)}
-            className={`px-2 h-6 fb-t-label fb-press rounded-full capitalize ${
-              urgency === u
-                ? 'bg-[rgb(var(--accent))] text-white'
-                : 'bg-[var(--surface-raised)] text-[var(--ink-50)] hover:text-[var(--ink-100)]'
-            }`}
-          >
-            {u}
-          </button>
-        ))}
-      </div>
-      <div className="mt-1.5">
-        <TagMentionInput
-          tags={capTags}
-          mentions={capMentions}
-          onTags={setCapTags}
-          onMentions={setCapMentions}
-        />
-      </div>
-      {confirm.needsDate && (
-        <div className="mt-2 flex items-center gap-2">
-          <span className="text-[12px] text-[var(--ink-70)]">When is “{confirm.phrase}”?</span>
-          <input
-            type="date"
-            value={confirmDate}
-            onChange={(e) => setConfirmDate(e.target.value)}
-            className="fb-field bg-[var(--surface-raised)] px-2 py-1 text-[12px]"
-          />
-          <span className="text-[11px] text-[var(--ink-40)]">leave empty for no date</span>
-        </div>
-      )}
-      <div className="mt-2.5 flex items-center justify-between gap-2">
+
+      <div className="mt-3 pt-3 border-t border-[var(--edge-soft)] flex items-center gap-2">
         <button
           onClick={onCancel}
-          className="text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+          data-testid="back-to-words"
+          className="text-[13px] text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
         >
           {cancelLabel}
         </button>
-        <div className="flex items-center gap-1.5">
-          {/* Only offered when the tidy actually changed something — otherwise
-              "as is" and "Enter" would file the identical item. */}
+        <div className="ml-auto flex items-center gap-1.5">
           {cleanupUsed && cleanup && (
             <button
               onClick={() => void fileConfirmed(true)}
@@ -593,9 +847,13 @@ export default function AttentionConfirmCard({
           <button
             onClick={() => void fileConfirmed()}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 h-8 px-3.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
+            data-testid="file-it"
+            className="btn-primary"
           >
-            {busy ? 'Filing…' : 'Enter ↵'}
+            <span>{busy ? 'Filing…' : 'File it'}</span>
+            <span aria-hidden className="rounded bg-white/20 px-1 text-[11px] leading-4">
+              ↵
+            </span>
           </button>
         </div>
       </div>

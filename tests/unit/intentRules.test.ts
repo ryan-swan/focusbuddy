@@ -145,7 +145,9 @@ describe('title extraction', () => {
     expect(titleFromCapture('fyi: the vendor moved the deadline. Also more detail here.')).toBe(
       'The vendor moved the deadline.'
     )
-    expect(titleFromCapture('Remind me to call Bob')).toBe('Remind me to call Bob')
+    // Capture rebuild (2026-08-30): scaffolding lead-ins are stripped —
+    // "remind me to" told the AI what you meant; the item keeps the verb.
+    expect(titleFromCapture('Remind me to call Bob')).toBe('Call Bob')
     expect(titleFromCapture('x'.repeat(200)).length).toBeLessThanOrEqual(120)
     expect(titleFromCapture('   ')).toBe('Untitled work item')
   })
