@@ -1663,6 +1663,19 @@ ring computes `rgba(124,58,237,0.35) 0 0 0 2px` — it paints. Suite 3,255
 (one net new pin; the DEC-053 ring pin rewritten to the superseding truth
 with its history).
 
+**Follow-up (same day, operator): the day runs MIDNIGHT TO MIDNIGHT.**
+`START_HOUR` 6 → 0, `END_HOUR` 23 → 24. The old 6am–10pm window silently
+HID anything booked outside it — an early flight or a late call rendered
+off-canvas with no hint it existed; the scroll window is what decides how
+many of the 24 hours are visible, which is why this is safe now and wasn't
+before DEC-078. Measured live: 24 gutter labels 12 AM → 11 PM, grid 1344px
+(= 24×56), auto-open landed at the current hour UNCLAMPED for the first
+time (704.7 vs 705.6 expected). Live bonus proof: the operator clicked a
+3 PM slot mid-verification and the composer opened at exactly 3:00 PM —
+the y→time math holds on the new origin. The compact rail grows to
+24×30px full-height by the same constants (its card scrolls; acceptable,
+revisit only if the operator flags it).
+
 <!-- Append below; increment DEC-NNN. -->
 
 ## DEC-056…061 — The platform arc (one investigation, six landings)
