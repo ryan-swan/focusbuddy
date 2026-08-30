@@ -52,37 +52,35 @@ and *why*, before anything is booked.
 
 ## What is next (priority order)
 
+0. **NEW (2026-08-30 pm): DEC-073…076 built, tested, live-verified, UNCOMMITTED**
+   — New Desk flow, calendar dblclick-details + inline complete, missed-items
+   launch triage, widget bell. The operator's smokes: click New Desk → Enter →
+   lands IN the desk; double-click a rail row and a grid block; check off a
+   work-item block; the triage prompt (4 real slipped blocks await it); open a
+   desk with a marked widget → bell filled → check completes it both ways.
+
 1. **The operator's live QA pass.** This has been the highest-yield loop all build —
    DEC-053, 055, 062, 065, 066, 067, 069, 070 and 071 all came from him looking at the
    screen. Notes come in → reproduce → fix in-stage → gates → commit.
 
-2. **Reason text quality (cheap, visible).** DEC-071 surfaced `PlannedProposal.reason` for
-   the first time and it reads thin — both blocks in the operator's test came back "Top of
-   the queue". The plumbing is done; the strings are generic. Make them say something
-   ("nothing else needs Thursday morning", "your momentum is on LakeDash").
+2. ~~Reason text quality~~ **DONE 2026-08-30 (DEC-072).** `reasonFor` is now a
+   strongest-checkable-fact ladder (overdue day counts, weekday dues, chosen
+   urgency, momentum, already-started, days waited, mode-aware fallbacks incl.
+   "Nothing else needs today"); the start strip got the same honesty pass.
+   Live-verified over CDP on real data: 7 proposals, 6 distinct reasons, zero
+   generic strings. 15 new pins; suite 3,211.
 
-3. **SPEC-002 "The Attendant" comparison — analysis delivered, rulings not made.**
-   A full side-by-side against the built system was produced this session (in the
-   transcript, not yet a doc — **worth writing up**). Summary of that analysis:
-   - **Already built:** the 8 categories, reference-don't-own, propose-never-apply,
-     a rate-capped notification substrate (`QUEUE_HOURLY_CAP = 5`, overflow collapses
-     to one summary banner), `EscalationLayer = ambient|inbox|interruptive`, the S7
-     "one proactive trigger" restraint doctrine, human-in-loop completion,
-     `attentionPrecision()`, quiet-wins analytics.
-   - **Two spec claims are WRONG and should be corrected before any ruling:** §3.7 says
-     PlexiDesk already tracks estimate accuracy / velocity — it does not (the raw material
-     exists in `estimate_minutes` + `focus_sessions.planned_seconds`; nothing computes it),
-     and it is used as the stated differentiator vs Motion. §3.10 says engaged-time-vs-plan
-     is measured — it is recorded, not measured.
-   - **Recommended take:** export (non-negotiable, cheap on SQLite, absent today);
-     single-key verbs; the four-test interrupt gate (cheap — the substrate already has
-     caps and layers); desk staging (the thing no calendar-first competitor can copy);
-     P3's mute-agent shadow log.
-   - **Recommended refuse:** M5/M6 act-silently (contradicts the operator's own DEC-052
-     ruling that the human stays in the loop); the mandate grid as specified (the spec
-     lists "needs managing" as a bad-EA failure mode and then specs one);
-     send-on-behalf; two-way calendar write.
-   - **Open structural question:** the spec's Inbox↔Today wall does not exist in Plexi.
+3. **SPEC-002 "The Attendant" — written up 2026-08-30; rulings not made.**
+   The spec is preserved verbatim in
+   [analysis/25](analysis/25-SPEC-002-ATTENDANT-RAW.md); the comparison was
+   rebuilt against the code (not transcribed) in
+   [analysis/26](analysis/26-SPEC-002-ATTENDANT-COMPARISON.md) — a REVIEW
+   BACKLOG: potential items to adopt gradually, nothing authorized. Headlines:
+   THREE spec corrections now (§3.7 velocity refined, §3.10 refined, §4.3
+   trashNode claim stale — already fixed), the spec's self-assigned DEC/CR
+   numbers all collide with the live log, ranked adoption candidates
+   (export first), six recommended refusals each anchored to a standing DEC,
+   and the Inbox↔Today wall question framed for a ruling (analysis/26 §7).
 
 4. **GAP-017 — Respond → Messages.** Operator explicitly deferred: investigate the
    messaging surface FIRST. Do not rename a taxonomy primary; it is a schema and

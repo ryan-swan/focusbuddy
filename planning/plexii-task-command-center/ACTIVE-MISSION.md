@@ -10,6 +10,32 @@
 green; both typechecks clean; app boots in ~3s.
 **Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
 
+**SESSION 2026-08-30 (this doc's own update):** ① SPEC-002 "The Attendant"
+written up — spec recovered verbatim from the transcript into
+[analysis/25](analysis/25-SPEC-002-ATTENDANT-RAW.md), comparison REBUILT
+against the code into
+[analysis/26](analysis/26-SPEC-002-ATTENDANT-COMPARISON.md) (review backlog
+only; three spec corrections incl. one new — §4.3's trashNode defect was
+already fixed in S1; DEC/CR numbering collisions flagged; rulings NOT made).
+② DEC-072 EXECUTED — planner reasons are now a strongest-checkable-fact
+ladder, the intent/replan modes are distinguishable (`PlanDayOptions.source`),
+the start strip stopped over-claiming superlatives; live-verified over CDP on
+real data (7 proposals, 6 distinct reasons, zero generic). ③ DEC-069/070
+hierarchy LIVE-VERIFIED by measurement (the owed photograph): a real
+3-sub-item group + the LakeDash desk cluster, all geometry exact over CDP
+(one connector per group, 14px inset, 6px bottom-1.5, spine top-level only,
+handle at own depth, zero stray lines, collapse/re-expand drift-free) —
+addendum under DEC-069/070. ④ **DEC-073…076 EXECUTED — the operator's
+four-feature round:** New Desk (named + date/time prefill + Enter-creates +
+navigates in), calendar double-click details + inline completion (rail circle;
+the block check closes the ITEM through the one close path), the missed-items
+launch triage (derived never stored, Later costs nothing, add-all-back = one
+undo batch — fired live on remount and found 4 genuinely-slipped Thursday
+blocks), and the widget bell + complete (state derived from the queue's own
+rows; outlined-click = the menu's exact capture flow; filled-click opens the
+queue — interpretive choice flagged in the DEC). Suite 3,196 → **3,244**;
+both typechecks clean. COMMITTED on the operator's order (2026-08-30): DEC-072 = `d5a47571` · the parallel session's DEC-073…076 = `e781d7d8` · docs (analysis/25+26, this file, the log, the prompt) in the commit after.
+
 **THIS BUILD (2026-08-27 → 08-30), 22 commits, DEC-056…071 — see DECISIONS-LOG:**
 
 **Platform stability (DEC-056…061) — shipped SEPARATELY to main as PR #5, still
@@ -43,11 +69,18 @@ both hand-listed `WORK_ITEM_COLUMNS`, so a new column got DDL, sync, CRDT
 allowlists and emit but no way in or out — `source_url` had been **write-only
 since DEC-052**. Both now derive from the manifest.
 
-**Analysis delivered, not yet a doc:** a full side-by-side of SPEC-002 "The
-Attendant" against the built system, including two spec claims that assert
-capability PlexiDesk does not have (§3.7 velocity/estimate accuracy — the stated
-differentiator vs Motion; §3.10 engaged-time-vs-plan). Summary is in
-NEXT-SESSION-PROMPT §3; **writing it up properly is an open task.**
+**SPEC-002 "The Attendant" written up (2026-08-30):** the spec is preserved
+verbatim ([analysis/25](analysis/25-SPEC-002-ATTENDANT-RAW.md), recovered from
+the transcript) and the side-by-side was REBUILT against the code at `9216f335`
+([analysis/26](analysis/26-SPEC-002-ATTENDANT-COMPARISON.md)) — a REVIEW
+BACKLOG only, per operator: adopt gradually, nothing authorized, nothing built.
+The rebuild refined the two known spec corrections (§3.7 velocity — a legacy
+desk-level elapsed-time ratio DOES exist but feeds nothing the spec claims;
+§3.10 engaged time is aggregated, vs-plan is not) and found a third: §4.3's
+"trashNode has no kind filter" defect was already fixed by nodeLifecycle.ts in
+S1. Also flagged: the spec's self-assigned DEC-015…019/CR-08…10 numbers all
+collide with the live log; two of its requested rulings are already
+substantively ruled by DEC-052. Rulings remain NOT made.
 
 **QA ROUND 3 + DEC-034/035 EXECUTED (2026-08-26, commits `ba3b518c`,
 `2e7e210e`, `14419286`):** the operator captured his next asks INTO the layer

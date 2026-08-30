@@ -1469,6 +1469,103 @@ Suite 3,061 green (three DEC-055 pins; the DEC-050 card and indent pins
 rewritten to the superseding truth, keeping the divider-bug history in the
 comment); typecheck clean.
 
+## DEC-072 — Plan reasons state checkable facts
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator: "make them say something real") · committed `d5a47571`
+
+DEC-071 made `reason` visible, and visibility exposed it: both blocks in the
+operator's test read "Top of the queue" — the fallback was doing most of the
+talking, because `reasonFor` asked only two questions (due within 2 days?
+momentum ≥2 on the desk?) before giving up. Most items have neither.
+
+The rewrite (`attentionPlanner.ts`): the reason is the item's strongest
+CHECKABLE fact, strongest first — deadline (now with day counts, "Overdue by
+2 days", and weekday names out to 7 days) → the person's own urgency call
+("You marked it urgent" — chosen outranks derived, DEC-037) → momentum
+(strings deliberately unchanged — pinned since DEC-052) → already-started →
+days waited → then WHY-THE-PLAN-CHOSE-IT: a replan says "Slipped earlier —
+proposing a fresh slot", intent mode says "Matches your intent", and ranked
+mode does the day arithmetic — "Nothing else needs today" only when no other
+schedulable item is due by the planned day's end, "Everything due already has
+a slot" only when each such item verifiably has one (dragged or proposed
+ahead of this row). The generic tail ("Next by rank") survives only for the
+mixed case none of those cover. **Found while wiring it:** both intent mode
+and replan-undone pass `onlyItemIds`, so the two were indistinguishable
+inside the planner — a replanned block would have claimed an intent match.
+`PlanDayOptions.source` now names the mode.
+
+Same honesty pass on the start strip (`attentionAnalytics`): its fallback
+claimed "Waiting the longest" on up to three cards at once and "Top of the
+queue" on cards #2–3 — superlatives only one card can hold. Now day counts
+("Waiting 9 days"), and only card #1 says "Top of your queue".
+
+Verified two ways: 15 new pins (suite 3,196 → 3,211, both typechecks clean)
+and LIVE over CDP 9223 — the planner module run read-only against the real
+store (107 items, 15 schedulable, 2 blocks already booked) returned seven
+proposals with SIX distinct reasons and zero generic strings: "Overdue by a
+day" / "Overdue by 2 days" ×2 / "Due tomorrow" / "Waiting 3 days" / "Already
+started — finish it" / "Everything due already has a slot". `planDay` is
+pure; the check wrote nothing.
+
+## DEC-073…076 — The operator's four-feature build round
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator spec, verbatim asks) · committed `e781d7d8`
+
+**DEC-073 — "New Desk": named, prefilled, and it OPENS.** The header button
+said "New" with a tooltip claiming "New room" while creating a desk; creation
+called `setActive` but never changed the VIEW, so the desk was born off-screen
+and had to be found under All Desks. Now: the button says **New Desk**, the
+set-up dialog pre-fills the title with the moment ("Aug 30, 12:52 PM" —
+`lib/deskDefaults.ts`), the field arrives focused with the text SELECTED so
+overwriting costs one keystroke, Enter files it, and creation navigates
+straight in (`goTask`). The prefill rides every create-desk entry (⌘K pill,
+Stage Manager) by construction — same dialog; Rooms and edits keep their text.
+
+**DEC-074 — calendar items open and complete in place.** Double-click a queue-
+rail row, a grid block, or a deadline chip → the DEC-036 item editor (centre
+peek); a desk-linked block's double-click opens the desk. The rail rows grew a
+visible completion circle; the grid block's check, on a work-item block, now
+closes the ITEM — each queue's own verb (PRIMARY_ACTION), through the ONE
+close path with its subtask and desk-complete offers — and marks the block
+done only if the close actually happened (the subtask offer can be cancelled;
+the store's setState refreshes the row before resolving, so re-reading it is
+the authoritative test). Undo on a done block stays calendar-local: it revives
+the block; the item reopens from Attention, never from here.
+
+**DEC-075 — missed items greet the launch.** Blocks still 'planned' whose
+whole span lies before today are "untriaged" — DERIVED, never stored
+(`lib/missedTriage.ts`; 14-day lookback so the first run can't wall the user
+with pre-feature history; a block straddling midnight is not missed — its day
+is not over). One prompt per app session (`MissedTriagePrompt` at App level):
+per row **Done** (item closed with its verb + block done), **Today** /
+**pick-a-day** (the original flips to 'missed' — the honest record, DEC-052 B4
+— and a FRESH block lands in the day's first opening, same clock time visibly
+overlapping if the day is full, never dropped), selection + **Complete
+selected**, **Add all back to the calendar** (first openings today→+7d, one
+undo batch), and **Later**, which costs nothing and returns next launch.
+Intra-day slips stay DEC-052 B4's replan flow; this owns the day boundary.
+
+**DEC-076 — the widget bell.** Every WidgetFrame header carries a bell:
+outlined = not in Attention, filled = a LIVE work item points at this widget —
+DERIVED from the queue's own rows (`lib/widgetAttention.ts`: sourceType
+'widget'/'widgets', comma-joined multi-marks honoured, exact-id match, newest
+live mark speaks), so the operator's "two-way sync" holds by construction
+rather than by events. An outlined bell runs the SAME flow as the context
+menu's "Add to Attention…" (preset → confirm console → item points at the
+widget; nothing files without Enter). A filled bell opens the queue.
+**Interpretive choice, flagged:** the spec said only "clicking adds" — a
+filled bell re-adding would duplicate, so filled-click = open the queue; say
+the word to change it. The check beside it appears ONLY when there is
+something to complete, and closes through the one path. Gated on
+workItemsEnabled(), like the menu.
+
+**Gates:** suite 3,211 → **3,244** (33 new: missedTriage 12, widgetAttention 7,
+wiring pins 14), both typechecks clean. **Live (CDP, read-only):** "New Desk"
+in the DOM; both mounted grid blocks carry the complete control; prefill
+returns the real moment; **the triage prompt fired itself on the HMR remount
+and found 4 genuinely-slipped Thursday blocks on the live DB** — the launch
+behaviour, observed. Widget bells: no desk canvas was mounted at verify time —
+23 live widget-marked items exist, so bells will light on first desk open;
+pinned by tests, awaiting the operator's eyes.
+
 <!-- Append below; increment DEC-NNN. -->
 
 ## DEC-056…061 — The platform arc (one investigation, six landings)
@@ -1599,6 +1696,38 @@ belonging to the previous depth — so on sub-items it hung in the parent's gutt
 
 **The pins now assert the ABSENCE of the segment machinery**, so nobody
 reintroduces it.
+
+**LIVE VERIFICATION 2026-08-30 (the owed photograph, done by measurement):**
+the prior session shipped this pinned-and-tested but never saw it on a
+multi-sub-item case — none was mounted (cause found: the one real group was
+COLLAPSED, persisted in `attention.collapsed`). Verified on the operator's
+live data over CDP 9223 — a real leader ("Add in-browser video streaming…")
+with THREE open sub-items, expanded via its own chevron (the DEC-062
+click-fix path), all geometry by getBoundingClientRect/getComputedStyle at
+dpr 1.7, full-viewport screenshot only:
+· ONE dashed connector per group — a single element, h=114px spanning all
+  three 40px child rows; inset 14.0px (= 8 + ind·28 + 6 exact); top gap 0.0;
+  bottom gap 6.0px (bottom-1.5); rgba(14,165,233,0.5) = queueTint(to_do, .5).
+· Children tile the wrapper exactly (718.3→838.3, zero gaps), borderTop 0px
+  on every child — no hairline cuts the subtree; the next UNIT gets the
+  divide-y hairline (0.588px = 1px @ dpr 1.7). Child pads 36px (= 8+28).
+· Spine is TOP-LEVEL only: leader carries the 3px sky bar (2.996px computed
+  — device-pixel snap), children carry none.
+· Drag handle rides its own row's depth: children 14px (= 8+28−22, ON the
+  connector line by design), leader 2px. Zero stray vertical-line elements
+  in the subtree — the old segment machinery is absent from the DOM, not
+  just the code.
+· Collapse unmounts children + wrapper (AnimatePresence exit), re-expand
+  reproduces identical geometry (inset 14, h 114 both passes) — no drift.
+· The DESK-CLUSTER variant (LakeDash, 3 rows) measured too: same grammar —
+  one connector, h=135.3px unbroken across the run, 6px bottom inset, pads
+  36px, no spines, zero strays. A 0.6px inter-row offset there is
+  device-pixel rounding of fractional row heights (nothing paints in it:
+  borders and margins all 0px), not a seam.
+No data writes; the one state change is the group now sits EXPANDED on the
+operator's screen (the toggle path updated `attention.collapsed`), which is
+what the verification required. DEC-069/070's construction claim holds on
+the real thing.
 
 ---
 
