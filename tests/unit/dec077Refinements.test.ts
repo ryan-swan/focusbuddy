@@ -73,7 +73,8 @@ describe('dec_077 — the handle is gone, the row still drags', () => {
 describe('dec_077 — nesting lights the whole row', () => {
   it('dec_077_into_state_is_a_row_tint_plus_ring', () => {
     expect(att).toContain(
-      "'bg-[rgba(var(--accent),0.14)] shadow-[inset_0_0_0_2px_rgba(var(--accent),0.55)]'"
+      // GAP-018 (DEC-086): converted to forms that actually paint.
+      "'bg-accent/[0.14] shadow-[inset_0_0_0_2px_rgb(var(--accent)/0.55)]'"
     )
   })
 
@@ -85,7 +86,7 @@ describe('dec_077 — nesting lights the whole row', () => {
       att.indexOf('dragId === i.id ||')
     )
     expect(chain).toContain("selected.has(i.id) && selectMode")
-    expect(chain).toContain("'hover:bg-[rgba(var(--accent),0.05)]'")
+    expect(chain).toContain("'hover:bg-accent/5'")
   })
 })
 

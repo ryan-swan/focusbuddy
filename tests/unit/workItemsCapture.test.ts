@@ -242,7 +242,8 @@ describe('S5 wiring locks (file-level)', () => {
     const list = read('src/renderer/src/components/assistant/MentionList.tsx')
     // A 10% tint read as "nothing is selected" in live QA.
     expect(list).not.toContain('bg-accent/10')
-    expect(list).toContain('rgba(var(--accent),0.14)')
+    // GAP-018 (DEC-086): the highlight now uses a color that paints.
+    expect(list).toContain('bg-accent/[0.14]')
     expect(list).toContain('inset_2px_0_0_rgb(var(--accent))')
   })
 })

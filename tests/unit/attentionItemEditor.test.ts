@@ -413,7 +413,9 @@ describe('DEC-050 — the item rows read like a project tool', () => {
     expect(view).toContain('divide-y divide-[var(--edge-soft)]">')
     // Rows are flush inside that box — no per-row card, no gap, no lift.
     expect(view).toContain('flex items-center gap-2 pr-2.5 py-1.5 min-h-[40px] transition-colors')
-    expect(view).toContain('hover:bg-[rgba(var(--accent),0.05)]')
+    // GAP-018 (DEC-086): rgba(var(--accent),X) substitutes to an INVALID
+    // color and never painted — swept to the slash/rgb()-slash forms.
+    expect(view).toContain('hover:bg-accent/5')
     expect(view).not.toContain('rounded-lg fb-glass-row transition-all')
   })
 
