@@ -1676,6 +1676,40 @@ the y→time math holds on the new origin. The compact rail grows to
 24×30px full-height by the same constants (its card scrolls; acceptable,
 revisit only if the operator flags it).
 
+## DEC-079 — Calendar QA round two: the rail windows, a swipe pages the range, 12 AM breathes
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator, three verbatim asks)
+
+**(1) The rail's Today widget windows twelve hours.** Midnight-to-midnight
+(DEC-078 follow-up) made the rail's full-height habit a 720px column of
+mostly night. The compact grid now gets the same scroll window as the big
+one — `12 * hourPx` = 360px, all 24 hours a scroll away — and the
+autoscroll's compact guard was removed, so the rail opens at the current
+hour too (clamped to the bottom in the evening, same as the big grid).
+
+**(2) Trackpad horizontal swipe pages the range.** One swipe = one
+`shift()` — the same function the chevrons call, so day/3-day/week page by
+their span and month by month with zero new range math. The handler sits on
+the calendar surface (plan bar + both views): horizontal-DOMINANT deltas
+only (vertical belongs to the time window), accumulated to a 120px
+threshold, fired ONCE, and the gesture's momentum tail swallowed until the
+stream is quiet for 250ms. Swipe left = forward in time.
+
+**(3) The 12 AM clip.** The first gutter label translates 6px up to sit ON
+its hour line (as every label does), and the DEC-078 restructure removed
+the old header padding that had been its headroom — so its top half clipped
+at the scroll edge (operator's screenshot). `pt-2` on the time window is
+the headroom; the label now sits at a designed 2px inset, both surfaces.
+
+**Verified live over CDP against the REAL handler and both surfaces:** a
+12-event 300px synthetic swipe paged exactly once (Aug 30–Sep 1 →
+Sep 2–Sep 4); a 6-event tail inside the same gesture changed nothing; the
+back-swipe returned; 12 vertical-dominant events with sideways drift paged
+nothing. Rail: window 360px exact, scrollH 729 (all 24h reachable),
+opens clamped-to-now, `12a` at 2.0px inset. Big grid: `12 AM` at 2.0px
+inset at scrollTop 0. Operator's view restored to Calendar after. Suite
+3,256; the two DEC-078 pins the restructure superseded were rewritten with
+their history.
+
 <!-- Append below; increment DEC-NNN. -->
 
 ## DEC-056…061 — The platform arc (one investigation, six landings)

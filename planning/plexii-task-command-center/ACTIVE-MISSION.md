@@ -59,7 +59,14 @@ converted this round's nine occurrences to the configured slash pattern;
 the ~10-file remainder is **GAP-018** (its own sweep — several files sit in
 077's working set). All measured live over CDP: 150px commanded = 150px
 moved, header pinned, page scroll untouched, ring computes
-rgba(124,58,237,0.35). Suite → **3,255**.
+rgba(124,58,237,0.35). Suite → **3,255**. Follow-ups same day: the day
+runs MIDNIGHT TO MIDNIGHT (constants flipped; the scroll window is what
+made that safe), then ⑦ **DEC-079** — the rail's Today widget windows
+twelve hours (scrolls for the rest, opens at now), trackpad horizontal
+swipe pages the range through the chevrons' own `shift()` (one swipe = one
+page, tail swallowed, vertical untouched), and the 12 AM label got its
+headroom back (`pt-2`; it was clipping at the scroll edge). All verified
+live against the real handler. Suite → **3,256**.
 
 **THIS BUILD (2026-08-27 → 08-30), 22 commits, DEC-056…071 — see DECISIONS-LOG:**
 
