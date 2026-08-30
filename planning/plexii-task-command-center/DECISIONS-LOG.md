@@ -1567,7 +1567,7 @@ behaviour, observed. Widget bells: no desk canvas was mounted at verify time —
 pinned by tests, awaiting the operator's eyes.
 
 ## DEC-077 — The refinement round: one circle, a bell that fills, rows that drag themselves
-**Date:** 2026-08-30 · **Status:** EXECUTED (operator QA on DEC-073…076) · UNCOMMITTED
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator QA on DEC-073…076) · UNCOMMITTED · committed `e88ee5c3`
 
 **(a) The bell now actually fills.** Root cause was a brand-system collision:
 `Icon`'s `filled` prop is a deliberate no-op for Plexii brand icons (they are
@@ -1709,6 +1709,64 @@ opens clamped-to-now, `12a` at 2.0px inset. Big grid: `12 AM` at 2.0px
 inset at scrollTop 0. Operator's view restored to Calendar after. Suite
 3,256; the two DEC-078 pins the restructure superseded were rewritten with
 their history.
+
+## DEC-080 — The Book time dialog: spec steps 1–9, edit mode, the option-B grammar
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator spec, reviewed pass by pass) · committed `34feaab1`
+
+The drag-select dialog rebuilt to the operator's book-time spec across five
+reviewed passes. The shape: the mode slider IS the header (Cmd+M; Framer
+thumb + reveal, reduced motion honoured); the title is the act of intent —
+empty commits the RESOLVED placeholder (attached → guest names → "Meeting" →
+room → "Focus"), with the refusal of date/time defaults pinned alongside its
+deliberate DEC-073 divergence (a block carries its time; a desk doesn't);
+one time row (pickers, the 15/25/30/45/60/90/120 cycling end chip with
+DEC-053's display-as-is + nearest-step entry, Repeat never says "Does not
+repeat"); meeting-only fields behind the reveal with the ENTER GUARD (chips
+commit on Enter/comma/Tab, suggestions ranked by recency of shared meetings
+from real past invitees; Where autofocuses its revealed input; agenda takes
+Shift+Enter). Commit closes FIRST, toasts Booked/Scheduled through the house
+recordWithToast with Undo, and meeting invites HOLD a stated 10s window Undo
+cancels — nothing sends (CR-08/09), the expiry callback is the future send
+site. The Attendant-proposed state is native (same dialog, accent-soft
+banner, countdown that BOOKS at zero, Esc dismisses; manual trigger only —
+hold-time unruled). Inline create ships FLAGGED OFF by operator ruling: a
+drag-highlight opens the FULL dialog; the flag opts into naming-in-place.
+Double-click on any meeting or plain block reopens the dialog seeded with
+everything; Save patches in place, preserves the block's own roomId, Undo
+restores every prior field. Work-item and desk blocks keep their DEC-074
+routes.
+
+**Step 5 ruled OPTION B:** one shared token grammar (`parseBlockTokens`) —
+durations strip and set, #room resolves and attaches (unmatched #words stay
+visible), meet/call/sync/1:1 flip mode WITHOUT being stripped, every effect
+echoed; deliberately NO @ tokens (@ stays Attention's in ⌘K and mentions' in
+chat — @-as-guest is its own later ruling). Parsing fires on token
+completion or blur, so "45min" is never clipped at "45m". Acceptance live:
+"Roadmap sync 30m " → "Roadmap sync", 30m, Meeting on Plexii Meet, echo
+"Set 30m, meeting".
+
+BlockComposer deleted per the spec's own step 9; the DEC-063
+link/location/end-time pin rewritten to the superseding surface with its
+history. `TimeBlockMeeting.agenda` added (JSON payload, no migration).
+Attach stays stubbed on desk_block (unruled; the stub id can never reach a
+real block). Every pass live-verified over CDP with real input events;
+suite closed at 3,310.
+
+---
+
+## DEC-081 — The name is Plexii: two i's, everywhere, enforced
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator ruling) · committed `327523f4`
+
+70 standalone single-i occurrences fixed across 36 files — "Plexii Meet",
+⌘K's "Opens in Plexii", chat/browser hints, "Plexii proposed an action",
+the changelog, the slide theme's display name (stable id untouched), and
+the wordmark's screen-reader label, which said "Plexi" while the logo
+renders *plexii*. Functional catch: the wake word `/(hey )?plexi\b/` could
+never match a transcript spelled "Plexii" — now `plexii?\b`. Fused legacy
+identifiers (PlexiDesk, PlexiSuite, PlexiOffice…) deliberately stay
+single-i pending their own ruling. Enforcement is mechanical: a grep-lock
+test fails on any standalone Plexi in src, and the root CLAUDE.md carries
+the convention for every future session (plus the operator's memory).
 
 <!-- Append below; increment DEC-NNN. -->
 

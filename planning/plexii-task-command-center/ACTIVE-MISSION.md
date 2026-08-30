@@ -66,7 +66,14 @@ twelve hours (scrolls for the rest, opens at now), trackpad horizontal
 swipe pages the range through the chevrons' own `shift()` (one swipe = one
 page, tail swallowed, vertical untouched), and the 12 AM label got its
 headroom back (`pt-2`; it was clipping at the scroll edge). All verified
-live against the real handler. Suite → **3,256**.
+live against the real handler. Suite → **3,256**. Then ⑧ **DEC-080** — the
+Book time dialog rebuilt to the operator's spec (steps 1–9 + edit mode +
+the option-B token grammar; BlockComposer deleted; drag-highlight opens the
+FULL dialog by ruling, inline create flagged OFF) and ⑨ **DEC-081** — the
+name is Plexii, 70 fixes across 36 files, wake-word fix, grep-locked +
+CLAUDE.md convention. ALL ROUNDS COMMITTED: DEC-077 = `e88ee5c3` (parallel
+session, attributed) · DEC-080 = `34feaab1` · DEC-081 = `327523f4`. Suite
+→ **3,310**; both typechecks clean; tree clean.
 
 **THIS BUILD (2026-08-27 → 08-30), 22 commits, DEC-056…071 — see DECISIONS-LOG:**
 
