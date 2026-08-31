@@ -261,13 +261,21 @@ export default function WeekTimeGrid({
   const dragRef = useRef<{
     id: string
     mode: 'move' | 'resize' | 'resize-top'
+    startClientX: number
     startClientY: number
     lastClientX: number
     lastClientY: number
     origStartMs: number
     origDur: number
     origDayIndex: number
+    // DEC-087 — true once the pointer travels past the dead zone. Until then
+    // the press is a CLICK-in-waiting, not a drag: no preview shift, no
+    // commit, and the click that follows opens the editor.
+    moved: boolean
   } | null>(null)
+  // DEC-087 — a drag that actually moved swallows the click event that the
+  // browser fires at pointerup, so drag-release never doubles as open-editor.
+  const dragConsumedClickRef = useRef(false)
   // Live refs to each day column so a move-drag can hit-test the pointer's X and
   // reschedule a block onto another day (Google-Calendar-style cross-day drag).
   const colRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -403,12 +411,14 @@ export default function WeekTimeGrid({
     dragRef.current = {
       id: block.id,
       mode,
+      startClientX: e.clientX,
       startClientY: e.clientY,
       lastClientX: e.clientX,
       lastClientY: e.clientY,
       origStartMs: block.startMs,
       origDur: block.durationMin,
-      origDayIndex: Math.floor((block.startMs - weekFrom) / DAY_MS)
+      origDayIndex: Math.floor((block.startMs - weekFrom) / DAY_MS),
+      moved: false
     }
     if (mode === 'move') onBlockDragActive?.(true)
     setDrag({ id: block.id, previewStart: block.startMs, previewDur: block.durationMin })
@@ -422,6 +432,12 @@ export default function WeekTimeGrid({
     d.lastClientX = e.clientX
     d.lastClientY = e.clientY
     const deltaY = e.clientY - d.startClientY
+    // DEC-087 — 5px dead zone (all modes): a sloppy click on a block or its
+    // 6px resize lip used to snap a 15-minute step before the hand settled.
+    // Below the threshold the press stays a click; past it, it is a drag for
+    // good (jitter back through zero must not re-arm the click).
+    if (!d.moved && Math.abs(deltaY) < 5 && Math.abs(e.clientX - d.startClientX) < 5) return
+    d.moved = true
     const deltaMs = (deltaY / hourPx) * 3_600_000
     if (d.mode === 'move') {
       // Cross-day: find the day column under the pointer's X so a block can be
@@ -453,6 +469,9 @@ export default function WeekTimeGrid({
     const d = dragRef.current
     dragRef.current = null
     if (d?.mode === 'move') onBlockDragActive?.(false)
+    // DEC-087 — the click event that follows this pointerup belongs to the
+    // drag, not the editor. (A press that never left the dead zone keeps it.)
+    dragConsumedClickRef.current = !!d?.moved
     // DEC-053 — released OUTSIDE the grid (over the queue rail): the caller
     // may consume the drop as an UNSCHEDULE instead of a move.
     if (d && d.mode === 'move' && onBlockDragOut) {
@@ -696,7 +715,22 @@ export default function WeekTimeGrid({
                       key={block.id}
                       data-testid="time-block"
                       onPointerDown={(e) => beginDrag(e, block, 'move')}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // DEC-087 — SINGLE click opens the editor (same
+                        // routing as double-click, which stays for habit).
+                        // Before this, a click did nothing, so people clicked
+                        // beside the block and the column's plain-click
+                        // booked a NEW slot — the demo's "it duplicated".
+                        // A click that ends a real drag is the drag's.
+                        if (dragConsumedClickRef.current) {
+                          dragConsumedClickRef.current = false
+                          return
+                        }
+                        if (block.meeting || !block.taskId) setEditBlockState(block)
+                        else if (isWorkItem) setEditItem(linked!)
+                        else if (linked) jumpToNode(linked)
+                      }}
                       onDoubleClick={(e) => {
                         e.stopPropagation()
                         // A meeting block (whatever it links) and a plain

@@ -11,7 +11,9 @@ import {
   planDay,
   schedulableItems,
   sweepMissed,
-  type PlannedProposal
+  type PlannedProposal,
+  parsePlanDay,
+  effectivePlanDay
 } from '../../lib/attentionPlanner'
 import { parseTags } from '../../lib/itemTags'
 import { parseMentions } from '../../lib/itemMentions'
@@ -255,6 +257,20 @@ export default function CalendarView(): JSX.Element {
     try {
       const opts = { placedIds: scheduledIds, deskTitles }
       const settings = loadPlannerSettings()
+      // DEC-087 — the demo's "nothing to place" at 6pm: (a) an intent that
+      // names a day ("…before noon tomorrow") plans THAT day, not the viewed
+      // one; (b) when today's working window has already closed, the plan
+      // rolls to tomorrow and says so instead of reporting a full day.
+      const named = intent.trim() ? parsePlanDay(intent, nowMs) : null
+      const eff = effectivePlanDay(named ?? planDayMs, blocks, settings, nowMs)
+      const targetDay = {
+        dayMs: eff.dayMs,
+        note: eff.rolledToTomorrow
+          ? 'Today’s working window has closed — this plans tomorrow instead.'
+          : named && named !== planDayMs
+            ? `Planning ${new Date(named).toLocaleDateString(undefined, { weekday: 'long' })}.`
+            : null
+      }
       let out: PlannedProposal[]
       if (intent.trim()) {
         // Intent mode: the model (or its keyword fallback) picks + orders;
@@ -278,14 +294,15 @@ export default function CalendarView(): JSX.Element {
           setProposals(null)
           return
         }
-        out = planDay(items, blocks, settings, planDayMs, nowMs, {
+        out = planDay(items, blocks, settings, targetDay.dayMs, nowMs, {
           ...opts,
           onlyItemIds: sel.ids,
           source: 'intent'
         })
-        setPlanNote(sel.note)
+        setPlanNote([sel.note, targetDay.note].filter(Boolean).join(' — ') || null)
       } else {
-        out = planDay(items, blocks, settings, planDayMs, nowMs, opts)
+        out = planDay(items, blocks, settings, targetDay.dayMs, nowMs, opts)
+        if (targetDay.note) setPlanNote(targetDay.note)
       }
       setProposals(out.length ? out : null)
       // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
@@ -296,7 +313,9 @@ export default function CalendarView(): JSX.Element {
       }
       if (!out.length)
         setPlanNote(
-          'Nothing to place — the day is full, or everything left is waiting on someone else.'
+          targetDay.note
+            ? `${targetDay.note} Still nothing fit — the queue may be empty or waiting on others.`
+            : 'Nothing to place — the day is full, or everything left is waiting on someone else.'
         )
     } finally {
       setPlanBusy(false)

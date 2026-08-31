@@ -132,7 +132,10 @@ export default function CaptureConsole(): JSX.Element | null {
         aria-label="Capture"
         data-testid="capture-console"
         onMouseDown={(e) => e.stopPropagation()}
-        className="fb-card w-[min(600px,92vw)] px-6 pt-5 pb-4"
+        // DEC-087 — the card sits 16vh down, so anything past ~76vh ran off
+        // the bottom of the viewport with no scrollbar (the demo's cut-off
+        // Desk drawer). Header stays pinned; the body scrolls.
+        className="fb-card w-[min(600px,92vw)] px-6 pt-5 pb-4 flex flex-col max-h-[76vh]"
       >
         <div className="flex items-baseline gap-2.5">
           <div className="text-[17px] font-semibold text-[var(--ink-100)]">Capture</div>
@@ -148,6 +151,7 @@ export default function CaptureConsole(): JSX.Element | null {
           </button>
         </div>
 
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-6 px-6">
         {confirmText == null ? (
           <>
             <div className="mt-4">
@@ -233,6 +237,7 @@ export default function CaptureConsole(): JSX.Element | null {
             />
           </div>
         )}
+        </div>
       </div>
     </div>
   )

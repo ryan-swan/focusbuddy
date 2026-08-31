@@ -2092,3 +2092,51 @@ mid-word ("…Cetra pitch deck—all high-cr"). Widened, word-boundary aware,
 ellipsised, still bounded because it is model output.
 
 ---
+
+## DEC-087 — Phase 1 of the demo-feedback plan: the three blockers
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Plan:** analysis/27
+
+Caleb's demo surfaced 20 items; analysis/27 consolidates them into 12 threads
+across 5 phases. Phase 1 is the three that made the demo stumble, and each
+turned out to be one honest mechanism, not mystery:
+
+**(a) The capture card ran off the screen.** `fb-card` had no height cap and
+no internal scroll, so the Desk drawer + mention input rendered below the
+viewport with nothing to grab. Now: `max-h-[76vh]` (the card already sits
+16vh down; 86vh would overhang), header pinned, body scrolls
+(`min-h-0 flex-1 overflow-y-auto overscroll-contain`).
+
+**(b) "Plan my day" at 6pm reported a full day.** Two truths compounding:
+`freeSlots` floors at *now* against a `dayStart..17:00` window, so an evening
+plan has zero slots by construction — and intent mode picked *items* but
+never the *day*, so "before noon tomorrow" still planned the viewed day. Two
+pure functions in attentionPlanner: `parsePlanDay` (tomorrow/today/tonight/
+weekday → local-midnight target; same-weekday means NEXT week) and
+`effectivePlanDay` (a requested TODAY with no usable slot rolls to tomorrow).
+CalendarView wires them into runPlan and SAYS what happened — "Today's
+working window has closed — this plans tomorrow instead." — because a rolled
+plan that pretends to be today's plan would be a lie with a calendar.
+
+**(c) Editing a block duplicated it or grew it.** Three compounding causes,
+measured: single click on a block did NOTHING (stopPropagation only), so
+people clicked, got silence, clicked beside it — and the column's plain-click
+booked a NEW slot. The 6px resize lips snapped ±15min off a ~7px slip
+(`Math.round` over a 56px hour). And any 1px jitter counted as a drag. Now:
+a 5px dead zone before ANY block drag engages (move and both resize modes —
+below it the press stays a click); a drag that actually moved consumes the
+click event that follows pointerup (`dragConsumedClickRef`); and a clean
+single click routes through the SAME ladder as double-click (meeting/plain →
+Book time dialog, work item → item editor, desk link → jump). Double-click
+stays for habit.
+
+Verified live over CDP (record in analysis/27): capture card capped at
+exactly 76vh with the drawer reachable; a 22:19 Plan-my-day produced
+tomorrow's proposals with the honest note; scratch-block matrix — click
+opens editor, 3px slip moves nothing and still opens it, 56px drag moves
+60min and opens nothing, lip wobble resizes nothing. 13 new pins in
+tests/unit/dec087DemoFixes.test.ts; 3,347 green; scratch blocks deleted.
+
+Also this round: a stray `npx prettier --write` reformatted CaptureConsole to
+prettier defaults (double quotes/semis — not house style; the repo has no
+prettier config). Caught by diff size, reverted, re-applied by hand. Rule
+absorbed: no formatter passes in this repo, the house style is the file.

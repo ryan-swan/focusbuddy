@@ -333,3 +333,48 @@ export function sweepMissed(blocks: TimeBlock[], nowMs: number): TimeBlock[] {
     (b) => b.status === 'planned' && b.startMs + b.durationMin * MIN + MISSED_GRACE_MS < nowMs
   )
 }
+
+// ── Phase-1 demo fixes (DEC-087) ────────────────────────────────────────────
+
+/** "…before noon tomorrow", "…on friday" — the DAY the intent names, as a
+ *  local-midnight ms, or null when it names none. planSelect picks ITEMS;
+ *  this picks the DAY — without it, every intent planned the viewed day
+ *  (the demo asked for tomorrow and was told today was full). */
+export function parsePlanDay(intent: string, nowMs: number): number | null {
+  const q = intent.toLowerCase()
+  const day = (offset: number): number => {
+    const d = new Date(nowMs)
+    d.setDate(d.getDate() + offset)
+    d.setHours(0, 0, 0, 0)
+    return d.getTime()
+  }
+  if (/\btomorrow\b/.test(q)) return day(1)
+  if (/\btoday\b|\btonight\b/.test(q)) return day(0)
+  const names = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  for (let i = 0; i < 7; i++) {
+    if (new RegExp(`\\b${names[i]}\\b`).test(q)) {
+      const dow = new Date(nowMs).getDay()
+      const add = (i - dow + 7) % 7 || 7 // "monday" on a Monday = NEXT Monday
+      return day(add)
+    }
+  }
+  return null
+}
+
+/** After the working window closes, "plan my day" has zero slots left — the
+ *  demo's "nothing to place, the day is full" moment, honest but useless.
+ *  When the target day is TODAY and its window yields no usable slot, plan
+ *  tomorrow instead and SAY SO. Returns the day to plan and the note. */
+export function effectivePlanDay(
+  requestedDayMs: number,
+  blocks: TimeBlock[],
+  settings: PlannerSettings,
+  nowMs: number
+): { dayMs: number; rolledToTomorrow: boolean } {
+  const today = new Date(nowMs)
+  today.setHours(0, 0, 0, 0)
+  if (requestedDayMs !== today.getTime()) return { dayMs: requestedDayMs, rolledToTomorrow: false }
+  if (freeSlots(blocks, requestedDayMs, settings, nowMs).length > 0)
+    return { dayMs: requestedDayMs, rolledToTomorrow: false }
+  return { dayMs: requestedDayMs + 24 * 60 * 60 * 1000, rolledToTomorrow: true }
+}
