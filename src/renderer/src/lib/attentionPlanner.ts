@@ -212,6 +212,16 @@ export interface PlanDayOptions {
  * queues use (one ranker — Analysis 24 §4) plus the momentum boost, packed
  * into the day's free slots with gaps, capped by the daily ceiling.
  */
+/** Clip to a word boundary with an ellipsis, so a truncated title never ends
+ *  mid-word inside quotation marks. */
+function clipTitle(s: string, max: number): string {
+  const t = s.trim()
+  if (t.length <= max) return t
+  const cut = t.slice(0, max)
+  const sp = cut.lastIndexOf(' ')
+  return `${(sp > max * 0.6 ? cut.slice(0, sp) : cut).trimEnd()}…`
+}
+
 /** DEC-092 — how strongly two items belong NEAR each other on a calendar.
  *  Same desk is the strongest signal; shared tags and shared mentions next;
  *  same intent class weakest. Pure and cheap — scored per candidate slot. */
@@ -366,8 +376,11 @@ export function planDay(
     })
     // The intelligence, said out loud (the placement WHY, beside the item
     // WHY): only for desk-level affinity, so the note stays signal.
+    // DEC-094 — separated and cleanly clipped. Concatenated bare, this ran
+    // into the lateness clause ("Due Saturday Grouped beside …") and cut off
+    // mid-quote once the review sheet gave reasons room to be read.
     const neighborNote = bestNeighbor
-      ? ` Grouped beside “${(bestNeighbor.title || 'related work').slice(0, 40)}”.`
+      ? ` · Grouped beside “${clipTitle(bestNeighbor.title || 'related work', 32)}”`
       : ''
     out.push({
       itemId: item.id,

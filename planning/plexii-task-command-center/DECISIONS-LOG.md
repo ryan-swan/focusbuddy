@@ -2433,3 +2433,50 @@ would have been half-usable. 56px edge zones, speed scaled by depth.
 Verified live: a `[TEST]` LakeDash chip carried the payload, the drop
 created one linked 30-minute block (14 → 15), and the probe's block was
 deleted after. 5 new pins; 3,433 green; both typechecks clean.
+
+## DEC-094 — The plan review joins the family
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Scope:** presentation only,
+by operator ruling
+
+The operator sent a full redesign spec (native-picker replacement, a
+computed cascade with pinning, locked already-booked rows, a capacity line
+from velocity history, a keyboard map) and then cut it back: *"forget all
+that back-end stuff… anything that contradicts what currently exists takes
+preference to the way it's currently built so you don't risk side effects.
+Just change the visual interface."* So: every handler, every model and every
+behaviour from DEC-071/089/092 is byte-for-byte intact. Nothing was added
+that needed data the dialog doesn't already hold.
+
+What changed is what it looks like:
+
+- **Header** — the mark sits in an accent tile (this dialog is Plexii
+  speaking); the title carries real weight; the subtitle speaks in hours
+  ("25 blocks · 12h 30m across 3 days") instead of raw minutes, naming the
+  day span only when there is one. DEC-071's promise sentence is unchanged.
+- **Prompt echo** — the labelled grey block became one quiet italic quoted
+  line. The requirement it existed for (the prompt is shown, in full, beside
+  the plan it produced) is unchanged.
+- **The planner note** — now an accent-tinted panel with an info mark, so it
+  reads as a note rather than as body copy.
+- **Rows** — ONE start time in a fixed 82px tabular column (the range said
+  one fact twice and wrapped; the end time moved to the tooltip). The title
+  takes the weight. Duration became a real chip. An overlap became an amber
+  "overlaps" chip instead of a sentence competing with the reason.
+- **Gap rules** — the empty time between consecutive rows, which the list
+  hid completely, is now a thin rule carrying the span; 30m+ reads "open" in
+  stronger ink. Computed from data that was already there.
+- **Day headers** — a hairline rule with the day's total as a span.
+- **Footer** — its own rule, a quiet two-line hint, a de-emphasised Discard,
+  and "Accept plan ↵" as an unmistakably primary button.
+- **Native pickers stay** (spec wanted them replaced; replacing them is new
+  interaction code and would have removed arbitrary-duration typing). They
+  now wear `accent-color`, so the OS chrome picks up the brand.
+
+Found while looking at the result: DEC-092's affinity note concatenated bare
+onto the lateness clause ("Due Saturday Grouped beside “…") and clipped
+mid-word inside its quotes. Separated with a middot and clipped on a word
+boundary (`clipTitle`) — a copy defect the polish made visible.
+
+Two DEC-071 pins rewritten to the superseding presentation with history.
+15 new pins (including a behaviour-untouched clause listing every DEC-089
+control); 3,448 green; both typechecks clean.

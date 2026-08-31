@@ -49,8 +49,11 @@ describe('dec_071 — the plan opens for review', () => {
     expect(cal).toContain('{pr.reason}')
     expect(cal).toContain('pr.startMs + pr.durationMin * 60_000')
     // ...and the prompt it is answering, in full.
+    // DEC-094 restyled the echo: the grey "You asked for" block became one
+    // quiet quoted line. The requirement — the prompt is SHOWN, in full,
+    // beside the plan it produced — is unchanged.
     expect(cal).toContain('{planIntent}')
-    expect(cal).toContain('You asked for')
+    expect(cal).toContain('“{planIntent}”')
   })
 
   it('dec_071_the_summary_bar_stops_pretending_to_explain', () => {
@@ -69,7 +72,9 @@ describe('dec_071 — the plan opens for review', () => {
 
   it('dec_071_opening_the_review_books_nothing', () => {
     // The whole stance (DEC-052 §5, anti-Motion): propose, never apply.
-    expect(cal).toContain('nothing is booked until\n                  you accept')
+    // DEC-094 rewrapped the subtitle (it now also carries the day span), so
+    // the sentence sits on one line in the source. Same promise, same words.
+    expect(cal).toContain('nothing is booked until you accept')
     expect(cal).toContain('async function acceptPlan(only?: PlannedProposal[])')
   })
 

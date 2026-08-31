@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { intentNamesTopic } from '@shared/planLanguage'
 import { useNodeStore } from '../../stores/nodes'
@@ -74,6 +74,16 @@ function dayStart(d: Date): Date {
 
 function dayMs(d: Date): number {
   return dayStart(d).getTime()
+}
+
+/** DEC-094 — minutes as a person says them: 45m · 1h · 4h 45m. The review
+ *  header used to read "285 min", which is a number you have to convert
+ *  before it means anything. */
+function fmtSpan(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  if (!h) return `${m}m`
+  return m ? `${h}h ${m}m` : `${h}h`
 }
 
 // 6 weeks × 7 days from the Monday on or before the 1st.
@@ -229,6 +239,11 @@ export default function CalendarView(): JSX.Element {
   // whose item got NO proposal stays put — never silently unscheduled.
   const [pendingMove, setPendingMove] = useState<Array<{ blockId: string; itemId: string }> | null>(
     null
+  )
+  /** DEC-094 — how many days the proposal spans, for the header sentence. */
+  const reviewDayCount = useMemo(
+    () => new Set((proposals ?? []).map((p) => new Date(p.startMs).toDateString())).size,
+    [proposals]
   )
   // DEC-071 — the proposal is REVIEWABLE before it is accepted. A summary line
   // that truncates ("3 blocks proposed · 82 min — Top creative items: Update
@@ -1167,16 +1182,25 @@ export default function CalendarView(): JSX.Element {
             onKeyDown={(e) => {
               if (e.key === 'Escape') setReviewOpen(false)
             }}
-            className="fb-card w-[min(680px,94vw)] p-4 max-h-full overflow-y-auto"
+            className="fb-card w-[min(680px,94vw)] px-5 py-4 max-h-full overflow-y-auto"
           >
-            <div className="flex items-start gap-2">
-              <Icon name="auto_awesome" size={16} className="mt-0.5 text-[rgb(var(--accent))]" />
+            <div className="flex items-start gap-2.5">
+              {/* DEC-094 — the mark sits in an accent tile, the way it does on
+                  the assistant surfaces: this dialog is Plexii speaking. */}
+              <span className="mt-0.5 shrink-0 h-7 w-7 rounded-[var(--radius-chip)] bg-accent/15 inline-flex items-center justify-center">
+                <Icon name="auto_awesome" size={15} className="text-[rgb(var(--accent))]" />
+              </span>
               <div className="min-w-0 flex-1">
-                <div className="fb-t-h3 text-[var(--ink-100)]">The plan Plexii proposes</div>
-                <div className="fb-t-caption text-[var(--ink-45)] mt-0.5">
-                  {proposals.length} block{proposals.length === 1 ? '' : 's'} ·{' '}
-                  {proposals.reduce((n, x) => n + x.durationMin, 0)} min · nothing is booked until
-                  you accept
+                <div className="text-[17px] font-semibold leading-tight text-[var(--ink-100)]">
+                  The plan Plexii proposes
+                </div>
+                <div className="fb-t-caption text-[var(--ink-45)] mt-1">
+                  <span className="font-semibold text-[var(--ink-70)]">
+                    {proposals.length} block{proposals.length === 1 ? '' : 's'}
+                  </span>{' '}
+                  · {fmtSpan(proposals.reduce((n, x) => n + x.durationMin, 0))}
+                  {reviewDayCount > 1 ? ` across ${reviewDayCount} days` : ''} ·{' '}
+                  <span className="text-[var(--ink-50)]">nothing is booked until you accept</span>
                 </div>
               </div>
               <button onClick={() => setReviewOpen(false)} className="icon-btn !h-7 !w-7 shrink-0">
@@ -1188,20 +1212,22 @@ export default function CalendarView(): JSX.Element {
                 thing the plan has to be judged against, and it is the text that
                 used to scroll out of the single-line field. */}
             {planIntent && (
-              <div className="mt-3 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-3 py-2">
-                <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-40)]">
-                  You asked for
-                </div>
-                <div className="fb-t-body text-[var(--ink-70)] mt-1 whitespace-pre-wrap break-words">
-                  {planIntent}
-                </div>
+              <div className="mt-2.5 pl-[38px] fb-t-body text-[var(--ink-55)] italic break-words">
+                “{planIntent}”
               </div>
             )}
 
             {/* The planner's own note, in full rather than truncated into the bar. */}
             {planNote && (
-              <div className="mt-3 fb-t-body text-[var(--ink-60)] whitespace-pre-wrap break-words">
-                {planNote}
+              <div className="mt-3 flex items-start gap-2 rounded-[var(--radius-row)] border border-accent/25 bg-accent/[0.07] px-3 py-2">
+                <Icon
+                  name="info"
+                  size={13}
+                  className="mt-[3px] shrink-0 text-[rgb(var(--accent))]"
+                />
+                <div className="fb-t-caption text-[var(--ink-70)] whitespace-pre-wrap break-words">
+                  {planNote}
+                </div>
               </div>
             )}
 
@@ -1218,21 +1244,26 @@ export default function CalendarView(): JSX.Element {
                 }, new Map<string, PlannedProposal[]>())
               ).map(([day, ps]) => (
                 <div key={day}>
-                  <div className="fb-t-caption uppercase tracking-wider text-[var(--ink-40)] mb-1">
-                    {new Date(ps[0].startMs).toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                    <span className="ml-2 fb-tabular normal-case tracking-normal text-[var(--ink-30)]">
-                      {ps.reduce((n, x) => n + x.durationMin, 0)} min
+                  <div className="flex items-baseline gap-2 mb-1.5 px-0.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-60)]">
+                      {new Date(ps[0].startMs).toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </span>
+                    <span className="flex-1 h-px bg-[var(--edge-soft)]" aria-hidden />
+                    <span className="fb-t-caption fb-tabular text-[var(--ink-45)]">
+                      {fmtSpan(ps.reduce((n, x) => n + x.durationMin, 0))}
                     </span>
                   </div>
-                  <div className="rounded-[var(--radius-card)] border border-[var(--edge-soft)] divide-y divide-[var(--edge-soft)] overflow-hidden">
+                  {/* DEC-094 — no divide-y: the GAP RULES are the dividers now,
+                      and they carry the empty time the old list hid entirely. */}
+                  <div className="rounded-[var(--radius-card)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] overflow-hidden">
                     {ps
                       .slice()
                       .sort((a, b) => a.startMs - b.startMs)
-                      .map((pr) => {
+                      .map((pr, idx, arr) => {
                         // DEC-089 — honesty over auto-fixing: a hand edit or
                         // a drag can make rows collide. Warn in place; the
                         // operator's own edits are the repair tool.
@@ -1272,9 +1303,39 @@ export default function CalendarView(): JSX.Element {
                             })
                           setRowEdit(null)
                         }
+                        // DEC-094 — the empty time between two rows, which
+                        // the old list hid completely. 30m+ reads as "open"
+                        // in stronger ink: a real hole you can drop work into.
+                        const prev = idx > 0 ? arr[idx - 1] : null
+                        const gapMin = prev
+                          ? Math.round(
+                              (pr.startMs - (prev.startMs + prev.durationMin * 60_000)) / 60_000
+                            )
+                          : 0
                         return (
+                        <Fragment key={pr.uid ?? `${pr.itemId}-${pr.startMs}`}>
+                        {prev && gapMin > 0 && (
+                          <div
+                            data-testid="plan-gap-rule"
+                            className="flex items-center gap-2 px-3 py-1 select-none"
+                            aria-hidden
+                          >
+                            <span className="flex-1 h-px bg-[var(--edge-soft)]" />
+                            <span
+                              className={`fb-t-caption fb-tabular ${
+                                gapMin >= 30 ? 'text-[var(--ink-50)]' : 'text-[var(--ink-30)]'
+                              }`}
+                            >
+                              {fmtSpan(gapMin)}
+                              {gapMin >= 30 ? ' open' : ''}
+                            </span>
+                            <span className="flex-1 h-px bg-[var(--edge-soft)]" />
+                          </div>
+                        )}
+                        {prev && gapMin <= 0 && (
+                          <div className="mx-3 h-px bg-[var(--edge-soft)]" aria-hidden />
+                        )}
                         <div
-                          key={pr.uid ?? `${pr.itemId}-${pr.startMs}`}
                           data-testid="plan-review-row"
                           // DEC-089 — the whole row is the drag surface, same
                           // grammar as the Attention queues (DEC-077). The
@@ -1309,7 +1370,7 @@ export default function CalendarView(): JSX.Element {
                               reorderProposal(from, pr.uid!, over.pos)
                           }}
                           title="Drag to reorder — the item takes the slot it lands on"
-                          className={`group relative flex items-start gap-3 px-3 py-2.5 bg-[var(--surface-raised)] cursor-grab active:cursor-grabbing ${
+                          className={`group relative flex items-start gap-3 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors hover:bg-accent/[0.05] ${
                             dragRowUid === pr.uid ? 'opacity-40' : ''
                           }`}
                         >
@@ -1353,7 +1414,7 @@ export default function CalendarView(): JSX.Element {
                                   d.setFullYear(y, m - 1, dd)
                                   editProposal(pr.uid!, { startMs: d.getTime() })
                                 }}
-                                className="w-full h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)]"
+                                className="w-full h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] border border-[rgb(var(--accent))] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)] [accent-color:rgb(var(--accent))] [color-scheme:inherit]"
                               />
                               <input
                                 type="time"
@@ -1366,29 +1427,29 @@ export default function CalendarView(): JSX.Element {
                                   d.setHours(h, min, 0, 0)
                                   editProposal(pr.uid!, { startMs: d.getTime() })
                                 }}
-                                className="w-full h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)]"
+                                className="w-full h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] border border-[rgb(var(--accent))] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)] [accent-color:rgb(var(--accent))] [color-scheme:inherit]"
                               />
                             </span>
                           ) : (
                             <button
                               onClick={() => setRowEdit({ uid: pr.uid!, field: 'when' })}
                               data-testid="plan-row-when"
-                              title="Change the day or start time"
-                              className="fb-t-caption fb-tabular text-[var(--ink-50)] hover:text-[var(--ink-100)] shrink-0 w-[112px] pt-0.5 text-left fb-press rounded"
+                              title={`Change the day or start time — ends ${new Date(
+                                endMs
+                              ).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
+                              // DEC-094 — the START only. The end is the start
+                              // plus the duration chip two columns over: the
+                              // old range said one fact twice and wrapped.
+                              className="text-[13px] font-medium fb-tabular text-[var(--ink-70)] hover:text-[rgb(var(--accent))] shrink-0 w-[82px] pt-px text-left fb-press rounded transition-colors"
                             >
                               {new Date(pr.startMs).toLocaleTimeString(undefined, {
-                                hour: 'numeric',
-                                minute: '2-digit'
-                              })}
-                              {' – '}
-                              {new Date(endMs).toLocaleTimeString(undefined, {
                                 hour: 'numeric',
                                 minute: '2-digit'
                               })}
                             </button>
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="fb-t-body text-[var(--ink-90)] break-words">
+                            <div className="text-[13.5px] font-medium leading-snug text-[var(--ink-100)] break-words">
                               {pr.title}
                             </div>
                             {/* The WHY. It was on the proposal all along and had
@@ -1399,12 +1460,14 @@ export default function CalendarView(): JSX.Element {
                               </div>
                             )}
                             {clash && (
-                              <div
+                              <span
                                 data-testid="plan-row-clash"
-                                className="fb-t-caption text-amber-600 dark:text-amber-400 mt-0.5"
+                                title="Overlaps another block — adjust the time or duration"
+                                className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
                               >
-                                Overlaps another block — adjust the time or duration
-                              </div>
+                                <Icon name="warning" size={11} />
+                                overlaps
+                              </span>
                             )}
                           </div>
                           {editingDur ? (
@@ -1437,19 +1500,22 @@ export default function CalendarView(): JSX.Element {
                               }
                               data-testid="plan-row-dur"
                               title="Change how long this gets"
-                              className="fb-t-caption fb-tabular text-[var(--ink-40)] hover:text-[var(--ink-100)] shrink-0 pt-0.5 fb-press rounded"
+                              // DEC-094 — a chip, not loose text: it is the
+                              // row's second control and should look like one.
+                              className="shrink-0 h-7 min-w-[46px] px-2 rounded-[var(--radius-chip)] border border-[var(--edge-strong)] bg-[var(--surface-sunken)] text-[12px] font-medium fb-tabular text-[var(--ink-70)] hover:border-[rgb(var(--accent))] hover:text-[rgb(var(--accent))] fb-press transition-colors"
                             >
-                              {pr.durationMin}m
+                              {fmtSpan(pr.durationMin)}
                             </button>
                           )}
                           <button
                             onClick={() => dropProposal(pr.uid!)}
                             title="Drop this block from the plan"
-                            className="icon-btn !h-6 !w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="icon-btn !h-6 !w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
                           >
                             <Icon name="close" size={12} />
                           </button>
                         </div>
+                        </Fragment>
                         )
                       })}
                   </div>
@@ -1457,11 +1523,16 @@ export default function CalendarView(): JSX.Element {
               ))}
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <span className="fb-t-caption text-[var(--ink-40)] flex-1">
-                Drag rows to reorder · click a time or duration to edit it. Accepting books{' '}
-                {proposals.length} block{proposals.length === 1 ? '' : 's'} — ⌘Z undoes the whole
-                plan.
+            {/* DEC-094 — the footer sits on its own rule, the hint is quiet,
+                and the primary action is unmistakably the primary action. */}
+            <div className="mt-4 pt-3 border-t border-[var(--edge-soft)] flex items-center gap-2.5">
+              <span className="fb-t-caption text-[var(--ink-40)] flex-1 leading-snug">
+                Drag rows to reorder · click a time or duration to edit it.
+                <br />
+                <span className="text-[var(--ink-30)]">
+                  Accepting books {proposals.length} block
+                  {proposals.length === 1 ? '' : 's'} — ⌘Z undoes the whole plan.
+                </span>
               </span>
               <button
                 onClick={() => {
@@ -1470,17 +1541,20 @@ export default function CalendarView(): JSX.Element {
                   setPendingMove(null)
                   setReviewOpen(false)
                 }}
-                className="h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)]"
+                className="h-9 px-3.5 rounded-[var(--radius-field)] fb-press fb-t-label text-[var(--ink-60)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)] transition-colors"
               >
                 Discard
               </button>
               <button
                 onClick={() => void acceptPlan()}
-                className="btn-primary"
+                className="btn-primary !h-9 !px-4 font-semibold shadow-[0_2px_10px_rgb(var(--accent)/0.35)]"
                 data-testid="plan-review-accept"
               >
                 <Icon name="check" size={14} />
-                <span>Accept all</span>
+                <span>Accept plan</span>
+                <span aria-hidden className="rounded bg-white/20 px-1 text-[11px] leading-4">
+                  ↵
+                </span>
               </button>
             </div>
           </div>
