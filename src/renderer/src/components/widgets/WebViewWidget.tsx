@@ -640,7 +640,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
     <WidgetFrame
       widget={widget}
       headerLabel={`${entry?.label ?? 'Browser'} · ${headerLabel}`}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
       headerMenuExtras={headerMenuExtras}
     >
       {body}

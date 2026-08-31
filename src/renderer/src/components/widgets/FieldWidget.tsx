@@ -128,7 +128,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
     )
     if (inline) return body
     return (
-      <WidgetFrame widget={widget} headerLabel="Field" headerAccent="bg-stone-300/60">
+      <WidgetFrame widget={widget} headerLabel="Field" headerAccent="bg-stone-300/60 dark:bg-white/[0.09]">
         {body}
       </WidgetFrame>
     )
@@ -224,7 +224,7 @@ export default function FieldWidget({ widget, inline = false }: Props): JSX.Elem
     <WidgetFrame
       widget={widget}
       headerLabel={state.def.label || FIELD_TYPE_LABELS[state.def.type]}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
     >
       {body}
     </WidgetFrame>

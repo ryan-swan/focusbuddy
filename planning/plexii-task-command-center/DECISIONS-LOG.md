@@ -2196,3 +2196,52 @@ and killed the accent; "Caleb Swan owns this; remind caleb monday"
 suggested Swan alone. 20 new tests (extraction matrix + wiring pins); one
 DEC-084 four-pill pin rewritten to five with history; 3,367 green; both
 typechecks clean.
+
+## DEC-089 — The plan review is a workbench; widget chrome survives dark mode
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Trigger:** operator live QA off
+the DEC-087 review sheet + the dark-mode desk
+
+**(A) The review sheet stopped being read-only.** The operator's ask: move
+things, change times, change lengths — without leaving the approval moment.
+Three additions, one honest rule each:
+
+- **Drag to reorder** — whole row is the drag surface (the Attention queues'
+  grammar, DEC-077). The SLOT LADDER HOLDS: the times the planner found (plus
+  any hand edits) keep their positions; items reassign over them, each
+  keeping its own duration (`reorderOverSlots`, pure, in attentionPlanner).
+  Dragging never invents new times.
+- **Inline when/duration** — click the time range → date + time inputs in
+  place (focus leaving both commits); click the duration → minutes input
+  (Enter/blur commits, snapped to 5). Accept books exactly what the rows say.
+- **Overlap warnings, not auto-fixes** — a longer item in a tighter slot, or
+  a hand-set time over an existing block, shows "Overlaps another block" on
+  every row involved. The sheet never silently reflows the day; the
+  operator's own edits are the repair tool.
+
+Rows carry client uids (itemId repeats on session splits; startMs is mutable
+now) — dropProposal and the editors key on them. Live-verified over CDP: 11
+draggable rows; duration 30→45 in place; start 9:00→8:00 in place; dragging
+row 3 before row 1 gave it the FIRST slot (the edited 8:00) with everything
+else stepping down one slot, times unmoved; a 240-min row lit 5 overlap
+warnings; Discard booked nothing.
+
+**(B) Widget chrome in dark mode.** The bell and completion circle weren't
+low-contrast by accident — the header wash under them was `bg-stone-200/70`
+(and 25 siblings), light-only, so dark mode floated LIGHT ink on a LIGHT
+wash. Every header wash now carries a dark companion (26 call sites + the
+default; hue identity kept — violet stays violet). The resting frame edge
+gets a real 1px `--edge-firm` border in dark (the 9%-white hairline melts
+into the canvas); the idle bell drops its extra dimming (ink-50 @ 80%).
+Measured on a live desk: header rgba(255,255,255,0.09) / violet 0.25, bell
+ink-50 @ 0.8, frame edge white 19%.
+
+**Found while measuring: GAP-019.** Two widget headers (Table, MindMap) had
+NO wash at all — `bg-[var(--edge-firm)]/60` is invalid CSS (an opacity
+modifier on an opaque var() token) and paints NOTHING, both themes. Fixed
+those two under this round; the ~40-site repo-wide disease is filed as
+GAP-019 with live paint-probe evidence, its own sweep round. The DEC-089
+lock already forbids the pattern in headerAccent, and the four-pill→
+five-pill DEC-084 pin got its history note last round.
+
+13 new tests (reorder math + editability pins + the two-clause chrome lock);
+3,380 green; both typechecks clean.

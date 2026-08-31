@@ -230,7 +230,7 @@ export default function DriveWidget({ widget, inline = false }: Props): JSX.Elem
 
   if (inline) return withModal
   return (
-    <WidgetFrame widget={widget} headerLabel={bound ? folderName || 'Drive' : 'Drive'} headerAccent="bg-amber-300/50">
+    <WidgetFrame widget={widget} headerLabel={bound ? folderName || 'Drive' : 'Drive'} headerAccent="bg-amber-300/50 dark:bg-amber-400/20">
       {withModal}
     </WidgetFrame>
   )

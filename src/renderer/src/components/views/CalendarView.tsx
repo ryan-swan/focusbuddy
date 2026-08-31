@@ -13,7 +13,8 @@ import {
   sweepMissed,
   type PlannedProposal,
   parsePlanDay,
-  effectivePlanDay
+  effectivePlanDay,
+  reorderOverSlots
 } from '../../lib/attentionPlanner'
 import { parseTags } from '../../lib/itemTags'
 import { parseMentions } from '../../lib/itemMentions'
@@ -219,6 +220,11 @@ export default function CalendarView(): JSX.Element {
   // WHEN each lands, or WHY it chose them, and the ghosts on the grid cannot be
   // clicked because nothing is booked yet. So the plan opens in a review pane.
   const [reviewOpen, setReviewOpen] = useState(false)
+  // DEC-089 — review-sheet interactions: one inline editor at a time (when =
+  // date+time, dur = minutes with a typing draft), and the drag in flight.
+  const [rowEdit, setRowEdit] = useState<{ uid: string; field: 'when' | 'dur'; draft?: string } | null>(null)
+  const [dragRowUid, setDragRowUid] = useState<string | null>(null)
+  const [dragRowOver, setDragRowOver] = useState<{ uid: string; pos: 'before' | 'after' } | null>(null)
   // The prompt that produced the current proposal, echoed in the review so the
   // plan can be judged against what was actually asked for.
   const [planIntent, setPlanIntent] = useState('')
@@ -304,7 +310,7 @@ export default function CalendarView(): JSX.Element {
         out = planDay(items, blocks, settings, targetDay.dayMs, nowMs, opts)
         if (targetDay.note) setPlanNote(targetDay.note)
       }
-      setProposals(out.length ? out : null)
+      setProposals(out.length ? withUids(out) : null)
       // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
       // truncated line. Nothing is booked by opening it.
       if (out.length) {
@@ -342,7 +348,7 @@ export default function CalendarView(): JSX.Element {
         deskTitles,
         source: 'replan'
       })
-      setProposals(out.length ? out : null)
+      setProposals(out.length ? withUids(out) : null)
       // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
       // truncated line. Nothing is booked by opening it.
       if (out.length) {
@@ -375,6 +381,24 @@ export default function CalendarView(): JSX.Element {
     return true
   }
 
+  // DEC-089 — review rows need identity that survives editing: itemId can
+  // repeat (session splits) and startMs is now mutable. Stamped once per plan.
+  const planUidSeq = useRef(0)
+  const withUids = (ps: PlannedProposal[]): PlannedProposal[] =>
+    ps.map((p) => (p.uid ? p : { ...p, uid: `pp-${++planUidSeq.current}` }))
+
+  /** DEC-089 — drag a review row to a new position: slot ladder holds,
+   *  items reassign over it (reorderOverSlots — pure, lib-tested). */
+  function reorderProposal(fromUid: string, toUid: string, pos: 'before' | 'after'): void {
+    setProposals((prev) => (prev ? reorderOverSlots(prev, fromUid, toUid, pos) : prev))
+  }
+
+  /** DEC-089 — inline edits commit straight onto the proposal; accept books
+   *  whatever the rows say. Nothing is booked until accept, as ever. */
+  function editProposal(uid: string, patch: Partial<Pick<PlannedProposal, 'startMs' | 'durationMin'>>): void {
+    setProposals((prev) => (prev ? prev.map((s) => (s.uid === uid ? { ...s, ...patch } : s)) : prev))
+  }
+
   async function acceptPlan(only?: PlannedProposal[]): Promise<void> {
     const take = only ?? proposals
     if (!take || take.length === 0) return
@@ -400,9 +424,9 @@ export default function CalendarView(): JSX.Element {
   }
 
   /** Drop one block from the proposal without touching the rest. */
-  function dropProposal(itemId: string, startMs: number): void {
+  function dropProposal(uid: string): void {
     setProposals((prev) => {
-      const next = (prev ?? []).filter((p) => !(p.itemId === itemId && p.startMs === startMs))
+      const next = (prev ?? []).filter((p) => p.uid !== uid)
       if (next.length > 0) return next
       // Emptying the set is the same as discarding it — leaving an empty
       // review open would be a dialog about nothing.
@@ -1045,24 +1069,161 @@ export default function CalendarView(): JSX.Element {
                     {ps
                       .slice()
                       .sort((a, b) => a.startMs - b.startMs)
-                      .map((pr) => (
+                      .map((pr) => {
+                        // DEC-089 — honesty over auto-fixing: a hand edit or
+                        // a drag can make rows collide. Warn in place; the
+                        // operator's own edits are the repair tool.
+                        const endMs = pr.startMs + pr.durationMin * 60_000
+                        const clash =
+                          (proposals ?? []).some(
+                            (q) =>
+                              q.uid !== pr.uid &&
+                              pr.startMs < q.startMs + q.durationMin * 60_000 &&
+                              q.startMs < endMs
+                          ) ||
+                          blocks.some(
+                            (b) =>
+                              (b.status === 'planned' || b.status === 'done') &&
+                              pr.startMs < b.startMs + b.durationMin * 60_000 &&
+                              b.startMs < endMs
+                          )
+                        const editingWhen =
+                          rowEdit != null && rowEdit.uid === pr.uid && rowEdit.field === 'when'
+                        const editingDur =
+                          rowEdit != null && rowEdit.uid === pr.uid && rowEdit.field === 'dur'
+                        const localDate = (ms: number): string => {
+                          const d = new Date(ms)
+                          const mm = String(d.getMonth() + 1).padStart(2, '0')
+                          const dd = String(d.getDate()).padStart(2, '0')
+                          return `${d.getFullYear()}-${mm}-${dd}`
+                        }
+                        const localTime = (ms: number): string => {
+                          const d = new Date(ms)
+                          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+                        }
+                        const commitDur = (): void => {
+                          const v = parseInt(rowEdit?.draft ?? '', 10)
+                          if (Number.isFinite(v) && v > 0)
+                            editProposal(pr.uid!, {
+                              durationMin: Math.max(5, Math.round(v / 5) * 5)
+                            })
+                          setRowEdit(null)
+                        }
+                        return (
                         <div
-                          key={`${pr.itemId}-${pr.startMs}`}
-                          className="group flex items-start gap-3 px-3 py-2.5 bg-[var(--surface-raised)]"
+                          key={pr.uid ?? `${pr.itemId}-${pr.startMs}`}
+                          data-testid="plan-review-row"
+                          // DEC-089 — the whole row is the drag surface, same
+                          // grammar as the Attention queues (DEC-077). The
+                          // slot ladder stays; items reorder over it.
+                          draggable={rowEdit?.uid !== pr.uid}
+                          onDragStart={(e) => {
+                            setDragRowUid(pr.uid ?? null)
+                            e.dataTransfer.setData('text/fb-planrow', pr.uid ?? '')
+                            e.dataTransfer.effectAllowed = 'move'
+                          }}
+                          onDragEnd={() => {
+                            setDragRowUid(null)
+                            setDragRowOver(null)
+                          }}
+                          onDragOver={(e) => {
+                            if (!dragRowUid || dragRowUid === pr.uid) return
+                            e.preventDefault()
+                            const r = e.currentTarget.getBoundingClientRect()
+                            const pos = e.clientY - r.top < r.height / 2 ? 'before' : 'after'
+                            setDragRowOver({ uid: pr.uid!, pos })
+                          }}
+                          onDragLeave={() =>
+                            setDragRowOver((cur) => (cur?.uid === pr.uid ? null : cur))
+                          }
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            const from = e.dataTransfer.getData('text/fb-planrow') || dragRowUid
+                            const over = dragRowOver
+                            setDragRowUid(null)
+                            setDragRowOver(null)
+                            if (from && over && over.uid === pr.uid)
+                              reorderProposal(from, pr.uid!, over.pos)
+                          }}
+                          title="Drag to reorder — the item takes the slot it lands on"
+                          className={`group relative flex items-start gap-3 px-3 py-2.5 bg-[var(--surface-raised)] cursor-grab active:cursor-grabbing ${
+                            dragRowUid === pr.uid ? 'opacity-40' : ''
+                          }`}
                         >
-                          <span className="fb-t-caption fb-tabular text-[var(--ink-50)] shrink-0 w-[112px] pt-0.5">
-                            {new Date(pr.startMs).toLocaleTimeString(undefined, {
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            })}
-                            {' – '}
-                            {new Date(
-                              pr.startMs + pr.durationMin * 60_000
-                            ).toLocaleTimeString(undefined, {
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            })}
-                          </span>
+                          {dragRowOver != null && dragRowOver.uid === pr.uid && (
+                            <span
+                              aria-hidden
+                              className={`absolute left-0 right-0 h-0.5 bg-[rgb(var(--accent))] ${
+                                dragRowOver.pos === 'before' ? 'top-0' : 'bottom-0'
+                              }`}
+                            />
+                          )}
+                          {editingWhen ? (
+                            <span
+                              className="shrink-0 w-[126px] flex flex-col gap-1"
+                              draggable={false}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              // Focus leaving the WHOLE editor (date and time
+                              // both) is what ends the edit — either input can
+                              // be the one the operator finishes in.
+                              onBlur={(e) => {
+                                if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                                  setRowEdit(null)
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                  e.stopPropagation()
+                                  setRowEdit(null)
+                                }
+                                if (e.key === 'Enter') setRowEdit(null)
+                              }}
+                            >
+                              <input
+                                type="date"
+                                autoFocus
+                                value={localDate(pr.startMs)}
+                                data-testid="plan-row-date"
+                                onChange={(e) => {
+                                  if (!e.target.value) return
+                                  const d = new Date(pr.startMs)
+                                  const [y, m, dd] = e.target.value.split('-').map(Number)
+                                  d.setFullYear(y, m - 1, dd)
+                                  editProposal(pr.uid!, { startMs: d.getTime() })
+                                }}
+                                className="w-full h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)]"
+                              />
+                              <input
+                                type="time"
+                                value={localTime(pr.startMs)}
+                                data-testid="plan-row-time"
+                                onChange={(e) => {
+                                  if (!e.target.value) return
+                                  const [h, min] = e.target.value.split(':').map(Number)
+                                  const d = new Date(pr.startMs)
+                                  d.setHours(h, min, 0, 0)
+                                  editProposal(pr.uid!, { startMs: d.getTime() })
+                                }}
+                                className="w-full h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)]"
+                              />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setRowEdit({ uid: pr.uid!, field: 'when' })}
+                              data-testid="plan-row-when"
+                              title="Change the day or start time"
+                              className="fb-t-caption fb-tabular text-[var(--ink-50)] hover:text-[var(--ink-100)] shrink-0 w-[112px] pt-0.5 text-left fb-press rounded"
+                            >
+                              {new Date(pr.startMs).toLocaleTimeString(undefined, {
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                              {' – '}
+                              {new Date(endMs).toLocaleTimeString(undefined, {
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                            </button>
+                          )}
                           <div className="min-w-0 flex-1">
                             <div className="fb-t-body text-[var(--ink-90)] break-words">
                               {pr.title}
@@ -1074,19 +1235,60 @@ export default function CalendarView(): JSX.Element {
                                 {pr.reason}
                               </div>
                             )}
+                            {clash && (
+                              <div
+                                data-testid="plan-row-clash"
+                                className="fb-t-caption text-amber-600 dark:text-amber-400 mt-0.5"
+                              >
+                                Overlaps another block — adjust the time or duration
+                              </div>
+                            )}
                           </div>
-                          <span className="fb-t-caption fb-tabular text-[var(--ink-40)] shrink-0 pt-0.5">
-                            {pr.durationMin}m
-                          </span>
+                          {editingDur ? (
+                            <input
+                              autoFocus
+                              type="number"
+                              min={5}
+                              step={5}
+                              value={rowEdit?.draft ?? String(pr.durationMin)}
+                              data-testid="plan-row-dur-input"
+                              draggable={false}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onChange={(e) =>
+                                setRowEdit((cur) => (cur ? { ...cur, draft: e.target.value } : cur))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') commitDur()
+                                if (e.key === 'Escape') {
+                                  e.stopPropagation()
+                                  setRowEdit(null)
+                                }
+                              }}
+                              onBlur={commitDur}
+                              className="w-16 h-7 px-1.5 rounded-[var(--radius-chip)] bg-[var(--surface-sunken)] outline-none [&:focus-visible]:outline-none text-[11px] fb-tabular text-[var(--ink-90)] shrink-0"
+                            />
+                          ) : (
+                            <button
+                              onClick={() =>
+                                setRowEdit({ uid: pr.uid!, field: 'dur', draft: String(pr.durationMin) })
+                              }
+                              data-testid="plan-row-dur"
+                              title="Change how long this gets"
+                              className="fb-t-caption fb-tabular text-[var(--ink-40)] hover:text-[var(--ink-100)] shrink-0 pt-0.5 fb-press rounded"
+                            >
+                              {pr.durationMin}m
+                            </button>
+                          )}
                           <button
-                            onClick={() => dropProposal(pr.itemId, pr.startMs)}
+                            onClick={() => dropProposal(pr.uid!)}
                             title="Drop this block from the plan"
                             className="icon-btn !h-6 !w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Icon name="close" size={12} />
                           </button>
                         </div>
-                      ))}
+                        )
+                      })}
                   </div>
                 </div>
               ))}
@@ -1094,8 +1296,9 @@ export default function CalendarView(): JSX.Element {
 
             <div className="mt-4 flex items-center gap-2">
               <span className="fb-t-caption text-[var(--ink-40)] flex-1">
-                Accepting books {proposals.length} block{proposals.length === 1 ? '' : 's'} — ⌘Z
-                undoes the whole plan.
+                Drag rows to reorder · click a time or duration to edit it. Accepting books{' '}
+                {proposals.length} block{proposals.length === 1 ? '' : 's'} — ⌘Z undoes the whole
+                plan.
               </span>
               <button
                 onClick={() => {

@@ -620,7 +620,7 @@ export default function VoiceRecorderWidget({ widget, inline = false }: Props): 
     <WidgetFrame
       widget={widget}
       headerLabel={state.captureMode === 'video' ? 'Video note' : 'Voice note'}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
     >
       {body}
     </WidgetFrame>

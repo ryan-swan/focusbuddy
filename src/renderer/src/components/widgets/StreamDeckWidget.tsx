@@ -517,7 +517,7 @@ export default function StreamDeckWidget({ widget, inline = false }: Props): JSX
 
   if (!currentPage) {
     return (
-      <WidgetFrame widget={widget} headerLabel="SpeedDeck" headerAccent="bg-stone-300/60">
+      <WidgetFrame widget={widget} headerLabel="SpeedDeck" headerAccent="bg-stone-300/60 dark:bg-white/[0.09]">
         <button
           className="m-2 px-3 py-2 rounded bg-accent text-white text-[12px]"
           onClick={() => {

@@ -25,10 +25,10 @@ const KIND_TO_DOCTYPE: Record<string, DocType> = {
   design: 'design'
 }
 const TYPE_META: Record<DocType, { label: string; accent: string }> = {
-  doc: { label: 'Document', accent: 'bg-sky-300/60' },
-  sheet: { label: 'Spreadsheet', accent: 'bg-emerald-300/60' },
-  slides: { label: 'Slides', accent: 'bg-orange-300/60' },
-  map: { label: 'Map', accent: 'bg-violet-300/60' },
+  doc: { label: 'Document', accent: 'bg-sky-300/60 dark:bg-sky-400/25' },
+  sheet: { label: 'Spreadsheet', accent: 'bg-emerald-300/60 dark:bg-emerald-400/25' },
+  slides: { label: 'Slides', accent: 'bg-orange-300/60 dark:bg-orange-400/25' },
+  map: { label: 'Map', accent: 'bg-violet-300/60 dark:bg-violet-400/25' },
   design: { label: 'Design', accent: 'bg-pink-300/60' }
 }
 

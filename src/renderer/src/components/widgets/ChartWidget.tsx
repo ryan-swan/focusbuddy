@@ -138,7 +138,7 @@ export default function ChartWidget({ widget }: Props): JSX.Element {
   const headerLabel = config.title?.trim() || (table ? `${table.title} chart` : 'Chart')
 
   return (
-    <WidgetFrame widget={widget} headerLabel={headerLabel} headerAccent="bg-indigo-300/50">
+    <WidgetFrame widget={widget} headerLabel={headerLabel} headerAccent="bg-indigo-300/50 dark:bg-indigo-400/20">
       <div className="h-full w-full flex flex-col bg-[var(--surface-raised)]" data-testid="chart-widget">
         {/* Toolbar: title, type quick-switch, edit toggle. */}
         <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--edge-soft)]">

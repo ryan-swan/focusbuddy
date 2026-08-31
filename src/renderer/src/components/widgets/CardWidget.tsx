@@ -250,7 +250,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
   if (inline) return content
 
   return (
-    <WidgetFrame widget={widget} headerLabel="card" headerAccent="bg-stone-200/70">
+    <WidgetFrame widget={widget} headerLabel="card" headerAccent="bg-stone-200/70 dark:bg-white/[0.07]">
       {content}
     </WidgetFrame>
   )

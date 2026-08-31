@@ -92,7 +92,7 @@ export default function ImageWidget({ widget, inline = false }: Props): JSX.Elem
     <WidgetFrame
       widget={widget}
       headerLabel={`Image · ${widget.title || hostnameOf(widget.content || '')}`}
-      headerAccent="bg-stone-200/70"
+      headerAccent="bg-stone-200/70 dark:bg-white/[0.07]"
     >
       {body}
     </WidgetFrame>

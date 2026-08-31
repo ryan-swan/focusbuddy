@@ -91,7 +91,7 @@ export default function VideoWidget({ widget, inline = false }: Props): JSX.Elem
     <WidgetFrame
       widget={widget}
       headerLabel={`Video · ${widget.title || hostnameOf(widget.content || '')}`}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
     >
       {body}
     </WidgetFrame>

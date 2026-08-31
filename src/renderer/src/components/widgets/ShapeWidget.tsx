@@ -230,7 +230,7 @@ export default function ShapeWidget({ widget, inline = false }: Props): JSX.Elem
   if (inline) return content
 
   return (
-    <WidgetFrame widget={widget} headerLabel="shape" headerAccent="bg-stone-200/70">
+    <WidgetFrame widget={widget} headerLabel="shape" headerAccent="bg-stone-200/70 dark:bg-white/[0.07]">
       {content}
     </WidgetFrame>
   )

@@ -1310,7 +1310,7 @@ export default function MindMapWidget({ widget, inline = false }: Props): JSX.El
 
   if (inline) return body
   return (
-    <WidgetFrame widget={widget} headerLabel="Mind map" headerAccent="bg-[var(--edge-firm)]/60">
+    <WidgetFrame widget={widget} headerLabel="Mind map" headerAccent="bg-[var(--edge-firm)]">
       {body}
     </WidgetFrame>
   )

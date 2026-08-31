@@ -78,6 +78,11 @@ export interface PlannedProposal {
   startMs: number
   durationMin: number
   reason: string
+  /** DEC-089 — client-side row identity for the review sheet. itemId alone
+   *  is not unique (a long item can split into several sessions), and
+   *  startMs stops being stable once rows are editable. Assigned by the
+   *  view when a plan enters review; the planner itself never sets it. */
+  uid?: string
 }
 
 export interface FreeSlot {
@@ -377,4 +382,29 @@ export function effectivePlanDay(
   if (freeSlots(blocks, requestedDayMs, settings, nowMs).length > 0)
     return { dayMs: requestedDayMs, rolledToTomorrow: false }
   return { dayMs: requestedDayMs + 24 * 60 * 60 * 1000, rolledToTomorrow: true }
+}
+
+/** DEC-089 — reorder a review row over the plan's slot ladder. The times
+ *  (the slots the planner found, plus any hand edits) HOLD their positions;
+ *  the items reassign over them in the new order, each keeping its own
+ *  duration. A longer item in a tighter slot is the operator's call — the
+ *  sheet warns about overlaps instead of silently reflowing the day. */
+export function reorderOverSlots(
+  ps: PlannedProposal[],
+  fromUid: string,
+  toUid: string,
+  pos: 'before' | 'after'
+): PlannedProposal[] {
+  if (fromUid === toUid) return ps
+  const sorted = [...ps].sort((a, b) => a.startMs - b.startMs)
+  const from = sorted.findIndex((s) => s.uid === fromUid)
+  const to = sorted.findIndex((s) => s.uid === toUid)
+  if (from < 0 || to < 0) return ps
+  const slots = sorted.map((s) => s.startMs)
+  const items = sorted.map(({ startMs: _drop, ...rest }) => rest)
+  let insertAt = to + (pos === 'after' ? 1 : 0)
+  if (from < insertAt) insertAt--
+  const [moved] = items.splice(from, 1)
+  items.splice(insertAt, 0, moved)
+  return items.map((it, i) => ({ ...it, startMs: slots[i] }))
 }

@@ -240,7 +240,7 @@ export default function ScratchpadWidget({ widget, inline = false }: Props): JSX
 
   if (inline) return body
   return (
-    <WidgetFrame widget={widget} headerLabel="Scratchpad" headerAccent="bg-violet-300/50">
+    <WidgetFrame widget={widget} headerLabel="Scratchpad" headerAccent="bg-violet-300/50 dark:bg-violet-400/20">
       {body}
     </WidgetFrame>
   )

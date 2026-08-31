@@ -1,15 +1,17 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-30 (night) — through DEC-088 (Phase 2, the People
-workstream: PEOPLE pill/drawer at the confirm stop, directory-grounded
-name extraction seeding person mentions, and the "Which Caleb?" clarify
-lane; DEC-087 was Phase 1's three demo-blockers). The demo consolidation
-and 5-phase plan live in **analysis/27-DEMO-FEEDBACK-PLAN.md** — Phase 3
-(context fidelity: Slack source_url, doc-created toast, mail verification)
-is the next queued build. DECISIONS-LOG carries DEC-072…088 in full.
+**Last updated:** 2026-08-30 (night) — through DEC-089 (the plan review is a
+workbench: drag-reorder over the slot ladder, inline when/duration edits,
+overlap warnings; plus the dark-mode widget-chrome fix — 26 header washes
+got dark companions, the frame a real dark edge). **GAP-019 is newly open**:
+`bg-[var(--token)]/N` modifiers are invalid CSS and paint NOTHING (~40
+sites; two header sites fixed, the sweep is its own round). DEC-088 was the
+People workstream, DEC-087 Phase 1's demo-blockers. analysis/27 carries the
+5-phase plan — Phase 3 (context fidelity) still queued, GAP-019 sweep now
+also on the shelf. DECISIONS-LOG carries DEC-072…089 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,367 tests green. Full typecheck clean.
+**Suite:** 3,380 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -23,11 +25,12 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…088**, append-only. DEC-072…088 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…089**, append-only. DEC-072…089 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)
-4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 is the live one (Respond → Messages)
+4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages) and GAP-019
+   (invalid var()+modifier utilities, ~40 sites) are the live ones
 
 Pre-flight:
 ```bash

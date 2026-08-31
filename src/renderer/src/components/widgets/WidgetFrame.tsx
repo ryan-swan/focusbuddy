@@ -69,7 +69,7 @@ export default function WidgetFrame({
   widget,
   children,
   headerLabel,
-  headerAccent = 'bg-stone-200/70',
+  headerAccent = 'bg-stone-200/70 dark:bg-white/[0.07]',
   draggableHandleClass = 'widget-handle',
   zonePosition: zonePositionProp,
   headerMenuExtras
@@ -917,7 +917,10 @@ export default function WidgetFrame({
               ? 'border-transparent widget-glow'
               : isPinned
                 ? 'border-amber-400/60'
-                : 'border-transparent'
+                : // DEC-089 — in dark mode the resting hairline (9% white)
+                  // melts into the desk canvas; the reserved 1px border slot
+                  // carries a real edge there. Light mode keeps hairline-only.
+                  'border-transparent dark:border-[color:var(--edge-firm)]'
         }`}
         style={{
           // The fb-card recipe: hairline ring so the card never melts into a
@@ -1061,7 +1064,9 @@ export default function WidgetFrame({
                 className={`widget-nodrag ml-1 h-5 w-5 rounded inline-flex items-center justify-center shrink-0 transition-colors ${
                   attentionItem
                     ? 'text-accent hover:bg-[var(--surface-sunken)]/60'
-                    : 'text-[var(--ink-40)] opacity-60 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
+                    : // DEC-089 — was ink-40 at 60%: tuned for the light
+                      // stone bar, invisible on the dark one. Quiet, not gone.
+                      'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
                 }`}
                 aria-label={attentionItem ? 'In Attention — open the queue' : 'Add to Attention'}
                 title={
@@ -1097,7 +1102,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   beginRename()
                 }}
-                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] opacity-75 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
                 aria-label="Rename widget"
                 title="Rename"
               >

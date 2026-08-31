@@ -344,7 +344,7 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
   if (inline) return content
 
   return (
-    <WidgetFrame widget={widget} headerLabel="sticky" headerAccent="bg-black/5">
+    <WidgetFrame widget={widget} headerLabel="sticky" headerAccent="bg-black/5 dark:bg-white/[0.06]">
       {content}
     </WidgetFrame>
   )

@@ -239,3 +239,36 @@ workItemsCapture.test.ts:246) — the sweep must rewrite those pins to the
 superseding truth, never delete them. Also check `--accent-hover` for the
 same pattern. Verify-command:
 `grep -rn "rgba(var(--accent)" src/renderer/src --include="*.tsx"`.
+
+## GAP-019 — `bg-[var(--token)]/N` opacity modifiers are INVALID CSS and paint nothing
+**Found:** 2026-08-30 (DEC-089's dark-mode chrome round) · **Status:** OPEN — two
+header sites fixed under DEC-089; the repo-wide sweep is its own round.
+
+GAP-018's sibling, one layer up. Tailwind 3.4 cannot alpha-modify an OPAQUE
+custom property: `bg-[var(--edge-firm)]/60` emits `rgb(var(--edge-firm) / 0.6)`,
+and since `--edge-firm` is a complete color (`oklch(… / 0.20)`), the declaration
+is invalid and the browser drops it — the element paints NOTHING, in both
+themes, silently. Measured live by paint-probe (all computed `rgba(0,0,0,0)`):
+
+    bg-[var(--surface-sunken)]/60  → transparent
+    bg-[var(--surface-sunken)]/95  → transparent
+    bg-[var(--edge-soft)]/60       → transparent
+    bg-[var(--edge-firm)]/60       → transparent
+    bg-[var(--surface-raised)]/90  → transparent
+    bg-[var(--surface-sunken)]     → paints (oklch …)  ← the unmodified form
+
+Blast radius: ~40 sites across SyncIndicator, HistoryPanel, ThemeBuilder,
+SettingsPanel, StageManagerStrip, LinkOverlay, ChatPanel, SharePeoplePicker,
+WidgetFocusDock, WidgetDock, ConversationList, RetrievalTrace,
+PlexiOfficeShell, FocusChatSurface, SlidesEditor, TableWidget, MindMapWidget
+(the last two fixed under DEC-089 — their widget HEADERS had no wash at all,
+half of the operator's dark-mode invisibility report). Also every
+`border-[var(--edge-soft)]/60` — same disease on border-color.
+
+Why the sweep is its own round: each site needs a JUDGMENT, not a mechanical
+strip — some washes were invisible no-ops the design has since absorbed
+(removing the modifier CHANGES the look), others should become real tokens or
+`color-mix()`. Fix shape per site: (a) drop the modifier and use the token's
+own alpha, (b) mint a dedicated token, or (c) Tailwind `color-mix` arbitrary
+value. Then a repo-wide lock (accentColorLock's pattern) closes the class.
+DEC-089's lock already forbids the pattern in `headerAccent` specifically.
