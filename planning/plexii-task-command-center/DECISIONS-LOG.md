@@ -2402,3 +2402,34 @@ Verified live: the verbatim day-off prompt → 3 blocks split Tue + Wed with
 the honest note and leftover count, discarded clean; affinity grouping
 visible in a real reason. 19 new tests; three DEC-052-era pins rewritten
 to the padded truth with history; 3,428 green; both typechecks clean.
+
+## DEC-093 — Deadline chips drag onto the grid
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Trigger:** operator live QA
+("the items that live above the time slots aren't able to be moved, but I
+should be able to drag those onto my calendar")
+
+The deadline band (DEC-052) rendered due items above the grid as click /
+double-click affordances only — the one thing you'd reach for, dragging a
+deadline into a time slot, was the one thing it refused. The receiving half
+already existed: day columns have accepted `text/fb-workitem` drops from the
+queue rail since DEC-052, booking a 30-minute linked block on the spot (the
+drag is the decision; undo covers regret). So this is one payload and one
+drop handler with a second source — not a new mechanism.
+
+The chip keeps its click (open Attention) and double-click (details); its
+title now teaches all three gestures. Deliberately NOT firing
+`onBlockDragActive`: that rings the queue rail as an UNSCHEDULE target
+(DEC-053), which would be a lie for an item that has no block yet.
+
+The chip STAYS after the drop — it marks the due date, which booking time
+does not move. (A "this is now scheduled" mark on the band is a separate
+question; the new block appearing under the pointer is its own feedback.)
+
+Also: the hour scroller now autoscrolls at its edges during a work-item
+drag. The band sits above a window showing about half a day, so without it
+you could only drop onto hours that happened to be in view — the feature
+would have been half-usable. 56px edge zones, speed scaled by depth.
+
+Verified live: a `[TEST]` LakeDash chip carried the payload, the drop
+created one linked 30-minute block (14 → 15), and the probe's block was
+deleted after. 5 new pins; 3,433 green; both typechecks clean.

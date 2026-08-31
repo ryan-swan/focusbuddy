@@ -569,6 +569,21 @@ export default function WeekTimeGrid({
                     {(dueByDay.get(dayIndex) ?? []).slice(0, compact ? 2 : 4).map((i) => (
                       <button
                         key={i.id}
+                        // DEC-093 — a deadline chip is a DRAG SOURCE, exactly
+                        // like a queue-rail row: same 'text/fb-workitem'
+                        // payload, so the day columns' existing drop handler
+                        // books it (DEC-052: the drag is the decision, 30 min,
+                        // undo covers regret). The chip stays after the drop —
+                        // it marks the DUE DATE, which the booking doesn't move.
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation()
+                          e.dataTransfer.setData('text/fb-workitem', i.id)
+                          e.dataTransfer.effectAllowed = 'copy'
+                          // NOT onBlockDragActive: that rings the queue rail
+                          // as an UNSCHEDULE target (DEC-053), which would be
+                          // a lie for an item that has no block yet.
+                        }}
                         onClick={(e) => {
                           e.stopPropagation()
                           goAttention()
@@ -577,7 +592,7 @@ export default function WeekTimeGrid({
                           e.stopPropagation()
                           setEditItem(i)
                         }}
-                        title={`Due: ${i.title} — open Attention (double-click for details)`}
+                        title={`Due: ${i.title} — drag onto the grid to book time · click to open Attention · double-click for details`}
                         className={`relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2.5 pr-1.5 py-1 fb-press bg-[var(--surface-raised)] ${
                           compact ? 'text-[10.5px]' : 'text-[11px]'
                         } leading-snug`}
@@ -619,6 +634,24 @@ export default function WeekTimeGrid({
           line, and with no headroom the top half clipped at the scroll edge. */}
       <div
         ref={timeScrollRef}
+        // DEC-093 — dragging a deadline chip (or a queue row) from ABOVE the
+        // grid can only reach the hours currently in view, and the window
+        // shows about half a day. Hovering near an edge scrolls the day under
+        // the pointer, so any hour is reachable without letting go.
+        onDragOver={(e) => {
+          if (
+            !e.dataTransfer.types.includes('text/fb-workitem') &&
+            !e.dataTransfer.types.includes('text/fb-node')
+          )
+            return
+          const el = timeScrollRef.current
+          if (!el) return
+          const r = el.getBoundingClientRect()
+          const EDGE = 56
+          const y = e.clientY
+          if (y < r.top + EDGE) el.scrollTop -= Math.max(6, (r.top + EDGE - y) / 2)
+          else if (y > r.bottom - EDGE) el.scrollTop += Math.max(6, (y - (r.bottom - EDGE)) / 2)
+        }}
         className="flex overflow-y-auto overscroll-contain pt-2"
         style={{ maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
       >

@@ -6,13 +6,14 @@ placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
 split between tomorrow and wednesday" now moves today's remaining blocks
 across the named days, replacing them on accept in one undo batch).
+DEC-093 made deadline chips draggable onto the grid (+ drag autoscroll);
 DEC-091 was Phase 3 (context fidelity), DEC-090 plan-intent honesty + time
 comprehension. **GAP-019 remains open** (`bg-[var(--token)]/N` invalid CSS,
 ~40 sites). analysis/27: Phases 1–3 done; Phase 4 gated on operator go;
 Phase 5 rulings/process. DECISIONS-LOG carries DEC-072…092 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,428 tests green. Full typecheck clean.
+**Suite:** 3,433 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -26,7 +27,7 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…092**, append-only. DEC-072…092 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…093**, append-only. DEC-072…093 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)
