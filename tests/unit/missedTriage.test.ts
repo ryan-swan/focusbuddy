@@ -90,8 +90,10 @@ describe('planReplacements', () => {
       blk({ id: 'm2', startMs: TODAY - DAY + 10 * H })
     ]
     const out = planReplacements([wall], missed, S, TODAY, TODAY)
-    // 9:00–16:30 walled; 16:30–17:00 fits m1; m2 spills to tomorrow 9:00.
-    expect(out.get('m1')!.startMs).toBe(TODAY + 16 * H + 30 * 60_000)
+    // DEC-092: the wall is padded by the 10-min gap, so today's tail slot is
+    // 16:40–17:00; m1 takes it and m2 spills to tomorrow 9:00. (Original pin
+    // had m1 at 16:30, flush against the wall.)
+    expect(out.get('m1')!.startMs).toBe(TODAY + 16 * H + 40 * 60_000)
     expect(out.get('m2')!.startMs).toBe(TODAY + DAY + 9 * H)
   })
 

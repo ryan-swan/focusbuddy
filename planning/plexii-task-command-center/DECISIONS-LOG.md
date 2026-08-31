@@ -2340,3 +2340,65 @@ caught it, coordinates re-measured, verified clean.)
 
 13 new tests; 3,409 green; both typechecks clean. Renderer-only round (the
 preload change is type-level) — no restart was needed.
+
+## DEC-092 — The planner learns the calendar it is writing into
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Trigger:** operator live QA
+(a replan crammed items against existing blocks; "reschedule my day, split
+between tomorrow and wednesday" answered "No open items match that"; the ii
+mark floated high in the intent bar)
+
+**Breathing room is now the calendar's, not just the plan's.** freeSlots
+padded NOTHING around existing blocks — a slot began the instant a block
+ended, which is exactly the cramming in the operator's screenshot. Every
+planned block now carries the house gap on BOTH sides, and an actual
+MEETING (a block with a meeting payload) carries `meetingBufferMin`
+(default 15, adjustable in the planner popover, floor-ed at the gap so
+"off" never gives a meeting less room than a plain block). Done blocks get
+no padding — history needs no breathing room. When a target day holds
+meetings, the plan note says "Kept 15 min clear around your meetings."
+
+**Placement stopped being first-fit.** Each item now scores every open
+interval: an earliness prior keeps days front-loaded, and NEIGHBOR AFFINITY
+pulls related work together — the existing block bordering a slot (or the
+proposal just placed in it) scores by `relatedness` (same desk 3, shared
+tag 2, shared mention 2, same class 1). The after-border only counts by
+PROXIMITY (landing at the start of a three-hour slot is not "beside" the
+block at its far end — the first test caught exactly that flaw).
+Discretionary pool items also CLUSTER (`chainRelated`): one desk-mate may
+be pulled forward after each head, but never across an item due by day's
+end — deadline-first is a promise; the rest is preference. When affinity
+places something, the reason SAYS so: "Grouped beside “…”." — live QA
+showed a 759-desk item landing right after the done 759 block, labelled.
+
+**"Reschedule my day" is a MOVE, not a topic search.** The operator's
+verbatim prompt reached the selection model, which honestly found no "day
+off" items and answered nothing. A new route runs FIRST: `parseReschedule`
+(a move verb + a reference to today) + `parsePlanDays` (EVERY named day —
+"between tomorrow and wednesday" is two) → `movableToday` (future, planned,
+item-linked; meetings and pinned blocks are untouchable by construction) →
+`planSplit` (round-robin across the named days, then per-day planDay with
+all buffers and affinity). The review states the contract: "Moving N of
+today's blocks — tomorrow + Wednesday. Accepting removes them from today."
+plus who stays and what didn't fit. Accept books the new blocks AND removes
+the sources in ONE undo batch; a dropped row keeps its old block — nothing
+is ever silently unscheduled (a source block whose item got no proposal
+stays put). Live QA found the empty-reschedule trap: passing `placedIds`
+excluded the very items being moved (scheduled today by definition) —
+fixed and pinned.
+
+**On the operator's "call a more powerful model if needed":** placement
+stays deterministic on purpose. The observed failure was mechanical
+first-fit, not a knowledge gap — a scoring rule is instant, testable, and
+explains itself in the reasons, where a model placement is none of those.
+The selection step already routes through modelRouting and can be upgraded
+per-purpose if selection quality ever lags; placement earns a model only
+if a failure appears that rules cannot express.
+
+Also: the ii mark in the intent bar now centres on the textarea's first
+line (measured 0.1px off; was ~6px high — items-start is deliberate for
+the growable field, the mark just needed the first-line offset).
+
+Verified live: the verbatim day-off prompt → 3 blocks split Tue + Wed with
+the honest note and leftover count, discarded clean; affinity grouping
+visible in a real reason. 19 new tests; three DEC-052-era pins rewritten
+to the padded truth with history; 3,428 green; both typechecks clean.

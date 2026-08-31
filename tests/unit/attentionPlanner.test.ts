@@ -58,9 +58,12 @@ describe('freeSlots', () => {
   it('existing blocks split the window; the clock floors the first slot', () => {
     const blocks = [blk({ id: 'b1', startMs: DAY0 + 11 * H, durationMin: 60 })]
     const slots = freeSlots(blocks, DAY0, S, DAY0 + 10 * H) // it is 10:00
+    // DEC-092: planned blocks are padded by the gap (10 min) on BOTH sides —
+    // slots no longer touch existing commitments. (Original pin had slots
+    // ending/starting at the block's exact edges.)
     expect(slots).toEqual([
-      { startMs: DAY0 + 10 * H, endMs: DAY0 + 11 * H },
-      { startMs: DAY0 + 12 * H, endMs: DAY0 + 17 * H }
+      { startMs: DAY0 + 10 * H, endMs: DAY0 + 11 * H - 10 * 60_000 },
+      { startMs: DAY0 + 12 * H + 10 * 60_000, endMs: DAY0 + 17 * H }
     ])
   })
 

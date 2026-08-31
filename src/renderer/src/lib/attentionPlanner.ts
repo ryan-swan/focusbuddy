@@ -1,5 +1,7 @@
 import type { FbNode, TimeBlock } from '@shared/types'
 import { rankScore, isTerminalState } from './attentionQueues'
+import { parseTags } from './itemTags'
+import { parseMentions, mentionKey } from './itemMentions'
 
 // DEC-052 (Track B) — the planner. Pure functions over (items, blocks,
 // settings, now): every placement decision is unit-tested, and the UI stays a
@@ -29,6 +31,11 @@ export interface PlannerSettings {
   maxSessionMin: number
   /** Breathing room enforced after each proposed block. */
   gapMin: number
+  /** DEC-092 — minutes kept clear on BOTH sides of an actual meeting (a
+   *  block with a meeting payload — invitees, a join link, a room). The
+   *  operator's rule: never schedule right against a call. 0 disables;
+   *  adjustable in the planner settings popover. */
+  meetingBufferMin: number
   /** Ceiling on TOTAL planned minutes in a day (existing blocks count). */
   maxDailyPlannedMin: number
   /** Step 9 — drag-select creates the block instantly with inline naming,
@@ -44,6 +51,7 @@ export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
   defaultBlockMin: 30,
   maxSessionMin: 90,
   gapMin: 10,
+  meetingBufferMin: 15,
   maxDailyPlannedMin: 330,
   inlineCreate: false
 }
@@ -88,6 +96,12 @@ export interface PlannedProposal {
 export interface FreeSlot {
   startMs: number
   endMs: number
+  /** DEC-092 — the item linked to the existing block bordering this slot
+   *  (before its start / after its end), when there is one. Placement uses
+   *  these to score NEIGHBOR AFFINITY: related work prefers to land beside
+   *  the block it belongs with. Set only when a border block links an item. */
+  beforeItemId?: string
+  afterItemId?: string
 }
 
 /** Blocks that OCCUPY time for planning purposes: anything real on the day
@@ -111,17 +125,44 @@ export function freeSlots(
   if (windowStart >= windowEnd) return []
   const busy = blocks
     .filter(occupies)
-    .map((b) => ({ start: b.startMs, end: b.startMs + b.durationMin * MIN }))
+    .map((b) => {
+      // DEC-092 — existing commitments get breathing room on BOTH sides: the
+      // house gap around ordinary planned blocks, the (larger, adjustable)
+      // meeting buffer around actual meetings. Done blocks are history — no
+      // padding around what already happened. Before this, a slot began the
+      // INSTANT a block ended, and replans crammed work against meetings.
+      const pad =
+        b.status === 'planned'
+          ? (b.meeting ? Math.max(settings.meetingBufferMin, settings.gapMin) : settings.gapMin) *
+            MIN
+          : 0
+      return {
+        start: b.startMs - pad,
+        end: b.startMs + b.durationMin * MIN + pad,
+        taskId: b.taskId ?? null
+      }
+    })
     .filter((b) => b.start < windowEnd && b.end > windowStart)
     .sort((a, b) => a.start - b.start)
   const slots: FreeSlot[] = []
   let cursor = windowStart
+  let lastTask: string | null = null
   for (const b of busy) {
-    if (b.start > cursor) slots.push({ startMs: cursor, endMs: Math.min(b.start, windowEnd) })
-    cursor = Math.max(cursor, b.end)
+    if (b.start > cursor)
+      slots.push({
+        startMs: cursor,
+        endMs: Math.min(b.start, windowEnd),
+        ...(lastTask ? { beforeItemId: lastTask } : {}),
+        ...(b.taskId ? { afterItemId: b.taskId } : {})
+      })
+    if (b.end > cursor) {
+      cursor = b.end
+      lastTask = b.taskId
+    }
     if (cursor >= windowEnd) break
   }
-  if (cursor < windowEnd) slots.push({ startMs: cursor, endMs: windowEnd })
+  if (cursor < windowEnd)
+    slots.push({ startMs: cursor, endMs: windowEnd, ...(lastTask ? { beforeItemId: lastTask } : {}) })
   return slots.filter((s) => s.endMs - s.startMs >= MIN_USEFUL_MIN * MIN)
 }
 
@@ -171,6 +212,45 @@ export interface PlanDayOptions {
  * queues use (one ranker — Analysis 24 §4) plus the momentum boost, packed
  * into the day's free slots with gaps, capped by the daily ceiling.
  */
+/** DEC-092 — how strongly two items belong NEAR each other on a calendar.
+ *  Same desk is the strongest signal; shared tags and shared mentions next;
+ *  same intent class weakest. Pure and cheap — scored per candidate slot. */
+export function relatedness(a: FbNode | null | undefined, b: FbNode | null | undefined): number {
+  if (!a || !b || a.id === b.id) return 0
+  let n = 0
+  if (a.parentId && a.parentId === b.parentId) n += 3
+  const at = new Set(parseTags(a.tags))
+  if (at.size && parseTags(b.tags).some((tag) => at.has(tag))) n += 2
+  const am = new Set(parseMentions(a.mentions).map(mentionKey))
+  if (am.size && parseMentions(b.mentions).some((m) => am.has(mentionKey(m)))) n += 2
+  if (a.intentClass && a.intentClass === b.intentClass) n += 1
+  return n
+}
+
+/** DEC-092 — cluster the DISCRETIONARY tail of a ranked pool so related work
+ *  runs together instead of interleaving. After each head, ONE strongly
+ *  related follower (desk-level, relatedness ≥ 3) may be pulled to the
+ *  front — but never across an item that is DUE by day's end: deadline-first
+ *  is a promise; the rest is preference. Deterministic and order-stable. */
+export function chainRelated(pool: FbNode[], dueIds: Set<string>): FbNode[] {
+  const rest = [...pool]
+  const out: FbNode[] = []
+  while (rest.length) {
+    const head = rest.shift()!
+    out.push(head)
+    let barrier = rest.findIndex((r) => dueIds.has(r.id))
+    if (barrier === -1) barrier = rest.length
+    for (let k = 1; k < barrier; k++) {
+      if (relatedness(head, rest[k]) >= 3) {
+        const [pulled] = rest.splice(k, 1)
+        rest.unshift(pulled)
+        break
+      }
+    }
+  }
+  return out
+}
+
 export function planDay(
   items: FbNode[],
   blocks: TimeBlock[],
@@ -193,6 +273,13 @@ export function planDay(
         (momentum.get(b.parentId ?? '') ?? 0) * 1.5 -
         (rankScore(a, nowMs) + (momentum.get(a.parentId ?? '') ?? 0) * 1.5)
     )
+    // DEC-092 — related discretionary items run together (due items are
+    // immovable barriers). "Randomly thrown on the calendar" was the
+    // operator's verdict on interleaved placement.
+    const dueTodayIds = new Set(
+      pool.filter((i) => i.dueAt != null && Date.parse(i.dueAt) < dayMs + DAY).map((i) => i.id)
+    )
+    pool = chainRelated(pool, dueTodayIds)
   }
 
   // The ceiling counts what the day ALREADY holds.
@@ -204,10 +291,22 @@ export function planDay(
   let budgetMin = Math.max(0, settings.maxDailyPlannedMin - existingMin)
 
   const momentum = momentumByDesk(items, nowMs)
-  const slots = freeSlots(blocks, dayMs, settings, nowMs)
+  // DEC-092 — placement stopped being first-fit. Each item scores every open
+  // interval: an earliness prior keeps days front-loaded, and NEIGHBOR
+  // AFFINITY (the existing block bordering the slot, or the proposal just
+  // placed in it) pulls related work together. Deterministic on purpose —
+  // the observed failure was mechanical cramming, not a knowledge gap, and
+  // a scoring rule is testable where a model call is not.
+  const itemById = new Map(items.map((i) => [i.id, i] as const))
+  const open: Array<FreeSlot & { beforeProposedId?: string }> = freeSlots(
+    blocks,
+    dayMs,
+    settings,
+    nowMs
+  ).map((s) => ({ ...s }))
+  const HOUR = 60 * MIN
+  const firstOpenMs = open.length ? open[0].startMs : 0
   const out: PlannedProposal[] = []
-  let slotIdx = 0
-  let cursor = slots.length ? slots[0].startMs : 0
 
   // Reason context (DEC-072): who else has a claim on this day. Computed over
   // ALL schedulable items (not just the pool) so drag-placed due items still
@@ -222,36 +321,65 @@ export function planDay(
 
   for (const item of pool) {
     if (budgetMin < MIN_USEFUL_MIN) break
-    // Find room for at least a useful sitting.
-    let durMin = Math.min(settings.defaultBlockMin, settings.maxSessionMin, budgetMin)
-    while (slotIdx < slots.length) {
-      const slot = slots[slotIdx]
-      const start = Math.max(cursor, slot.startMs)
-      const roomMin = Math.floor((slot.endMs - start) / MIN)
-      if (roomMin >= MIN_USEFUL_MIN) {
-        durMin = Math.min(durMin, roomMin)
-        const othersDue = [...dueByDayEnd].filter((id) => id !== item.id)
-        out.push({
-          itemId: item.id,
-          title: item.title,
-          startMs: start,
-          durationMin: durMin,
-          reason: reasonFor(item, nowMs, momentum, opts.deskTitles, {
-            source: opts.source,
-            dayWord,
-            anyOthersDue: othersDue.length > 0,
-            othersDueHandled: othersDue.every((id) => placed.has(id) || proposedIds.has(id))
-          })
-        })
-        proposedIds.add(item.id)
-        budgetMin -= durMin
-        cursor = start + (durMin + settings.gapMin) * MIN
-        break
+    const wantMin = Math.min(settings.defaultBlockMin, settings.maxSessionMin, budgetMin)
+    let best = -1
+    let bestScore = -Infinity
+    let bestNeighbor: FbNode | null = null
+    for (let k = 0; k < open.length; k++) {
+      const s = open[k]
+      const roomMin = Math.floor((s.endMs - s.startMs) / MIN)
+      if (roomMin < MIN_USEFUL_MIN) continue
+      const beforeItem = itemById.get(s.beforeProposedId ?? s.beforeItemId ?? '') ?? null
+      const afterItem = itemById.get(s.afterItemId ?? '') ?? null
+      const affBefore = relatedness(beforeItem, item)
+      // The before-border is genuinely adjacent (we place at slot start);
+      // the after-border only counts by PROXIMITY — landing at the start of
+      // a three-hour slot is not "beside" the block at its far end.
+      const closeness = Math.max(
+        0,
+        1 - (s.endMs - (s.startMs + Math.min(wantMin, roomMin) * MIN)) / HOUR
+      )
+      const affAfter = relatedness(afterItem, item) * closeness
+      const score = -((s.startMs - firstOpenMs) / HOUR) * 0.8 + affBefore * 2.5 + affAfter * 1.5
+      if (score > bestScore + 1e-9) {
+        bestScore = score
+        best = k
+        bestNeighbor =
+          affBefore >= affAfter
+            ? affBefore >= 3
+              ? beforeItem
+              : null
+            : affAfter >= 3
+              ? afterItem
+              : null
       }
-      slotIdx++
-      cursor = slotIdx < slots.length ? slots[slotIdx].startMs : 0
     }
-    if (slotIdx >= slots.length) break
+    if (best < 0) break
+    const s = open[best]
+    const durMin = Math.min(wantMin, Math.floor((s.endMs - s.startMs) / MIN))
+    const othersDue = [...dueByDayEnd].filter((id) => id !== item.id)
+    const baseReason = reasonFor(item, nowMs, momentum, opts.deskTitles, {
+      source: opts.source,
+      dayWord,
+      anyOthersDue: othersDue.length > 0,
+      othersDueHandled: othersDue.every((id) => placed.has(id) || proposedIds.has(id))
+    })
+    // The intelligence, said out loud (the placement WHY, beside the item
+    // WHY): only for desk-level affinity, so the note stays signal.
+    const neighborNote = bestNeighbor
+      ? ` Grouped beside “${(bestNeighbor.title || 'related work').slice(0, 40)}”.`
+      : ''
+    out.push({
+      itemId: item.id,
+      title: item.title,
+      startMs: s.startMs,
+      durationMin: durMin,
+      reason: `${baseReason}${neighborNote}`
+    })
+    proposedIds.add(item.id)
+    budgetMin -= durMin
+    s.startMs += (durMin + settings.gapMin) * MIN
+    s.beforeProposedId = item.id
   }
   return out
 }
@@ -517,5 +645,106 @@ export function planSpread(
     }
     dayMs += 24 * 60 * 60 * 1000
   }
+  return out
+}
+
+// ── DEC-092 — "reschedule my day": moving plans is not picking topics ───────
+
+const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+/** EVERY day the intent names, in text order, deduped — parsePlanDay's
+ *  plural sibling ("split between tomorrow and wednesday" names two). */
+export function parsePlanDays(intent: string, nowMs: number): number[] {
+  const q = intent.toLowerCase()
+  const day = (offset: number): number => {
+    const d = new Date(nowMs)
+    d.setDate(d.getDate() + offset)
+    d.setHours(0, 0, 0, 0)
+    return d.getTime()
+  }
+  const hits: Array<{ at: number; ms: number }> = []
+  const scan = (re: RegExp, ms: number): void => {
+    const m = re.exec(q)
+    if (m) hits.push({ at: m.index, ms })
+  }
+  scan(/\btomorrow\b/, day(1))
+  scan(/\btoday\b|\btonight\b/, day(0))
+  const dow = new Date(nowMs).getDay()
+  DAY_NAMES.forEach((name, i) => {
+    const m = new RegExp(`\\b${name}\\b`).exec(q)
+    if (m) hits.push({ at: m.index, ms: day((i - dow + 7) % 7 || 7) })
+  })
+  const seen = new Set<number>()
+  return hits
+    .sort((a, b) => a.at - b.at)
+    .filter((h) => (seen.has(h.ms) ? false : (seen.add(h.ms), true)))
+    .map((h) => h.ms)
+}
+
+export interface RescheduleAsk {
+  /** Local-midnight targets, today excluded; [tomorrow] when none named. */
+  targetDays: number[]
+}
+
+/** "Taking the day off — reschedule the rest of my day for a split between
+ *  tomorrow and wednesday." A MOVE command, not a topic search: it acts on
+ *  today's remaining scheduled blocks, so it must never reach the selection
+ *  model (which would honestly find no "day off" items and answer nothing). */
+export function parseReschedule(intent: string, nowMs: number): RescheduleAsk | null {
+  const q = intent.toLowerCase()
+  if (!/\b(reschedul\w*|move|push|shift|bump)\b/.test(q)) return null
+  if (!/\b(today|tonight|my day|the day|rest of (?:my |the )?day)\b/.test(q)) return null
+  const today = new Date(nowMs)
+  today.setHours(0, 0, 0, 0)
+  const targets = parsePlanDays(intent, nowMs).filter((d) => d !== today.getTime())
+  return { targetDays: targets.length ? targets : [today.getTime() + DAY] }
+}
+
+/** What a reschedule may honestly move: today's REMAINING planned blocks
+ *  that link an item. Meetings and locked blocks are untouchable by
+ *  construction (other people / an explicit pin); plain unlinked blocks
+ *  have no item to re-propose. */
+export function movableToday(blocks: TimeBlock[], nowMs: number): TimeBlock[] {
+  const d = new Date(nowMs)
+  d.setHours(0, 0, 0, 0)
+  const dayStart = d.getTime()
+  return blocks.filter(
+    (b) =>
+      b.status === 'planned' &&
+      b.startMs > nowMs &&
+      b.startMs >= dayStart &&
+      b.startMs < dayStart + DAY &&
+      !b.locked &&
+      !b.meeting &&
+      !!b.taskId
+  )
+}
+
+/** DEC-092 — split a set of items across SEVERAL named days: dealt
+ *  round-robin (each target gets a share), then placed per-day by planDay
+ *  with all of its buffers and affinity. Items that fit nowhere are simply
+ *  absent from the result — the caller counts and says so. */
+export function planSplit(
+  items: FbNode[],
+  blocks: TimeBlock[],
+  settings: PlannerSettings,
+  targetDays: number[],
+  nowMs: number,
+  itemIds: string[],
+  opts: PlanDayOptions = {}
+): PlannedProposal[] {
+  if (!targetDays.length || !itemIds.length) return []
+  const shares: string[][] = targetDays.map(() => [])
+  itemIds.forEach((id, i) => shares[i % targetDays.length].push(id))
+  const out: PlannedProposal[] = []
+  targetDays.forEach((dayMs, d) => {
+    out.push(
+      ...planDay(items, blocks, settings, dayMs, nowMs, {
+        ...opts,
+        onlyItemIds: shares[d],
+        source: 'replan'
+      })
+    )
+  })
   return out
 }

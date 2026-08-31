@@ -138,7 +138,9 @@ describe('DEC-052 B3/B4 — the planner is preview-first, always', () => {
     // SUBSET so the review can drop a block, and the batch counts what was
     // actually taken. The property pinned here is unchanged — one accepted
     // plan is one undo unit.
-    expect(view).toContain('endBatch(`Planned ${take.length} blocks`)')
+    // DEC-092: accept can also be a MOVE (reschedule replaces source blocks
+    // in the same batch), so the label is conditional. One batch either way.
+    expect(view).toContain('pendingMove ? `Moved ${take.length} blocks` : `Planned ${take.length} blocks`')
     expect(view).toContain('async function acceptPlan(only?: PlannedProposal[])')
   })
 

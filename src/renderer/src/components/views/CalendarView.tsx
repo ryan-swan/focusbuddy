@@ -18,7 +18,10 @@ import {
   reorderOverSlots,
   parsePlanWindow,
   parsePlanSpread,
-  planSpread
+  planSpread,
+  parseReschedule,
+  movableToday,
+  planSplit
 } from '../../lib/attentionPlanner'
 import { parseTags } from '../../lib/itemTags'
 import { parseMentions } from '../../lib/itemMentions'
@@ -221,6 +224,12 @@ export default function CalendarView(): JSX.Element {
   // DEC-090 — set when an intent honestly matched NOTHING: the note offers
   // "plan the rest of the day instead", and this arms that one-click path.
   const [planOfferFull, setPlanOfferFull] = useState(false)
+  // DEC-092 — a RESCHEDULE plan carries the blocks it replaces: accepting
+  // books the new blocks AND removes these (same undo batch); a source block
+  // whose item got NO proposal stays put — never silently unscheduled.
+  const [pendingMove, setPendingMove] = useState<Array<{ blockId: string; itemId: string }> | null>(
+    null
+  )
   // DEC-071 — the proposal is REVIEWABLE before it is accepted. A summary line
   // that truncates ("3 blocks proposed · 82 min — Top creative items: Update
   // Chan…") is an assurance, not an explanation: it cannot say WHICH items,
@@ -268,6 +277,7 @@ export default function CalendarView(): JSX.Element {
     setPlanBusy(true)
     setPlanNote(null)
     setPlanOfferFull(false)
+    setPendingMove(null)
     try {
       const opts = { placedIds: scheduledIds, deskTitles }
       const settings = loadPlannerSettings()
@@ -291,19 +301,85 @@ export default function CalendarView(): JSX.Element {
         : named && named !== planDayMs
           ? `Planning ${new Date(named).toLocaleDateString(undefined, { weekday: 'long' })}.`
           : null
+      // DEC-092 — say the buffer out loud when it actually shaped the day.
+      const dayHasMeetings = blocks.some(
+        (b) =>
+          b.status === 'planned' &&
+          b.meeting &&
+          b.startMs >= eff.dayMs &&
+          b.startMs < eff.dayMs + 86_400_000
+      )
       const targetDay = {
         dayMs: eff.dayMs,
         note:
-          [dayNote, win ? `Keeping it to ${win.label}.` : null, spread ? 'Spreading across the week.' : null]
+          [
+            dayNote,
+            win ? `Keeping it to ${win.label}.` : null,
+            spread ? 'Spreading across the week.' : null,
+            dayHasMeetings && planSettings.meetingBufferMin > 0
+              ? `Kept ${planSettings.meetingBufferMin} min clear around your meetings.`
+              : null
+          ]
             .filter(Boolean)
             .join(' ') || null
       }
       let out: PlannedProposal[]
-      // DEC-090 — an intent that names NO topic ("spread my open items
-      // across the week during work hours") is pure scheduling language: it
-      // means the FULL queue, routed deterministically. Only a named topic
-      // pays for selection — and can honestly come back empty.
-      if (askText.trim() && intentNamesTopic(askText)) {
+      // DEC-092 — a RESCHEDULE intent ("taking the day off — reschedule the
+      // rest of my day, split between tomorrow and wednesday") is a MOVE
+      // command over today's remaining blocks, not a topic search. It must
+      // never reach the selection model — which would honestly find no
+      // "day off" items and answer nothing (the operator's live failure).
+      const resched = askText.trim() ? parseReschedule(askText, nowMs) : null
+      if (resched) {
+        const movable = movableToday(blocks, nowMs)
+        const dayName = (ms: number): string =>
+          new Date(ms).toDateString() === new Date(nowMs + 86_400_000).toDateString()
+            ? 'tomorrow'
+            : new Date(ms).toLocaleDateString(undefined, { weekday: 'long' })
+        const stayed = blocks.filter(
+          (b) =>
+            b.status === 'planned' && b.startMs > nowMs && b.startMs < planDayMs + 86_400_000 &&
+            b.startMs >= planDayMs && (b.meeting || b.locked)
+        ).length
+        if (!movable.length) {
+          setPlanNote(
+            stayed
+              ? 'Nothing left today that I can move — what remains is meetings or pinned blocks, and those need you.'
+              : 'Nothing left on today to move.'
+          )
+          setProposals(null)
+          return
+        }
+        const ids = [...new Set(movable.map((b) => b.taskId!))]
+        // NOT opts: placedIds excludes already-scheduled items, and the items
+        // being MOVED are scheduled today by definition — passing it made
+        // every reschedule come back empty (live QA). onlyItemIds is the
+        // whole filter here.
+        out = planSplit(items, blocks, planSettings, resched.targetDays, nowMs, ids, {
+          deskTitles
+        })
+        if (!out.length) {
+          setPlanNote('Those days have no room in the working window — nothing moved.')
+          setProposals(null)
+          return
+        }
+        const placedIds = new Set(out.map((o) => o.itemId))
+        setPendingMove(
+          movable
+            .filter((b) => placedIds.has(b.taskId!))
+            .map((b) => ({ blockId: b.id, itemId: b.taskId! }))
+        )
+        const leftBehind = ids.filter((id) => !placedIds.has(id)).length
+        setPlanNote(
+          [
+            `Moving ${placedIds.size} of today’s blocks — ${resched.targetDays.map(dayName).join(' + ')}. Accepting removes them from today.`,
+            stayed ? 'Meetings and pinned blocks stay put — those need you.' : null,
+            leftBehind ? `${leftBehind} didn’t fit and stays on today.` : null
+          ]
+            .filter(Boolean)
+            .join(' ')
+        )
+      } else if (askText.trim() && intentNamesTopic(askText)) {
         // Intent mode: the model (or its keyword fallback) picks + orders;
         // placement stays deterministic and local.
         const candidates = schedulableItems(items, nowMs)
@@ -453,9 +529,22 @@ export default function CalendarView(): JSX.Element {
           origin: 'auto'
         })
       }
+      // DEC-092 — a reschedule REPLACES: the source blocks whose items were
+      // actually re-placed leave today, inside the same batch (⌘Z restores
+      // both directions). A dropped row keeps its old block where it was.
+      if (pendingMove) {
+        const accepted = new Set(take.map((p) => p.itemId))
+        const rm = useTimeBlockStore.getState().remove
+        for (const mv of pendingMove) {
+          if (accepted.has(mv.itemId)) await rm(mv.blockId)
+        }
+      }
     } finally {
-      useActionHistory.getState().endBatch(`Planned ${take.length} blocks`)
+      useActionHistory.getState().endBatch(
+        pendingMove ? `Moved ${take.length} blocks` : `Planned ${take.length} blocks`
+      )
     }
+    setPendingMove(null)
     setProposals(null)
     setPlanNote(null)
     setReviewOpen(false)
@@ -713,7 +802,10 @@ export default function CalendarView(): JSX.Element {
             {mode !== 'month' && (
               <div className="mb-3 flex flex-col gap-2" data-testid="plan-bar">
                 <div className="flex items-start gap-2 rounded-[var(--radius-card)] fb-glass-card pl-3.5 pr-2 py-2">
-                  <Icon name="auto_awesome" size={15} className="shrink-0 text-[rgb(var(--accent))]" />
+                  {/* DEC-092 — mt centres the ii mark on the FIRST line of the
+                      growable textarea (items-start is deliberate, DEC-071;
+                      without the offset the mark floats ~6px high). */}
+                  <Icon name="auto_awesome" size={15} className="shrink-0 mt-[6px] text-[rgb(var(--accent))]" />
                   {/* DEC-071 — a textarea that grows with what you type. It
                       was a single-line input, so a real intent prompt ("I'm
                       feeling extra creative right now. Good ideas are flowing,
@@ -833,6 +925,23 @@ export default function CalendarView(): JSX.Element {
                           </select>
                         </label>
                         <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
+                          Meeting buffer
+                          {/* DEC-092 — the operator's rule: never schedule
+                              right against an actual meeting. 0 turns it off. */}
+                          <select
+                            value={settings.meetingBufferMin}
+                            onChange={(e) => patchSettings({ meetingBufferMin: Number(e.target.value) })}
+                            data-testid="meeting-buffer-select"
+                            className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[12px]"
+                          >
+                            {[0, 10, 15, 20, 30].map((m) => (
+                              <option key={m} value={m}>
+                                {m === 0 ? 'off' : `${m} min around meetings`}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[12px] text-[var(--ink-60)]">
                           Breathing room
                           <select
                             value={settings.gapMin}
@@ -904,6 +1013,7 @@ export default function CalendarView(): JSX.Element {
                         setProposals(null)
                         setPlanNote(null)
                         setPlanOfferFull(false)
+                        setPendingMove(null)
                       }}
                       className="icon-btn !h-7 !w-7 shrink-0"
                       title="Clear"
@@ -1357,6 +1467,7 @@ export default function CalendarView(): JSX.Element {
                 onClick={() => {
                   setProposals(null)
                   setPlanNote(null)
+                  setPendingMove(null)
                   setReviewOpen(false)
                 }}
                 className="h-8 px-3 fb-btn-surface fb-press fb-t-label text-[var(--ink-70)]"
