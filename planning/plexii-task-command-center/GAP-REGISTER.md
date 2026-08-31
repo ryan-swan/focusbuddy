@@ -272,3 +272,35 @@ strip — some washes were invisible no-ops the design has since absorbed
 own alpha, (b) mint a dedicated token, or (c) Tailwind `color-mix` arbitrary
 value. Then a repo-wide lock (accentColorLock's pattern) closes the class.
 DEC-089's lock already forbids the pattern in `headerAccent` specifically.
+
+## GAP-020 — Six `--ink-*` steps are referenced but never defined
+**Found:** 2026-08-31 (DEC-095's analytics restyle) · **Status:** OPEN —
+locked against growth, cleanup is its own round.
+
+`var(--ink-80)` and friends are not in tokens.css. An undefined custom
+property makes the whole declaration invalid, so the element **silently
+inherits its parent's colour** — text meant to be secondary renders at full
+ink weight. Measured live against the running app (`getPropertyValue` on
+`document.documentElement`, plus a paint probe):
+
+    --ink-100 ✓   --ink-90 ✓   --ink-80  ✗ (52 uses)
+    --ink-70  ✓   --ink-60 ✓   --ink-55  ✗ (2)
+    --ink-50  ✓   --ink-45 ✗ (10)         --ink-40 ✓
+    --ink-35  ✗ (2)            --ink-30 ✓  --ink-25 ✗ (2)
+    --ink-10  ✓                --ink-300 ✗ (2, likely a typo for --ink-30)
+
+    paint probe: color: var(--ink-80)  →  oklch(0.15 0.012 264)   ← ink-100,
+    i.e. the inherited body colour, not a lighter step.
+
+~68 sites across the renderer. This is the GAP-018/019 family one layer up:
+the value is not merely wrong, the declaration never lands.
+
+Why the fix is its own round: either DEFINE the six steps (a design decision
+— ink-90 is 28% and ink-70 is 46%, so ink-80 ≈ 37%; and every one of the 52
+sites changes appearance the moment it resolves) or REWRITE the 68 sites
+onto defined steps. Both are a visible, app-wide typographic change that
+deserves its own before/after pass, not a side effect of a polish commit.
+
+Locked meanwhile: `accentColorLock.test.ts` freezes the offender set
+{80, 45, 55, 35, 25, 300}. It may shrink; a NEW undefined step fails the
+build.

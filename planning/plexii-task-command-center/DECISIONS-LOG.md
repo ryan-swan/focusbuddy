@@ -2480,3 +2480,42 @@ boundary (`clipTitle`) — a copy defect the polish made visible.
 Two DEC-071 pins rewritten to the superseding presentation with history.
 15 new pins (including a behaviour-untouched clause listing every DEC-089
 control); 3,448 green; both typechecks clean.
+
+## DEC-095 — The Attention analytics band, made of material
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Scope:** presentation only
+
+Same ruling as DEC-094: the numbers, the filters and every handler are
+untouched; this is what they look like. The KPI tiles were flat swatches —
+a single flat tint, no edge, no depth, and nothing at all on hover.
+
+The house recipe, now in globals.css as `.fb-kpi-tile`: a tone-tinted
+gradient (160°), a hairline ring in the same tone, the shared
+`--shadow-inset-highlight` every fb-card uses, and a gloss sweep across the
+top 42% — theme-aware (28% white in light, 7% in dark), pointer-events off,
+and painted UNDER the content by z-order. Hover lifts 2px and deepens the
+tint and ring; active settles back; `prefers-reduced-motion` drops both.
+The selected state (DEC-049 — a tile is also the queue filter) closes the
+ring to 1.5px and holds the tint at hover strength, so "this one is on"
+reads without hovering it, and its label takes the tone.
+
+The tone rides in as `--kpi-tone`, a SPACE-separated RGB triplet via a new
+`toneTriplet()` — the `rgb(var(--x) / a)` form is the only one that survives
+an alpha modifier (GAP-018/019: a comma triplet or a complete colour there
+paints nothing). `queueTint` is untouched and still serves the inline fills.
+
+Also: the 14-day sparkline gained rounded caps and a vertical gradient, and
+its EMPTY days now read as absent (a neutral stub) instead of a sliver of
+the same success green. The status bars sit in a recessed track with a
+highlight on each segment. The "Breakdown" toggle became a chip that turns
+accent when open, rather than loose caption text.
+
+**Found while measuring: GAP-020.** `--ink-80` (52 uses), `--ink-45`,
+`--ink-55`, `--ink-35`, `--ink-25` and `--ink-300` are referenced but never
+defined — the declaration is invalid, so those elements silently inherit
+their parent's colour (paint-probed live: `var(--ink-80)` resolves to
+ink-100). Defining or rewriting them changes text colour in ~68 places at
+once, so it is its own round; two fixes I had already made outside this
+component were REVERTED to keep that diff whole. `accentColorLock` now
+freezes the offender set — it may shrink, a new one fails the build.
+
+11 new pins; 3,460 green; both typechecks clean.

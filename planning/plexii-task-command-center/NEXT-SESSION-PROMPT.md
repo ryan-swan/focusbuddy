@@ -6,7 +6,11 @@ placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
 split between tomorrow and wednesday" now moves today's remaining blocks
 across the named days, replacing them on accept in one undo batch).
-DEC-094 restyled the plan review as Book time's sibling (presentation only —
+DEC-095 restyled the Attention analytics tiles as house material (gloss,
+tone ring, hover lift) and found **GAP-020** — six `--ink-*` steps are
+referenced but never defined, so ~68 elements silently inherit their
+parent's colour (`--ink-80` alone is 52 uses); locked against growth,
+cleanup is its own round. DEC-094 restyled the plan review as Book time's sibling (presentation only —
 the operator cut a larger redesign spec back to visuals; the cascade,
 pinning, locked rows and capacity line were NOT built and remain open ideas
 in that spec). DEC-093 made deadline chips draggable onto the grid;
@@ -16,7 +20,7 @@ comprehension. **GAP-019 remains open** (`bg-[var(--token)]/N` invalid CSS,
 Phase 5 rulings/process. DECISIONS-LOG carries DEC-072…092 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,448 tests green. Full typecheck clean.
+**Suite:** 3,460 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -30,12 +34,13 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…094**, append-only. DEC-072…094 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…095**, append-only. DEC-072…095 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)
-4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages) and GAP-019
-   (invalid var()+modifier utilities, ~40 sites) are the live ones
+4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages), GAP-019
+   (invalid var()+modifier utilities, ~40 sites) and GAP-020 (undefined ink
+   tokens, ~68 sites) are the live ones
 
 Pre-flight:
 ```bash

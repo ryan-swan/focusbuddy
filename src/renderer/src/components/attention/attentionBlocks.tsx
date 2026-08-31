@@ -8,7 +8,7 @@ import { useTimeBlockStore } from '../../stores/timeBlocks'
 import WeekTimeGrid from '../views/WeekTimeGrid'
 import { quietWinLines } from '../../lib/completionDetect'
 import Icon from '../Icon'
-import { QUEUE_COLOR, QUEUE_ICON, queueOf, queueTint } from '../../lib/attentionQueues'
+import { QUEUE_COLOR, QUEUE_ICON, queueOf, queueTint, toneTriplet } from '../../lib/attentionQueues'
 import {
   pulseCounts,
   overdueRadar,
@@ -391,7 +391,11 @@ export function AnalyticsBlock({
         trailing={
           <button
             onClick={() => setOpenBreakdown((v) => !v)}
-            className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press inline-flex items-center gap-1"
+            className={`fb-t-caption fb-press inline-flex items-center gap-1 h-7 px-2 rounded-[var(--radius-chip)] border transition-colors ${
+              openBreakdown
+                ? 'border-[rgb(var(--accent))] text-[rgb(var(--accent))] bg-accent/10'
+                : 'border-[var(--edge-soft)] text-[var(--ink-50)] hover:text-[var(--ink-100)] hover:border-[var(--edge-strong)]'
+            }`}
           >
             <Icon name={openBreakdown ? 'expand_less' : 'expand_more'} size={13} />
             Breakdown
@@ -412,20 +416,30 @@ export function AnalyticsBlock({
                       : `Show only ${m.label.toLowerCase()}`
                     : undefined
                 }
-                className={`rounded-lg px-3 py-2.5 text-left fb-press transition-shadow ${
-                  on ? 'shadow-[inset_0_0_0_1.5px_currentColor]' : ''
-                }`}
-                style={{
-                  backgroundColor: queueTint(m.tone, on ? 0.16 : 0.08),
-                  color: m.tone
-                }}
+                data-on={on ? 'true' : 'false'}
+                className="fb-kpi-tile rounded-xl px-3 py-2.5 text-left fb-press"
+                style={
+                  {
+                    '--kpi-tone': toneTriplet(m.tone),
+                    color: m.tone
+                  } as React.CSSProperties
+                }
               >
-                <div className="text-[22px] leading-none font-semibold fb-tabular text-[var(--ink-100)]">
+                <div className="text-[23px] leading-none font-semibold fb-tabular tracking-tight text-[var(--ink-100)]">
                   {m.value}
                 </div>
-                <div className="fb-t-caption text-[var(--ink-60)] mt-1 truncate">{m.label}</div>
+                <div
+                  className={`fb-t-caption mt-1.5 truncate ${
+                    on ? 'font-semibold' : 'font-medium'
+                  }`}
+                  style={{ color: on ? m.tone : 'var(--ink-60)' }}
+                >
+                  {m.label}
+                </div>
                 {m.hint && (
-                  <div className="fb-t-caption text-[var(--ink-30)] truncate">{m.hint}</div>
+                  // --ink-40 is the "faint meta" token; --ink-30 is documented
+                  // decorative-only (hairlines), and this is text.
+                  <div className="fb-t-caption text-[var(--ink-40)] truncate">{m.hint}</div>
                 )}
               </button>
             )
@@ -442,10 +456,13 @@ export function AnalyticsBlock({
                   {pulse.closedByDay.map((n, i) => (
                     <div
                       key={i}
-                      className="flex-1 rounded-[1px] self-end"
+                      className="flex-1 rounded-t-[2px] self-end transition-[height] duration-300"
                       style={{
-                        height: n === 0 ? '2px' : `${Math.max(14, (n / max) * 100)}%`,
-                        backgroundColor: queueTint('#10b981', n === 0 ? 0.18 : 0.55)
+                        height: n === 0 ? '3px' : `${Math.max(16, (n / max) * 100)}%`,
+                        background:
+                          n === 0
+                            ? queueTint('#64748b', 0.22)
+                            : `linear-gradient(180deg, ${queueTint('#10b981', 0.85)} 0%, ${queueTint('#10b981', 0.45)} 100%)`
                       }}
                     />
                   ))}
@@ -480,11 +497,11 @@ export function AnalyticsBlock({
                   <div key={r.queue} className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="fb-t-caption text-[var(--ink-60)] w-20 truncate">{r.label}</span>
-                      <div className="flex-1 h-2 rounded-full overflow-hidden flex bg-[var(--surface-sunken)]">
-                        <div style={{ width: seg(r.done7d), backgroundColor: queueTint('#10b981', 0.7) }} />
-                        <div style={{ width: seg(r.inProgress), backgroundColor: queueTint('#0ea5e9', 0.7) }} />
-                        <div style={{ width: seg(r.waiting), backgroundColor: queueTint('#f59e0b', 0.6) }} />
-                        <div style={{ width: seg(r.notStarted), backgroundColor: queueTint('#64748b', 0.35) }} />
+                      <div className="fb-stat-track flex-1 h-2 rounded-full overflow-hidden flex bg-[var(--surface-sunken)]">
+                        <div className="fb-stat-seg" style={{ width: seg(r.done7d), backgroundColor: queueTint('#10b981', 0.75) }} />
+                        <div className="fb-stat-seg" style={{ width: seg(r.inProgress), backgroundColor: queueTint('#0ea5e9', 0.75) }} />
+                        <div className="fb-stat-seg" style={{ width: seg(r.waiting), backgroundColor: queueTint('#f59e0b', 0.65) }} />
+                        <div className="fb-stat-seg" style={{ width: seg(r.notStarted), backgroundColor: queueTint('#64748b', 0.3) }} />
                       </div>
                       <span className="fb-t-caption fb-tabular text-[var(--ink-40)] w-6 text-right">
                         {activeN}
@@ -518,11 +535,11 @@ export function AnalyticsBlock({
               <div key={r.queue} className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="fb-t-caption text-[var(--ink-60)] w-20 truncate">{r.label}</span>
-                  <div className="flex-1 h-2 rounded-full overflow-hidden flex bg-[var(--surface-sunken)]">
-                    <div style={{ width: seg(r.done7d), backgroundColor: queueTint('#10b981', 0.7) }} />
-                    <div style={{ width: seg(r.inProgress), backgroundColor: queueTint('#0ea5e9', 0.7) }} />
-                    <div style={{ width: seg(r.waiting), backgroundColor: queueTint('#f59e0b', 0.6) }} />
-                    <div style={{ width: seg(r.notStarted), backgroundColor: queueTint('#64748b', 0.35) }} />
+                  <div className="fb-stat-track flex-1 h-2 rounded-full overflow-hidden flex bg-[var(--surface-sunken)]">
+                    <div className="fb-stat-seg" style={{ width: seg(r.done7d), backgroundColor: queueTint('#10b981', 0.75) }} />
+                    <div className="fb-stat-seg" style={{ width: seg(r.inProgress), backgroundColor: queueTint('#0ea5e9', 0.75) }} />
+                    <div className="fb-stat-seg" style={{ width: seg(r.waiting), backgroundColor: queueTint('#f59e0b', 0.65) }} />
+                    <div className="fb-stat-seg" style={{ width: seg(r.notStarted), backgroundColor: queueTint('#64748b', 0.3) }} />
                   </div>
                   <span className="fb-t-caption fb-tabular text-[var(--ink-40)] w-8 text-right">
                     {activeN}

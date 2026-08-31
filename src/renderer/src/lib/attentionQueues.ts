@@ -62,6 +62,15 @@ export const QUEUE_COLOR: Record<string, string> = {
 }
 
 /** hex + alpha → rgba() for the subtle washes. */
+/** DEC-095 — the same hex as a SPACE-SEPARATED RGB triplet ("14 165 233"),
+ *  for CSS custom properties that get alpha modifiers downstream
+ *  (`rgb(var(--kpi-tone) / 0.2)`). GAP-018/019: a comma triplet or a
+ *  complete color in that position is invalid CSS and paints nothing. */
+export function toneTriplet(hex: string): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
+}
+
 export function queueTint(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16)
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
