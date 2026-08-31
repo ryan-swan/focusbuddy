@@ -1,17 +1,18 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-30 (night) — through DEC-089 (the plan review is a
-workbench: drag-reorder over the slot ladder, inline when/duration edits,
-overlap warnings; plus the dark-mode widget-chrome fix — 26 header washes
-got dark companions, the frame a real dark edge). **GAP-019 is newly open**:
-`bg-[var(--token)]/N` modifiers are invalid CSS and paint NOTHING (~40
-sites; two header sites fixed, the sweep is its own round). DEC-088 was the
-People workstream, DEC-087 Phase 1's demo-blockers. analysis/27 carries the
-5-phase plan — Phase 3 (context fidelity) still queued, GAP-019 sweep now
-also on the shelf. DECISIONS-LOG carries DEC-072…089 in full.
+**Last updated:** 2026-08-30 (night) — through DEC-090 (the plan intent
+stopped hallucinating: an empty model selection SURVIVES with a one-click
+"plan the rest of the day instead" offer; time windows ("later in the day",
+"first half", "after 2pm") and week-spread now parse deterministically and
+constrain the slots; topic-less intents skip the model entirely via
+shared/planLanguage.ts). DEC-089 made the plan review a workbench + fixed
+dark-mode widget chrome; **GAP-019 remains open** (`bg-[var(--token)]/N` is
+invalid CSS, ~40 sites). analysis/27 carries the 5-phase plan — Phase 3
+(context fidelity) still queued, GAP-019 sweep on the shelf. DECISIONS-LOG
+carries DEC-072…090 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,380 tests green. Full typecheck clean.
+**Suite:** 3,396 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -25,7 +26,7 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…089**, append-only. DEC-072…089 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…090**, append-only. DEC-072…090 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)

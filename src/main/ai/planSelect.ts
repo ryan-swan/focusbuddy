@@ -2,6 +2,7 @@ import { getSharedAiClient } from './anthropic'
 import { resolveModel } from './modelRouting'
 import { recordAiUsage } from '../db/telemetry'
 import { extractJson } from './chatJson'
+import { PLAN_STOPWORDS as STOPWORDS } from '../../shared/planLanguage'
 
 // DEC-052 (Track B3, mode b) — the intent-driven planner's SELECTION step.
 // The operator's example: "I'm feeling really motivated to take on the CETRA
@@ -30,11 +31,8 @@ export interface PlanSelection {
 /** Deterministic fallback: every whitespace token of the intent that is 3+
  *  chars must... no — ANY token matching title/context keeps the item, ranked
  *  by how many tokens hit. Zero hits = not selected. */
-const STOPWORDS = new Set([
-  'the', 'and', 'for', 'with', 'this', 'that', 'today', 'tomorrow', 'take',
-  'want', 'wanna', 'feel', 'feeling', 'really', 'lets', 'get', 'going',
-  'work', 'working', 'stuff', 'things', 'motivated', 'focus', 'day'
-])
+// DEC-090 — the stopword list moved to shared/planLanguage.ts (one list,
+// shared with the renderer's topic detector, or the two drift).
 
 // DEC-071 — how much of the model's note survives, and how it is cut.
 //
@@ -100,9 +98,15 @@ export async function selectItemsForPlan(
       model,
       max_tokens: 400,
       system:
-        'You select which open work items match what the user wants to work on today, ' +
+        'You select which open work items match what the user wants to work on, ' +
         'and order them best-first (their stated focus first, deadlines next). ' +
-        'Select ONLY items genuinely related to the stated intent — an empty selection is a valid answer. ' +
+        'Select ONLY items genuinely related to the stated intent. ' +
+        'Time or day words ("tomorrow", "first half of the day", "later", "this week") describe WHEN ' +
+        'to schedule, never WHICH items to pick — ignore them for selection. ' +
+        'If no items genuinely relate to the named topic, project or person, return {"ids":[]} with a note ' +
+        'saying what you looked for — do NOT pad the selection with unrelated items. ' +
+        'If the intent names NO particular topic ("plan everything", "spread my items across the week"), ' +
+        'that means ALL items — select every id. ' +
         'Return ONLY JSON: {"ids":["..."],"note":"one short line describing the selection"}. No prose.',
       messages: [
         {
@@ -117,10 +121,13 @@ export async function selectItemsForPlan(
     if (!json) return fallback()
     const parsed = JSON.parse(json) as { ids?: unknown; note?: unknown }
     const valid = new Set(candidates.map((c) => c.id))
-    const ids = Array.isArray(parsed.ids)
-      ? (parsed.ids as unknown[]).map(String).filter((id) => valid.has(id))
-      : []
-    if (!ids.length) return fallback()
+    if (!Array.isArray(parsed.ids)) return fallback()
+    const ids = (parsed.ids as unknown[]).map(String).filter((id) => valid.has(id))
+    // DEC-090 — an EMPTY model selection is an honest answer ("no Cetra
+    // items are open"), not a failure. Overriding it with the keyword
+    // fallback was the hallucination the operator saw: scaffolding words
+    // matched random items and the plan confidently scheduled them. Only a
+    // failed call (no JSON, bad shape, thrown) falls back.
     return {
       ids,
       note: typeof parsed.note === 'string' ? trimNote(parsed.note) : null,

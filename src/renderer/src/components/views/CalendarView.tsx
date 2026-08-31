@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
+import { intentNamesTopic } from '@shared/planLanguage'
 import { useNodeStore } from '../../stores/nodes'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
@@ -14,7 +15,10 @@ import {
   type PlannedProposal,
   parsePlanDay,
   effectivePlanDay,
-  reorderOverSlots
+  reorderOverSlots,
+  parsePlanWindow,
+  parsePlanSpread,
+  planSpread
 } from '../../lib/attentionPlanner'
 import { parseTags } from '../../lib/itemTags'
 import { parseMentions } from '../../lib/itemMentions'
@@ -214,6 +218,9 @@ export default function CalendarView(): JSX.Element {
   const [intent, setIntent] = useState('')
   const [proposals, setProposals] = useState<PlannedProposal[] | null>(null)
   const [planNote, setPlanNote] = useState<string | null>(null)
+  // DEC-090 — set when an intent honestly matched NOTHING: the note offers
+  // "plan the rest of the day instead", and this arms that one-click path.
+  const [planOfferFull, setPlanOfferFull] = useState(false)
   // DEC-071 — the proposal is REVIEWABLE before it is accepted. A summary line
   // that truncates ("3 blocks proposed · 82 min — Top creative items: Update
   // Chan…") is an assurance, not an explanation: it cannot say WHICH items,
@@ -256,29 +263,47 @@ export default function CalendarView(): JSX.Element {
     return m
   }, [nodes])
 
-  async function runPlan(): Promise<void> {
+  async function runPlan(forceFull = false): Promise<void> {
     if (planBusy) return
     setPlanBusy(true)
     setPlanNote(null)
+    setPlanOfferFull(false)
     try {
       const opts = { placedIds: scheduledIds, deskTitles }
       const settings = loadPlannerSettings()
+      const askText = forceFull ? '' : intent
       // DEC-087 — the demo's "nothing to place" at 6pm: (a) an intent that
       // names a day ("…before noon tomorrow") plans THAT day, not the viewed
       // one; (b) when today's working window has already closed, the plan
       // rolls to tomorrow and says so instead of reporting a full day.
-      const named = intent.trim() ? parsePlanDay(intent, nowMs) : null
-      const eff = effectivePlanDay(named ?? planDayMs, blocks, settings, nowMs)
+      // DEC-090 — the intent's TIME language now lands too: a window
+      // ("first half", "later in the day", "after 2pm") narrows the slots,
+      // and "spread across the week" plans several workdays instead of one.
+      const named = askText.trim() ? parsePlanDay(askText, nowMs) : null
+      const win = askText.trim() ? parsePlanWindow(askText, settings) : null
+      const spread = askText.trim() ? parsePlanSpread(askText) : false
+      const planSettings = win
+        ? { ...settings, dayStartMin: win.startMin, dayEndMin: win.endMin }
+        : settings
+      const eff = effectivePlanDay(named ?? planDayMs, blocks, planSettings, nowMs)
+      const dayNote = eff.rolledToTomorrow
+        ? 'Today’s working window has closed — this plans tomorrow instead.'
+        : named && named !== planDayMs
+          ? `Planning ${new Date(named).toLocaleDateString(undefined, { weekday: 'long' })}.`
+          : null
       const targetDay = {
         dayMs: eff.dayMs,
-        note: eff.rolledToTomorrow
-          ? 'Today’s working window has closed — this plans tomorrow instead.'
-          : named && named !== planDayMs
-            ? `Planning ${new Date(named).toLocaleDateString(undefined, { weekday: 'long' })}.`
-            : null
+        note:
+          [dayNote, win ? `Keeping it to ${win.label}.` : null, spread ? 'Spreading across the week.' : null]
+            .filter(Boolean)
+            .join(' ') || null
       }
       let out: PlannedProposal[]
-      if (intent.trim()) {
+      // DEC-090 — an intent that names NO topic ("spread my open items
+      // across the week during work hours") is pure scheduling language: it
+      // means the FULL queue, routed deterministically. Only a named topic
+      // pays for selection — and can honestly come back empty.
+      if (askText.trim() && intentNamesTopic(askText)) {
         // Intent mode: the model (or its keyword fallback) picks + orders;
         // placement stays deterministic and local.
         const candidates = schedulableItems(items, nowMs)
@@ -294,27 +319,40 @@ export default function CalendarView(): JSX.Element {
               .filter(Boolean)
               .join(', ')
           }))
-        const sel = await window.api.workItems.planSelect(intent, candidates)
+        const sel = await window.api.workItems.planSelect(askText, candidates)
         if (!sel.ids.length) {
-          setPlanNote('Nothing in the queue matches that. Try different words, or leave it empty to let Plexii pick.')
+          // DEC-090 — the honest zero, said out loud (operator ruling). An
+          // empty selection now SURVIVES from the model (it used to be
+          // overridden by keyword noise — the "random items" hallucination),
+          // and the answer offers the real alternative instead of guessing.
+          setPlanNote(sel.note ?? 'No open items match that.')
+          setPlanOfferFull(true)
           setProposals(null)
           return
         }
-        out = planDay(items, blocks, settings, targetDay.dayMs, nowMs, {
-          ...opts,
-          onlyItemIds: sel.ids,
-          source: 'intent'
-        })
+        out = spread
+          ? planSpread(items, blocks, planSettings, targetDay.dayMs, nowMs, {
+              ...opts,
+              onlyItemIds: sel.ids,
+              source: 'intent'
+            })
+          : planDay(items, blocks, planSettings, targetDay.dayMs, nowMs, {
+              ...opts,
+              onlyItemIds: sel.ids,
+              source: 'intent'
+            })
         setPlanNote([sel.note, targetDay.note].filter(Boolean).join(' — ') || null)
       } else {
-        out = planDay(items, blocks, settings, targetDay.dayMs, nowMs, opts)
+        out = spread
+          ? planSpread(items, blocks, planSettings, targetDay.dayMs, nowMs, opts)
+          : planDay(items, blocks, planSettings, targetDay.dayMs, nowMs, opts)
         if (targetDay.note) setPlanNote(targetDay.note)
       }
       setProposals(out.length ? withUids(out) : null)
       // DEC-071 — a plan arrives for REVIEW, not as a fait accompli behind a
       // truncated line. Nothing is booked by opening it.
       if (out.length) {
-        setPlanIntent(intent.trim())
+        setPlanIntent(askText.trim())
         setReviewOpen(true)
       }
       if (!out.length)
@@ -832,7 +870,21 @@ export default function CalendarView(): JSX.Element {
                         <span className="text-[rgb(var(--accent))] ml-1.5">Review</span>
                       </button>
                     ) : (
-                      <span className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0">{planNote}</span>
+                      <span className="fb-t-label text-[var(--ink-80)] flex-1 min-w-0">
+                        {planNote}
+                        {/* DEC-090 — the honest zero comes with the real
+                            alternative: one click plans from the full queue
+                            instead of the intent silently doing it anyway. */}
+                        {planOfferFull && (
+                          <button
+                            onClick={() => void runPlan(true)}
+                            data-testid="plan-offer-full"
+                            className="ml-2 text-[rgb(var(--accent))] hover:underline fb-press"
+                          >
+                            Plan the rest of the day instead
+                          </button>
+                        )}
+                      </span>
                     )}
                     {proposals && (
                       <>
@@ -851,6 +903,7 @@ export default function CalendarView(): JSX.Element {
                       onClick={() => {
                         setProposals(null)
                         setPlanNote(null)
+                        setPlanOfferFull(false)
                       }}
                       className="icon-btn !h-7 !w-7 shrink-0"
                       title="Clear"

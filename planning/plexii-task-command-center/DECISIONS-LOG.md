@@ -2245,3 +2245,53 @@ five-pill DEC-084 pin got its history note last round.
 
 13 new tests (reorder math + editability pins + the two-clause chrome lock);
 3,380 green; both typechecks clean.
+
+## DEC-090 — The plan intent stops hallucinating and learns to tell time
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Trigger:** operator live QA
+("cetra partners, first half of tomorrow" pulled random items; "later in the
+day" packed the morning)
+
+**The hallucination had a mechanism, not a mystery.** planSelect's model was
+already told an empty selection was valid — but the CODE overrode an empty
+answer with the keyword fallback (`if (!ids.length) return fallback()`), and
+the fallback's stopword list was so thin that scaffolding words ("items",
+"open", "related", "first", "half") matched dozens of unrelated items. The
+model said "no Cetra items are open"; the code replaced that honesty with
+noise and confidently scheduled it. Three fixes:
+
+- An EMPTY model selection now SURVIVES — only a FAILED call falls back.
+- The stopword list grew planner scaffolding + all time language, and moved
+  to `src/shared/planLanguage.ts` (ONE list, shared with the renderer's
+  topic detector, or the two drift).
+- The zero lands as the operator ruled it: the model's own note ("No items
+  found related to Cetra Partners…") plus a one-click offer — **Plan the
+  rest of the day instead** — rather than the intent silently doing that
+  anyway. The offer plans the full queue and does NOT echo the no-match ask
+  above unrelated blocks.
+
+**Time language now goes somewhere.** Two deterministic parsers join
+DEC-087's parsePlanDay: `parsePlanWindow` ("first half", "before noon",
+"later in the day", "after 2pm", "between 2 and 4", morning/afternoon/
+evening — each with a speakable label folded into the note) narrows the
+slot window by overriding dayStart/dayEnd for that plan; `parsePlanSpread`
+("across/throughout the week", "over the next few days") switches to
+`planSpread`, which plans up to five WORKDAYS (weekends skipped, each item
+placed once, stops when the queue is exhausted). effectivePlanDay now runs
+against the WINDOWED settings, so "this evening" at 6pm keeps today instead
+of rolling to tomorrow.
+
+**Topic-less intents never reach the model.** "spread my open items across
+the week during work hours" names no topic — every token is scheduling
+language. `intentNamesTopic` routes such intents straight to the full queue
+deterministically; live QA showed even the sharpened prompt could misread
+"my open items" as a topic search and return zero. Selection is only paid
+for — and can only come back empty — when a topic is actually named.
+
+Live-verified across two restarts: the Cetra intent → 0 rows, the model's
+own note, the offer; the offer → the full 11-block plan; "fantasy football
+league work, later in the day tomorrow" → 4 fantasy items starting 2:00 PM
+(not 9:00); "spread my open items across the week" → 21 blocks over Monday
++ Tuesday, day-grouped, "Spreading across the week." noted. 16 new tests
+(window/spread/topic matrices, the operator's verbatim failing intent
+selecting nothing, honest-empty pins); six DEC-052/087 pins rewritten to
+the superseding truth with history; 3,396 green; both typechecks clean.

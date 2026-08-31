@@ -73,9 +73,15 @@ describe('DEC-087(b) — effectivePlanDay: a closed today rolls to tomorrow', ()
 describe('DEC-087(b) — CalendarView wires day + rollover into runPlan', () => {
   const src = read('components/views/CalendarView.tsx')
   it('parsePlanDay and effectivePlanDay feed the plan target', () => {
-    expect(src).toContain('parsePlanDay(intent, nowMs)')
-    expect(src).toContain('effectivePlanDay(named ?? planDayMs, blocks, settings, nowMs)')
-    expect(src).toContain('planDay(items, blocks, settings, targetDay.dayMs, nowMs')
+    // DEC-090: the parsed text is askText (forceFull passes '' to plan the
+    // full queue), and the effective day is computed against the WINDOWED
+    // settings so "this evening" at 6pm doesn't roll to tomorrow. The
+    // original pins said intent/settings; the day+rollover wiring stands.
+    expect(src).toContain('parsePlanDay(askText, nowMs)')
+    expect(src).toContain('effectivePlanDay(named ?? planDayMs, blocks, planSettings, nowMs)')
+    // DEC-090: placement now uses the WINDOWED settings (planSettings), so
+    // "later in the day" narrows the slots. The target-day wiring stands.
+    expect(src).toContain('planDay(items, blocks, planSettings, targetDay.dayMs, nowMs')
   })
   it('the rollover is SAID, not silent', () => {
     expect(src).toContain('Today’s working window has closed — this plans tomorrow instead.')

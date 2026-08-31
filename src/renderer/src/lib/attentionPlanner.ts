@@ -408,3 +408,114 @@ export function reorderOverSlots(
   items.splice(insertAt, 0, moved)
   return items.map((it, i) => ({ ...it, startMs: slots[i] }))
 }
+
+// ── DEC-090 — the intent's TIME language, parsed deterministically ──────────
+
+export interface PlanWindow {
+  startMin: number
+  endMin: number
+  /** Folded into the plan note — "Planning tomorrow, the afternoon." */
+  label: string
+}
+
+const MIN12 = 12 * 60
+
+/** Clock phrase → minutes-from-midnight. "2pm"→840, "9"→540 (am below 8 is
+ *  assumed pm — nobody plans for 3am), "14:30"→870. */
+function clockToMin(h: number, m: number, mer: string | undefined): number | null {
+  if (h > 23 || m > 59) return null
+  if (mer === 'pm' && h < 12) h += 12
+  else if (mer === 'am' && h === 12) h = 0
+  else if (!mer && h >= 1 && h < 8) h += 12 // bare "by 3" means 3pm
+  return h * 60 + m
+}
+
+/** "later in the day", "first half", "before noon", "after 2pm", "between
+ *  2 and 4" — the WINDOW an intent asks for, or null when it names none.
+ *  Without this, "later" packed the morning: freeSlots always started at
+ *  the first opening, and the intent's time words went nowhere. */
+export function parsePlanWindow(intent: string, s: PlannerSettings): PlanWindow | null {
+  const q = intent.toLowerCase()
+  const W = (startMin: number, endMin: number, label: string): PlanWindow | null =>
+    endMin - startMin >= 30 ? { startMin, endMin, label } : null
+
+  // Explicit ranges beat named periods.
+  const between = /\bbetween\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s+and\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(q)
+  if (between) {
+    const a = clockToMin(+between[1], +(between[2] ?? 0), between[3] ?? between[6])
+    const b = clockToMin(+between[4], +(between[5] ?? 0), between[6] ?? between[3])
+    if (a != null && b != null && b > a) return W(a, b, `between ${fmtMin(a)} and ${fmtMin(b)}`)
+  }
+  const after = /\b(?:after|from|starting(?:\s+at)?)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(q)
+  if (after) {
+    const a = clockToMin(+after[1], +(after[2] ?? 0), after[3])
+    if (a != null) return W(a, Math.max(s.dayEndMin, Math.min(a + 4 * 60, 21 * 60)), `after ${fmtMin(a)}`)
+  }
+  const before = /\b(?:before|by)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(q)
+  if (before) {
+    const b = clockToMin(+before[1], +(before[2] ?? 0), before[3])
+    if (b != null) return W(s.dayStartMin, b, `before ${fmtMin(b)}`)
+  }
+
+  if (/\bfirst half\b/.test(q)) return W(s.dayStartMin, MIN12 + 30, 'the first half of the day')
+  if (/\bsecond half\b/.test(q)) return W(MIN12 + 30, s.dayEndMin, 'the second half of the day')
+  if (/\bbefore noon\b|\bby noon\b/.test(q)) return W(s.dayStartMin, MIN12, 'before noon')
+  if (/\b(?:around noon|midday|over lunch)\b/.test(q)) return W(11 * 60, 14 * 60, 'around midday')
+  if (/\bmorning\b/.test(q)) return W(s.dayStartMin, MIN12, 'the morning')
+  if (/\b(?:late afternoon|end of (?:the )?day)\b/.test(q))
+    return W(Math.max(s.dayStartMin, 15 * 60), s.dayEndMin, 'the end of the day')
+  if (/\blater (?:in|on) the day\b|\blater today\b|\blater tomorrow\b/.test(q))
+    return W(Math.max(s.dayStartMin, 14 * 60), s.dayEndMin, 'later in the day')
+  if (/\bafternoon\b/.test(q)) return W(MIN12, s.dayEndMin, 'the afternoon')
+  if (/\b(?:evening|tonight)\b/.test(q)) return W(17 * 60, 21 * 60, 'the evening')
+  if (/\bearly (?:in the day|today|tomorrow|start)\b|\bstart of (?:the )?day\b/.test(q))
+    return W(s.dayStartMin, 11 * 60, 'the early part of the day')
+  return null
+}
+
+function fmtMin(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}${m ? `:${String(m).padStart(2, '0')}` : ''}${h < 12 ? 'am' : 'pm'}`
+}
+
+/** "spread it across the week", "throughout the week", "over the next few
+ *  days" — plan over several workdays instead of packing one. */
+export function parsePlanSpread(intent: string): boolean {
+  return /\bspread\b|\b(?:across|throughout|through|over) the (?:rest of the )?(?:week|next few days)\b|\bover the next (?:few |couple (?:of )?)?days\b/i.test(
+    intent
+  )
+}
+
+/** DEC-090 — plan across up to five WORKDAYS starting at dayMs: each day is
+ *  planned with what remains, weekends are skipped ("during work hours"),
+ *  and the loop stops when the queue is exhausted. */
+export function planSpread(
+  items: FbNode[],
+  blocks: TimeBlock[],
+  settings: PlannerSettings,
+  startDayMs: number,
+  nowMs: number,
+  opts: PlanDayOptions = {}
+): PlannedProposal[] {
+  const out: PlannedProposal[] = []
+  let remaining = new Set(opts.onlyItemIds ?? schedulableItems(items, nowMs).map((i) => i.id))
+  let dayMs = startDayMs
+  let workdays = 0
+  while (remaining.size > 0 && workdays < 5) {
+    const dow = new Date(dayMs).getDay()
+    if (dow !== 0 && dow !== 6) {
+      workdays++
+      const day = planDay(items, blocks, settings, dayMs, nowMs, {
+        ...opts,
+        onlyItemIds: [...remaining]
+      })
+      out.push(...day)
+      remaining = new Set([...remaining].filter((id) => !day.some((p) => p.itemId === id)))
+      if (day.length === 0 && workdays > 1) break // days are open but nothing fits — stop honestly
+    }
+    dayMs += 24 * 60 * 60 * 1000
+  }
+  return out
+}

@@ -149,10 +149,17 @@ describe('DEC-052 B3/B4 — the planner is preview-first, always', () => {
   })
 
   it('the intent mode selects via IPC with a keyword floor; empty selection is honest', () => {
-    expect(view).toContain('window.api.workItems.planSelect(intent, candidates)')
+    // DEC-090: runPlan gained forceFull ("plan the rest of the day instead"),
+    // so the selection reads askText (the intent, or '' when forced full).
+    // The pin's point is unchanged: selection goes through the IPC.
+    expect(view).toContain('window.api.workItems.planSelect(askText, candidates)')
     const sel = read('src/main/ai/planSelect.ts')
     expect(sel).toContain('return fallback()')
-    expect(sel).toContain('an empty selection is a valid answer')
+    // DEC-090 sharpened the prompt: empty is not merely "valid" — it is the
+    // REQUIRED answer when nothing relates, and time words are excluded
+    // from selection. Same doctrine, stronger wording.
+    expect(sel).toContain('return {"ids":[]} with a note')
+    expect(sel).toContain('Time or day words')
   })
 })
 
