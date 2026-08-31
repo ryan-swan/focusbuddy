@@ -100,6 +100,8 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
+import { extractPeople } from '../ai/peopleExtract'
+import { listPeopleDirectory } from '../peopleDirectory'
 import { selectItemsForPlan } from '../ai/planSelect'
 import {
   ensureSignalSchema,
@@ -750,6 +752,12 @@ export function registerIpcHandlers(): void {
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  // DEC-088 — the people scan alone, for MARKED captures (whose class the
+  // preset table already decided — that path deliberately never classifies,
+  // and this keeps it model-free while still suggesting workspace people).
+  ipcMain.handle('workItems:scanPeople', (_e, text: string) =>
+    extractPeople(String(text ?? ''), listPeopleDirectory())
+  )
   // DEC-052 (Track D, tier 1) — the typed action ledger + the once-ever
   // pairing guard. Device-local observations; never rides sync.
   ensureSignalSchema()

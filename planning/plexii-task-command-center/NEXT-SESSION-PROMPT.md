@@ -1,14 +1,15 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-30 (night) — through DEC-087 (Phase 1 of the
-demo-feedback plan: capture-card overflow, planner day-targeting +
-after-hours rollover, block click-vs-drag guard). The demo consolidation and
-the 5-phase plan live in **analysis/27-DEMO-FEEDBACK-PLAN.md** — Phase 2
-(People workstream) is the next queued build. DECISIONS-LOG carries
-DEC-072…087 in full.
+**Last updated:** 2026-08-30 (night) — through DEC-088 (Phase 2, the People
+workstream: PEOPLE pill/drawer at the confirm stop, directory-grounded
+name extraction seeding person mentions, and the "Which Caleb?" clarify
+lane; DEC-087 was Phase 1's three demo-blockers). The demo consolidation
+and 5-phase plan live in **analysis/27-DEMO-FEEDBACK-PLAN.md** — Phase 3
+(context fidelity: Slack source_url, doc-created toast, mail verification)
+is the next queued build. DECISIONS-LOG carries DEC-072…088 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,347 tests green. Full typecheck clean.
+**Suite:** 3,367 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -22,10 +23,10 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…087**, append-only. DEC-072…087 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…088**, append-only. DEC-072…088 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
-   feedback consolidation and 5-phase plan (Phase 1 done; Phase 2 = People)
+   feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)
 4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 is the live one (Respond → Messages)
 
 Pre-flight:

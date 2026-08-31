@@ -1,8 +1,8 @@
 # 27 — Demo feedback: 20 items → 12 threads → 5 phases
 
 **Date:** 2026-08-30 · **Source:** operator walkthrough of the build with Caleb
-(transcript notes, items 1–20) · **Status:** Phase 1 EXECUTED (DEC-087); phases
-2–5 awaiting operator sequencing.
+(transcript notes, items 1–20) · **Status:** Phases 1–2 EXECUTED (DEC-087,
+DEC-088); phases 3–5 awaiting operator sequencing.
 
 The operator demoed the Attention + Calendar work to Caleb and brought back 20
 raw items. Reviewed each against the code. The consolidation below is the
@@ -91,7 +91,7 @@ send-state feedback.
 | Phase | Items | Size | Status |
 |---|---|---|---|
 | **1 — Demo-blockers** | Capture modal scroll/cutoff · Plan-my-day day-targeting + after-hours fallback · calendar duplicate-vs-edit guard | ~1 session | **DONE — DEC-087** |
-| **2 — People** | People pill/drawer split · meeting names → structured mentions · person-clarify lane (groundwork for SPEC-027; routing itself stays deferred) | 1–2 sessions | queued |
+| **2 — People** | People pill/drawer split · capture names → structured mentions · person-clarify lane (groundwork for SPEC-027; routing itself stays deferred) | 1–2 sessions | **DONE — DEC-088** (wrapup-proposal mentions ride Phase 4's transcript rebuild) |
 | **3 — Context fidelity** | Slack/webview `source_url` capture · doc-created toast + linkage · mail send verification | ~1 session | queued |
 | **4 — Polish & intelligence** | Transcript UI rebuild · AI-suggested tags · home-page widgets / live doc embed | on operator go, per-item | gated |
 | **5 — Rulings & process** | Caleb checkout note · synced-docs QA session · taxonomy ruling with queue-usage data · Michael review → landing | as scheduled | open |

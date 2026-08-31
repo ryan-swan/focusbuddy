@@ -8,7 +8,9 @@ import Icon from './Icon'
 import TagMentionInput from './TagMentionInput'
 import { URGENCY_LEVELS } from '../lib/itemTags'
 import { serializeTags } from '../lib/itemTags'
-import { serializeMentions, type ItemMention } from '../lib/itemMentions'
+import { serializeMentions, mentionKey, type ItemMention } from '../lib/itemMentions'
+import { usePeopleStore, personName } from '../lib/peopleDirectory'
+import { useAccountStore } from '../stores/account'
 import { parseSelectionList, normalizeSelectionText } from '../lib/selectionList'
 
 // The ONE confirm stop (DEC-019), extracted so every capture surface renders
@@ -88,9 +90,9 @@ export default function AttentionConfirmCard({
   const updateFieldsStore = useWorkItemStore((s) => s.updateFields)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   /** One drawer at a time — same rule as Where in Book time. */
-  const [openDrawer, setOpenDrawer] = useState<'category' | 'urgency' | 'when' | 'desk' | null>(
-    null
-  )
+  const [openDrawer, setOpenDrawer] = useState<
+    'category' | 'urgency' | 'when' | 'people' | 'desk' | null
+  >(null)
   const [catTouched, setCatTouched] = useState(false)
   const [whenTouched, setWhenTouched] = useState(false)
   /** 'someday' = no date (the honest default; filing semantics unchanged). */
@@ -105,6 +107,17 @@ export default function AttentionConfirmCard({
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // DEC-088 — PEOPLE is its own dimension. The demo buried the @ field under
+  // Desk (#2/#6); the person references an item carries deserve their own
+  // labelled pill, their own drawer, and their own confidence accent.
+  const [peopleTouched, setPeopleTouched] = useState(false)
+  const [peopleInferred, setPeopleInferred] = useState(false)
+  const [personClarify, setPersonClarify] = useState<{
+    phrase: string
+    candidates: Array<{ id: string; title: string; hint: string }>
+  } | null>(null)
+  const [peopleFilter, setPeopleFilter] = useState('')
+  const dirPeople = usePeopleStore((s) => s.people)
   // DEC-026: the tidy — requested AFTER the screen is up, seq-guarded.
   const [cleanup, setCleanup] = useState<{ title: string; note: string; originalTitle: string } | null>(null)
   const [cleanupUsed, setCleanupUsed] = useState(false)
@@ -155,7 +168,16 @@ export default function AttentionConfirmCard({
     setCapTags([])
     setCapMentions([])
     setNotesEdited(false)
+    setPeopleTouched(false)
+    setPeopleInferred(false)
+    setPersonClarify(null)
+    setPeopleFilter('')
     tidyPending.current = null
+    // DEC-088 — the directory loads on the chat panel today; a capture can
+    // happen first. Fetch once (attempted-guarded) so the People drawer and
+    // main's scan have real names to offer. Never awaited — capture never
+    // waits (R011); the first post-boot capture may honestly offer nobody.
+    if (!usePeopleStore.getState().attempted) void usePeopleStore.getState().load()
     // A MARKED object already knows what it is — the preset table decided,
     // so the classifier is skipped entirely (no latency, no model, works with
     // the key removed). Typed captures still classify.
@@ -191,6 +213,16 @@ export default function AttentionConfirmCard({
             }
           })
         })
+        // DEC-088 — marked captures skip the classifier by design; the
+        // deterministic people scan still runs (selection text included).
+        void window.api.workItems
+          .scanPeople([text, rawNotes].filter(Boolean).join('\n'))
+          .then((s) => {
+            if (!alive) return
+            const pc = seedPeople({ people: s.people, clarify: s.clarify })
+            if (pc) setOpenDrawer('people')
+          })
+          .catch(() => {})
         return () => {
           alive = false
         }
@@ -231,6 +263,14 @@ export default function AttentionConfirmCard({
           })
         tidyPending.current = tidy
       }
+      void window.api.workItems
+        .scanPeople([text, rawNotes].filter(Boolean).join('\n'))
+        .then((s) => {
+          if (!alive) return
+          const pc = seedPeople({ people: s.people, clarify: s.clarify })
+          if (pc) setOpenDrawer('people')
+        })
+        .catch(() => {})
       return () => {
         alive = false
       }
@@ -272,6 +312,21 @@ export default function AttentionConfirmCard({
         } else if (c.clarify != null) {
           setOpenDrawer('when')
         }
+        // DEC-088 — people the capture references arrive pre-suggested. The
+        // People drawer auto-opens for an ambiguity ONLY when the deadline
+        // question didn't take the one auto-open (DEC-016: one question) —
+        // otherwise the lit pill carries it until opened.
+        const pc = seedPeople({ people: c.people ?? [], clarify: c.personClarify ?? null })
+        if (c.clarify == null && pc) setOpenDrawer('people')
+        // Notes typed in the console can name people the title didn't.
+        if (rawNotes.trim()) {
+          void window.api.workItems
+            .scanPeople(rawNotes)
+            .then((s) => {
+              if (alive) seedPeople({ people: s.people, clarify: s.clarify })
+            })
+            .catch(() => {})
+        }
         const seq = ++cleanupSeq.current
         // The tidy is still requested AFTER the screen is up — a capture never
         // waits on it (R011) — but it now lands INTO the preview rather than
@@ -310,6 +365,48 @@ export default function AttentionConfirmCard({
       cleanupSeq.current++
     }
   }, [text, rawNotes, source?.intentClass])
+
+  /** DEC-088 — fold a people scan into the card: self filtered out (a
+   *  mention of yourself is noise), suggestions merged into the mention
+   *  chips, and ONE surviving ambiguity kept as the drawer's question.
+   *  Returns the surviving clarify so the caller can decide auto-open —
+   *  the deadline question outranks it (DEC-016: one question). */
+  function seedPeople(scan: {
+    people: Array<{ id: string; title: string }>
+    clarify: { phrase: string; candidates: Array<{ id: string; title: string; hint: string }> } | null
+  }): typeof scan.clarify {
+    const acct = useAccountStore.getState()
+    const selfEmail = (acct.account?.email ?? acct.cachedEmail ?? '').toLowerCase()
+    const dir = usePeopleStore.getState().people
+    const isSelf = (id: string): boolean => {
+      if (!selfEmail) return false
+      const person = dir.find((d) => d.accountId === id)
+      return !!person?.email && person.email.toLowerCase() === selfEmail
+    }
+    const add = scan.people.filter((s) => !isSelf(s.id))
+    let clarify = scan.clarify
+    if (clarify) {
+      const cands = clarify.candidates.filter((c) => !isSelf(c.id))
+      if (cands.length === 0) clarify = null
+      else if (cands.length === 1) {
+        // The "ambiguity" was you plus one other — that's an answer.
+        add.push({ id: cands[0].id, title: cands[0].title })
+        clarify = null
+      } else clarify = { ...clarify, candidates: cands }
+    }
+    if (add.length) {
+      setCapMentions((prev) => {
+        const seen = new Set(prev.map(mentionKey))
+        const next = [...prev]
+        for (const s of add)
+          if (!seen.has(`person:${s.id}`)) next.push({ kind: 'person', id: s.id, title: s.title })
+        return next
+      })
+      setPeopleInferred(true)
+    }
+    if (clarify) setPersonClarify((prev) => prev ?? clarify)
+    return clarify
+  }
 
   function cycleClass(dir: 1 | -1): void {
     if (!confirm) return
@@ -498,6 +595,42 @@ export default function AttentionConfirmCard({
                   day: 'numeric'
                 })
               : 'Pick a date'
+  // DEC-088 — the People pill's face and accent. Accent = Plexii put a name
+  // there (or holds a question) and the operator hasn't touched the dimension.
+  const capPeople = capMentions.filter((m) => m.kind === 'person')
+  const peopleValue =
+    capPeople.length === 0
+      ? 'No one'
+      : capPeople.length === 1
+        ? capPeople[0].title
+        : `${capPeople[0].title.split(' ')[0]} +${capPeople.length - 1}`
+  const peopleAccent = (peopleInferred || personClarify != null) && !peopleTouched
+  const addPerson = (id: string, title: string): void => {
+    setCapMentions((prev) =>
+      prev.some((m) => m.kind === 'person' && m.id === id)
+        ? prev
+        : [...prev, { kind: 'person', id, title }]
+    )
+    setPeopleTouched(true)
+    setPersonClarify(null)
+    setPeopleFilter('')
+  }
+  const removePerson = (id: string): void => {
+    setCapMentions((prev) => prev.filter((m) => !(m.kind === 'person' && m.id === id)))
+    setPeopleTouched(true)
+  }
+  const selfEmailLc = (
+    useAccountStore.getState().account?.email ??
+    useAccountStore.getState().cachedEmail ??
+    ''
+  ).toLowerCase()
+  const peopleOffers = dirPeople
+    .filter((d) => !capPeople.some((m) => m.id === d.accountId))
+    .filter((d) => !selfEmailLc || (d.email ?? '').toLowerCase() !== selfEmailLc)
+    .filter(
+      (d) => !peopleFilter || personName(d).toLowerCase().includes(peopleFilter.toLowerCase())
+    )
+    .slice(0, 6)
   const recentDesks = nodes
     .filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId)
     .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -515,7 +648,7 @@ export default function AttentionConfirmCard({
   }
 
   const pill = (
-    key: 'category' | 'urgency' | 'when' | 'desk',
+    key: 'category' | 'urgency' | 'when' | 'people' | 'desk',
     labelTxt: string,
     value: string,
     accent: boolean
@@ -650,11 +783,14 @@ export default function AttentionConfirmCard({
         />
       </div>
 
-      {/* The four dimensions — labelled pills that visibly open. */}
-      <div className="mt-3 grid grid-cols-2 min-[560px]:grid-cols-4 gap-2.5">
+      {/* The five dimensions — labelled pills that visibly open. PEOPLE sits
+          before DESK on purpose: the demo's complaint was people buried
+          under the desk selector (who before where). */}
+      <div className="mt-3 grid grid-cols-2 min-[560px]:grid-cols-5 gap-2.5">
         {pill('category', 'CATEGORY', CLASS_LABEL[confirm.picked] ?? confirm.picked, catAccent)}
         {pill('urgency', 'URGENCY', urgency[0].toUpperCase() + urgency.slice(1), false)}
         {pill('when', 'WHEN', whenValue, whenAccent)}
+        {pill('people', 'PEOPLE', peopleValue, peopleAccent)}
         {pill('desk', 'DESK', deskValue, deskAccent)}
       </div>
 
@@ -678,6 +814,10 @@ export default function AttentionConfirmCard({
                   (confirm.phrase
                     ? `When should this come back to you? (“${confirm.phrase}”)`
                     : 'When should this come back to you?')}
+                {openDrawer === 'people' &&
+                  (personClarify
+                    ? `Which “${personClarify.phrase}”?`
+                    : 'Who is this about or with?')}
                 {openDrawer === 'desk' && 'Where does this work already live?'}
               </div>
               {openDrawer === 'category' && (
@@ -748,6 +888,75 @@ export default function AttentionConfirmCard({
                     }}
                     className="mt-2 w-full h-9 px-3 rounded-full bg-[var(--surface-raised)] outline-none [&:focus-visible]:outline-none text-[13px] text-[var(--ink-90)]"
                   />
+                </>
+              )}
+              {openDrawer === 'people' && (
+                <>
+                  {personClarify && (
+                    <div className="flex flex-wrap gap-1.5 mb-2" data-testid="person-clarify">
+                      {personClarify.candidates.map((c) =>
+                        option(
+                          false,
+                          () => addPerson(c.id, c.title),
+                          <>
+                            <span className="max-w-[160px] truncate">{c.title}</span>
+                            <span className="text-[11px] text-[var(--ink-40)]">{c.hint}</span>
+                          </>,
+                          c.id
+                        )
+                      )}
+                    </div>
+                  )}
+                  {capPeople.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {capPeople.map((m) => (
+                        <span
+                          key={m.id}
+                          className="inline-flex items-center gap-1 pl-2 pr-1 h-8 rounded-full text-[13px] bg-[rgb(var(--accent))] text-white font-semibold"
+                        >
+                          <Icon name="person" size={13} />
+                          <span className="max-w-[160px] truncate">{m.title}</span>
+                          <button
+                            onClick={() => removePerson(m.id)}
+                            className="inline-flex items-center justify-center h-5 w-5 rounded-full hover:bg-white/20 fb-press"
+                            aria-label={`Remove ${m.title}`}
+                          >
+                            <Icon name="close" size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {peopleOffers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {peopleOffers.map((d) =>
+                        option(
+                          false,
+                          () => addPerson(d.accountId, personName(d)),
+                          <span className="max-w-[160px] truncate">{personName(d)}</span>,
+                          d.accountId
+                        )
+                      )}
+                    </div>
+                  )}
+                  {dirPeople.length > 6 && (
+                    <input
+                      value={peopleFilter}
+                      onChange={(e) => setPeopleFilter(e.target.value)}
+                      placeholder="Find a person…"
+                      className="mt-2 w-full h-9 px-3 rounded-full bg-[var(--surface-raised)] outline-none [&:focus-visible]:outline-none text-[13px] text-[var(--ink-90)] placeholder:text-[var(--ink-40)]"
+                    />
+                  )}
+                  {dirPeople.length === 0 && capPeople.length === 0 && (
+                    <div className="text-[12.5px] text-[var(--ink-40)]">
+                      Nobody to offer — this workspace has no org directory loaded.
+                    </div>
+                  )}
+                  {/* The honest boundary (DEC-039): a reference, not a send.
+                      Routing an item TO someone arrives with SPEC-027. */}
+                  <div className="mt-2 text-[11px] text-[var(--ink-40)]">
+                    A mention keeps the person with the item — it doesn’t send them anything yet.
+                  </div>
                 </>
               )}
               {openDrawer === 'desk' && (

@@ -1784,7 +1784,23 @@ const api = {
         title: string
         dueAt: string | null
       }>
+      /** DEC-088 — directory-grounded people the capture references. */
+      people: Array<{ id: string; title: string }>
+      personClarify: {
+        phrase: string
+        candidates: Array<{ id: string; title: string; hint: string }>
+      } | null
     }> => ipcRenderer.invoke('workItems:classify', text),
+    /** DEC-088 — the people scan alone (marked captures skip classify). */
+    scanPeople: (
+      text: string
+    ): Promise<{
+      people: Array<{ id: string; title: string }>
+      clarify: {
+        phrase: string
+        candidates: Array<{ id: string; title: string; hint: string }>
+      } | null
+    }> => ipcRenderer.invoke('workItems:scanPeople', text),
     /** DEC-052 B3 — intent-driven plan selection (ids ordered best-first). */
     planSelect: (
       intent: string,

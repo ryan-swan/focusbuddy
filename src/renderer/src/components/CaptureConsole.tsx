@@ -6,6 +6,7 @@ import { useNodeStore } from '../stores/nodes'
 import { deskCaptureContext } from '../lib/captureContext'
 import AttentionConfirmCard, { CLASS_LABEL } from './AttentionConfirmCard'
 import { CAPTURE_LEADINS, ROTATE_MS } from '../lib/captureCopy'
+import { usePeopleStore } from '../lib/peopleDirectory'
 
 // Capture (the Attention capture window, rebuilt as Book time's sibling —
 // same visual language, same tokens, same restraint). The tab bar is GONE:
@@ -60,6 +61,10 @@ export default function CaptureConsole(): JSX.Element | null {
           : deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
       )
       if (!t) setTimeout(() => fieldRef.current?.focus(), 0)
+      // DEC-088 — start the directory fetch the moment capture opens, so by
+      // the time Enter classifies, main's people scan has real names. Never
+      // awaited; a cold first capture may honestly suggest nobody.
+      if (!usePeopleStore.getState().attempted) void usePeopleStore.getState().load()
     }
   }, [open, initialText])
 

@@ -38,9 +38,13 @@ describe('step 1 — two fields, two Enters, no tab bar', () => {
   })
 })
 
-describe('step 2 — four labelled pills, one drawer, a stated default', () => {
-  it('the four dimensions render as labelled pills with chevrons', () => {
-    for (const k of ['category', 'urgency', 'when', 'desk'])
+// DEC-088 grew the card's dimensions from four to five: PEOPLE got its own
+// pill and drawer (the demo buried people under Desk). The step-2 shape —
+// labelled pills, one drawer at a time, each led by its question — is
+// unchanged; these pins now count five. (Original DEC-084 pins said four.)
+describe('step 2 — five labelled pills, one drawer, a stated default', () => {
+  it('the five dimensions render as labelled pills with chevrons', () => {
+    for (const k of ['category', 'urgency', 'when', 'people', 'desk'])
       expect(card).toContain(`'${k}'`)
     expect(card).toContain('expand_more')
     expect(card).toContain('rotate-180')
@@ -48,7 +52,7 @@ describe('step 2 — four labelled pills, one drawer, a stated default', () => {
   })
 
   it('one drawer at a time, each led by its question', () => {
-    expect(card).toContain("useState<'category' | 'urgency' | 'when' | 'desk' | null>")
+    expect(card).toContain("'category' | 'urgency' | 'when' | 'people' | 'desk' | null")
     expect(card).toContain('What is this item asking you to do?')
     expect(card).toContain('How hard is it pushing?')
     expect(card).toContain('When should this come back to you?')

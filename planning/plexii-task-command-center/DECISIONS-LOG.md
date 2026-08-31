@@ -2140,3 +2140,59 @@ Also this round: a stray `npx prettier --write` reformatted CaptureConsole to
 prettier defaults (double quotes/semis — not house style; the repo has no
 prettier config). Caught by diff size, reverted, re-applied by hand. Rule
 absorbed: no formatter passes in this repo, the house style is the file.
+
+## DEC-088 — Phase 2 of the demo-feedback plan: the People workstream
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Plan:** analysis/27 (#2 #3 #4 #6 #12)
+
+The demo's people complaints were one decision wearing four costumes: the @
+field lived inside the Desk drawer, so people looked buried, missing, and
+inconsistent all at once. Three builds, one workstream:
+
+**PEOPLE is its own pill.** The confirm stop now has five dimensions —
+CATEGORY / URGENCY / WHEN / PEOPLE / DESK, who before where. The People
+drawer asks "Who is this about or with?", offers the org directory as
+one-click chips (filter appears past six), shows the item's person mentions
+as removable chips, and states the honest boundary in place: *"A mention
+keeps the person with the item — it doesn't send them anything yet."*
+Routing TO a person remains SPEC-027; nothing here pretends otherwise. The
+Desk drawer keeps the full DEC-039 @ grammar (one input, grammar never
+forks) — person chips render in both because the state is one array.
+
+**Capture text seeds mentions — directory-grounded, deterministic.** New
+`src/main/ai/peopleExtract.ts`: full names, then handles, then single
+names, word-boundary matched against the directory the app genuinely
+loaded (peopleDirectory's honesty contract: empty directory extracts
+nobody, ever). Names that are also English words ("Will", "Mark", "Grace")
+match only in their capitalized form, so "will follow up" never becomes a
+person — and every suggestion arrives accent-marked at the confirm stop,
+which is the real safety net. `classifyCapture` carries the scan on all
+three paths (rules/model/fallback) at zero model cost; marked captures —
+which skip the classifier by design — get a dedicated `workItems:scanPeople`
+IPC, so a highlighted "Caleb needs to…" also arrives pre-mentioned. Self is
+filtered renderer-side by account email (a mention of yourself is noise).
+The directory prefetches when capture opens (attempted-guarded, never
+awaited): a cold first capture may honestly offer nobody — capture never
+waits (R011).
+
+**Ambiguity is the question, not a guess.** Two Calebs and a bare "caleb"
+produce NO mention and ONE clarify: the People drawer auto-opens asking
+"Which Caleb?" with both candidates (handle as the hint). A full name binds
+its person and SATISFIES later bare references — "Caleb Swan… remind
+caleb…" never silently binds the other Caleb. One clarify max, and the
+deadline question still outranks it at auto-open (DEC-016: one question) —
+outranked, the lit pill carries it until opened. This is demo item #4 — the
+one-off "Is this Caleb from your workspace?" behavior — made a system.
+
+Boundary noted: meeting-WRAPUP proposals (the transcribe→deliverables
+pipeline) don't ride this yet — that surface is Phase 4's transcript
+rebuild, gated on the operator's go, and gets mention-wiring there.
+
+Verified live over CDP after a full restart (main-process round): five
+pills render; empty-directory drawer shows the honest "Nobody to offer" +
+boundary line; with a scratch directory published-then-reset — "ask
+michael…" filed the card with PEOPLE = Michael Roe in accent; "ask
+caleb…" auto-opened the drawer with both Calebs, picking Swan set the pill
+and killed the accent; "Caleb Swan owns this; remind caleb monday"
+suggested Swan alone. 20 new tests (extraction matrix + wiring pins); one
+DEC-084 four-pill pin rewritten to five with history; 3,367 green; both
+typechecks clean.

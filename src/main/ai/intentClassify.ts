@@ -13,6 +13,8 @@ import { recordAiUsage } from '../db/telemetry'
 import { extractJson } from './chatJson'
 import { canonicalIntentClass } from '@shared/workItems'
 import { PROTOCOL_VOCAB_NOTE } from './vocabulary'
+import { listPeopleDirectory } from '../peopleDirectory'
+import { extractPeople, type PersonClarify, type PersonSuggestion } from './peopleExtract'
 import {
   classifyByRules,
   scanDeadline,
@@ -38,6 +40,13 @@ export interface CaptureClassification {
   /** DEC-025: further intents the compound carried (rules-only, ≤3). The
    *  console offers them as pre-checked chips on the same confirm stop. */
   secondaries: SecondaryIntent[]
+  /** DEC-088 — directory-grounded people the text references, deterministic
+   *  (peopleExtract.ts). Suggested mentions, accent-marked at the confirm
+   *  stop; empty whenever the directory is (honesty over recall). */
+  people: PersonSuggestion[]
+  /** DEC-088 — ONE ambiguous single-name reference ("Which Caleb?") for the
+   *  People drawer. The deadline question still outranks it at auto-open. */
+  personClarify: PersonClarify | null
 }
 
 async function classifyWithModel(text: string): Promise<{ intentClass: IntentClass; confidence: number } | null> {
@@ -88,6 +97,9 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
   const secondaries = secondaryCaptures(text, now)
   const title = titleFromCapture(primaryText)
   const scan = scanDeadline(primaryText, now)
+  // DEC-088 — people can appear in ANY segment of a compound; scan the whole
+  // capture. Deterministic, so the rules fast path stays model-free.
+  const peopleScan = extractPeople(text, listPeopleDirectory())
   const ruled = classifyByRules(primaryText)
   if (ruled) {
     return {
@@ -99,7 +111,9 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
         ? { kind: 'deadline', phrase: scan!.phrase }
         : null,
       via: 'rules',
-      secondaries
+      secondaries,
+      people: peopleScan.people,
+      personClarify: peopleScan.clarify
     }
   }
   const modeled = await classifyWithModel(primaryText)
@@ -113,7 +127,9 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
         ? { kind: 'deadline', phrase: scan!.phrase }
         : null,
       via: 'model',
-      secondaries
+      secondaries,
+      people: peopleScan.people,
+      personClarify: peopleScan.clarify
     }
   }
   // The floor: never block, never lose — file it lightly.
@@ -124,6 +140,8 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
     dueAt: null,
     clarify: null,
     via: 'fallback',
-    secondaries
+    secondaries,
+    people: peopleScan.people,
+    personClarify: peopleScan.clarify
   }
 }

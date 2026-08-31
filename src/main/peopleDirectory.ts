@@ -39,6 +39,12 @@ export function getDirectoryPerson(accountId: string): DirectoryPerson | null {
   return people.find((p) => p.accountId === accountId) ?? null
 }
 
+/** DEC-088 — the whole cache, for the capture-time people scan. Same honesty
+ *  contract as the resolver: empty until the renderer publishes a real fetch. */
+export function listPeopleDirectory(): DirectoryPerson[] {
+  return people
+}
+
 // The display name for a person, from whatever the directory genuinely has. The
 // handle is the fallback because it is the one field that is always present.
 export function personDisplayName(p: DirectoryPerson): string {
