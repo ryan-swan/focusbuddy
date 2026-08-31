@@ -104,3 +104,11 @@ export function presetForMulti(count: number, deskTitle?: string): AttentionPres
     intentClass: 'to_do'
   }
 }
+
+/** DEC-091 — the URL a browser-widget mark should freeze onto the item, or
+ *  null for every other kind. A browser widget's `content` is its live URL
+ *  (WebViewWidget.persistNavUrl); anything else's content is not a place. */
+export function browserMarkUrl(kind: string, content: string | null | undefined): string | null {
+  if (kind !== 'webview' && kind !== 'browser') return null
+  return content && /^https?:\/\//i.test(content) ? content : null
+}

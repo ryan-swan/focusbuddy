@@ -78,7 +78,7 @@ export default function AttentionConfirmCard({
   /** CR-09 D-A: set when this capture came from MARKING an object. The item
    *  then points at that object (sourceType/sourceRef) and opens on the class
    *  the preset table chose — deterministic, no model call. */
-  source?: { sourceType: string; sourceRef: string; intentClass?: string } | null
+  source?: { sourceType: string; sourceRef: string; intentClass?: string; sourceUrl?: string | null } | null
   /** Fired once everything is filed: a human summary + how many items. */
   onFiled: (summary: string, count: number, primaryId: string) => void
   onCancel: () => void
@@ -500,6 +500,7 @@ export default function AttentionConfirmCard({
         approvalState: 'auto', // user-authored: submitting IS the approval
         sourceType: source?.sourceType ?? 'note',
         sourceRef: source?.sourceRef ?? null,
+        sourceUrl: source?.sourceUrl ?? null,
         wiOrigin: 'human'
       })
       // DEC-046: filing preserves the previewed structure. createdBySecIdx

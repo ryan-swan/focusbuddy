@@ -1159,6 +1159,22 @@ export default function AttentionView(): JSX.Element {
             </button>
           ) : (
             <>
+              {i.sourceUrl && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // DEC-091 — the deep link: the page the mark was made ON
+                    // (the Slack thread, the ticket), frozen at mark time.
+                    // The widget itself may have browsed away; this has not.
+                    void window.api.files.openExternal(i.sourceUrl!)
+                  }}
+                  data-row-action
+                  title={`Open the source page — ${i.sourceUrl}`}
+                  className="icon-btn !h-6 !w-6"
+                >
+                  <Icon name="link" size={14} />
+                </button>
+              )}
               {hasDesk && i.sourceRef && i.sourceType !== 'note' && (
                 <button
                   onClick={() => openHere(i)}

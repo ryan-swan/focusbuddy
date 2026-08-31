@@ -1,18 +1,18 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-30 (night) — through DEC-090 (the plan intent
-stopped hallucinating: an empty model selection SURVIVES with a one-click
-"plan the rest of the day instead" offer; time windows ("later in the day",
-"first half", "after 2pm") and week-spread now parse deterministically and
-constrain the slots; topic-less intents skip the model entirely via
-shared/planLanguage.ts). DEC-089 made the plan review a workbench + fixed
-dark-mode widget chrome; **GAP-019 remains open** (`bg-[var(--token)]/N` is
-invalid CSS, ~40 sites). analysis/27 carries the 5-phase plan — Phase 3
-(context fidelity) still queued, GAP-019 sweep on the shelf. DECISIONS-LOG
-carries DEC-072…090 in full.
+**Last updated:** 2026-08-31 — through DEC-091 (Phase 3, context fidelity:
+browser marks freeze `source_url` and the queue/editor deep-link back to the
+exact page; the house NOTICE toast announces AI-created documents with an
+Open door; mail sends are two-stage with the recipients stated and a "Sent
+to …" fact). DEC-090 fixed plan-intent hallucination + time comprehension;
+DEC-089 the review workbench + dark chrome. **GAP-019 remains open**
+(`bg-[var(--token)]/N` is invalid CSS, ~40 sites). analysis/27: Phases 1–3
+done; Phase 4 (transcript rebuild · AI tags · home widgets) is gated on the
+operator's go, Phase 5 is rulings/process. DECISIONS-LOG carries
+DEC-072…091 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,396 tests green. Full typecheck clean.
+**Suite:** 3,409 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -26,7 +26,7 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…090**, append-only. DEC-072…090 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…091**, append-only. DEC-072…091 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)

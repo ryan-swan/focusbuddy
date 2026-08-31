@@ -508,6 +508,32 @@ export default function AttentionItemEditor({
           </div>
         </div>
 
+        {item.sourceUrl && (
+          <div className="block mt-3">
+            <span className="fb-t-caption text-[var(--ink-40)]">Source</span>
+            <button
+              onClick={() => void window.api.files.openExternal(item.sourceUrl!)}
+              data-testid="item-source-link"
+              title={item.sourceUrl}
+              className="mt-1 flex items-center gap-1.5 text-[13px] text-[rgb(var(--accent))] hover:underline fb-press max-w-full"
+            >
+              <Icon name="link" size={13} className="shrink-0" />
+              {/* DEC-091 — the exact page this was marked from (frozen at
+                  mark time; the widget may have browsed away since). */}
+              <span className="truncate">
+                {(() => {
+                  try {
+                    return new URL(item.sourceUrl!).hostname + new URL(item.sourceUrl!).pathname
+                  } catch {
+                    return item.sourceUrl
+                  }
+                })()}
+              </span>
+              <Icon name="open_in_new" size={12} className="shrink-0 text-[var(--ink-40)]" />
+            </button>
+          </div>
+        )}
+
         <div className="block mt-3">
           <span className="fb-t-caption text-[var(--ink-40)]">
             Tags &amp; mentions{' '}

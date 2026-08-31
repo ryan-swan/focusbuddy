@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMailStore, type ComposeInitial } from '../stores/mail'
 import Icon from './Icon'
 import Modal from './plexi/Modal'
+import { useNoticeStore } from '../stores/notice'
 
 // Compose / reply window for the user's own mailbox. One component serves new
 // mail, reply, reply-all and forward — the caller just seeds the fields and the
@@ -44,6 +45,12 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // DEC-091 — the recipient stop (operator ruling: "recipient confirmation").
+  // The first Send validates and ARMS: the footer states exactly who will
+  // receive it and the button asks for the second press. Editing any field
+  // disarms. Mail has no undo — the one honest moment to catch a wrong
+  // address is BEFORE the wire, so the stop lives there.
+  const [armed, setArmed] = useState(false)
 
   // Escape and backdrop close are handled by the Modal wrapper (guarded below so
   // a send in flight is not interrupted). This listener only carries the
@@ -71,6 +78,12 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
       setError(`That does not look like an email address: ${bad}`)
       return
     }
+    // First press arms; the second, with the recipients stated, sends.
+    if (!armed) {
+      setArmed(true)
+      setError(null)
+      return
+    }
     setBusy(true)
     setError(null)
     const r = await send({
@@ -83,12 +96,24 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
       references: initial?.references ?? []
     })
     if (r.ok) {
+      // DEC-091 — send-state feedback: the dialog used to just vanish on
+      // success, which read as "did that go?". The notice states the fact.
+      const extra = ccList.length + bccList.length
+      useNoticeStore.getState().show({
+        text: `Sent to ${toList.join(', ')}${extra ? ` (+${extra} cc/bcc)` : ''}`,
+        icon: 'send'
+      })
       onSent?.()
       onClose()
       return
     }
-    setError(r.error ?? 'Sending failed.')
+    setError(r.error ?? 'Sending failed — nothing left your mailbox.')
     setBusy(false)
+  }
+
+  /** Any edit to who gets it (or what they get) disarms the confirm. */
+  function disarm(): void {
+    if (armed) setArmed(false)
   }
 
   const inputCls =
@@ -129,7 +154,7 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             <input
               autoFocus
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => { disarm(); setTo(e.target.value) }}
               placeholder="name@example.com"
               className={inputCls}
             />
@@ -149,13 +174,13 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
                 <label className="w-10 text-[11px] uppercase tracking-wider text-[var(--ink-50)] shrink-0">
                   Cc
                 </label>
-                <input value={cc} onChange={(e) => setCc(e.target.value)} className={inputCls} />
+                <input value={cc} onChange={(e) => { disarm(); setCc(e.target.value) }} className={inputCls} />
               </div>
               <div className="flex items-center gap-2">
                 <label className="w-10 text-[11px] uppercase tracking-wider text-[var(--ink-50)] shrink-0">
                   Bcc
                 </label>
-                <input value={bcc} onChange={(e) => setBcc(e.target.value)} className={inputCls} />
+                <input value={bcc} onChange={(e) => { disarm(); setBcc(e.target.value) }} className={inputCls} />
               </div>
             </>
           )}
@@ -165,14 +190,14 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
             </label>
             <input
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => { disarm(); setSubject(e.target.value) }}
               placeholder="Subject"
               className={inputCls}
             />
           </div>
           <textarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => { disarm(); setBody(e.target.value) }}
             rows={12}
             placeholder="Write your message…"
             className="fb-field w-full text-[13px] px-2.5 py-2 bg-[var(--surface-raised)] text-[var(--ink-100)] resize-none leading-relaxed"
@@ -180,16 +205,30 @@ export default function ComposeDialog({ initial, onClose, onSent }: Props): JSX.
           {error && <div className="text-[12px] text-red-600 dark:text-red-400">{error}</div>}
         </div>
 
+        {armed && !busy && (
+          <div
+            data-testid="send-confirm-strip"
+            className="mx-4 mb-1 rounded-md bg-accent/10 border border-accent/40 px-2.5 py-1.5 text-[11.5px] text-[var(--ink-90)]"
+          >
+            Sending to{' '}
+            <span className="font-semibold">{parseAddresses(to).join(', ')}</span>
+            {parseAddresses(cc).length > 0 && <> · cc {parseAddresses(cc).join(', ')}</>}
+            {parseAddresses(bcc).length > 0 && <> · bcc {parseAddresses(bcc).join(', ')}</>}
+          </div>
+        )}
         <div className="flex items-center gap-2 px-4 py-3 border-t border-[var(--edge-soft)]">
           <button
             onClick={() => void handleSend()}
             disabled={busy}
+            data-testid="mail-send"
             className="text-[13px] px-4 py-1.5 rounded bg-accent text-white hover:brightness-110 disabled:opacity-60 inline-flex items-center gap-1.5"
           >
             <Icon name={busy ? 'hourglass_top' : 'send'} size={14} />
-            {busy ? 'Sending…' : 'Send'}
+            {busy ? 'Sending…' : armed ? 'Confirm send' : 'Send'}
           </button>
-          <span className="text-[10px] text-[var(--ink-40)]">⌘↵ to send</span>
+          <span className="text-[10px] text-[var(--ink-40)]">
+            {armed ? '⌘↵ again to confirm' : '⌘↵ to send'}
+          </span>
           <button
             onClick={onClose}
             disabled={busy}

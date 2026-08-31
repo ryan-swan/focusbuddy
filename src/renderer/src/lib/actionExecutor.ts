@@ -22,6 +22,7 @@ import { sanitizeWebviewUrl } from './browserUrl'
 import { useMailStore } from '../stores/mail'
 import { useMessagingStore } from '../stores/messaging'
 import { useViewStore } from '../stores/view'
+import { useNoticeStore } from '../stores/notice'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 import { computeSectionFrame, effectiveLayout } from './sectionGeometry'
@@ -504,6 +505,18 @@ async function applyCreateKnowledgeEntry(
 // Create a standalone document (doc / sheet / slides) in the Documents library,
 // carrying the proposal's title. A real fb_documents row, the same as the New
 // button makes, so it opens and edits normally.
+// DEC-091 — demo item #14: an AI-created document landed behind the front
+// window and the operator could not find it. Every successful document
+// create/generate/fill now raises the house notice with an Open door
+// (stores/notice.ts) — the fact, and the way there, without stealing focus.
+function noticeDocReady(verb: string, label: string, title: string, docId: string): void {
+  useNoticeStore.getState().show({
+    text: `${verb} ${label.toLowerCase()} “${title}”`,
+    icon: 'description',
+    action: { label: 'Open', run: () => useViewStore.getState().goDocument(docId) }
+  })
+}
+
 async function applyCreateDocument(
   p: Extract<ActionProposal, { kind: 'create-document' }>,
   ctx: { destinationFolderId?: string | null; resolvedIds?: Map<string, string> }
@@ -535,6 +548,7 @@ async function applyCreateDocument(
     if (doc && ctx.destinationFolderId) {
       await window.api.fileManager.fileDocument(doc.id, ctx.destinationFolderId).catch(() => null)
     }
+    if (doc) noticeDocReady('Created', label, p.title, doc.id)
     return { ok: true, message: doc ? `Created ${label} "${p.title}"` : `Could not create the ${label}.` }
   } catch (e) {
     return { ok: false, message: `Could not create the document: ${e instanceof Error ? e.message : String(e)}` }
@@ -590,6 +604,7 @@ async function applyGenerateDocument(
     await store.refresh()
     if (store.active?.id === docId) await store.open(docId)
     if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+    noticeDocReady('Filled', label, p.title || widget.title || 'Untitled', docId)
     return { ok: true, message: `Filled ${label.toLowerCase()} "${p.title || widget.title}" — recoverable in Version history` }
   }
 
@@ -612,6 +627,7 @@ async function applyGenerateDocument(
       await window.api.fileManager.fileDocument(docId, ctx.destinationFolderId).catch(() => null)
     }
     if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+    noticeDocReady('Created', label, p.title, docId)
     return { ok: true, message: `Created ${label.toLowerCase()} "${p.title}" in Files` }
   }
 
@@ -646,6 +662,7 @@ async function applyGenerateDocument(
     color: null
   })
   if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+  noticeDocReady('Created', label, p.title, docId)
   return { ok: true, message: `Created ${label.toLowerCase()} "${p.title}" on the desk` }
 }
 

@@ -2295,3 +2295,48 @@ league work, later in the day tomorrow" → 4 fantasy items starting 2:00 PM
 (window/spread/topic matrices, the operator's verbatim failing intent
 selecting nothing, honest-empty pins); six DEC-052/087 pins rewritten to
 the superseding truth with history; 3,396 green; both typechecks clean.
+
+## DEC-091 — Phase 3 of the demo-feedback plan: context fidelity
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Plan:** analysis/27 (#7 #11 #14)
+
+**(#7) A mark freezes the page it was made on.** `source_url` had been in the
+schema since DEC-052 and written by NOTHING (DEC-064 fixed the read side and
+noted it was write-only). Now both mark dispatchers — the widget bell and
+the right-click / highlight menu — freeze the browser widget's live URL
+onto the item at mark time (`browserMarkUrl`: only webview/browser kinds,
+only real http(s); a browser's `content` IS its current URL via
+persistNavUrl). The item then deep-links back: a queue-row action ("Open
+the source page") and a Source row in the item editor, both through
+`files:openExternal` — because the WIDGET may have browsed away since, and
+the frozen URL has not. This is the Slack-thread gap: mark a message view,
+and the item carries the exact page, not just the widget. Verified live on
+the 759 desk: the bell froze `sleeper.com/leagues/…/team` into the mark
+event; a scratch item's URL survived write→readback; queue + editor both
+rendered the link. (Follow-up noted, not built: "Open it here" could also
+re-navigate the widget to the frozen URL.)
+
+**(#14) Created documents announce themselves.** New house primitive: the
+NOTICE toast (stores/notice.ts + NoticeToast.tsx) — asserts a fact, offers
+a door, leaves. Deliberately not the UndoToast (reverses things) nor the
+CompletionToast (awaits a decision); bottom-right, steps above the
+completion offer when both are up, never takes focus. All four document
+success paths (create-blank, widget-fill, to-Files, desk-widget) raise
+"Created/Filled {kind} “{title}”" with Open → goDocument. A DEV-only drive
+seam (fb:dev-notice, the __plexiiProposeBlock precedent) makes it
+verifiable without a model call.
+
+**(#11) Mail: the recipient stop and the sent fact.** The first Send now
+ARMS: a strip states every recipient in full (to/cc/bcc) and the button
+becomes "Confirm send"; the second press sends. Editing ANY field disarms.
+Mail has no undo — the honest moment to catch a wrong address is before
+the wire. On success the dialog no longer just vanishes: the notice states
+"Sent to …" (with the cc/bcc count); failure says "nothing left your
+mailbox". The AI compose path was already draft-only (unchanged). Verified
+live without sending: arm → strip named probe@example.com + "Confirm
+send"; a focus-asserted edit disarmed both; Discard sent nothing. (The
+first disarm probe failed its focus assertion — the armed strip re-centres
+the modal and stale coordinates missed the field; the DEC-084 abort rule
+caught it, coordinates re-measured, verified clean.)
+
+13 new tests; 3,409 green; both typechecks clean. Renderer-only round (the
+preload change is type-level) — no restart was needed.

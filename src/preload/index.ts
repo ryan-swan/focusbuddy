@@ -1741,6 +1741,8 @@ const api = {
       wiUrgency?: string | null
       sourceRef?: string | null
       sourceType?: string | null
+      /** DEC-091 — the exact URL a browser-widget mark was made at. */
+      sourceUrl?: string | null
       confidence?: number | null
       approvalState?: string
       wiOrigin?: 'human' | 'ai' | 'system'

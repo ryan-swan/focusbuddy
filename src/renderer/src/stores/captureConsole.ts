@@ -13,6 +13,11 @@ export interface CaptureSource {
   sourceRef: string
   /** Pre-picked class from the preset table; the card can still flip it. */
   intentClass?: string
+  /** DEC-091 — the URL a browser widget was AT when the mark was made (the
+   *  Slack message view, the doc, the ticket). Stored on the item as
+   *  source_url so the queue can deep-link back to the exact page, not just
+   *  the widget — which may have navigated away since. */
+  sourceUrl?: string | null
   /** The desk the object lives on, so the item parents correctly. */
   deskId?: string | null
   deskTitle?: string | null

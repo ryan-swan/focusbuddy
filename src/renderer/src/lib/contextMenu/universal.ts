@@ -7,7 +7,7 @@
 import type { WidgetKind } from '@shared/types'
 import { MenuSection, type MenuContribution, type MenuContext } from './types'
 import { CREATE_AND_CONNECT_MENU } from '../createConnectedTool'
-import { presetForWidget, presetForMulti, presetForSelection } from '../attentionPresets'
+import { presetForWidget, presetForMulti, presetForSelection, browserMarkUrl } from '../attentionPresets'
 import { workItemsEnabled } from '../workItemsCapability'
 import {
   createWidget,
@@ -64,14 +64,23 @@ export function buildAttention(ctx: MenuContext): MenuContribution | null {
     intentClass: string,
     ref: string,
     type: string,
-    notes?: string
+    notes?: string,
+    sourceUrl?: string | null
   ): void => {
     window.dispatchEvent(
       new CustomEvent('fb:command-new-work-item', {
         detail: {
           captureText: text,
           notes,
-          source: { sourceType: type, sourceRef: ref, intentClass, deskId: ctx.taskId }
+          source: {
+            sourceType: type,
+            sourceRef: ref,
+            intentClass,
+            deskId: ctx.taskId,
+            // DEC-091 — a mark made ON a browser widget (incl. a highlighted
+            // Slack message) freezes the page URL onto the item.
+            sourceUrl: sourceUrl ?? null
+          }
         }
       })
     )
@@ -105,13 +114,14 @@ export function buildAttention(ctx: MenuContext): MenuContribution | null {
       // and the whole selection rides the notes, so nothing highlighted is
       // dropped. No selection = the widget-level preset, as before.
       const sel = ctx.selection?.text?.trim()
+      const url = browserMarkUrl(w.kind, w.content)
       if (sel) {
         const p = presetForSelection(w.kind, sel)
-        openMark(p.text, p.intentClass, w.id, 'widget', p.notes || undefined)
+        openMark(p.text, p.intentClass, w.id, 'widget', p.notes || undefined, url)
         return
       }
       const p = presetForWidget(w.kind, w.title ?? '', seedText(ctx))
-      openMark(p.text, p.intentClass, w.id, 'widget')
+      openMark(p.text, p.intentClass, w.id, 'widget', undefined, url)
     }
   }
 }

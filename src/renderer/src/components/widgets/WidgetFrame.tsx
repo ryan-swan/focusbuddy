@@ -37,7 +37,7 @@ import { useWorkItemStore } from '../../stores/workItems'
 import { useViewStore } from '../../stores/view'
 import { liveItemForWidget } from '../../lib/widgetAttention'
 import { workItemsEnabled } from '../../lib/workItemsCapability'
-import { presetForWidget } from '../../lib/attentionPresets'
+import { presetForWidget, browserMarkUrl } from '../../lib/attentionPresets'
 import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import CompleteCircle from '../attention/CompleteCircle'
@@ -179,7 +179,12 @@ export default function WidgetFrame({
             sourceType: 'widget',
             sourceRef: widget.id,
             intentClass: p.intentClass,
-            deskId: widget.taskId
+            deskId: widget.taskId,
+            // DEC-091 — a browser widget's content IS its current URL
+            // (persistNavUrl); freeze it on the item so the queue can return
+            // to the exact page (the Slack thread, the ticket) even after
+            // the widget browses elsewhere.
+            sourceUrl: browserMarkUrl(widget.kind, widget.content)
           }
         }
       })
