@@ -36,6 +36,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.2.2',
+    date: '2026-09-01T18:00:00Z',
+    title: 'PlexiDesk 4.2.2 \u2014 long tables and code blocks respect the page',
+    tag: 'fix',
+    summary:
+      'A table or code block longer than a page used to run straight off the sheet \u2014 through the bottom margin, across the gap and over the pages below \u2014 which is what you saw when a long piece of pasted markdown landed in a document. Both now break properly: a table continues at the next row on the following page, and a code block continues at the next line. Tables can also repeat their header row on every page, so a long table keeps its column headings; right-click the table and turn it on, and the setting stays with the document and carries through to Word. An image taller than the page now fits the page instead of overflowing it.',
+    highlights: [
+      'A table longer than a page continues on the next page instead of running off the sheet.',
+      'A long code block breaks across pages the same way.',
+      'Right-click a table to repeat its header row on every page \u2014 it stays with the document and exports to Word.',
+      'An image taller than the page is fitted to it rather than overflowing.'
+    ]
+  },
+  {
+    version: '4.2.1',
+    date: '2026-09-01T14:00:00Z',
+    title: 'PlexiDesk 4.2.1 \u2014 the mail list follows your selection',
+    tag: 'fix',
+    summary:
+      'Moving through your inbox with j and k now scrolls the mail list to follow you. The conversations at the top could end up hidden above the fold, tucked under the header bar, with the reading pane showing a message whose row was nowhere on screen. PlexiOffice is also signed and notarised by Apple now, the same as PlexiDesk, so it opens without a security warning \u2014 the one update that moves you onto a signed build may need a manual reinstall.',
+    highlights: [
+      'j and k scroll the mail list so the highlighted conversation stays in view.',
+      'The newest messages no longer sit hidden above the fold, underneath the header bar.',
+      'PlexiOffice is signed and notarised by Apple, so it opens without a security warning.'
+    ]
+  },
+  {
     version: '4.2.0',
     date: '2026-09-01T12:00:00Z',
     title: 'PlexiDesk 4.2.0 — Attention: everything you owe, in one place',

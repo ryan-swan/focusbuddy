@@ -461,6 +461,53 @@ export default function DocEditor({
     }
   }
 
+  // ── Table right-click menu ────────────────────────────────────────────────
+  // Tables are the one block with a per-table page-layout choice (repeat the
+  // header row on continuation pages), and a right-click on the table itself is
+  // where Word and Docs put it. Kept local to the editor DOM so it never fires
+  // over the rest of the app chrome.
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number; pos: number; on: boolean } | null>(null)
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom as HTMLElement
+    const onCtx = (e: MouseEvent): void => {
+      const found = editor.view.posAtCoords({ left: e.clientX, top: e.clientY })
+      if (!found) return
+      const $pos = editor.state.doc.resolve(found.pos)
+      for (let d = $pos.depth; d > 0; d--) {
+        if ($pos.node(d).type.name === 'table') {
+          e.preventDefault()
+          setTableMenu({
+            x: e.clientX,
+            y: e.clientY,
+            pos: $pos.before(d),
+            on: $pos.node(d).attrs.headerRepeat === true
+          })
+          return
+        }
+      }
+    }
+    dom.addEventListener('contextmenu', onCtx)
+    return () => dom.removeEventListener('contextmenu', onCtx)
+  }, [editor])
+  function toggleHeaderRepeat(): void {
+    if (!editor || !tableMenu) return
+    const { pos } = tableMenu
+    editor
+      .chain()
+      .focus()
+      .command(({ tr, dispatch }) => {
+        const node = tr.doc.nodeAt(pos)
+        if (!node || node.type.name !== 'table') return false
+        if (dispatch) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, headerRepeat: !node.attrs.headerRepeat })
+        }
+        return true
+      })
+      .run()
+    setTableMenu(null)
+  }
+
   if (!editor) return <div />
 
   // Continuous flow keeps its comfortable reading measure; page view hands the
@@ -474,6 +521,26 @@ export default function DocEditor({
 
   return (
     <div className={`relative flex h-full ${scopeClass} ${focusMode ? 'fb-focus-mode' : ''}`}>
+      {tableMenu && (
+        <>
+          {/* Click-away closes without changing anything. */}
+          <div className="fixed inset-0 z-[80]" onMouseDown={() => setTableMenu(null)} />
+          <div
+            data-testid="doc-table-menu"
+            className="fixed z-[81] min-w-[232px] rounded-[var(--radius-row)] fb-glass-panel py-1 fb-t-label"
+            style={{ left: tableMenu.x, top: tableMenu.y }}
+          >
+            <button
+              data-testid="doc-table-header-repeat"
+              onClick={toggleHeaderRepeat}
+              className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)] text-[var(--ink-90)] fb-press flex items-center gap-2"
+            >
+              <Icon name={tableMenu.on ? 'check_box' : 'check_box_outline_blank'} size={15} />
+              Repeat header row on every page
+            </button>
+          </div>
+        </>
+      )}
       {/* Named heading styles: one rule per configured level, scoped to this editor. */}
       <style dangerouslySetInnerHTML={{ __html: headingCss(scopeClass, headingStyles) }} />
       <style dangerouslySetInnerHTML={{ __html: FOCUS_CSS }} />
@@ -1226,6 +1293,27 @@ function PageSheet({
           floor lets a wide child (a long code line, a big table) stretch the whole
           page past the paper edge, dragging the margins and sheet backgrounds with
           it. Pinned here, wide content is instead contained by overflowCss above. */}
+      {/* An image or figure cannot be split across a page, so pagination moves it
+          whole — and one taller than the content band had nowhere to go but
+          through the bottom margin and the sheets below. Capping it to the band
+          makes an oversized image fit the page it lands on instead, which is what
+          Word and Docs do. Scoped to page view: continuous flow has no band to
+          fit, and `width:auto` keeps the aspect ratio while overflowCss's
+          `max-width:100%` still holds the column.
+
+          The 6em allowance is the image's own BLOCK chrome. The node view wraps
+          the image in a block that carries the prose margins, so an image capped
+          at exactly the band still produced a block taller than the band (864px
+          of image inside a 931px block) — and because such an image is the first
+          thing on its page, pagination rightly refuses to push it: the next page
+          would be just as short. Expressed in em because those margins are
+          em-based, so the allowance tracks the type size instead of assuming
+          one. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `[data-testid="doc-page"] .ProseMirror :is(img, figure) { max-height: calc(${usable}px - 6em); width: auto; object-fit: contain; }`
+        }}
+      />
       <div className="relative" data-testid="doc-page" data-orientation={page.orientation} data-pages={pageCount} style={{ width: geom.w, minWidth: 0, maxWidth: geom.w, flexShrink: 0, minHeight: totalH }}>
         {/* One white sheet per page, each the real paper height, stacked with the
             gap between them so the grey canvas shows through as a true page split. */}

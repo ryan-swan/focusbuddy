@@ -2,6 +2,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorView } from '@tiptap/pm/view'
+import type { Node as PMNode } from '@tiptap/pm/model'
 
 // True page pagination for the document editor's Page view. It measures the laid-
 // out blocks and inserts a transparent spacer widget before each block that would
@@ -35,6 +36,58 @@ export function setPaginationConfig(next: Partial<PagCfg>): void {
 
 export const paginationKey = new PluginKey<DecorationSet>('pagePagination')
 
+/**
+ * A spacer that is valid INSIDE a table. A <div> between rows is not: the browser
+ * will not lay it out as a block in a <tbody>, so a table break has to be a real
+ * row whose single cell carries the height.
+ */
+function rowSpacerDom(px: number, cols: number): HTMLElement {
+  const tr = document.createElement('tr')
+  tr.className = 'fb-page-spacer'
+  tr.style.height = `${px}px`
+  tr.setAttribute('contenteditable', 'false')
+  tr.setAttribute('aria-hidden', 'true')
+  const td = document.createElement('td')
+  td.colSpan = Math.max(1, cols)
+  td.style.height = `${px}px`
+  td.style.padding = '0'
+  td.style.border = '0'
+  td.style.background = 'transparent'
+  tr.appendChild(td)
+  return tr
+}
+
+/** Widest row's cell count, so a spacer row spans the whole table. */
+function countColumns(table: PMNode): number {
+  let cols = 1
+  table.forEach((row) => {
+    let n = 0
+    row.forEach((cell) => {
+      n += (cell.attrs.colspan as number) || 1
+    })
+    if (n > cols) cols = n
+  })
+  return cols
+}
+
+/**
+ * An inert clone of the table's header row, drawn at the top of a continuation
+ * page when the table opts in. Cloned from the live DOM so it inherits the
+ * table's real column widths and cell styling — a hand-built row would drift
+ * from the original the moment a column is resized.
+ */
+function repeatHeaderDom(headerDom: HTMLElement): HTMLElement {
+  const tr = headerDom.cloneNode(true) as HTMLElement
+  tr.className = `${tr.className} fb-repeat-header`.trim()
+  tr.setAttribute('contenteditable', 'false')
+  tr.setAttribute('aria-hidden', 'true')
+  // A clone is a copy of content that already exists in the document; it must
+  // never be selectable or land in the copy buffer as a duplicate row.
+  tr.style.userSelect = 'none'
+  tr.style.pointerEvents = 'none'
+  return tr
+}
+
 function spacerDom(px: number): HTMLElement {
   const el = document.createElement('div')
   el.className = 'fb-page-spacer'
@@ -66,12 +119,22 @@ interface LineBox {
 // box so they move whole, overflowing only if taller than a page.
 function lineBoxesOf(dom: HTMLElement): LineBox[] {
   const tag = dom.tagName
+  // PRE is deliberately NOT atomic. A pasted code fence is routinely taller than
+  // a sheet, and an atomic block "overflows only if taller than a page" means it
+  // paints straight through the bottom margin, the gap and the sheets below
+  // (measured: a 90-line fence ran 1085px past its page band). Code lines are
+  // real lines, so they break like prose — the reader gets the rest of the
+  // listing on the next page instead of a block that ignores the paper.
+  //
+  // TABLE stays out of this list too, but for a different reason: it breaks at
+  // ROW boundaries, handled in computeDecorations where the row positions are
+  // known. Anything that genuinely cannot be split — an image, a figure, a rule
+  // — remains atomic and moves whole.
   const atomic =
     tag === 'TABLE' ||
     tag === 'IMG' ||
     tag === 'HR' ||
     tag === 'FIGURE' ||
-    tag === 'PRE' ||
     dom.classList.contains('tableWrapper') ||
     !!dom.querySelector('table, img')
   if (atomic) {
@@ -140,8 +203,12 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
   const doc = view.state.doc
 
   const contentTop = (view.dom as HTMLElement).getBoundingClientRect().top
+  // Repeated headers are inserted height exactly like spacers are, so they must
+  // be subtracted when recovering a line's natural (un-paginated) position —
+  // otherwise every break after the first drifts and the measure loop never
+  // settles.
   const spacerRects = Array.from(
-    (view.dom as HTMLElement).querySelectorAll('.fb-page-spacer')
+    (view.dom as HTMLElement).querySelectorAll('.fb-page-spacer, .fb-repeat-header')
   ).map((el) => {
     const r = (el as HTMLElement).getBoundingClientRect()
     return { top: r.top, h: r.height }
@@ -162,9 +229,83 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
     pageTop = nTop
   }
 
-  doc.forEach((_node, offset) => {
+  doc.forEach((node, offset) => {
     const dom = view.nodeDOM(offset)
     if (!(dom instanceof HTMLElement) || typeof dom.getBoundingClientRect !== 'function') return
+
+    // A table breaks between ROWS. Treating it as one atom meant a table taller
+    // than a sheet painted straight through the bottom margin, the gap and the
+    // sheets below (measured: 3781px past its band). Rows are the only place a
+    // table can be cut without mangling it, and unlike a text line the row's
+    // document position is known exactly, so the spacer goes between rows
+    // instead of inside a cell.
+    if (node.type.name === 'table') {
+      const cols = countColumns(node)
+      // Opt-in per table, set from the table's right-click menu. Only meaningful
+      // when the first row is actually a header row.
+      const first = node.firstChild
+      const hasHeader = !!first && first.childCount > 0 && first.child(0).type.name === 'tableHeader'
+      const repeatHeader = node.attrs.headerRepeat === true && hasHeader
+      const headerDom = repeatHeader
+        ? (view.nodeDOM(offset + 1) as HTMLElement | null)
+        : null
+      let rowPos = offset + 1
+      let firstOnPage = true
+      // A repeated header eats the top of every continuation page, so those pages
+      // hold less. Without this the rows are measured against a full-height band
+      // they no longer have, and the shortfall compounds: each page starts one
+      // header lower than the last.
+      let bandLoss = 0
+      node.forEach((row) => {
+        const rowDom = view.nodeDOM(rowPos)
+        if (rowDom instanceof HTMLElement) {
+          const r = rowDom.getBoundingClientRect()
+          const above = spacerAbove(r.top)
+          const nTop = r.top - contentTop - above
+          const nBottom = r.bottom - contentTop - above
+          if (nBottom > pageTop + pageContentPx - bandLoss + 0.5 && nTop > pageTop + 0.5 && !firstOnPage) {
+            // The spacer's job is unchanged by the repeat: it must still carry
+            // the break all the way TO the next page's content top. The repeated
+            // header then occupies the first band of that page and the data rows
+            // follow it. Subtracting the header height here put the header one
+            // header-height ABOVE the band — drawn in the top margin.
+            // Its added height is already accounted for, because
+            // .fb-repeat-header is counted alongside spacers in spacerAbove.
+            const px = Math.max(
+              0,
+              Math.round(pageTop + pageContentPx - bandLoss - nTop + mBottom + gapPx + mTop)
+            )
+            decos.push(
+              // side -2 so the spacer is drawn BEFORE the repeated header at the
+              // same position. Reversed, the header lands at the foot of the
+              // page being left rather than the top of the one being started.
+              Decoration.widget(rowPos, () => rowSpacerDom(px, cols), {
+                side: -2,
+                key: `pb-row-${rowPos}-${px}`
+              })
+            )
+            if (repeatHeader && headerDom) {
+              const hd = headerDom
+              decos.push(
+                Decoration.widget(rowPos, () => repeatHeaderDom(hd), {
+                  side: -1,
+                  key: `pb-hdr-${rowPos}`
+                })
+              )
+            }
+            parts.push(`row${rowPos}:${px}${repeatHeader ? '+h' : ''}`)
+            pageTop = nTop
+            if (repeatHeader && headerDom) bandLoss = Math.round(headerDom.getBoundingClientRect().height)
+            firstOnPage = true
+          } else {
+            firstOnPage = false
+          }
+        }
+        rowPos += row.nodeSize
+      })
+      return
+    }
+
     const lines = lineBoxesOf(dom)
     for (let i = 0; i < lines.length; i++) {
       const ln = lines[i]
