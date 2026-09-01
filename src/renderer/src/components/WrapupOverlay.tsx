@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon'
 import ProposalCards from './ProposalCards'
-import MeetingCommitmentsCard from './MeetingCommitmentsCard'
+import MeetingCommitmentsCard, { CarriedFromLastTime } from './MeetingCommitmentsCard'
 import { useWrapupStore } from '../stores/wrapup'
 import { useNodeStore } from '../stores/nodes'
 import type { AppliedProposal } from '@shared/types'
@@ -15,6 +15,7 @@ import type { FileEntry } from '@shared/fields'
 
 export default function WrapupOverlay(): JSX.Element | null {
   const status = useWrapupStore((s) => s.status)
+  const carried = useWrapupStore((s) => s.carried)
   const title = useWrapupStore((s) => s.title)
   const step = useWrapupStore((s) => s.step)
   const summary = useWrapupStore((s) => s.summary)
@@ -103,6 +104,13 @@ export default function WrapupOverlay(): JSX.Element | null {
 
           {status === 'review' && (
             <>
+              {/* M5 (P5) — what last time left open leads even the confirm
+                  stop: the room's first question is "did we move?". */}
+              {carried.length > 0 && (
+                <section className="mb-2">
+                  <CarriedFromLastTime items={carried} />
+                </section>
+              )}
               {/* M3 (§3.6) — the confirm stop leads the review: it is the
                   screen that makes something happen after. */}
               {meetingId && commitments.length > 0 && !commitmentsFiled && (

@@ -215,6 +215,14 @@ widget on the meeting desk) rides with M3's sourceUrl anchors.
   moves to its own round.
 
 ### M5 — Prep + series  *(spec P5, Q12)*
+
+> **STATUS 2026-09-01: DONE — DEC-104. M5 COMPLETE.** series_id/block_id on
+> the meeting record (stamped from the calendar origin); prep = pure
+> database facts (previous instance, carried, attendee items, agenda) in
+> the Stage's PREP pane; "Carried from last time" atop the wrap-up review
+> AND the Record, with a Done verb; Q14 per-series brief knob wired
+> (default on, toggle on the meeting, wrap-up asks). Briefs for others +
+> external-calendar series matching stay deferred by name.
 - Staging assembles: attendees + last-discussed, open work_items
   mentioning them, agenda from booking, unresolved commitments from the
   previous instance (`seriesId`).

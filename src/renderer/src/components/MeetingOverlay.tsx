@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
 import { useMeetingRoomStore, type DockSide } from '../stores/meetingRoom'
 import { consentSummary } from '../lib/meetingConsent'
+import { getMeetingOrigin } from '../lib/startMeeting'
+import type { MeetingPrep } from '@shared/meetings'
 import { useAccountStore } from '../stores/account'
 import { useVideoBlocked, CAMERA_BLOCKED_HINT } from '../lib/useVideoBlocked'
 import { usePresenceStore } from '../stores/presence'
@@ -179,6 +181,34 @@ export default function MeetingOverlay(): JSX.Element | null {
     const el = liveScrollRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [liveLines])
+
+  // M5 (P5) — staging: when the room came from a booked calendar block, the
+  // Stage assembles prep from database facts — the agenda, the previous
+  // instance's still-open items, and each attendee's open items. Fetched
+  // once per room; an ad-hoc meeting has no origin block and shows nothing.
+  const [prep, setPrep] = useState<MeetingPrep | null>(null)
+  const [prepOpen, setPrepOpen] = useState(true)
+  useEffect(() => {
+    if (status !== 'in') {
+      setPrep(null)
+      return
+    }
+    const origin = getMeetingOrigin()
+    if (origin?.kind !== 'calendar') return
+    if (!origin.seriesId && !origin.agenda && !origin.invitees?.length) return
+    if (typeof window.api.meetings.prep !== 'function') return
+    let alive = true
+    void window.api.meetings
+      .prep({ seriesId: origin.seriesId ?? null, invitees: origin.invitees ?? [], agenda: origin.agenda ?? null })
+      .then((data) => {
+        if (!alive) return
+        if (data.agenda || data.carried.length || data.attendees.length) setPrep(data)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [status])
 
   // Active screen shares to present: my own (when sharing) plus any peer who is
   // presenting. These render whole (object-contain), separate from camera tiles.
@@ -394,6 +424,49 @@ export default function MeetingOverlay(): JSX.Element | null {
           <span className="text-[10.5px] text-amber-300/90" data-testid="moment-count">⚑ {moments.length}</span>
         )}
       </div>
+      {prep && (
+        <div className="border-b border-white/10" data-testid="meeting-prep">
+          <button
+            onClick={() => setPrepOpen((v) => !v)}
+            className="w-full px-3 py-1.5 flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wider text-white/50 hover:text-white/80"
+            data-testid="meeting-prep-toggle"
+          >
+            <Icon name={prepOpen ? 'expand_more' : 'chevron_right'} size={13} />
+            PREP
+          </button>
+          {prepOpen && (
+            <div className="px-3 pb-2 max-h-[180px] overflow-y-auto space-y-2">
+              {prep.agenda && (
+                <div className="text-[11.5px] text-white/70 leading-snug" data-testid="prep-agenda">
+                  <span className="text-white/40">To settle:</span> {prep.agenda}
+                </div>
+              )}
+              {prep.carried.length > 0 && (
+                <div data-testid="prep-carried">
+                  <div className="text-[10px] text-white/40 mb-0.5">
+                    Carried from {prep.lastMeeting?.title || 'last time'} — still open
+                  </div>
+                  {prep.carried.slice(0, 6).map((it) => (
+                    <div key={it.id} className="text-[11.5px] text-white/70 leading-snug truncate">
+                      · {it.title}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {prep.attendees.map((a) => (
+                <div key={a.invitee} data-testid="prep-attendee">
+                  <div className="text-[10px] text-white/40 mb-0.5">Open with {a.invitee}</div>
+                  {a.items.slice(0, 3).map((it) => (
+                    <div key={it.id} className="text-[11.5px] text-white/70 leading-snug truncate">
+                      · {it.title}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}

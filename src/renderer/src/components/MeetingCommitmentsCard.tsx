@@ -6,6 +6,7 @@ import { useWorkItemStore } from '../stores/workItems'
 import { useActionHistory } from '../stores/actionHistory'
 import { useNoticeStore } from '../stores/notice'
 import { serializeMentions } from '../lib/itemMentions'
+import type { CarriedItem } from '@shared/meetings'
 
 // M3 (SPEC-003 §3.6) — the confirm stop for extracted commitments. This is
 // the screen that answers "nothing happens after": nothing files silently
@@ -19,6 +20,72 @@ import { serializeMentions } from '../lib/itemMentions'
 //   - everything stays on the meeting's desk; Attention holds references.
 // Enter files the checked set; one batch, one undo (R008 — dismissal, not
 // deletion, is the reverse).
+
+// M5 (SPEC-003 P5) — "Carried from last time": the previous instance's
+// still-open items, atop the commitments. Database facts, not extraction —
+// nothing here was guessed, so nothing needs a confirm stop. The one verb is
+// Done: a carried item resolved in the room gets closed right here.
+export function CarriedFromLastTime({
+  items,
+  lastTitle,
+  lastAt
+}: {
+  items: CarriedItem[]
+  lastTitle?: string
+  lastAt?: number
+}): JSX.Element | null {
+  const setItemState = useWorkItemStore((s) => s.setState)
+  const [doneIds, setDoneIds] = useState<Record<string, boolean>>({})
+  if (items.length === 0) return null
+  const when = lastAt
+    ? new Date(lastAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : null
+  return (
+    <div className="mb-3" data-testid="carried-from-last-time">
+      <div className="text-[10.5px] font-semibold tracking-wider text-[var(--ink-40)] mb-1.5">
+        CARRIED FROM LAST TIME
+        {when && <span className="ml-1.5 font-normal normal-case tracking-normal">· {lastTitle || 'previous meeting'}, {when}</span>}
+      </div>
+      {items.map((it) => (
+        <div
+          key={it.id}
+          className="group flex items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-[var(--surface-sunken)]"
+          data-testid={`carried-${it.id}`}
+        >
+          <span className="text-[12.5px] text-[var(--ink-90)] flex-1 min-w-0 truncate">
+            {doneIds[it.id] ? <s className="text-[var(--ink-50)]">{it.title}</s> : it.title}
+          </span>
+          {it.dueAt && !doneIds[it.id] && (
+            <span className="text-[10.5px] text-[var(--ink-50)] fb-tabular shrink-0">
+              due {new Date(it.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+          {!doneIds[it.id] && (
+            <button
+              onClick={() => {
+                setDoneIds((d) => ({ ...d, [it.id]: true }))
+                // 'completed' is the house terminal state (WORK_ITEM_STATES —
+                // there is no 'done'), and setState REJECTS an unknown state
+                // by resolving false, not throwing: both paths must un-strike
+                // the row or the UI claims a completion the store refused.
+                void setItemState(it.id, 'completed')
+                  .then((ok) => {
+                    if (!ok) setDoneIds((d) => ({ ...d, [it.id]: false }))
+                  })
+                  .catch(() => setDoneIds((d) => ({ ...d, [it.id]: false })))
+              }}
+              className="hidden group-hover:inline-flex text-[10.5px] text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press shrink-0"
+              data-testid={`carried-done-${it.id}`}
+              title="Resolved in this meeting — mark it done"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function MeetingCommitmentsCard({
   commitments,

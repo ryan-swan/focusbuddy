@@ -2895,3 +2895,59 @@ both typechecks clean. One M1 pin rewritten to the pane's new truth (the
 static "arrives after the call" note became three honest branches). **M4
 is complete** — M5 (Prep + series) next on the operator's go; MCP is a
 named follow-up round.
+
+## DEC-104 — M5: Prep + series — the meeting remembers
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+P5, Q12/Q14) · **Branch:** ryan-next
+
+**Series identity is a column, not a guess.** fb_meetings gained series_id
+and block_id, stamped at wrap-up from the calendar origin (the Join button
+on a booked block now sends blockId, seriesId, agenda and invitees along).
+From there, everything M5 promises is an INDEXED LOOKUP: the previous
+instance is the latest sibling row, and "carried from last time" is the
+still-ACTIVE work_items that instance filed — M3's own output, read back.
+External-calendar series matching stayed deferred by plan: title-matching
+would fake a memory the store does not have.
+
+**The staging (P5).** meetings:prep assembles pure database facts — agenda
+from the booking, the previous instance, its still-open items, and each
+attendee's open items (invitee email matched humbly against mention names;
+a miss is a quiet miss). No model call builds prep. It renders in the
+Stage's notes pane as a collapsible PREP section the moment a room joined
+from a booked block opens: what to settle, what last time left open, what
+is open with each person in the room.
+
+**"Carried from last time" leads both ends (the crown jewel).** Atop the
+wrap-up review — before even the confirm stop, because the room's first
+question is "did we move?" — and atop the Record's Commitments view, with
+the previous meeting named and dated. The one verb is Done: a carried item
+resolved in the room is closed right there (house terminal state
+'completed', one hover button).
+
+**Q14, wired honestly.** meeting-series-prefs.json (the retention-pref
+precedent) holds one knob per series: whether the wrap-up mints the host's
+To Know brief. Default ON; the toggle lives on the series meeting itself
+("Brief me after each meeting in this series"); the wrap-up asks before
+minting. Briefs FOR OTHER ATTENDEES remain a named follow-up — they need
+an out-of-room delivery channel (the meetingSignal relay dies with the
+room, and the wrap-up finishes after everyone has left).
+
+**Live verification caught a real bug.** The Done button first shipped
+calling setState(id, 'done') — but the house terminal state is
+'completed', and setWorkItemState REJECTS an unknown state by resolving
+FALSE without throwing: the strikethrough stood over an item still open, a
+false completion the catch-only handler could never see. Fixed ('completed',
+and a false return now un-strikes the row) and pinned. The rest held
+first try: series stamped through create; prep returned the previous
+instance, the carried item, the Dana-by-email-local-part attendee match
+(ghost invitee quietly missed) and the agenda; prefs defaulted on, turned
+off, persisted off, and the detail's toggle rendered that persisted state;
+CARRIED FROM LAST TIME rendered named and dated atop the Record. Scratch
+data cleaned. Not driven live: the Stage PREP pane inside a real joined
+room (origin-driven; pinned + the assembly proven by the same IPC the pane
+calls) — it rides the operator's two-machine QA.
+
+15 new tests (m5PrepSeries: real-SQLite prep queries, prefs, pins);
+3,582 green across 329 files; both typechecks clean. **M5 is complete** —
+M6 (Guest Capture) starts with the G1 ScreenCaptureKit spike, on the
+operator's go.

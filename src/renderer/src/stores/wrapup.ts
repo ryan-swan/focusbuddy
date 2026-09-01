@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { ActionProposal } from '@shared/types'
 import { useMeetingsStore } from './meetings'
 import { getMeetingOrigin, clearMeetingOrigin } from '../lib/startMeeting'
+import type { CarriedItem } from '@shared/meetings'
 import { ensureMeetingFolder, saveTranscriptDoc, saveMeetingNotesDoc } from '../lib/meetingWrapup'
 import { transcribeRecording } from '../lib/transcribeRecording'
 import { mergeTrackSegments, formatAttributedTranscript } from '../lib/transcriptMerge'
@@ -37,6 +38,10 @@ interface WrapupState {
   // DEC-079 — the Meeting record this wrap-up produced, so approved
   // deliverables can POINT back at it (sourceType 'meeting').
   meetingId: string | null
+  /** M5 — still-open items from the PREVIOUS instance of this series
+   *  ("carried from last time"), shown atop the commitments card. Database
+   *  facts, fetched once the meeting record exists with its seriesId. */
+  carried: CarriedItem[]
   /** M3 — extracted commitments awaiting the confirm stop. Never filed
    *  silently (S3-DEC-023): the review screen is the only door. */
   commitments: ValidatedCommitment[]
@@ -76,9 +81,10 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   transcriptDocId: null,
   meetingId: null,
   commitments: [],
+  carried: [],
 
   begin: async ({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, moments }) => {
-    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [] })
+    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [], carried: [] })
     // M1 — the notes are the user's words and must survive REGARDLESS of how
     // transcription goes: saved first, not gated on the pipeline succeeding.
     if ((notes && notes.trim()) || (moments && moments.length)) {
@@ -97,7 +103,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
     }
   },
 
-  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [] })
+  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [], carried: [] })
 }))
 
 // The wrap-up pipeline, extracted so `begin` can wrap the whole thing in one
@@ -228,7 +234,11 @@ async function runWrapup(
       transcript,
       summary,
       actionItems: proposals.filter((p) => p.kind === 'create-task').map((p) => ('title' in p ? p.title : '')),
-      durationSec
+      durationSec,
+      // M5 — series identity rides the calendar origin onto the record;
+      // "carried from last time" is an indexed lookup from here on.
+      seriesId: origin?.kind === 'calendar' ? (origin.seriesId ?? null) : null,
+      blockId: origin?.kind === 'calendar' ? (origin.blockId ?? null) : null
     })
     .catch(() => null)
 
@@ -299,11 +309,29 @@ async function runWrapup(
     if (ex.ok) commitments = validateCommitments(ex.commitments, savedSegments, selfId)
   }
 
+  // M5 — carried from last time: the previous instance's still-open items,
+  // for the section atop the commitments card. Best-effort database facts.
+  let carried: CarriedItem[] = []
+  if (meeting?.seriesId && typeof window.api.meetings.prep === 'function') {
+    carried = await window.api.meetings
+      .prep({ seriesId: meeting.seriesId, excludeMeetingId: meeting.id })
+      .then((prep) => prep.carried)
+      .catch(() => [])
+  }
+
   // M3 (Q14, host-only default) — the meeting authors ONE To Know item:
   // machine-authored, DEC-014-exempt, the Attendant's own channel. "Here's
-  // what happened; you don't need to do anything." Per-series opt-in for
-  // OTHERS arrives with M5's series object.
-  if (meeting?.id && forceLocalTranscription && summary.trim()) {
+  // what happened; you don't need to do anything." M5 wired Q14's per-series
+  // knob: a series whose briefs are noise can turn them off, and the wrap-up
+  // asks before minting. Briefs for OTHER attendees remain a named follow-up
+  // (they need an out-of-room delivery channel).
+  const briefsWanted = !meeting?.seriesId
+    ? true
+    : await window.api.meetings
+        .getSeriesPrefs(meeting.seriesId)
+        .then((p) => p.briefs)
+        .catch(() => true)
+  if (meeting?.id && forceLocalTranscription && summary.trim() && briefsWanted) {
     await window.api.workItems
       .create({
         title: `Meeting brief — ${title || 'Meeting'}`,
@@ -373,5 +401,5 @@ async function runWrapup(
   // commitments, the overlapping create-task proposals leave the cards so
   // one obligation is never offered through two doors.
   const cardProposals = commitments.length ? proposals.filter((p) => p.kind !== 'create-task') : proposals
-  set({ status: 'review', summary, proposals: cardProposals, commitments, meetingId: meeting?.id ?? null })
+  set({ status: 'review', summary, proposals: cardProposals, commitments, carried, meetingId: meeting?.id ?? null })
 }

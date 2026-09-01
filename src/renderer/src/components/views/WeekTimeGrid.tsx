@@ -867,7 +867,13 @@ export default function WeekTimeGrid({
                               // room is the fallback, not the destination.
                               const ext = block.meeting?.joinUrl
                               if (ext) void window.api.files.openExternal(ext)
-                              else void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
+                              else
+                                void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting', {
+                                  blockId: block.id,
+                                  seriesId: block.seriesId ?? null,
+                                  agenda: block.meeting!.agenda ?? null,
+                                  invitees: block.meeting!.invitees
+                                })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                             className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"

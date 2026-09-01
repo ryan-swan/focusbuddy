@@ -93,7 +93,7 @@ interface DocCommentDto {
   resolved: boolean
   createdAt: number
 }
-import type { Meeting, MeetingDraft, MeetingPatch, TranscriptSearchHit, TranscriptSegment, TranscriptSegmentDraft } from '@shared/meetings'
+import type { Meeting, MeetingDraft, MeetingPatch, MeetingPrep, TranscriptSearchHit, TranscriptSegment, TranscriptSegmentDraft } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 import type { PlexiSignRequest, PlexiSignDraft, PlexiSignPatch, SignAction } from '@shared/sign'
@@ -1636,6 +1636,17 @@ const api = {
     /** M4 — Recall: search every meeting's transcript at segment level. */
     searchSegments: (query: string, limit?: number): Promise<TranscriptSearchHit[]> =>
       ipcRenderer.invoke('meetings:searchSegments', query, limit),
+    /** M5 — prep: previous instance, carried items, attendee items, agenda. */
+    prep: (input: {
+      seriesId?: string | null
+      excludeMeetingId?: string
+      invitees?: string[]
+      agenda?: string | null
+    }): Promise<MeetingPrep> => ipcRenderer.invoke('meetings:prep', input),
+    getSeriesPrefs: (seriesId: string): Promise<{ briefs: boolean }> =>
+      ipcRenderer.invoke('meetings:getSeriesPrefs', seriesId),
+    setSeriesPrefs: (seriesId: string, patch: { briefs?: boolean }): Promise<{ briefs: boolean }> =>
+      ipcRenderer.invoke('meetings:setSeriesPrefs', seriesId, patch),
     /** M2c — audio retention (CR-13) + export. */
     saveAudioTakes: (
       meetingId: string,

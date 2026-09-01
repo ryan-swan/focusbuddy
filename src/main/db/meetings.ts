@@ -17,6 +17,8 @@ interface MeetingRow {
   duration_sec: number | null
   record_json: string | null
   desk_node_id: string | null
+  series_id: string | null
+  block_id: string | null
   created_at: number
   updated_at: number
 }
@@ -44,6 +46,8 @@ function rowToMeeting(row: MeetingRow): Meeting {
   return {
     record: parseRecord(row.record_json),
     deskNodeId: row.desk_node_id ?? null,
+    seriesId: row.series_id ?? null,
+    blockId: row.block_id ?? null,
     id: row.id,
     title: row.title,
     transcript: row.transcript,
@@ -72,8 +76,8 @@ export function createMeeting(draft: MeetingDraft): Meeting {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_meetings (id, title, transcript, summary, action_items_json, duration_sec, created_at, updated_at, org_id)
-     VALUES (@id, @title, @transcript, @summary, @items, @duration, @now, @now, @orgId)`
+    `INSERT INTO fb_meetings (id, title, transcript, summary, action_items_json, duration_sec, series_id, block_id, created_at, updated_at, org_id)
+     VALUES (@id, @title, @transcript, @summary, @items, @duration, @seriesId, @blockId, @now, @now, @orgId)`
   ).run({
     id,
     title: draft.title ?? 'Untitled meeting',
@@ -81,6 +85,8 @@ export function createMeeting(draft: MeetingDraft): Meeting {
     summary: draft.summary ?? '',
     items: JSON.stringify(draft.actionItems ?? []),
     duration: draft.durationSec ?? null,
+    seriesId: draft.seriesId ?? null,
+    blockId: draft.blockId ?? null,
     now,
     orgId: getActiveOrgId()
   })

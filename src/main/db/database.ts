@@ -1240,6 +1240,12 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_meetings', 'record_json', 'TEXT')
   // M2c (S3-DEC-020) — the meeting's desk node, when one was minted.
   ensureColumn(db, 'fb_meetings', 'desk_node_id', 'TEXT')
+  // M5 (SPEC-003 P5) — series identity: a meeting born from a booked calendar
+  // block remembers its block and its series, which is what makes "carried
+  // from last time" a cheap indexed lookup instead of a title-match guess.
+  ensureColumn(db, 'fb_meetings', 'series_id', 'TEXT')
+  ensureColumn(db, 'fb_meetings', 'block_id', 'TEXT')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_meetings_series ON fb_meetings(series_id, created_at)')
   ensureColumn(db, 'fb_sign_requests', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_smart_folders', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   // Semantic-search vectors and the activity / focus / browsing logs are scoped

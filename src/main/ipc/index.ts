@@ -115,6 +115,7 @@ import {
   type RetentionMode
 } from '../meetingAudio'
 import { ensureSegmentRecall, searchMeetingSegments } from '../segmentRecall'
+import { buildMeetingPrep, getSeriesPrefs, setSeriesPrefs } from '../meetingPrep'
 import { exportMeeting } from '../meetingExport'
 import type { TranscriptSegmentDraft } from '@shared/meetings'
 import { extractPeople } from '../ai/peopleExtract'
@@ -2643,6 +2644,16 @@ export function registerIpcHandlers(): void {
   // M4 — Recall: segment-level FTS across every meeting's transcript.
   ipcMain.handle('meetings:searchSegments', (_e, query: string, limit?: number) =>
     searchMeetingSegments(String(query ?? ''), typeof limit === 'number' ? limit : 12)
+  )
+  // M5 — prep (all database facts, no model call) + per-series prefs (Q14).
+  ipcMain.handle(
+    'meetings:prep',
+    (_e, input: { seriesId?: string | null; excludeMeetingId?: string; invitees?: string[]; agenda?: string | null }) =>
+      buildMeetingPrep(input ?? {})
+  )
+  ipcMain.handle('meetings:getSeriesPrefs', (_e, seriesId: string) => getSeriesPrefs(String(seriesId)))
+  ipcMain.handle('meetings:setSeriesPrefs', (_e, seriesId: string, patch: { briefs?: boolean }) =>
+    setSeriesPrefs(String(seriesId), patch ?? {})
   )
   ipcMain.handle('meetings:update', (_e, id: string, patch: MeetingPatch) => updateMeeting(id, patch))
   ipcMain.handle('meetings:delete', (_e, id: string) => deleteMeeting(id))

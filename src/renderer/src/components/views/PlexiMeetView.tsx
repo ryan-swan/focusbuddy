@@ -12,11 +12,11 @@ import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClien
 import { useNodeStore } from '../../stores/nodes'
 import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
-import type { Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
+import type { CarriedItem, Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
 import { fmtOffset } from '../../lib/transcriptMerge'
 import { validateRecordSpans } from '../../lib/recordSpans'
 import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
-import MeetingCommitmentsCard from '../MeetingCommitmentsCard'
+import MeetingCommitmentsCard, { CarriedFromLastTime } from '../MeetingCommitmentsCard'
 import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
 import { useViewStore } from '../../stores/view'
 import type { ActionProposal } from '@shared/types'
@@ -635,8 +635,35 @@ function MeetingDetail({
   // M2b — Commitments opens by default: the person who just left the room
   // is the most common reader and needs the shortest artifact (S3-DEC-022).
   const [view, setView] = useState<RecordView>('commitments')
+  // M5 — series memory: the previous instance and what it left open, plus
+  // the Q14 per-series brief knob. Database facts; absent for ad-hoc meetings.
+  const [carried, setCarried] = useState<CarriedItem[]>([])
+  const [lastMeeting, setLastMeeting] = useState<{ id: string; title: string; createdAt: number } | null>(null)
+  const [seriesBriefs, setSeriesBriefs] = useState<boolean | null>(null)
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const threadRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!meeting.seriesId || typeof window.api.meetings.prep !== 'function') return
+    let alive = true
+    void window.api.meetings
+      .prep({ seriesId: meeting.seriesId, excludeMeetingId: meeting.id })
+      .then((prep) => {
+        if (!alive) return
+        setCarried(prep.carried)
+        setLastMeeting(prep.lastMeeting)
+      })
+      .catch(() => {})
+    void window.api.meetings
+      .getSeriesPrefs(meeting.seriesId)
+      .then((prefs) => {
+        if (alive) setSeriesBriefs(prefs.briefs)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [meeting.id, meeting.seriesId])
+
   useEffect(() => {
     let alive = true
     setSegments([])
@@ -837,6 +864,13 @@ function MeetingDetail({
 
       {view === 'commitments' && (
         <div className="px-5 py-4 space-y-5" data-testid="rendering-commitments">
+          {carried.length > 0 && (
+            <CarriedFromLastTime
+              items={carried}
+              lastTitle={lastMeeting?.title}
+              lastAt={lastMeeting?.createdAt}
+            />
+          )}
           {segments.length > 0 && foundCommitments === null && (
             <button
               onClick={() => void findCommitments()}
@@ -1005,6 +1039,29 @@ function MeetingDetail({
         </div>
       )}
 
+      {/* M5 (Q14) — the per-series brief knob, on the series meeting itself:
+          a series whose briefs are noise gets silenced here, and the wrap-up
+          asks before minting the next one. */}
+      {meeting.seriesId && seriesBriefs !== null && (
+        <div className="px-5 pb-2">
+          <label className="flex items-center gap-2 text-[11.5px] text-[var(--ink-50)] cursor-pointer" data-testid="series-briefs-row">
+            <input
+              type="checkbox"
+              checked={seriesBriefs}
+              onChange={(e) => {
+                const next = e.target.checked
+                setSeriesBriefs(next)
+                void window.api.meetings
+                  .setSeriesPrefs(meeting.seriesId!, { briefs: next })
+                  .catch(() => setSeriesBriefs(!next))
+              }}
+              className="accent-[rgb(var(--accent))]"
+              data-testid="series-briefs-toggle"
+            />
+            <span>Brief me after each meeting in this series</span>
+          </label>
+        </div>
+      )}
       {(audio?.present || exported) && (
         <div className="px-5 pb-2 space-y-1.5">
           {audio?.present && (

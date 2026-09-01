@@ -33,7 +33,18 @@ export type MeetingOrigin =
   | { kind: 'design'; id: string; title: string }
   | { kind: 'chat'; channelId: string; title: string }
   | { kind: 'desk'; nodeId: string; title: string }
-  | { kind: 'calendar'; title: string }
+  | {
+      kind: 'calendar'
+      title: string
+      // M5 — series identity + staging facts ride the origin from the booked
+      // block: the wrap-up stamps them onto the meeting record, and the Stage
+      // assembles prep from them. All optional — an external-calendar join or
+      // a bare deep link has none, and prep quietly shows nothing.
+      blockId?: string
+      seriesId?: string | null
+      agenda?: string | null
+      invitees?: string[]
+    }
   | { kind: 'standalone'; title: string }
 
 let currentOrigin: MeetingOrigin | null = null
@@ -94,9 +105,13 @@ export async function startArtifactMeeting(origin: MeetingOrigin): Promise<strin
 // Join a specific, already-known room — the host and every invitee of a
 // scheduled calendar meeting open the SAME room id, so this is what the "Join"
 // button on a calendar meeting and the haptyx://meet?room= deep link both call.
-export async function joinMeetingRoom(roomId: string, title?: string): Promise<void> {
+export async function joinMeetingRoom(
+  roomId: string,
+  title?: string,
+  meta?: { blockId?: string; seriesId?: string | null; agenda?: string | null; invitees?: string[] }
+): Promise<void> {
   if (meetBlocked()) return
-  currentOrigin = { kind: 'calendar', title: title || 'Meeting' }
+  currentOrigin = { kind: 'calendar', title: title || 'Meeting', ...meta }
   useViewStore.getState().goMeetings()
   await useMeetingRoomStore.getState().join(roomId, title || 'Meeting')
 }

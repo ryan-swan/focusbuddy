@@ -26,11 +26,17 @@
 > box, assistant grounding pool, meeting citations that route) AND the
 > ⌘⇧T live transcript (consent-inherited tap, view-driven cost,
 > shed-don't-lag queue). G3: MCP ruled to its own round (no server
-> surface exists). Suite: 3,567 tests / 328 files. Next: M5 — Prep +
-> series (seriesId, "carried from last time", Q14 per-series opt-in).
-> Owed: two-machine consent QA (now incl. the speak→live-pane loop);
-> the PlexiCam calls consent follow-up; per-item moment anchors + the
-> Record widget (C5 sliver, one round); Recall-over-MCP round.
+> surface exists). **M5 is COMPLETE (DEC-104)**: series_id stamped from
+> the calendar origin, prep as pure database facts in the Stage's PREP
+> pane, "Carried from last time" atop the wrap-up AND the Record (with
+> a Done verb — house state 'completed', a live-caught fix), and Q14's
+> per-series brief knob. Suite: 3,582 tests / 329 files. Next: M6 —
+> Guest Capture, which STARTS with the G1 ScreenCaptureKit spike
+> (mic-only is the honest floor: "Plexii can hear you, not them").
+> Owed: two-machine consent QA (speak→live-pane loop + Stage PREP pane
+> in a real room); the PlexiCam calls consent follow-up; per-item
+> moment anchors + the Record widget (C5 sliver); Recall-over-MCP
+> round; briefs for other attendees (needs out-of-room delivery).
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

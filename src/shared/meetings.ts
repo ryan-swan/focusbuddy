@@ -22,6 +22,10 @@ export interface Meeting {
   /** M2c (S3-DEC-020) — the desk node minted for this meeting, when one
    *  was. The container everything else hangs off. */
   deskNodeId: string | null
+  // M5 — series identity, stamped when the meeting started from a booked
+  // calendar block. Null for ad-hoc meetings; seriesId groups instances.
+  seriesId: string | null
+  blockId: string | null
   createdAt: number
   updatedAt: number
 }
@@ -57,6 +61,9 @@ export interface MeetingDraft {
   summary?: string
   actionItems?: string[]
   durationSec?: number | null
+  // M5 — stamped when the meeting started from a booked calendar block.
+  seriesId?: string | null
+  blockId?: string | null
 }
 
 export interface MeetingPatch {
@@ -67,6 +74,8 @@ export interface MeetingPatch {
   durationSec?: number | null
   record?: MeetingRecord | null
   deskNodeId?: string | null
+  seriesId?: string | null
+  blockId?: string | null
 }
 
 // M2 (SPEC-003 S3-DEC-021) — one attributed, timestamped span of speech.
@@ -74,6 +83,30 @@ export interface MeetingPatch {
 // (legacy mixed-blob transcriptions); per-track capture makes it exact for
 // native meetings. confidence is the ENGINE's own belief (cloud logprobs),
 // or null where the engine exposes none (local) — never fabricated.
+// M5 — meeting prep: what the staging assembles before (and the wrap-up
+// reads after) a series meeting. Everything here is a database fact — the
+// agenda from the booking, the previous instance, its still-open items, and
+// the attendees' open items. No model call builds prep.
+export interface CarriedItem {
+  id: string
+  title: string
+  state: string
+  intentClass: string | null
+  dueAt: number | null
+}
+
+export interface AttendeeItems {
+  invitee: string
+  items: CarriedItem[]
+}
+
+export interface MeetingPrep {
+  agenda: string | null
+  lastMeeting: { id: string; title: string; createdAt: number } | null
+  carried: CarriedItem[]
+  attendees: AttendeeItems[]
+}
+
 // M4 — one Recall hit: a segment with its meeting identity, so the answer
 // is a speaker + a timestamp + a door (never a bare string).
 export interface TranscriptSearchHit {
