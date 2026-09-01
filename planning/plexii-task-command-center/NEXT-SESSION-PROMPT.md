@@ -40,12 +40,18 @@
 > also caught + fixed an M2-era seam: the transcribe IPC bridge dropped
 > forceProvider (CR-11 forced-local never reached main; failed closed).
 > Suite: 3,593 tests / 330 files.
-> Next: operator's pick — the named follow-up rounds: two-machine
-> consent QA (live pane, Stage PREP, guest capture in a real call);
-> PlexiCam 1:1 calls consent; C5 Record widget + per-item moment
-> anchors; Recall-over-MCP; briefs for other attendees (out-of-room
-> delivery); or back to analysis/27 Phase 4 (AI-suggested tags, home
-> widgets) / Phase 5 process items.
+> **PlexiCam calls consent is CLOSED (DEC-106)**: the 1:1 form of the
+> M1 hole — the whisper pref now records MY mic and ASKS the peer over
+> the callSignal relay (capture-on-answer, decline never tapped,
+> standing-pref auto-answer, worded states both sides, requester-only
+> Stop with a held take); calls ride the meeting pipeline (per-track,
+> attributed, on-device) and ConversationRecorder is deleted. Suite:
+> 3,602 tests / 331 files.
+> Next: operator's pick — two-machine QA (meetings consent, live pane,
+> Stage PREP, guest capture, AND the new calls consent round-trip); C5
+> Record widget + per-item moment anchors; Recall-over-MCP; briefs for
+> other attendees (out-of-room delivery); or back to analysis/27
+> Phase 4 (AI-suggested tags, home widgets) / Phase 5 process items.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

@@ -86,6 +86,12 @@ export default function CallOverlay(): JSX.Element | null {
   const hangup = useCallStore((s) => s.hangup)
   const toggleMute = useCallStore((s) => s.toggleMute)
   const toggleCamera = useCallStore((s) => s.toggleCamera)
+  const transcribing = useCallStore((s) => s.transcribing)
+  const recordingBy = useCallStore((s) => s.recordingBy)
+  const peerConsent = useCallStore((s) => s.peerConsent)
+  const consentAsk = useCallStore((s) => s.consentAsk)
+  const answerCallConsent = useCallStore((s) => s.answerCallConsent)
+  const stopTranscribing = useCallStore((s) => s.stopTranscribing)
   // DEC-078 — OS-refused frames render as an honest note, not a black box.
   const cameraBlocked = useVideoBlocked(localStream)
 
@@ -134,6 +140,19 @@ export default function CallOverlay(): JSX.Element | null {
           ? 'Connected'
           : 'Call ended'
 
+  // The state named in words, continuously (the §3.8 doctrine, 1:1-reduced):
+  // who is recording, on whose machine, and where the peer's answer stands.
+  const peerName = personDisplayName(peer, 'They')
+  const consentLine = !transcribing
+    ? null
+    : recordingBy === 'peer'
+      ? `${peerName} is transcribing this call — their machine, not yours`
+      : peerConsent === 'pending'
+        ? `Recording · asking ${peerName}…`
+        : peerConsent === 'declined'
+          ? `Recording · only you — ${peerName} declined (not recorded)`
+          : `Recording · you and ${peerName} consented`
+
   // Active call window (outgoing/connecting/connected/ended).
   return (
     // Video stage: forced-dark chrome; white hairlines are relative to the stage, not the theme.
@@ -171,7 +190,51 @@ export default function CallOverlay(): JSX.Element | null {
             {personDisplayName(peer, 'Call')} · {statusLabel}
           </span>
         </div>
+        {consentLine && (
+          <div className="absolute bottom-2 left-3 right-3 flex items-center gap-1.5" data-testid="call-consent-line">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse shrink-0" />
+            <span className="text-[10.5px] text-rose-200/90 truncate flex-1">{consentLine}</span>
+            {recordingBy === 'me' && (
+              <button
+                onClick={stopTranscribing}
+                className="text-[10.5px] text-white/60 hover:text-white shrink-0"
+                data-testid="call-stop-transcribing"
+                title="Stop capturing — what was recorded so far still wraps up when the call ends"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* The peer asked to transcribe: the modal makes the machine and the
+          stakes explicit, and declining keeps the call — only the capture
+          of MY voice is refused (honoured by construction on their side). */}
+      {consentAsk && (
+        <div className="px-3 py-2.5 bg-stone-800/90 border-t border-white/10" data-testid="call-consent-ask">
+          <p className="text-[12px] text-white/90 leading-snug">
+            {consentAsk.byName} asked Plexii to transcribe this call — recorded and transcribed on their
+            machine. Decline and your voice is never captured; the call continues either way.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => answerCallConsent('accepted')}
+              className="flex-1 rounded-md bg-white text-stone-900 text-[12px] font-medium py-1.5 fb-press"
+              data-testid="call-consent-accept"
+            >
+              Yes, transcribe
+            </button>
+            <button
+              onClick={() => answerCallConsent('declined')}
+              className="flex-1 rounded-md bg-white/10 text-white text-[12px] py-1.5 fb-press"
+              data-testid="call-consent-decline"
+            >
+              Not my voice
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="px-3 py-2 text-[12px] text-rose-300 bg-rose-500/10" data-testid="call-error">

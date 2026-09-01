@@ -310,13 +310,14 @@ export default function PlexiMeetView(): JSX.Element {
             <Icon name="video_call" size={17} /> Start or schedule a meeting
           </button>
 
-          {/* DEC-098 made meeting recording consent-only: this preference no
-              longer starts anything in a MEETING (recording begins in the
-              room, with everyone asked). It still governs 1:1 PlexiCam calls
-              until their own consent round — the copy says what is true. */}
+          {/* DEC-098 made meeting recording consent-only; the calls consent
+              round closed the same hole for 1:1s. This preference now only
+              expresses MY side: on a call it records my mic and ASKS the
+              other person — their voice is captured when they say yes, and
+              a decline is honoured by construction (never tapped). */}
           <label
             className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
-            title="Applies to 1:1 calls. Meetings never auto-record — recording starts in the room and every participant is asked first."
+            title="Applies to 1:1 calls: your mic is recorded and the other person is asked before their voice is captured — declining keeps them out entirely. Meetings never auto-record."
           >
             <input
               type="checkbox"
@@ -328,7 +329,7 @@ export default function PlexiMeetView(): JSX.Element {
               data-testid="meet-whisper-toggle"
               className="accent-[rgb(var(--accent))]"
             />
-            <span>Transcribe &amp; summarise my 1:1 calls</span>
+            <span>Transcribe &amp; summarise my 1:1 calls (the other person is asked)</span>
           </label>
 
           {/* M2c (CR-13) — audio retention. Local disk only, never uploaded. */}

@@ -3010,3 +3010,58 @@ named: two-machine consent QA (live pane, Stage PREP, real-room guest
 coexistence); PlexiCam 1:1 calls consent round; C5 Record widget +
 per-item moment anchors; Recall-over-MCP round; briefs for other
 attendees (out-of-room delivery).
+
+## DEC-106 — PlexiCam calls consent — the M1 hole closed in its 1:1 form
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** named follow-up from
+DEC-098/DEC-101 (the meetings audit found the same defect in calls) ·
+**Branch:** ryan-next
+
+**The hole.** One side's whisper preference silently recorded BOTH voices
+the moment a call connected — `ConversationRecorder` mixed local + remote
+and the peer was never told, never asked. Identical in kind to the
+meetings hole M1 closed; it survived because DEC-101 could only rename
+the preference honestly, not rebuild the flow.
+
+**The close, mirroring M1 exactly.** The preference now expresses MY
+intent only: at connect it starts a per-track recorder (the M1/C1
+foundation, reused), taps MY mic, and sends a consent-request over the
+existing callSignal relay — an opaque-JSON kind, zero server changes,
+old clients ignore it. The peer's stream is tapped when their
+consent-response arrives, never before (capture-on-answer); a decline is
+honoured by construction — never tapped, the call continues, the record
+holds only my side. Late media (renegotiation) applies the standing
+answer, not a new grab. The peer's own standing preference answers FOR
+them — someone who ticked "transcribe my 1:1 calls" has already said
+yes, so both-on calls record on both machines, each side consented;
+everyone else gets a modal that names the machine and the stakes
+("recorded and transcribed on their machine… decline and your voice is
+never captured; the call continues either way" — the verbs are "Yes,
+transcribe" and "Not my voice").
+
+**Named in words, continuously (§3.8 reduced).** The requester's window:
+"Recording · asking NAME…" → "you and NAME consented" / "only you — NAME
+declined (not recorded)", with a requester-only Stop (the take-so-far
+still wraps up at call end, via a held take). The consenting side's
+window: "NAME is transcribing this call — their machine, not yours."
+
+**Calls ride the meeting pipeline now.** The wrap-up gets per-track
+takes with speakers { You, peer's name } and forceLocalTranscription —
+a consented recording must not grow a silent third-party disclosure, so
+call audio joins meeting audio in never leaving the machine. That buys
+calls the whole M2–M4 stack for free: attributed segments, the Record,
+the commitments confirm stop, Recall. ConversationRecorder — the silent
+mixer — is deleted from the tree. The preference copy tells the new
+truth: "Transcribe & summarise my 1:1 calls (the other person is asked)."
+
+Verified: 9-pin suite over the closed hole (blind-capture gone,
+capture-on-answer, decline-never-tapped, standing-pref auto-answer,
+worded states, held take, meeting-grade handoff, dead recorder gone);
+clean boot on the real build with the new preference copy rendered. The
+live two-party round-trip inherently needs two machines — it joins the
+operator's two-machine QA (with meetings consent, the live pane, Stage
+PREP and guest capture).
+
+9 new tests; 3,602 green across 331 files; both typechecks clean. The
+PlexiCam follow-up is CLOSED; remaining named rounds: C5 Record widget +
+moment anchors, Recall-over-MCP, briefs for other attendees, two-machine
+QA (operator-owed).
