@@ -102,6 +102,7 @@ import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
 import { saveTranscriptSegments, listTranscriptSegments } from '../db/transcripts'
 import { enhanceRecord, type EnhanceInput } from '../ai/enhanceRecord'
+import { extractCommitments, type ExtractInput } from '../ai/extractCommitments'
 import {
   saveAudioTakes,
   audioInfo,
@@ -2611,6 +2612,8 @@ export function registerIpcHandlers(): void {
   // M2b — the Enhance pass (SPEC-003 §3.4). The renderer validates every
   // returned span against the real segments and downgrades the unprovable.
   ipcMain.handle('ai:enhanceRecord', (_e, input: EnhanceInput) => enhanceRecord(input))
+  // M3 — the commitment extractor (anchors validated renderer-side).
+  ipcMain.handle('ai:extractCommitments', (_e, input: ExtractInput) => extractCommitments(input))
   // M2c — audio retention (CR-13) + export (the non-negotiable).
   ipcMain.handle('meetings:saveAudioTakes', (_e, meetingId: string, takes: AudioTakeIn[]) =>
     saveAudioTakes(String(meetingId), Array.isArray(takes) ? takes : [])

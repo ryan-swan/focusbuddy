@@ -14,6 +14,8 @@ import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { Meeting, TranscriptSegment } from '@shared/meetings'
 import { validateRecordSpans } from '../../lib/recordSpans'
+import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
+import MeetingCommitmentsCard from '../MeetingCommitmentsCard'
 import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
 import { useViewStore } from '../../stores/view'
 import type { ActionProposal } from '@shared/types'
@@ -597,6 +599,41 @@ function MeetingDetail({
   // template rebuild, and the door to the meeting's desk (S3-DEC-020).
   const [audio, setAudio] = useState<{ present: boolean; files: number; bytes: number; kept: boolean } | null>(null)
   const [rebuilding, setRebuilding] = useState(false)
+  // M3 — extraction for PAST meetings: the same confirm stop, on demand.
+  const [extracting, setExtracting] = useState(false)
+  const [foundCommitments, setFoundCommitments] = useState<ValidatedCommitment[] | null>(null)
+  const selfId = useAccountStore((s) => s.account?.id ?? '')
+  async function findCommitments(): Promise<void> {
+    if (extracting || segments.length === 0) return
+    setExtracting(true)
+    try {
+      const roster = [
+        ...new Map(
+          segments
+            .filter((s) => s.speakerAccountId)
+            .map((s) => [s.speakerAccountId as string, { accountId: s.speakerAccountId as string, name: s.speakerName }])
+        ).values()
+      ]
+      const ex = await window.api.meetings.extractCommitments({
+        title: meeting.title,
+        notes: (meeting.record?.spans ?? [])
+          .filter((s) => s.tier === 'yours')
+          .map((s) => s.text)
+          .join('\n'),
+        segments: segments.map((s) => ({
+          id: s.id,
+          startMs: s.startMs,
+          speakerName: s.speakerName,
+          speakerAccountId: s.speakerAccountId,
+          text: s.text
+        })),
+        roster
+      })
+      setFoundCommitments(ex.ok ? validateCommitments(ex.commitments, segments, selfId) : [])
+    } finally {
+      setExtracting(false)
+    }
+  }
   const [exported, setExported] = useState<string | null>(null)
   const refreshMeetings = useMeetingsStore((s) => s.load)
   const goTask = useViewStore((s) => s.goTask)
@@ -723,6 +760,32 @@ function MeetingDetail({
 
       {view === 'commitments' && (
         <div className="px-5 py-4 space-y-5" data-testid="rendering-commitments">
+          {segments.length > 0 && foundCommitments === null && (
+            <button
+              onClick={() => void findCommitments()}
+              disabled={extracting}
+              className="fb-btn-surface inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 text-[var(--ink-90)] disabled:opacity-50"
+              data-testid="find-commitments"
+              title="Extract commitments from the transcript — they go through the confirm stop, never silently into Attention"
+            >
+              <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
+              {extracting ? 'Reading the transcript…' : 'Find commitments'}
+            </button>
+          )}
+          {foundCommitments !== null &&
+            (foundCommitments.length > 0 ? (
+              <MeetingCommitmentsCard
+                commitments={foundCommitments}
+                meetingId={meeting.id}
+                meetingTitle={meeting.title}
+                deskNodeId={meeting.deskNodeId}
+                onFiled={() => setFoundCommitments(null)}
+              />
+            ) : (
+              <p className="text-[12.5px] text-[var(--ink-50)]">
+                Nothing in this transcript reads as a commitment — an honest zero, not a failure.
+              </p>
+            ))}
           {meeting.actionItems.length === 0 ? (
             <p className="text-[13px] text-[var(--ink-50)]">
               Nothing was committed to in this meeting — or nothing was recorded. Owners and

@@ -7,6 +7,8 @@ import { transcribeRecording } from '../lib/transcribeRecording'
 import { mergeTrackSegments, formatAttributedTranscript } from '../lib/transcriptMerge'
 import { buildYoursSpans, validateRecordSpans } from '../lib/recordSpans'
 import { DEFAULT_RECORD_TEMPLATE } from '../lib/recordTemplates'
+import { validateCommitments, type ValidatedCommitment } from '../lib/commitments'
+import { useAccountStore } from './account'
 import { useNodeStore } from './nodes'
 import { useWidgetStore } from './widgets'
 
@@ -35,6 +37,9 @@ interface WrapupState {
   // DEC-079 — the Meeting record this wrap-up produced, so approved
   // deliverables can POINT back at it (sourceType 'meeting').
   meetingId: string | null
+  /** M3 — extracted commitments awaiting the confirm stop. Never filed
+   *  silently (S3-DEC-023): the review screen is the only door. */
+  commitments: ValidatedCommitment[]
   begin: (input: {
     title: string
     buffer: ArrayBuffer
@@ -70,9 +75,10 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   folderName: '',
   transcriptDocId: null,
   meetingId: null,
+  commitments: [],
 
   begin: async ({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, moments }) => {
-    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null })
+    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [] })
     // M1 — the notes are the user's words and must survive REGARDLESS of how
     // transcription goes: saved first, not gated on the pipeline succeeding.
     if ((notes && notes.trim()) || (moments && moments.length)) {
@@ -91,7 +97,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
     }
   },
 
-  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null })
+  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [] })
 }))
 
 // The wrap-up pipeline, extracted so `begin` can wrap the whole thing in one
@@ -261,6 +267,59 @@ async function runWrapup(
     }
   }
 
+  // M3 (§3.6) — extract commitments, meetings only. They go to the CONFIRM
+  // STOP, never silently into Attention (S3-DEC-023); other-owned ones
+  // arrive unchecked with the owner as a mention (C7 — reference, no send).
+  let commitments: ValidatedCommitment[] = []
+  if (meeting?.id && savedSegments.length && forceLocalTranscription) {
+    set({ step: 'Finding commitments…' })
+    const selfId = useAccountStore.getState().account?.id ?? ''
+    const roster = [
+      ...new Map(
+        savedSegments
+          .filter((s) => s.speakerAccountId)
+          .map((s) => [s.speakerAccountId as string, { accountId: s.speakerAccountId as string, name: s.speakerName }])
+      ).values(),
+      ...(selfId ? [{ accountId: selfId, name: speakers?.[selfId] || speakers?.me || 'You' }] : [])
+    ]
+    const ex = await window.api.meetings
+      .extractCommitments({
+        title,
+        notes: notes ?? '',
+        segments: savedSegments.map((s) => ({
+          id: s.id,
+          startMs: s.startMs,
+          speakerName: s.speakerName,
+          speakerAccountId: s.speakerAccountId,
+          text: s.text
+        })),
+        roster
+      })
+      .catch(() => ({ ok: false as const, error: 'extract failed' }))
+    if (ex.ok) commitments = validateCommitments(ex.commitments, savedSegments, selfId)
+  }
+
+  // M3 (Q14, host-only default) — the meeting authors ONE To Know item:
+  // machine-authored, DEC-014-exempt, the Attendant's own channel. "Here's
+  // what happened; you don't need to do anything." Per-series opt-in for
+  // OTHERS arrives with M5's series object.
+  if (meeting?.id && forceLocalTranscription && summary.trim()) {
+    await window.api.workItems
+      .create({
+        title: `Meeting brief — ${title || 'Meeting'}`,
+        notes: summary.trim(),
+        intentClass: 'to_know',
+        dueAt: null,
+        confidence: 1,
+        approvalState: 'approved',
+        wiOrigin: 'ai',
+        sourceType: 'meeting',
+        sourceRef: meeting.id
+      })
+      .then(() => window.dispatchEvent(new CustomEvent('fb:workitems-changed')))
+      .catch(() => null)
+  }
+
   // M2c (CR-13) — persist the audio takes, retention permitting. Zero means
   // zero: no save call at all, so the takes die with this function's scope
   // at the end of the Enhance pass — not at a nightly sweep. A declined
@@ -309,5 +368,10 @@ async function runWrapup(
     }
   }
 
-  set({ status: 'review', summary, proposals, meetingId: meeting?.id ?? null })
+  // C6 — the split: COMMITMENTS go through the confirm stop; artifact
+  // deliverables stay on ProposalCards. When the extractor produced
+  // commitments, the overlapping create-task proposals leave the cards so
+  // one obligation is never offered through two doors.
+  const cardProposals = commitments.length ? proposals.filter((p) => p.kind !== 'create-task') : proposals
+  set({ status: 'review', summary, proposals: cardProposals, commitments, meetingId: meeting?.id ?? null })
 }

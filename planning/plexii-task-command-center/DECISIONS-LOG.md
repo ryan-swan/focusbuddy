@@ -2781,3 +2781,56 @@ meeting's delete); export surface present (the OS dialog needs a human
 hand — honest limit of solo verification). 14 new tests; 3,528 green;
 both typechecks clean. **M2 is complete** — M3 (routing into Attention)
 is next.
+
+## DEC-102 — M3: commitments route into Attention — the loop closes
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M3, C6 C7) · **Branch:** ryan-next
+
+**The extractor is anchored or it is honest.** `ai:extractCommitments`
+(main/ai/extractCommitments.ts) reads the attributed segments and returns
+commitments with a `segmentId` that must be verbatim-or-null — the prompt
+says why in the model's face: an unanchored item "will be marked
+unverified, which is honest; a wrong anchor is not." Owners come ONLY from
+the meeting roster, deadlines only if someone said one, and zero
+commitments is a valid answer. `validateCommitments` (lib/commitments.ts)
+then enforces it in pure code: an unresolvable anchor downgrades to
+inferred, `mine` = ownerless-or-self, and intent classes are canonicalised
+with `to_do` as the floor.
+
+**The confirm stop is the batch variant of the card we already trust.**
+MeetingCommitmentsCard sits atop the wrap-up review (and behind "Find
+commitments" on any past meeting): checkbox list, class chips that cycle
+on click, due dates, and the header that states the contract — "nothing
+files until you say so." Your own commitments start CHECKED; other-owned
+start UNCHECKED with an amber "owner is X, not you" note, and filing one
+attaches the owner as a person MENTION — never a send (C7, the SPEC-027
+boundary). Anchored rows quote their line — `[m:ss] Speaker: "…"` behind
+the heard rule; unanchored rows say so in words. Filed items land as one
+undo batch: parentId = the meeting's desk node, sourceType 'meeting' +
+sourceRef = the meeting id (DEC-079's chip route opens the meeting from
+Attention), wiOrigin 'ai', confidence 0.95 anchored / 0.6 inferred.
+
+**C6 split, as planned.** When commitments exist, create-task proposals
+are filtered OFF the wrap-up's ProposalCards — commitments own tasks now;
+artifact deliverables (docs, lists, links) stay on the cards. And the
+host gets the **To Know brief** — a machine-authored to_know item titled
+for the meeting, wiOrigin 'ai' (DEC-014-exempt by spec ruling); Q14's
+per-series opt-in for other attendees stays deferred to M5.
+
+**Live, on the real build:** a REAL extractCommitments call over scratch
+segments honoured every clause first try — Dana's "I will send Doug the
+revised contract by Friday" came back owner-attributed and anchored, the
+group's March decision came back ownerless and anchored, and the
+small-talk line was left alone. The Meet-view door rendered the card
+("Plexii found 2 things in this meeting"), Dana's row defaulted
+unchecked, "File 1 item" filed exactly the checked one — sourceType
+'meeting', to_decide, wiOrigin 'ai', confidence 0.95 — and the scratch
+item was dismissed (R008) and the meeting deleted clean, segments gone
+with it. One honest sliver deferred: the filed item points at its MEETING
+(sourceRef → the DEC-079 door); the per-item MOMENT anchor (jump straight
+to the quoted segment from Attention) rides with the C5 Record-widget
+round, where sourceUrl anchors get built once for both.
+
+13 new tests (m3Routing); 3,541 green across 326 files; both typechecks
+clean. **M3 is complete** — M4 (Recall, G2/G3 spikes first) is next on
+the operator's go.

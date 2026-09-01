@@ -1646,6 +1646,16 @@ const api = {
       ipcRenderer.invoke('meetings:setAudioRetention', mode),
     export: (meetingId: string, format: 'markdown' | 'json'): Promise<{ ok: boolean; path?: string; error?: string }> =>
       ipcRenderer.invoke('meetings:export', meetingId, format),
+    /** M3 — commitment extraction; anchors validated renderer-side. */
+    extractCommitments: (input: {
+      title: string
+      notes: string
+      segments: Array<{ id: string; startMs: number; speakerName: string; speakerAccountId: string | null; text: string }>
+      roster: Array<{ accountId: string; name: string }>
+    }): Promise<
+      | { ok: true; commitments: Array<{ title: string; ownerAccountId?: string | null; ownerName?: string | null; dueAt?: string | null; intentClass?: string; segmentId?: string | null }> }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('ai:extractCommitments', input),
     /** M2b — the Enhance pass; renderer validates + downgrades unprovable spans. */
     enhanceRecord: (input: {
       title: string

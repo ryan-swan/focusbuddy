@@ -17,9 +17,14 @@
 > both engines, the attributed per-track pipeline, CR-11 local-only
 > meeting audio. M2 is COMPLETE: DEC-099 (transcript
 > truth), DEC-100 (the Record + three renderings), DEC-101 (container,
-> templates, export, CR-13 retention). Next: M3 — commitments route
-> through the Attention confirm step.
-> Owed: two-machine consent QA; the PlexiCam calls consent follow-up.
+> templates, export, CR-13 retention). **M3 is COMPLETE (DEC-102)**:
+> anchored commitment extraction, the batch confirm stop (other-owned
+> unchecked, owner as mention — never a send), the C6 split, and the
+> host's To Know brief; verified live end-to-end. Suite: 3,541 tests /
+> 326 files. Next: M4 — Recall over segments (G2 live-decode and G3 MCP
+> spikes first; Recall alone is the value if the spikes say no).
+> Owed: two-machine consent QA; the PlexiCam calls consent follow-up;
+> per-item moment anchors + the Record widget (C5 sliver, one round).
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

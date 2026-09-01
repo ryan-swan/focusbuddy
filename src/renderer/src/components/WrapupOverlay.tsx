@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon'
 import ProposalCards from './ProposalCards'
+import MeetingCommitmentsCard from './MeetingCommitmentsCard'
 import { useWrapupStore } from '../stores/wrapup'
 import { useNodeStore } from '../stores/nodes'
 import type { AppliedProposal } from '@shared/types'
@@ -23,6 +24,19 @@ export default function WrapupOverlay(): JSX.Element | null {
   const folderId = useWrapupStore((s) => s.folderId)
   const folderName = useWrapupStore((s) => s.folderName)
   const meetingId = useWrapupStore((s) => s.meetingId)
+  const commitments = useWrapupStore((s) => s.commitments)
+  const [commitmentsFiled, setCommitmentsFiled] = useState(false)
+  const [meetingDeskId, setMeetingDeskId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!meetingId) return
+    let alive = true
+    void window.api.meetings.get(meetingId).then((m) => {
+      if (alive) setMeetingDeskId(m?.deskNodeId ?? null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [meetingId])
   const dismiss = useWrapupStore((s) => s.dismiss)
 
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
@@ -89,6 +103,19 @@ export default function WrapupOverlay(): JSX.Element | null {
 
           {status === 'review' && (
             <>
+              {/* M3 (§3.6) — the confirm stop leads the review: it is the
+                  screen that makes something happen after. */}
+              {meetingId && commitments.length > 0 && !commitmentsFiled && (
+                <section className="mb-4">
+                  <MeetingCommitmentsCard
+                    commitments={commitments}
+                    meetingId={meetingId}
+                    meetingTitle={title}
+                    deskNodeId={meetingDeskId}
+                    onFiled={() => setCommitmentsFiled(true)}
+                  />
+                </section>
+              )}
               <section>
                 <h3 className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1.5">Summary</h3>
                 {summary ? (

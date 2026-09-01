@@ -182,6 +182,11 @@ widget on the meeting desk) rides with M3's sourceUrl anchors.
   decline = never written, zero = at Enhance).
 
 ### M3 — Routing into Attention  *(spec P3 · C6 C7)*
+
+> **STATUS 2026-09-01: DONE — DEC-102. M3 COMPLETE.** Anchored extractor +
+> pure validation, the batch confirm stop (other-owned unchecked, owner as
+> mention, never a send), C6 split, the To Know brief. Per-item moment
+> anchors ride with the C5 Record-widget round.
 - `extract-commitments` returns spans with anchors (or it is all inferred
   — the extractor contract is the test).
 - The confirm step gets its **batch variant** (checkbox list over the
