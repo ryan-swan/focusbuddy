@@ -2689,3 +2689,45 @@ relaunch is now part of the restart ritual.
 16 new tests; 3,502 green; both typechecks clean. M2b (the Record object,
 three renderings, provenance CSS, meeting-node container, export,
 retention) is next.
+
+## DEC-100 — M2b: the Record — one object, three renderings
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M2, second half) · **Branch:** ryan-next
+
+**The Record object (§3.4).** `record_json` on fb_meetings: provenance-
+tiered spans (`yours / heard / inferred`), each heard span carrying a
+segmentId anchor. Built by the Enhance pass at wrap-up — best-effort and
+NON-BLOCKING: a failed enhance leaves summary and deliverables intact and
+the Record simply absent.
+
+**The rule that makes the middle tier honest (S3-DEC-021), enforced in a
+pure layer.** `lib/recordSpans.ts`: a heard span whose anchor does not
+resolve to a real segment is DOWNGRADED to inferred, anchor nulled — the
+tier can never be asserted, only proven. A model-forged `yours` is a
+forgery, downgraded too: only `buildYoursSpans` mints yours, from the
+user's notes, verbatim, byte-for-byte. The anchor's timestamp is always
+taken from the SEGMENT, never trusted from the model. The Enhance prompt
+states the contract in the model's own terms ("a heard claim without its
+segmentId will be discarded as unproven") — and the FIRST live call
+honoured it: four spans back, both heard ones carrying real segmentIds.
+
+**Three renderings, Commitments default (S3-DEC-022).** A segmented
+control (1/2/3, §3.10) in the meeting detail: Commitments (the existing
+action items — owners and Attention routing arrive with M3's extractor),
+Brief (yours leads at full ink; heard renders with a hairline left rule,
+the timestamp on hover, and a click that jumps to the moment in Thread;
+inferred in lighter ink — the same accent-vs-ink doctrine as capture, its
+third tier), and Thread (the real segments: clock position, speaker, text,
+with sub-50% engine confidence dimmed and every row carrying an honest
+tooltip — "Engine confidence 31%" / "unknown (on-device)").
+
+Verified live on the real build: record round-trip (3 spans); a REAL
+Enhance call over scratch segments (contract held); Commitments default;
+yours measured at ink-100, inferred at ink-50, heard's rule and hover
+timestamp rendered; the heard click landed in Thread on the anchored
+segment; the low-confidence row dimmed; scratch meeting deleted with its
+segments (DEC-099's cascade doing its job).
+
+Still open in M2 (M2c): the meeting-node container (C5), templates,
+export, audio retention (CR-13). 12 new tests; 3,514 green; both
+typechecks clean.

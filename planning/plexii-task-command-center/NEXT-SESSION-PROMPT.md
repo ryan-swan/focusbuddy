@@ -15,8 +15,10 @@
 > **Meet (SPEC-003) is underway on ryan-next** — analysis/28 is the plan;
 > M1 landed as DEC-098; M2a (transcript truth) as DEC-099 — segments from
 > both engines, the attributed per-track pipeline, CR-11 local-only
-> meeting audio. Next: M2b (the Record object, three renderings,
-> provenance CSS, meeting-node container, export, retention).
+> meeting audio. M2b (the Record: Enhance with
+> anchor-or-downgrade, three renderings with provenance) landed as
+> DEC-100. Next: M2c (meeting-node container, templates, export, audio
+> retention) then M3 (routing into Attention).
 > Owed: two-machine consent QA; the PlexiCam calls consent follow-up.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
@@ -38,7 +40,7 @@ comprehension. **GAP-019 remains open** (`bg-[var(--token)]/N` invalid CSS,
 Phase 5 rulings/process. DECISIONS-LOG carries DEC-072…092 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,502 tests green. Full typecheck clean.
+**Suite:** 3,514 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -52,7 +54,7 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…099**, append-only. DEC-072…099 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…100**, append-only. DEC-072…100 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)

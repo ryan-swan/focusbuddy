@@ -12,7 +12,7 @@ import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClien
 import { useNodeStore } from '../../stores/nodes'
 import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
-import type { Meeting } from '@shared/meetings'
+import type { Meeting, TranscriptSegment } from '@shared/meetings'
 import type { ActionProposal } from '@shared/types'
 
 // PlexiMeet: meetings that turn into actions. Record a meeting and it is
@@ -506,6 +506,15 @@ export default function PlexiMeetView(): JSX.Element {
   )
 }
 
+// M2b (SPEC-003 §3.4) — the three renderings of one Record, and the
+// provenance treatment that is the entire trust model:
+//   yours    — full ink, no marker. The user's words, never rewritten.
+//   heard    — normal ink with a hairline left rule; the timestamp on
+//              hover; clicking jumps to the moment in Thread.
+//   inferred — lighter ink, no rule, no anchor. The machine's guess LOOKS
+//              like a guess (the same accent-vs-ink doctrine as capture).
+type RecordView = 'commitments' | 'brief' | 'thread'
+
 function MeetingDetail({
   meeting,
   onChange,
@@ -521,6 +530,45 @@ function MeetingDetail({
   const [transcript, setTranscript] = useState(meeting.transcript)
   const [showTranscript, setShowTranscript] = useState(false)
   const [madeTasks, setMadeTasks] = useState<Record<number, boolean>>({})
+  // M2b — Commitments opens by default: the person who just left the room
+  // is the most common reader and needs the shortest artifact (S3-DEC-022).
+  const [view, setView] = useState<RecordView>('commitments')
+  const [segments, setSegments] = useState<TranscriptSegment[]>([])
+  const threadRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    let alive = true
+    setSegments([])
+    void window.api.meetings.segments(meeting.id).then((s) => {
+      if (alive) setSegments(s)
+    })
+    return () => {
+      alive = false
+    }
+  }, [meeting.id])
+  // 1/2/3 pick the rendering (SPEC-003 §3.10), never while typing.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
+      if (e.key === '1') setView('commitments')
+      if (e.key === '2') setView('brief')
+      if (e.key === '3') setView('thread')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  const fmtMs = (ms: number): string => {
+    const s = Math.floor(ms / 1000)
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  }
+  const jumpToSegment = (segmentId: string): void => {
+    setView('thread')
+    setTimeout(() => {
+      threadRef.current
+        ?.querySelector(`[data-segment-id="${segmentId}"]`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 60)
+  }
 
   async function makeTask(idx: number, text: string): Promise<void> {
     await createNode({ kind: 'task', title: text, parentId: null }).catch(() => null)
@@ -547,21 +595,39 @@ function MeetingDetail({
         </button>
       </div>
 
-      <div className="px-5 py-4 space-y-5">
-        <section>
-          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Summary</h2>
-          <textarea
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            onBlur={() => summary !== meeting.summary && onChange({ summary })}
-            placeholder="The AI summary appears here after recording, or write your own notes."
-            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent)/0.40)]"
-          />
-        </section>
+      {/* M2b — the segmented control: three renderings, one Record. */}
+      <div className="px-5 pt-3 flex items-center gap-1" data-testid="record-views">
+        {(
+          [
+            ['commitments', 'Commitments', '1'],
+            ['brief', 'Brief', '2'],
+            ['thread', 'Thread', '3']
+          ] as const
+        ).map(([v, label, key]) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            data-testid={`record-view-${v}`}
+            className={`h-8 px-3 rounded-[var(--radius-chip)] text-[12.5px] font-medium fb-press transition-colors inline-flex items-center gap-1.5 ${
+              view === v
+                ? 'bg-[rgb(var(--accent))] text-white'
+                : 'text-[var(--ink-60)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)]'
+            }`}
+          >
+            {label}
+            <span className={`text-[10px] ${view === v ? 'text-white/60' : 'text-[var(--ink-30)]'}`}>{key}</span>
+          </button>
+        ))}
+      </div>
 
-        {meeting.actionItems.length > 0 && (
-          <section data-testid="meet-actions">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Action items</h2>
+      {view === 'commitments' && (
+        <div className="px-5 py-4 space-y-5" data-testid="rendering-commitments">
+          {meeting.actionItems.length === 0 ? (
+            <p className="text-[13px] text-[var(--ink-50)]">
+              Nothing was committed to in this meeting — or nothing was recorded. Owners and
+              routing into Attention arrive with extraction.
+            </p>
+          ) : (
             <div className="space-y-1.5">
               {meeting.actionItems.map((item, i) => (
                 <div key={i} className="fb-card flex items-center gap-2 px-3 py-2">
@@ -578,8 +644,115 @@ function MeetingDetail({
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </div>
+      )}
+
+      {view === 'brief' && (
+        <div className="px-5 py-4" data-testid="rendering-brief">
+          {meeting.record && meeting.record.spans.length > 0 ? (
+            <div className="space-y-4">
+              {/* yours first — the reader's own words lead. */}
+              {meeting.record.spans.filter((s) => s.tier === 'yours').length > 0 && (
+                <div className="space-y-1" data-testid="brief-yours">
+                  {meeting.record.spans
+                    .filter((s) => s.tier === 'yours')
+                    .map((s, i) => (
+                      <p key={`y${i}`} className="text-[13.5px] leading-relaxed text-[var(--ink-100)]">
+                        {s.text}
+                      </p>
+                    ))}
+                </div>
+              )}
+              {[...new Set(meeting.record.spans.filter((s) => s.tier !== 'yours').map((s) => s.section ?? 'Notes'))].map(
+                (section) => (
+                  <section key={section}>
+                    <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">
+                      {section}
+                    </h2>
+                    <div className="space-y-1.5">
+                      {meeting.record!.spans
+                        .filter((s) => s.tier !== 'yours' && (s.section ?? 'Notes') === section)
+                        .map((s, i) =>
+                          s.tier === 'heard' && s.segmentId ? (
+                            <button
+                              key={`h${i}`}
+                              onClick={() => jumpToSegment(s.segmentId!)}
+                              title={s.startMs != null ? `Heard at ${fmtMs(s.startMs)} — click to jump to the moment` : undefined}
+                              data-tier="heard"
+                              className="block w-full text-left text-[13px] leading-relaxed text-[var(--ink-90)] border-l-2 border-[var(--edge-strong)] pl-2.5 hover:border-[rgb(var(--accent))] fb-press"
+                            >
+                              {s.text}
+                            </button>
+                          ) : (
+                            <p key={`i${i}`} data-tier="inferred" className="text-[13px] leading-relaxed text-[var(--ink-50)]">
+                              {s.text}
+                            </p>
+                          )
+                        )}
+                    </div>
+                  </section>
+                )
+              )}
+            </div>
+          ) : (
+            <p className="text-[13px] text-[var(--ink-50)]">
+              {meeting.summary
+                ? meeting.summary
+                : 'No record yet — it is built when a recorded meeting ends.'}
+            </p>
+          )}
+        </div>
+      )}
+
+      {view === 'thread' && (
+        <div className="px-5 py-4" data-testid="rendering-thread" ref={threadRef}>
+          {segments.length > 0 ? (
+            <div className="space-y-2">
+              {segments.map((s) => (
+                <div
+                  key={s.id}
+                  data-segment-id={s.id}
+                  className={`flex items-start gap-2.5 ${
+                    s.confidence != null && s.confidence < 0.5 ? 'opacity-60' : ''
+                  }`}
+                  title={
+                    s.confidence != null
+                      ? `Engine confidence ${(s.confidence * 100).toFixed(0)}%`
+                      : 'Engine confidence unknown (on-device)'
+                  }
+                >
+                  <span className="fb-tabular text-[11px] text-[var(--ink-40)] w-10 shrink-0 pt-0.5">
+                    {fmtMs(s.startMs)}
+                  </span>
+                  <span className="text-[12px] font-semibold text-[var(--ink-70)] w-20 shrink-0 truncate pt-0.5">
+                    {s.speakerName || 'Speaker'}
+                  </span>
+                  <span className="flex-1 text-[13px] leading-relaxed text-[var(--ink-90)]">{s.text}</span>
+                </div>
+              ))}
+            </div>
+          ) : meeting.transcript ? (
+            <pre className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-[var(--ink-80)] font-[inherit]">
+              {meeting.transcript}
+            </pre>
+          ) : (
+            <p className="text-[13px] text-[var(--ink-50)]">No transcript for this meeting.</p>
+          )}
+        </div>
+      )}
+
+      <div className="px-5 py-4 space-y-5 border-t border-[var(--edge-soft)]">
+        <section>
+          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Summary</h2>
+          <textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            onBlur={() => summary !== meeting.summary && onChange({ summary })}
+            placeholder="The AI summary appears here after recording, or write your own notes."
+            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent)/0.40)]"
+          />
+        </section>
 
         <section>
           <button

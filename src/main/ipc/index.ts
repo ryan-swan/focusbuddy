@@ -101,6 +101,7 @@ import {
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
 import { saveTranscriptSegments, listTranscriptSegments } from '../db/transcripts'
+import { enhanceRecord, type EnhanceInput } from '../ai/enhanceRecord'
 import type { TranscriptSegmentDraft } from '@shared/meetings'
 import { extractPeople } from '../ai/peopleExtract'
 import { listPeopleDirectory } from '../peopleDirectory'
@@ -2588,6 +2589,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('meetings:saveSegments', (_e, meetingId: string, segments: TranscriptSegmentDraft[]) =>
     saveTranscriptSegments(String(meetingId), Array.isArray(segments) ? segments : [])
   )
+  // M2b — the Enhance pass (SPEC-003 §3.4). The renderer validates every
+  // returned span against the real segments and downgrades the unprovable.
+  ipcMain.handle('ai:enhanceRecord', (_e, input: EnhanceInput) => enhanceRecord(input))
   ipcMain.handle('meetings:segments', (_e, meetingId: string) =>
     listTranscriptSegments(String(meetingId))
   )

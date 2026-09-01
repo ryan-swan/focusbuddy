@@ -1236,6 +1236,8 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_apps', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_forms', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_meetings', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // M2b — the Record (SPEC-003 §3.4): provenance-tiered spans, JSON.
+  ensureColumn(db, 'fb_meetings', 'record_json', 'TEXT')
   ensureColumn(db, 'fb_sign_requests', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_smart_folders', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   // Semantic-search vectors and the activity / focus / browsing logs are scoped

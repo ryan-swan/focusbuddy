@@ -16,8 +16,36 @@ export interface Meeting {
   // Plain-text action items distilled from the meeting.
   actionItems: string[]
   durationSec: number | null
+  /** M2b — the Record: one object, three renderings (SPEC-003 §3.4). Null
+   *  until an Enhance pass has run for this meeting. */
+  record: MeetingRecord | null
   createdAt: number
   updatedAt: number
+}
+
+// M2b (SPEC-003 §2.3, S3-DEC-021) — the Record's provenance model. Three
+// tiers, and the middle one is the rule that makes the model honest:
+//   yours    — the user typed it. Verbatim, never rewritten, ever.
+//   heard    — carries a resolvable transcript anchor (segmentId). A heard
+//              span whose anchor does not resolve is DOWNGRADED to inferred
+//              automatically — the tier can never be asserted, only proven.
+//   inferred — the model's synthesis. Contestable, and rendered as such.
+export type RecordTier = 'yours' | 'heard' | 'inferred'
+
+export interface RecordSpan {
+  tier: RecordTier
+  text: string
+  /** heard only — the segment this claim is drawn from. */
+  segmentId: string | null
+  /** heard only — the anchor's clock position, for the hover timestamp. */
+  startMs: number | null
+  /** Brief section heading this span renders under (template-driven). */
+  section: string | null
+}
+
+export interface MeetingRecord {
+  spans: RecordSpan[]
+  generatedAt: number
 }
 
 export interface MeetingDraft {
@@ -34,6 +62,7 @@ export interface MeetingPatch {
   summary?: string
   actionItems?: string[]
   durationSec?: number | null
+  record?: MeetingRecord | null
 }
 
 // M2 (SPEC-003 S3-DEC-021) — one attributed, timestamped span of speech.

@@ -14,8 +14,19 @@ interface MeetingRow {
   summary: string
   action_items_json: string
   duration_sec: number | null
+  record_json: string | null
   created_at: number
   updated_at: number
+}
+
+function parseRecord(raw: string | null): Meeting['record'] {
+  if (!raw) return null
+  try {
+    const r = JSON.parse(raw) as Meeting['record']
+    return r && Array.isArray(r.spans) ? r : null
+  } catch {
+    return null
+  }
 }
 
 function parseItems(raw: string): string[] {
@@ -29,6 +40,7 @@ function parseItems(raw: string): string[] {
 
 function rowToMeeting(row: MeetingRow): Meeting {
   return {
+    record: parseRecord(row.record_json),
     id: row.id,
     title: row.title,
     transcript: row.transcript,
@@ -82,12 +94,21 @@ export function updateMeeting(id: string, patch: MeetingPatch): Meeting | null {
     summary: patch.summary ?? existing.summary,
     items: JSON.stringify(patch.actionItems ?? existing.actionItems),
     duration: patch.durationSec !== undefined ? patch.durationSec : existing.durationSec,
+    record:
+      patch.record !== undefined
+        ? patch.record
+          ? JSON.stringify(patch.record)
+          : null
+        : existing.record
+          ? JSON.stringify(existing.record)
+          : null,
     updated_at: Date.now(),
     id
   }
   db.prepare(
     `UPDATE fb_meetings SET title = @title, transcript = @transcript, summary = @summary,
-       action_items_json = @items, duration_sec = @duration, updated_at = @updated_at WHERE id = @id`
+       action_items_json = @items, duration_sec = @duration, record_json = @record,
+       updated_at = @updated_at WHERE id = @id`
   ).run(next)
   return getMeeting(id)
 }

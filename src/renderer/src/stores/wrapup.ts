@@ -5,6 +5,7 @@ import { getMeetingOrigin, clearMeetingOrigin } from '../lib/startMeeting'
 import { ensureMeetingFolder, saveTranscriptDoc, saveMeetingNotesDoc } from '../lib/meetingWrapup'
 import { transcribeRecording } from '../lib/transcribeRecording'
 import { mergeTrackSegments, formatAttributedTranscript } from '../lib/transcriptMerge'
+import { buildYoursSpans, validateRecordSpans } from '../lib/recordSpans'
 
 // End-of-conversation wrap-up. When a meeting or call ends with a recording, this
 // drives the one honest pipeline: transcribe the mixed audio, ask the AI for a
@@ -75,7 +76,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
       void saveMeetingNotesDoc(title, notes ?? '', moments ?? [], Date.now())
     }
     try {
-      await runWrapup({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription }, set)
+      await runWrapup({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes }, set)
     } catch (err) {
       // Any thrown/rejected step (IPC failure, network, an AI provider error)
       // resolves to an honest error state instead of an unhandled rejection —
@@ -100,10 +101,11 @@ interface WrapupInput {
   tracks?: Array<{ accountId: string; buffer: ArrayBuffer; mimeType: string; offsetMs: number; durationSec: number }>
   speakers?: Record<string, string>
   forceLocalTranscription?: boolean
+  notes?: string
 }
 
 async function runWrapup(
-  { title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription }: WrapupInput,
+  { title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes }: WrapupInput,
   set: (partial: Partial<WrapupState>) => void
 ): Promise<void> {
   let transcript = ''
@@ -223,8 +225,36 @@ async function runWrapup(
 
   // M2 — the segments ARE the transcript now; persist them against the
   // meeting record so the Thread rendering and Recall have data, not prose.
+  let savedSegments: Awaited<ReturnType<typeof window.api.meetings.saveSegments>> = []
   if (meeting?.id && segmentDrafts.length) {
-    await window.api.meetings.saveSegments(meeting.id, segmentDrafts).catch(() => null)
+    savedSegments = (await window.api.meetings.saveSegments(meeting.id, segmentDrafts).catch(() => null)) ?? []
+  }
+
+  // M2b — the Enhance pass (§3.4). Best-effort and NON-BLOCKING: a failed
+  // enhance leaves summary + deliverables intact and the Record simply
+  // absent. `yours` spans are built HERE from the notes, verbatim — the
+  // model never touches them; its heard claims are validated against the
+  // real segments and the unprovable are downgraded (S3-DEC-021).
+  if (meeting?.id && savedSegments.length) {
+    set({ step: 'Building the record…', status: 'processing' })
+    const enh = await window.api.meetings
+      .enhanceRecord({
+        title,
+        notes: notes ?? '',
+        segments: savedSegments.map((s) => ({
+          id: s.id,
+          startMs: s.startMs,
+          speakerName: s.speakerName,
+          text: s.text
+        }))
+      })
+      .catch(() => ({ ok: false as const, error: 'enhance failed' }))
+    if (enh.ok) {
+      const spans = [...buildYoursSpans(notes ?? ''), ...validateRecordSpans(enh.spans, savedSegments)]
+      await window.api.meetings
+        .update(meeting.id, { record: { spans, generatedAt: Date.now() } })
+        .catch(() => null)
+    }
   }
 
   set({ status: 'review', summary, proposals, meetingId: meeting?.id ?? null })

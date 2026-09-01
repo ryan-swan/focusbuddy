@@ -1628,6 +1628,15 @@ const api = {
       ipcRenderer.invoke('meetings:saveSegments', meetingId, segments),
     segments: (meetingId: string): Promise<TranscriptSegment[]> =>
       ipcRenderer.invoke('meetings:segments', meetingId),
+    /** M2b — the Enhance pass; renderer validates + downgrades unprovable spans. */
+    enhanceRecord: (input: {
+      title: string
+      notes: string
+      segments: Array<{ id: string; startMs: number; speakerName: string; text: string }>
+    }): Promise<
+      | { ok: true; spans: Array<{ tier: 'heard' | 'inferred'; text: string; segmentId?: string; section?: string }> }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('ai:enhanceRecord', input),
     update: (id: string, patch: MeetingPatch): Promise<Meeting | null> =>
       ipcRenderer.invoke('meetings:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('meetings:delete', id)
