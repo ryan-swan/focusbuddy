@@ -3065,3 +3065,42 @@ PREP and guest capture).
 PlexiCam follow-up is CLOSED; remaining named rounds: C5 Record widget +
 moment anchors, Recall-over-MCP, briefs for other attendees, two-machine
 QA (operator-owed).
+
+## DEC-107 — C5 closed: the Record widget + per-item moment anchors
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** named follow-up
+(S3-DEC-020's last sliver, deferred at DEC-101; the moment anchor named at
+DEC-102) · **Branch:** ryan-next
+
+**The Record stands on its desk.** New widget kind 'meeting-record'
+(content = meeting id): the wrap-up mints it FIRST, beside the transcript
+doc, and it READS the meetings store live — never a copy — so the desk
+shows the same truth PlexiMeet shows, provenance tiers intact: yours at
+ink-100 leading, heard behind its timestamped quote rule, inferred
+visibly quieter. Every heard line is a DOOR — click it and PlexiMeet
+opens with the Thread scrolled to that exact segment. Honest states for
+the not-yet ("written at wrap-up") and the gone ("the Record went with
+it"). The kind is deliberately absent from the hand-add catalogue, so
+the empty shell S3-DEC-020 warned about can never be placed by hand; an
+unknown kind on an older client falls into Canvas's default case.
+
+**The moment anchor, closed where DEC-102 left it.** A new internal URL —
+plexii://meeting/<id>?seg=<segmentId> (lib/meetingLink, build + parse
+unit-pinned) — rides the DEC-091 source_url column. MeetingCommitmentsCard
+stamps it on every ANCHORED commitment it files; unanchored items keep the
+meeting-level door only, the honest asymmetry. The Attention chip now
+PARSES before it opens: an internal moment routes inside Plexii
+(openMeeting + segmentId → M4's fb:open-meeting listener → Thread scrolled
+to the line, icon my_location, title "Jump to the spoken moment"); any
+other URL is DEC-091's web mark, still opened externally, untouched.
+
+Verified live on the real build, both doors: the Attention chip landed
+the Thread on Dana's exact line ("[0:30] Dana: the contract must be
+countersigned by Friday", visible in-viewport); the desk widget rendered
+its DECISIONS section with all three tiers and its heard line landed the
+same segment the same way. Scratch data cleaned (item dismissed per
+R008, meeting deleted with segments, desk trashed).
+
+9 new tests (c5RecordWidget: URL round-trips + wiring pins); 3,611 green
+across 332 files; both typechecks clean. **C5 is fully closed.**
+Remaining named rounds: Recall-over-MCP; briefs for other attendees;
+two-machine QA (operator-owed); analysis/27 Phase 4/5.

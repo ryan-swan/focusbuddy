@@ -386,7 +386,14 @@ async function runWrapup(
         title: `${title || 'Meeting'} — ${new Date().toLocaleDateString()}`
       })
       if (desk) {
-        let x = 40
+        // C5, closed: the Record itself stands on the desk beside the
+        // transcript — reading the meetings store live, provenance tiers
+        // intact, its heard lines doors into the Thread.
+        await useWidgetStore
+          .getState()
+          .create({ taskId: desk.id, kind: 'meeting-record', content: meeting.id, x: 40, y: 40, width: 420, height: 440 })
+          .catch(() => null)
+        let x = 500
         for (const docId of [transcriptDocId].filter((d): d is string => !!d)) {
           await useWidgetStore
             .getState()

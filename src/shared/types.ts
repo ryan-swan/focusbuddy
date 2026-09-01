@@ -61,6 +61,12 @@ export type WidgetKind =
   // freely-placed elements), embeddable on the desk like the other office docs
   // (backed by an fb_documents row of type 'design').
   | 'design'
+  // The meeting Record on its desk (C5, S3-DEC-020's last sliver): content
+  // holds the meeting id; renders the Record's spans with their provenance
+  // tiers and doors into PlexiMeet. Minted by the wrap-up beside the
+  // transcript doc — deliberately absent from the add-widget catalogue, so
+  // an empty shell can never be hand-placed.
+  | 'meeting-record'
   // Stream Deck — Elgato-style 10×3 button grid with folder navigation,
   // macros, app launching, media keys, and volume control. Configuration
   // (buttons, folders, action payloads) lives in widget.content as JSON.

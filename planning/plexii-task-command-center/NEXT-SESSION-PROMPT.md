@@ -47,11 +47,17 @@
 > Stop with a held take); calls ride the meeting pipeline (per-track,
 > attributed, on-device) and ConversationRecorder is deleted. Suite:
 > 3,602 tests / 331 files.
+> **C5 is fully closed (DEC-107)**: widget kind 'meeting-record' minted
+> first on the meeting desk (live store read, provenance tiers, heard
+> lines are doors), plus per-item moment anchors — plexii://meeting/
+> <id>?seg=<segId> stamped on anchored commitments; the Attention chip
+> parses before it opens (moments inside, DEC-091 web marks still
+> external). Suite: 3,611 tests / 332 files.
 > Next: operator's pick — two-machine QA (meetings consent, live pane,
-> Stage PREP, guest capture, AND the new calls consent round-trip); C5
-> Record widget + per-item moment anchors; Recall-over-MCP; briefs for
-> other attendees (out-of-room delivery); or back to analysis/27
-> Phase 4 (AI-suggested tags, home widgets) / Phase 5 process items.
+> Stage PREP, guest capture, calls consent round-trip); Recall-over-MCP;
+> briefs for other attendees (out-of-room delivery); or back to
+> analysis/27 Phase 4 (AI-suggested tags, home widgets) / Phase 5
+> process items.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

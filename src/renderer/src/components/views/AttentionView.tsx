@@ -3,6 +3,7 @@ import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
+import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
@@ -625,10 +626,15 @@ export default function AttentionView(): JSX.Element {
   /** DEC-079 — jump to the meeting an item came from: open PlexiMeet, then
    *  hand it the meeting to select once the view has mounted (the same
    *  post-navigation handoff pattern openHere uses for widgets). */
-  function openMeeting(meetingId: string): void {
+  function openMeeting(meetingId: string, segmentId?: string | null): void {
     goMeetings()
     setTimeout(
-      () => window.dispatchEvent(new CustomEvent('fb:open-meeting', { detail: { id: meetingId } })),
+      () =>
+        window.dispatchEvent(
+          new CustomEvent('fb:open-meeting', {
+            detail: segmentId ? { id: meetingId, segmentId } : { id: meetingId }
+          })
+        ),
       250
     )
   }
@@ -1163,16 +1169,24 @@ export default function AttentionView(): JSX.Element {
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    // DEC-091 — the deep link: the page the mark was made ON
-                    // (the Slack thread, the ticket), frozen at mark time.
-                    // The widget itself may have browsed away; this has not.
-                    void window.api.files.openExternal(i.sourceUrl!)
+                    // C5 round — an internal plexii:// URL is a MOMENT: it
+                    // opens the meeting with the Thread scrolled to the
+                    // quoted line. Anything else is DEC-091's web deep link
+                    // (the Slack thread, the ticket), frozen at mark time —
+                    // the widget may have browsed away; this has not.
+                    const moment = parseMeetingMomentUrl(i.sourceUrl)
+                    if (moment) openMeeting(moment.meetingId, moment.segmentId)
+                    else void window.api.files.openExternal(i.sourceUrl!)
                   }}
                   data-row-action
-                  title={`Open the source page — ${i.sourceUrl}`}
+                  title={
+                    parseMeetingMomentUrl(i.sourceUrl)
+                      ? 'Jump to the spoken moment in the meeting'
+                      : `Open the source page — ${i.sourceUrl}`
+                  }
                   className="icon-btn !h-6 !w-6"
                 >
-                  <Icon name="link" size={14} />
+                  <Icon name={parseMeetingMomentUrl(i.sourceUrl) ? 'my_location' : 'link'} size={14} />
                 </button>
               )}
               {hasDesk && i.sourceRef && i.sourceType !== 'note' && (

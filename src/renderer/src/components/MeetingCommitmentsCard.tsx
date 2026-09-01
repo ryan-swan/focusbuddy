@@ -7,6 +7,7 @@ import { useActionHistory } from '../stores/actionHistory'
 import { useNoticeStore } from '../stores/notice'
 import { serializeMentions } from '../lib/itemMentions'
 import type { CarriedItem } from '@shared/meetings'
+import { buildMeetingMomentUrl } from '../lib/meetingLink'
 
 // M3 (SPEC-003 §3.6) — the confirm stop for extracted commitments. This is
 // the screen that answers "nothing happens after": nothing files silently
@@ -130,6 +131,10 @@ export default function MeetingCommitmentsCard({
             wiOrigin: 'ai',
             sourceType: 'meeting',
             sourceRef: meetingId,
+            // C5 round — the MOMENT anchor: an anchored commitment's chip
+            // lands the Thread on the exact quoted line, not just the
+            // meeting. Unanchored items keep the meeting-level door only.
+            sourceUrl: c.segment ? buildMeetingMomentUrl(meetingId, c.segment.id) : null,
             // C7 — the owner rides as a person mention: a reference the item
             // keeps, never a notification we send. SPEC-027 owns sending.
             mentions:
