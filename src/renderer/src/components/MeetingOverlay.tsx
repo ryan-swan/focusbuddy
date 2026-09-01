@@ -82,8 +82,12 @@ function ControlButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`inline-flex ${size} items-center justify-center rounded-full transition-colors ${
-        danger ? 'bg-rose-500 text-white hover:bg-rose-600' : active ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white/10 text-white hover:bg-white/20'
+      className={`inline-flex ${size} items-center justify-center rounded-full fb-press transition-colors shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] ${
+        danger
+          ? 'bg-gradient-to-b from-rose-500 to-rose-600 text-white hover:from-rose-400'
+          : active
+            ? 'bg-white/20 text-white hover:bg-white/30'
+            : 'bg-white/10 text-white hover:bg-white/20'
       }`}
     >
       <Icon name={icon} size={small ? 17 : 20} />
@@ -418,8 +422,10 @@ export default function MeetingOverlay(): JSX.Element | null {
   const notesPane = (
     <div className="w-[300px] shrink-0 flex flex-col rounded-xl bg-stone-900/90 border border-white/10 overflow-hidden" data-testid="meeting-notes-pane">
       <div className="px-3 py-2 border-b border-white/10 flex items-center gap-2">
-        <Icon name="edit_note" size={15} className="text-white/70" />
-        <span className="text-[12px] font-semibold text-white/90 flex-1">Notes — yours, verbatim</span>
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-chip)] bg-white/10 text-white/80">
+          <Icon name="edit_note" size={14} />
+        </span>
+        <span className="text-[12px] font-semibold text-white/90 flex-1 tracking-tight">Notes — yours, verbatim</span>
         {moments.length > 0 && (
           <span className="text-[10.5px] text-amber-300/90" data-testid="moment-count">⚑ {moments.length}</span>
         )}

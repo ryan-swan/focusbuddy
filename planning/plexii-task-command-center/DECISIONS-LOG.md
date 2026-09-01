@@ -3313,3 +3313,65 @@ delivered to the operator.
 
 7 material pins (meetHouseMaterial — paper, chip, gloss, eyebrow, track,
 sticky bar, column); 3,662 green across 337 files; both typechecks clean.
+
+## DEC-113 — the transcription bug: `task:'transcribe'` was poisoning whisper
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** operator bug report
+(a real test meeting came back as one sentence looped a dozen times; "Find
+commitments" then honestly found nothing) · **Branch:** ryan-next ·
+**Commit:** cca8693a
+
+**Root-caused by measurement on the operator's OWN saved take** (36.5s of
+clear speech, decoded off disk). The decode passed `task: 'transcribe'`;
+on transformers.js 2.17.2's whisper models that option forces a decoder
+path that collapses real speech into "So So So…" loops. Omitting it — the
+library default — transcribes the same audio near-perfectly. The
+commitments extractor was never broken: it correctly found nothing in the
+loop mush (an honest zero over garbage).
+
+**The full fix, each part proven on that take:**
+- Drop `task: 'transcribe'`. The one load-bearing line.
+- whisper-base for wrap-up truth (tiny genuinely loops on this audio);
+  tiny stays only for the live ⌘⇧T pane, a labelled courtesy the wrap-up
+  rewrites afterward.
+- Belt and braces: explicit 30s windows + 5s stride + a 3-gram repeat ban,
+  and a pure collapse-repeat net (whisperCore.collapseRepeatRuns) that
+  folds any surviving loop to one honest segment.
+- Decode quality: the renderer decodes at native rate then resamples via
+  OfflineAudioContext, instead of a forced-16kHz AudioContext whose
+  in-decode resampler muddied the first seconds.
+- Recovery: a "Re-transcribe" button on any meeting with retained audio
+  re-runs the saved takes through the current engine (segments, transcript
+  and summary rewritten, the commitments door reopened). Audio never
+  leaves the machine — the same local decode path as the wrap-up.
+
+**Honest note on the detour:** a long bisection wrongly blamed the Electron
+main process / onnxruntime threadpool and briefly moved transcription to a
+child process — every "clean" comparison run had simply happened to omit
+`task`. That machinery was fully reverted; the engine stays simple and
+in-process. Pure logic lives in whisperCore.
+
+Verified live on the operator's broken meeting: a clean 6-segment
+transcript, a coherent summary, and both stated deliverables ("follow up
+with Caleb on timestamp/clip", "make the video meeting feel in-desk") now
+surface as commitments. 10 new tests (whisperQuality); one M2a pin
+migrated to whisperCore; 3,672 green.
+
+## DEC-114 — Stage + wrap-up wear the house material
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** operator request
+(the DEC-112 companion — "bring the Stage and wrap-up into the house
+material too") · **Branch:** ryan-next · **Scope rule:** DEC-094's —
+presentation only.
+
+**Wrap-up** (the review overlay after every recording) now carries the
+same finish as the restyled PlexiMeet: a rose identity chip, the display
+title, eyebrow section headers (SUMMARY / DELIVERABLES), and a glossy
+accent-primary "Done" (Close stays quiet). Already an fb-card on the house
+scrim; this made it read as the same product as the rest. **Stage** (the
+live video surface — legitimately dark, like every video app) got the
+premium treatment where it belongs: control buttons gain the house press,
+an inset gloss highlight and a danger gradient; the notes-pane header gets
+the chip-and-eyebrow treatment. The dark video stage stays dark by design.
+
+3 material pins added (wrap-up chip + display, glossy Done, premium Stage
+controls); 3,675 green across 338 files; both typechecks clean. Light and
+dark wrap-up screenshots delivered.

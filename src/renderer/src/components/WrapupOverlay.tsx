@@ -75,13 +75,15 @@ export default function WrapupOverlay(): JSX.Element | null {
   return (
     <div className="fb-scrim fixed inset-0 z-[210] flex items-start justify-center pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
       <div className="fb-card w-[560px] max-w-[92vw] max-h-[78vh] flex flex-col overflow-hidden" data-testid="wrapup-panel">
-        <div className="px-5 py-3.5 border-b border-[var(--edge-soft)] flex items-center gap-2.5">
-          <Icon name="summarize" size={18} className="text-rose-500" filled />
+        <div className="px-5 py-3.5 border-b border-[var(--edge-soft)] flex items-center gap-2.5 bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)]">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] bg-rose-500/10 text-rose-500 shadow-[inset_0_0_0_1px_rgb(244_63_94/0.18)]">
+            <Icon name="summarize" size={17} filled />
+          </span>
           <div className="min-w-0">
-            <h2 className="text-[14px] font-semibold text-[var(--ink-100)] truncate">{title || 'Conversation'}</h2>
-            <p className="text-[11px] text-[var(--ink-50)]">Wrap-up</p>
+            <h2 className="fb-display text-[14px] font-semibold text-[var(--ink-100)] truncate leading-tight">{title || 'Conversation'}</h2>
+            <p className="text-[11px] text-[var(--ink-50)] leading-tight">Wrap-up</p>
           </div>
-          <button onClick={dismiss} className="ml-auto p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)]" aria-label="Close">
+          <button onClick={dismiss} className="ml-auto p-1 rounded text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press" aria-label="Close">
             <Icon name="close" size={16} />
           </button>
         </div>
@@ -125,7 +127,7 @@ export default function WrapupOverlay(): JSX.Element | null {
                 </section>
               )}
               <section>
-                <h3 className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-1.5">Summary</h3>
+                <h3 className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Summary</h3>
                 {summary ? (
                   <p className="text-[13px] text-[var(--ink-90)] leading-relaxed whitespace-pre-wrap" data-testid="wrapup-summary">{summary}</p>
                 ) : (
@@ -162,7 +164,7 @@ export default function WrapupOverlay(): JSX.Element | null {
               )}
 
               <section className="mt-5" data-testid="wrapup-deliverables">
-                <h3 className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium mb-2">
+                <h3 className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-2">
                   Deliverables{proposals.length ? ` (${proposals.length})` : ''}
                 </h3>
                 {proposals.length === 0 ? (
@@ -189,8 +191,16 @@ export default function WrapupOverlay(): JSX.Element | null {
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-[var(--edge-soft)] flex justify-end">
-          <button onClick={dismiss} data-testid="wrapup-done" className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-lg bg-[var(--surface-sunken)] text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-base)]">
+        <div className="px-5 py-3 border-t border-[var(--edge-soft)] flex justify-end bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)]">
+          <button
+            onClick={dismiss}
+            data-testid="wrapup-done"
+            className={
+              status === 'review'
+                ? 'inline-flex items-center gap-1.5 h-8 px-4 rounded-[var(--radius-field)] text-white text-[12.5px] font-semibold fb-press bg-gradient-to-b from-[rgb(var(--accent))] to-[rgb(var(--accent-hover))] shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.12)]'
+                : 'inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] text-[12.5px] text-[var(--ink-90)] fb-press hover:bg-[var(--surface-base)]'
+            }
+          >
             {status === 'review' ? 'Done' : 'Close'}
           </button>
         </div>

@@ -45,3 +45,23 @@ describe('PlexiMeet wears the house material', () => {
     expect(view.split('max-w-[780px]').length - 1).toBeGreaterThanOrEqual(4)
   })
 })
+
+describe('the Stage and wrap-up wear the house material too', () => {
+  const wrap = readFileSync(join(ROOT, 'src/renderer/src/components/WrapupOverlay.tsx'), 'utf-8')
+  const stage = readFileSync(join(ROOT, 'src/renderer/src/components/MeetingOverlay.tsx'), 'utf-8')
+
+  it('the wrap-up header carries the rose identity chip and display title', () => {
+    expect(wrap).toContain('bg-rose-500/10 text-rose-500')
+    expect(wrap).toContain('fb-display text-[14px] font-semibold')
+  })
+
+  it("the wrap-up's Done is a glossy accent primary; Close stays quiet", () => {
+    expect(wrap).toContain('bg-gradient-to-b from-[rgb(var(--accent))] to-[rgb(var(--accent-hover))]')
+    expect(wrap).toContain("status === 'review'")
+  })
+
+  it('the Stage controls are premium — press, gloss inset, danger gradient', () => {
+    expect(stage).toContain('rounded-full fb-press transition-colors shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]')
+    expect(stage).toContain('bg-gradient-to-b from-rose-500 to-rose-600 text-white hover:from-rose-400')
+  })
+})

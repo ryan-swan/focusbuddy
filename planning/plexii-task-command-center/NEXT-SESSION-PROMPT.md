@@ -89,6 +89,17 @@
 > compositor tiles to CDP screenshots (layerized elements especially) —
 > captureBeyondViewport + a damage nudge is the honest capture. Suite:
 > 3,662 tests / 337 files.
+> **DEC-113 (the real bug fix)**: meeting transcription was garbage —
+> `task: 'transcribe'` poisoned whisper (looped one sentence a dozen
+> times; "Find commitments" honestly found nothing). Fixed by dropping
+> `task`, defaulting to whisper-base (tiny only for the live pane),
+> anti-loop guards + a collapse net, an OfflineAudioContext resample,
+> and a "Re-transcribe" recovery button. A long child-process detour was
+> a red herring, fully reverted — engine stays in-process. Verified live
+> on the operator's own broken meeting: clean transcript + both
+> deliverables surface as commitments. **DEC-114**: Stage + wrap-up
+> wear the house material (presentation only). Suite: 3,675 tests /
+> 338 files.
 
 **Last updated:** 2026-09-01 — through DEC-111 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
