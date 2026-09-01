@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { ActionProposal } from '@shared/types'
 import { useMeetingsStore } from './meetings'
 import { getMeetingOrigin, clearMeetingOrigin } from '../lib/startMeeting'
-import { ensureMeetingFolder, saveTranscriptDoc } from '../lib/meetingWrapup'
+import { ensureMeetingFolder, saveTranscriptDoc, saveMeetingNotesDoc } from '../lib/meetingWrapup'
 import { transcribeRecording } from '../lib/transcribeRecording'
 
 // End-of-conversation wrap-up. When a meeting or call ends with a recording, this
@@ -30,7 +30,18 @@ interface WrapupState {
   // DEC-079 — the Meeting record this wrap-up produced, so approved
   // deliverables can POINT back at it (sourceType 'meeting').
   meetingId: string | null
-  begin: (input: { title: string; buffer: ArrayBuffer; mimeType: string; durationSec: number }) => Promise<void>
+  begin: (input: {
+    title: string
+    buffer: ArrayBuffer
+    mimeType: string
+    durationSec: number
+    /** M1 — per-participant attributed takes (C1). Held for M2's attributed
+     *  transcription; the mixed buffer still feeds today's pipeline. */
+    tracks?: Array<{ accountId: string; buffer: ArrayBuffer; mimeType: string; offsetMs: number; durationSec: number }>
+    /** The Stage notepad + ⌘⇧M anchors, saved verbatim beside the transcript. */
+    notes?: string
+    moments?: number[]
+  }) => Promise<void>
   dismiss: () => void
 }
 
@@ -48,8 +59,16 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   transcriptDocId: null,
   meetingId: null,
 
-  begin: async ({ title, buffer, mimeType, durationSec }) => {
+  begin: async ({ title, buffer, mimeType, durationSec, tracks, notes, moments }) => {
     set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null })
+    // M1 — the notes are the user's words and must survive REGARDLESS of how
+    // transcription goes: saved first, not gated on the pipeline succeeding.
+    if ((notes && notes.trim()) || (moments && moments.length)) {
+      void saveMeetingNotesDoc(title, notes ?? '', moments ?? [], Date.now())
+    }
+    // Per-track takes are the M2 foundation; nothing consumes them yet and
+    // this says so honestly rather than pretending they are stored.
+    void tracks
     try {
       await runWrapup({ title, buffer, mimeType, durationSec }, set)
     } catch (err) {

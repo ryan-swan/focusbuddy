@@ -1,8 +1,16 @@
 import { create } from 'zustand'
 import { sendSocketMessage, setMeetingSocketHandler, type MeetingSocketEvent } from '../lib/messagingSocket'
 import { notifyExternal } from '../lib/notify'
-import { ConversationRecorder } from '../lib/conversationRecorder'
-import { whisperEnabled, setWhisperEnabled } from '../lib/whisperPref'
+import { MeetingTrackRecorder } from '../lib/trackRecorder'
+import {
+  initialConsent,
+  isConsentWire,
+  mayCapture,
+  type ConsentChoice,
+  type ConsentMap,
+  type ConsentWire
+} from '../lib/meetingConsent'
+import { saveMeetingNotesDoc } from '../lib/meetingWrapup'
 import { useWrapupStore } from './wrapup'
 import { useAccountStore } from './account'
 import { personDisplayName } from '../lib/personName'
@@ -80,14 +88,31 @@ interface MeetingRoomStore {
   // Presentation of the live room (see MeetingLayout). dockSide is remembered.
   layout: MeetingLayout
   dockSide: DockSide
-  // Whether this meeting is being recorded for a transcript + summary. Reflects
-  // the whisper opt-in at join and can be toggled live during the meeting.
+  // M1 (S3-DEC-024) — recording state under consent. `transcribing` kept as
+  // the UI-facing name; it is true only after someone explicitly STARTED a
+  // recording. No preference, calendar rule or rejoin ever sets it.
   transcribing: boolean
+  /** Who started the recording (accountId), when one is live. */
+  recordingBy: string | null
+  /** Per-participant consent, self included (S3-DEC-024). */
+  consent: ConsentMap
+  /** A consent prompt awaiting MY answer, when someone else started. */
+  consentAsk: { by: string; byName: string } | null
+  /** The Stage notepad — my words, verbatim, saved on leave. */
+  notes: string
+  /** ⌘⇧M anchors: ms offsets on the meeting clock (recording t0 when live,
+   *  join time otherwise — a moment is a moment either way). */
+  moments: number[]
+  joinedAtMs: number | null
 
   init: () => void
   setLayout: (layout: MeetingLayout) => void
   setDockSide: (side: DockSide) => void
+  /** Start the consent flow + recording, or stop a recording I started. */
   setTranscribing: (on: boolean) => void
+  answerConsent: (choice: ConsentChoice) => void
+  setNotes: (text: string) => void
+  markMoment: () => void
   start: (title?: string) => Promise<string | null>
   join: (roomId: string, title?: string) => Promise<void>
   invite: (peer: { accountId: string; handle: string }) => void
@@ -117,8 +142,9 @@ let screenSenders = new Map<string, RTCRtpSender>()
 // The screen stream id each peer has announced they are sharing, so ontrack can
 // route their screen track to `screenStream` instead of merging it into camera.
 let announcedScreenSid = new Map<string, string>()
-// Records the mixed audio of the meeting so it can be summarised on leave.
-let recorder: ConversationRecorder | null = null
+// M1 — the per-track recorder (C1, ruled foundation): one attributed take
+// per consented participant plus a mixed blob for the legacy wrap-up.
+let recorder: MeetingTrackRecorder | null = null
 
 function genRoomId(): string {
   return `meet-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
@@ -129,6 +155,14 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     const roomId = get().roomId
     if (!roomId) return
     sendSocketMessage({ type: 'meetingSignal', payload: { roomId, to, data: JSON.stringify(data) } })
+  }
+
+  /** M1 — the initiator's authoritative consent snapshot, to every peer. */
+  function broadcastConsentState(consent: ConsentMap): void {
+    const me = useAccountStore.getState().account?.id ?? ''
+    for (const id of Object.keys(get().participants)) {
+      signalTo(id, { kind: 'consent-state', by: me, consent })
+    }
   }
 
   // Create (or fetch) the peer connection for a member, wiring local tracks, ICE
@@ -167,8 +201,9 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       for (const track of inbound ? inbound.getTracks() : [e.track]) {
         if (!camera.getTracks().some((t) => t.id === track.id)) camera.addTrack(track)
       }
-      // Mix this peer's audio into the conversation recording.
-      recorder?.addStream(camera)
+      // M1 — capture this peer ONLY if they have consented (S3-DEC-024).
+      // 'pending' is a no until they answer; 'declined' is a no forever.
+      if (recorder && mayCapture(get().consent[accountId])) recorder.tap(accountId, camera)
       set({ participants: { ...get().participants, [accountId]: { ...p, stream: camera } } })
     }
     pc.onconnectionstatechange = () => {
@@ -270,6 +305,12 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       muted: false,
       cameraOff: false,
       transcribing: false,
+      recordingBy: null,
+      consent: {},
+      consentAsk: null,
+      notes: '',
+      moments: [],
+      joinedAtMs: null,
       // Next meeting starts on the stage; dockSide preference is kept.
       layout: 'stage'
     })
@@ -317,9 +358,20 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     if (e.type === 'meetingPeerJoined') {
       // A newcomer arrived after me: prepare a connection but wait for their offer.
       ensurePeer(e.payload.peer.accountId, e.payload.peer.handle, e.payload.peer.firstName, e.payload.peer.lastName)
+      // M1 — recording live and I started it: the newcomer is asked before a
+      // single sample of theirs is captured (they join as 'pending').
+      const me = useAccountStore.getState().account?.id ?? ''
+      if (get().transcribing && get().recordingBy === me) {
+        const myName = personDisplayName(useAccountStore.getState().account ?? {}, 'The host')
+        const next = { ...get().consent, [e.payload.peer.accountId]: 'pending' as const }
+        set({ consent: next })
+        signalTo(e.payload.peer.accountId, { kind: 'consent-request', by: me, byName: myName })
+        broadcastConsentState(next)
+      }
       return
     }
     if (e.type === 'meetingPeerLeft') {
+      recorder?.untap(e.payload.accountId)
       dropPeer(e.payload.accountId)
       return
     }
@@ -349,6 +401,43 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
           if (p && p.screenStream) {
             set({ participants: { ...get().participants, [from]: { ...p, screenStream: null } } })
           }
+        }
+        return
+      }
+      // M1 — the consent handshake rides the same relay as SDP/ICE (no server
+      // changes). Handled before ensurePeer: consent messages must not mint
+      // peer connections.
+      if (isConsentWire(data as { kind?: string })) {
+        const wire = data as unknown as ConsentWire
+        if (wire.kind === 'consent-request') {
+          // Someone started recording; I owe an answer. Until I give one I am
+          // 'pending' and my audio is not captured anywhere.
+          set({
+            transcribing: true,
+            recordingBy: wire.by,
+            consentAsk: { by: wire.by, byName: wire.byName },
+            consent: { ...get().consent, [wire.by]: 'accepted' }
+          })
+        } else if (wire.kind === 'consent-response') {
+          const next = { ...get().consent, [from]: wire.choice }
+          set({ consent: next })
+          // If I hold the recorder and they consented, start capturing them NOW.
+          if (recorder && mayCapture(wire.choice)) {
+            const p = get().participants[from]
+            if (p?.stream) recorder.tap(from, p.stream)
+          }
+          if (recorder && wire.choice === 'declined') recorder.untap(from)
+        } else if (wire.kind === 'consent-state') {
+          // The initiator's authoritative snapshot (so late joiners and every
+          // header agree on the same words).
+          set({ transcribing: true, recordingBy: wire.by, consent: wire.consent })
+          const me = useAccountStore.getState().account?.id ?? ''
+          if (wire.consent[me] === 'pending' && !get().consentAsk) {
+            const initiator = get().participants[wire.by]
+            set({ consentAsk: { by: wire.by, byName: initiator ? personDisplayName(initiator, initiator.handle) : 'The host' } })
+          }
+        } else if (wire.kind === 'recording-stopped') {
+          set({ transcribing: false, recordingBy: null, consent: {}, consentAsk: null })
         }
         return
       }
@@ -411,6 +500,12 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     layout: 'stage',
     dockSide: loadDockSide(),
     transcribing: false,
+    recordingBy: null,
+    consent: {},
+    consentAsk: null,
+    notes: '',
+    moments: [],
+    joinedAtMs: null,
 
     setLayout: (layout) => set({ layout }),
     setDockSide: (side) => {
@@ -421,28 +516,55 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       }
       set({ dockSide: side })
     },
-    // Turn meeting transcription on/off live. Persists the choice as the user's
-    // default. Turning on mid-meeting starts recording from now (own mic + any
-    // connected peers); turning off stops and discards the recording so no
-    // summary is produced. Peers that connect later are mixed in automatically
-    // (see ontrack).
+    // M1 (S3-DEC-024) — start recording THROUGH consent, or stop one I
+    // started. Starting: I consent by the act itself; everyone present is
+    // prompted and captured only once they answer yes. No preference is
+    // written here — a meeting recording is a per-meeting act, never a
+    // default (the old code both persisted a global pref and captured every
+    // peer instantly, untold; both behaviours are deliberately gone).
     setTranscribing: (on) => {
-      setWhisperEnabled(on)
+      const me = useAccountStore.getState().account?.id ?? ''
       if (on && !recorder && get().status === 'in') {
-        recorder = new ConversationRecorder()
+        recorder = new MeetingTrackRecorder()
         const local = get().localStream
-        if (local) recorder.addStream(local)
-        for (const p of Object.values(get().participants)) {
-          if (p.stream) recorder.addStream(p.stream)
-        }
-        set({ transcribing: true })
-      } else if (!on && recorder) {
+        if (local) recorder.tap(me || 'me', local)
+        const others = Object.keys(get().participants)
+        const consent = initialConsent(me, others)
+        set({ transcribing: true, recordingBy: me, consent })
+        const myName = personDisplayName(useAccountStore.getState().account ?? {}, 'The host')
+        for (const id of others) signalTo(id, { kind: 'consent-request', by: me, byName: myName })
+      } else if (!on && recorder && get().recordingBy === me) {
         void recorder.stop()
         recorder = null
-        set({ transcribing: false })
-      } else {
-        set({ transcribing: on && !!recorder })
+        for (const id of Object.keys(get().participants)) signalTo(id, { kind: 'recording-stopped' })
+        set({ transcribing: false, recordingBy: null, consent: {}, consentAsk: null })
       }
+      // Anyone else's recording is not mine to stop; the button is disabled
+      // for non-initiators in the UI, and this is the belt to that brace.
+    },
+
+    // My answer to someone else's recording. 'declined' means my audio is
+    // never captured — enforced on the RECORDING client via the response
+    // (their tap() choke point), and my own client never taps anything.
+    answerConsent: (choice) => {
+      const ask = get().consentAsk
+      if (!ask) return
+      const me = useAccountStore.getState().account?.id ?? ''
+      set({ consentAsk: null, consent: { ...get().consent, [me]: choice } })
+      for (const id of Object.keys(get().participants)) {
+        signalTo(id, { kind: 'consent-response', choice })
+      }
+    },
+
+    setNotes: (text) => set({ notes: text }),
+
+    // ⌘⇧M — a timestamped anchor on the meeting clock. Needs no recording
+    // and no model: offsets resolve against the transcript when it exists
+    // (M2), and stand alone as "minute 14 mattered" until then.
+    markMoment: () => {
+      const t0 = recorder?.startedAt ?? get().joinedAtMs
+      if (t0 == null) return
+      set({ moments: [...get().moments, Date.now() - t0] })
     },
 
     init: () => {
@@ -463,17 +585,12 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       set({ status: 'joining', error: null, roomId, title: title ?? null, participants: {} })
       try {
         const local = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        // Record the conversation for the end-of-meeting transcript + summary,
-        // but ONLY when the user has opted into it via the "Transcribe & summarise
-        // my meetings" toggle. This mirrors PlexiCam calls (stores/call.ts); the
-        // toggle was previously inert for meetings, which is why turning it on did
-        // nothing. Recording is never forced.
-        if (whisperEnabled()) {
-          recorder = new ConversationRecorder()
-          recorder.addStream(local)
-          set({ transcribing: true })
-        }
-        set({ localStream: local, status: 'in', incomingInvite: null })
+        // M1 (S3-DEC-024) — recording is OFF until a person starts it, in the
+        // room, through the consent flow. The old behaviour (a saved
+        // preference silently starting capture at join, with no one told) is
+        // deliberately gone and must not return: no preference, calendar rule
+        // or rejoin ever starts a recording.
+        set({ localStream: local, status: 'in', incomingInvite: null, joinedAtMs: Date.now() })
         // Announce; the server replies with the roster and we offer to each member.
         sendSocketMessage({ type: 'meetingJoin', payload: { roomId, title: title ?? undefined } })
       } catch {
@@ -546,17 +663,37 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     leave: () => {
       const roomId = get().roomId
       const title = get().title || 'Meeting'
+      const notes = get().notes
+      const moments = get().moments
+      const me = useAccountStore.getState().account?.id ?? ''
+      // The initiator leaving ends the recording for everyone — say so.
+      if (recorder && get().recordingBy === me) {
+        for (const id of Object.keys(get().participants)) signalTo(id, { kind: 'recording-stopped' })
+      }
       if (roomId) sendSocketMessage({ type: 'meetingLeave', payload: { roomId } })
-      // Stop the recording and, if the meeting was more than a moment, hand the
-      // mixed audio to the wrap-up flow for a summary + deliverables.
+      // Stop the recording and hand the take to the wrap-up: the mixed blob
+      // feeds today's transcription; the per-track takes ride along as the
+      // M2 foundation (attributed transcription).
       const rec = recorder
       recorder = null
       if (rec) {
-        void rec.stop().then((res) => {
-          if (res && res.durationSec >= 2) {
-            void useWrapupStore.getState().begin({ title, buffer: res.buffer, mimeType: res.mimeType, durationSec: res.durationSec })
+        void rec.stop().then((take) => {
+          if (take.mixed && take.mixed.durationSec >= 2) {
+            void useWrapupStore.getState().begin({
+              title,
+              buffer: take.mixed.buffer,
+              mimeType: take.mixed.mimeType,
+              durationSec: take.mixed.durationSec,
+              tracks: take.tracks,
+              notes,
+              moments
+            })
           }
         })
+      } else if (notes.trim() || moments.length) {
+        // Notes without a recording are still the meeting's record — the
+        // Stage is notes-first, recording-optional. Saved verbatim.
+        void saveMeetingNotesDoc(title, notes, moments, Date.now())
       }
       teardown()
     },

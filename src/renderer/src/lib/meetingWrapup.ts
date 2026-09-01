@@ -88,3 +88,45 @@ export async function saveTranscriptDoc(
     return null
   }
 }
+
+/** M1 (SPEC-003 Stage) — the live notes, preserved VERBATIM as their own
+ *  document beside the transcript. Your words are never rewritten (§3.4);
+ *  ⌘⇧M moments render as timestamp lines so they survive to M2, where they
+ *  resolve into transcript anchors. Works with or without a recording — the
+ *  Stage is notes-first, recording-optional. */
+export async function saveMeetingNotesDoc(
+  title: string,
+  notes: string,
+  moments: number[],
+  now: number,
+  folderId?: string | null
+): Promise<string | null> {
+  const fmt = (ms: number): string => {
+    const s = Math.floor(ms / 1000)
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  }
+  const momentLines = moments.length
+    ? `\n\n---\n\nMarked moments\n${moments.map((m) => `- ⚑ ${fmt(m)}`).join('\n')}`
+    : ''
+  const body = `${notes.trim()}${momentLines}`.trim()
+  if (!body) return null
+  try {
+    let target = folderId ?? null
+    if (target === undefined || target === null) {
+      const folder = await ensureMeetingFolder(null, title, now)
+      target = folder?.folderId ?? null
+    }
+    const doc = await window.api.documents.create({
+      docType: 'doc',
+      title: `${title || 'Meeting'} — your notes`,
+      body: transcriptToDocBody(body)
+    })
+    if (doc) {
+      const filed = await window.api.fileManager.fileDocument(doc.id, target).catch(() => null)
+      if (!filed && target) await window.api.fileManager.fileDocument(doc.id, null).catch(() => null)
+    }
+    return doc?.id ?? null
+  } catch {
+    return null
+  }
+}

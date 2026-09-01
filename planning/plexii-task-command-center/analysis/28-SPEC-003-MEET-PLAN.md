@@ -139,6 +139,9 @@ Each is a shippable round with the usual gates: pins, live CDP
 verification, DEC entry, dual-push.
 
 ### M1 — The Stage, honest consent, and the capture format  *(spec P1 + C1 + C4)*
+**DONE — DEC-098** (two-machine consent QA still owed by the operator; the
+PlexiCam 1:1 calls surface carries the same consent hole as a named
+follow-up).
 The no-AI phase, and the one that fixes a live liability.
 - **Consent handshake** over the existing meeting socket: starting
   recording prompts every participant (accept / decline /

@@ -2578,3 +2578,60 @@ rewritten to the superseding hover-wash form with history.
 3,462 green; both typechecks clean. All three paint-integrity gaps are now
 closed: the accent family (GAP-018/DEC-086), the wash family
 (GAP-019/DEC-097), the ink scale (GAP-020/DEC-096).
+
+## DEC-098 — M1: the Stage, honest consent, per-track capture
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003)
+· **Branch:** ryan-next
+
+The first Meet phase, and the one that fixes a live liability. Three builds:
+
+**Consent (S3-DEC-024).** Recording had TWO silent-start paths: any
+participant's toggle captured every stream with nobody told, and a saved
+preference started capture at join. Both are gone. Starting a recording now
+prompts every participant over the existing meetingSignal relay (zero
+server changes): accept / accept-without-transcript / decline. Until
+someone answers they are 'pending' and not a sample of theirs is captured;
+a decline is honoured BY CONSTRUCTION (their stream is never tapped — the
+recorder's tap() is the single choke point, gated on `mayCapture`). The
+header names the state in words, continuously, in both layouts —
+"Recording · 1 of 3 consented — Dana has not responded" — never an icon
+alone. Late joiners are prompted before capture; the initiator alone stops
+it; the initiator leaving stops it for everyone, said out loud. The
+whisper preference no longer touches meetings (it still governs 1:1
+PlexiCam calls — the SAME consent hole exists there and is a named
+follow-up; the consent lib was built reusable for it).
+
+**Per-track capture (C1, operator-ruled foundation).** "I do not want AI
+guessing at speaker 1 versus 4." It never will again for native meetings:
+MeetingTrackRecorder records one attributed, audio-only take per consented
+participant on one shared clock, alongside the mixed blob that still feeds
+the legacy wrap-up. Attribution is exact by construction — each take IS a
+known accountId. M2 transcribes the tracks; the mixed blob then becomes a
+convenience artifact.
+
+**The Stage (SPEC-003 §3.3).** A notepad, not a transcript viewer, grafted
+into MeetingOverlay's stage layout (C9 — no fourth surface): blank by
+default, your words verbatim and never rewritten, ⌘⇧M marks a moment
+(clock offsets — no recording and no model required; they resolve into
+transcript anchors in M2), ⌘⇧T answers honestly ("the transcript arrives
+after the call"). Notes + moments survive every path: with a recording
+they ride the wrap-up (saved FIRST, never gated on transcription
+succeeding); without one they are still saved as the meeting's record —
+notes-first, recording-optional.
+
+Verified live via the store's e2e handle (a real two-party handshake needs
+the operator's two-machine QA session — flagged): the Stage renders with
+the notes pane open; typed notes land verbatim in the store; a REAL ⌘⇧M
+keystroke marked a moment and ⌘⇧T toggled the honest line; the worded
+header rendered "Recording · 1 of 2 consented — Sam Oak has not
+responded" from a mixed consent map; the decline button wrote 'declined'
+under the operator's real accountId. Driving quirk for the record:
+synthetic clicks don't transfer element focus while the Electron window is
+unfocused — Page.bringToFront + asserted programmatic focus is the
+pattern (the DEC-084 rule's substance, an asserted focused target, held
+throughout). A missed-triage dialog (z-330) over the meeting overlay
+(z-200) intercepted the first probe — real data, not a defect chased now.
+
+24 new tests (the consent decision table in full, wire-envelope kinds,
+recorder degradation, choke-point and no-auto-start pins); 3,486 green;
+both typechecks clean.
