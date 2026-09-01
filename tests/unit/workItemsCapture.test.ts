@@ -53,13 +53,13 @@ describe('Δ3 — the loose-thought decay tier', () => {
     const { raw, db } = freshDb()
     const now = 100 * DAY
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'loose_thought', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'to_remember', ?)"
     ).run('stale', 'Old idea', now - (LOOSE_THOUGHT_DECAY_DAYS + 1) * DAY)
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'loose_thought', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'to_remember', ?)"
     ).run('fresh', 'New idea', now - 2 * DAY)
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'action', ?)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES (?, 'work_item', ?, 'open', 'to_do', ?)"
     ).run('task', 'Real task', now - 40 * DAY) // actionable items NEVER decay
     expect(decayLooseThoughtsCore(db, now)).toBe(1)
     const stale = raw
@@ -82,7 +82,7 @@ describe('Δ3 — the loose-thought decay tier', () => {
   it('a decayed thought remains promotable: reclassify-then-reopen path stays legal', () => {
     const { raw, db } = freshDb()
     raw.prepare(
-      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES ('t', 'work_item', 'X', 'dismissed', 'loose_thought', 0)"
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, updated_at) VALUES ('t', 'work_item', 'X', 'dismissed', 'to_remember', 0)"
     ).run()
     expect(setWorkItemStateCore(db, 't', 'open')).toBe(true)
     const row = raw.prepare('SELECT status FROM nodes WHERE id = ?').get('t') as { status: string }
@@ -145,14 +145,105 @@ describe('S5 wiring locks (file-level)', () => {
     expect(sugg).toContain("kind: 'capture'")
     expect(sugg).toContain("title: 'attention'")
     // A LEADING @attention send never reaches the model — it renders the
-    // shared confirm card INLINE in the chat (DEC-028).
+    // shared confirm card INLINE in the chat (DEC-028). DEC-031 moved the
+    // grammar itself into the shared parser, so the panel reads THAT rather
+    // than carrying a private regex that could drift from the other surfaces.
     const panel = read('src/renderer/src/components/ChatPanel.tsx')
-    expect(panel).toContain('^@attention\\b')
+    expect(panel).toContain("from '../lib/attentionCommand'")
+    expect(panel).toContain('parseAttentionCommand(content)')
     expect(panel).toContain('setInlineCapture')
-    // ⌘K and the home bar both arm the Slack-style pill on Tab.
-    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('attnArmed')
+    // History: ⌘K armed a Slack-style pill on Tab (DEC-028c) — retired by
+    // operator ruling 2026-08-30: selecting Attention in ⌘K OPENS the Capture
+    // window, typing happens there. The home bar keeps its pill.
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).not.toContain('attnArmed')
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain('Attention — open Capture')
     const home = read('src/renderer/src/components/views/StartOrAskPlexi.tsx')
     expect(home).toContain("'capture:attention'")
     expect(home).toContain('armAttention')
+  })
+
+  it('the @ picker owns Tab — the intent-cycler must yield while it is open', () => {
+    // Operator live QA: Tab never selected the Attention row and silently
+    // flipped the previewed intent to "Search the web" instead. The composer's
+    // Tab cycler is CAPTURE-phase, so it ran before ProseMirror's suggestion
+    // plugin and swallowed every Tab. The guard is the fix; this pins it so
+    // the keyboard contract (DEC-028c) cannot regress.
+    const panel = read('src/renderer/src/components/ChatPanel.tsx')
+    const guard = panel.indexOf('[data-testid="mention-picker"]')
+    expect(guard).toBeGreaterThan(-1)
+    // …and it must come BEFORE the cycler, or it changes nothing.
+    const cycler = panel.indexOf('setOmniPick((p) => (p + 1) % composerIntents.length)')
+    expect(cycler).toBeGreaterThan(guard)
+    // The picker really does carry the testid the guard looks for.
+    expect(read('src/renderer/src/components/assistant/MentionList.tsx')).toContain(
+      'data-testid="mention-picker"'
+    )
+  })
+
+  it('DEC-031 — every capture surface reads the ONE @attention grammar', () => {
+    // The operator ruled @attention deterministic wherever it sits. Three
+    // surfaces implement it; all three must consult the shared parser, or the
+    // grammar drifts back into four private regexes.
+    const parser = "from '../lib/attentionCommand'"
+    expect(read('src/renderer/src/components/ChatPanel.tsx')).toContain(parser)
+    expect(read('src/renderer/src/components/CommandCenter.tsx')).toContain(parser)
+    expect(read('src/renderer/src/components/views/StartOrAskPlexi.tsx')).toContain(
+      "from '../../lib/attentionCommand'"
+    )
+    // ⌘K: an inline token outranks everything, exactly like a leading one.
+    const ck = read('src/renderer/src/components/CommandCenter.tsx')
+    expect(ck).toContain('attnInline')
+    // (attnArmed left with the retired ⌘K pill; the explicit-address rule
+    // stands on the two grammar forms.)
+    expect(ck).toContain('attnPrefix || attnInline')
+    // …and the omni rows yield to EVERY Attention mention (plain "attention"
+    // included), so Enter opens Capture instead of asking the model.
+    expect(ck).toContain("if (q !== '' && !attnAddressed) {")
+    expect(ck).toContain('const attnAddressed =')
+    // Chat: an inline token captures AND still sends the stripped message.
+    const panel = read('src/renderer/src/components/ChatPanel.tsx')
+    expect(panel).toContain("attn.mode === 'inline' && attn.messageText")
+    // The intent strip yields to ANY @attention now, not just a leading one.
+    expect(panel).toContain('hasAttentionCommand(draft)')
+    // ⌘K's omni rows ("Ask Plexii" hard-scores 2000) must yield too, or they
+    // outrank the capture entry and the token reaches the model instead.
+    // History: the omni suppression keyed on the literal token only; the
+    // 2026-08-30 ruling widened it to every Attention mention (attnAddressed
+    // — which itself includes hasAttentionCommand(q)).
+    expect(ck).toContain('hasAttentionCommand(q) ||')
+    // The last mile: send() itself intercepts, so the direct callers that
+    // bypass the composer (⌘K Ask, home bar, voice) cannot leak a token to
+    // the model. The composer strips first, so this never double-captures.
+    const store = read('src/renderer/src/stores/chat.ts')
+    expect(store).toContain('parseAttentionCommand(content)')
+    expect(store).toContain("fb:command-new-work-item")
+    expect(store).toContain("attn.mode === 'leading' || !attn.messageText")
+  })
+
+  it('DEC-034 evolved: two labelled fields, then the pill-grid confirm', () => {
+    // History: DEC-034 made capture task+notes with an Enter ↵ preview. The
+    // capture rebuild (operator spec) kept the two-field + confirm shape and
+    // re-presented it: labelled fields, a rotating category placeholder,
+    // Cmd+Enter as the verbatim commit path, and the confirm step as four
+    // labelled pills with one drawer open at a time.
+    const console_ = read('src/renderer/src/components/CaptureConsole.tsx')
+    const card = read('src/renderer/src/components/AttentionConfirmCard.tsx')
+    expect(console_).toContain('WHAT NEEDS YOU?')
+    expect(console_).toContain('NOTES')
+    expect(console_).toContain('CAPTURE_LEADINS')
+    expect(console_).toContain('file exactly as typed')
+    expect(console_).toContain('fileVerbatim')
+    expect(card).toContain('Plexii read it like this.')
+    expect(card).toContain("pill('category', 'CATEGORY'")
+    expect(card).toContain('File it')
+  })
+
+  it('the picker highlights its selected row visibly (the Enter/Tab target is legible)', () => {
+    const list = read('src/renderer/src/components/assistant/MentionList.tsx')
+    // A 10% tint read as "nothing is selected" in live QA.
+    expect(list).not.toContain('bg-accent/10')
+    // GAP-018 (DEC-086): the highlight now uses a color that paints.
+    expect(list).toContain('bg-accent/[0.14]')
+    expect(list).toContain('inset_2px_0_0_rgb(var(--accent))')
   })
 })

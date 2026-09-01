@@ -186,7 +186,7 @@ export async function exportDocx(input: { html: string; title: string; page?: Pa
     const inch = (n: number): number => Math.round(n * 1440)
     const paper = paperTwips(page.size)
     const landscape = page.orientation === 'landscape'
-    // Give tables a visible default border so a Plexi table doesn't arrive in Word
+    // Give tables a visible default border so a Plexii table doesn't arrive in Word
     // as an invisible grid, and wrap the body with a base font so the document
     // reads like a real Word file rather than browser default.
     const styledHtml = `<style>table,th,td{border:1px solid #999;border-collapse:collapse;padding:4px}</style>${input.html}`

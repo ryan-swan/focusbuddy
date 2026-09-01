@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
 import { useMeetingRoomStore, type DockSide } from '../stores/meetingRoom'
+import { useVideoBlocked, CAMERA_BLOCKED_HINT } from '../lib/useVideoBlocked'
 import { usePresenceStore } from '../stores/presence'
 import { personDisplayName, personInitials } from '../lib/personName'
 
 // PlexiMeet live room, mounted once at the app root. Two presentations:
 //  - 'stage': the classic fullscreen room (video gallery + controls).
 //  - 'collaborate': the meeting docks to one edge as a movable panel so the rest
-//    of Plexi stays the focus and the user can navigate anywhere while the call
+//    of Plexii stays the focus and the user can navigate anywhere while the call
 //    keeps running (the room lives in a global store, so it survives navigation).
 // Nothing is faked: a tile shows "connecting" until its peer connection is up,
 // and a peer that drops is removed rather than frozen.
@@ -28,7 +29,22 @@ function Video({
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     const el = ref.current
-    if (el && el.srcObject !== stream) el.srcObject = stream
+    if (!el) return
+    if (el.srcObject !== stream) el.srcObject = stream
+    // DEC-078 — autoPlay alone does NOT start playback in this Electron build
+    // when srcObject lands after mount: the element stayed paused at
+    // readyState 0 with a live, enabled track attached (measured over CDP),
+    // which is exactly "video never turns on". VoiceRecorderWidget learned
+    // the same lesson earlier and plays explicitly; these tiles now do too.
+    if (stream) {
+      void el.play().catch(() => {
+        // A rejected play (rare) retries once metadata arrives.
+        el.onloadedmetadata = () => {
+          el.onloadedmetadata = null
+          void el.play().catch(() => {})
+        }
+      })
+    }
   }, [stream])
   return (
     <video
@@ -98,6 +114,9 @@ export default function MeetingOverlay(): JSX.Element | null {
 
   const presencePeers = usePresenceStore((s) => s.peers)
   const [showInvite, setShowInvite] = useState(false)
+  // DEC-078 — a live-but-muted local video track means the OS is refusing
+  // frames (TCC denial): show the honest state, never a black rectangle.
+  const cameraBlocked = useVideoBlocked(localStream)
 
   const remote = useMemo(() => Object.values(participants), [participants])
 
@@ -117,7 +136,7 @@ export default function MeetingOverlay(): JSX.Element | null {
   )
 
   // Escape leaves the meeting ONLY in stage mode. In collaborate mode the user is
-  // navigating Plexi with the meeting docked, so Escape must not drop the call.
+  // navigating Plexii with the meeting docked, so Escape must not drop the call.
   useEffect(() => {
     if (status === 'idle' || layout !== 'stage') return
     function onKey(e: KeyboardEvent): void {
@@ -204,11 +223,19 @@ export default function MeetingOverlay(): JSX.Element | null {
     return (
       <>
         <div className={`relative rounded-xl overflow-hidden bg-stone-900 border border-white/10 ${frame}`}>
-          {localStream && !cameraOff ? (
+          {localStream && !cameraOff && !cameraBlocked ? (
             <Video stream={localStream} muted mirrored />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5" title={cameraBlocked ? CAMERA_BLOCKED_HINT : undefined}>
               <span className={`inline-flex ${avatar} items-center justify-center rounded-full bg-white/10 font-semibold text-white`}>You</span>
+              {cameraBlocked && !cameraOff && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10.5px] text-amber-300/90 bg-amber-500/10 rounded px-1.5 py-0.5"
+                  data-testid="camera-blocked-note"
+                >
+                  <Icon name="videocam_off" size={11} /> Camera blocked by macOS
+                </span>
+              )}
             </div>
           )}
           <span className="absolute bottom-1.5 left-1.5 text-[11px] text-white/90 bg-black/40 rounded px-1.5 py-0.5">You{muted ? ' · muted' : ''}</span>
@@ -281,7 +308,7 @@ export default function MeetingOverlay(): JSX.Element | null {
     </div>
   )
 
-  // ── Collaborate: docked panel on the chosen edge, Plexi stays interactive ──
+  // ── Collaborate: docked panel on the chosen edge, Plexii stays interactive ──
   if (collaborate) {
     const sideCls: Record<DockSide, string> = {
       left: 'top-0 bottom-0 left-0 w-[300px] flex-col border-r',

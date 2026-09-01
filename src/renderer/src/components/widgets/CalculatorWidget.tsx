@@ -132,7 +132,7 @@ export default function CalculatorWidget({ widget, inline = false }: Props): JSX
   if (inline) return content
 
   return (
-    <WidgetFrame widget={widget} headerLabel="calculator" headerAccent="bg-stone-300/60">
+    <WidgetFrame widget={widget} headerLabel="calculator" headerAccent="bg-stone-300/60 dark:bg-white/[0.09]">
       {content}
     </WidgetFrame>
   )

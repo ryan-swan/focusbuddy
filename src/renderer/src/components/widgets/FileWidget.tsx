@@ -177,7 +177,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
     )
     if (inline) return body
     return (
-      <WidgetFrame widget={widget} headerLabel="File" headerAccent="bg-stone-300/60">
+      <WidgetFrame widget={widget} headerLabel="File" headerAccent="bg-stone-300/60 dark:bg-white/[0.09]">
         {body}
       </WidgetFrame>
     )
@@ -238,7 +238,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
       <WidgetFrame
         widget={widget}
         headerLabel={widget.title || host}
-        headerAccent="bg-stone-300/60"
+        headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
       >
         {body}
       </WidgetFrame>
@@ -282,7 +282,7 @@ export default function FileWidget({ widget, inline = false }: Props): JSX.Eleme
     <WidgetFrame
       widget={widget}
       headerLabel={file ? file.originalName : 'File'}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
     >
       {body}
     </WidgetFrame>

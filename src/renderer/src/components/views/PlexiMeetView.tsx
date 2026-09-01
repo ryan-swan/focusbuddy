@@ -53,6 +53,18 @@ export default function PlexiMeetView(): JSX.Element {
     void load()
   }, [load])
 
+  // DEC-079 — an Attention item's "meeting" chip lands here: select the
+  // meeting it points at so the transcript is on screen. The id is selected
+  // even if the list is still loading — selection resolves when it arrives.
+  useEffect(() => {
+    function onOpen(e: Event): void {
+      const id = (e as CustomEvent).detail?.id as string | undefined
+      if (id) setSelectedId(id)
+    }
+    window.addEventListener('fb:open-meeting', onOpen)
+    return () => window.removeEventListener('fb:open-meeting', onOpen)
+  }, [])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return meetings

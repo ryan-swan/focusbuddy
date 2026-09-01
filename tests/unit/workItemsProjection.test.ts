@@ -5,7 +5,8 @@ import {
   WORK_ITEM_COLUMNS,
   WORK_ITEM_SCHEMA_EPOCH,
   WORK_ITEM_STATES,
-  statusForWorkItemState
+  statusForWorkItemState,
+  initialWorkItemState
 } from '../../src/shared/workItems'
 import {
   ensureWorkItemSchema,
@@ -69,6 +70,7 @@ describe('the status projection (§2.3, A-02) — every state, table-driven', ()
     reviewed: 'done',
     completed: 'done',
     discussed: 'done',
+    decided: 'done',
     dismissed: 'parked',
     reclassified: 'parked',
     archived: 'parked'
@@ -149,6 +151,38 @@ describe('normalizeAppliedWorkItem — the apply-site recompute (F012)', () => {
     const row = raw.prepare('SELECT status FROM nodes WHERE id = ?').get('desk') as { status: string }
     expect(row.status).toBe('in_progress')
   })
+
+  it('a LEGACY intent_class canonicalizes on apply (taxonomy alignment convergence)', () => {
+    // The revert mechanism this guards: a 409 conflict-apply (or an
+    // un-updated peer's push) delivers a stale legacy copy — the apply-site
+    // normalization must map it forward so the rename cannot regress.
+    const { raw, db } = freshDb()
+    raw.exec(
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, schema_epoch) VALUES ('wi', 'work_item', 'X', 'open', 'acknowledgment', 1)"
+    )
+    expect(normalizeAppliedWorkItem(db, 'wi')).toBe('applied')
+    const row = raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('wi') as {
+      intent_class: string
+    }
+    expect(row.intent_class).toBe('to_respond')
+    // Current values pass through untouched; unknown values store verbatim.
+    raw.exec(
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, schema_epoch) VALUES ('wi2', 'work_item', 'Y', 'open', 'to_decide', 1)"
+    )
+    normalizeAppliedWorkItem(db, 'wi2')
+    expect(
+      (raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('wi2') as { intent_class: string })
+        .intent_class
+    ).toBe('to_decide')
+    raw.exec(
+      "INSERT INTO nodes (id, kind, title, work_item_state, intent_class, schema_epoch) VALUES ('wi3', 'work_item', 'Z', 'open', 'future_class', 1)"
+    )
+    normalizeAppliedWorkItem(db, 'wi3')
+    expect(
+      (raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('wi3') as { intent_class: string })
+        .intent_class
+    ).toBe('future_class')
+  })
 })
 
 describe('satellites (§2.4) + orphan reconciliation (R017) + the detach hook', () => {
@@ -182,5 +216,20 @@ describe('satellites (§2.4) + orphan reconciliation (R017) + the detach hook', 
       detached_from_id: string
     }
     expect(local.detached_from_id).toBe('desk')
+  })
+})
+
+describe('DEC-047 (D-5) — capture-time birth state', () => {
+  it('active states are honored; terminal and garbage fall to open; suggested wins', () => {
+    expect(initialWorkItemState(undefined, 'in_progress')).toBe('in_progress')
+    expect(initialWorkItemState(undefined, 'waiting')).toBe('waiting')
+    expect(initialWorkItemState(undefined, 'blocked')).toBe('blocked')
+    expect(initialWorkItemState(undefined, undefined)).toBe('open')
+    // Terminal at birth would skip closure notifications — refused.
+    expect(initialWorkItemState(undefined, 'completed')).toBe('open')
+    expect(initialWorkItemState(undefined, 'archived')).toBe('open')
+    expect(initialWorkItemState(undefined, 'nonsense')).toBe('open')
+    // The approval gate outranks any request.
+    expect(initialWorkItemState('suggested', 'in_progress')).toBe('suggested')
   })
 })

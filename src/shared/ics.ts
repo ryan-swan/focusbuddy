@@ -1,5 +1,5 @@
 // Calendar interop for meetings: a standards-compliant iCalendar (.ics) event and
-// an "add to Google Calendar" URL, so a Plexi meeting can be saved to Apple
+// an "add to Google Calendar" URL, so a Plexii meeting can be saved to Apple
 // Calendar, Outlook or Google. Pure (no Electron/DOM) so it is unit-testable and
 // usable from both the main and renderer processes.
 

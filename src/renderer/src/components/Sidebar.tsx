@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ConnectedApp, FbNode, NodeKind, WidgetSuggestion } from '@shared/types'
 import { useNodeStore } from '../stores/nodes'
 import { useWorkItemStore } from '../stores/workItems'
-import { useCaptureConsole } from '../stores/captureConsole'
+import { useCaptureConsole, type CaptureSource } from '../stores/captureConsole'
 import PlexiiLogo from './PlexiiLogo'
 import { useWidgetStore } from '../stores/widgets'
 import { useConnectedAppsStore } from '../stores/connectedApps'
@@ -126,6 +126,7 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
   const goShared = useViewStore((s) => s.goShared)
   const goTrash = useViewStore((s) => s.goTrash)
   const goAttention = useViewStore((s) => s.goAttention)
+  const goCalendar = useViewStore((s) => s.goCalendar)
   const goFiles = useViewStore((s) => s.goFiles)
   const goConnectedApp = useViewStore((s) => s.goConnectedApp)
   const goVault = useViewStore((s) => s.goVault)
@@ -216,11 +217,15 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
     // console PREFILLED (the @attention path); a bare dispatch opens it empty.
     function onNewWorkItem(e: Event): void {
       const detail = (e as CustomEvent).detail as
-        | { title?: string; captureText?: string }
+        | { title?: string; captureText?: string; notes?: string; source?: CaptureSource | null }
         | undefined
       const title = detail?.title?.trim()
       if (!title) {
-        useCaptureConsole.getState().openConsole(detail?.captureText?.trim() || '')
+        // CR-09 D-A: a MARK carries its object through to the confirm card —
+        // and a marked SELECTION carries the full highlight as notes (DEC-044).
+        useCaptureConsole
+          .getState()
+          .openConsole(detail?.captureText?.trim() || '', detail?.source ?? null, detail?.notes ?? '')
         return
       }
       void useWorkItemStore
@@ -363,6 +368,9 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
           {/* Monochrome by plexidesk-75's rail rule: no tone, accent only when active. */}
           <CollapsedNavIcon icon="plexii:ai"     label="Plexii"       active={viewIsActive({ kind: 'plexii' })}     onClick={() => { setActive(null); goPlexii() }} />
           <CollapsedNavIcon icon="notifications" label="Attention"    tone={AREA_TONES.desks}  active={viewIsActive({ kind: 'attention' })} onClick={() => { setActive(null); goAttention() }} />
+          {viewEnabled('calendar') && (
+            <CollapsedNavIcon icon="calendar_month" label="Calendar" tone={AREA_TONES.desks} active={viewIsActive({ kind: 'calendar' })} onClick={() => { setActive(null); goCalendar() }} />
+          )}
           <CollapsedNavIcon icon="meeting_room"  label="Rooms"        tone={AREA_TONES.rooms}     active={viewIsActive({ kind: 'rooms' })}      onClick={() => { setActive(null); goRooms() }} />
           <CollapsedNavIcon icon="desk"          label="Desks"        tone={AREA_TONES.desks}    active={viewIsActive({ kind: 'desks' })}      onClick={() => { setActive(null); goDesks() }} />
           <CollapsedNavIcon icon="folder_shared" label="Shared Desks" tone={AREA_TONES.shared} active={viewIsActive({ kind: 'shared' })}    onClick={() => { setActive(null); goShared() }} />
@@ -458,11 +466,11 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
         <div className="ml-auto flex items-center">
           <button
             onClick={requestCreateDesk}
-            title="New room"
+            title="New desk — opens set-up with today's date pre-filled; Enter creates and opens it"
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-[rgb(var(--accent))] text-white text-[12px] font-medium hover:bg-[rgb(var(--accent-hover))]"
           >
             <Icon name="add" size={14} />
-            <span>New</span>
+            <span>New Desk</span>
           </button>
           {/* The minimise control is window chrome, not a desk action — a
               hairline and real spacing keep it from reading as part of New. */}
@@ -509,6 +517,22 @@ export default function Sidebar({ collapsed, onToggle, glass = false }: Props = 
               goAttention()
             }}
           />
+          {/* Calendar — the planning lens on the same items (DEC-052 reverses
+              DEC-020's calendar clause by operator ruling: the rebuilt surface
+              is a daily ritual, not the read-only grid the retirement judged).
+              Attention and Calendar sit as peers deliberately. */}
+          {viewEnabled('calendar') && (
+            <NavRow
+              icon="calendar_month"
+              label="Calendar"
+              tone={AREA_TONES.desks}
+              active={viewIsActive({ kind: 'calendar' })}
+              onClick={() => {
+                setActive(null)
+                goCalendar()
+              }}
+            />
+          )}
           {/* Plexii — the AI hub. Clicking opens the hub page; the chevron
               expands to the 3 most recent conversations (Rooms sublist
               pattern). AI carries the accent hue per the destination-hue

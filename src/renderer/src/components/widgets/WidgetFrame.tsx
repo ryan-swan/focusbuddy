@@ -33,6 +33,15 @@ import { chimeIn, chimeOut } from '../../lib/audioBeep'
 import { useZonePosition } from '../../lib/pinLayout'
 import { LinkDragContext } from '../../lib/linkDragContext'
 import { widgetDisplayName } from '../../lib/widgetDisplayName'
+import { useWorkItemStore } from '../../stores/workItems'
+import { useViewStore } from '../../stores/view'
+import { liveItemForWidget } from '../../lib/widgetAttention'
+import { workItemsEnabled } from '../../lib/workItemsCapability'
+import { presetForWidget, browserMarkUrl } from '../../lib/attentionPresets'
+import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import CompleteCircle from '../attention/CompleteCircle'
+import { PLEXII_ICONS } from '../icons/plexiiIcons'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -60,7 +69,7 @@ export default function WidgetFrame({
   widget,
   children,
   headerLabel,
-  headerAccent = 'bg-stone-200/70',
+  headerAccent = 'bg-stone-200/70 dark:bg-white/[0.07]',
   draggableHandleClass = 'widget-handle',
   zonePosition: zonePositionProp,
   headerMenuExtras
@@ -142,6 +151,45 @@ export default function WidgetFrame({
   const [shareOpen, setShareOpen] = useState(false)
   const isActive = useWidgetStore((s) => s.activeWidgetId === widget.id)
   const zoom = useWidgetStore((s) => s.zoom)
+  // DEC-076 — the header bell. Outlined = not in Attention; filled = a LIVE
+  // work item points at this widget (derived from the queue's own rows via
+  // liveItemForWidget, so the two surfaces cannot disagree). Clicking an
+  // outlined bell runs the SAME flow as the menu's "Add to Attention…" —
+  // the preset text into the standard confirm console, item POINTS at the
+  // widget (sourceType/sourceRef), nothing files without the person's Enter.
+  // A filled bell opens the queue. The check beside it closes the item with
+  // its own queue verb through the one close path.
+  const attentionOn = workItemsEnabled()
+  const workItems = useWorkItemStore((s) => s.items)
+  const wiLoaded = useWorkItemStore((s) => s.loaded)
+  const refreshWorkItems = useWorkItemStore((s) => s.refresh)
+  useEffect(() => {
+    if (attentionOn && !wiLoaded) void refreshWorkItems()
+  }, [attentionOn, wiLoaded, refreshWorkItems])
+  const attentionItem = attentionOn ? liveItemForWidget(workItems, widget.id) : null
+  const goAttention = useViewStore((s) => s.goAttention)
+  const closeWorkItem = useCloseWorkItem()
+  function markWidgetForAttention(): void {
+    const p = presetForWidget(widget.kind, widget.title ?? '', widget.content ?? '')
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-work-item', {
+        detail: {
+          captureText: p.text,
+          source: {
+            sourceType: 'widget',
+            sourceRef: widget.id,
+            intentClass: p.intentClass,
+            deskId: widget.taskId,
+            // DEC-091 — a browser widget's content IS its current URL
+            // (persistNavUrl); freeze it on the item so the queue can return
+            // to the exact page (the Slack thread, the ticket) even after
+            // the widget browses elsewhere.
+            sourceUrl: browserMarkUrl(widget.kind, widget.content)
+          }
+        }
+      })
+    )
+  }
   // Per-widget Context Health frame (plexi-4.0, UX-022). Reads the pre-review
   // "since your last visit" snapshot captured on desk open; `current` -> no frame.
   const health = useContextHealthStore((s) => s.lastVisit[widget.id])
@@ -874,7 +922,10 @@ export default function WidgetFrame({
               ? 'border-transparent widget-glow'
               : isPinned
                 ? 'border-amber-400/60'
-                : 'border-transparent'
+                : // DEC-089 — in dark mode the resting hairline (9% white)
+                  // melts into the desk canvas; the reserved 1px border slot
+                  // carries a real edge there. Light mode keeps hairline-only.
+                  'border-transparent dark:border-[color:var(--edge-firm)]'
         }`}
         style={{
           // The fb-card recipe: hairline ring so the card never melts into a
@@ -1001,6 +1052,52 @@ export default function WidgetFrame({
                 {widgetDisplayName(widget, headerLabel)}
               </span>
             )}
+            {/* DEC-076/077 — bell + completion, ADJACENT TO THE TITLE, away
+                from the right-side control array where they got lost. The
+                bell fills SOLID when a live item points at this widget (the
+                brand icon is a line SVG whose `filled` prop is a no-op — it
+                fills here explicitly); the circle is the one completion
+                form factor every surface shares. */}
+            {attentionOn && !titleEditing && (
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (attentionItem) goAttention()
+                  else markWidgetForAttention()
+                }}
+                className={`widget-nodrag ml-1 h-5 w-5 rounded inline-flex items-center justify-center shrink-0 transition-colors ${
+                  attentionItem
+                    ? 'text-accent hover:bg-[var(--surface-sunken)]/60'
+                    : // DEC-089 — was ink-40 at 60%: tuned for the light
+                      // stone bar, invisible on the dark one. Quiet, not gone.
+                      'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
+                }`}
+                aria-label={attentionItem ? 'In Attention — open the queue' : 'Add to Attention'}
+                title={
+                  attentionItem
+                    ? `In Attention: “${attentionItem.title || 'this widget'}” — click to open the queue`
+                    : 'Add to Attention'
+                }
+                data-testid={`widget-bell-${widget.id}`}
+              >
+                <BellIcon size={13} active={!!attentionItem} />
+              </button>
+            )}
+            {attentionOn && attentionItem && !titleEditing && (
+              <CompleteCircle
+                size={14}
+                className="widget-nodrag shrink-0"
+                onClick={() =>
+                  void closeWorkItem(
+                    attentionItem,
+                    (PRIMARY_ACTION[queueOf(attentionItem)] ?? PRIMARY_ACTION.to_do).state
+                  )
+                }
+                title={`${(PRIMARY_ACTION[queueOf(attentionItem)] ?? PRIMARY_ACTION.to_do).label} — complete “${attentionItem.title || 'this item'}”`}
+                dataTestId={`widget-attn-complete-${widget.id}`}
+              />
+            )}
           </span>
           <div className="flex items-center gap-0.5">
             {!titleEditing && (
@@ -1010,7 +1107,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   beginRename()
                 }}
-                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-40)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] opacity-75 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
                 aria-label="Rename widget"
                 title="Rename"
               >
@@ -1161,6 +1258,31 @@ export default function WidgetFrame({
         />
       )}
     </Rnd>
+  )
+}
+
+// ── The bell (DEC-076/077) ──────────────────────────────────────────────────
+//
+// The brand 'notifications' icon is a line SVG on currentColor; Icon's
+// `filled` prop deliberately does not apply to brand icons, which is why the
+// active bell only changed colour. Active state here fills the SAME brand
+// path solid — one path source (PLEXII_ICONS), two renderings.
+
+function BellIcon({ size, active }: { size: number; active: boolean }): JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={active ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: PLEXII_ICONS['notifications'] }}
+    />
   )
 }
 

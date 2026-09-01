@@ -7,8 +7,11 @@
 import type { WidgetKind } from '@shared/types'
 import { MenuSection, type MenuContribution, type MenuContext } from './types'
 import { CREATE_AND_CONNECT_MENU } from '../createConnectedTool'
+import { presetForWidget, presetForMulti, presetForSelection, browserMarkUrl } from '../attentionPresets'
+import { workItemsEnabled } from '../workItemsCapability'
 import {
   createWidget,
+  hasWorkableText,
   convertWidget,
   bringToFront,
   ejectFromSection,
@@ -30,17 +33,99 @@ import {
 // Kinds the Convert / Turn-into menu offers. Only kinds that actually exist as
 // widgets, gated per the critic: no Calendar event, no Desk, until those
 // receiving surfaces exist.
+// DEC-041 — only kinds that can actually RECEIVE the source's text.
+//
+// Table, Mind map and Diagram used to be offered here and never once carried
+// anything across: the copy only happens between text kinds, so "turn this
+// into a Mind map" produced an EMPTY mind map every time, from every source.
+// A menu entry that never does what it says is worse than a missing one.
 const CONVERT_TARGETS: Array<{ kind: WidgetKind; label: string; icon: string }> = [
   { kind: 'sticky', label: 'Sticky', icon: 'sticky_note_2' },
   { kind: 'note', label: 'Note', icon: 'description' },
   { kind: 'markdown', label: 'Markdown', icon: 'subject' },
-  { kind: 'page', label: 'Page', icon: 'article' },
-  { kind: 'table', label: 'Table', icon: 'table_chart' },
-  { kind: 'mindmap', label: 'Mind map', icon: 'account_tree' },
-  { kind: 'diagram', label: 'Diagram', icon: 'schema' }
+  { kind: 'page', label: 'Page', icon: 'article' }
 ]
 
 const seedText = (ctx: MenuContext): string => workingText(ctx).text
+
+// ── Attention (CR-09 D-A) ───────────────────────────────────────────────────
+// The FIRST row on every object menu, by operator ruling: marking a thing is
+// the most common reason to open this menu at all. Deterministic — a preset
+// table names it and picks its class, the standard confirm card (DEC-028)
+// takes it from there, and the filed item POINTS at the object
+// (sourceType/sourceRef) rather than copying it.
+export function buildAttention(ctx: MenuContext): MenuContribution | null {
+  if (!workItemsEnabled()) return null
+  const obj = ctx.object
+  if (obj.type === 'empty-canvas') return null
+
+  const openMark = (
+    text: string,
+    intentClass: string,
+    ref: string,
+    type: string,
+    notes?: string,
+    sourceUrl?: string | null
+  ): void => {
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-work-item', {
+        detail: {
+          captureText: text,
+          notes,
+          source: {
+            sourceType: type,
+            sourceRef: ref,
+            intentClass,
+            deskId: ctx.taskId,
+            // DEC-091 — a mark made ON a browser widget (incl. a highlighted
+            // Slack message) freezes the page URL onto the item.
+            sourceUrl: sourceUrl ?? null
+          }
+        }
+      })
+    )
+  }
+
+  if (obj.type === 'multi') {
+    const n = obj.widgets.length
+    return {
+      id: 'core/attention',
+      section: MenuSection.Context,
+      priority: -1000, // above every other Context row
+      label: `Add ${n} to Attention…`,
+      icon: 'notifications',
+      onSelect: () => {
+        const p = presetForMulti(n)
+        openMark(p.text, p.intentClass, obj.widgets.map((w) => w.id).join(','), 'widgets')
+      }
+    }
+  }
+
+  const w = obj.widget
+  return {
+    id: 'core/attention',
+    section: MenuSection.Context,
+    priority: -1000,
+    label: 'Add to Attention…',
+    icon: 'notifications',
+    shortcut: undefined,
+    onSelect: () => {
+      // DEC-044: a HIGHLIGHT is the capture — its first line titles the item
+      // and the whole selection rides the notes, so nothing highlighted is
+      // dropped. No selection = the widget-level preset, as before.
+      const sel = ctx.selection?.text?.trim()
+      const url = browserMarkUrl(w.kind, w.content)
+      if (sel) {
+        const p = presetForSelection(w.kind, sel)
+        openMark(p.text, p.intentClass, w.id, 'widget', p.notes || undefined, url)
+        return
+      }
+      const p = presetForWidget(w.kind, w.title ?? '', seedText(ctx))
+      openMark(p.text, p.intentClass, w.id, 'widget', undefined, url)
+    }
+  }
+}
+
 
 export function buildCreate(ctx: MenuContext): MenuContribution[] {
   const seed = seedText(ctx)
@@ -54,7 +139,7 @@ export function buildCreate(ctx: MenuContext): MenuContribution[] {
       id: 'core/create',
       section: MenuSection.Create,
       priority: 0,
-      label: 'Create',
+      label: 'Create & link',
       icon: 'add',
       children: CREATE_AND_CONNECT_MENU.map<MenuContribution>((entry) => ({
         id: `core/create/${entry.kind}`,
@@ -71,13 +156,17 @@ export function buildCreate(ctx: MenuContext): MenuContribution[] {
 // Convert only makes sense from an existing object with content to reinterpret.
 export function buildConvert(ctx: MenuContext): MenuContribution[] {
   if (ctx.object.type === 'empty-canvas') return []
+  // DEC-041: no text, no copy. Without this the submenu appeared on a browser
+  // or a table and silently degraded into "spawn an empty widget and wire it"
+  // — which is exactly what Create already does, under an honest name.
+  if (!hasWorkableText(ctx)) return []
   const src = sourceWidget(ctx)
   return [
     {
       id: 'core/convert',
       section: MenuSection.Convert,
       priority: 0,
-      label: 'Convert',
+      label: 'Copy into',
       icon: 'sync_alt',
       children: CONVERT_TARGETS.filter((t) => t.kind !== src?.kind).map<MenuContribution>((t) => ({
         id: `core/convert/${t.kind}`,

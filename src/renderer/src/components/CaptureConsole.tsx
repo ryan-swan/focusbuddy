@@ -1,131 +1,103 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCaptureConsole } from '../stores/captureConsole'
 import { useWorkItemStore } from '../stores/workItems'
-import { useAssistantChrome } from '../stores/assistantChrome'
 import { useViewStore } from '../stores/view'
 import { useNodeStore } from '../stores/nodes'
 import { deskCaptureContext } from '../lib/captureContext'
-import { promptText } from './plexi/PromptDialog'
-import Icon from './Icon'
-import AttentionConfirmCard, { CLASS_CHOICES, CLASS_LABEL } from './AttentionConfirmCard'
+import AttentionConfirmCard, { CLASS_LABEL } from './AttentionConfirmCard'
+import { CAPTURE_LEADINS, ROTATE_MS } from '../lib/captureCopy'
+import { usePeopleStore } from '../lib/peopleDirectory'
 
-// The capture console (Attention S5, SPEC-007–013). One box, three modes:
-//   Routed   — the classifier files the text as the right work object
-//              (deterministic hard rules first; model only for ambiguity;
-//              loose-thought floor — a capture is never lost or blocked).
-//   Unrouted — no AI touch at all: filed verbatim as a loose thought.
-//   Expand   — hands the text to the assistant panel (the existing
-//              chat-to-desk promotion path formalized).
-// DEC-028: the routed confirm stop is the SHARED AttentionConfirmCard — the
-// same component the chat renders inline — so the flow can never fork.
-// House dialog shell (fb-scrim / fb-card / fb-field).
+// Capture (the Attention capture window, rebuilt as Book time's sibling —
+// same visual language, same tokens, same restraint). The tab bar is GONE:
+// Routed and Unrouted had identical fields, so the difference was never a
+// mode — it was a destination, and destinations belong on the commit:
+//
+//   Enter      → classify and show the confirm step   (the default)
+//   Cmd+Enter  → file exactly as typed — no classification, no confirm
+//
+// Expand left the dialog entirely (it was an escape hatch to the assistant,
+// not a peer; the assistant remains a keystroke away everywhere else).
+// The governing constraint: someone who has never used this app must know
+// what to do without being told. Two labelled fields, two Enters, and the
+// second Enter is usually the only decision.
+//
+// DEC-028 stands: a capture arriving WITH text (armed pill, @attention
+// prefix, chat hand-off) opens straight at the confirm card. DEC-023 stands:
+// a desk-context capture parents onto that desk — the context now surfaces
+// as the confirm step's Desk pill (accent = inferred) instead of a chip.
 
-type Mode = 'routed' | 'unrouted' | 'expand'
 
 export default function CaptureConsole(): JSX.Element | null {
   const open = useCaptureConsole((s) => s.open)
   const initialText = useCaptureConsole((s) => s.initialText)
+  const source = useCaptureConsole((s) => s.source)
   const close = useCaptureConsole((s) => s.close)
   const createItem = useWorkItemStore((s) => s.create)
-  const openAssistant = useAssistantChrome((s) => s.openPanel)
 
   const [text, setText] = useState('')
-  const [mode, setMode] = useState<Mode>('routed')
+  const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filed, setFiled] = useState<string | null>(null)
-  const [filedId, setFiledId] = useState<string | null>(null)
-  // DEC-019(b): routed capture ALWAYS stops at the ONE confirm card. When
-  // set, the card owns the flow (classify, chips, secondaries, tidy, date).
+  // DEC-019(b)/DEC-028: when set, the confirm card owns the flow.
   const [confirmText, setConfirmText] = useState<string | null>(null)
-  // V2 (DEC-023): when the console opens over a desk view, the capture files
-  // ONTO that desk (origin lens + detach semantics). Clearable with one ✕.
+  // DEC-023 — capture over a desk view files ONTO that desk.
   const [deskCtx, setDeskCtx] = useState<{ id: string; title: string } | null>(null)
+  const [titleFocused, setTitleFocused] = useState(false)
+  const [leadIdx, setLeadIdx] = useState(0)
   const fieldRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     if (open) {
       const t = initialText.trim()
       setText(t)
-      setMode('routed')
+      setNotes(useCaptureConsole.getState().initialNotes || '')
       setError(null)
-      setFiled(null)
-      setFiledId(null)
-      // DEC-028: a capture that arrives WITH text (armed pill, @attention
-      // prefix, chat hand-off) already carries the operator's commitment —
-      // it opens straight AT the confirm card ("opens prefilled at the
-      // classify step", DEC-019's own words). "← Edit text" drops back to
-      // the textarea with the text intact. A bare open stays a textarea.
       setConfirmText(t ? t : null)
-      setDeskCtx(deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes))
+      const marked = useCaptureConsole.getState().source
+      setDeskCtx(
+        marked?.deskId
+          ? { id: marked.deskId, title: marked.deskTitle || 'this desk' }
+          : deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
+      )
       if (!t) setTimeout(() => fieldRef.current?.focus(), 0)
+      // DEC-088 — start the directory fetch the moment capture opens, so by
+      // the time Enter classifies, main's people scan has real names. Never
+      // awaited; a cold first capture may honestly suggest nobody.
+      if (!usePeopleStore.getState().attempted) void usePeopleStore.getState().load()
     }
   }, [open, initialText])
 
+  // The rotation: only while there is nothing typed and nothing focused —
+  // a moving placeholder under a cursor is noise, not teaching.
+  useEffect(() => {
+    if (!open || text || titleFocused) return
+    const t = setInterval(() => setLeadIdx((i) => (i + 1) % CAPTURE_LEADINS.length), ROTATE_MS)
+    return () => clearInterval(t)
+  }, [open, text, titleFocused])
+
   if (!open) return null
 
-  async function fileUnrouted(): Promise<void> {
-    const t = text.trim()
-    const title = t.length > 120 ? `${t.slice(0, 117)}…` : t
-    const item = await createItem({
-      title,
-      notes: t === title ? undefined : t,
-      parentId: deskCtx?.id ?? null,
-      intentClass: 'loose_thought',
-      dueAt: null,
-      confidence: 1,
-      approvalState: 'auto',
-      sourceType: 'note',
-      wiOrigin: 'human'
-    })
-    setFiled(`${CLASS_LABEL.loose_thought} — “${item.title}”`)
-    setFiledId(item.id)
-    setText('')
-    setTimeout(close, 2500)
-  }
-
-  async function reclassifyFiled(): Promise<void> {
-    if (!filedId) return
-    const next = await promptText({
-      title: 'Reclassify',
-      label: 'Where does it belong?',
-      choices: CLASS_CHOICES
-    })
-    if (next) {
-      await useWorkItemStore.getState().reclassify(filedId, next)
-      setFiled(`${CLASS_LABEL[next] ?? next} — moved`)
-      setTimeout(close, 900)
-    }
-  }
-
-  async function submit(): Promise<void> {
+  /** Cmd+Enter — file exactly as typed. No classification, no confirm stop,
+   *  no AI touch by contract (the old Unrouted, now a commit path). */
+  async function fileVerbatim(): Promise<void> {
     const t = text.trim()
     if (!t || busy) return
     setBusy(true)
-    setError(null)
     try {
-      if (mode === 'expand') {
-        // Formalized chat-to-desk promotion — the house path the suggestion
-        // rows use: land on the CHAT tab, open the panel, stage the text in
-        // the composer WITHOUT sending (fb:composer-stage). The second
-        // dispatch covers a panel that had to mount first.
-        useAssistantChrome.getState().setTab('chat')
-        openAssistant()
-        window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: t }))
-        setTimeout(
-          () => window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: t })),
-          400
-        )
-        close()
-        return
-      }
-      if (mode === 'unrouted') {
-        // No AI touch by contract — verbatim, no confirmation stop.
-        await fileUnrouted()
-        return
-      }
-      // DEC-019(b): classify + ALWAYS confirm — the shared card takes over.
-      setConfirmText(t)
+      const title = t.length > 120 ? `${t.slice(0, 117)}…` : t
+      await createItem({
+        title,
+        notes: [t === title ? '' : t, notes.trim()].filter(Boolean).join('\n\n') || undefined,
+        parentId: deskCtx?.id ?? null,
+        intentClass: 'to_remember',
+        dueAt: null,
+        confidence: 1,
+        approvalState: 'auto',
+        sourceType: 'note',
+        wiOrigin: 'human'
+      })
+      close()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not file that. Try again.')
     } finally {
@@ -133,135 +105,147 @@ export default function CaptureConsole(): JSX.Element | null {
     }
   }
 
-  const modeBtn = (m: Mode, label: string, hint: string): JSX.Element => (
-    <button
-      key={m}
-      onClick={() => setMode(m)}
-      title={hint}
-      className={`px-2.5 h-7 fb-t-label fb-press rounded-[var(--radius-field)] ${
-        mode === m
-          ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
-          : 'text-[var(--ink-50)] hover:text-[var(--ink-100)]'
-      }`}
-    >
-      {label}
-    </button>
-  )
+  function onFieldKeyDown(e: React.KeyboardEvent): void {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      void fileVerbatim()
+      return
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      const t = text.trim()
+      if (t) setConfirmText(t)
+      return
+    }
+    if (e.key === 'Escape') close()
+  }
+
+  const label = 'text-[10.5px] font-semibold tracking-wider text-[var(--ink-40)] mb-1'
+  const field =
+    'w-full rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-2 outline-none ' +
+    '[&:focus-visible]:outline-none border border-transparent focus:border-[rgb(var(--accent))] ' +
+    'resize-none text-[var(--ink-100)] placeholder:text-[var(--ink-50)] transition-colors'
 
   return (
     <div
-      className="fb-scrim fixed inset-0 z-[300] flex items-start justify-center pt-[18vh]"
+      className="fb-scrim fixed inset-0 z-[300] flex items-start justify-center pt-[16vh]"
       onMouseDown={close}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Capture"
+        data-testid="capture-console"
         onMouseDown={(e) => e.stopPropagation()}
-        className="fb-card w-[min(560px,92vw)] p-4"
+        // DEC-087 — the card sits 16vh down, so anything past ~76vh ran off
+        // the bottom of the viewport with no scrollbar (the demo's cut-off
+        // Desk drawer). Header stays pinned; the body scrolls.
+        className="fb-card w-[min(600px,92vw)] px-6 pt-5 pb-4 flex flex-col max-h-[76vh]"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="text-[14px] font-semibold text-[var(--ink-100)]">Attention</div>
-            <button
-              onClick={() => {
-                useViewStore.getState().goAttention()
-                close()
-              }}
-              className="text-[11px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
-              title="Open the Attention page"
-            >
-              Open page →
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            {modeBtn('routed', 'Routed', 'Plexii files it as the right work object')}
-            {modeBtn('unrouted', 'Unrouted', 'No AI touch — saved verbatim as a loose thought')}
-            {modeBtn('expand', 'Expand', 'Hand it to the assistant to develop')}
-          </div>
-        </div>
-        {deskCtx && mode !== 'expand' && (
-          <div className="mt-2 inline-flex items-center gap-1.5 h-6 pl-2 pr-1 rounded-full bg-[var(--surface-sunken)] fb-t-caption text-[var(--ink-70)]">
-            <Icon name="desk" size={12} className="text-[var(--ink-40)]" />
-            <span className="truncate max-w-[220px]">on {deskCtx.title}</span>
-            <button
-              onClick={() => setDeskCtx(null)}
-              title="File standalone instead"
-              className="inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-[var(--surface-raised)] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
-            >
-              <Icon name="close" size={11} />
-            </button>
-          </div>
-        )}
-        {confirmText == null && (
-          <textarea
-            ref={fieldRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit()
-              if (e.key === 'Escape') close()
+        <div className="flex items-baseline gap-2.5">
+          <div className="text-[17px] font-semibold text-[var(--ink-100)]">Capture</div>
+          <button
+            onClick={() => {
+              useViewStore.getState().goAttention()
+              close()
             }}
-            placeholder={
-              mode === 'unrouted'
-                ? 'Saved exactly as typed…'
-                : 'Remind me to… / Review the… / Schedule a… / fyi:…'
-            }
-            rows={3}
-            className="fb-field mt-3 w-full bg-[var(--surface-raised)] px-3 py-2 text-[13px] resize-y"
-          />
-        )}
-        {confirmText != null && (
+            className="text-[13px] text-[var(--ink-40)] hover:text-[var(--ink-100)] fb-press"
+            title="Open the Attention page"
+          >
+            Open Attention →
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-6 px-6">
+        {confirmText == null ? (
+          <>
+            <div className="mt-4">
+              <div className={label}>WHAT NEEDS YOU?</div>
+              <textarea
+                ref={fieldRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onFocus={() => setTitleFocused(true)}
+                onBlur={() => setTitleFocused(false)}
+                onKeyDown={onFieldKeyDown}
+                placeholder={CAPTURE_LEADINS[leadIdx]}
+                rows={2}
+                data-testid="capture-title"
+                className={`${field} text-[16.5px]`}
+              />
+            </div>
+            <div className="mt-3">
+              <div className={label}>NOTES</div>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onKeyDown={onFieldKeyDown}
+                placeholder="Anything worth keeping with it — links, names, what you already know"
+                rows={2}
+                data-testid="capture-notes"
+                className={`${field} text-[14.5px] text-[var(--ink-90)]`}
+              />
+            </div>
+            {error && (
+              <div className="mt-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>
+            )}
+            <div className="mt-4 pt-3 border-t border-[var(--edge-soft)] flex items-center gap-3">
+              <span className="text-[12px] text-[var(--ink-50)]">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[11px] font-medium">
+                  ⌘↵
+                </kbd>{' '}
+                file exactly as typed{' '}
+                <span className="text-[var(--ink-30)]">·</span>{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--surface-sunken)] text-[11px] font-medium">
+                  esc
+                </kbd>{' '}
+                close
+              </span>
+              <button
+                onClick={() => {
+                  const t = text.trim()
+                  if (t) setConfirmText(t)
+                }}
+                disabled={busy || !text.trim()}
+                data-testid="capture-continue"
+                className="btn-primary ml-auto"
+              >
+                <span>Continue</span>
+                <span aria-hidden className="rounded bg-white/20 px-1 text-[11px] leading-4">
+                  ↵
+                </span>
+              </button>
+            </div>
+          </>
+        ) : (
           <div className="mt-3">
             <AttentionConfirmCard
               text={confirmText}
+              notes={notes}
               deskCtx={deskCtx}
-              onFiled={(summary, _count, id) => {
-                setFiled(summary)
-                setFiledId(id)
+              source={source}
+              cancelLabel="← back to your words"
+              onFiled={() => {
                 setText('')
+                setNotes('')
                 setConfirmText(null)
-                setTimeout(close, 2500)
+                // The toast (with Undo) is the confirmation now — the window
+                // has nothing left to say.
+                setTimeout(close, 350)
               }}
-              onCancel={() => setConfirmText(null)}
+              onCancel={() => {
+                setConfirmText(null)
+                // "Back to your words" puts the cursor back IN the words —
+                // and keeps Esc alive (focus on <body> hears nothing).
+                setTimeout(() => fieldRef.current?.focus(), 0)
+              }}
             />
           </div>
         )}
-        {error && <div className="mt-2 text-[12px] text-red-600 dark:text-red-400">{error}</div>}
-        {filed && (
-          <div className="mt-2 flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
-            <span className="inline-flex items-center gap-1.5">
-              <Icon name="check_circle" size={14} /> Filed to Attention · {filed}
-            </span>
-            {filedId && (
-              <button
-                onClick={() => void reclassifyFiled()}
-                className="text-[var(--ink-40)] hover:text-[var(--ink-100)] underline underline-offset-2 fb-press"
-              >
-                Wrong? Reclassify
-              </button>
-            )}
-          </div>
-        )}
-        {confirmText == null && (
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-[11px] text-[var(--ink-30)]">⌘↵ to file · Esc to close</div>
-            <button
-              onClick={() => void submit()}
-              disabled={busy || !text.trim()}
-              className="inline-flex items-center gap-1.5 h-8 px-3.5 fb-btn-surface fb-press fb-t-label text-[var(--ink-100)] disabled:opacity-50"
-            >
-              {busy
-                ? 'Working…'
-                : mode === 'expand'
-                  ? 'Open in assistant'
-                  : mode === 'unrouted'
-                    ? 'File it'
-                    : 'Classify'}
-            </button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   )
 }
+
+export { CLASS_LABEL }

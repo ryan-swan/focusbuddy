@@ -83,7 +83,7 @@ describe('browser-target provider — actions per right-click target', () => {
   it('offers AI Assist and Create seeded from a text selection in the page', () => {
     const labels = allLabels(resolveMenu(browserCtx({}, 'some selected page text')))
     expect(labels).toContain('AI Assist')
-    expect(labels).toContain('Create')
+    expect(labels).toContain('Create & link')
   })
 
   it('shows no target-specific rows when right-clicking empty page space', () => {
@@ -91,6 +91,6 @@ describe('browser-target provider — actions per right-click target', () => {
     expect(labels).not.toContain('Open link in new browser')
     expect(labels).not.toContain('Save image to desk')
     // Still a usable menu (Create at least).
-    expect(labels).toContain('Create')
+    expect(labels).toContain('Create & link')
   })
 })

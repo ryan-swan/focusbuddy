@@ -1,3 +1,4 @@
+import type { WriteOrigin } from '../shared/writeOrigin'
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   ActionProposal,
@@ -115,11 +116,13 @@ const api = {
   nodes: {
     list: (): Promise<FbNode[]> => ipcRenderer.invoke('nodes:list'),
     get: (id: string): Promise<FbNode | null> => ipcRenderer.invoke('nodes:get', id),
-    create: (draft: NodeDraft): Promise<FbNode> => ipcRenderer.invoke('nodes:create', draft),
-    update: (id: string, patch: NodePatch): Promise<FbNode | null> =>
-      ipcRenderer.invoke('nodes:update', id, patch),
+    create: (draft: NodeDraft, origin?: WriteOrigin): Promise<FbNode> =>
+      ipcRenderer.invoke('nodes:create', draft, origin),
+    update: (id: string, patch: NodePatch, origin?: WriteOrigin): Promise<FbNode | null> =>
+      ipcRenderer.invoke('nodes:update', id, patch, origin),
     // Soft-delete: returns the trashed ids (the node + its subtree) for undo.
-    delete: (id: string): Promise<string[]> => ipcRenderer.invoke('nodes:delete', id),
+    delete: (id: string, origin?: WriteOrigin): Promise<string[]> =>
+      ipcRenderer.invoke('nodes:delete', id, origin),
     // DEC-021 (D2): immediate hard-delete + memory purge — the dialog's
     // "Delete everything permanently" choice. No trash window, no undo.
     deletePermanent: (
@@ -204,12 +207,14 @@ const api = {
       ipcRenderer.invoke('widgets:listByTask', taskId),
     listByKind: (kind: Widget['kind']): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByKind', kind),
-    create: (draft: WidgetDraft): Promise<Widget> => ipcRenderer.invoke('widgets:create', draft),
+    create: (draft: WidgetDraft, origin?: WriteOrigin): Promise<Widget> =>
+      ipcRenderer.invoke('widgets:create', draft, origin),
     createOptional: (draft: WidgetDraft): Promise<Widget | null> =>
       ipcRenderer.invoke('widgets:createOptional', draft),
-    update: (id: string, patch: WidgetPatch): Promise<Widget | null> =>
-      ipcRenderer.invoke('widgets:update', id, patch),
-    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('widgets:delete', id),
+    update: (id: string, patch: WidgetPatch, origin?: WriteOrigin): Promise<Widget | null> =>
+      ipcRenderer.invoke('widgets:update', id, patch, origin),
+    delete: (id: string, origin?: WriteOrigin): Promise<boolean> =>
+      ipcRenderer.invoke('widgets:delete', id, origin),
     restore: (id: string): Promise<boolean> => ipcRenderer.invoke('widgets:restore', id),
     bringToFront: (id: string): Promise<Widget | null> =>
       ipcRenderer.invoke('widgets:bringToFront', id)
@@ -709,8 +714,8 @@ const api = {
     }> => ipcRenderer.invoke('ai:topUpCredits', amountUsd)
   },
   history: {
-    record: (url: string, title: string, taskId: string | null): Promise<void> =>
-      ipcRenderer.invoke('history:record', url, title, taskId),
+    record: (url: string, title: string, taskId: string | null, countsAsVisit?: boolean): Promise<void> =>
+      ipcRenderer.invoke('history:record', url, title, taskId, countsAsVisit),
     recent: (limit: number, taskId?: string | null): Promise<BrowsingHistoryEntry[]> =>
       ipcRenderer.invoke('history:recent', limit, taskId ?? null)
   },
@@ -1711,6 +1716,19 @@ const api = {
   // local DB. These expose the local half (collect changes, apply pulls, cursor).
   // The workItems:* namespace (Attention S3, §4). Work items NEVER travel
   // nodes:* — this is their one seam; the store wraps it.
+  /** DEC-052 Track D — the typed action ledger (device-local). */
+  signals: {
+    record: (input: { kind: string; targetKind?: string; targetRef?: string; payload?: string }): Promise<{ id: string; kind: string; occurredAt: number }> =>
+      ipcRenderer.invoke('signals:record', input),
+    list: (sinceMs: number): Promise<Array<{ id: string; kind: string; targetKind: string | null; targetRef: string | null; occurredAt: number; payload: string | null }>> =>
+      ipcRenderer.invoke('signals:list', sinceMs),
+    matchState: (signalId: string, itemId: string): Promise<{ promptedAt: number | null; outcome: string | null } | null> =>
+      ipcRenderer.invoke('signals:matchState', signalId, itemId),
+    markPrompted: (signalId: string, itemId: string, confidence: number): Promise<void> =>
+      ipcRenderer.invoke('signals:markPrompted', signalId, itemId, confidence),
+    outcome: (signalId: string, itemId: string, outcome: 'completed' | 'dismissed' | 'ignored'): Promise<void> =>
+      ipcRenderer.invoke('signals:outcome', signalId, itemId, outcome)
+  },
   workItems: {
     list: (): Promise<FbNode[]> => ipcRenderer.invoke('workItems:list'),
     get: (id: string): Promise<FbNode | null> => ipcRenderer.invoke('workItems:get', id),
@@ -1723,6 +1741,8 @@ const api = {
       wiUrgency?: string | null
       sourceRef?: string | null
       sourceType?: string | null
+      /** DEC-091 — the exact URL a browser-widget mark was made at. */
+      sourceUrl?: string | null
       confidence?: number | null
       approvalState?: string
       wiOrigin?: 'human' | 'ai' | 'system'
@@ -1766,11 +1786,36 @@ const api = {
         title: string
         dueAt: string | null
       }>
+      /** DEC-088 — directory-grounded people the capture references. */
+      people: Array<{ id: string; title: string }>
+      personClarify: {
+        phrase: string
+        candidates: Array<{ id: string; title: string; hint: string }>
+      } | null
     }> => ipcRenderer.invoke('workItems:classify', text),
+    /** DEC-088 — the people scan alone (marked captures skip classify). */
+    scanPeople: (
+      text: string
+    ): Promise<{
+      people: Array<{ id: string; title: string }>
+      clarify: {
+        phrase: string
+        candidates: Array<{ id: string; title: string; hint: string }>
+      } | null
+    }> => ipcRenderer.invoke('workItems:scanPeople', text),
+    /** DEC-052 B3 — intent-driven plan selection (ids ordered best-first). */
+    planSelect: (
+      intent: string,
+      candidates: Array<{ id: string; title: string; context: string }>
+    ): Promise<{ ids: string[]; note: string | null; via: 'model' | 'fallback' }> =>
+      ipcRenderer.invoke('planner:selectItems', intent, candidates),
     // DEC-026: the opt-in tidy — null unless the capture is messy enough AND
     // the model produced a faithful title+gist. Approve-before-apply.
-    proposeCleanup: (text: string): Promise<{ title: string; note: string } | null> =>
-      ipcRenderer.invoke('workItems:proposeCleanup', text),
+    proposeCleanup: (
+      text: string,
+      notes?: string
+    ): Promise<{ title: string; note: string } | null> =>
+      ipcRenderer.invoke('workItems:proposeCleanup', text, notes),
     enabled: (): Promise<boolean> => ipcRenderer.invoke('workItems:enabled'),
     precision: (): Promise<number | null> => ipcRenderer.invoke('workItems:precision'),
     // Internal (S2): the arrival router's seam.

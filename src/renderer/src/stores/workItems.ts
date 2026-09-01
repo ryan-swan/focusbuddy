@@ -24,11 +24,16 @@ interface WorkItemStore {
     notes?: string
     parentId?: string | null
     intentClass?: string
+    state?: string
     dueAt?: string | null
+    wiUrgency?: string | null
+    tags?: string | null
+    mentions?: string | null
     confidence?: number | null
     approvalState?: string
     sourceRef?: string | null
     sourceType?: string | null
+    sourceUrl?: string | null
     wiOrigin?: 'human' | 'ai' | 'system'
   }) => Promise<FbNode>
   updateFields: (id: string, patch: Record<string, unknown>) => Promise<FbNode | null>

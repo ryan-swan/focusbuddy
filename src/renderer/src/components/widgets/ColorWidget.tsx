@@ -112,7 +112,7 @@ export default function ColorWidget({ widget, inline = false }: Props): JSX.Elem
   if (inline) return content
 
   return (
-    <WidgetFrame widget={widget} headerLabel="color" headerAccent="bg-stone-200/70">
+    <WidgetFrame widget={widget} headerLabel="color" headerAccent="bg-stone-200/70 dark:bg-white/[0.07]">
       {content}
     </WidgetFrame>
   )

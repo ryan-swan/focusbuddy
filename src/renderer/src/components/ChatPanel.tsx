@@ -41,6 +41,8 @@ import {
 import Icon from './Icon'
 import AttentionConfirmCard from './AttentionConfirmCard'
 import { deskCaptureContext } from '../lib/captureContext'
+import { parseAttentionCommand, hasAttentionCommand } from '../lib/attentionCommand'
+import { presetForSelection } from '../lib/attentionPresets'
 
 // The three display modes, in Notion's order and with Notion's labels. The
 // header's mode button shows the current mode's icon; the dropdown lists all
@@ -526,6 +528,35 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     const noTask = !activeTaskId
     return [
       {
+        // DEC-044: a highlight in the CHAT marks the same way one in a doc
+        // does — first row, first line titles it, the full selection rides
+        // the notes. Works with no desk open (the item files standalone).
+        label: 'Add to Attention…',
+        icon: 'notifications',
+        onClick: () => {
+          // 'ai-chat' lands the preset's DEFAULT class (to_do): a highlighted
+          // AI answer is usually something to act on — 'chat' would map to
+          // to_respond, but nobody awaits words back from a bot.
+          const p = presetForSelection('ai-chat', text)
+          window.dispatchEvent(
+            new CustomEvent('fb:command-new-work-item', {
+              detail: {
+                captureText: p.text,
+                notes: p.notes || undefined,
+                source: {
+                  sourceType: 'chat',
+                  sourceRef: activeConversationId ?? 'chat',
+                  intentClass: p.intentClass,
+                  deskId: activeTaskId
+                }
+              }
+            })
+          )
+          window.getSelection()?.removeAllRanges()
+        }
+      },
+      { separator: true },
+      {
         label: 'Save selection as sticky',
         icon: 'sticky_note_2',
         disabled: noTask,
@@ -682,12 +713,37 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     ],
     [nodes, docList]
   )
+  // DEC-027: capability probe for the deterministic @attention interception —
+  // at mount, re-probed when the Settings toggle flips.
+  const [workItemsOn, setWorkItemsOn] = useState(false)
+  useEffect(() => {
+    const probe = (): void => {
+      window.api.workItems
+        .enabled()
+        .then(setWorkItemsOn)
+        .catch(() => {})
+    }
+    probe()
+    window.addEventListener('fb:workitems-toggled', probe)
+    return () => window.removeEventListener('fb:workitems-toggled', probe)
+  }, [])
+
   const composerIntents = useMemo(
     // Mid-conversation, short phrases are usually replies, so chat leads;
     // on a fresh conversation the same phrase is searchy and the web leads
     // (the instant ruling). Deterministic intents divert either way.
-    () => composerOmniIntents(draft, omniTargets, { chatFirst: messages.length > 0 }),
-    [draft, omniTargets, messages.length]
+    //
+    // …EXCEPT while the draft is a leading-@attention capture: submitComposer
+    // intercepts that before any intent runs, so Enter files it and can never
+    // search. The strip exists to say what Enter will do (R11), so offering
+    // "Search the web" here was a false promise — and on a fresh conversation
+    // it even rendered as the PRE-SELECTED ⏎ action (operator live QA). One
+    // predicate, shared with the send path, so the two can never disagree.
+    () =>
+      workItemsOn && hasAttentionCommand(draft)
+        ? []
+        : composerOmniIntents(draft, omniTargets, { chatFirst: messages.length > 0 }),
+    [draft, omniTargets, messages.length, workItemsOn]
   )
   const pickedIntent: OmniIntent | null =
     composerIntents.length > 0
@@ -712,21 +768,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   } | null>(null)
   const [inlineFiled, setInlineFiled] = useState<string | null>(null)
 
-  // DEC-027: capability probe for the deterministic @attention interception —
-  // at mount, re-probed when the Settings toggle flips.
-  const [workItemsOn, setWorkItemsOn] = useState(false)
-  useEffect(() => {
-    const probe = (): void => {
-      window.api.workItems
-        .enabled()
-        .then(setWorkItemsOn)
-        .catch(() => {})
-    }
-    probe()
-    window.addEventListener('fb:workitems-toggled', probe)
-    return () => window.removeEventListener('fb:workitems-toggled', probe)
-  }, [])
-
   const submitComposer = useCallback(async (): Promise<void> => {
     const ed = editorRef.current
     // The document is the source of truth: its chips serialise to "@Title" in
@@ -739,21 +780,29 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       performOmniIntent({ kind: 'search', label: 'Search the web', url: content })
       return
     }
-    // DEC-027/028: a LEADING @attention is a capture, not a chat message — it
-    // never reaches the model, and the confirm stop renders INLINE above the
-    // composer (the same shared card as the console) so the operator never
-    // leaves the chat. Mid-sentence mentions keep the AI proposal path.
-    const attn = workItemsOn ? /^@attention\b[:,]?\s*([\s\S]*)$/i.exec(content) : null
-    if (attn) {
+    // DEC-027/028 + DEC-031: @attention ANYWHERE is a DETERMINISTIC capture —
+    // the confirm stop renders INLINE above the composer (the same shared card
+    // as the console) so the operator never leaves the chat.
+    //   leading → pure capture; the model never sees it.
+    //   inline  → capture AND still send the message, token stripped, so a
+    //             "build me X @attention" gets both halves. This replaced a
+    //             prompt rule the model could ignore — and did (live QA: only
+    //             the page was created, the item never reached the queue).
+    const attn = workItemsOn ? parseAttentionCommand(content) : null
+    if (attn && attn.mode !== 'none') {
       ed?.commands.clearContent()
       setDraft('')
-      const captureText = attn[1].trim()
-      if (!captureText) return // a bare @attention send has nothing to file
-      setInlineCapture({
-        text: captureText,
-        deskCtx: deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
-      })
-      setInlineFiled(null)
+      if (attn.captureText) {
+        setInlineCapture({
+          text: attn.captureText,
+          deskCtx: deskCaptureContext(useViewStore.getState().view, useNodeStore.getState().nodes)
+        })
+        setInlineFiled(null)
+      }
+      // The conversational half of an inline token still runs.
+      if (attn.mode === 'inline' && attn.messageText) {
+        await send(thread.serverTaskId, attn.messageText, thread.key)
+      }
       return
     }
     // Auto (the omni door, AI-01): when the previewed pick is a non-chat
@@ -814,7 +863,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         break
       case 'url':
         // A web source opens in the in-app browser panel (A2, R4/R13): the
-        // web never leaves Plexi. The panel's toolbar carries the explicit
+        // web never leaves Plexii. The panel's toolbar carries the explicit
         // system-browser escape.
         useWebPanel.getState().openWeb(target.url)
         break
@@ -1563,9 +1612,9 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             </div>
           )}
           {inlineCapture && (
-            <div className="mb-2 rounded-[var(--radius-field)] border border-[rgba(var(--accent),0.35)] bg-[var(--surface-raised)] p-2.5">
+            <div className="mb-2 rounded-[var(--radius-field)] border border-accent/35 bg-[var(--surface-raised)] p-2.5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded bg-[rgba(var(--accent),0.14)] text-[rgb(var(--accent))] fb-t-caption font-medium">
+                <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded bg-accent/[0.14] text-[rgb(var(--accent))] fb-t-caption font-medium">
                   @attention
                 </span>
                 <span className="fb-t-caption text-[var(--ink-50)] truncate flex-1">
@@ -1609,6 +1658,13 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           )}
           <div
             onKeyDownCapture={(e) => {
+              // The "@" picker OWNS Tab whenever it is open (DEC-028's keyboard
+              // contract: Tab picks the highlighted row). This handler is
+              // capture-phase, so it runs BEFORE ProseMirror's suggestion
+              // plugin — without this guard it swallowed every Tab, the picker
+              // never saw one, and the stolen keystroke silently cycled the
+              // intent to "Search the web" instead (operator live QA).
+              if (e.key === 'Tab' && document.querySelector('[data-testid="mention-picker"]')) return
               // Tab flips the previewed intent (R11) — only while the strip
               // is showing, so normal focus travel is untouched otherwise.
               if (e.key === 'Tab' && !e.shiftKey && composerMode === 'auto' && composerIntents.length > 1) {
@@ -1621,7 +1677,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
             <MentionComposer
               placeholder={
                 composerMode === 'search'
-                  ? 'Search the web — results open in Plexi'
+                  ? 'Search the web — results open in Plexii'
                   : discovering
                     ? 'Start anywhere — an idea, a question, a hunch…'
                     : ctx.placeholder
@@ -1745,7 +1801,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                     m.id === 'auto'
                       ? 'Smart: URLs open, take-me-to navigates, everything else asks'
                       : m.id === 'search'
-                        ? 'Type straight into your search engine — results open in Plexi'
+                        ? 'Type straight into your search engine — results open in Plexii'
                         : 'Everything goes to Plexii'
                   }
                   onClick={() => {

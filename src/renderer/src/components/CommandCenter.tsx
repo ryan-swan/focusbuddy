@@ -9,6 +9,7 @@ import type { WidgetKind, SearchHit } from '@shared/types'
 import { WIDGET_CATALOG, isAdvancedKind } from '../lib/widgetCatalog'
 import { getNavPrefs, setNavPrefs } from '../lib/navPrefs'
 import Icon from './Icon'
+import { parseAttentionCommand, hasAttentionCommand } from '../lib/attentionCommand'
 import { useCapabilityEnabled, useCapabilityStore } from '../stores/capabilities'
 import { entitlementFor, capabilityForDocType, DOC_TYPE_LABEL } from '../lib/entitlementReason'
 import { canCreateWidget } from '../lib/gating'
@@ -82,7 +83,6 @@ export default function CommandCenter({
   const [highlightIdx, setHighlightIdx] = useState(0)
   // DEC-028: the armed @attention pill — Tab on the Attention row (or on an
   // "@a…" partial) arms it; the query then IS the capture text.
-  const [attnArmed, setAttnArmed] = useState(false)
   // Deep content search results (notes, doc bodies, table cells, files) from the
   // main process, fetched async + debounced as the query changes.
   const [deepHits, setDeepHits] = useState<SearchHit[]>([])
@@ -160,11 +160,9 @@ export default function CommandCenter({
     setPaletteOpen(true)
     setQuery('')
     setHighlightIdx(0)
-    setAttnArmed(false)
   }
   function closePalette(): void {
     setPaletteOpen(false)
-    setAttnArmed(false)
   }
 
   // Cmd+K from anywhere — open palette. Cmd+Shift+K = body double quick
@@ -457,26 +455,44 @@ export default function CommandCenter({
     // prefix of attention) surfaces this entry on top, and Tab ARMS the
     // Slack-style pill — the query then IS the capture text and Enter files
     // it. The console opens prefilled at the classify step either way.
+    // Operator ruling (2026-08-30): a query that MENTIONS Attention — plain
+    // "attention", "@attention", or an "@a…" partial — belongs to the capture
+    // row, full stop. The omni rows (Ask Plexii hard-scores 2000) yield to
+    // ALL of these, not just the literal token; without this, Enter on
+    // "attention" asked the model instead of opening Capture.
+    const attnAddressed =
+      workItemsOn &&
+      (hasAttentionCommand(q) ||
+        /^@?attention\b/i.test(q) ||
+        (/^@([a-z]*)$/i.test(q) && 'attention'.startsWith(q.slice(1).toLowerCase())))
     if (workItemsOn) {
       const attnPrefix = /^@?attention\b[:,]?\s*(.*)$/i.exec(q)
-      const atPartial = !attnPrefix ? /^@([a-z]*)$/i.exec(q) : null
+      // DEC-031: the token ANYWHERE in the query addresses Attention just as
+      // explicitly as opening with it. Before this, "…by friday @attention"
+      // scored as a fuzzy match, lost to Ask Plexii, and took a 30s round trip
+      // through the model that filed nothing (operator live QA).
+      const attnInline = !attnPrefix && hasAttentionCommand(q) ? parseAttentionCommand(q) : null
+      const atPartial = !attnPrefix && !attnInline ? /^@([a-z]*)$/i.exec(q) : null
       const atMatches = !!atPartial && 'attention'.startsWith(atPartial[1].toLowerCase())
-      const prefill = attnArmed ? q.trim() : (attnPrefix?.[1]?.trim() ?? '')
+      const prefill = attnPrefix?.[1]?.trim() ?? attnInline?.captureText ?? ''
       items.push({
         id: 'attention-capture',
+        // Operator ruling (2026-08-30): selecting Attention OPENS the Capture
+        // window — typing happens THERE, not in this bar. The ⌘K armed pill
+        // (DEC-028c) is retired here; text typed after the token still files
+        // directly (DEC-031's grammar, unchanged), and chat + the home bar
+        // keep their own flows.
         label: prefill
           ? `Attention — capture “${prefill.slice(0, 40)}${prefill.length > 40 ? '…' : ''}”`
-          : atMatches
-            ? 'Attention — Tab to arm, then type your thought'
-            : 'Attention — capture anything',
-        hint: 'Routed, unrouted, or expand · @attention from anywhere',
+          : 'Attention — open Capture',
+        hint: 'Opens the Capture window · @attention <text> files directly',
         icon: 'notifications',
         kind: 'action',
         // An explicit @-address (armed pill, full prefix, or @-partial)
         // outranks EVERYTHING — Enter on the raw query must capture, never
         // fall through to search or navigation.
         score:
-          attnArmed || attnPrefix
+          attnPrefix || attnInline
             ? 500
             : atMatches
               ? 490
@@ -720,7 +736,12 @@ export default function CommandCenter({
     // says); a bare phrase's web search sits above static nav but below a
     // strong workspace hit, so naming a document still goes to the document
     // and Tab/arrows reach the web in one step. Never on an empty query.
-    if (q !== '') {
+    // DEC-031: an @attention token is an explicit address to Attention. The
+    // omni rows must not compete with it — "Ask Plexii" hard-scores 2000 when
+    // the input reads as a question, which is exactly how the operator's
+    // "…by friday @attention" lost to a 30s model round trip that filed
+    // nothing. No omni row is offered while the token is present.
+    if (q !== '' && !attnAddressed) {
       const intents = classifyOmniInput(query, [])
       const lead = intents[0]?.kind
       for (const intent of intents) {
@@ -736,9 +757,9 @@ export default function CommandCenter({
                 : `Ask Plexii — “${query.trim()}”`,
           hint:
             intent.kind === 'url'
-              ? 'Opens in Plexi'
+              ? 'Opens in Plexii'
               : intent.kind === 'search'
-                ? 'Web results in Plexi'
+                ? 'Web results in Plexii'
                 : 'Plexii answers in the side panel',
           icon: intent.kind === 'url' ? 'language' : intent.kind === 'search' ? 'travel_explore' : 'forum',
           kind: 'action',
@@ -773,7 +794,6 @@ export default function CommandCenter({
     query,
     nodes,
     workItemsOn,
-    attnArmed,
     canSmartStack,
     activeTaskId,
     onOpenBodyDouble,
@@ -820,19 +840,6 @@ export default function CommandCenter({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setHighlightIdx((i) => Math.max(0, i - 1))
-    } else if (e.key === 'Tab' && !e.shiftKey && workItemsOn && !attnArmed) {
-      // DEC-028: Tab arms the @attention pill when the Attention row is
-      // highlighted or the query is an "@a…" partial of it.
-      const partial = /^@([a-z]*)$/i.exec(query)
-      const onRow = results[highlightIdx]?.id === 'attention-capture'
-      if (onRow || (partial && 'attention'.startsWith(partial[1].toLowerCase()))) {
-        e.preventDefault()
-        setAttnArmed(true)
-        setQuery('')
-        setHighlightIdx(0)
-      }
-    } else if (e.key === 'Backspace' && attnArmed && query === '') {
-      setAttnArmed(false)
     } else if (e.key === 'Enter') {
       e.preventDefault()
       const r = results[highlightIdx]
@@ -873,15 +880,6 @@ export default function CommandCenter({
                     {editorScope}
                   </span>
                 )}
-                {attnArmed && (
-                  <span
-                    className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-accent bg-accent/10 border border-accent/20 rounded-md px-1.5 py-0.5"
-                    title="Armed — Enter files what you type to Attention. Backspace on empty removes it."
-                  >
-                    <Icon name="notifications" size={11} />
-                    @attention
-                  </span>
-                )}
                 <input
                   ref={inputRef}
                   data-testid="command-palette-input"
@@ -892,11 +890,9 @@ export default function CommandCenter({
                   }}
                   onKeyDown={paletteKeyDown}
                   placeholder={
-                    attnArmed
-                      ? 'What needs attention? Enter files it…'
-                      : editorScope && editorCommands.length > 0
-                        ? `Command the ${editorScope.toLowerCase()}, or search everything…`
-                        : 'Search everything — tasks, notes, docs, files, actions…'
+                    editorScope && editorCommands.length > 0
+                      ? `Command the ${editorScope.toLowerCase()}, or search everything…`
+                      : 'Search everything — tasks, notes, docs, files, actions…'
                   }
                   className="flex-1 bg-transparent text-[13px] text-[var(--ink-100)] placeholder:text-[var(--ink-40)]"
                 />

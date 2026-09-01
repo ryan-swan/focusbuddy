@@ -70,6 +70,10 @@ export type WidgetKind =
   // BR, but it's a regular widget the user can resize, unpin, drag to the
   // canvas, delete, or re-add via the widget picker like anything else.
   | 'minimap'
+  // DEC-045 (CR-09 D-B) — the Attention widget ON A DESK. Scope lives in
+  // widget.content as JSON {"scope":"desk"|"all"}; defaults to the desk it
+  // sits on and falls back to all when that desk holds nothing.
+  | 'attention'
   // Voice / video recorder — captures audio (and later webcam video) via
   // MediaRecorder, persists the blob through the files store, and runs
   // it through Whisper (OpenAI) for transcription, then Anthropic for
@@ -176,11 +180,27 @@ export interface FbNode {
   // dueAt is ISO-8601, deliberately distinct from the numeric desk dueDate.
   workItemState?: string | null
   intentClass?: string | null
+  intentSub?: string | null
+  /** DEC-035: the item LEADING this item's group (a sibling ref, one level). */
+  groupId?: string | null
+  /** DEC-037: comma-delimited normalized tags. Optional, always. */
+  tags?: string | null
+  /** DEC-039: JSON entity mentions ({kind,id,title}[]) — people/desks/rooms/plans. */
+  mentions?: string | null
   originatorId?: string | null
   recipientId?: string | null
   dueAt?: string | null
   wiUrgency?: string | null
   sourceRef?: string | null
+  sourceUrl?: string | null
+  // DEC-063 — the meeting a `to_meet` item points at. Optional throughout: an
+  // item can be a bare "meet with Sam" long before any of it is known.
+  meetStartAt?: string | null
+  meetDurationMin?: number | null
+  meetUrl?: string | null
+  meetLocation?: string | null
+  meetAttendees?: string | null
+  meetRsvp?: MeetRsvp | null
   sourceType?: string | null
   confidence?: number | null
   approvalState?: string | null
@@ -272,7 +292,14 @@ export interface NodePatch {
 // A booked stretch of time on the calendar, optionally tied to a task. This is
 // how the calendar goes from "tasks shown on their due day" to "I've booked
 // 2-3pm to focus on this", and a block can launch a focus session for its task.
-export type TimeBlockStatus = 'planned' | 'done'
+// DEC-052: 'missed' (the slot passed, work not done — what "replan undone"
+// sweeps) and 'skipped' (deliberately let go) join the union. The db CHECK was
+// dropped (migrateTimeBlocksStatusCheck); this union is the guard.
+// DEC-063 — the answer owed on an invitation. `needed` is the state that makes
+// a Meet item worth surfacing at all: somebody is waiting on you.
+export type MeetRsvp = 'needed' | 'yes' | 'no' | 'maybe'
+
+export type TimeBlockStatus = 'planned' | 'done' | 'missed' | 'skipped'
 
 // When a time block is a scheduled meeting, it carries the room to join and the
 // people invited to it. The room id is stable so the same link works for the
@@ -281,6 +308,20 @@ export type TimeBlockStatus = 'planned' | 'done'
 export interface TimeBlockMeeting {
   roomId: string
   invitees: string[] // email addresses the invite was sent to
+  // DEC-063 — a meeting is not always Plexii's own room, and is not always
+  // online. `joinUrl` is an EXTERNAL link (Google Meet, Zoom, Teams) that takes
+  // precedence over the built-in room when set; `location` is where to
+  // physically be. Both optional, and not exclusive: a hybrid meeting has both.
+  //
+  // roomId stays required and is still minted for every meeting: it costs
+  // nothing, and it means a meeting that started as in-person can always be
+  // joined remotely without editing anything. The payload is stored as JSON on
+  // the block, so adding these needed no migration.
+  joinUrl?: string | null
+  location?: string | null
+  /** Book-time step 7 — what this meeting needs to settle. Same free ride as
+   *  joinUrl/location above: the payload is JSON on the block, no migration. */
+  agenda?: string | null
 }
 
 export type TimeBlockRecurrence = 'daily' | 'weekly' | 'monthly'
@@ -299,6 +340,15 @@ export interface TimeBlock {
   // row; clearing it (delete "this and future") stops the series.
   recurrence?: TimeBlockRecurrence | null
   seriesId?: string | null
+  // DEC-052 scheduling foundation. origin: who placed this block — 'manual'
+  // (a person) or 'auto' (the planner); replan may only move 'auto' blocks.
+  // locked: never moved by any scheduler — set by hand, or automatically when
+  // an external edit is detected (the honour-and-pin convention). pushPolicy:
+  // whether this block ever leaves Plexii for an external calendar ('local' is
+  // the default and the convention).
+  origin: 'manual' | 'auto'
+  locked: boolean
+  pushPolicy: 'local' | 'push'
   createdAt: number
   updatedAt: number
 }
@@ -312,6 +362,8 @@ export interface TimeBlockDraft {
   durationMin: number
   meeting?: TimeBlockMeeting | null
   recurrence?: TimeBlockRecurrence | null
+  /** Who is placing this block (default 'manual'). */
+  origin?: 'manual' | 'auto'
 }
 
 export interface TimeBlockPatch {
@@ -321,6 +373,8 @@ export interface TimeBlockPatch {
   durationMin?: number
   status?: TimeBlockStatus
   meeting?: TimeBlockMeeting | null
+  locked?: boolean
+  pushPolicy?: 'local' | 'push'
 }
 
 export interface Widget {
@@ -699,7 +753,7 @@ export interface AgentActionOutcome {
 
 // ── Situational proactivity (workspace radar) ────────────────────────────────
 // A cheap, deterministic (no-LLM) detector surfaces actionable situations across
-// the user's REAL work in Plexi — tasks, inbound mail, and the calendar — as
+// the user's REAL work in Plexii — tasks, inbound mail, and the calendar — as
 // one-tap suggestions they can act on or dismiss.
 export type RadarKind = 'overdue' | 'due_soon' | 'stalled' | 'reply_needed' | 'meeting_soon'
 
@@ -785,6 +839,11 @@ export type ActionProposal =
       widgetKind: WidgetKind
       title?: string
       content?: string
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {
@@ -819,8 +878,8 @@ export type ActionProposal =
       kind: 'create-work-item'
       title: string
       notes?: string
-      // Which Attention queue this belongs to (action/review/scheduling/fyi/
-      // acknowledgment/discussion/loose_thought). Omitted → action.
+      // Which Attention queue this belongs to (to_do/to_review/to_decide/
+      // to_respond/to_meet/to_discuss/to_remember/to_know). Omitted → to_do.
       intentClass?: string
       reason?: string
     }
@@ -859,6 +918,11 @@ export type ActionProposal =
       kind: 'create-todo-list'
       title: string
       items: string[]
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {
@@ -866,6 +930,11 @@ export type ActionProposal =
       kind: 'create-page'
       title: string
       content: string // serialized Tiptap JSON
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {
@@ -982,6 +1051,11 @@ export type ActionProposal =
           | 'button'
         options?: string[] // for select types
       }>
+      // DEC-032: the desk this belongs on, when the user named one. A real
+      // node id from the desk roster the model is shown; the card resolves it
+      // (id, else title) and applies there WITHOUT asking. Omitted = use the
+      // desk the user is on, and only ask when there is none.
+      deskId?: string
       reason?: string
     }
   | {

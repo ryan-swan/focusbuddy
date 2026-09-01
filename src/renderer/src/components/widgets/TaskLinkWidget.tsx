@@ -139,7 +139,7 @@ export default function TaskLinkWidget({ widget, inline = false }: Props): JSX.E
 
   if (inline) return body
   return (
-    <WidgetFrame widget={widget} headerLabel="task link" headerAccent="bg-stone-200/70">
+    <WidgetFrame widget={widget} headerLabel="task link" headerAccent="bg-stone-200/70 dark:bg-white/[0.07]">
       {body}
     </WidgetFrame>
   )

@@ -284,7 +284,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     )
     if (inline) return body
     return (
-      <WidgetFrame widget={widget} headerLabel="Table" headerAccent="bg-[var(--edge-firm)]/60">
+      <WidgetFrame widget={widget} headerLabel="Table" headerAccent="bg-[var(--edge-firm)]">
         {body}
       </WidgetFrame>
     )
@@ -1459,7 +1459,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
     <WidgetFrame
       widget={widget}
       headerLabel={table.title}
-      headerAccent="bg-[var(--edge-firm)]/60"
+      headerAccent="bg-[var(--edge-firm)]"
     >
       {body}
     </WidgetFrame>

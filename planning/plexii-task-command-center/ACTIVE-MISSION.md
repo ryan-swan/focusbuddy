@@ -3,9 +3,224 @@
 <!-- Single source of truth for live state. Update at every phase boundary, then regenerate
      NEXT-SESSION-PROMPT.md. -->
 
-**Last updated:** 2026-08-25 (DEC-020 EXECUTED — the nav retirement) · **State:**
-IN_PROGRESS — Phase 6 execution (DEC-017 autopilot. S0 ✔ S1 ✔ S2 ✔ S3 ✔ S4 ✔ L1 ✔ S5 ✔
-→ **S7 ✔ — G6 MET (607ace78). THE BUILD'S SPINE IS COMPLETE AND LIVE.**)
+**Last updated:** 2026-08-30 (Attention/Calendar + platform-stability build) ·
+**State:** 🏁 **LANDED on main** (PR #4, main @ `c0e32a0c`, default-OFF) →
+**POST-LANDING ITERATION.** Branch `ryan-command-center` @ `4dc603de`, clean,
+**71 commits ahead of main**, pushed to both remotes. Suite **3,196 / 304 files**
+green; both typechecks clean; app boots in ~3s.
+**Start here next session:** [NEXT-SESSION-PROMPT.md](NEXT-SESSION-PROMPT.md).
+
+**SESSION 2026-08-30 (evening) — Plexi Meet round (DEC-082/083, UNCOMMITTED):**
+video diagnosed to the root (macOS TCC denies camera to the LAUNCHING app's
+identity — com.anthropic.claude-code, "Policy disallows prompt"; operator must
+grant it in System Settings or launch dev from Terminal) + two real defects
+fixed (tiles never called play(); OS-muted tracks rendered as silent black —
+now an honest "Camera blocked by macOS" note, verified live against the
+blocked camera). Meeting-born attention items now carry
+sourceType 'meeting' → the queue chip links back to the meeting, transcript
+on screen (driven live end-to-end). Suite **3,332**, full typecheck clean.
+The Fireflies-level transcript UI rebuild is GATED on the operator's go —
+not started, per instruction.
+
+
+**SESSION 2026-08-30 (this doc's own update):** ① SPEC-002 "The Attendant"
+written up — spec recovered verbatim from the transcript into
+[analysis/25](analysis/25-SPEC-002-ATTENDANT-RAW.md), comparison REBUILT
+against the code into
+[analysis/26](analysis/26-SPEC-002-ATTENDANT-COMPARISON.md) (review backlog
+only; three spec corrections incl. one new — §4.3's trashNode defect was
+already fixed in S1; DEC/CR numbering collisions flagged; rulings NOT made).
+② DEC-072 EXECUTED — planner reasons are now a strongest-checkable-fact
+ladder, the intent/replan modes are distinguishable (`PlanDayOptions.source`),
+the start strip stopped over-claiming superlatives; live-verified over CDP on
+real data (7 proposals, 6 distinct reasons, zero generic). ③ DEC-069/070
+hierarchy LIVE-VERIFIED by measurement (the owed photograph): a real
+3-sub-item group + the LakeDash desk cluster, all geometry exact over CDP
+(one connector per group, 14px inset, 6px bottom-1.5, spine top-level only,
+handle at own depth, zero stray lines, collapse/re-expand drift-free) —
+addendum under DEC-069/070. ④ **DEC-073…076 EXECUTED — the operator's
+four-feature round:** New Desk (named + date/time prefill + Enter-creates +
+navigates in), calendar double-click details + inline completion (rail circle;
+the block check closes the ITEM through the one close path), the missed-items
+launch triage (derived never stored, Later costs nothing, add-all-back = one
+undo batch — fired live on remount and found 4 genuinely-slipped Thursday
+blocks), and the widget bell + complete (state derived from the queue's own
+rows; outlined-click = the menu's exact capture flow; filled-click opens the
+queue — interpretive choice flagged in the DEC). ⑤ **DEC-077 EXECUTED — the
+operator's refinement round on ④:** the bell FILLS solid (root cause: brand
+line icons no-op Icon's `filled` by design — the same PLEXII path renders
+filled at the call site), ONE `CompleteCircle` component adopted by all four
+completion surfaces (grid blocks got a VISIBLE 12px circle; the hover check
+narrows to plain blocks + undo), bell+circle moved beside the widget title,
+the six-dot handle retired from BOTH queues with whole-row drag kept
+(expanded rows opt out so notes stay selectable), and drop-to-nest lights
+the whole target row (bg ternary consolidated — one owner per state). Suite
+→ **3,254**; both typechecks clean; live-verified by real-DOM drive
+(Attention: 15 rows / 14 draggable / 0 handles / 18px circles; Calendar:
+15 rail circles / 4 block circles on 10 blocks / 0 handles), view restored
+after. Earlier rounds COMMITTED on the operator's order: DEC-072 =
+`d5a47571` · DEC-073…076 = `e781d7d8` · docs = `1e3ecae1`. **DEC-077 is
+UNCOMMITTED — awaiting operator review.** ⑥ **DEC-078 EXECUTED — the
+calendar breathes (operator QA, three asks):** HOUR_PX 44→56; the hours in
+their OWN scroll window (pinned header band above — which also ends the
+per-column deadline-band misalignment; `overscroll-contain`; opens at the
+current hour; the rail's compact mode untouched); uniform raised day
+columns with today as a light `ring-accent/35` outline ALONE. **Found while
+verifying: `rgba(var(--accent),…)` arbitrary values are INVALID CSS and
+have never painted** — DEC-053's today ring silently never rendered;
+converted this round's nine occurrences to the configured slash pattern;
+the ~10-file remainder is **GAP-018** (its own sweep — several files sit in
+077's working set). All measured live over CDP: 150px commanded = 150px
+moved, header pinned, page scroll untouched, ring computes
+rgba(124,58,237,0.35). Suite → **3,255**. Follow-ups same day: the day
+runs MIDNIGHT TO MIDNIGHT (constants flipped; the scroll window is what
+made that safe), then ⑦ **DEC-079** — the rail's Today widget windows
+twelve hours (scrolls for the rest, opens at now), trackpad horizontal
+swipe pages the range through the chevrons' own `shift()` (one swipe = one
+page, tail swallowed, vertical untouched), and the 12 AM label got its
+headroom back (`pt-2`; it was clipping at the scroll edge). All verified
+live against the real handler. Suite → **3,256**. Then ⑧ **DEC-080** — the
+Book time dialog rebuilt to the operator's spec (steps 1–9 + edit mode +
+the option-B token grammar; BlockComposer deleted; drag-highlight opens the
+FULL dialog by ruling, inline create flagged OFF) and ⑨ **DEC-081** — the
+name is Plexii, 70 fixes across 36 files, wake-word fix, grep-locked +
+CLAUDE.md convention. ⑩ **DEC-082/083** (parallel session) — Plexii Meet camera root-caused to
+the launcher's TCC identity (OS verdict, surfaced honestly in-app) +
+meeting-born items link back to their meeting — committed `4f5e92c2`.
+⑪ **DEC-084** — Capture rebuilt as Book time's sibling (tab bar gone, two
+labelled fields + rotating placeholder, four-pill confirm with drawers,
+honest confidence accents, New-item form DELETED) — `5b88490c`.
+⑫ **DEC-085** — ⌘K → Attention opens Capture (armed pill retired from ⌘K;
+the omni yield widened — plain "attention" no longer asks the model) —
+`f31c7e24`. Suite → **3,332 / 311**. ALL ROUNDS COMMITTED: DEC-077 = `e88ee5c3` (parallel
+session, attributed) · DEC-080 = `34feaab1` · DEC-081 = `327523f4`. Suite
+→ **3,310**; both typechecks clean; tree clean.
+
+**THIS BUILD (2026-08-27 → 08-30), 22 commits, DEC-056…071 — see DECISIONS-LOG:**
+
+**Platform stability (DEC-056…061) — shipped SEPARATELY to main as PR #5, still
+OPEN + MERGEABLE.** Deliberately carries no Attention/Calendar work so the team
+inherits the fixes without the feature branch. Six defects, one shape: *a guard
+that checked the request instead of the outcome.* An unbounded tombstone sync
+loop (10 server writes/minute, forever, `sync_rev 7,319` on one widget); ~2,500
+Events per boot in an append-only store PLX-EVT-030 forbids pruning (clean boot
+now **4**); a synchronous Keychain call on the boot path that hung the app behind
+an invisible OS prompt (**indefinite → 3s**); retention caps that had zero call
+sites since the initial commit; a nav fan-in writing 39,762 rows in 19 hours; and
+`visit_count` corruption user-visible AND fed to the LLM (Slack at 14,096
+"visits"), repaired from its exact provenance. **All six were invisible to a
+green suite and were found by measuring the live database.**
+
+**Attention/Calendar (DEC-062…071).** Meet items now POINT AT a meeting (operator
+ruled option 2 — an unanswered RSVP is a meeting not on your calendar, so it
+cannot BE a block): six manifest columns, invite-shaped rows, a capture flow, and
+a link to a real block. The day plan became reviewable before acceptance — a
+centre-peek pane showing which items, when, and *why*, using a `reason` field the
+planner had computed all along and never displayed.
+
+**The queue's hierarchy was RE-BASELINED (DEC-070).** Four rounds of per-row
+connector segments (DEC-062…069) each fixed a seam and produced another; the
+operator called a reset and supplied an inspiration component. A subtree is now
+ONE animated group with ONE dashed connector — seams impossible *by construction
+rather than by care*. **The tests pin the ABSENCE of the old segment machinery.**
+
+**A manifest gap surfaced while building (DEC-064):** `PATCHABLE` and `rowToNode`
+both hand-listed `WORK_ITEM_COLUMNS`, so a new column got DDL, sync, CRDT
+allowlists and emit but no way in or out — `source_url` had been **write-only
+since DEC-052**. Both now derive from the manifest.
+
+**SPEC-002 "The Attendant" written up (2026-08-30):** the spec is preserved
+verbatim ([analysis/25](analysis/25-SPEC-002-ATTENDANT-RAW.md), recovered from
+the transcript) and the side-by-side was REBUILT against the code at `9216f335`
+([analysis/26](analysis/26-SPEC-002-ATTENDANT-COMPARISON.md)) — a REVIEW
+BACKLOG only, per operator: adopt gradually, nothing authorized, nothing built.
+The rebuild refined the two known spec corrections (§3.7 velocity — a legacy
+desk-level elapsed-time ratio DOES exist but feeds nothing the spec claims;
+§3.10 engaged time is aggregated, vs-plan is not) and found a third: §4.3's
+"trashNode has no kind filter" defect was already fixed by nodeLifecycle.ts in
+S1. Also flagged: the spec's self-assigned DEC-015…019/CR-08…10 numbers all
+collide with the live log; two of its requested rulings are already
+substantively ruled by DEC-052. Rulings remain NOT made.
+
+**QA ROUND 3 + DEC-034/035 EXECUTED (2026-08-26, commits `ba3b518c`,
+`2e7e210e`, `14419286`):** the operator captured his next asks INTO the layer
+itself and they were built from his own queue. **Read/copy (`ba3b518c`):** queue
+rows truncated with no way to open them — the text existed but only the DB could
+give it back. Rows now expand in place (full title + notes, selectable) with a
+Copy action; `itemFullText()` is the one definition. **DEC-034 (`2e7e210e`):**
+capture is now task + optional NOTES (Tab into it, Enter files), the button says
+**Enter ↵** not "Classify", and the second screen PREVIEWS the finished item
+instead of asking what it will become. The tidy moved INTO that preview
+("Tidied · undo") with **Enter as is** filing his own words — approve-before-
+apply holds, R011 latency holds, and the verbatim capture is preserved on every
+path (an untidied-notes case that would have dropped the typed text was caught
+in review). **DEC-035 (`14419286`):** the six-dot handle — attach (group),
+reorder, or drag to another section. Grouping is a SIBLING ref (`group_id` in
+the manifest) because the leaf invariant forbids work-item parents; **exactly
+one level, enforced at the DB**, and a child whose leader leaves the queue is
+PROMOTED, never hidden. Suite **2,840**. Live-verified through the real IPC path.
+
+**DEC-031/032/033 EXECUTED (2026-08-26, commit `f3741bf5`):** the operator ruled
+"yes to all three" on the QA round's open questions. **DEC-031:** @attention is
+now DETERMINISTIC anywhere in a message — one shared grammar
+(`lib/attentionCommand.ts`) read by the composer, ⌘K, the home bar AND
+`chatStore.send()`; leading = pure capture, inline = capture AND still send the
+stripped message (both halves). Two bypasses were found only by driving the real
+UI: ⌘K's "Ask Plexii" hard-scores 2000 and outranked the capture entry (the
+operator's exact 30s path), and ⌘K/home/voice call `send()` directly, skipping
+the composer's interception — `send()` is now the last-mile guarantee, and the
+composer strips first so double capture is impossible. **DEC-032:** desk-placed
+proposals carry an optional `deskId`; the model gets a real desk roster in both
+prompts, the card resolves id-then-title and applies there — an unresolvable id
+falls back to the chooser, never a silent retarget. **DEC-033:** the
+`[ask-latency]` trail shipped and already answered the question —
+`retrieval=831ms ttft=6518ms streamed=FALSE`: the credits proxy rejects
+streaming, so the whole answer generates before anything appears. The 30s was
+generation with zero feedback BY CONSTRUCTION, not a code inefficiency.
+**Still open (needs a ruling):** BYOK-vs-progress-affordance for credits mode.
+Suite **2,797**.
+
+**QA ROUND 1 — chat composer (2026-08-26, commit `e61da75b`):** operator live QA
+found the @ picker's keyboard contract (DEC-028c) broken in practice. Root cause:
+ChatPanel's omni-intent Tab cycler is CAPTURE-phase, so it ran before
+ProseMirror's suggestion plugin and swallowed every Tab — the picker's own
+handler never fired, and the stolen keystroke cycled the preview to "Search the
+web". Fixed (picker owns Tab while open) + two adjacent defects: the selected
+row's 10%-tint highlight was invisible (now tint + inset accent bar), and the
+intent strip PRE-SELECTED "Search the web" for @attention drafts even without
+Tab — a false promise, since `submitComposer` intercepts a leading @attention
+first; the strip now suppresses itself on a shared `ATTENTION_PREFIX_RE`.
+Also strengthened the model rule: "@attention" ANYWHERE is a STANDING ORDER to
+emit create-work-item, and alongside a buildable ask it must emit BOTH (the
+operator's "pitch deck … @attention" produced only a create-page). Verified live
+via CDP with real key events. Suite **2,781**. **OPEN FOR RULING (3):** (a) should
+a trailing/mid-sentence @attention become DETERMINISTIC capture instead of
+model-mediated (amends DEC-027)? (b) should `create-page` (and friends) carry a
+desk target so "apply" doesn't demand a manual pick the model already knows?
+(c) the ⌘K→ask→chat round trip took ~30s — needs its own latency trace.
+
+**TAXONOMY ALIGNMENT EXECUTED (2026-08-26, commit `0ae275bf` — the stage
+DEC-029a sequenced; no DEC consumed):** the eight primaries live end-to-end —
+schema `to_do/to_review/to_decide/to_respond/to_meet/to_discuss/to_remember/
+to_know` (acknowledgment+direct merged into to_respond; to_decide NEW with
+terminal `'decided'`), labels To Do · Review · Decide · Respond · Meet ·
+Discuss · Remember · Know, legacy→canonical map at every boundary, NEW
+decide/respond hard triggers + the question-mark→to_respond wart fix, prompts
+derive unions from the one shared list, `intent_sub` reserved in the manifest,
+R-03 precision fix, SQL state predicates built from shared state arrays,
+CLASS_CHOICES centralized (two drifting copies removed), and the **Layer-0
+bare manual form** on the Attention page. `migrateIntentTaxonomyV2` renamed
+the live DB's 24 rows + 20 notification rows (pre-imaged, idempotent,
+re-runs each boot; VACUUM restore point via MIGRATION_VERSION 3).
+**Incident caught live:** the first sync cycle REVERTED the rename (stale
+baseRev → 409 → conflict-apply of the server's old copy) — fixed by
+canonicalizing legacy classes in `normalizeAppliedWorkItem` ON APPLY (dirty
+trigger re-pushes; fleet converges forward); second boot observed settled
+canonical+clean on the real DB. CDP smoke: classify→to_decide/to_respond via
+rules, new queue labels rendering, manual form→Decide queue→archived.
+Baseline now **2,778 tests / 274 files**. Housekeeping: the standalone
+sync-wake PR is MOOT (PRs #1–4 all merged, none open). Full ledger:
+[phases/HANDOFFS/taxonomy-alignment.md](phases/HANDOFFS/taxonomy-alignment.md).
 
 **DEC-020 EXECUTED (2026-08-25):** operator ruled "Retire the tabs and add plan due
 dates to the feeders first" — done in that order. (1) `plan-due` feeder kind: plan
@@ -63,11 +278,13 @@ drift status (6 upstream commits, ipc/index.ts-only overlap), rollout plan.
 **Operator's move:** merge-from-main once on the fork, open the PR with the
 package's body, hand Caleb §4 (F-1 matters independently).
 
-**LANDING STATUS (corrected 2026-08-26):** `saasmouth main` was NEVER updated —
-the push was classifier-blocked and the handed command not run; the operator then
-ruled WAIT-UNTIL-FINISHED: **fork-branch pushes only** until Attention is declared
-fully ready (memory: plexii-repo-ownership-and-push-rules). Landing when ready =
-`git push origin ryan-command-center:main` as ryanswan313, run by the operator.
+**LANDING STATUS (final, 2026-08-26):** the layer **LANDED via PR #4** (main @
+`c0e32a0c`, main CI green). The wait-until-finished fork-only rule is FULFILLED
+and retired. "Declare ready" was later revealed as a misunderstanding; **DEC-030
+ruled LEAVE IT LANDED** — no revert (can't un-reveal; revert-trap), the flag is
+the gate, iteration continues in PR-sized rounds. Landing pattern that stands:
+branch push + `gh pr merge` as ryanswan313 (raw push to main stays blocked).
+Owed: the operator's WIP framing note to Michael + Caleb (drafted, unsent).
 
 **THE FINISH LINE (GA checklist): BUILD COMPLETE ①–⑤.** ① FYI backstop ✔ ·
 ② item archival ✔ (DEC-024) · ③ multi-intent ✔ (DEC-025) · ④ cleanup rewrite ✔
@@ -99,7 +316,7 @@ observed), Living Doc + Meetings as the first observers (both half-built:
 meeting vocabulary + approval_state='suggested' shipped in S2/S5), the Layer-0
 gap audit (no item editing · no Attention selection mode · no bare manual form),
 deferred rails named (tags/cross-ref, delegation→SPEC-027, standup feed).
-Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-029.
+Decision list now D-A…D-K. Awaiting the operator's brainstorm → DEC-031+.
 Recommended post-landing.
 
 **DEC-029 (2026-08-26): taxonomy tests adopted as LAW + R-06 confirmed; the
@@ -116,9 +333,15 @@ main @ 5d1ef8d8; five predicted conflicts resolved keep-branch; the auto-merge
 briefly duplicated the F010 functions + a preload property (caught by typecheck,
 excised). 2,763 green. The branch is current with everything the team has.
 
-**When ⑥ passes and the operator declares ready:** the landing is
-`git push origin ryan-command-center:main` as ryanswan313 (operator-run),
-then the message to Michael + Caleb pointing at UPSTREAM-PR-PACKAGE.md.
+**🏁 LANDED (2026-08-26): the operator declared ready — PR #4 merged, main @
+`c0e32a0c`, content delta between branch and main = ZERO files.** 91 commits,
+172 files, +16,998/−429, 2,763 tests, DEC-001…029 — from empty planning folder
+to landed layer in three days. The layer ships default-OFF; the reveal message
+to Michael + Caleb points at PR #4 + UPSTREAM-PR-PACKAGE.md. Post-landing
+queue: CR-09 (D-A…D-K brainstorm → DEC-031+), the category alignment stage
+(analysis/22), the observers, SPEC-027 routing era. **DEC-030 (same day):
+"declare ready" had been a misunderstanding — operator ruled LEAVE IT LANDED;
+iteration continues; the WIP note to the team is his to send.**
 
 **DEC-019 IMPLEMENTED (2026-08-25, 2d251f0a):** (a) CR-08 phasing ratified by operator;
 (b) ONE capture model — @attention prefix in ⌘K captures directly, single palette

@@ -1,8 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Icon from '../Icon'
 
-// ── Plexi dashboard primitives ──────────────────────────────────────────────
-// The shared component layer that makes every Plexi surface read as one suite:
+// ── Plexii dashboard primitives ──────────────────────────────────────────────
+// The shared component layer that makes every Plexii surface read as one suite:
 // greeting headers, stat tiles with trend deltas, right-rail cards, and status
 // pills — all built on the existing design tokens (tokens.css: ink/surface/edge
 // ramps, --accent, fb-* utilities) so they adapt to light / dark / futuristic /

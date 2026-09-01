@@ -1,7 +1,7 @@
 import type { FbNode, RadarSuggestion, MailListItem, TimeBlock } from '@shared/types'
 
 // The workspace radar: cheap, deterministic detectors (NO model call) over the
-// user's REAL work in Plexi — tasks, inbound mail, and the calendar — surfaced as
+// user's REAL work in Plexii — tasks, inbound mail, and the calendar — surfaced as
 // one-tap suggestions. Pure over (data, now) so each unit-tests exactly and
 // re-runs freely. Nothing here is AI or fabricated — every suggestion points at a
 // real item with a real reason.

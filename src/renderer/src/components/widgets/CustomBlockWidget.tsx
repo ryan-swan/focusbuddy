@@ -418,7 +418,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
   if (inline) return content
 
   return (
-    <WidgetFrame widget={widget} headerLabel="custom block" headerAccent="bg-stone-200/70">
+    <WidgetFrame widget={widget} headerLabel="custom block" headerAccent="bg-stone-200/70 dark:bg-white/[0.07]">
       {content}
     </WidgetFrame>
   )

@@ -22,6 +22,7 @@ import { sanitizeWebviewUrl } from './browserUrl'
 import { useMailStore } from '../stores/mail'
 import { useMessagingStore } from '../stores/messaging'
 import { useViewStore } from '../stores/view'
+import { useNoticeStore } from '../stores/notice'
 import { catalogFor } from './widgetCatalog'
 import { spawnPositionFor } from './spawnPosition'
 import { computeSectionFrame, effectiveLayout } from './sectionGeometry'
@@ -70,6 +71,11 @@ export async function applyProposal(
     // dropped on a desk as a widget. Only generate-document acts on it today;
     // create-document already lives in Files, and desk-only kinds never see it.
     toFiles?: boolean
+    // DEC-079 — provenance for created work items. The meeting wrap-up passes
+    // {sourceType:'meeting', sourceRef:<meeting id>} so an approved action item
+    // points back at the meeting whose transcript produced it; every other
+    // surface keeps the 'chat' default.
+    workItemSource?: { sourceType: string; sourceRef: string }
   }
 ): Promise<ApplyResult> {
   switch (proposal.kind) {
@@ -88,7 +94,7 @@ export async function applyProposal(
     case 'create-task':
       return applyCreateTask(proposal, ctx)
     case 'create-work-item':
-      return applyCreateWorkItem(proposal)
+      return applyCreateWorkItem(proposal, ctx)
     case 'start-focus-session':
       return applyStartFocusSession(proposal, ctx)
     case 'delete-widget':
@@ -212,7 +218,7 @@ export async function ensureDependencies(
   return { ok: true, appliedParents }
 }
 
-// ── The suite-wide actions (Plexi 3.0): the AI acts beyond the canvas ────────
+// ── The suite-wide actions (Plexii 3.0): the AI acts beyond the canvas ────────
 
 // Minimal markdown-ish text → Tiptap nodes: '#'-prefixed lines become headings,
 // blank-line-separated runs become paragraphs. Deliberately simple — rich
@@ -499,6 +505,18 @@ async function applyCreateKnowledgeEntry(
 // Create a standalone document (doc / sheet / slides) in the Documents library,
 // carrying the proposal's title. A real fb_documents row, the same as the New
 // button makes, so it opens and edits normally.
+// DEC-091 — demo item #14: an AI-created document landed behind the front
+// window and the operator could not find it. Every successful document
+// create/generate/fill now raises the house notice with an Open door
+// (stores/notice.ts) — the fact, and the way there, without stealing focus.
+function noticeDocReady(verb: string, label: string, title: string, docId: string): void {
+  useNoticeStore.getState().show({
+    text: `${verb} ${label.toLowerCase()} “${title}”`,
+    icon: 'description',
+    action: { label: 'Open', run: () => useViewStore.getState().goDocument(docId) }
+  })
+}
+
 async function applyCreateDocument(
   p: Extract<ActionProposal, { kind: 'create-document' }>,
   ctx: { destinationFolderId?: string | null; resolvedIds?: Map<string, string> }
@@ -530,6 +548,7 @@ async function applyCreateDocument(
     if (doc && ctx.destinationFolderId) {
       await window.api.fileManager.fileDocument(doc.id, ctx.destinationFolderId).catch(() => null)
     }
+    if (doc) noticeDocReady('Created', label, p.title, doc.id)
     return { ok: true, message: doc ? `Created ${label} "${p.title}"` : `Could not create the ${label}.` }
   } catch (e) {
     return { ok: false, message: `Could not create the document: ${e instanceof Error ? e.message : String(e)}` }
@@ -585,6 +604,7 @@ async function applyGenerateDocument(
     await store.refresh()
     if (store.active?.id === docId) await store.open(docId)
     if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+    noticeDocReady('Filled', label, p.title || widget.title || 'Untitled', docId)
     return { ok: true, message: `Filled ${label.toLowerCase()} "${p.title || widget.title}" — recoverable in Version history` }
   }
 
@@ -607,6 +627,7 @@ async function applyGenerateDocument(
       await window.api.fileManager.fileDocument(docId, ctx.destinationFolderId).catch(() => null)
     }
     if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+    noticeDocReady('Created', label, p.title, docId)
     return { ok: true, message: `Created ${label.toLowerCase()} "${p.title}" in Files` }
   }
 
@@ -641,6 +662,7 @@ async function applyGenerateDocument(
     color: null
   })
   if (ctx.resolvedIds) ctx.resolvedIds.set(p.id, docId)
+  noticeDocReady('Created', label, p.title, docId)
   return { ok: true, message: `Created ${label.toLowerCase()} "${p.title}" on the desk` }
 }
 
@@ -730,7 +752,7 @@ async function applyOpenUrl(
   if (!/^https?:\/\//i.test(p.url)) {
     return { ok: false, message: 'Skipped — URL must start with https://' }
   }
-  // R4/R13: the web never leaves Plexi and never demands a canvas. With no
+  // R4/R13: the web never leaves Plexii and never demands a canvas. With no
   // desk open, the in-app browser panel is the destination — the old
   // "Open a task first" refusal was the pre-panel behaviour and read as
   // clunk the moment Caleb hit it from Home. With a desk open, the loved
@@ -877,7 +899,8 @@ async function applyStartFocusSession(
 // code path (the store → workItems module), origin 'ai', approval recorded.
 // The typed refusals (capability off / un-migrated device) surface honestly.
 async function applyCreateWorkItem(
-  p: Extract<ActionProposal, { kind: 'create-work-item' }>
+  p: Extract<ActionProposal, { kind: 'create-work-item' }>,
+  ctx: { workItemSource?: { sourceType: string; sourceRef: string } }
 ): Promise<ApplyResult> {
   try {
     const { useWorkItemStore } = await import('../stores/workItems')
@@ -887,7 +910,9 @@ async function applyCreateWorkItem(
       intentClass: p.intentClass,
       wiOrigin: 'ai',
       approvalState: 'approved',
-      sourceType: 'chat'
+      // DEC-079 — the wrap-up names the meeting; everything else stays 'chat'.
+      sourceType: ctx.workItemSource?.sourceType ?? 'chat',
+      sourceRef: ctx.workItemSource?.sourceRef
     })
     return { ok: true, message: `Filed "${item.title}" to Attention` }
   } catch (err) {

@@ -1,26 +1,55 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FbNode, TimeBlock, TimeBlockMeeting, TimeBlockRecurrence } from '@shared/types'
+import type { FbNode, TimeBlock } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useWorkItemStore } from '../../stores/workItems'
 import { useTimeBlockStore } from '../../stores/timeBlocks'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { useViewStore } from '../../stores/view'
 import { futuristicPowerOn } from '../../lib/audioBeep'
-import { newMeetingRoomId, joinMeetingRoom } from '../../lib/startMeeting'
-import { sendMeetingInvites } from '../../lib/meetingInvite'
+import { blockFit } from '../../lib/calendarGeometry'
+import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
+import AttentionItemEditor from '../AttentionItemEditor'
+import BookTimeDialog from '../BookTimeDialog'
+import { useActionHistory } from '../../stores/actionHistory'
+import { loadPlannerSettings } from '../../lib/attentionPlanner'
+import {
+  resolvePlaceholder,
+  scheduleInviteHold,
+  fmtTimeRange,
+  HOLD_INVITES_MS,
+  type InviteHold
+} from '../../lib/bookTime'
+import CompleteCircle from '../attention/CompleteCircle'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import { joinMeetingRoom } from '../../lib/startMeeting'
 import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
-// Week time-grid — the time-blocking surface. Seventeen hour rows × seven day
-// columns. Click an empty slot to book a block (tie it to a task or leave it as
-// generic focus time), drag a block to reschedule, drag its bottom edge to
-// change its length, and start a focus session straight from a block.
+// Week time-grid — the time-blocking surface. Twenty-four hour rows × seven
+// day columns, midnight to midnight. Click an empty slot to book a block (tie
+// it to a task or leave it as generic focus time), drag a block to reschedule,
+// drag its bottom edge to change its length, and start a focus session
+// straight from a block.
+//
+// DEC-078 — the hours live in their OWN scroll window (Google-style): day
+// headers + deadline chips stay pinned while the time area scrolls beneath
+// them, so a wheel over the grid moves through the day and the page never
+// budges. DEC-079: the rail's compact mode windows too — twelve hours on
+// screen, the rest a scroll away — since midnight-to-midnight made its
+// full-height habit a 720px column of mostly night.
 
-const START_HOUR = 6
-const END_HOUR = 23 // exclusive-ish; we render rows START_HOUR..END_HOUR-1
-const HOUR_PX = 44
+// DEC-078 follow-up (operator): the day runs midnight to midnight. The old
+// 6am–10pm window silently HID anything booked outside it — an early flight
+// or a late call rendered off-canvas with no hint it existed. All 24 hours
+// exist now; the scroll window (below) decides how many are on screen.
+const START_HOUR = 0
+const END_HOUR = 24 // exclusive-ish; we render rows START_HOUR..END_HOUR-1
+// DEC-078 — taller hours, fewer on screen. 44px showed all seventeen rows at
+// once and every one of them was cramped; 56px gives each hour real room and
+// lets the scroll window own how many are visible.
+const HOUR_PX = 56
 const SNAP_MIN = 15
 const DAY_MS = 86_400_000
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function dayStartMs(weekStart: Date, dayIndex: number): number {
   const d = new Date(weekStart)
@@ -40,12 +69,54 @@ function fmtTime(ms: number): string {
 interface Composer {
   dayIndex: number
   startMs: number
+  /** DEC-053 — set when a drag selected a span; the composer opens at that
+   *  exact length instead of its default. */
+  initialDurationMin?: number
   // A node (task or folder) dragged onto the grid — booked directly without
   // the picker.
   prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
+  /** Inline create's Cmd+Enter carries the typed draft into the dialog. */
+  initialTitle?: string
+  /** Step 8 — the Attendant-proposed state (manual trigger only today). */
+  proposal?: { reason: string; autoBookAtMs: number }
 }
 
-export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.Element {
+export interface GridGhost {
+  itemId: string
+  title: string
+  startMs: number
+  durationMin: number
+  reason: string
+}
+
+export default function WeekTimeGrid({
+  weekStart,
+  days = 7,
+  compact = false,
+  ghosts,
+  onGhostRemove,
+  filterQueue,
+  onBlockDragOut,
+  onBlockDragActive
+}: {
+  weekStart: Date
+  /** How many day columns to render from weekStart (7 = week, 3, 1 = day). */
+  days?: number
+  /** Narrow-surface mode (the Attention rail): tighter rows, smaller gutter. */
+  compact?: boolean
+  /** DEC-052 B3 — PROPOSED blocks, rendered dashed until the person accepts.
+   *  Nothing here is written; the caller owns the preview-confirm. */
+  ghosts?: GridGhost[]
+  onGhostRemove?: (itemId: string) => void
+  /** DEC-053 — show only one classification's deadlines (undefined = all). */
+  filterQueue?: string
+  /** DEC-053 — a block pointer-dragged and RELEASED outside the grid: return
+   *  true to consume the drop (the caller unschedules); false = normal move. */
+  onBlockDragOut?: (block: TimeBlock, clientX: number, clientY: number) => boolean
+  /** Fires when a block pointer-drag starts/ends, so the caller can light an
+   *  unschedule zone. */
+  onBlockDragActive?: (active: boolean) => void
+}): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const blocks = useTimeBlockStore((s) => s.blocks)
   const loadRange = useTimeBlockStore((s) => s.loadRange)
@@ -57,25 +128,59 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   const goTask = useViewStore((s) => s.goTask)
   const goProject = useViewStore((s) => s.goProject)
 
+  const hourPx = compact ? 30 : HOUR_PX
   const weekFrom = weekStart.getTime()
-  const weekTo = weekFrom + 7 * DAY_MS
+  const weekTo = weekFrom + days * DAY_MS
 
   useEffect(() => {
     void loadRange(weekFrom, weekTo)
   }, [weekFrom, weekTo, loadRange])
 
-  // A block can link to ANY node — a task (focusable) or a folder (jump-to).
+  // A block can link to ANY node — a task (focusable), a folder (jump-to), or
+  // (DEC-052) a WORK ITEM. Work items never pass through the node store by
+  // design (listNodes filters the kind out), so they resolve from their own
+  // store — widening listNodes would leak them into every desk surface.
+  const workItems = useWorkItemStore((st) => st.items)
+  const wiLoaded = useWorkItemStore((st) => st.loaded)
+  const refreshItems = useWorkItemStore((st) => st.refresh)
+  useEffect(() => {
+    if (!wiLoaded) void refreshItems()
+  }, [wiLoaded, refreshItems])
+  const goAttention = useViewStore((st) => st.goAttention)
   const nodesById = useMemo(() => {
     const m = new Map<string, FbNode>()
     for (const n of nodes) m.set(n.id, n)
     return m
   }, [nodes])
-  const tasks = useMemo(() => nodes.filter((n) => n.kind === 'task'), [nodes])
+  const itemsById = useMemo(() => {
+    const m = new Map<string, FbNode>()
+    for (const i of workItems) m.set(i.id, i)
+    return m
+  }, [workItems])
+  // DEC-052 — the deadline band: due Attention items render ABOVE the grid,
+  // per day, visually distinct from scheduled blocks (the Akiflow deadline-row
+  // convention). Active items only; closing one clears it from the band.
+  const dueByDay = useMemo(() => {
+    const m = new Map<number, FbNode[]>()
+    for (const i of workItems) {
+      if (!i.dueAt || isTerminalState(i.workItemState) || i.detachedFromId != null) continue
+      if (filterQueue && queueOf(i) !== filterQueue) continue
+      const t = Date.parse(i.dueAt)
+      if (Number.isNaN(t) || t < weekFrom || t >= weekTo) continue
+      const dayIndex = Math.floor((t - weekFrom) / DAY_MS)
+      m.set(dayIndex, [...(m.get(dayIndex) ?? []), i])
+    }
+    for (const list of m.values())
+      list.sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
+    return m
+  }, [workItems, weekFrom, weekTo, filterQueue])
 
   // Open the node a block links to: tasks open in the canvas, folders open the
   // project dashboard.
   function jumpToNode(node: FbNode): void {
-    if (node.kind === 'task') {
+    if (node.kind === 'work_item') {
+      goAttention()
+    } else if (node.kind === 'task') {
       setActive(node.id)
       goTask(node.id)
     } else {
@@ -83,7 +188,71 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     }
   }
 
+  // DEC-074 — details + completion without leaving the grid. Double-click a
+  // work-item block (or a deadline chip) → the DEC-036 editor; the check on a
+  // work-item block closes the ITEM with its queue's verb through the one
+  // close path, then marks the block done — but only if the close actually
+  // happened (the subtask offer can be cancelled; the store's setState
+  // refreshes the row before resolving, so re-reading it is authoritative).
+  const closeWorkItem = useCloseWorkItem()
+  const [editItem, setEditItem] = useState<FbNode | null>(null)
+  // Step 9 — inline create: the block exists already; this is just its name
+  // being typed in place on the calendar.
+  // A booked block double-clicked open for full editing — the Book time
+  // dialog is the edit surface (its own step-9 charter).
+  const [editBlock, setEditBlockState] = useState<TimeBlock | null>(null)
+  const [inlineEdit, setInlineEdit] = useState<{
+    blockId: string
+    dayIndex: number
+    startMs: number
+    durationMin: number
+    draft: string
+  } | null>(null)
+  // Step 8 — hold-time doesn't exist yet, so the proposed state fires from a
+  // manual trigger: window.__plexiiProposeBlock({ inMin, durationMin,
+  // autoBookInMin, reason }) opens the SAME dialog pre-filled with the banner.
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__plexiiProposeBlock = (opts?: {
+      inMin?: number
+      durationMin?: number
+      autoBookInMin?: number
+      reason?: string
+    }) => {
+      const startMs = snapMs(Date.now() + (opts?.inMin ?? 60) * 60_000)
+      setComposer({
+        dayIndex: 0,
+        startMs,
+        initialDurationMin: opts?.durationMin ?? 30,
+        proposal: {
+          reason:
+            opts?.reason ??
+            'Plexii held this for you. Free window before your 4:30. Change anything, or leave it — it books itself in 20 minutes.',
+          autoBookAtMs: Date.now() + (opts?.autoBookInMin ?? 20) * 60_000
+        }
+      })
+    }
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__plexiiProposeBlock
+    }
+  }, [])
+  const deskChoices = useMemo(
+    () => nodes.filter((n) => n.kind === 'task' && !n.archived && !n.sharedRootId),
+    [nodes]
+  )
+  async function completeItemAndBlock(block: TimeBlock, item: FbNode): Promise<void> {
+    await closeWorkItem(item, (PRIMARY_ACTION[queueOf(item)] ?? PRIMARY_ACTION.to_do).state)
+    const after = useWorkItemStore.getState().items.find((x) => x.id === item.id)
+    if (after && isTerminalState(after.workItemState)) {
+      await updateBlock(block.id, { status: 'done' })
+    }
+  }
+
   const [composer, setComposer] = useState<Composer | null>(null)
+  // DEC-053 — Google-style drag-to-create: press on empty grid, drag a span
+  // (15-min snap), release → the composer opens for exactly that span. A
+  // press that never travels stays a plain click-to-create.
+  const [sel, setSel] = useState<{ dayIndex: number; startMs: number; endMs: number } | null>(null)
+  const selRef = useRef<{ dayIndex: number; anchorMs: number; moved: boolean } | null>(null)
   // "Add to calendar" menu for a meeting block — anchored at the click point.
   const [calMenu, setCalMenu] = useState<{ block: TimeBlock; x: number; y: number } | null>(null)
   const [drag, setDrag] = useState<{ id: string; previewStart: number; previewDur: number } | null>(
@@ -92,47 +261,139 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   const dragRef = useRef<{
     id: string
     mode: 'move' | 'resize' | 'resize-top'
+    startClientX: number
     startClientY: number
+    lastClientX: number
+    lastClientY: number
     origStartMs: number
     origDur: number
     origDayIndex: number
+    // DEC-087 — true once the pointer travels past the dead zone. Until then
+    // the press is a CLICK-in-waiting, not a drag: no preview shift, no
+    // commit, and the click that follows opens the editor.
+    moved: boolean
   } | null>(null)
+  // DEC-087 — a drag that actually moved swallows the click event that the
+  // browser fires at pointerup, so drag-release never doubles as open-editor.
+  const dragConsumedClickRef = useRef(false)
   // Live refs to each day column so a move-drag can hit-test the pointer's X and
   // reschedule a block onto another day (Google-Calendar-style cross-day drag).
   const colRefs = useRef<(HTMLDivElement | null)[]>([])
+  // DEC-078 — the time window opens where the day actually is: on mount,
+  // scroll so the current hour sits one row below the top edge. Once; the
+  // person owns the scroll position after that.
+  const timeScrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = timeScrollRef.current
+    if (!el) return
+    const h = new Date().getHours() + new Date().getMinutes() / 60
+    el.scrollTop = Math.max(0, (h - START_HOUR - 1) * hourPx)
+  }, [compact, hourPx])
 
   // Convert a y offset within a day column to an absolute time for that day.
   function yToMs(dayIndex: number, y: number): number {
     const base = dayStartMs(weekStart, dayIndex) + START_HOUR * 3_600_000
-    return base + (y / HOUR_PX) * 3_600_000
+    return base + (y / hourPx) * 3_600_000
   }
 
-  function onColumnClick(e: React.MouseEvent, dayIndex: number): void {
-    // Ignore clicks that landed on a block (those stopPropagation).
+  function onColumnPointerDown(e: React.PointerEvent, dayIndex: number): void {
+    // Blocks stopPropagation on their own pointerdown, so reaching here means
+    // empty grid. Left button only; ignore while a composer is open.
+    if (e.button !== 0 || composer) return
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const y = e.clientY - rect.top
-    setComposer({ dayIndex, startMs: snapMs(yToMs(dayIndex, y)) })
+    const anchorMs = snapMs(yToMs(dayIndex, y))
+    selRef.current = { dayIndex, anchorMs, moved: false }
+    const onMove = (ev: PointerEvent): void => {
+      const cur = selRef.current
+      if (!cur) return
+      const yy = ev.clientY - rect.top
+      const at = snapMs(yToMs(cur.dayIndex, yy))
+      if (at !== cur.anchorMs) cur.moved = true
+      setSel({
+        dayIndex: cur.dayIndex,
+        startMs: Math.min(cur.anchorMs, at),
+        endMs: Math.max(cur.anchorMs, at) + (at === cur.anchorMs ? 0 : 0)
+      })
+    }
+    const onUp = (ev: PointerEvent): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      const cur = selRef.current
+      selRef.current = null
+      setSel(null)
+      if (!cur) return
+      const yy = ev.clientY - rect.top
+      const at = snapMs(yToMs(cur.dayIndex, yy))
+      if (!cur.moved || at === cur.anchorMs) {
+        // A plain click: composer at the pressed slot, default length.
+        setComposer({ dayIndex: cur.dayIndex, startMs: cur.anchorMs })
+        return
+      }
+      const startMs = Math.min(cur.anchorMs, at)
+      const durationMin = Math.max(SNAP_MIN, Math.round((Math.abs(at - cur.anchorMs)) / 60000))
+      // Step 9 (flagged) — a drag books instantly, named by the SAME
+      // placeholder resolution the dialog uses, with the title in inline
+      // edit right on the block. The dialog stays the edit/proposal surface;
+      // it just stops being what greets a drag. Flag OFF = the DEC-053 path,
+      // verbatim, seed and all.
+      if (loadPlannerSettings().inlineCreate) {
+        const title = resolvePlaceholder({
+          mode: 'focus',
+          attachedTitle: null,
+          guests: [],
+          roomName: null
+        })
+        void createBlock({
+          taskId: null,
+          title,
+          startMs,
+          durationMin,
+          meeting: null,
+          recurrence: null
+        }).then((b) =>
+          setInlineEdit({ blockId: b.id, dayIndex: cur.dayIndex, startMs, durationMin, draft: '' })
+        )
+        return
+      }
+      setComposer({ dayIndex: cur.dayIndex, startMs, initialDurationMin: durationMin })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
   // Dragging a task or folder from the sidebar onto a day column opens the
   // composer pre-filled at the dropped time, so you book it by just confirming
   // how long. The sidebar already publishes the node id as `text/fb-node`.
   function onColumnDragOver(e: React.DragEvent): void {
-    if (e.dataTransfer.types.includes('text/fb-node')) {
+    if (
+      e.dataTransfer.types.includes('text/fb-node') ||
+      e.dataTransfer.types.includes('text/fb-workitem')
+    ) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
     }
   }
 
   function onColumnDrop(e: React.DragEvent, dayIndex: number): void {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const startMs = snapMs(yToMs(dayIndex, y))
+    // DEC-052 — dropping an ATTENTION item books it immediately: a 30-minute
+    // block linked to the item, resizable after the fact. No composer stop —
+    // the drag was the decision (Undo covers regret). Title stays empty so
+    // the block always renders the item's live title.
+    const itemId = e.dataTransfer.getData('text/fb-workitem')
+    if (itemId && itemsById.has(itemId)) {
+      e.preventDefault()
+      void createBlock({ taskId: itemId, title: '', startMs, durationMin: 30 })
+      return
+    }
     const id = e.dataTransfer.getData('text/fb-node')
     if (!id) return
     e.preventDefault()
     const node = nodes.find((n) => n.id === id)
     if (!node) return
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const y = e.clientY - rect.top
-    const startMs = snapMs(yToMs(dayIndex, y))
     setComposer({
       dayIndex,
       startMs,
@@ -150,11 +411,16 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     dragRef.current = {
       id: block.id,
       mode,
+      startClientX: e.clientX,
       startClientY: e.clientY,
+      lastClientX: e.clientX,
+      lastClientY: e.clientY,
       origStartMs: block.startMs,
       origDur: block.durationMin,
-      origDayIndex: Math.floor((block.startMs - weekFrom) / DAY_MS)
+      origDayIndex: Math.floor((block.startMs - weekFrom) / DAY_MS),
+      moved: false
     }
+    if (mode === 'move') onBlockDragActive?.(true)
     setDrag({ id: block.id, previewStart: block.startMs, previewDur: block.durationMin })
     window.addEventListener('pointermove', onDragMove)
     window.addEventListener('pointerup', onDragEnd, { once: true })
@@ -163,13 +429,21 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
   function onDragMove(e: PointerEvent): void {
     const d = dragRef.current
     if (!d) return
+    d.lastClientX = e.clientX
+    d.lastClientY = e.clientY
     const deltaY = e.clientY - d.startClientY
-    const deltaMs = (deltaY / HOUR_PX) * 3_600_000
+    // DEC-087 — 5px dead zone (all modes): a sloppy click on a block or its
+    // 6px resize lip used to snap a 15-minute step before the hand settled.
+    // Below the threshold the press stays a click; past it, it is a drag for
+    // good (jitter back through zero must not re-arm the click).
+    if (!d.moved && Math.abs(deltaY) < 5 && Math.abs(e.clientX - d.startClientX) < 5) return
+    d.moved = true
+    const deltaMs = (deltaY / hourPx) * 3_600_000
     if (d.mode === 'move') {
       // Cross-day: find the day column under the pointer's X so a block can be
       // dragged to another day, keeping its time-of-day plus the vertical delta.
       let targetDay = d.origDayIndex
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < days; i++) {
         const r = colRefs.current[i]?.getBoundingClientRect()
         if (r && e.clientX >= r.left && e.clientX <= r.right) {
           targetDay = i
@@ -194,6 +468,19 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     window.removeEventListener('pointermove', onDragMove)
     const d = dragRef.current
     dragRef.current = null
+    if (d?.mode === 'move') onBlockDragActive?.(false)
+    // DEC-087 — the click event that follows this pointerup belongs to the
+    // drag, not the editor. (A press that never left the dead zone keeps it.)
+    dragConsumedClickRef.current = !!d?.moved
+    // DEC-053 — released OUTSIDE the grid (over the queue rail): the caller
+    // may consume the drop as an UNSCHEDULE instead of a move.
+    if (d && d.mode === 'move' && onBlockDragOut) {
+      const block = blocks.find((b) => b.id === d.id)
+      if (block && onBlockDragOut(block, d.lastClientX, d.lastClientY)) {
+        setDrag(null)
+        return
+      }
+    }
     setDrag((cur) => {
       if (d && cur && cur.id === d.id) {
         if (cur.previewStart !== d.origStartMs || cur.previewDur !== d.origDur) {
@@ -213,27 +500,186 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
     }
   }
 
-  const gridHeight = (END_HOUR - START_HOUR) * HOUR_PX
+  /** Inline create endings: Enter/blur keep the block (typed name wins,
+   *  resolved name stays if empty) · Esc removes it · Cmd+Enter promotes to
+   *  the full dialog with everything carried over (the block is re-made by
+   *  the dialog's own commit, so it is removed here first). */
+  async function finishInline(keepDraft: boolean): Promise<void> {
+    const ie = inlineEdit
+    if (!ie) return
+    setInlineEdit(null)
+    if (keepDraft && ie.draft.trim()) await updateBlock(ie.blockId, { title: ie.draft.trim() })
+  }
+  async function cancelInline(): Promise<void> {
+    const ie = inlineEdit
+    if (!ie) return
+    setInlineEdit(null)
+    await removeBlock(ie.blockId)
+  }
+  async function promoteInline(): Promise<void> {
+    const ie = inlineEdit
+    if (!ie) return
+    setInlineEdit(null)
+    await removeBlock(ie.blockId)
+    setComposer({
+      dayIndex: ie.dayIndex,
+      startMs: ie.startMs,
+      initialDurationMin: ie.durationMin,
+      initialTitle: ie.draft
+    })
+  }
+
+  const gridHeight = (END_HOUR - START_HOUR) * hourPx
   const now = Date.now()
 
   return (
-    <div className="flex" data-testid="week-time-grid">
+    <div className="flex flex-col" data-testid="week-time-grid">
+      {/* DEC-078 — the pinned band: day headers + deadline chips stay put
+          while the hours scroll beneath them. Living up here (not inside each
+          column) also means a tall chip stack can no longer push its own
+          column's canvas out of line with the others. */}
+      <div className="flex">
+        <div className={`${compact ? 'w-8' : 'w-14'} shrink-0`} />
+        <div
+          className={`grid flex-1 min-w-0 ${compact ? 'gap-1' : 'gap-1.5'}`}
+          style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: days }, (_, dayIndex) => {
+            const dStart = dayStartMs(weekStart, dayIndex)
+            const label = new Date(dStart).toLocaleDateString(undefined, { weekday: 'short' })
+            const isToday = new Date(dStart).toDateString() === new Date().toDateString()
+            return (
+              <div key={dayIndex} className="flex flex-col min-w-0">
+                <div
+                  className={`text-center py-1.5 mb-1 rounded-[var(--radius-chip)] truncate ${
+                    isToday
+                      ? 'text-accent font-semibold bg-accent/10'
+                      : 'text-[var(--ink-50)] font-medium'
+                  } ${compact ? 'text-[11px]' : 'text-[12px]'}`}
+                  title={new Date(dStart).toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                >
+                  {label} {new Date(dStart).getDate()}
+                </div>
+                {(dueByDay.get(dayIndex)?.length ?? 0) > 0 && (
+                  <div className="flex flex-col gap-0.5 pb-1" data-testid="deadline-band">
+                    {(dueByDay.get(dayIndex) ?? []).slice(0, compact ? 2 : 4).map((i) => (
+                      <button
+                        key={i.id}
+                        // DEC-093 — a deadline chip is a DRAG SOURCE, exactly
+                        // like a queue-rail row: same 'text/fb-workitem'
+                        // payload, so the day columns' existing drop handler
+                        // books it (DEC-052: the drag is the decision, 30 min,
+                        // undo covers regret). The chip stays after the drop —
+                        // it marks the DUE DATE, which the booking doesn't move.
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation()
+                          e.dataTransfer.setData('text/fb-workitem', i.id)
+                          e.dataTransfer.effectAllowed = 'copy'
+                          // NOT onBlockDragActive: that rings the queue rail
+                          // as an UNSCHEDULE target (DEC-053), which would be
+                          // a lie for an item that has no block yet.
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goAttention()
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          setEditItem(i)
+                        }}
+                        title={`Due: ${i.title} — drag onto the grid to book time · click to open Attention · double-click for details`}
+                        className={`relative w-full text-left truncate rounded-[var(--radius-chip)] border border-dashed pl-2.5 pr-1.5 py-1 fb-press bg-[var(--surface-raised)] ${
+                          compact ? 'text-[10.5px]' : 'text-[11px]'
+                        } leading-snug`}
+                        style={{
+                          borderColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.6),
+                          color: 'var(--ink-70)'
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full"
+                          style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.7) }}
+                        />
+                        {i.title}
+                      </button>
+                    ))}
+                    {(dueByDay.get(dayIndex)?.length ?? 0) > (compact ? 2 : 4) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          goAttention()
+                        }}
+                        className="fb-t-caption text-[var(--ink-40)] hover:text-[var(--ink-80)] text-left pl-2 fb-press"
+                      >
+                        +{(dueByDay.get(dayIndex)?.length ?? 0) - (compact ? 2 : 4)} more due
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {/* DEC-078/079 — the hours scroll in their own window: hover the grid
+          and a wheel moves through the day, never the page (overscroll
+          contained). The rail's compact window is twelve hours. pt-2 is the
+          12 AM fix: the first gutter label translates 6px up to sit ON its
+          line, and with no headroom the top half clipped at the scroll edge. */}
+      <div
+        ref={timeScrollRef}
+        // DEC-093 — dragging a deadline chip (or a queue row) from ABOVE the
+        // grid can only reach the hours currently in view, and the window
+        // shows about half a day. Hovering near an edge scrolls the day under
+        // the pointer, so any hour is reachable without letting go.
+        onDragOver={(e) => {
+          if (
+            !e.dataTransfer.types.includes('text/fb-workitem') &&
+            !e.dataTransfer.types.includes('text/fb-node')
+          )
+            return
+          const el = timeScrollRef.current
+          if (!el) return
+          const r = el.getBoundingClientRect()
+          const EDGE = 56
+          const y = e.clientY
+          if (y < r.top + EDGE) el.scrollTop -= Math.max(6, (r.top + EDGE - y) / 2)
+          else if (y > r.bottom - EDGE) el.scrollTop += Math.max(6, (y - (r.bottom - EDGE)) / 2)
+        }}
+        className="flex overflow-y-auto overscroll-contain pt-2"
+        style={{ maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
+      >
       {/* Hour gutter */}
-      <div className="w-12 shrink-0 select-none" style={{ paddingTop: 22 }}>
+      <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`}>
         {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
           <div
             key={i}
-            style={{ height: HOUR_PX }}
-            className="fb-t-caption font-mono text-[var(--ink-40)] text-right pr-1.5 -translate-y-1.5"
+            style={{ height: hourPx }}
+            className={`font-mono text-[var(--ink-40)] text-right pr-2 -translate-y-1.5 whitespace-nowrap ${compact ? 'text-[9.5px]' : 'text-[11px]'}`}
           >
-            {START_HOUR + i}:00
+            {(() => {
+              // DEC-053 — 12-hour cycle, per operator ruling (no military time).
+              const h = START_HOUR + i
+              const h12 = h % 12 === 0 ? 12 : h % 12
+              const mer = h < 12 ? 'AM' : 'PM'
+              return compact ? `${h12}${mer === 'AM' ? 'a' : 'p'}` : `${h12} ${mer}`
+            })()}
           </div>
         ))}
       </div>
 
       {/* Day columns */}
-      <div className="grid grid-cols-7 gap-1 flex-1">
-        {DAY_LABELS.map((label, dayIndex) => {
+      <div
+        className={`grid flex-1 min-w-0 ${compact ? 'gap-1' : 'gap-1.5'}`}
+        style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: days }, (_, dayIndex) => {
           const dStart = dayStartMs(weekStart, dayIndex)
           const isToday = new Date(dStart).toDateString() === new Date().toDateString()
           // A block being dragged is placed by its PREVIEW start, so a cross-day
@@ -243,24 +689,19 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           const dayBlocks = blocks.filter((b) => effStart(b) >= dStart && effStart(b) < dStart + DAY_MS)
           return (
             <div key={dayIndex} className="flex flex-col min-w-0">
-              <div
-                className={`text-center fb-t-caption font-semibold py-1 rounded-[var(--radius-chip)] ${
-                  isToday
-                    ? 'text-accent'
-                    : 'text-[var(--ink-50)]'
-                }`}
-              >
-                {label} {new Date(dStart).getDate()}
-              </div>
+              {/* DEC-078 — no graying: every day is the same raised surface,
+                  and today is marked by a light accent outline ALONE. The old
+                  sunken wash on non-today columns made the week read as
+                  sixth-sevenths disabled. */}
               <div
                 ref={(el) => (colRefs.current[dayIndex] = el)}
                 className={`relative rounded-[var(--radius-row)] border ${
                   isToday
-                    ? 'border-accent/40 bg-accent/[0.03]'
-                    : 'border-[var(--edge-soft)] bg-[var(--surface-sunken)]'
+                    ? 'border-transparent bg-[var(--surface-raised)] ring-2 ring-accent/35'
+                    : 'border-[var(--edge-soft)] bg-[var(--surface-raised)]'
                 }`}
                 style={{ height: gridHeight }}
-                onClick={(e) => onColumnClick(e, dayIndex)}
+                onPointerDown={(e) => onColumnPointerDown(e, dayIndex)}
                 onDragOver={onColumnDragOver}
                 onDrop={(e) => onColumnDrop(e, dayIndex)}
                 data-testid={`day-col-${dayIndex}`}
@@ -269,7 +710,7 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                 {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
                   <div
                     key={i}
-                    style={{ top: i * HOUR_PX, height: HOUR_PX }}
+                    style={{ top: i * hourPx, height: hourPx }}
                     className="absolute left-0 right-0 border-t border-[var(--edge-soft)] pointer-events-none"
                   />
                 ))}
@@ -279,40 +720,154 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                   const startMs = preview ? preview.previewStart : block.startMs
                   const durMin = preview ? preview.previewDur : block.durationMin
                   const top =
-                    ((startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * HOUR_PX
-                  const height = (durMin / 60) * HOUR_PX
-                  const linked = block.taskId ? nodesById.get(block.taskId) ?? null : null
+                    ((startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * hourPx
+                  const height = (durMin / 60) * hourPx
+                  const linked = block.taskId
+                    ? nodesById.get(block.taskId) ?? itemsById.get(block.taskId) ?? null
+                    : null
+                  const isWorkItem = linked?.kind === 'work_item'
                   const isTaskBlock = !block.taskId || linked?.kind === 'task'
+                  const wiHue = isWorkItem ? QUEUE_COLOR[queueOf(linked!)] ?? '#64748b' : null
                   const done = block.status === 'done'
+                  // DEC-077 — an ACTIVE work-item block completes via the same
+                  // circle every other surface uses; the hover cluster's check
+                  // then only serves plain blocks (and done-undo).
+                  const itemCompletable =
+                    isWorkItem && !done && !!linked && !isTerminalState(linked.workItemState)
                   const isPast = startMs + durMin * 60000 < now
+                  // A short block cannot hold padded text. The caption line is
+                  // ~15px on its own, so py-1's 4px top and bottom crop it
+                  // inside a 16px box — a 15-minute event rendered its title
+                  // with the bottom sheared off. Short blocks therefore shed
+                  // the vertical padding and centre a single line, and the
+                  // floor rises to the height one line actually needs.
+                  const fit = blockFit(height)
+                  const tight = fit.tight
                   return (
                     <div
                       key={block.id}
                       data-testid="time-block"
                       onPointerDown={(e) => beginDrag(e, block, 'move')}
-                      onClick={(e) => e.stopPropagation()}
-                      className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 py-1 fb-t-caption overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // DEC-087 — SINGLE click opens the editor (same
+                        // routing as double-click, which stays for habit).
+                        // Before this, a click did nothing, so people clicked
+                        // beside the block and the column's plain-click
+                        // booked a NEW slot — the demo's "it duplicated".
+                        // A click that ends a real drag is the drag's.
+                        if (dragConsumedClickRef.current) {
+                          dragConsumedClickRef.current = false
+                          return
+                        }
+                        if (block.meeting || !block.taskId) setEditBlockState(block)
+                        else if (isWorkItem) setEditItem(linked!)
+                        else if (linked) jumpToNode(linked)
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        // A meeting block (whatever it links) and a plain
+                        // block open the FULL dialog with every detail —
+                        // guests, where, agenda, time — seeded for editing.
+                        // Work-item and desk links keep their DEC-074 routes.
+                        if (block.meeting || !block.taskId) setEditBlockState(block)
+                        else if (isWorkItem) setEditItem(linked!)
+                        else if (linked) jumpToNode(linked)
+                      }}
+                      className={`absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 ${
+                        tight ? 'py-0 flex items-center' : 'py-1'
+                      } fb-t-caption overflow-hidden cursor-grab active:cursor-grabbing group/block border ${
                         done
                           ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                           : isPast
                             ? 'bg-[var(--surface-sunken)]/90 border-[var(--edge-firm)]/50 text-[var(--ink-50)]'
                             : 'bg-accent/15 border-accent/40 text-[var(--ink-90)]'
                       }`}
-                      style={{ top: Math.max(0, top), height: Math.max(16, height) }}
+                      style={{
+                        top: Math.max(0, top),
+                        height: fit.boxHeight,
+                        ...(wiHue && !done && !isPast
+                          ? {
+                              backgroundColor: queueTint(wiHue, 0.14),
+                              borderColor: queueTint(wiHue, 0.45)
+                            }
+                          : {})
+                      }}
                       title={`${block.title || linked?.title || 'Focus time'} · ${fmtTime(startMs)}`}
                     >
-                      <div className={`font-medium truncate ${done ? 'line-through' : ''}`}>
-                        {block.title || linked?.title || 'Focus time'}
+                      <div className={`flex gap-1 min-w-0 ${tight ? 'items-center flex-1' : 'items-start'}`}>
+                        {itemCompletable && (
+                          <CompleteCircle
+                            size={12}
+                            className={tight ? '' : 'mt-[2px]'}
+                            onClick={() => void completeItemAndBlock(block, linked!)}
+                            title={`${(PRIMARY_ACTION[queueOf(linked!)] ?? PRIMARY_ACTION.to_do).label} — complete the item and this block`}
+                            dataTestId="block-complete-circle"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          {inlineEdit?.blockId === block.id ? (
+                            /* Step 9 — the name typed in place. Enter/blur
+                               keep, Esc removes the block, Cmd+Enter promotes
+                               to the full dialog with the draft carried. */
+                            <input
+                              autoFocus
+                              value={inlineEdit.draft}
+                              data-testid="inline-title-input"
+                              placeholder={block.title}
+                              onChange={(e) =>
+                                setInlineEdit((ie) => (ie ? { ...ie, draft: e.target.value } : ie))
+                              }
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                              onDoubleClick={(e) => e.stopPropagation()}
+                              onBlur={() => void finishInline(true)}
+                              onKeyDown={(e) => {
+                                e.stopPropagation()
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                  e.preventDefault()
+                                  void promoteInline()
+                                } else if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  void finishInline(true)
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault()
+                                  void cancelInline()
+                                }
+                              }}
+                              className="w-full bg-transparent outline-none [&:focus-visible]:outline-none font-medium leading-[1.25] text-inherit placeholder:text-[var(--ink-40)] border-b border-[rgb(var(--accent))]"
+                            />
+                          ) : (
+                          <div
+                            className={`font-medium leading-[1.25] ${done ? 'line-through' : ''} ${
+                              height < 34 ? 'truncate' : 'line-clamp-2'
+                            }`}
+                          >
+                            {block.title || linked?.title || 'Focus time'}
+                          </div>
+                          )}
+                          {height >= 34 && (
+                            <div className="text-[9.5px] opacity-70 tabular-nums mt-px">
+                              {fmtTime(startMs)}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-[9px] opacity-70 tabular-nums">{fmtTime(startMs)}</div>
 
-                      {/* hover actions */}
-                      <div className="absolute top-0.5 right-0.5 hidden group-hover/block:flex items-center gap-0.5">
+                      {/* hover actions — z-raised above the resize handles,
+                          whose top strip otherwise overlaps these buttons'
+                          first few pixels and eats clicks there. */}
+                      <div className="absolute top-0.5 right-0.5 z-10 hidden group-hover/block:flex items-center gap-0.5">
                         {block.meeting && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
+                              // An external link wins: if someone pasted a Zoom
+                              // URL, that is the meeting — the minted Plexii
+                              // room is the fallback, not the destination.
+                              const ext = block.meeting?.joinUrl
+                              if (ext) void window.api.files.openExternal(ext)
+                              else void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                             className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"
@@ -364,17 +919,25 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                             <Icon name="bolt" size={9} />
                           </button>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            void updateBlock(block.id, { status: done ? 'planned' : 'done' })
-                          }}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
-                          title={done ? 'Mark not done' : 'Mark done'}
-                        >
-                          <Icon name={done ? 'undo' : 'check'} size={9} />
-                        </button>
+                        {!itemCompletable && (
+                          /* DEC-074/077 — an active work-item block completes
+                             via its visible circle instead; this check serves
+                             plain blocks and the done-undo. Undo stays
+                             calendar-local: it revives the BLOCK only — the
+                             item reopens from Attention, not from here. */
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void updateBlock(block.id, { status: done ? 'planned' : 'done' })
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            title={done ? 'Mark not done' : 'Mark done'}
+                            data-testid="block-complete"
+                          >
+                            <Icon name={done ? 'undo' : 'check'} size={9} />
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -415,40 +978,147 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
                     </div>
                   )
                 })}
+
+                {sel && sel.dayIndex === dayIndex && sel.endMs > sel.startMs && (
+                  <div
+                    data-testid="drag-select"
+                    className="absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] border-[1.5px] border-accent/70 bg-accent/15 pointer-events-none z-10 px-1.5 py-0.5 fb-t-caption text-[var(--ink-80)]"
+                    style={{
+                      top: ((sel.startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * hourPx,
+                      height: Math.max(10, ((sel.endMs - sel.startMs) / 3_600_000) * hourPx)
+                    }}
+                  >
+                    {fmtTime(sel.startMs)} – {fmtTime(sel.endMs)}
+                  </div>
+                )}
+                {(ghosts ?? [])
+                  .filter((g) => g.startMs >= dStart && g.startMs < dStart + DAY_MS)
+                  .map((g) => {
+                    const top =
+                      ((g.startMs - (dStart + START_HOUR * 3_600_000)) / 3_600_000) * hourPx
+                    const height = (g.durationMin / 60) * hourPx
+                    return (
+                      <div
+                        key={`ghost:${g.itemId}`}
+                        data-testid="plan-ghost"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0.5 right-0.5 rounded-[var(--radius-chip)] px-1.5 py-1 fb-t-caption overflow-hidden border-[1.5px] border-dashed border-accent/60 bg-accent/[0.06] text-[var(--ink-80)] group/ghost"
+                        style={{ top: Math.max(0, top), height: Math.max(16, height) }}
+                        title={`${g.title} — ${g.reason} (proposed; accept to book)`}
+                      >
+                        <div className="font-medium leading-[1.25] truncate">{g.title}</div>
+                        {(g.durationMin / 60) * hourPx >= 34 && (
+                          <div className="text-[9.5px] opacity-70 truncate">{g.reason}</div>
+                        )}
+                        {onGhostRemove && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onGhostRemove(g.itemId)
+                            }}
+                            className="absolute top-0.5 right-0.5 hidden group-hover/ghost:inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
+                            title="Drop this proposal"
+                          >
+                            <Icon name="close" size={9} />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )
         })}
       </div>
+      </div>
 
-      {composer && (
-        <BlockComposer
-          startMs={composer.startMs}
-          tasks={tasks.filter((t) => t.status !== 'done')}
-          prefillNode={composer.prefillNode}
-          onCancel={() => setComposer(null)}
-          onCreate={async (taskId, title, durationMin, meeting, recurrence) => {
-            await createBlock({ taskId, title, startMs: composer.startMs, durationMin, meeting, recurrence })
-            if (!meeting || meeting.invitees.length === 0) return { inviteNote: null }
-            // Send the join details to the invitees over the connected mailbox,
-            // and report the honest outcome (sent / partial / no mailbox).
-            const r = await sendMeetingInvites({
-              title: title || 'Meeting',
-              startMs: composer.startMs,
-              durationMin,
-              roomId: meeting.roomId,
-              invitees: meeting.invitees
-            })
-            if (r.noAccount) {
-              return {
-                inviteNote:
-                  'Meeting saved. Connect a mailbox in Mail to email the invites; the join link is on the calendar block.'
+      {editItem && (
+        <AttentionItemEditor
+          item={editItem}
+          desks={deskChoices}
+          onClose={(changed) => {
+            setEditItem(null)
+            if (changed) void refreshItems()
+          }}
+        />
+      )}
+      {editBlock && (
+        <BookTimeDialog
+          startMs={editBlock.startMs}
+          initialDurationMin={editBlock.durationMin}
+          editBlock={editBlock}
+          prefillNode={(() => {
+            const n = editBlock.taskId
+              ? nodesById.get(editBlock.taskId) ?? itemsById.get(editBlock.taskId)
+              : null
+            return n ? { id: n.id, title: n.title, kind: n.kind } : undefined
+          })()}
+          onCancel={() => setEditBlockState(null)}
+          onSave={async (patch) => {
+            const prev = editBlock
+            setEditBlockState(null)
+            await updateBlock(prev.id, patch)
+            useActionHistory.getState().recordWithToast({
+              label: `Saved \u201c${patch.title ?? prev.title}\u201d \u00b7 ${fmtTimeRange(
+                patch.startMs ?? prev.startMs,
+                patch.durationMin ?? prev.durationMin
+              )}`,
+              undo: async () => {
+                await updateBlock(prev.id, {
+                  taskId: prev.taskId,
+                  title: prev.title,
+                  startMs: prev.startMs,
+                  durationMin: prev.durationMin,
+                  meeting: prev.meeting ?? null
+                })
+              },
+              redo: async () => {
+                await updateBlock(prev.id, patch)
               }
-            }
-            if (r.failed.length > 0) {
-              return { inviteNote: `Meeting saved. Invited ${r.sent}; could not email ${r.failed.join(', ')}.` }
-            }
-            return { inviteNote: `Meeting saved and invites sent to ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` }
+            })
+          }}
+        />
+      )}
+      {/* Book time (spec pass 1, steps 1–3) — replaces BlockComposer at the
+          mount. The old composer stays below as the steps‑4–9 reference
+          (guests / where / agenda / invites) and is deleted at step 9.
+          Drop-books-immediately never reaches this mount, unchanged. */}
+      {composer && (
+        <BookTimeDialog
+          startMs={composer.startMs}
+          initialDurationMin={composer.initialDurationMin}
+          initialTitle={composer.initialTitle}
+          prefillNode={composer.prefillNode}
+          proposal={composer.proposal}
+          onCancel={() => setComposer(null)}
+          onCreate={async (taskId, title, startMs, durationMin, meeting, recurrence) => {
+            // Step 7 — closes IMMEDIATELY; no spinner, no confirmation step.
+            // The create is a local write; the toast is where regret goes.
+            setComposer(null)
+            const draft = { taskId, title, startMs, durationMin, meeting, recurrence }
+            const block = await createBlock(draft)
+            // The stated hold: outbound invites wait a window Undo can
+            // cancel. Nothing sends today (CR-08/CR-09 — no outbound path,
+            // no hosted links); the expiry callback is the future send site.
+            const hold: InviteHold | null =
+              meeting && meeting.invitees.length > 0
+                ? scheduleInviteHold(() => {
+                    /* future: sendMeetingInvites(...) — deliberately silent */
+                  }, HOLD_INVITES_MS)
+                : null
+            const verb = meeting ? 'Scheduled' : 'Booked'
+            useActionHistory.getState().recordWithToast({
+              label: `${verb} “${title}” · ${fmtTimeRange(startMs, durationMin)}${
+                hold ? ` · invites hold ${HOLD_INVITES_MS / 1000}s` : ''
+              }`,
+              undo: async () => {
+                hold?.cancel()
+                await removeBlock(block.id)
+              },
+              redo: async () => {
+                await createBlock(draft)
+              }
+            })
           }}
         />
       )}
@@ -504,250 +1174,6 @@ export default function WeekTimeGrid({ weekStart }: { weekStart: Date }): JSX.El
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-function BlockComposer({
-  startMs,
-  tasks,
-  prefillNode,
-  onCancel,
-  onCreate
-}: {
-  startMs: number
-  tasks: FbNode[]
-  prefillNode?: { id: string; title: string; kind: FbNode['kind'] }
-  onCancel: () => void
-  onCreate: (
-    taskId: string | null,
-    title: string,
-    durationMin: number,
-    meeting: TimeBlockMeeting | null,
-    recurrence: TimeBlockRecurrence | null
-  ) => Promise<{ inviteNote: string | null }>
-}): JSX.Element {
-  const [taskId, setTaskId] = useState<string>('')
-  const [title, setTitle] = useState('')
-  const [duration, setDuration] = useState(60)
-  const [repeat, setRepeat] = useState<TimeBlockRecurrence | ''>('')
-  const [busy, setBusy] = useState(false)
-  const [isMeeting, setIsMeeting] = useState(false)
-  const [invitees, setInvitees] = useState('')
-  const [inviteNote, setInviteNote] = useState<string | null>(null)
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
-  // A meeting block gets a stable room id now so the same link works for the
-  // host and every invitee. Emails are split on commas, spaces, and newlines.
-  function parsedInvitees(): string[] {
-    return invitees
-      .split(/[\s,;]+/)
-      .map((e) => e.trim().toLowerCase())
-      .filter((e) => e.includes('@'))
-  }
-
-  async function submit(): Promise<void> {
-    if (busy) return
-    setBusy(true)
-    try {
-      const meeting: TimeBlockMeeting | null = isMeeting
-        ? { roomId: newMeetingRoomId(), invitees: parsedInvitees() }
-        : null
-      // A dragged node books directly against that node; otherwise use the
-      // picker (a chosen task, or a labelled generic focus block).
-      let result: { inviteNote: string | null }
-      if (prefillNode) {
-        result = await onCreate(prefillNode.id, '', duration, meeting, repeat || null)
-      } else {
-        const label = taskId ? '' : title.trim() || (isMeeting ? 'Meeting' : 'Focus time')
-        result = await onCreate(taskId || null, label, duration, meeting, repeat || null)
-      }
-      // If invites went out (or couldn't), show the honest note and keep the
-      // panel open so the user reads it; otherwise close straight away.
-      if (result.inviteNote) {
-        setInviteNote(result.inviteNote)
-      } else {
-        onCancel()
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div
-      className="fb-scrim fixed inset-0 z-[200] flex items-center justify-center"
-      onClick={onCancel}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="fb-card fb-press w-[340px] rounded-[var(--radius-card)] fb-pop-in p-4 space-y-3"
-        data-testid="block-composer"
-      >
-        <div className="flex items-center gap-2">
-          <Icon name="schedule" size={16} className="text-accent" />
-          <h3 className="fb-t-title text-[var(--ink-100)]">Book time</h3>
-          <span className="ml-auto fb-t-caption font-mono">
-            {fmtTime(startMs)}
-          </span>
-        </div>
-
-        {prefillNode ? (
-          <div
-            className="flex items-center gap-2 rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-2 py-1.5"
-            data-testid="composer-prefill"
-          >
-            <Icon
-              name={prefillNode.kind === 'folder' ? 'folder' : 'task_alt'}
-              size={14}
-              className="text-accent shrink-0"
-            />
-            <span className="fb-t-body text-[var(--ink-90)] truncate">
-              {prefillNode.title}
-            </span>
-          </div>
-        ) : (
-          <>
-            <label className="block">
-              <span className="fb-t-caption uppercase tracking-wider font-medium">
-                Task
-              </span>
-              <select
-                value={taskId}
-                onChange={(e) => setTaskId(e.target.value)}
-                className="fb-field fb-t-body mt-1"
-                data-testid="composer-task"
-              >
-                <option value="">Focus time (no task)</option>
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {!taskId && (
-              <label className="block">
-                <span className="fb-t-caption uppercase tracking-wider font-medium">
-                  Label (optional)
-                </span>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Focus time"
-                  className="fb-field fb-t-body mt-1"
-                />
-              </label>
-            )}
-          </>
-        )}
-
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isMeeting}
-            onChange={(e) => setIsMeeting(e.target.checked)}
-            className="accent-accent"
-            data-testid="composer-meeting-toggle"
-          />
-          <Icon name="videocam" size={14} className="text-accent" />
-          <span className="fb-t-body text-[var(--ink-90)]">Video meeting</span>
-        </label>
-
-        {isMeeting && (
-          <label className="block">
-            <span className="fb-t-caption uppercase tracking-wider font-medium">
-              Invite people (emails)
-            </span>
-            <textarea
-              value={invitees}
-              onChange={(e) => setInvitees(e.target.value)}
-              placeholder="alex@acme.com, sam@acme.com"
-              rows={2}
-              className="fb-field fb-t-body mt-1 resize-none"
-              data-testid="composer-invitees"
-            />
-            <span className="mt-1 block fb-t-caption">
-              Each invitee gets an email with the time and a link to join in PlexiDesk.
-            </span>
-          </label>
-        )}
-
-        {inviteNote && (
-          <div
-            className="rounded-[var(--radius-row)] bg-[var(--surface-sunken)] px-2.5 py-2 fb-t-label text-[var(--ink-70)]"
-            data-testid="composer-invite-note"
-          >
-            {inviteNote}
-          </div>
-        )}
-
-        <label className="block">
-          <span className="fb-t-caption uppercase tracking-wider font-medium">
-            Length
-          </span>
-          <select
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="fb-field fb-t-body mt-1"
-          >
-            {[15, 25, 30, 45, 60, 90, 120].map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="fb-t-caption uppercase tracking-wider font-medium">
-            Repeats
-          </span>
-          <select
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value as TimeBlockRecurrence | '')}
-            className="fb-field fb-t-body mt-1"
-            data-testid="block-repeat"
-          >
-            <option value="">Does not repeat</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-
-        <div className="flex justify-end gap-2 pt-1">
-          {inviteNote ? (
-            <button onClick={onCancel} className="btn-primary" data-testid="composer-done">
-              <Icon name="check" size={14} />
-              <span>Done</span>
-            </button>
-          ) : (
-            <>
-              <button onClick={onCancel} className="btn-ghost">
-                Cancel
-              </button>
-              <button
-                onClick={() => void submit()}
-                disabled={busy}
-                className="btn-primary"
-                data-testid="composer-create"
-              >
-                <Icon name={isMeeting ? 'videocam' : 'add'} size={14} />
-                <span>{isMeeting ? 'Schedule meeting' : 'Book it'}</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

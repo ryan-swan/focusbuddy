@@ -15,7 +15,7 @@ import { getSharedAiClient } from './anthropic'
 import { resolveModel } from './modelRouting'
 import { recordAiUsage } from '../db/telemetry'
 import { extractJson } from './chatJson'
-import { needsCleanup } from './intentRules'
+import { qualifiesForTidy } from './intentRules'
 
 export interface CleanupProposal {
   /** A crisp title, ≤90 chars, stating the actual ask/fact. */
@@ -24,9 +24,16 @@ export interface CleanupProposal {
   note: string
 }
 
-export async function proposeCleanup(text: string): Promise<CleanupProposal | null> {
+export async function proposeCleanup(
+  text: string,
+  notes?: string
+): Promise<CleanupProposal | null> {
   const t = text.trim()
-  if (!needsCleanup(t)) return null
+  // DEC-034: the operator's optional notes field rides the same tidy — "clean
+  // up any notes (if there are any)". The messiness gate reads BOTH, so a
+  // crisp task line with a rambling note still qualifies.
+  const n = (notes ?? '').trim()
+  if (!qualifiesForTidy(t, n)) return null
   try {
     // Credits-aware (F-8 family): the tidy works on PlexiDesk credits too.
     const client = getSharedAiClient()
@@ -37,10 +44,18 @@ export async function proposeCleanup(text: string): Promise<CleanupProposal | nu
       max_tokens: 250,
       system:
         'You tidy ONE messy captured note. Extract a crisp title (max 90 chars) stating the ' +
-        'actual ask or fact, and a clean 1-3 sentence note preserving EVERY concrete detail ' +
+        'actual ask or fact, and a clean note preserving EVERY concrete detail ' +
         '(names, dates, amounts, links). Never invent, never editorialize, never drop a fact. ' +
-        'Keep the writer\'s language. Return ONLY JSON: {"title":"...","note":"..."}. No prose.',
-      messages: [{ role: 'user', content: t.slice(0, 4000) }]
+        'Keep the writer\'s language. When NOTES are supplied, tidy them into the note field ' +
+        'rather than replacing them with a summary of the title.\n' +
+        'FORMATTING MATTERS AS MUCH AS WORDING (DEC-046): collapse stray blank lines and ' +
+        'double spacing; when the content covers several points, steps, or entries, format the ' +
+        'note as short "- " bullet lines (one point each) instead of a paragraph; keep a genuine ' +
+        'single thought as 1-3 sentences. Newlines in the note field are real newlines.\n' +
+        'Return ONLY JSON: {"title":"...","note":"..."}. No prose.',
+      messages: [
+        { role: 'user', content: (n ? `TASK: ${t}\n\nNOTES: ${n}` : t).slice(0, 4000) }
+      ]
     })
     recordAiUsage(model, resp.usage?.input_tokens ?? 0, resp.usage?.output_tokens ?? 0)
     const out = resp.content

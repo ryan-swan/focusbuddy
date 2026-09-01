@@ -747,7 +747,7 @@ function ListRow(props: {
         props.dragging ? 'opacity-40' : ''
       } ${
         props.selected
-          ? 'bg-[rgba(var(--accent),0.08)] hover:bg-[rgba(var(--accent),0.12)]'
+          ? 'bg-accent/[0.08] hover:bg-accent/[0.12]'
           : 'bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)]'
       }`}
       data-testid={`index-row-${props.id}`}
@@ -902,7 +902,7 @@ function TableGroup<T>(props: {
           data-testid={`table-row-${props.idOf(it)}`}
           className={`cursor-pointer ${
             props.selectedIds?.has(props.idOf(it))
-              ? 'bg-[rgba(var(--accent),0.08)] hover:bg-[rgba(var(--accent),0.12)]'
+              ? 'bg-accent/[0.08] hover:bg-accent/[0.12]'
               : 'hover:bg-[var(--surface-hover)] active:bg-[var(--surface-sunken)]'
           }`}
         >

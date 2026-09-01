@@ -87,7 +87,7 @@ describe('resolveMenu — deterministic eight-item ceiling and ordering', () => 
     // Every canonical band that applies is represented.
     const ls = labels(items)
     expect(ls).toContain('AI Assist')
-    expect(ls).toContain('Create')
+    expect(ls).toContain('Create & link')
   })
 
   it('folds three or more context rows into two slots (one inlined plus More actions)', () => {
@@ -110,7 +110,7 @@ describe('resolveMenu — deterministic eight-item ceiling and ordering', () => 
     const items = resolveMenu(widgetCtx(widget('note', 'some text')))
     const ls = labels(items)
     const aiIdx = ls.indexOf('AI Assist')
-    const createIdx = ls.indexOf('Create')
+    const createIdx = ls.indexOf('Create & link')
     expect(aiIdx).toBeGreaterThanOrEqual(0)
     expect(createIdx).toBeGreaterThan(aiIdx)
     // The very last non-separator row is a destructive one.
@@ -124,7 +124,7 @@ describe('resolveMenu — deterministic eight-item ceiling and ordering', () => 
     // AI Assist (1) -> Change Tone (2) -> Professional (3)
     expect(maxDepth([ai as CtxMenuItem])).toBe(3)
     // Create / Convert merged slot stays within two levels.
-    const create = topLevel(items).find((i) => i.label === 'Create')
+    const create = topLevel(items).find((i) => i.label === 'Create & link')
     expect(maxDepth([create as CtxMenuItem])).toBe(2)
   })
 })
@@ -132,14 +132,15 @@ describe('resolveMenu — deterministic eight-item ceiling and ordering', () => 
 describe('resolveMenu — Create and Convert merge into one slot', () => {
   beforeEach(() => clearWidgetContextActions())
 
-  it('puts both the create offerings and a Turn-this-into group under a single Create slot', () => {
+  it('puts both the create offerings and a Copy-into group under a single slot', () => {
     const items = resolveMenu(widgetCtx(widget('note', 'convert me')))
     const ls = labels(items)
-    expect(ls.filter((l) => l === 'Create')).toHaveLength(1)
+    expect(ls.filter((l) => l === 'Create & link')).toHaveLength(1)
     expect(ls).not.toContain('Convert')
-    const create = topLevel(items).find((i) => i.label === 'Create')
+    expect(ls).not.toContain('Create') // the bare, wire-hiding label is gone
+    const create = topLevel(items).find((i) => i.label === 'Create & link')
     const childLabels = create?.children?.map((c) => c.label) ?? []
-    expect(childLabels).toContain('Turn this into')
+    expect(childLabels).toContain('Copy into')
   })
 })
 
@@ -249,5 +250,40 @@ describe('resolveMenu — multi-selection', () => {
     expect(ls).not.toContain('Create')
     // Destructive still last.
     expect(topLevel(items).at(-1)?.label).toBe('Delete 2 widgets')
+  })
+})
+
+describe('DEC-041 — the menu only offers what it can actually do', () => {
+  beforeEach(() => clearWidgetContextActions())
+
+  it('hides "Copy into" entirely when the source has no text to copy', () => {
+    // A browser is not a text kind, so a "conversion" would have copied
+    // nothing — it degraded into Create under a misleading name.
+    const items = resolveMenu(widgetCtx(widget('webview')))
+    const create = topLevel(items).find((i) => i.label === 'Create & link')
+    const childLabels = create?.children?.map((c) => c.label) ?? []
+    expect(childLabels).not.toContain('Copy into')
+    // …but Create & link is still offered: spawning a wired widget is real.
+    expect(childLabels.length).toBeGreaterThan(0)
+  })
+
+  it('only offers copy targets that can RECEIVE text', () => {
+    const items = resolveMenu(widgetCtx(widget('note', 'some real text')))
+    const create = topLevel(items).find((i) => i.label === 'Create & link')
+    const childLabels = create?.children?.map((c) => c.label) ?? []
+    expect(childLabels).toContain('Copy into')
+    // These three never carried the text across, in any direction.
+    const afterHeader = childLabels.slice(childLabels.indexOf('Copy into'))
+    expect(afterHeader).not.toContain('Table')
+    expect(afterHeader).not.toContain('Mind map')
+    expect(afterHeader).not.toContain('Diagram')
+  })
+
+  it('no longer offers the broken Task link', () => {
+    const items = resolveMenu(widgetCtx(widget('note', 'text')))
+    const create = topLevel(items).find((i) => i.label === 'Create & link')
+    const childLabels = create?.children?.map((c) => c.label) ?? []
+    // It could only ever render "Referenced task was deleted or moved."
+    expect(childLabels).not.toContain('Task link')
   })
 })

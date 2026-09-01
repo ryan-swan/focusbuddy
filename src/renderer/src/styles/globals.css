@@ -472,6 +472,131 @@ body {
       0 18px 44px -14px oklch(0% 0 0 / 0.55),
       var(--shadow-inset-highlight);
   }
+  /* ── Container-query layout (DEC-054) ───────────────────────────────────
+     The sidebar reserves its width with PADDING on <main>, so the window
+     width never changes when the left panel opens — which means Tailwind's
+     xl: breakpoints (viewport-based) fire identically whether the panel is
+     open or closed, and a two-column page silently gets ~260px narrower
+     with no layout response. That is the "clunky when the menu opens"
+     failure. These rules watch the CONTAINER instead, so the page reflows
+     on the space it actually has. */
+  .fb-cq {
+    container-type: inline-size;
+  }
+  /* Calendar: queue rail + grid. */
+  .fb-cq-cal {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  @container (min-width: 1040px) {
+    .fb-cq-cal {
+      grid-template-columns: 288px minmax(0, 1fr);
+    }
+  }
+  @container (min-width: 1360px) {
+    .fb-cq-cal {
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+  /* Attention: queues + block rail. */
+  .fb-cq-att {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  @container (min-width: 1080px) {
+    .fb-cq-att {
+      grid-template-columns: minmax(0, 1fr) 330px;
+    }
+  }
+  @container (min-width: 1400px) {
+    .fb-cq-att {
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 1.5rem;
+    }
+  }
+  /* The rail hides itself only when the CONTAINER is genuinely too narrow. */
+  .fb-cq-rail {
+    display: none;
+  }
+  @container (min-width: 1040px) {
+    .fb-cq-rail {
+      display: flex;
+    }
+  }
+
+  /* ── Glass card (DEC-054) ───────────────────────────────────────────────
+     The SAME material as .fb-widget-tile — Liquid Glass fill, layered depth
+     shadow, inset highlight — without the tile's child-layout rules. Those
+     rules exist to make a widget INTERIOR distribute its rows; a page card
+     (an Attention block, the calendar shell) owns its own layout and would
+     be broken by having its header forced into a column. One material, two
+     jobs, no drift: both read the same tokens. */
+  .fb-glass-card {
+    background-color: var(--glass-pillow-fill);
+    backdrop-filter: var(--glass-pillow-blur);
+    -webkit-backdrop-filter: var(--glass-pillow-blur);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(20% 0.01 264 / 0.05),
+      0 6px 16px -6px oklch(20% 0.01 264 / 0.1),
+      0 18px 40px -14px oklch(20% 0.01 264 / 0.13),
+      var(--shadow-inset-highlight);
+  }
+  html.dark .fb-glass-card {
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(0% 0 0 / 0.35),
+      0 6px 16px -6px oklch(0% 0 0 / 0.45),
+      0 18px 44px -14px oklch(0% 0 0 / 0.55),
+      var(--shadow-inset-highlight);
+  }
+  /* DEC-055 — a MORE SOLID panel for a standing column (the calendar's queue
+     rail). Same family as .fb-glass-card, but it sits on the raised surface
+     rather than a translucent fill, so a long list reads as its own panel
+     instead of text floating on the dotted paper. */
+  .fb-glass-panel {
+    background-color: color-mix(in oklab, var(--surface-raised) 94%, transparent);
+    backdrop-filter: var(--glass-pillow-blur);
+    -webkit-backdrop-filter: var(--glass-pillow-blur);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(20% 0.01 264 / 0.05),
+      0 8px 20px -8px oklch(20% 0.01 264 / 0.12),
+      0 22px 48px -18px oklch(20% 0.01 264 / 0.15),
+      var(--shadow-inset-highlight);
+  }
+  html.dark .fb-glass-panel {
+    background-color: color-mix(in oklab, var(--surface-raised) 92%, transparent);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(0% 0 0 / 0.35),
+      0 8px 20px -8px oklch(0% 0 0 / 0.5),
+      0 22px 52px -18px oklch(0% 0 0 / 0.6),
+      var(--shadow-inset-highlight);
+  }
+
+  /* A quieter sibling for rows INSIDE a glass card (queue rows, rail items):
+     the same family, one depth step down, so a list reads as content on the
+     card rather than a stack of competing cards. */
+  .fb-glass-row {
+    background-color: var(--glass-pillow-fill);
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(20% 0.01 264 / 0.04),
+      0 4px 10px -8px oklch(20% 0.01 264 / 0.10);
+  }
+  html.dark .fb-glass-row {
+    box-shadow:
+      0 0 0 1px var(--edge-hairline),
+      0 1px 2px oklch(0% 0 0 / 0.28),
+      0 4px 12px -8px oklch(0% 0 0 / 0.4);
+  }
+
   /* Inside a tile, the widget root is a flex column and its content region
      (the card's last child) grows — so interiors distribute rows, stretch
      grids, or center singles instead of pooling dead space at the bottom. */
@@ -2067,7 +2192,7 @@ body {
     radial-gradient(ellipse 56% 42% at 10% 98%, rgba(56, 189, 248, 0.1) 0%, transparent 64%),
     radial-gradient(ellipse 56% 42% at 90% 98%, rgba(251, 113, 133, 0.085) 0%, transparent 64%),
     /* accent-tinted core glow rising from the floor */
-    radial-gradient(ellipse 90% 60% at 50% 112%, rgba(var(--accent), 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 90% 60% at 50% 112%, rgb(var(--accent) / 0.1) 0%, transparent 60%),
     #06070c !important;
   background-attachment: fixed !important;
   position: relative;
@@ -2215,8 +2340,8 @@ body {
   border-color: rgba(255, 255, 255, 0.09) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 0 0 1px rgba(var(--accent), 0.12),
-    0 12px 32px -8px rgba(var(--accent), 0.2),
+    0 0 0 1px rgb(var(--accent) / 0.12),
+    0 12px 32px -8px rgb(var(--accent) / 0.2),
     0 24px 56px -24px rgba(0, 0, 0, 0.62) !important;
 }
 
@@ -2237,7 +2362,7 @@ body {
    itself twinkles while you work. */
 .gemstone .desk-paper {
   background:
-    radial-gradient(ellipse 52% 36% at 50% 50%, rgba(var(--accent), 0.04) 0%, transparent 66%),
+    radial-gradient(ellipse 52% 36% at 50% 50%, rgb(var(--accent) / 0.04) 0%, transparent 66%),
     #05060a !important;
   position: relative;
 }
@@ -2270,9 +2395,9 @@ body {
 .fb-canvas-dragging.gemstone .desk-paper,
 .gemstone .fb-canvas-dragging .desk-paper {
   background:
-    linear-gradient(to right, rgba(var(--accent), 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(var(--accent), 0.06) 1px, transparent 1px),
-    radial-gradient(ellipse 52% 36% at 50% 50%, rgba(var(--accent), 0.04) 0%, transparent 66%),
+    linear-gradient(to right, rgb(var(--accent) / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--accent) / 0.06) 1px, transparent 1px),
+    radial-gradient(ellipse 52% 36% at 50% 50%, rgb(var(--accent) / 0.04) 0%, transparent 66%),
     #05060a !important;
   background-size: 24px 24px, 24px 24px, auto, auto !important;
 }
@@ -2282,15 +2407,15 @@ body {
 .gemstone .btn-primary {
   background: linear-gradient(
     180deg,
-    rgba(var(--accent), 0.98),
-    rgba(var(--accent-hover), 0.98)
+    rgb(var(--accent) / 0.98),
+    rgb(var(--accent-hover) / 0.98)
   ) !important;
   border: none !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 0 0 1px rgba(var(--accent), 0.34),
+    0 0 0 1px rgb(var(--accent) / 0.34),
     0 1px 2px rgba(0, 0, 0, 0.34),
-    0 12px 32px -8px rgba(var(--accent), 0.42) !important;
+    0 12px 32px -8px rgb(var(--accent) / 0.42) !important;
   transition:
     box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
@@ -2299,13 +2424,13 @@ body {
   transform: translateY(-1px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    0 0 0 1px rgba(var(--accent), 0.55),
+    0 0 0 1px rgb(var(--accent) / 0.55),
     0 1px 2px rgba(0, 0, 0, 0.34),
-    0 16px 40px -8px rgba(var(--accent), 0.58) !important;
+    0 16px 40px -8px rgb(var(--accent) / 0.58) !important;
 }
 
 .gemstone .text-accent {
-  text-shadow: 0 0 12px rgba(var(--accent), 0.4);
+  text-shadow: 0 0 12px rgb(var(--accent) / 0.4);
 }
 
 .gemstone .border-stone-200,
@@ -2723,4 +2848,95 @@ body {
     'opsz' 24;
   user-select: none;
   display: inline-block;
+}
+
+/* DEC-095 — the Attention analytics tiles. They were flat swatches: one
+   tint, no edge, no depth, nothing on hover. Now they are material chips
+   in the house recipe — a tone-tinted gradient, a hairline ring in the
+   tone, the shared inset top highlight, and a gloss sweep across the top
+   42%. The tone rides in as --kpi-tone, which MUST be a space-separated
+   RGB triplet ("14 165 233"): the `rgb(var(--x) / a)` form is the only
+   one that survives an alpha modifier (GAP-018/019 — a comma triplet or a
+   complete color here paints NOTHING). */
+.fb-kpi-tile {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    160deg,
+    rgb(var(--kpi-tone) / 0.15) 0%,
+    rgb(var(--kpi-tone) / 0.05) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--kpi-tone) / 0.2),
+    var(--shadow-inset-highlight);
+  transition:
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+/* The gloss: a light sweep over the upper half, the way a physical key or a
+   glass chip catches a room. Never over the content — pointer-events off and
+   painted under the text by z-order. */
+.fb-kpi-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.28) 0%, rgb(255 255 255 / 0) 42%);
+}
+.dark .fb-kpi-tile::after {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0) 42%);
+}
+.fb-kpi-tile > * {
+  position: relative;
+  z-index: 1;
+}
+.fb-kpi-tile:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(
+    160deg,
+    rgb(var(--kpi-tone) / 0.22) 0%,
+    rgb(var(--kpi-tone) / 0.08) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--kpi-tone) / 0.32),
+    var(--shadow-cast),
+    var(--shadow-inset-highlight);
+}
+.fb-kpi-tile:active {
+  transform: translateY(0);
+}
+/* Selected (DEC-049: the tile is also the queue filter) — the ring closes
+   fully and the tint holds at its hover strength, so "this one is on" reads
+   without hovering it. */
+.fb-kpi-tile[data-on='true'] {
+  background: linear-gradient(
+    160deg,
+    rgb(var(--kpi-tone) / 0.26) 0%,
+    rgb(var(--kpi-tone) / 0.1) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1.5px rgb(var(--kpi-tone) / 0.55),
+    var(--shadow-soft),
+    var(--shadow-inset-highlight);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb-kpi-tile {
+    transition: none;
+  }
+  .fb-kpi-tile:hover {
+    transform: none;
+  }
+}
+
+/* The stacked status bar under each queue label: a recessed track so the
+   segments read as filling something, and a top highlight on the fill. */
+.fb-stat-track {
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.1);
+}
+.dark .fb-stat-track {
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+}
+.fb-stat-seg {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.25) 0%, rgb(255 255 255 / 0) 60%);
 }

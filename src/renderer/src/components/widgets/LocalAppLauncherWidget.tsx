@@ -130,7 +130,7 @@ export default function LocalAppLauncherWidget({ widget, inline = false }: Props
     <WidgetFrame
       widget={widget}
       headerLabel={`App · ${sourceApp?.title ?? 'broken link'}`}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
     >
       {body}
     </WidgetFrame>

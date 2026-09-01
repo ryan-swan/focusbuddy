@@ -100,6 +100,17 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
+import { extractPeople } from '../ai/peopleExtract'
+import { listPeopleDirectory } from '../peopleDirectory'
+import { selectItemsForPlan } from '../ai/planSelect'
+import {
+  ensureSignalSchema,
+  recordSignal,
+  listSignals,
+  matchState,
+  markPrompted,
+  recordOutcome as recordSignalOutcome
+} from '../db/signals'
 import { proposeCleanup } from '../ai/cleanupRewrite'
 import {
   isWorkItemsEnabled,
@@ -158,6 +169,8 @@ import {
 } from '../context/engine'
 import { plexiId } from '@shared/plexiId'
 import type { MaterialityInput } from '../context/materiality'
+import { isRealCreate, isRealDelete, stateChanged } from '../context/objectEventGuards'
+import type { WriteOrigin } from '../../shared/writeOrigin'
 import {
   bringToFront,
   createWidget,
@@ -739,10 +752,51 @@ export function registerIpcHandlers(): void {
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
+  // DEC-088 — the people scan alone, for MARKED captures (whose class the
+  // preset table already decided — that path deliberately never classifies,
+  // and this keeps it model-free while still suggesting workspace people).
+  ipcMain.handle('workItems:scanPeople', (_e, text: string) =>
+    extractPeople(String(text ?? ''), listPeopleDirectory())
+  )
+  // DEC-052 (Track D, tier 1) — the typed action ledger + the once-ever
+  // pairing guard. Device-local observations; never rides sync.
+  ensureSignalSchema()
+  ipcMain.handle('signals:record', (_e, input: { kind: string; targetKind?: string; targetRef?: string; payload?: string }) =>
+    recordSignal({
+      kind: String(input?.kind ?? ''),
+      targetKind: input?.targetKind ?? null,
+      targetRef: input?.targetRef ?? null,
+      payload: input?.payload ?? null
+    })
+  )
+  ipcMain.handle('signals:list', (_e, sinceMs: number) => listSignals(Number(sinceMs) || 0))
+  ipcMain.handle('signals:matchState', (_e, signalId: string, itemId: string) =>
+    matchState(String(signalId), String(itemId))
+  )
+  ipcMain.handle('signals:markPrompted', (_e, signalId: string, itemId: string, confidence: number) =>
+    markPrompted(String(signalId), String(itemId), Number(confidence) || 0)
+  )
+  ipcMain.handle('signals:outcome', (_e, signalId: string, itemId: string, outcome: string) =>
+    recordSignalOutcome(String(signalId), String(itemId), String(outcome))
+  )
+  // DEC-052 (B3, intent mode) — pick + order the items an intent names. Pure
+  // selection: placement and the preview-confirm stay in the renderer.
+  ipcMain.handle('planner:selectItems', (_e, intent: string, candidates: unknown) =>
+    selectItemsForPlan(
+      String(intent ?? ''),
+      Array.isArray(candidates)
+        ? (candidates as Array<{ id?: unknown; title?: unknown; context?: unknown }>).map((c) => ({
+            id: String(c.id ?? ''),
+            title: String(c.title ?? ''),
+            context: String(c.context ?? '')
+          }))
+        : []
+    )
+  )
   // DEC-026 (Δ6): the opt-in tidy proposal — gated on the deterministic
   // messiness test inside, null on any failure, never blocks a capture.
-  ipcMain.handle('workItems:proposeCleanup', (_e, text: string) =>
-    isWorkItemsEnabled() ? proposeCleanup(String(text ?? '')) : null
+  ipcMain.handle('workItems:proposeCleanup', (_e, text: string, notes?: string) =>
+    isWorkItemsEnabled() ? proposeCleanup(String(text ?? ''), notes ? String(notes) : undefined) : null
   )
   ipcMain.handle('workItems:enabled', () => isWorkItemsEnabled())
   // V2 (DEC-023): the Settings toggle — the pref finally has a real switch.
@@ -795,7 +849,7 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('nodes:list', () => listNodes())
   ipcMain.handle('nodes:get', (_e, id: string) => getNode(id))
-  ipcMain.handle('nodes:create', (_e, draft: NodeDraft) => {
+  ipcMain.handle('nodes:create', (_e, draft: NodeDraft, origin?: WriteOrigin) => {
     // Work_items never travel the nodes:* namespace (F008 one-code-path):
     // their creator is workItems:create (S3), which wraps the dedicated
     // db-module function. This protocol-boundary refusal is additional to
@@ -803,27 +857,34 @@ export function registerIpcHandlers(): void {
     if (draft.kind === 'work_item') {
       throw new Error('work_item creation goes through workItems:create, not nodes:create')
     }
+    // DEC-059 — createNode is idempotent by id: it returns the existing row
+    // untouched when the id is already present, so a replayed create is a
+    // no-op in the database. Ask what happened before claiming it happened.
+    const preexisting = draft.id ? getNode(draft.id) : null
     const node = createNode(draft)
     // Live projection: a real ObjectCreated Event on a real user action.
     // (Binary ternary is safe: work_item was refused above.)
-    emitObjectEvent({
+    if (origin !== 'sync' && isRealCreate(preexisting)) {
+      emitObjectEvent({
       eventType: node.kind === 'folder' ? 'RoomCreated' : 'DeskCreated',
       category: 'user',
       objectId: node.id,
       deskId: node.parentId ?? null,
       currentState: { title: node.title, kind: node.kind, importance: node.importance, status: node.status },
-      changeSummary: `Created ${node.kind} "${node.title}"`
-    })
-    // You created it, so you have seen it: anchor the review point past the
-    // creation event so a brand-new desk does not report itself as "changed since
-    // your last visit". Later changes still surface honestly.
-    ceMarkReviewed(node.id)
+        changeSummary: `Created ${node.kind} "${node.title}"`
+      })
+      // You created it, so you have seen it: anchor the review point past the
+      // creation event so a brand-new desk does not report itself as "changed
+      // since your last visit". Later changes still surface honestly.
+      ceMarkReviewed(node.id)
+    }
     return node
   })
-  ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch) => {
+  ipcMain.handle('nodes:update', (_e, id: string, patch: NodePatch, origin?: WriteOrigin) => {
     const before = getNode(id)
     const node = updateNode(id, patch)
-    if (node) {
+    // DEC-059 — a write that changed nothing is not an update.
+    if (origin !== 'sync' && node && stateChanged(before as never, node as never)) {
       emitObjectEvent({
         eventType: node.status === 'done' && before?.status !== 'done' ? 'DeskCompleted' : 'DeskUpdated',
         category: 'user',
@@ -839,16 +900,19 @@ export function registerIpcHandlers(): void {
   // Trash surfacing (lifecycle L1): the Trash view's list + subtree restore.
   ipcMain.handle('nodes:listTrash', () => listTrash())
   ipcMain.handle('nodes:restoreTree', (_e, rootId: string) => restoreTree(rootId))
-  ipcMain.handle('nodes:delete', (_e, id: string) => {
+  ipcMain.handle('nodes:delete', (_e, id: string, origin?: WriteOrigin) => {
     const before = getNode(id)
     const removed = deleteNode(id)
-    emitObjectEvent({
-      eventType: 'DeskDeleted',
-      category: 'user',
-      objectId: id,
-      currentState: { title: before?.title ?? null, trashed: true },
-      changeSummary: `Deleted "${before?.title ?? id}"`
-    })
+    // DEC-059 — deleting an id that is already gone is not a transition.
+    if (origin !== 'sync' && isRealDelete(before)) {
+      emitObjectEvent({
+        eventType: 'DeskDeleted',
+        category: 'user',
+        objectId: id,
+        currentState: { title: before?.title ?? null, trashed: true },
+        changeSummary: `Deleted "${before?.title ?? id}"`
+      })
+    }
     return removed
   })
   // DEC-021 (D2): the permanent-purge arm of the delete dialog. Refusals (C2
@@ -856,13 +920,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('nodes:deletePermanent', (_e, id: string) => {
     const before = getNode(String(id || ''))
     const result = deleteNodePermanent(String(id || ''))
-    emitObjectEvent({
-      eventType: 'DeskDeleted',
-      category: 'user',
-      objectId: String(id || ''),
-      currentState: { title: before?.title ?? null, trashed: false },
-      changeSummary: `Permanently deleted "${before?.title ?? id}" (memory purged)`
-    })
+    if (isRealDelete(before)) {
+      emitObjectEvent({
+        eventType: 'DeskDeleted',
+        category: 'user',
+        objectId: String(id || ''),
+        currentState: { title: before?.title ?? null, trashed: false },
+        changeSummary: `Permanently deleted "${before?.title ?? id}" (memory purged)`
+      })
+    }
     return result
   })
   ipcMain.handle('nodes:restore', (_e, ids: string[]) => restoreNodes(ids))
@@ -934,32 +1000,47 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:get', (_e, id: string) => getWidget(id))
   ipcMain.handle('widgets:listByTask', (_e, taskId: string) => listWidgetsByTask(taskId))
   ipcMain.handle('widgets:listByKind', (_e, kind: Widget['kind']) => listWidgetsByKind(kind))
-  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft) => {
+  ipcMain.handle('widgets:create', (_e, draft: WidgetDraft, origin?: WriteOrigin) => {
+    const preexistingWidget = draft.id ? getWidget(draft.id) : null
     const widget = createWidget(draft)
     // Widgets are first-class Context-Engine objects (PLX-APP-002): a real create
     // emits an Event on the widget's object id so its Context Health can be derived.
-    emitObjectEvent({
-      eventType: 'WidgetCreated',
-      category: 'user',
-      objectId: widget.id,
-      deskId: widget.taskId ?? null,
-      currentState: { kind: widget.kind, title: widget.title ?? null },
-      changeSummary: `Added ${widget.kind}${widget.title ? ` "${widget.title}"` : ''}`
-    })
-    // You created it, so you have seen it: baseline past the creation so a brand-new
-    // widget does not report itself as "changed since your last visit".
-    ceMarkReviewed(widget.id)
+    // DEC-059 — createWidget is idempotent by id ("so a replayed/echoed create
+    // never duplicates"); the event layer has to honour the same contract.
+    if (origin !== 'sync' && isRealCreate(preexistingWidget)) {
+      emitObjectEvent({
+        eventType: 'WidgetCreated',
+        category: 'user',
+        objectId: widget.id,
+        deskId: widget.taskId ?? null,
+        currentState: { kind: widget.kind, title: widget.title ?? null },
+        changeSummary: `Added ${widget.kind}${widget.title ? ` "${widget.title}"` : ''}`
+      })
+      // You created it, so you have seen it: baseline past the creation so a
+      // brand-new widget does not report itself as "changed since your last visit".
+      ceMarkReviewed(widget.id)
+    }
     return widget
   })
   // Tolerant variant for auto-spawned chrome (minimap): no-op if the task is gone.
   // Chrome is not user content, so it emits no Object Event.
   ipcMain.handle('widgets:createOptional', (_e, draft: WidgetDraft) => createWidgetIfTaskExists(draft))
-  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch) => {
+  ipcMain.handle('widgets:update', (_e, id: string, patch: WidgetPatch, origin?: WriteOrigin) => {
+    const beforeWidget = getWidget(id)
     const widget = updateWidget(id, patch)
     // Emit only for content-meaningful changes. Pure geometry/layout moves are not
     // "changed since your last visit" content and must never flood the log or
     // flicker a health frame on every drag.
-    if (widget && ('content' in patch || 'title' in patch)) {
+    //
+    // DEC-059 — the patch naming a field is not the same as the field changing.
+    // A replay re-sends the content it already stored, so presence alone let one
+    // sticky mint six identical Events inside 2ms. Check the outcome too.
+    if (
+      origin !== 'sync' &&
+      widget &&
+      ('content' in patch || 'title' in patch) &&
+      stateChanged(beforeWidget as never, widget as never)
+    ) {
       emitObjectEvent({
         eventType: 'WidgetUpdated',
         category: 'user',
@@ -974,7 +1055,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('widgets:delete', (_e, id: string) => {
     const before = getWidget(id)
     const removed = deleteWidget(id)
-    if (before) {
+    if (origin !== 'sync' && isRealDelete(before)) {
       emitObjectEvent({
         eventType: 'WidgetDeleted',
         category: 'user',
@@ -1667,8 +1748,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'history:record',
-    (_e, url: string, title: string, taskId: string | null) =>
-      recordVisit(url, title, taskId)
+    (_e, url: string, title: string, taskId: string | null, countsAsVisit?: boolean) =>
+      recordVisit(url, title, taskId, countsAsVisit ?? true)
   )
   ipcMain.handle('history:recent', (_e, limit: number, taskId?: string | null) =>
     getRecentHistory(limit, taskId ?? null)

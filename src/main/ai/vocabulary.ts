@@ -13,11 +13,17 @@
 // directly, and the capability gate is passed in by callers rather than read
 // here.
 
+import { INTENT_CLASSES } from '@shared/workItems'
+
 /** The reserved wire verb for creating a work_item. Defined end-to-end at S0
  *  (parsed by all five proposal parsers, listed in the creation gate, labeled,
  *  no-op'd by the executor) so nothing can ever squat on the name; it does real
  *  work only when the work-items capability is enabled (S3+). */
 export const CREATE_WORK_ITEM_KIND = 'create-work-item' as const
+
+// The intentClass union every prompt shows, derived from the one shared list
+// (taxonomy alignment) so a class can never exist in prompts but not in code.
+const INTENT_CLASS_UNION = INTENT_CLASSES.map((c) => `"${c}"`).join('|')
 
 /** Appended to the create-task catalog entries: what create-task actually makes. */
 export const CREATE_TASK_DEFINITION =
@@ -46,7 +52,7 @@ export const MINDMAP_TASK_SCOPE_NOTE =
  *  of hard rule 4’s "ALWAYS create-todo-list" so actionable to-dos route to
  *  work items the moment the tool exists, and not a turn before. */
 const WORK_ITEM_CATALOG_ENTRY =
-  '  { "kind": "create-work-item", "title": "Call Bob about the lease", "notes": "optional detail", "intentClass": "action"|"review"|"scheduling"|"fyi"|"acknowledgment"|"discussion"|"loose_thought", "reason": "..." }' +
+  `  { "kind": "create-work-item", "title": "Call Bob about the lease", "notes": "optional detail", "intentClass": ${INTENT_CLASS_UNION}, "reason": "..." }` +
   '  (creates a WORK ITEM — a single actionable to-do the user tracks in their Attention queues. ' +
   'NOT a desk and NOT a widget: use it for individual commitments, follow-ups, and action items)\n'
 
@@ -54,16 +60,22 @@ const WORK_ITEM_RULES =
   'WORK-ITEM RULES:\n' +
   '- A single actionable commitment ("call Bob", "send the invoice") is a create-work-item, ' +
   'NOT a create-task (that opens a whole desk) and NOT a create-todo-list.\n' +
-  '- Set intentClass from what the item is TRYING TO DO: a to-do = "action"; needs judgment or ' +
-  'sign-off = "review"; time/meeting related = "scheduling" (e.g. a call being arranged); worth ' +
-  'knowing = "fyi"; needs only receipt = "acknowledgment"; talk it through live = "discussion"; ' +
-  'an idle idea = "loose_thought". Context decides — an item born from a scheduling conversation ' +
-  'is "scheduling", not "action".\n' +
+  '- Set intentClass from what the item is TRYING TO DO: something to be done = "to_do"; needs ' +
+  'judgment or sign-off on an artifact = "to_review"; a choice between options = "to_decide"; ' +
+  'someone awaits words back (an answer, reply, or acknowledgment) = "to_respond"; time/meeting ' +
+  'related = "to_meet" (e.g. a call being arranged); talk it through live = "to_discuss"; an idle ' +
+  'idea worth keeping = "to_remember"; information worth keeping with nothing owed back = "to_know". ' +
+  'Context decides — an item born from a scheduling conversation is "to_meet", not "to_do".\n' +
   '- create-todo-list remains correct ONLY for a static multi-line checklist living on the ' +
   'current desk’s canvas; individual tracked to-dos are work items (this refines rule 4).\n' +
-  '- When the user mentions "@attention" (or says to put/route/add/file something to their Attention), ' +
-  'that IS the instruction: emit create-work-item for it in THIS reply, intentClass chosen from ' +
-  'context. Never answer that you cannot access Attention — the action card is the access.\n' +
+  '- "@attention" ANYWHERE in the message — start, middle, or end — is a STANDING ORDER, not a topic: ' +
+  'this reply MUST include a create-work-item action for what the user described, with intentClass ' +
+  'chosen from context. The same goes for "put/route/add/file this to my attention". It is never ' +
+  'optional and never satisfied by prose alone.\n' +
+  '- If that message ALSO asks for something buildable (a deck, a page, a document, a desk), emit ' +
+  'BOTH: the build action AND the create-work-item that tracks it. Emitting only the build action is ' +
+  'a FAILURE — the user asked for the thing and for it to be tracked. Never answer that you cannot ' +
+  'access Attention: the action card IS the access.\n' +
   '- Tracking work ABOUT a desk is a WORK ITEM, never a desk edit: "make this desk a task", ' +
   '"remind me to finish this desk", "I need to complete X desk" → create-work-item (put the desk\'s ' +
   'name in the title). update-task exists ONLY to edit the desk\'s own fields when the user asks to ' +
@@ -80,7 +92,7 @@ export function workItemCatalogAddendum(enabled: boolean): string {
  *  the capability is ON (S5): the meeting is the surface most likely to
  *  produce action items, so its routing flips the moment work items exist. */
 export const MEETING_WORK_ITEM_DELIVERABLE =
-  '  { "kind": "create-work-item", "title": "short action item", "notes": "optional detail", "intentClass": "action"|"review"|"scheduling"|"fyi"|"discussion", "reason": "what in the transcript calls for this" }\n'
+  '  { "kind": "create-work-item", "title": "short action item", "notes": "optional detail", "intentClass": "to_do"|"to_review"|"to_decide"|"to_respond"|"to_meet"|"to_discuss"|"to_know", "reason": "what in the transcript calls for this" }\n'
 
 /** The capture-routing rule for meeting wrapups. OFF: the S0 legacy phrasing
  *  (create-task still carries action items, correctly defined as desk-
@@ -103,5 +115,5 @@ export function meetingCaptureRule(enabled: boolean): string {
 /** Voice-note action shape for create-work-item, injected while ON (Δ13):
  *  "remind me to call Bob" is the canonical work-item utterance. */
 export const VOICE_WORK_ITEM_SHAPE =
-  '{"kind":"create-work-item","title":"…","notes":"…","intentClass":"action"|"review"|"scheduling"|"fyi"|"discussion"|"loose_thought","reason":"…"}  (a single tracked to-do — ' +
+  `{"kind":"create-work-item","title":"…","notes":"…","intentClass":${INTENT_CLASS_UNION},"reason":"…"}  (a single tracked to-do — ` +
   'use this for reminders and action items; pick intentClass from what it is trying to do; create-task creates a whole DESK)\n'

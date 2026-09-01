@@ -22,6 +22,7 @@ export default function WrapupOverlay(): JSX.Element | null {
   const needsApiKey = useWrapupStore((s) => s.needsApiKey)
   const folderId = useWrapupStore((s) => s.folderId)
   const folderName = useWrapupStore((s) => s.folderName)
+  const meetingId = useWrapupStore((s) => s.meetingId)
   const dismiss = useWrapupStore((s) => s.dismiss)
 
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
@@ -139,6 +140,10 @@ export default function WrapupOverlay(): JSX.Element | null {
                     proposals={proposals.filter((p) => !consumed.has(p.id))}
                     activeTaskId={activeTaskId}
                     destinationFolderId={dest}
+                    workItemSource={
+                      // DEC-079 — approved action items POINT at this meeting.
+                      meetingId ? { sourceType: 'meeting', sourceRef: meetingId } : undefined
+                    }
                     appliedProposals={applied}
                     onApplied={(id, a) => setApplied((prev) => ({ ...prev, [id]: a }))}
                     onConsume={(id) => setConsumed((prev) => new Set(prev).add(id))}

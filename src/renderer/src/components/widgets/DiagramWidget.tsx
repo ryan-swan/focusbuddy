@@ -349,7 +349,7 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
 
   if (inline) return body
   return (
-    <WidgetFrame widget={widget} headerLabel="Diagram" headerAccent="bg-sky-300/50">
+    <WidgetFrame widget={widget} headerLabel="Diagram" headerAccent="bg-sky-300/50 dark:bg-sky-400/20">
       {body}
     </WidgetFrame>
   )

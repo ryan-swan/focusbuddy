@@ -8,8 +8,11 @@ import {
   archivedItems,
   detachedItems,
   itemReason,
+  itemFullText,
   isTerminalState,
   rankScore,
+  scopeItemsForDesk,
+  clusterByDesk,
   PRIMARY_ACTION,
   QUEUE_ORDER
 } from '../../src/renderer/src/lib/attentionQueues'
@@ -47,7 +50,7 @@ function wi(over: Partial<FbNode>): FbNode {
     sharedFromHandle: null,
     sharedRootId: null,
     workItemState: 'open',
-    intentClass: 'action',
+    intentClass: 'to_do',
     ...over
   } as FbNode
 }
@@ -55,22 +58,36 @@ function wi(over: Partial<FbNode>): FbNode {
 describe('groupIntoQueues', () => {
   it('groups by intent class in the fixed order, hides terminal/snoozed/detached', () => {
     const items = [
-      wi({ id: 'a', intentClass: 'action' }),
-      wi({ id: 'r', intentClass: 'review' }),
-      wi({ id: 'done', intentClass: 'action', workItemState: 'completed' }),
+      wi({ id: 'a', intentClass: 'to_do' }),
+      wi({ id: 'r', intentClass: 'to_review' }),
+      wi({ id: 'done', intentClass: 'to_do', workItemState: 'completed' }),
       // F013: a hostile status can NEVER surface a terminal item.
-      wi({ id: 'hostile', intentClass: 'action', workItemState: 'dismissed', status: 'open' }),
-      wi({ id: 'snoozed', intentClass: 'action', snoozeUntil: NOW + DAY }),
-      wi({ id: 'wake', intentClass: 'action', snoozeUntil: NOW - 1000 }), // passed → visible
-      wi({ id: 'det', intentClass: 'action', detachedFromId: 'gone-desk' })
+      wi({ id: 'hostile', intentClass: 'to_do', workItemState: 'dismissed', status: 'open' }),
+      wi({ id: 'snoozed', intentClass: 'to_do', snoozeUntil: NOW + DAY }),
+      wi({ id: 'wake', intentClass: 'to_do', snoozeUntil: NOW - 1000 }), // passed → visible
+      wi({ id: 'det', intentClass: 'to_do', detachedFromId: 'gone-desk' })
     ]
     const qs = groupIntoQueues(items, NOW)
-    const action = qs.find((q) => q.queue === 'action')!
-    expect(action.items.map((i) => i.id).sort()).toEqual(['a', 'wake'])
-    expect(qs.find((q) => q.queue === 'review')!.items).toHaveLength(1)
+    const todo = qs.find((q) => q.queue === 'to_do')!
+    expect(todo.items.map((i) => i.id).sort()).toEqual(['a', 'wake'])
+    expect(qs.find((q) => q.queue === 'to_review')!.items).toHaveLength(1)
     expect(qs.map((q) => q.queue)).toEqual(
-      QUEUE_ORDER.filter((q) => ['action', 'review'].includes(q))
+      QUEUE_ORDER.filter((q) => ['to_do', 'to_review'].includes(q))
     )
+  })
+
+  it('legacy classes canonicalize at the grouping boundary (alignment)', () => {
+    // A straggler row an un-updated peer pushed between migrations still
+    // lands in the right queue — never a raw legacy bucket.
+    const items = [
+      wi({ id: 'l1', intentClass: 'action' }),
+      wi({ id: 'l2', intentClass: 'acknowledgment' }),
+      wi({ id: 'l3', intentClass: 'direct' }),
+      wi({ id: 'l4', intentClass: 'loose_thought' })
+    ]
+    const qs = groupIntoQueues(items, NOW)
+    expect(qs.map((q) => q.queue)).toEqual(['to_do', 'to_respond', 'to_remember'])
+    expect(qs.find((q) => q.queue === 'to_respond')!.items.map((i) => i.id).sort()).toEqual(['l2', 'l3'])
   })
 
   it('orders within a queue by rank: due proximity dominates, then staleness', () => {
@@ -80,10 +97,10 @@ describe('groupIntoQueues', () => {
       wi({ id: 'soon', dueAt: new Date(NOW + DAY).toISOString(), updatedAt: NOW }),
       wi({ id: 'fresh-undated', updatedAt: NOW })
     ]
-    const action = groupIntoQueues(items, NOW).find((q) => q.queue === 'action')!
+    const todo = groupIntoQueues(items, NOW).find((q) => q.queue === 'to_do')!
     // Ranker v1 (SPEC-019): due-soon beats due-later; among undated, the item
     // that has waited longest for the eye ranks HIGHER (staleness signal).
-    expect(action.items.map((i) => i.id)).toEqual(['soon', 'later', 'stale-undated', 'fresh-undated'])
+    expect(todo.items.map((i) => i.id)).toEqual(['soon', 'later', 'stale-undated', 'fresh-undated'])
   })
 
   it('rankScore: past due dominates; explicit human actionable gets the light thumb', () => {
@@ -161,8 +178,9 @@ describe('closing verbs + reasons', () => {
       expect(PRIMARY_ACTION[q], q).toBeTruthy()
       expect(isTerminalState(PRIMARY_ACTION[q].state), q).toBe(true)
     }
-    expect(PRIMARY_ACTION.action.label).toBe('Done')
-    expect(PRIMARY_ACTION.acknowledgment.label).toBe('Acknowledge')
+    expect(PRIMARY_ACTION.to_do.label).toBe('Done')
+    expect(PRIMARY_ACTION.to_respond.label).toBe('Responded')
+    expect(PRIMARY_ACTION.to_decide).toEqual({ state: 'decided', label: 'Decided' })
   })
 
   it('one reason per item: due proximity beats origin; decay is named', () => {
@@ -176,5 +194,77 @@ describe('closing verbs + reasons', () => {
     ).toContain('Due')
     expect(itemReason(wi({ reasonCode: 'decayed' }), NOW)).toBe('Faded out quietly')
     expect(itemReason(wi({}), NOW)).toBeNull()
+  })
+})
+
+describe('itemFullText — the whole capture, for reading and copying', () => {
+  it('joins title and notes verbatim, with a blank line between', () => {
+    expect(itemFullText({ title: 'Short title', description: 'The long note.' })).toBe(
+      'Short title\n\nThe long note.'
+    )
+  })
+
+  it('omits an empty half rather than leaving stray blank lines', () => {
+    expect(itemFullText({ title: 'Only a title', description: '' })).toBe('Only a title')
+    expect(itemFullText({ title: 'Only a title', description: '   ' })).toBe('Only a title')
+    expect(itemFullText({ title: '', description: 'Only notes' })).toBe('Only notes')
+  })
+
+  it('does NOT truncate — the point is the unedited text', () => {
+    const long = 'x'.repeat(500)
+    expect(itemFullText({ title: long, description: long })).toHaveLength(1002)
+  })
+})
+
+describe('DEC-045 — the desk-widget scope', () => {
+  const deskItem = (id: string, parentId: string | null, state = 'open'): FbNode =>
+    wi({ id, parentId, workItemState: state })
+
+  it('scopes to the desk when it holds active items', () => {
+    const items = [deskItem('a', 'd1'), deskItem('b', 'd2'), deskItem('c', null)]
+    const r = scopeItemsForDesk(items, 'd1')
+    expect(r.fellBack).toBe(false)
+    expect(r.scoped.map((i) => i.id)).toEqual(['a'])
+  })
+
+  it('falls back to ALL when the desk holds nothing active — and says so', () => {
+    const items = [deskItem('done', 'd1', 'completed'), deskItem('b', 'd2')]
+    const r = scopeItemsForDesk(items, 'd1')
+    expect(r.fellBack).toBe(true)
+    expect(r.scoped).toHaveLength(2) // everything, terminal rows included for the shelves
+  })
+
+  it('a detached item does not keep an empty desk from falling back', () => {
+    const items = [wi({ id: 'det', parentId: 'd1', detachedFromId: 'gone' }), deskItem('b', 'd2')]
+    expect(scopeItemsForDesk(items, 'd1').fellBack).toBe(true)
+  })
+})
+
+describe('DEC-047 (D-1) — desk clusters, derived from parentId', () => {
+  const row = (id: string, parentId: string | null) => ({ item: wi({ id, parentId }) })
+
+  it('a desk with 2+ rows in the section clusters; order of appearance holds', () => {
+    const rows = [row('a', 'd1'), row('b', 'd2'), row('c', 'd1'), row('d', null)]
+    const cs = clusterByDesk(rows)
+    expect(cs.map((c) => c.deskId)).toEqual(['d1', null])
+    expect(cs[0].rows.map((r) => r.item.id)).toEqual(['a', 'c'])
+    // d2 (single) and the standalone flow together, flat, in order.
+    expect(cs[1].rows.map((r) => r.item.id)).toEqual(['b', 'd'])
+  })
+
+  it('a single-item desk renders FLAT — its chips already name the desk', () => {
+    const cs = clusterByDesk([row('a', 'd1'), row('b', null)])
+    expect(cs).toHaveLength(1)
+    expect(cs[0].deskId).toBeNull()
+    expect(cs[0].rows.map((r) => r.item.id)).toEqual(['a', 'b'])
+  })
+
+  it('the ranker still leads: the first-ranked row decides cluster position', () => {
+    const cs = clusterByDesk([row('top', null), row('a', 'd1'), row('b', 'd1')])
+    expect(cs.map((c) => c.deskId)).toEqual([null, 'd1'])
+  })
+
+  it('empty in, empty out', () => {
+    expect(clusterByDesk([])).toEqual([])
   })
 })

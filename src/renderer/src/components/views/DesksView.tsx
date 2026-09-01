@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
+import { useWorkItemStore } from '../../stores/workItems'
+import { isTerminalState } from '../../lib/attentionQueues'
 import { useOrgStore, PERSONAL_ORG_ID } from '../../stores/org'
 import { useViewStore } from '../../stores/view'
 import { useDeskWidgets, realWidgetCount } from '../../lib/useDeskWidgets'
@@ -69,6 +71,23 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
   // Public share-link target (a desk shared as a 'task' snapshot). Opens the
   // universal ShareDialog; null when closed.
   const [linkTarget, setLinkTarget] = useState<{ id: string; title: string } | null>(null)
+
+  // DEC-047 D-4 — each desk's attention signal, derived with the queues' own
+  // active-set rules (non-terminal, not detached) + a due count.
+  const workItems = useWorkItemStore((st) => st.items)
+  const attentionByDesk = useMemo(() => {
+    const m = new Map<string, { open: number; due: number }>()
+    const now = Date.now()
+    for (const i of workItems) {
+      if (!i.parentId) continue
+      if (isTerminalState(i.workItemState) || i.detachedFromId != null) continue
+      const e = m.get(i.parentId) ?? { open: 0, due: 0 }
+      e.open++
+      if (i.dueAt && Date.parse(i.dueAt) < now + 48 * 60 * 60 * 1000) e.due++
+      m.set(i.parentId, e)
+    }
+    return m
+  }, [workItems])
 
   const roomTitleById = useMemo(() => {
     const m = new Map<string, string>()
@@ -163,7 +182,14 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
     metaLine: (d) => {
       const room = d.parentId ? roomTitleById.get(d.parentId) : null
       const count = widgetsByDesk[d.id] ? realWidgetCount(widgetsByDesk[d.id]) : null
-      return [room, STATUS_LABEL[d.status], count == null ? null : count === 0 ? 'empty' : `${count} items`]
+      // DEC-047 D-4: the desk card carries its attention signal — derived
+      // from the same active-set rules the queues use. Status groups stay
+      // exactly as they were.
+      const attn = attentionByDesk.get(d.id)
+      const attnLine = attn
+        ? `${attn.open} open${attn.due ? ` · ${attn.due} due` : ''}`
+        : null
+      return [room, STATUS_LABEL[d.status], count == null ? null : count === 0 ? 'empty' : `${count} items`, attnLine]
         .filter(Boolean)
         .join(' · ')
     },

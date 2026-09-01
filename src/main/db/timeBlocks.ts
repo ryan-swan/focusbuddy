@@ -14,6 +14,9 @@ interface TimeBlockRow {
   meeting_json: string | null
   recurrence: TimeBlockRecurrence | null
   series_id: string | null
+  origin: 'manual' | 'auto'
+  locked: number
+  push_policy: 'local' | 'push'
   created_at: number
   updated_at: number
 }
@@ -43,6 +46,9 @@ function rowToBlock(row: TimeBlockRow): TimeBlock {
     meeting: parseMeeting(row.meeting_json),
     recurrence: row.recurrence ?? null,
     seriesId: row.series_id ?? null,
+    origin: row.origin === 'auto' ? 'auto' : 'manual',
+    locked: !!row.locked,
+    pushPolicy: row.push_policy === 'push' ? 'push' : 'local',
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
@@ -74,10 +80,11 @@ export function createTimeBlock(draft: TimeBlockDraft): TimeBlock {
   const now = Date.now()
   const duration = Math.max(5, Math.round(draft.durationMin))
   db.prepare(
-    `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, meeting_json, recurrence, series_id, created_at, updated_at, org_id)
-     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', @meetingJson, @recurrence, @seriesId, @now, @now, @orgId)`
+    `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, meeting_json, recurrence, series_id, origin, created_at, updated_at, org_id)
+     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', @meetingJson, @recurrence, @seriesId, @origin, @now, @now, @orgId)`
   ).run({
     id,
+    origin: draft.origin === 'auto' ? 'auto' : 'manual',
     taskId: draft.taskId ?? null,
     title: draft.title ?? '',
     startMs: Math.round(draft.startMs),
@@ -127,8 +134,8 @@ export function materializeRecurringBlocks(): void {
   // (deleted) occurrence blocks its own regeneration because the row id
   // already exists. ON CONFLICT DO NOTHING makes the whole pass idempotent.
   const insert = db.prepare(
-    `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, meeting_json, recurrence, series_id, created_at, updated_at, org_id)
-     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', NULL, @recurrence, @seriesId, @now, @now, @orgId)
+    `INSERT INTO time_blocks (id, task_id, title, start_ms, duration_min, status, meeting_json, recurrence, series_id, origin, created_at, updated_at, org_id)
+     VALUES (@id, @taskId, @title, @startMs, @durationMin, 'planned', NULL, @recurrence, @seriesId, @origin, @now, @now, @orgId)
      ON CONFLICT(id) DO NOTHING`
   )
   for (const head of heads) {
@@ -139,6 +146,7 @@ export function materializeRecurringBlocks(): void {
       const now = Date.now()
       insert.run({
         id: `${head.series_id}@${cursor}`,
+        origin: head.origin === 'auto' ? 'auto' : 'manual',
         taskId: head.task_id,
         title: head.title,
         startMs: cursor,
@@ -163,7 +171,11 @@ export function updateTimeBlock(id: string, patch: TimeBlockPatch): TimeBlock | 
     ['startMs', 'start_ms', (v) => Math.round(v as number)],
     ['durationMin', 'duration_min', (v) => Math.max(5, Math.round(v as number))],
     ['status', 'status', (v) => v],
-    ['meeting', 'meeting_json', (v) => (v ? JSON.stringify(v) : null)]
+    ['meeting', 'meeting_json', (v) => (v ? JSON.stringify(v) : null)],
+    // DEC-052: the pin and the per-block push choice are patchable; origin is
+    // a birth fact and is not.
+    ['locked', 'locked', (v) => (v ? 1 : 0)],
+    ['pushPolicy', 'push_policy', (v) => (v === 'push' ? 'push' : 'local')]
   ]
   for (const [key, col, coerce] of cols) {
     if (patch[key] !== undefined) {

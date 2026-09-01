@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
-// Shared form primitives for the Plexi suite. Every input, textarea and select
-// on a Plexi surface composes fieldInputClass() instead of hand-rolling
+// Shared form primitives for the Plexii suite. Every input, textarea and select
+// on a Plexii surface composes fieldInputClass() instead of hand-rolling
 // hardcoded grey utility classes, so fields repaint correctly across light,
 // dark, futuristic and atelier via the token ramps in tokens.css.
 

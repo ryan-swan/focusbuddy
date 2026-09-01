@@ -53,7 +53,13 @@ import { normalizeMapBody, autoLayout } from '@shared/mapGraph'
 import type { MapShape } from '@shared/types'
 import type { SlidesBody } from '@shared/types'
 import { resolveAnthropicKey } from '../settingsStore'
-import { shouldUseCredits, getCreditClient, invalidateCreditClient } from './creditMode'
+import {
+  shouldUseCredits,
+  getCreditClient,
+  invalidateCreditClient,
+  isCreditClient,
+  isStreamingUnsupported
+} from './creditMode'
 import { groundingBlock, retrievalSourceLine, type GroundingSource } from './grounding'
 import { cachedSystem, cachedUserContent, cacheTokens, type CacheTextBlock } from './cacheControl'
 import { coerceAgentStatus, normalizeBlocker, enforceAgentStatus, parseVerifyResult, type VerifyVerdict } from './agentEnvelope'
@@ -338,6 +344,14 @@ function summarizeLinks(taskId: string, widgets: Widget[]): string {
   return 'Live wires between widgets (typed relationships):\n' + lines.join('\n')
 }
 
+// DEC-032: a model-supplied desk target, taken only when it is a non-empty
+// string. Validity (does this id exist? does a title match?) is settled at the
+// card, against the live node store — this layer just carries it honestly.
+function deskIdOf(action: Record<string, unknown>): string | undefined {
+  const v = action.deskId
+  return typeof v === 'string' && v.trim() ? v.trim() : undefined
+}
+
 function taskBlock(taskId: string): string {
   const node = getNode(taskId)
   if (!node || node.kind !== 'task') return ''
@@ -371,7 +385,11 @@ const ACTION_KINDS_CATALOG =
   '  { "kind": "open-url", "url": "https://docs.google.com/...", "title": "Brief draft", "reason": "..." }\n' +
   '  { "kind": "agent-browse", "task": "Search this site for a 2-bedroom under $2400 and open the best listing", "url": "https://...", "reason": "..." }  (Plexii drives the in-app browser step by step — visible, stoppable, consent-gated. Use when the user asks you to DO something on a website: search within it, fill a form, walk a flow. For simply showing a page, use open-url. It never signs in, pays, solves CAPTCHAs, or moves files — if the task needs that, say that part is theirs. "url" is where to start; omit it to act on the page already open.)\n' +
   '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
-  '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "reason": "..." }\n' +
+  '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "deskId": "optional — the desk id this belongs on", "reason": "..." }\n' +
+  '  (DESK PLACEMENT: create-page, create-widget, create-todo-list and create-table all accept an optional "deskId". ' +
+  'When the user names a desk, or the request plainly belongs to one in the roster above, SET IT to that exact id — ' +
+  'the action then applies straight to that desk instead of stopping to ask the user where it goes. ' +
+  'Omit it when the user means the desk they are already on, and never guess an id that is not in the roster.)\n' +
   '  { "kind": "create-task", "title": "Q1 rebrand", "notes": "scope notes", "reason": "..." }  (' +
   CREATE_TASK_DEFINITION +
   ')\n' +
@@ -474,7 +492,8 @@ function buildSystemPrompt(
     includeMemory ? memoryBlock() : '',
     includeMemory ? calendarBlock() : '',
     documentsBlock(),
-    conversationsBlock()
+    conversationsBlock(),
+    deskRosterBlock()
   ]
     .filter(Boolean)
     .join('\n')
@@ -491,6 +510,27 @@ function buildSystemPrompt(
 // prefix byte-change on every single turn, so prompt caching never hit. Minute
 // precision keeps it stable turn-to-turn (well within the 5-min TTL) while still
 // being exact enough for relative-date resolution.
+// DEC-032 — the desk roster. Desk-placed actions (create-page, create-widget,
+// create-todo-list, create-table) may name the desk they belong on, but only if
+// the model has seen real ids: taskBlock() shows the CURRENT desk alone, so off
+// a desk the model had nothing to point at and every card fell back to asking
+// the user to pick (operator live QA). Titles + ids only, capped, newest first;
+// it rides the cached prefix, and desks change rarely enough for that to hold.
+function deskRosterBlock(): string {
+  const desks = listNodes()
+    // listNodes() already excludes trashed rows (and work_items) in SQL.
+    .filter((n) => n.kind === 'task' && !n.archived)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 25)
+  if (desks.length === 0) return ''
+  const lines = desks.map((d) => `  ${d.id}  ${d.title || 'Untitled desk'}`)
+  return (
+    'The user\u2019s desks (id then title) — use one of these ids as "deskId" on a\n' +
+    'desk-placed action when the user names or clearly means that desk. Never\n' +
+    'invent an id; omit deskId when no desk is meant.\n' + lines.join('\n')
+  )
+}
+
 function clockBlock(): string {
   const now = new Date()
   const isoMinute = now.toISOString().slice(0, 16) + 'Z' // YYYY-MM-DDTHH:mmZ
@@ -662,6 +702,7 @@ export function parseChatJson(raw: string): {
           title: typeof action.title === 'string' ? (action.title as string) : undefined,
           content:
             typeof action.content === 'string' ? (action.content as string) : undefined,
+          deskId: deskIdOf(action),
           reason
         })
         break
@@ -741,6 +782,7 @@ export function parseChatJson(raw: string): {
           kind: 'create-todo-list',
           title,
           items,
+          deskId: deskIdOf(action),
           reason
         })
         break
@@ -756,6 +798,7 @@ export function parseChatJson(raw: string): {
           kind: 'create-page',
           title,
           content: JSON.stringify(sectionsToTiptap(sections)),
+          deskId: deskIdOf(action),
           reason
         })
         break
@@ -852,6 +895,7 @@ export function parseChatJson(raw: string): {
             ActionProposal,
             { kind: 'create-table' }
           >['columns'],
+          deskId: deskIdOf(action),
           reason
         })
         break
@@ -1534,6 +1578,15 @@ export async function sendChatStream(
     return
   }
 
+  // DEC-033 — the ask-latency trail. A ⌘K ask that took ~30s with no visible
+  // progress had no way to say WHERE the time went (operator live QA). These
+  // three marks separate retrieval, time-to-first-token, and total, and record
+  // whether the turn actually streamed — on PlexiDesk credits it cannot (the
+  // proxy 400s on streaming), so the whole answer lands at once and the wait
+  // is silent by construction. Greppable: "[ask-latency]".
+  const t0 = Date.now()
+  let tFirstToken = 0
+
   let prepared: PreparedChatCall
   try {
     prepared = await prepareChatCall(req)
@@ -1541,6 +1594,7 @@ export async function sendChatStream(
     cb.onError({ ok: false, error: (e as Error).message })
     return
   }
+  const tPrepared = Date.now()
   // Retrieval is done — report it before a single token of the answer exists.
   if (prepared.mentions.length > 0) cb.onMentions(prepared.mentions)
   cb.onSources({
@@ -1567,34 +1621,62 @@ export async function sendChatStream(
     // the SAME request runs non-streamed and the full text lands in the
     // consumer as one delta — everything downstream reads only the
     // accumulated text, so the two shapes converge by construction.
-    const onCredits = shouldUseCredits() && getCreditClient() === c
-    let finalMsg: Awaited<ReturnType<typeof c.messages.create>>
-    if (onCredits) {
-      finalMsg = await c.messages.create({
-        model: resolveModel('chat'),
-        max_tokens: 16384,
-        system: prepared.system,
-        messages: prepared.msgs
-      })
-      for (const b of finalMsg.content) {
+    // DEC-051 — ask the CLIENT, not policy. `shouldUseCredits()` is re-derived
+    // here from global state that retrieval may have moved during this very
+    // turn (a balance update, a settings change invalidating the cached
+    // instance): policy would say "not credits" while `c` still IS the proxy,
+    // and the stream 400s in the user's face. The baseURL cannot drift.
+    const onCredits = isCreditClient(c)
+    const body: Anthropic.MessageCreateParamsNonStreaming = {
+      model: resolveModel('chat'),
+      max_tokens: 16384,
+      system: prepared.system,
+      messages: prepared.msgs
+    }
+    const nonStreamed = async (): Promise<Anthropic.Message> => {
+      const msg = (await c.messages.create(body)) as Anthropic.Message
+      if (!tFirstToken) tFirstToken = Date.now()
+      for (const b of msg.content) {
         if (b.type === 'text') consumer.push(b.text)
       }
+      return msg
+    }
+    let streamed = !onCredits
+    let finalMsg: Anthropic.Message
+    if (onCredits) {
+      finalMsg = await nonStreamed()
     } else {
-      const stream = c.messages.stream({
-        model: resolveModel('chat'),
-        max_tokens: 16384,
-        system: prepared.system,
-        messages: prepared.msgs
-      })
-      opts?.onAbortReady?.(() => stream.abort())
+      try {
+        const stream = c.messages.stream(body)
+        opts?.onAbortReady?.(() => stream.abort())
 
-      stream.on('text', (delta: string) => consumer.push(delta))
+        stream.on('text', (delta: string) => {
+          if (!tFirstToken) tFirstToken = Date.now()
+          consumer.push(delta)
+        })
 
-      finalMsg = await stream.finalMessage()
+        finalMsg = await stream.finalMessage()
+      } catch (e) {
+        // Belt and braces: any route that still reaches a streaming-refusing
+        // endpoint answers non-streamed instead of showing a raw 400.
+        if (!isStreamingUnsupported(e)) throw e
+        streamed = false
+        finalMsg = await nonStreamed()
+      }
     }
     {
       const ct = cacheTokens(finalMsg.usage)
       recordAiUsage(resolveModel('chat'), finalMsg.usage?.input_tokens ?? 0, finalMsg.usage?.output_tokens ?? 0, ct.read, ct.write)
+      const done = Date.now()
+      // eslint-disable-next-line no-console
+      console.info(
+        `[ask-latency] total=${done - t0}ms retrieval=${tPrepared - t0}ms ` +
+          `ttft=${tFirstToken ? tFirstToken - tPrepared : -1}ms ` +
+          `generate=${tFirstToken ? done - tFirstToken : -1}ms ` +
+          `streamed=${streamed} systemChars=${prepared.system.reduce((n, b) => n + (b.text?.length ?? 0), 0)} ` +
+          `in=${finalMsg.usage?.input_tokens ?? 0} out=${finalMsg.usage?.output_tokens ?? 0} ` +
+          `cacheRead=${ct.read} model=${resolveModel('chat')}`
+      )
     }
     stopReason = (finalMsg.stop_reason as string) ?? ''
     if (stopReason === 'refusal') {
@@ -1829,7 +1911,7 @@ function buildAgentSystemPrompt(taskId: string | null): string {
     '- NEVER set status "done" if a prior OBSERVATION shows [FAILED] for something you did not either retry this round or explain in "narration". Never claim an action happened; only the OBSERVATIONS say what actually happened (no-fakery).\n' +
     '- Keep each round small and focused; do not re-propose actions already [applied]. Prefer the single most useful next step.\n' +
     '- compose-mail and post-chat are DRAFTS the user sends themselves; never imply they were sent. Never invent ids, columns, facts, names or dates — leave out anything the context does not support.\n'
-  const extras = [clockBlock(), memoryBlock(), calendarBlock(), documentsBlock(), conversationsBlock()]
+  const extras = [clockBlock(), memoryBlock(), calendarBlock(), documentsBlock(), conversationsBlock(), deskRosterBlock()]
     .filter(Boolean)
     .join('\n')
   let out = `${base}\n\n${extras}`
@@ -2144,32 +2226,39 @@ export async function askWorkspaceStream(
     // Credits proxy: no streaming (see sendChat) — same request non-streamed,
     // delivered to the caller as one delta.
     let full = ''
-    let final: Awaited<ReturnType<typeof c.messages.create>>
-    if (shouldUseCredits() && getCreditClient() === c) {
-      final = await c.messages.create({
-        model: resolveModel('chat'),
-        max_tokens: 1500,
-        system,
-        messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
-      })
-      for (const b of final.content) {
+    const body: Anthropic.MessageCreateParamsNonStreaming = {
+      model: resolveModel('chat'),
+      max_tokens: 1500,
+      system,
+      messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
+    }
+    const nonStreamed = async (): Promise<Anthropic.Message> => {
+      const msg = (await c.messages.create(body)) as Anthropic.Message
+      for (const b of msg.content) {
         if (b.type === 'text') {
           full += b.text
           onDelta(b.text)
         }
       }
+      return msg
+    }
+    let final: Anthropic.Message
+    // DEC-051 — the client decides (see sendChat), with the same fallback.
+    if (isCreditClient(c)) {
+      final = await nonStreamed()
     } else {
-      const stream = c.messages.stream({
-        model: resolveModel('chat'),
-        max_tokens: 1500,
-        system,
-        messages: [{ role: 'user', content: cachedUserContent(docsContext, tail) as never }]
-      })
-      stream.on('text', (delta: string) => {
-        full += delta
-        onDelta(delta)
-      })
-      final = await stream.finalMessage()
+      try {
+        const stream = c.messages.stream(body)
+        stream.on('text', (delta: string) => {
+          full += delta
+          onDelta(delta)
+        })
+        final = await stream.finalMessage()
+      } catch (e) {
+        if (!isStreamingUnsupported(e)) throw e
+        full = ''
+        final = await nonStreamed()
+      }
     }
     {
       const ct = cacheTokens(final.usage)

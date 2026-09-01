@@ -232,7 +232,7 @@ export default function TimerWidget({ widget, inline = false }: Props): JSX.Elem
   if (inline) return body
 
   return (
-    <WidgetFrame widget={widget} headerLabel="timer" headerAccent="bg-stone-200/70">
+    <WidgetFrame widget={widget} headerLabel="timer" headerAccent="bg-stone-200/70 dark:bg-white/[0.07]">
       {body}
     </WidgetFrame>
   )

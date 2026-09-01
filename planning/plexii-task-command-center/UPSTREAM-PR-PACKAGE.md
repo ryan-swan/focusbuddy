@@ -1,16 +1,11 @@
 # Upstream Landing Package — The Attention Layer
 
-**Prepared 2026-08-25 · NOT YET LANDED** — the operator ruled
-wait-until-finished: the branch stays on the fork until the GA smokes pass,
-then the landing is one operator-run command
-(`git push origin ryan-command-center:main` as `ryanswan313`, whose
-collaborator write access is confirmed; the earlier fork-only workflow was an
-artifact of the CLI being on the `ryan-swan` account). Repo is co-owned
-(Ryan/Michael/Caleb). **~75 commits · 160+ files · +15k / −0.4k · 2,763 tests
-green · typecheck clean · DEC-001…DEC-028 recorded.** The PR-body text below
-is the landing's record — read it as "what arrives on main." F-7's broken
-mail-OAuth wiring was independently fixed upstream (`7be3be4c`); the merge
-adopts main's mail block byte-for-byte.
+**LANDED 2026-08-26 — PR #4 merged, main @ `c0e32a0c`** (operator declared
+ready; landed via the PR route so this package's body is the permanent
+record). Final shape: **91 commits · 172 files · +16,998/−429 · 2,763 tests
+green · typecheck clean · DEC-001…DEC-029 recorded.** The groundwork fixes
+(F-8/F-9 + CI Node 22) landed separately first as PRs #2/#3. `workItems.enabled`
+ships OFF — Michael + Caleb opt in via Settings → AI → Attention layer.
 
 ---
 

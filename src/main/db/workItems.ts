@@ -29,12 +29,24 @@ import {
   WORK_ITEM_COLUMNS,
   WORK_ITEM_SCHEMA_EPOCH,
   WORK_ITEM_STATES,
+  ACTIVE_WORK_ITEM_STATES,
+  TERMINAL_WORK_ITEM_STATES,
+  DEFAULT_INTENT_CLASS,
+  MAX_GROUP_DEPTH,
+  canonicalIntentClass,
+  initialWorkItemState,
   statusForWorkItemState,
   type WorkItemState
 } from '@shared/workItems'
 
 export { WORK_ITEM_COLUMNS, WORK_ITEM_SCHEMA_EPOCH, WORK_ITEM_STATES, statusForWorkItemState }
 export type { WorkItemState }
+
+// SQL IN-list built from the one shared state source, so adding a state can
+// never miss a predicate (the pre-alignment inline lists drifted per-query).
+const sqlIn = (xs: readonly string[]): string => xs.map((s) => `'${s}'`).join(',')
+const ACTIVE_IN = sqlIn(ACTIVE_WORK_ITEM_STATES)
+const TERMINAL_IN = sqlIn(TERMINAL_WORK_ITEM_STATES)
 
 // ── Schema (columns + satellites §2.4) ──────────────────────────────────────
 
@@ -107,7 +119,13 @@ export interface WorkItemDraft {
   intentClass?: string
   dueAt?: string | null
   wiUrgency?: string | null
+  /** DEC-047 D-5: an ACTIVE birth state (open/in_progress/waiting/blocked);
+   *  anything else falls to 'open'. Terminal states stay setState-only. */
+  state?: string
+  tags?: string | null
+  mentions?: string | null
   sourceRef?: string | null
+  sourceUrl?: string | null
   sourceType?: string | null
   confidence?: number | null
   approvalState?: string
@@ -175,16 +193,16 @@ export function createWorkItemCore(
       throw new WorkItemWriteRefusedError('WORK_ITEM_PARENT_REFUSED', 'Nothing nests under a work item.')
   }
   const id = draft.id ?? randomUUID()
-  const state: WorkItemState = draft.approvalState === 'suggested' ? 'suggested' : 'open'
+  const state: WorkItemState = initialWorkItemState(draft.approvalState, draft.state)
   const now = Date.now()
   d.prepare(
     `INSERT INTO nodes (
        id, parent_id, kind, title, description, status,
        priority, interest, importance, sort_order, created_at, updated_at,
        org_id, work_item_state, intent_class, originator_id, recipient_id,
-       due_at, wi_urgency, source_ref, source_type, confidence, approval_state,
-       reason_code, wi_origin, schema_epoch
-     ) VALUES (?, ?, 'work_item', ?, ?, ?, 3, 3, 3, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       due_at, wi_urgency, tags, mentions, source_ref, source_url, source_type, confidence,
+       approval_state, reason_code, wi_origin, schema_epoch
+     ) VALUES (?, ?, 'work_item', ?, ?, ?, 3, 3, 3, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     draft.parentId ?? null,
@@ -195,12 +213,15 @@ export function createWorkItemCore(
     now,
     orgId,
     state,
-    draft.intentClass ?? 'action',
+    canonicalIntentClass(draft.intentClass) ?? DEFAULT_INTENT_CLASS,
     draft.originatorId ?? null,
     draft.recipientId ?? draft.originatorId ?? null,
     draft.dueAt ?? null,
     draft.wiUrgency ?? null,
+    draft.tags ?? null,
+    draft.mentions ?? null,
     draft.sourceRef ?? null,
+    draft.sourceUrl ?? null,
     draft.sourceType ?? null,
     draft.confidence ?? null,
     draft.approvalState ?? 'auto',
@@ -246,9 +267,15 @@ export type RemoteWorkItemVerdict = 'applied' | 'parked-epoch' | 'not-work-item'
  */
 export function normalizeAppliedWorkItem(d: LifecycleDb, id: string): RemoteWorkItemVerdict {
   const row = d
-    .prepare('SELECT kind, parent_id, work_item_state, schema_epoch FROM nodes WHERE id = ?')
+    .prepare('SELECT kind, parent_id, work_item_state, intent_class, schema_epoch FROM nodes WHERE id = ?')
     .get(id) as
-    | { kind: string; parent_id: string | null; work_item_state: string | null; schema_epoch: number | null }
+    | {
+        kind: string
+        parent_id: string | null
+        work_item_state: string | null
+        intent_class: string | null
+        schema_epoch: number | null
+      }
     | undefined
   if (row?.kind !== 'work_item') return 'not-work-item'
   if ((row.schema_epoch ?? 0) > WORK_ITEM_SCHEMA_EPOCH) {
@@ -262,6 +289,20 @@ export function normalizeAppliedWorkItem(d: LifecycleDb, id: string): RemoteWork
     id,
     statusForWorkItemState(state)
   )
+  // Taxonomy alignment: a LEGACY intent_class arriving by any transport — an
+  // un-updated peer's push, or a 409 conflict-apply delivering a stale server
+  // copy — canonicalizes ON APPLY. The UPDATE fires the dirty trigger, so the
+  // canonical value pushes back next cycle and the fleet converges FORWARD.
+  // Without this, a conflict-apply regresses renamed rows until the next
+  // startup migration (observed live on the migration's first sync cycle).
+  // Unknown non-legacy values still store verbatim (S2's philosophy — only
+  // the known legacy set maps).
+  if (row.intent_class != null) {
+    const canonical = canonicalIntentClass(row.intent_class)
+    if (canonical && canonical !== row.intent_class) {
+      d.prepare('UPDATE nodes SET intent_class = ? WHERE id = ?').run(canonical, id)
+    }
+  }
   // Leaf invariant on the replicated parent chain.
   if (row.parent_id) {
     const parent = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(row.parent_id) as
@@ -283,29 +324,12 @@ export function createWorkItem(draft: WorkItemDraft, actor?: WorkItemActor): FbN
   return item
 }
 
-const TERMINAL_STATES: ReadonlySet<string> = new Set([
-  'acknowledged',
-  'answered',
-  'scheduled',
-  'delivered',
-  'reviewed',
-  'completed',
-  'discussed',
-  'dismissed',
-  'reclassified'
-])
+// Closure = terminal minus 'archived' (DEC-024: archiving is a shelf move,
+// never a loop closure — no notification).
+const CLOSURE_STATES = TERMINAL_WORK_ITEM_STATES.filter((s) => s !== 'archived')
+const TERMINAL_STATES: ReadonlySet<string> = new Set(CLOSURE_STATES)
 
-const CLOSURE_VERB: Record<string, string> = {
-  acknowledged: 'acknowledged',
-  answered: 'answered',
-  scheduled: 'scheduled',
-  delivered: 'delivered',
-  reviewed: 'reviewed',
-  completed: 'completed',
-  discussed: 'discussed',
-  dismissed: 'dismissed',
-  reclassified: 'reclassified'
-}
+const CLOSURE_VERB: Record<string, string> = Object.fromEntries(CLOSURE_STATES.map((s) => [s, s]))
 
 export function setWorkItemState(id: string, state: WorkItemState, actor?: WorkItemActor): boolean {
   const db = getDb()
@@ -322,7 +346,7 @@ export function setWorkItemState(id: string, state: WorkItemState, actor?: WorkI
       if (row) {
         postNotification(db, {
           ref: id,
-          queue: row.intent_class ?? 'action',
+          queue: canonicalIntentClass(row.intent_class) ?? DEFAULT_INTENT_CLASS,
           title: `${row.title || 'Work item'} — ${CLOSURE_VERB[state] ?? state}`,
           body: 'Loop closed.',
           dedupeKey: `wi-close:${id}:${state}`,
@@ -349,9 +373,9 @@ export function decayLooseThoughtsCore(d: LifecycleDb, nowMs: number): number {
   const cutoff = nowMs - LOOSE_THOUGHT_DECAY_DAYS * 24 * 60 * 60 * 1000
   const stale = d
     .prepare(
-      `SELECT id FROM nodes WHERE kind = 'work_item' AND intent_class = 'loose_thought'
+      `SELECT id FROM nodes WHERE kind = 'work_item' AND intent_class = 'to_remember'
          AND trashed_at IS NULL AND updated_at < ?
-         AND work_item_state NOT IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed','reclassified','archived')`
+         AND work_item_state NOT IN (${TERMINAL_IN})`
     )
     .all(cutoff) as Array<{ id: string }>
   for (const row of stale) {
@@ -380,9 +404,9 @@ export function postDeadlineNudgesCore(
     .prepare(
       `SELECT id, title, intent_class, due_at FROM nodes
        WHERE kind = 'work_item' AND trashed_at IS NULL
-         AND intent_class IN ('action','review','scheduling')
+         AND intent_class IN ('to_do','to_review','to_meet','to_decide','to_respond')
          AND due_at IS NOT NULL AND due_at > ? AND due_at <= ?
-         AND work_item_state IN ('open','in_progress','waiting','needs_review','needs_approval','delegated','blocked','suggested','stale')`
+         AND work_item_state IN (${ACTIVE_IN})`
     )
     .all(nowIso, soon) as Array<{ id: string; title: string; intent_class: string; due_at: string }>
   let posted = 0
@@ -402,26 +426,26 @@ export function postDeadlineNudgesCore(
     })
     if (ok) posted++
   }
-  // DEC-024 — the FYI deadline backstop: a dated FYI gets ONE quiet nudge
-  // when its date ARRIVES (not before — FYIs are never "due soon"), on the
-  // inbox layer, same dedupe shape and caps. The 24h lookback keeps ancient
-  // pre-feature dates from spamming a first sweep; anything older missed its
-  // window silently, by restraint.
+  // DEC-024 — the To Know deadline backstop: a dated to_know item gets ONE
+  // quiet nudge when its date ARRIVES (not before — nothing here is "due"),
+  // on the inbox layer, same dedupe shape and caps. The 24h lookback keeps
+  // ancient pre-feature dates from spamming a first sweep; anything older
+  // missed its window silently, by restraint.
   const dayAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString()
   const fyis = d
     .prepare(
       `SELECT id, title, due_at FROM nodes
        WHERE kind = 'work_item' AND trashed_at IS NULL
-         AND intent_class = 'fyi'
+         AND intent_class = 'to_know'
          AND due_at IS NOT NULL AND due_at > ? AND due_at <= ?
-         AND work_item_state IN ('open','in_progress','waiting','needs_review','needs_approval','delegated','blocked','suggested','stale')`
+         AND work_item_state IN (${ACTIVE_IN})`
     )
     .all(dayAgo, nowIso) as Array<{ id: string; title: string; due_at: string }>
   for (const r of fyis) {
     const day = r.due_at.slice(0, 10)
     const { posted: ok } = postNotification(d, {
       ref: r.id,
-      queue: 'fyi',
+      queue: 'to_know',
       title: r.title || 'FYI',
       body: 'Its date arrived.',
       deliverAt: nowMs,
@@ -456,7 +480,7 @@ export function sourceTypeSuppressedCore(
       `SELECT work_item_state AS state FROM nodes
        WHERE kind = 'work_item' AND org_id = ? AND source_type = ?
          AND wi_origin = 'ai' AND approval_state IN ('suggested','dismissed','approved','merged')
-         AND work_item_state IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed','reclassified')
+         AND work_item_state IN (${sqlIn(CLOSURE_STATES)})
        ORDER BY updated_at DESC LIMIT ?`
     )
     .all(orgId, sourceType, SOURCE_SUPPRESS_THRESHOLD) as Array<{ state: string }>
@@ -512,14 +536,16 @@ export function attentionBadgeCounts(): { headline: number; byIntent: Record<str
     .prepare(
       `SELECT intent_class AS intent, wi_origin AS origin, COUNT(*) AS n FROM nodes
        WHERE kind = 'work_item' AND trashed_at IS NULL AND org_id = ?
-         AND work_item_state IN ('open','in_progress','waiting','needs_review','needs_approval','delegated','blocked','suggested','stale')
+         AND work_item_state IN (${ACTIVE_IN})
        GROUP BY intent_class, wi_origin`
     )
     .all(getActiveOrgId()) as Array<{ intent: string | null; origin: string | null; n: number }>
   const byIntent: Record<string, number> = {}
   let headline = 0
   for (const r of rows) {
-    const key = r.intent ?? 'action'
+    // Canonical keys even for a straggler row an un-updated peer pushed
+    // between migrations — the badge never shows a legacy bucket.
+    const key = canonicalIntentClass(r.intent) ?? r.intent ?? DEFAULT_INTENT_CLASS
     byIntent[key] = (byIntent[key] ?? 0) + r.n
     if (r.origin !== 'system') headline += r.n
   }
@@ -548,8 +574,11 @@ export function clearWorkItemDetached(id: string): void {
 /** MET-006 wiring: attention precision over recent terminal transitions.
  *  acted = the item was closed with its class verb; dismissed = it was noise.
  *  'reclassified' is neutral (a re-bin, not a verdict) and decayed dismissals
- *  are the system's own act — both excluded. Q1's 0.70 threshold recalibrates
- *  against this number (S7). */
+ *  are the system's own act — both excluded. R-03 (taxonomy alignment):
+ *  to_know items leave the denominator entirely — information is never
+ *  "acted on or noise", and counting it inflated the metric the Q1 0.70
+ *  threshold recalibrates against (S7). The legacy 'fyi' value stays
+ *  excluded for straggler rows an un-updated peer may push. */
 export function workItemAttentionPrecision(windowDays = 30): number | null {
   const db = getDb()
   const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000
@@ -557,7 +586,8 @@ export function workItemAttentionPrecision(windowDays = 30): number | null {
     .prepare(
       `SELECT work_item_state AS state, reason_code FROM nodes
        WHERE kind = 'work_item' AND org_id = ? AND updated_at > ?
-         AND work_item_state IN ('acknowledged','answered','scheduled','delivered','reviewed','completed','discussed','dismissed')`
+         AND (intent_class IS NULL OR intent_class NOT IN ('to_know','fyi'))
+         AND work_item_state IN (${sqlIn(CLOSURE_STATES.filter((s) => s !== 'reclassified'))})`
     )
     .all(getActiveOrgId(), cutoff) as Array<{ state: string; reason_code: string | null }>
   const transitions = rows
@@ -672,14 +702,38 @@ export function applyRemoteWorkItemTrash(id: string, trashed: boolean): void {
 /** Fields a caller may patch through updateFields. State changes go through
  *  setWorkItemState ONLY (the projection recompute lives there); status is
  *  never patchable (derived). */
+//
+// DEC-064 — DERIVED from the manifest, minus an explicit refusal list. This was
+// a hand-kept map, so a new manifest column got DDL, sync and emit but was
+// silently un-writable: updateFields dropped the unknown key without erroring,
+// the caller saw success, and the value never landed. Deriving it inverts the
+// default — a new column is patchable unless somebody says why not, and the
+// why-not is written down here rather than implied by an omission.
+const NOT_PATCHABLE: Record<string, string> = {
+  // State changes go through setWorkItemState ONLY — the status projection is
+  // recomputed there, and a bare UPDATE would leave it lying.
+  work_item_state: 'setWorkItemState owns the state machine and its projection',
+  // Provenance and routing identity: written once at creation, never edited.
+  originator_id: 'who raised it is history, not a field',
+  recipient_id: 'routing identity — SPEC-027 owns it',
+  source_ref: 'where it came from is history',
+  source_type: 'where it came from is history',
+  wi_origin: 'how it was born is history',
+  confidence: "the classifier's own number; a human editing it would be a lie",
+  // The writer's schema version. Stamped by the writer, read by the receiver.
+  schema_epoch: 'stamped by the writer, never by a caller'
+}
+
 const PATCHABLE: Record<string, string> = {
   title: 'title',
   notes: 'description',
-  intentClass: 'intent_class',
-  dueAt: 'due_at',
-  wiUrgency: 'wi_urgency',
-  reasonCode: 'reason_code',
-  approvalState: 'approval_state'
+  // DEC-035: manual placement within a queue. A base `nodes` column that
+  // already rides the sync body, so a hand-ordered queue travels between
+  // devices without joining the work_item manifest.
+  sortOrder: 'sort_order',
+  ...Object.fromEntries(
+    WORK_ITEM_COLUMNS.filter((c) => !(c.column in NOT_PATCHABLE)).map((c) => [c.attr, c.column])
+  )
 }
 
 export function updateWorkItemFieldsCore(
@@ -692,6 +746,55 @@ export function updateWorkItemFieldsCore(
     | { kind: string }
     | undefined
   if (row?.kind !== 'work_item') return false
+  if (patch.intentClass !== undefined) {
+    // Only the eight primaries land in intent_class; legacy values map
+    // forward, garbage is a refusal (not the silent store it used to be).
+    const canonical = canonicalIntentClass(patch.intentClass)
+    if (!canonical) return false
+    patch = { ...patch, intentClass: canonical }
+  }
+  if (patch.groupId !== undefined && patch.groupId !== null) {
+    // DEC-048 — nesting is real (supersedes DEC-035's one-level flattening),
+    // capped at MAX_GROUP_DEPTH levels and enforced HERE, not only in the UI:
+    // whatever writes group_id (a drag, an agent, a peer's sync arrival
+    // replayed through this path) meets the same wall. Grouping under a child
+    // now genuinely nests under that child.
+    const parentId = String(patch.groupId)
+    if (parentId === id) return false // never its own parent
+    const parentRow = d.prepare('SELECT kind FROM nodes WHERE id = ?').get(parentId) as
+      | { kind: string }
+      | undefined
+    if (parentRow?.kind !== 'work_item') return false
+    // Walk UP from the new parent: its level, refusing a cycle (the walk
+    // reaching the item being grouped) and any over-deep legacy chain.
+    const up = d.prepare(`SELECT group_id FROM nodes WHERE id = ? AND kind = 'work_item'`)
+    const seen = new Set<string>([id])
+    let level = 1
+    let cursor: string | null = parentId
+    while (cursor) {
+      if (seen.has(cursor)) return false // would close a cycle
+      seen.add(cursor)
+      const r = up.get(cursor) as { group_id: string | null } | undefined
+      const next = r?.group_id && r.group_id !== cursor ? r.group_id : null
+      if (!next) break
+      level++
+      cursor = next
+      if (level >= MAX_GROUP_DEPTH) return false // parent already at the floor
+    }
+    // Walk DOWN from the item: its own subtree rides along, so the deepest
+    // resulting level is parent-level + subtree-height.
+    const kidsOf = d.prepare(
+      `SELECT id FROM nodes WHERE kind = 'work_item' AND group_id = ? AND id != ?`
+    )
+    const height = (nodeId: string, depth: number): number => {
+      if (depth >= MAX_GROUP_DEPTH) return depth
+      let h = depth
+      for (const k of kidsOf.all(nodeId, nodeId) as Array<{ id: string }>)
+        h = Math.max(h, height(k.id, depth + 1))
+      return h
+    }
+    if (level + height(id, 1) > MAX_GROUP_DEPTH) return false
+  }
   const sets: string[] = []
   const params: Record<string, unknown> = { id, now: Date.now() }
   for (const [key, col] of Object.entries(PATCHABLE)) {

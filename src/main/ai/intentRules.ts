@@ -5,7 +5,7 @@
 // pay model latency at all, which is what makes the R011 budget (classified
 // capture ≤ standup baseline + 1s) structurally safe. The model (Haiku,
 // purpose 'intent_classify') is only the fallback for genuinely ambiguous
-// text, and ITS failure falls back further to loose_thought — a capture is
+// text, and ITS failure falls back further to to_remember — a capture is
 // never lost and never blocked.
 //
 // Also here: the deadline-phrase machinery behind DEC-016's Q1 rule — the ONE
@@ -20,14 +20,14 @@
 export const Q1_CONFIDENCE_THRESHOLD = 0.7
 
 export type IntentClass =
-  | 'action'
-  | 'review'
-  | 'scheduling'
-  | 'fyi'
-  | 'acknowledgment'
-  | 'discussion'
-  | 'loose_thought'
-  | 'direct'
+  | 'to_do'
+  | 'to_review'
+  | 'to_decide'
+  | 'to_respond'
+  | 'to_meet'
+  | 'to_discuss'
+  | 'to_remember'
+  | 'to_know'
 
 export interface RuleClassification {
   intentClass: IntentClass
@@ -36,7 +36,17 @@ export interface RuleClassification {
   trigger?: string
 }
 
-const ACTIONABLE: ReadonlySet<IntentClass> = new Set(['action', 'review', 'scheduling'])
+// Classes whose items carry commitments a deadline can bind to. to_decide and
+// to_respond joined at the taxonomy alignment: "decide by Friday" and "reply
+// by Thursday" are exactly the deadline-bearing shapes Q1 exists for (the
+// synthesis's To Decide question set names the deadline explicitly).
+const ACTIONABLE: ReadonlySet<IntentClass> = new Set([
+  'to_do',
+  'to_review',
+  'to_meet',
+  'to_decide',
+  'to_respond'
+])
 
 export function isActionableClass(c: IntentClass): boolean {
   return ACTIONABLE.has(c)
@@ -44,50 +54,66 @@ export function isActionableClass(c: IntentClass): boolean {
 
 // Ordered — first match wins. Specific verbs before generic ones.
 const HARD_TRIGGERS: ReadonlyArray<{ trigger: string; re: RegExp; intentClass: IntentClass }> = [
-  { trigger: 'fyi-prefix', re: /^(fyi|note to self|for the record)\b[:,]?\s*/i, intentClass: 'fyi' },
+  { trigger: 'fyi-prefix', re: /^(fyi|note to self|for the record)\b[:,]?\s*/i, intentClass: 'to_know' },
   {
     trigger: 'ack-request',
     re: /\b(acknowledge|confirm (receipt|you (got|received))|just confirming)\b/i,
-    intentClass: 'acknowledgment'
+    intentClass: 'to_respond'
+  },
+  // Reply-shaped language: someone is waiting on words back. Ahead of
+  // review-verb on purpose — "respond to the review request" is a response.
+  {
+    trigger: 'respond-verb',
+    re: /\b(reply to|respond to|get back to|write back|answer (his|her|their|the)\b)/i,
+    intentClass: 'to_respond'
+  },
+  // Decision language: options on the table, a call to make. Ahead of
+  // review-verb so "decide whether to approve" routes as the decision it is
+  // (T-5: decide's questions are not review's).
+  {
+    trigger: 'decide-verb',
+    re: /\b(decide|decision (on|about)|choose (between|whether)|pick (between|one of)|make (a|the) call on|weigh (the )?options)\b/i,
+    intentClass: 'to_decide'
   },
   {
     trigger: 'review-verb',
     re: /\b(review|approve|approval|sign[- ]?off|feedback on|look over|proofread)\b/i,
-    intentClass: 'review'
+    intentClass: 'to_review'
   },
   {
     trigger: 'schedule-verb',
     re: /\b(schedule|reschedule|book (a|the|time)|calendar|set up a (call|meeting|sync)|meet (on|at|next)|30[- ]?min(ute)? (sync|call|meeting))\b/i,
-    intentClass: 'scheduling'
+    intentClass: 'to_meet'
   },
   {
     trigger: 'discussion-verb',
     re: /\b(discuss|talk (about|through)|bring up (at|in)|agenda|next 1[:.]1|next one[- ]on[- ]one)\b/i,
-    intentClass: 'discussion'
+    intentClass: 'to_discuss'
   },
   {
     trigger: 'action-verb',
     re: /\b(remind me|need to|have to|must|don'?t forget|make sure (i|we|to)|follow up|todo|to-do|task:)\b/i,
-    intentClass: 'action'
+    intentClass: 'to_do'
   },
   // Idea-capture language files lightly (the decay tier), even when it wears
-  // a verb like "flesh out": an idea is a thought to keep, not yet a task.
+  // a verb like "flesh out": an idea is a thought to keep, not yet a to-do.
   // Ordered AFTER the explicit action verbs so "need to flesh out the pricing
-  // idea by Friday" still routes as the action it states.
+  // idea by Friday" still routes as the to-do it states.
   {
     trigger: 'idea-signal',
     re: /\b(idea|brainstorm|concept|what if|shower thought|random thought)\b/i,
-    intentClass: 'loose_thought'
+    intentClass: 'to_remember'
   },
-  // A direct question the assistant is not answering inline becomes a
-  // needs-answer ACTION (the synthesis's own merge of the question route).
-  { trigger: 'question-mark', re: /\?\s*$/, intentClass: 'action' }
+  // A trailing question needs WORDS BACK, not a task: it files to Respond
+  // (the alignment's fix for the old question→action conflation, which T-5
+  // flagged — an answer's questions are not a to-do's).
+  { trigger: 'question-mark', re: /\?\s*$/, intentClass: 'to_respond' }
 ]
 
 /** The deterministic first pass. Returns undefined when no rule fires. */
 export function classifyByRules(text: string): RuleClassification | undefined {
   const t = text.trim()
-  if (!t) return { intentClass: 'loose_thought', confidence: 0.9, trigger: 'empty' }
+  if (!t) return { intentClass: 'to_remember', confidence: 0.9, trigger: 'empty' }
   for (const rule of HARD_TRIGGERS) {
     if (rule.re.test(t)) return { intentClass: rule.intentClass, confidence: 0.95, trigger: rule.trigger }
   }
@@ -95,7 +121,7 @@ export function classifyByRules(text: string): RuleClassification | undefined {
   // decay tier's population. Longer prose without a trigger goes to the model.
   const words = t.split(/\s+/).length
   if (words <= 4 && !/\b(do|make|send|call|write|fix|build|get|buy)\b/i.test(t)) {
-    return { intentClass: 'loose_thought', confidence: 0.75, trigger: 'short-fragment' }
+    return { intentClass: 'to_remember', confidence: 0.75, trigger: 'short-fragment' }
   }
   return undefined
 }
@@ -178,10 +204,49 @@ export function needsDeadlineClarification(
   return isActionableClass(intentClass) && scan !== null && scan.dueAt === null
 }
 
+// ── Light tidy (DEC-043) ───────────────────────────────────────────────────
+// Deterministic capitalization for titles below the model-tidy bar: "call bob
+// thursday" should still come out "Call Bob Thursday" without paying a model
+// call. Only ever ADDS capitals, never lowercases — idempotent, and safe on
+// deliberate casing ("iPhone" is untouched). Four rules:
+//   1. the first letter
+//   2. standalone "i"
+//   3. weekday + month names ("may" excluded — "may need to" is a verb)
+//   4. a name-shaped word right after a person-verb ("call bob" → "call Bob"),
+//      unless it is a stopword ("call the notary" stays)
+
+const CAL_WORD_RE =
+  /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|june|july|august|september|october|november|december)\b/g
+const PERSON_VERB_RE = /\b(call|email|text|ping|ask|tell|meet|message|remind)\s+([a-z][a-z']+)\b/g
+const NAME_STOPWORDS = new Set([
+  'the', 'a', 'an', 'my', 'our', 'your', 'his', 'her', 'their',
+  'them', 'him', 'me', 'back', 'in', 'on', 'at', 'to', 'with', 'about',
+  'up', 'everyone', 'someone', 'anybody', 'people', 'team', 'again', 'now',
+  'today', 'tomorrow', 'tonight'
+])
+
+export function lightTidyTitle(raw: string): string {
+  let t = raw
+  t = t.replace(/\bi\b/g, 'I')
+  t = t.replace(CAL_WORD_RE, (w) => w[0].toUpperCase() + w.slice(1))
+  t = t.replace(PERSON_VERB_RE, (m, verb: string, name: string) =>
+    NAME_STOPWORDS.has(name) ? m : `${verb} ${name[0].toUpperCase()}${name.slice(1)}`
+  )
+  if (t && /[a-z]/.test(t[0])) t = t[0].toUpperCase() + t.slice(1)
+  return t
+}
+
 /** A short title from a capture: first sentence-ish, trimmed, capped. */
 export function titleFromCapture(text: string): string {
   const first = text.trim().split(/(?<=[.!?])\s+|\n/)[0] ?? ''
-  const t = first.replace(/^(fyi|note to self|for the record)\b[:,]?\s*/i, '').trim()
+  // Capture scaffolding exists to tell the AI what you meant; it shouldn't
+  // survive into the item ("remind me to call Doug" files as "Call Doug").
+  const t = lightTidyTitle(
+    first
+      .replace(/^(fyi|note to self|for the record|todo|to-do)\b[:,]?\s*/i, '')
+      .replace(/^(remind me to|i need to|i have to|don'?t forget to)\s+/i, '')
+      .trim()
+  )
   return (t.length > 120 ? `${t.slice(0, 117)}…` : t) || 'Untitled work item'
 }
 
@@ -263,6 +328,26 @@ export function needsCleanup(text: string): boolean {
   // A long unpunctuated run-on: 18+ words with no sentence break at all.
   if (words >= 18 && !/[.!?;\n]/.test(t.slice(0, -1))) return true
   return false
+}
+
+/** DEC-040 — when the preview should ATTEMPT a tidy at all. The old gate
+ *  (needsCleanup alone) only fired on genuinely messy text, so medium
+ *  captures showed raw with no tidy and the preview felt inconsistent
+ *  ("sometimes I get the tidied up version, other times I don't"). The
+ *  preview now attempts a tidy for anything with real content: 8+ words,
+ *  more than one sentence, notes attached, or the classic messiness signs.
+ *  Tiny fragments still skip — "call Bob Thursday" IS its own tidy, and a
+ *  model call there returns the input at latency cost. */
+export function qualifiesForTidy(text: string, notes?: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if ((notes ?? '').trim()) return true
+  if (needsCleanup(t)) return true
+  const words = t.split(/\s+/).length
+  if (words >= 5) return true
+  // Sentence punctuation anywhere before the final character = more than
+  // one segment (same trick as needsCleanup's run-on test).
+  return /[.!?;\n]/.test(t.slice(0, -1))
 }
 
 /** The secondaries a compound capture carries beyond its primary. Rules-only:

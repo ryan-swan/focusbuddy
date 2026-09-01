@@ -1,5 +1,5 @@
 /**
- * Plexi animated logo.
+ * Plexii animated logo.
  *
  * Zero dependencies, zero client JS - the animation is pure CSS inside the SVG,
  * so these render fine as React Server Components. They also freeze on the
@@ -56,7 +56,7 @@ function a11y(title: string | null | undefined, fallback: string) {
 }
 
 const MARK_CSS = `
-/* Plexi animated mark. 3.0s seamless loop; frame 0 and the final frame
+/* Plexii animated mark. 3.0s seamless loop; frame 0 and the final frame
        are the exact static logo. Geometry is only ever transformed, never
        redrawn. Recolour with --plexi-mark (works when the SVG is inlined in
        the page; when embedded as an image file, bake a colour instead:
@@ -182,7 +182,7 @@ const MARK_CSS = `
 `
 
 const WORDMARK_CSS = `
-/* Plexi wordmark. 'plex' is vector-traced from the master artwork; the 'ii'
+/* Plexii wordmark. 'plex' is vector-traced from the master artwork; the 'ii'
        is the animated mark at the wordmark's own proportions. 3.0s seamless
        loop, opening and closing on the exact static logo.
        Recolour with --plexi-wordmark (letters) and --plexi-mark (the ii).
@@ -307,7 +307,7 @@ const WORDMARK_CSS = `
 `
 
 const WORDMARK_GRADIENT_CSS = `
-/* Plexi wordmark. 'plex' is vector-traced from the master artwork; the 'ii'
+/* Plexii wordmark. 'plex' is vector-traced from the master artwork; the 'ii'
        is the animated mark at the wordmark's own proportions. 3.0s seamless
        loop, opening and closing on the exact static logo.
        Recolour with --plexi-wordmark (letters) and --plexi-mark (the ii).
@@ -437,7 +437,7 @@ export function PlexiMark({
       viewBox="0 0 922 922"
       xmlns="http://www.w3.org/2000/svg"
       style={vars(color, letterColor, style)}
-      {...a11y(title, "Plexi")}
+      {...a11y(title, "Plexii")}
       {...rest}
     >
       {animated ? (
@@ -481,7 +481,7 @@ export function PlexiWordmark({
       viewBox="0 0 1952.9 812.0"
       xmlns="http://www.w3.org/2000/svg"
       style={vars(color, letterColor, style)}
-      {...a11y(title, "Plexi")}
+      {...a11y(title, "Plexii")}
       {...rest}
     >
       {animated ? (

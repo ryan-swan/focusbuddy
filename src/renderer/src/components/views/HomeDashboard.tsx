@@ -19,14 +19,18 @@ import { useAccountStore } from '../../stores/account'
 import { personFirstName } from '../../lib/personName'
 import { useDocumentsStore } from '../../stores/documents'
 import { useNodeStore } from '../../stores/nodes'
-import { useAssistantChrome } from '../../stores/assistantChrome'
-import { usePinLayer } from '../../stores/pinLayer'
 import { useFocusSessionStore } from '../../stores/focusSession'
 import { RailCard } from '../plexi'
 import Modal from '../plexi/Modal'
 import StandupHome from './StandupHome'
 import StartOrAskPlexi from './StartOrAskPlexi'
 import Icon from '../Icon'
+import {
+  AttentionPulseBlock,
+  OverdueRadarBlock,
+  AgendaBlock,
+  RecentActivityBlock
+} from '../attention/attentionBlocks'
 import { migrateQuickLinks } from './homeShortcutTargets'
 import {
   HOME_WIDGET_DEFS,
@@ -39,7 +43,6 @@ import {
   AppLauncherWidget,
   CreateWidget,
   FocusTimerWidget,
-  OverdueRadarWidget,
   OneThingNowWidget,
   WhereWasIWidget,
   StalledDeskWidget,
@@ -63,7 +66,7 @@ import { useMessagingStore } from '../../stores/messaging'
 import { usePresenceStore } from '../../stores/presence'
 import { useCapabilityEnabled } from '../../stores/capabilities'
 import { personDisplayName } from '../../lib/personName'
-import type { ActivityEvent, ActivityKind, DocumentMeta, FbNode, TimeBlock } from '@shared/types'
+import type { ActivityEvent, DocumentMeta, FbNode } from '@shared/types'
 
 // Home — the landing dashboard, laid out as a desk the app sets for you.
 // The page sits on the same desk-paper substrate as a real canvas, and every
@@ -95,19 +98,6 @@ const DOC_TYPE_ICON: Record<string, { icon: string; tint: string; label: string 
   design: { icon: 'palette', tint: 'text-fuchsia-500', label: 'Design' }
 }
 
-const ACTIVITY_ICON: Record<ActivityKind, string> = {
-  task_switched: 'swap_horiz',
-  widget_added: 'add_circle',
-  widget_focused: 'visibility',
-  widget_removed: 'remove_circle',
-  browser_nav: 'public',
-  note_edit: 'edit_note',
-  chat_sent: 'forum',
-  session_started: 'bolt',
-  session_ended: 'check_circle',
-  ai_setup_run: 'auto_awesome',
-  resume_generated: 'description'
-}
 
 function relTime(ms: number): string {
   const diff = Date.now() - ms
@@ -121,9 +111,6 @@ function relTime(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function clockTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-}
 
 // Greeting name from the real account. We never invent a name: signed-out users
 // get a plain, friendly fallback rather than a fabricated identity.
@@ -144,65 +131,11 @@ function timeOfDay(now: number): string {
   return 'Good evening'
 }
 
-function summarizeActivity(e: ActivityEvent): string {
-  const p = e.payload as Record<string, unknown>
-  const truncate = (v: unknown, n: number): string => {
-    const s = typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v)
-    return s.length > n ? s.slice(0, n) + '…' : s
-  }
-  switch (e.kind) {
-    case 'task_switched':
-      return `Opened ${truncate(p.toTitle, 40) || 'a desk'}`
-    case 'widget_added':
-      return `Added ${truncate(p.kind, 20) || 'a tool'}${p.title ? ` "${truncate(p.title, 28)}"` : ''}`
-    case 'widget_focused':
-      return `Focused ${truncate(p.kind, 20) || 'a tool'}`
-    case 'widget_removed':
-      return `Removed ${truncate(p.kind, 20) || 'a tool'}`
-    case 'browser_nav':
-      return `Visited ${truncate(p.title || p.host || p.url, 46) || 'a page'}`
-    case 'note_edit':
-      return `Edited a note`
-    case 'chat_sent':
-      return `Asked the assistant a question`
-    case 'session_started':
-      return `Started a focus session`
-    case 'session_ended':
-      return `${truncate(p.outcome, 16) || 'Ended'} a focus session`
-    case 'ai_setup_run':
-      return `Ran AI setup`
-    case 'resume_generated':
-      return `Generated a recap`
-    default:
-      return 'Activity'
-  }
-}
 
-function startOfDay(now: number): number {
-  const d = new Date(now)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
 
 // Locally-dismissed activity items (spec §4.2 "Dismiss — remove low-value items
 // from view"). Kept in localStorage so a dismissal sticks across reloads; capped
 // so the list can't grow without bound.
-const DISMISSED_KEY = 'fb.home.dismissedActivity.v1'
-function loadDismissed(): Set<string> {
-  try {
-    const raw = localStorage.getItem(DISMISSED_KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
-  } catch {
-    return new Set()
-  }
-}
-function saveDismissed(s: Set<string>): void {
-  try {
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...s].slice(-500)))
-  } catch {
-    /* ignore */
-  }
-}
 
 // ── The slot system ──────────────────────────────────────────────────────────
 // Two columns — a wide main track and a narrow rail — each an ordered list of
@@ -382,17 +315,13 @@ export default function HomeDashboard(): JSX.Element {
   const createNode = useNodeStore((s) => s.create)
   const setActive = useNodeStore((s) => s.setActive)
 
-  const pin = usePinLayer((s) => s.pin)
-
   const focusActive = useFocusSessionStore((s) => s.active)
   const startFocus = useFocusSessionStore((s) => s.start)
   const finishFocus = useFocusSessionStore((s) => s.finish)
 
   // Today's real time blocks and the real workspace-wide activity feed are loaded
   // imperatively. null means "still loading"; [] means "loaded, genuinely empty".
-  const [agenda, setAgenda] = useState<TimeBlock[] | null>(null)
   const [activity, setActivity] = useState<ActivityEvent[] | null>(null)
-  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed())
   // A clock that ticks each minute so the greeting + relative times stay current.
   const [now, setNow] = useState(() => Date.now())
 
@@ -479,12 +408,6 @@ export default function HomeDashboard(): JSX.Element {
   useEffect(() => {
     void refreshDocs()
     void refreshNodes()
-    const dayStart = startOfDay(Date.now())
-    const dayEnd = dayStart + 86_400_000
-    window.api.timeBlocks
-      .list(dayStart, dayEnd)
-      .then(setAgenda)
-      .catch(() => setAgenda([]))
     // Workspace-wide activity over the last 7 days. A null taskId asks the real
     // activity log for every recorded event, newest first.
     window.api.trail
@@ -547,33 +470,11 @@ export default function HomeDashboard(): JSX.Element {
   }, [rooms, navRoom])
 
   // Today's agenda — only the events that fall on the local day, in time order.
-  const todayEvents = useMemo<TimeBlock[]>(() => {
-    if (!agenda) return []
-    return [...agenda].sort((a, b) => a.startMs - b.startMs).slice(0, 6)
-  }, [agenda])
 
   // Pulse — real counts only. Tasks due today / overdue come from the real
   // nodes; events today from the real agenda. Anything not instrumented
   // (productivity %, focus-time %) is deliberately absent.
-  const insights = useMemo(() => {
-    const dayStart = startOfDay(now)
-    const dayEnd = dayStart + 86_400_000
-    const openTasks = nodes.filter((n) => n.kind === 'task' && n.status !== 'done' && !n.archived)
-    const dueToday = openTasks.filter((n) => n.dueDate != null && n.dueDate >= dayStart && n.dueDate < dayEnd).length
-    const overdue = openTasks.filter((n) => n.dueDate != null && n.dueDate < dayStart).length
-    const eventsToday = (agenda ?? []).length
-    return [
-      { id: 'open-tasks', icon: 'check_circle', label: openTasks.length === 1 ? 'open desk' : 'open desks', value: openTasks.length, tone: 'accent' as const },
-      { id: 'due-today', icon: 'event', label: 'due today', value: dueToday, tone: dueToday > 0 ? ('amber' as const) : ('stone' as const) },
-      { id: 'overdue', icon: 'priority_high', label: overdue === 1 ? 'overdue task' : 'overdue tasks', value: overdue, tone: overdue > 0 ? ('rose' as const) : ('stone' as const) },
-      { id: 'events-today', icon: 'calendar_today', label: eventsToday === 1 ? 'event today' : 'events today', value: eventsToday, tone: 'sky' as const }
-    ]
-  }, [nodes, agenda, now])
 
-  const recentActivity = useMemo(
-    () => (activity ?? []).filter((e) => !dismissed.has(e.id)).slice(0, 12),
-    [activity, dismissed]
-  )
 
   const openDesk = (n: FbNode): void => {
     if (n.kind === 'folder') {
@@ -586,42 +487,6 @@ export default function HomeDashboard(): JSX.Element {
     v.goTask(n.id)
   }
 
-  // Activity feed per-item actions (spec §4.2). Only the actions that genuinely
-  // apply to a logged event are offered: Open its source desk, Ask Plexi about it
-  // (open the context-aware assistant on that desk), and Dismiss it. The
-  // content-only actions (Convert to task, Add to desk, Assign, Save) belong to the
-  // richer §4.2 content feed, and Pin arrives with the universal pin layer.
-  const openActivity = (e: ActivityEvent): void => {
-    if (!e.taskId) return
-    setActive(e.taskId)
-    v.goTask(e.taskId)
-  }
-  const askAboutActivity = (e: ActivityEvent): void => {
-    if (e.taskId) {
-      setActive(e.taskId)
-      v.goTask(e.taskId)
-    }
-    const chrome = useAssistantChrome.getState()
-    chrome.setMode('sidebar')
-    chrome.openPanel()
-  }
-  const dismissActivity = (id: string): void => {
-    setDismissed((prev) => {
-      const next = new Set(prev)
-      next.add(id)
-      saveDismissed(next)
-      return next
-    })
-  }
-  const pinActivity = (e: ActivityEvent): void => {
-    pin({
-      kind: 'activity',
-      refId: e.id,
-      title: summarizeActivity(e),
-      source: 'Home activity',
-      deskId: e.taskId ?? undefined
-    })
-  }
 
   const onCreate = async (): Promise<void> => {
     // Create a real blank document and open it — the same path the documents hub
@@ -783,13 +648,13 @@ export default function HomeDashboard(): JSX.Element {
       case 'attention':
         return <AttentionWidget size={size} />
       case 'att-tasks':
-        return <AttentionQueueWidget queue="action" title="Tasks" emptyLine="Nothing needs you. Capture with ⌘K." size={size} />
+        return <AttentionQueueWidget queue="to_do" title="To Do" emptyLine="Nothing needs you. Capture with ⌘K." size={size} />
       case 'att-reviews':
-        return <AttentionQueueWidget queue="review" title="Reviews" emptyLine="No reviews waiting." size={size} />
+        return <AttentionQueueWidget queue="to_review" title="Review" emptyLine="No reviews waiting." size={size} />
       case 'att-calendar':
         return <AttentionCalendarWidget size={size} />
       case 'att-ack':
-        return <AttentionQueueWidget queue="acknowledgment" title="Acknowledgments" emptyLine="Nothing to acknowledge." size={size} />
+        return <AttentionQueueWidget queue="to_respond" title="Respond" emptyLine="No one waiting on you." size={size} />
       case 'att-completed':
         return <AttentionCompletedWidget size={size} />
       case 'att-stale':
@@ -801,7 +666,9 @@ export default function HomeDashboard(): JSX.Element {
       case 'focus-timer':
         return <FocusTimerWidget size={size} />
       case 'overdue':
-        return <OverdueRadarWidget size={size} />
+        // DEC-048: attention-backed, one component with a variant prop — the
+        // full variant lives on the Attention command center.
+        return <OverdueRadarBlock variant="compact" />
       case 'one-thing':
         return <OneThingNowWidget />
       case 'where-was-i':
@@ -978,76 +845,9 @@ export default function HomeDashboard(): JSX.Element {
         )
 
       case 'agenda':
-        return (
-          <RailCard
-            title="Today's agenda"
-            icon="calendar_today"
-            tone="sky"
-            action={{ label: 'Calendar', onClick: () => v.goCalendar() }}
-          >
-            {agenda === null ? (
-              <SkeletonLines rows={3} />
-            ) : todayEvents.length === 0 ? (
-              <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-agenda-empty">
-                Nothing scheduled today.
-              </p>
-            ) : (
-              <ul className="flex-1 min-h-0 flex flex-col justify-evenly" data-testid="home-agenda">
-                {todayEvents.slice(0, size === 'stack' ? 8 : 3).map((b) => (
-                  <li key={b.id} className="flex items-center gap-2.5 px-1 py-1" data-testid={`home-agenda-item-${b.id}`}>
-                    <span className="shrink-0 fb-t-caption fb-tabular w-14">
-                      {clockTime(b.startMs)}
-                    </span>
-                    <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
-                      {b.title || 'Time block'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </RailCard>
-        )
-
+        return <AgendaBlock variant="compact" />
       case 'pulse':
-        return (
-          <RailCard title="Pulse" icon="monitoring" tone="violet">
-            <div
-              className={`grid auto-rows-fr flex-1 min-h-0 gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}
-              data-testid="home-insights"
-              title="Counts come straight from your tasks and calendar. Productivity and focus-time scores are not tracked yet, so they are not shown."
-            >
-              {insights.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-2 fb-tile-lit px-2.5 py-2"
-                >
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
-                      s.tone === 'accent'
-                        ? 'bg-accent/10 text-accent'
-                        : s.tone === 'amber'
-                          ? 'bg-amber-500/10 text-amber-500'
-                          : s.tone === 'rose'
-                            ? 'bg-rose-500/10 text-rose-500'
-                            : s.tone === 'sky'
-                              ? 'bg-sky-500/10 text-sky-500'
-                              : 'bg-stone-500/10 text-[var(--ink-50)]'
-                    }`}
-                  >
-                    <Icon name={s.icon} size={13} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block fb-display fb-tabular text-[16px] leading-none text-[var(--ink-100)]">
-                      {s.value}
-                    </span>
-                    <span className="block truncate fb-t-caption">{s.label}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </RailCard>
-        )
-
+        return <AttentionPulseBlock variant="compact" />
       case 'quick':
         return (
           <RailCard title="Quick actions" icon="bolt" tone="emerald">
@@ -1061,75 +861,7 @@ export default function HomeDashboard(): JSX.Element {
         )
 
       case 'activity':
-        return (
-          <RailCard title="Recent activity" icon="bolt" tone="accent">
-            {activity === null ? (
-              <SkeletonLines rows={4} />
-            ) : recentActivity.length === 0 ? (
-              <p className="my-auto py-4 text-center text-[12px] text-[var(--ink-50)]" data-testid="home-activity-empty">
-                No recent activity yet. As you open desks and run sessions, it shows up here.
-              </p>
-            ) : (
-              <ul className="flex-1 min-h-0 flex flex-col justify-evenly" data-testid="home-activity">
-                {recentActivity.slice(0, size === 'stack' ? 9 : 4).map((e) => (
-                  <li
-                    key={e.id}
-                    className="group flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-[var(--surface-sunken)]"
-                    data-testid={`home-activity-item-${e.id}`}
-                  >
-                    <Icon name={ACTIVITY_ICON[e.kind] ?? 'circle'} size={14} className="text-[var(--ink-40)] shrink-0" />
-                    <span className="flex-1 truncate text-[12px] text-[var(--ink-90)]">
-                      {summarizeActivity(e)}
-                    </span>
-                    {/* Timestamp normally; a compact action row on hover/focus. */}
-                    <span className="shrink-0 fb-t-caption fb-tabular group-hover:hidden">
-                      {relTime(e.ts)}
-                    </span>
-                    <span className="shrink-0 hidden group-hover:flex items-center gap-0.5">
-                      {e.taskId && (
-                        <button
-                          onClick={() => openActivity(e)}
-                          title="Open its desk"
-                          data-testid={`home-activity-open-${e.id}`}
-                          className="icon-btn h-6 w-6 text-[var(--ink-50)] hover:text-[rgb(var(--accent))]"
-                        >
-                          <Icon name="open_in_new" size={13} />
-                        </button>
-                      )}
-                      {e.taskId && (
-                        <button
-                          onClick={() => askAboutActivity(e)}
-                          title="Ask Plexi about this"
-                          data-testid={`home-activity-ask-${e.id}`}
-                          className="icon-btn h-6 w-6 text-[var(--ink-50)] hover:text-[rgb(var(--accent))]"
-                        >
-                          <Icon name="auto_awesome" size={13} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => pinActivity(e)}
-                        title="Pin to your global pins"
-                        data-testid={`home-activity-pin-${e.id}`}
-                        className="icon-btn h-6 w-6 text-[var(--ink-50)] hover:text-[rgb(var(--accent))]"
-                      >
-                        <Icon name="push_pin" size={13} />
-                      </button>
-                      <button
-                        onClick={() => dismissActivity(e.id)}
-                        title="Dismiss"
-                        data-testid={`home-activity-dismiss-${e.id}`}
-                        className="icon-btn h-6 w-6 text-[var(--ink-40)] hover:text-rose-500"
-                      >
-                        <Icon name="close" size={13} />
-                      </button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </RailCard>
-        )
-
+        return <RecentActivityBlock variant="compact" />
       default:
         return null
     }
@@ -1936,15 +1668,6 @@ function SizePreview({
 
 // Skeleton loading — placeholder bars in the shape of the content, so a
 // widget's data arriving feels like focus resolving, never like a fetch.
-function SkeletonLines({ rows }: { rows: number }): JSX.Element {
-  return (
-    <div className="my-auto space-y-2.5 py-1.5" aria-hidden="true">
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="fb-skeleton h-3.5" style={{ width: `${88 - i * 13}%` }} />
-      ))}
-    </div>
-  )
-}
 
 // ── Customize mode: config pickers ───────────────────────────────────────────
 // Small choosers for the widgets that need a subject: which desk to pin, which

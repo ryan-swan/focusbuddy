@@ -23,6 +23,19 @@ export interface WidgetCatalogEntry {
 
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   {
+    // DEC-045: the same command-center face the home screen has, placeable on
+    // any desk. Defaults to THIS desk's items; one tap widens to all.
+    kind: 'attention',
+    category: 'Tools',
+    label: 'Attention',
+    icon: 'notifications',
+    hint: 'This desk’s attention items — or all of them',
+    defaultWidth: 380,
+    defaultHeight: 340,
+    defaultContent: '{"scope":"desk"}',
+    isWebBased: false
+  },
+  {
     kind: 'sticky',
     category: 'Notes',
     label: 'Sticky',

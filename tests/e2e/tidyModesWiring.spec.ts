@@ -19,9 +19,9 @@ import { launchApp, type LaunchedApp, waitForReady } from './_helpers'
 // click > Add object > Files > Document/Spreadsheet > Create new) must open
 // at the new bumped catalog defaults (860x760 / 880x580).
 //
-// Driving method: real right-click context menu + hover chain into nested
-// flyouts (Auto-arrange > Tidy > <mode>, and for scenario (d) Auto-arrange >
-// Tidy > Columns... > 3 columns), exactly the code path a user drives. Widget
+// Driving method: hover the top pill's Tidy button and click a mode from its
+// icon strip (DEC-038) — exactly the code path a user drives now that Tidy
+// exists only there. Widget
 // positions are read back through the exposed window.__fbWidgets store
 // (same technique as wireTrustLayer.spec.ts / deskLayoutObjectOverlay.spec.ts)
 // rather than DOM rects, since store x/y is what handleAutoArrange writes and
@@ -88,28 +88,32 @@ async function openTask(window: Page, taskTitleRe: RegExp): Promise<void> {
   await window.waitForTimeout(300)
 }
 
-// Right-clicks an empty patch of canvas and hovers into Auto-arrange > Tidy,
-// leaving the Tidy submenu open so the caller can click a mode (or hover one
-// more level for Columns.../Rows...).
 // "Empty patch of canvas" is measured from the VISIBLE left edge: since the
 // full-bleed desk (Edges + Glass Phase 1b) the canvas element starts beneath
-// the dock column, so x is offset by --fb-dock-inset.
+// the dock column, so x is offset by --fb-dock-inset. Still needed by the
+// "Add object" scenario, which drives the canvas menu (that menu keeps its
+// other entries — only Tidy moved).
 async function visibleOrigin(window: Page): Promise<number> {
   return window.evaluate(
     () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fb-dock-inset')) || 0
   )
 }
 
-async function openTidyMenu(window: Page, at: { x: number; y: number } = { x: 200, y: 200 }): Promise<void> {
-  const surface = window.locator('[data-canvas-surface="true"]')
-  const inset = await visibleOrigin(window)
-  await surface.click({ button: 'right', position: { x: at.x + inset, y: at.y } })
-  await expect(window.locator('[data-canvas-ctx-menu]').first()).toBeVisible()
-  const menu = window.locator('[data-canvas-ctx-menu]')
-  await menu.getByText('Auto-arrange', { exact: true }).hover()
-  await window.waitForTimeout(200)
-  await menu.getByText('Tidy', { exact: true }).hover()
-  await window.waitForTimeout(200)
+// DEC-038: Tidy lives in ONE place now — the top pill. It used to also be a
+// submenu on the desk right-click menu (Auto-arrange > Tidy > <mode>); that
+// duplicate was removed, so this spec drives the pill instead. The modes are
+// offered as ICONS, so they are addressed by test id / accessible name rather
+// than by visible label text.
+async function openTidyMenu(window: Page): Promise<void> {
+  await window.locator('[data-testid="pill-tidy"]').hover()
+  await expect(window.locator('[data-testid="tidy-menu"]')).toBeVisible()
+}
+
+/** Click one tidy mode from the pill's icon strip. */
+async function pickTidy(window: Page, testId: string): Promise<void> {
+  await openTidyMenu(window)
+  await window.locator(`[data-testid="${testId}"]`).click()
+  await window.waitForTimeout(500)
 }
 
 async function widgetPositions(
@@ -146,12 +150,7 @@ test('(a) Tidy > Single column (vertical) stacks 5 widgets in one column, y incr
     { title: 'w4', x: 1000, y: 50 }
   ])
   await openTask(window, /Tidy vertical test/)
-  await openTidyMenu(window)
-  await window
-    .locator('[data-canvas-ctx-menu]')
-    .getByText('Single column (vertical)', { exact: true })
-    .click()
-  await window.waitForTimeout(500)
+  await pickTidy(window, 'tidy-mode-vertical')
 
   const pos = await widgetPositions(window, ids)
   expect(Object.keys(pos)).toHaveLength(5)
@@ -180,12 +179,7 @@ test('(b) Tidy > Single row (horizontal) lays 5 widgets in one row, x increasing
     { title: 'w4', x: 1000, y: 50 }
   ])
   await openTask(window, /Tidy horizontal test/)
-  await openTidyMenu(window)
-  await window
-    .locator('[data-canvas-ctx-menu]')
-    .getByText('Single row (horizontal)', { exact: true })
-    .click()
-  await window.waitForTimeout(500)
+  await pickTidy(window, 'tidy-mode-horizontal')
 
   const pos = await widgetPositions(window, ids)
   expect(Object.keys(pos)).toHaveLength(5)
@@ -213,8 +207,7 @@ test('(c) Tidy > Square grid lays 4 widgets into a 2x2, columns aligned', async 
     { title: 'w3', x: 1500, y: 300 }
   ])
   await openTask(window, /Tidy square test/)
-  await openTidyMenu(window)
-  await window.locator('[data-canvas-ctx-menu]').getByText('Square grid', { exact: true }).click()
+  await pickTidy(window, 'tidy-mode-square')
   await window.waitForTimeout(500)
 
   const pos = await widgetPositions(window, ids)
@@ -235,9 +228,12 @@ test('(c) Tidy > Square grid lays 4 widgets into a 2x2, columns aligned', async 
 })
 
 // ---------------------------------------------------------------------------
-// (d) Tidy > Columns... > 3 columns
+// (d) DEC-040: square grid derives its own shape — 6 widgets → 3 columns.
+// This scenario used to drive "Columns... > 3 columns"; those explicit count
+// buttons were removed ("I shouldn't need to select the amount"), and
+// balancedColumns(6) === 3, so the expected geometry is unchanged.
 // ---------------------------------------------------------------------------
-test('(d) Tidy > Columns... > 3 columns spreads 6 widgets across three x values', async () => {
+test('(d) square grid spreads 6 widgets across three x values', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
@@ -251,12 +247,7 @@ test('(d) Tidy > Columns... > 3 columns spreads 6 widgets across three x values'
     { title: 'w5', x: 1700, y: 650 }
   ])
   await openTask(window, /Tidy columns test/)
-  await openTidyMenu(window)
-  const menu = window.locator('[data-canvas-ctx-menu]')
-  await menu.getByText('Columns…', { exact: true }).hover()
-  await window.waitForTimeout(200)
-  await menu.getByText('3 columns', { exact: true }).click()
-  await window.waitForTimeout(500)
+  await pickTidy(window, 'tidy-mode-square')
 
   const pos = await widgetPositions(window, ids)
   expect(Object.keys(pos)).toHaveLength(6)
@@ -300,15 +291,10 @@ test('(e) linked widgets (A-B, C-D) stay adjacent after a Tidy, isolated E does 
   )
 
   await openTask(window, /Tidy cluster test/)
-  await openTidyMenu(window)
   // Single row makes "adjacent" unambiguous: adjacency in sorted-x order maps
   // 1:1 onto adjacency in the algorithm's internal item order, with no
   // row-wrap boundary to complicate the check.
-  await window
-    .locator('[data-canvas-ctx-menu]')
-    .getByText('Single row (horizontal)', { exact: true })
-    .click()
-  await window.waitForTimeout(500)
+  await pickTidy(window, 'tidy-mode-horizontal')
 
   const pos = await widgetPositions(window, ids)
   expect(Object.keys(pos)).toHaveLength(5)

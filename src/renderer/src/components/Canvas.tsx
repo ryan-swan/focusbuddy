@@ -31,6 +31,7 @@ import TimerWidget from './widgets/TimerWidget'
 import SectionWidget from './widgets/SectionWidget'
 import StreamDeckWidget from './widgets/StreamDeckWidget'
 import WidgetFocusMode from './WidgetFocusMode'
+import { DeskAttentionWidget } from './views/attentionWidgets'
 import ExtensionPrompt from './ExtensionPrompt'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
@@ -232,6 +233,9 @@ function renderWidgetInner(w: Widget): JSX.Element | null {
       // showing twice" bug. The migration effect below also deletes them from
       // storage; this guarantees they are invisible even before that runs.
       return null
+    case 'attention':
+      // DEC-045: the desk-scoped command-center face (CR-09 D-B).
+      return <DeskAttentionWidget widget={w} />
     case 'voice-recorder':
       return <VoiceRecorderWidget widget={w} />
     case 'mindmap':
@@ -1714,35 +1718,10 @@ export default function Canvas(): JSX.Element {
           label: 'Stack by type',
           icon: 'layers',
           onClick: () => void groupByType(true)
-        },
-        {
-          // Tidy modes — every mode keeps linked widgets clustered together.
-          label: 'Tidy',
-          icon: 'grid_view',
-          children: [
-            { label: 'Square grid', icon: 'grid_view', onClick: () => void handleAutoArrange({ mode: 'square' }) },
-            { label: 'Single column (vertical)', icon: 'view_agenda', onClick: () => void handleAutoArrange({ mode: 'vertical' }) },
-            { label: 'Single row (horizontal)', icon: 'view_column', onClick: () => void handleAutoArrange({ mode: 'horizontal' }) },
-            { label: 'Mosaic', icon: 'dashboard', onClick: () => void handleAutoArrange({ mode: 'mosaic' }) },
-            { label: 'Rows of the canvas (flow)', icon: 'reorder', onClick: () => void handleAutoArrange({ mode: 'flow' }) },
-            {
-              label: 'Columns…',
-              icon: 'view_week',
-              children: [2, 3, 4, 5, 6].map((c) => ({
-                label: `${c} columns`,
-                onClick: () => void handleAutoArrange({ mode: 'custom', cols: c })
-              }))
-            },
-            {
-              label: 'Rows…',
-              icon: 'table_rows',
-              children: [2, 3, 4, 5, 6].map((r) => ({
-                label: `${r} rows`,
-                onClick: () => void handleAutoArrange({ mode: 'custom', rows: r })
-              }))
-            }
-          ]
         }
+        // DEC-038: the Tidy submenu used to live here. It now exists ONLY in
+        // the top pill, where its modes are offered as icons — one home for
+        // one concept, instead of the same list in two places.
       ]
     }
     return [
@@ -2702,7 +2681,7 @@ export default function Canvas(): JSX.Element {
               cognitive-load ring + canvas tools. Uses fixed positioning internally. */}
           {activeTaskId && (
             <FloatingPill
-              onTidy={() => void handleAutoArrange()}
+              onTidy={(opts) => void handleAutoArrange(opts)}
               tidyDisabled={!activeTaskId}
               onBuild={() => setShowAiBuilder(true)}
               onSaveTemplate={() => setSaveTemplateOpen({ context: 'toolbar' })}

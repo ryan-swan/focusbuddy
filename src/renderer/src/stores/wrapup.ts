@@ -27,6 +27,9 @@ interface WrapupState {
   folderId: string | null
   folderName: string
   transcriptDocId: string | null
+  // DEC-079 — the Meeting record this wrap-up produced, so approved
+  // deliverables can POINT back at it (sourceType 'meeting').
+  meetingId: string | null
   begin: (input: { title: string; buffer: ArrayBuffer; mimeType: string; durationSec: number }) => Promise<void>
   dismiss: () => void
 }
@@ -43,9 +46,10 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   folderId: null,
   folderName: '',
   transcriptDocId: null,
+  meetingId: null,
 
   begin: async ({ title, buffer, mimeType, durationSec }) => {
-    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null })
+    set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null })
     try {
       await runWrapup({ title, buffer, mimeType, durationSec }, set)
     } catch (err) {
@@ -59,7 +63,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
     }
   },
 
-  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null })
+  dismiss: () => set({ status: 'idle', title: '', step: '', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null })
 }))
 
 // The wrap-up pipeline, extracted so `begin` can wrap the whole thing in one
@@ -115,8 +119,11 @@ async function runWrapup(
 
   const summary = r.summary ?? ''
   const proposals = r.proposals ?? []
-  // Save a real Meeting record so the conversation is kept, best-effort.
-  void useMeetingsStore
+  // Save a real Meeting record so the conversation is kept, best-effort — but
+  // AWAITED now (DEC-079): its id is what lets an approved deliverable point
+  // back at the meeting whose transcript produced it. A failed save degrades
+  // to the old behaviour (items file without a link), never blocks the review.
+  const meeting = await useMeetingsStore
     .getState()
     .create({
       title,
@@ -125,7 +132,7 @@ async function runWrapup(
       actionItems: proposals.filter((p) => p.kind === 'create-task').map((p) => ('title' in p ? p.title : '')),
       durationSec
     })
-    .catch(() => {})
+    .catch(() => null)
 
-  set({ status: 'review', summary, proposals })
+  set({ status: 'review', summary, proposals, meetingId: meeting?.id ?? null })
 }

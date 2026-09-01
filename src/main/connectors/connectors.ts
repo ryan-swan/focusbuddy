@@ -1,6 +1,6 @@
 // Connector contracts (spec §56, REQ-CON). A Connector declares the capabilities it
 // implements and consumers query those rather than assume (CON-001); it maps external
-// permissions into the Plexi model and never over-grants (CON-002), defaulting to the
+// permissions into the Plexii model and never over-grants (CON-002), defaulting to the
 // most restrictive when it cannot faithfully represent an external model (CON-003);
 // synchronisation is resumable from a durable cursor and idempotent (CON-005);
 // removing a Connector never deletes what it imported (CON-006); and it backs off on
@@ -19,7 +19,7 @@ export function connectorImplements(caps: ConnectorCapabilities, capability: key
 
 // ── CON-002 / CON-003 — permission mapping, most-restrictive default ──────────
 export type PlexiPermission = 'none' | 'read' | 'write'
-// Map an external permission into the Plexi model. An unrecognised or
+// Map an external permission into the Plexii model. An unrecognised or
 // unrepresentable external permission defaults to the most restrictive (none),
 // never widening access (CON-002/003).
 export function mapExternalPermission(external: string, faithful = true): PlexiPermission {

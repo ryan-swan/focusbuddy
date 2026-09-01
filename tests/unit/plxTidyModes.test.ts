@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { tidyPositions, type TidyItem } from '../../src/renderer/src/lib/autoArrange'
+import {
+  tidyPositions,
+  balancedColumns,
+  MAX_TIDY_GROWTH,
+  type TidyItem
+} from '../../src/renderer/src/lib/autoArrange'
 
 // Tidy layout modes (plx-app widget-link overhaul N5): square / vertical /
 // horizontal / mosaic / custom rows×cols. The caller passes items already ordered
@@ -95,7 +100,7 @@ describe('tidyPositions — flow', () => {
 // its layout would otherwise leave. Positions above are unchanged; these pin the
 // new w/h.
 describe('tidyPositions — fills gaps (no wasted space)', () => {
-  it('grid: every widget grows to its whole cell (column width × row height)', () => {
+  it('grid: a widget grows TOWARD its cell, but never past the growth cap', () => {
     // 2×2 square. col0 = a,c (widest 100); col1 = b,d (widest 200).
     //             row0 = a,b (tallest 80); row1 = c,d (tallest 150).
     const varied: TidyItem[] = [
@@ -107,12 +112,33 @@ describe('tidyPositions — fills gaps (no wasted space)', () => {
     const p = Object.fromEntries(
       tidyPositions(varied, { mode: 'square' }, 2000, 40, 60).map((x) => [x.id, x])
     )
-    expect(p.a.w).toBe(100)
+    // The widest/tallest member of a cell is never shrunk.
     expect(p.b.w).toBe(200)
-    expect(p.d.w).toBe(200) // grew from 100 to its column width
-    expect(p.a.h).toBe(80)
     expect(p.c.h).toBe(150)
-    expect(p.d.h).toBe(150) // grew from 80 to its row height
+    // d shares a 200-wide column and a 150-tall row, but it is 100x80: it grows
+    // only to the cap (125 / 100), NOT to the cell. This is the fix for
+    // "it stretches my apps really wide, well beyond the necessary limits".
+    expect(p.d.w).toBe(Math.round(100 * MAX_TIDY_GROWTH))
+    expect(p.d.h).toBe(Math.round(80 * MAX_TIDY_GROWTH))
+    expect(p.d.w).toBeLessThan(200)
+    // A widget already matching its cell is untouched.
+    expect(p.a.w).toBe(100)
+    expect(p.a.h).toBe(80)
+  })
+
+  it('grid: nothing is ever SHRUNK to fit a cell', () => {
+    const p = tidyPositions(
+      [
+        { id: 'big', w: 900, h: 600 },
+        { id: 'small', w: 100, h: 80 }
+      ],
+      { mode: 'square' },
+      2000,
+      40,
+      60
+    )
+    expect(p.find((x) => x.id === 'big')!.w).toBe(900)
+    expect(p.find((x) => x.id === 'big')!.h).toBe(600)
   })
 
   it('flow: a row is filled edge to edge and every item shares the row height', () => {
@@ -122,8 +148,12 @@ describe('tidyPositions — fills gaps (no wasted space)', () => {
     expect(row1.length).toBe(2)
     expect(row1[0].h).toBe(row1[1].h) // uniform row height
     const last = row1[row1.length - 1]
-    // The last item's right edge reaches padding + flowWidth (no trailing gap).
-    expect((last.x ?? 0) + (last.w ?? 0)).toBe(60 + 260)
+    // The row reaches for the full width, but only within the growth cap: two
+    // 100-wide items may each reach 125, so the row ends at or before the edge
+    // and never by inflating a small widget several times over.
+    const right = (last.x ?? 0) + (last.w ?? 0)
+    expect(right).toBeLessThanOrEqual(60 + 260)
+    for (const it of row1) expect(it.w).toBeLessThanOrEqual(Math.round(100 * MAX_TIDY_GROWTH))
   })
 
   it('mosaic: every item grows to the column width so columns are flush', () => {
@@ -133,7 +163,38 @@ describe('tidyPositions — fills gaps (no wasted space)', () => {
       { id: 'c', w: 100, h: 80 }
     ]
     const p = tidyPositions(mixed, { mode: 'mosaic', cols: 2 }, 2000, 40, 60)
-    // Column width is the widest item (120); every item fills it.
-    for (const it of p) expect(it.w).toBe(120)
+    // Column width is the widest item (120); the others reach TOWARD it but
+    // are capped, so one wide item cannot drag every other one out to its size.
+    const byId = Object.fromEntries(p.map((x) => [x.id, x]))
+    expect(byId.a.w).toBe(120) // the widest is untouched
+    expect(byId.b.w).toBe(Math.round(90 * MAX_TIDY_GROWTH))
+    expect(byId.c.w).toBe(120) // 100 * 1.25 = 125, capped by the cell at 120
+  })
+})
+
+describe('balancedColumns — square grid shape (DEC-040)', () => {
+  it('matches the operator\'s own examples', () => {
+    expect(balancedColumns(4)).toBe(2) // 2 + 2
+    expect(balancedColumns(9)).toBe(3) // a true 3x3
+    expect(balancedColumns(10)).toBe(5) // 5 on top, 5 on the bottom
+  })
+
+  it('avoids ragged last rows rather than chasing sqrt exactly', () => {
+    // ceil(sqrt(10)) would be 4 → rows of 4,4,2 with a hole in the last row.
+    expect(balancedColumns(10)).not.toBe(Math.ceil(Math.sqrt(10)))
+    // 8 → 4+4 rather than 3,3,2.
+    expect(balancedColumns(8)).toBe(4)
+    // 7 is awkward however you cut it; 4+3 beats 3,3,1.
+    expect(balancedColumns(7)).toBe(4)
+  })
+
+  it('degenerate counts stay sane', () => {
+    expect(balancedColumns(0)).toBe(1)
+    expect(balancedColumns(1)).toBe(1)
+    expect(balancedColumns(2)).toBe(2)
+  })
+
+  it('never asks for more columns than there are items', () => {
+    for (let n = 1; n <= 40; n++) expect(balancedColumns(n)).toBeLessThanOrEqual(n)
   })
 })

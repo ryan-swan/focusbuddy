@@ -134,6 +134,17 @@ export const useNodeStore = create<NodeStore>((set, get) => ({
   update: async (id, patch) => {
     const prev = get().nodes.find((n) => n.id === id) ?? null
     const updated = await window.api.nodes.update(id, patch)
+    // DEC-052 Track D (#7) — a desk marked done is a QUIET WIN: it feeds the
+    // ledger for analytics ("counted from the work, not the checkboxes") and
+    // never prompts (closing a desk already ran its own offers).
+    if (patch.status === 'done') {
+      const closing = get().nodes.find((n) => n.id === id)
+      if (closing?.kind === 'task' && closing.status !== 'done') {
+        void window.api.signals
+          .record({ kind: 'desk_closed', targetKind: 'desk', targetRef: id })
+          .catch(() => {})
+      }
+    }
     if (!updated) return
     set({ nodes: get().nodes.map((n) => (n.id === id ? updated : n)) })
     nudgeSync()

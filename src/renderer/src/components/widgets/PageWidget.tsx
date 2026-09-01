@@ -554,7 +554,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
     <WidgetFrame
       widget={widget}
       headerLabel={widget.title || 'Page'}
-      headerAccent="bg-stone-300/60"
+      headerAccent="bg-stone-300/60 dark:bg-white/[0.09]"
     >
       {body}
     </WidgetFrame>

@@ -172,3 +172,135 @@ crossroads ruling CR-01..07, IQ-1 (missing bug-report sections 7/8/13/14/17).
 2. When the closing work ships + its gate passes, mark CLOSED (keep the entry).
 3. New gaps discovered during execution → append, increment GAP-NNN.
 4. A phase isn't done until its assigned gaps are CLOSED.
+
+## GAP-017 — "Respond" may want to be "Messages", but the messaging surface is unmapped
+**Severity:** MEDIUM · **Closes in:** a designated investigation, then a ruling · **Status:** OPEN (logged 2026-08-28, operator)
+
+The operator, ruling on Meet-as-invite (DEC-062), raised the sibling question and
+**explicitly deferred it**: "before making any changes to the 'Respond' items, we will
+need to do a designated investigation into the current messaging features, so just log
+this as something to come back to."
+
+**The thought, recorded verbatim in substance:** `to_respond` items read as tasks, the
+same defect Meet has. They might instead read as MESSAGES — rename the queue to
+"Messages" so it can carry actual messages from Plexii's own messaging capability, and
+let the user reply **directly from the attention queue**, or jump to the real thread.
+
+**Why it is not actionable yet.** Nobody has mapped what Plexii's messaging actually is
+today. A first look found `src/renderer/src/components/views/MessagesView.tsx` and a
+`mail/` stack (IMAP + app-specific passwords, `mailAccount.ts`) — so there is at least
+one message surface and one mail transport, but their model, storage, threading and
+identity story are unexamined. Ruling on a rename before that is known would be
+deciding the shape of a thing we have not looked at.
+
+**What the investigation must answer before any ruling:**
+1. What message sources exist (in-app messaging? IMAP mail? Slack via webview?), and
+   which of them have a durable local model versus a rendered-only view.
+2. Whether a thread has a stable id an attention item could point at — the same
+   question `source_url` answers for other queues.
+3. Whether replying can be done in-place without owning the composer for every source,
+   or whether "open the thread" is the honest affordance for some sources.
+4. Whether "Messages" is the right NAME for a queue that must also hold non-message
+   responses (a form to fill, a comment to answer) — or whether those belong elsewhere.
+5. The DEC-062 precedent: Meet earns its invite treatment because a meeting has an
+   agreed shape (when / where / who / join). Does a "response" have an equivalent one?
+
+**Do not** rename the queue, change `to_respond` semantics, or touch the taxonomy until
+this is investigated and ruled. The eight primaries are a migrated, spec-traced
+vocabulary (DEC-029a); renaming one is a schema and migration event, not a label edit.
+
+
+## GAP-018 — `rgba(var(--accent),…)` arbitrary values are INVALID CSS and paint nothing
+**Severity:** MEDIUM (visual, app-wide, invisible to tests) · **Status: CLOSED 2026-08-30 (DEC-086)** — 43 occurrences swept across 9 files INCLUDING globals.css (the register's census missed it — the futuristic/gemstone theme glows never painted); plus the sibling bug the sweep exposed: bare non-multiple-of-5 opacity modifiers (`accent/14`) generate NO utility — the sweep's own first pass minted 17, caught by live probe and converted to arbitrary form. Both classes grep-locked in tests/unit/accentColorLock.test.ts.
+
+`--accent` is a space-separated triplet (`124 58 237`), so
+`rgba(var(--accent),0.14)` substitutes to `rgba(124 58 237,0.14)` — invalid
+(space-separated components with a comma alpha). Chrome rejects it at
+computed-value time: backgrounds render transparent, rings/shadows compute
+`none`. Proven live: a resting `bg-[rgba(var(--accent),0.14)]` element
+measured `backgroundColor: rgba(0,0,0,0)`; DEC-053's today ring never
+painted. Every accent wash/ring/inset written this way has been silently
+absent since it shipped, and the suite stayed green because source-pins pin
+strings, not paint.
+
+**The fix pattern (sanctioned, already in the config):**
+`accent: 'rgb(var(--accent) / <alpha-value>)'` → `bg-accent/10`,
+`ring-accent/35`, `bg-accent/[0.14]`; inside arbitrary shadows use
+`rgb(var(--accent)/0.3)`. DEC-078 converted the nine occurrences in
+WeekTimeGrid + CalendarView and pinned `not.toContain('rgba(var(--accent)')`
+for that file.
+
+**Remaining census (2026-08-30):** occurrences in ~10 files —
+TagMentionInput, AttentionConfirmCard, ChatPanel, MissedTriagePrompt,
+assistant/MentionList, TrashView, attentionWidgets, RoomsDesksIndex,
+AttentionView (+ WidgetFrame via the 077 round). Some are PINNED by tests
+(attentionItemEditor.test.ts:408, dec077Refinements.test.ts:76/88,
+workItemsCapture.test.ts:246) — the sweep must rewrite those pins to the
+superseding truth, never delete them. Also check `--accent-hover` for the
+same pattern. Verify-command:
+`grep -rn "rgba(var(--accent)" src/renderer/src --include="*.tsx"`.
+
+## GAP-019 — `bg-[var(--token)]/N` opacity modifiers are INVALID CSS and paint nothing
+**Found:** 2026-08-30 (DEC-089's dark-mode chrome round) · **Status:** OPEN — two
+header sites fixed under DEC-089; the repo-wide sweep is its own round.
+
+GAP-018's sibling, one layer up. Tailwind 3.4 cannot alpha-modify an OPAQUE
+custom property: `bg-[var(--edge-firm)]/60` emits `rgb(var(--edge-firm) / 0.6)`,
+and since `--edge-firm` is a complete color (`oklch(… / 0.20)`), the declaration
+is invalid and the browser drops it — the element paints NOTHING, in both
+themes, silently. Measured live by paint-probe (all computed `rgba(0,0,0,0)`):
+
+    bg-[var(--surface-sunken)]/60  → transparent
+    bg-[var(--surface-sunken)]/95  → transparent
+    bg-[var(--edge-soft)]/60       → transparent
+    bg-[var(--edge-firm)]/60       → transparent
+    bg-[var(--surface-raised)]/90  → transparent
+    bg-[var(--surface-sunken)]     → paints (oklch …)  ← the unmodified form
+
+Blast radius: ~40 sites across SyncIndicator, HistoryPanel, ThemeBuilder,
+SettingsPanel, StageManagerStrip, LinkOverlay, ChatPanel, SharePeoplePicker,
+WidgetFocusDock, WidgetDock, ConversationList, RetrievalTrace,
+PlexiOfficeShell, FocusChatSurface, SlidesEditor, TableWidget, MindMapWidget
+(the last two fixed under DEC-089 — their widget HEADERS had no wash at all,
+half of the operator's dark-mode invisibility report). Also every
+`border-[var(--edge-soft)]/60` — same disease on border-color.
+
+Why the sweep is its own round: each site needs a JUDGMENT, not a mechanical
+strip — some washes were invisible no-ops the design has since absorbed
+(removing the modifier CHANGES the look), others should become real tokens or
+`color-mix()`. Fix shape per site: (a) drop the modifier and use the token's
+own alpha, (b) mint a dedicated token, or (c) Tailwind `color-mix` arbitrary
+value. Then a repo-wide lock (accentColorLock's pattern) closes the class.
+DEC-089's lock already forbids the pattern in `headerAccent` specifically.
+
+## GAP-020 — Six `--ink-*` steps are referenced but never defined
+**Found:** 2026-08-31 (DEC-095's analytics restyle) · **Status:** OPEN —
+locked against growth, cleanup is its own round.
+
+`var(--ink-80)` and friends are not in tokens.css. An undefined custom
+property makes the whole declaration invalid, so the element **silently
+inherits its parent's colour** — text meant to be secondary renders at full
+ink weight. Measured live against the running app (`getPropertyValue` on
+`document.documentElement`, plus a paint probe):
+
+    --ink-100 ✓   --ink-90 ✓   --ink-80  ✗ (52 uses)
+    --ink-70  ✓   --ink-60 ✓   --ink-55  ✗ (2)
+    --ink-50  ✓   --ink-45 ✗ (10)         --ink-40 ✓
+    --ink-35  ✗ (2)            --ink-30 ✓  --ink-25 ✗ (2)
+    --ink-10  ✓                --ink-300 ✗ (2, likely a typo for --ink-30)
+
+    paint probe: color: var(--ink-80)  →  oklch(0.15 0.012 264)   ← ink-100,
+    i.e. the inherited body colour, not a lighter step.
+
+~68 sites across the renderer. This is the GAP-018/019 family one layer up:
+the value is not merely wrong, the declaration never lands.
+
+Why the fix is its own round: either DEFINE the six steps (a design decision
+— ink-90 is 28% and ink-70 is 46%, so ink-80 ≈ 37%; and every one of the 52
+sites changes appearance the moment it resolves) or REWRITE the 68 sites
+onto defined steps. Both are a visible, app-wide typographic change that
+deserves its own before/after pass, not a side effect of a polish commit.
+
+Locked meanwhile: `accentColorLock.test.ts` freezes the offender set
+{80, 45, 55, 35, 25, 300}. It may shrink; a NEW undefined step fails the
+build.

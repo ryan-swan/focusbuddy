@@ -115,12 +115,132 @@ describe('updateFields / reclassify', () => {
   it('reclassify re-bins intent and leaves the item active', () => {
     const { raw, db } = freshDb()
     wi(raw, 'a')
-    expect(reclassifyWorkItemCore(db, 'a', 'review')).toBe(true)
+    expect(reclassifyWorkItemCore(db, 'a', 'to_review')).toBe(true)
     const row = raw.prepare('SELECT intent_class, work_item_state FROM nodes WHERE id = ?').get('a') as {
       intent_class: string
       work_item_state: string
     }
-    expect(row).toEqual({ intent_class: 'review', work_item_state: 'open' })
+    expect(row).toEqual({ intent_class: 'to_review', work_item_state: 'open' })
+  })
+
+  it('reclassify maps legacy values forward and refuses garbage (alignment)', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'a')
+    // A legacy class (saved Flow, stale prompt cache) canonicalizes on write.
+    expect(reclassifyWorkItemCore(db, 'a', 'acknowledgment')).toBe(true)
+    let row = raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('a') as {
+      intent_class: string
+    }
+    expect(row.intent_class).toBe('to_respond')
+    // Garbage is refused — never the silent store it used to be.
+    expect(reclassifyWorkItemCore(db, 'a', 'nonsense')).toBe(false)
+    row = raw.prepare('SELECT intent_class FROM nodes WHERE id = ?').get('a') as {
+      intent_class: string
+    }
+    expect(row.intent_class).toBe('to_respond')
+  })
+})
+
+describe('DEC-039 — creation carries the chosen context (file-level pins)', () => {
+  // createWorkItemCore is guarded by the capability pref + the CHECK-clause
+  // probe, so it is pinned at the source: the INSERT must carry tags and
+  // mentions, and the draft must map them — a capture-time tag that silently
+  // vanished at create would otherwise look like a UI bug.
+  it('the INSERT and the draft both know tags + mentions', () => {
+    const src = readFileSync(join(process.cwd(), 'src/main/db/workItems.ts'), 'utf8')
+    expect(src).toContain('due_at, wi_urgency, tags, mentions, source_ref')
+    expect(src).toContain('draft.tags ?? null')
+    expect(src).toContain('draft.mentions ?? null')
+    // …and both stay patchable after creation. DEC-064 derives PATCHABLE from
+    // the manifest instead of hand-listing it, so the pin is now on the RULE —
+    // a manifest column is patchable unless explicitly refused — rather than on
+    // a literal that a derivation legitimately removes.
+    expect(src).toContain('WORK_ITEM_COLUMNS.filter((c) => !(c.column in NOT_PATCHABLE))')
+    const refusals = src.slice(src.indexOf('const NOT_PATCHABLE'), src.indexOf('const PATCHABLE'))
+    expect(refusals).not.toContain('tags:')
+    expect(refusals).not.toContain('mentions:')
+  })
+
+  it('DEC-064 — every manifest column is readable and writable unless refused', () => {
+    // The bug this pins: PATCHABLE and rowToNode both hand-listed the manifest,
+    // so a new column got DDL, sync and emit but no way in or out. `source_url`
+    // sat write-only from DEC-052 until DEC-064 — stored fine, read as
+    // undefined, unnoticed only because nothing had written one yet.
+    const nodes = readFileSync(join(process.cwd(), 'src/main/db/nodes.ts'), 'utf8')
+    expect(nodes).toContain('for (const def of WORK_ITEM_COLUMNS) out[def.attr]')
+    // Refusals must say WHY, so an omission can never masquerade as a decision.
+    const src2 = readFileSync(join(process.cwd(), 'src/main/db/workItems.ts'), 'utf8')
+    const refusals = src2.slice(src2.indexOf('const NOT_PATCHABLE'), src2.indexOf('const PATCHABLE'))
+    const entries = refusals.match(/^\s{2}\w+:/gm) ?? []
+    expect(entries.length).toBeGreaterThan(0)
+    // Either quote style — one reason contains an apostrophe and is written
+    // with double quotes, which is the correct way to write it.
+    for (const e of entries) {
+      expect(refusals).toMatch(new RegExp(e.trim() + ` ('[^']{10,}'|"[^"]{10,}")`))
+    }
+  })
+})
+
+describe('DEC-048 — grouping nests to MAX depth 3, enforced at the db', () => {
+  const gid = (raw: ReturnType<typeof freshDb>['raw'], id: string): string | null =>
+    (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get(id) as { group_id: string | null })
+      .group_id
+
+  it('builds a 3-level chain and REFUSES the 4th level', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'root')
+    wi(raw, 'kid')
+    wi(raw, 'grandkid')
+    wi(raw, 'toodeep')
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'root' })).toBe(true)
+    // Grouping under a CHILD now genuinely nests (supersedes DEC-035's flatten).
+    expect(updateWorkItemFieldsCore(db, 'grandkid', { groupId: 'kid' })).toBe(true)
+    expect(gid(raw, 'grandkid')).toBe('kid')
+    // Level 4 hits the wall.
+    expect(updateWorkItemFieldsCore(db, 'toodeep', { groupId: 'grandkid' })).toBe(false)
+    expect(gid(raw, 'toodeep')).toBeNull()
+  })
+
+  it('counts the SUBTREE the item brings with it', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'a1')
+    wi(raw, 'a2')
+    wi(raw, 'b1')
+    wi(raw, 'b2')
+    updateWorkItemFieldsCore(db, 'a2', { groupId: 'a1' }) // a1 is 2 tall
+    updateWorkItemFieldsCore(db, 'b2', { groupId: 'b1' }) // b1 is 2 tall
+    // 2-tall subtree under a level-2 item → level 4: refused.
+    expect(updateWorkItemFieldsCore(db, 'b1', { groupId: 'a2' })).toBe(false)
+    // Under a ROOT it fits exactly (1 + 2 = 3).
+    expect(updateWorkItemFieldsCore(db, 'b1', { groupId: 'a1' })).toBe(true)
+    expect(gid(raw, 'b1')).toBe('a1')
+    expect(gid(raw, 'b2')).toBe('b1') // internal structure untouched
+  })
+
+  it('refuses self-grouping, a non-item parent, a missing parent, and a CYCLE', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'lead')
+    wi(raw, 'kid')
+    raw.prepare("INSERT INTO nodes (id, kind, title) VALUES ('desk', 'task', 'D')").run()
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'lead' })).toBe(false)
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'desk' })).toBe(false)
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'missing' })).toBe(false)
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })).toBe(true)
+    // Grouping the parent under its own child would close a cycle — refused.
+    expect(updateWorkItemFieldsCore(db, 'lead', { groupId: 'kid' })).toBe(false)
+    expect(gid(raw, 'lead')).toBeNull()
+  })
+
+  it('ungroup clears the reference', () => {
+    const { raw, db } = freshDb()
+    wi(raw, 'lead')
+    wi(raw, 'kid')
+    updateWorkItemFieldsCore(db, 'kid', { groupId: 'lead' })
+    expect(updateWorkItemFieldsCore(db, 'kid', { groupId: null })).toBe(true)
+    expect(
+      (raw.prepare('SELECT group_id FROM nodes WHERE id = ?').get('kid') as { group_id: string | null })
+        .group_id
+    ).toBeNull()
   })
 })
 

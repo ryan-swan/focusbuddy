@@ -144,7 +144,7 @@ export default function MinimapWidget({ widget, inline = false }: Props): JSX.El
 
   if (inline) return body
   return (
-    <WidgetFrame widget={widget} headerLabel="Minimap" headerAccent="bg-stone-300/60">
+    <WidgetFrame widget={widget} headerLabel="Minimap" headerAccent="bg-stone-300/60 dark:bg-white/[0.09]">
       {body}
     </WidgetFrame>
   )

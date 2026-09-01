@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from '../Icon'
+import { parseAttentionCommand } from '../../lib/attentionCommand'
 import { useViewStore } from '../../stores/view'
 import { useNodeStore } from '../../stores/nodes'
 import { useChatStore, NEW_CHAT_KEY } from '../../stores/chat'
@@ -16,7 +17,7 @@ import EnginePickerChip from '../browser/EnginePickerChip'
 // straight into your engine and opens results in the in-app browser. Both
 // semantics: tapping a pill acts on what's typed AND locks the mode (sticky
 // across sessions) until switched. In Ask mode the smart layer still honours
-// the instant rule — a bare URL opens in Plexi and "take me to X" navigates
+// the instant rule — a bare URL opens in Plexii and "take me to X" navigates
 // or searches — so nothing deterministic ever waits on the model. The R6
 // placement review asked the bar to advertise all three doors and teach ⌘K;
 // both live here now.
@@ -386,6 +387,20 @@ export default function StartOrAskPlexi(): JSX.Element {
               }
               if (e.key === 'Enter') {
                 e.preventDefault()
+                // DEC-031: an @attention token anywhere in the line is a
+                // deterministic capture — it must never fall through to the
+                // ask/search path (which is what silently swallowed it).
+                const attn = workItemsOn ? parseAttentionCommand(goal) : null
+                if (attn && attn.mode !== 'none') {
+                  window.dispatchEvent(
+                    new CustomEvent('fb:command-new-work-item', {
+                      detail: attn.captureText ? { captureText: attn.captureText } : undefined
+                    })
+                  )
+                  setGoal('')
+                  setAttnArmed(false)
+                  return
+                }
                 start()
               }
             }}
@@ -395,7 +410,7 @@ export default function StartOrAskPlexi(): JSX.Element {
               attnArmed
                 ? 'What needs attention? Enter files it…'
                 : searching
-                  ? 'Search the web — results open right here in Plexi'
+                  ? 'Search the web — results open right here in Plexii'
                   : 'Ask Plexii, search the web, or open anything — @ jumps to a desk, room or widget'
             }
             // No focus box (Caleb's ruling): the global :focus-visible outline

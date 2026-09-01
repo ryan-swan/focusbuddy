@@ -1,69 +1,120 @@
 import type { FbNode } from '@shared/types'
+import { TERMINAL_WORK_ITEM_STATES, DEFAULT_INTENT_CLASS, canonicalIntentClass } from '@shared/workItems'
 
 // Attention queue semantics (S6, SPEC-017/§2.3-F013). Pure and testable:
 // grouping, ordering, and the per-class primary action. Everything derives
 // from work_item_state / intent_class — NEVER from the legacy status
 // projection (F013: 'open' is a compatibility value, not a "needs me" signal).
+//
+// Taxonomy alignment: the eight primaries in the synthesis's order. Schema
+// values keep the full to_* form; the labels here are THE user-facing names.
+// Item classes canonicalize at this boundary (canonicalIntentClass), so a
+// legacy value a not-yet-updated peer pushed still groups and closes right.
 
 export const QUEUE_ORDER = [
-  'action',
-  'review',
-  'scheduling',
-  'acknowledgment',
-  'discussion',
-  'fyi',
-  'loose_thought'
+  'to_do',
+  'to_review',
+  'to_decide',
+  'to_respond',
+  'to_meet',
+  'to_discuss',
+  'to_remember',
+  'to_know'
 ] as const
 
 export const QUEUE_LABEL: Record<string, string> = {
-  action: 'Tasks',
-  review: 'Reviews',
-  scheduling: 'Scheduling',
-  acknowledgment: 'Acknowledgments',
-  discussion: 'Discussions',
-  fyi: 'FYI',
-  loose_thought: 'Loose thoughts',
-  direct: 'Messages'
+  to_do: 'To Do',
+  to_review: 'Review',
+  to_decide: 'Decide',
+  to_respond: 'Respond',
+  to_meet: 'Meet',
+  to_discuss: 'Discuss',
+  to_remember: 'Remember',
+  to_know: 'Know'
 }
 
 export const QUEUE_ICON: Record<string, string> = {
-  action: 'check_circle',
-  review: 'rate_review',
-  scheduling: 'event',
-  acknowledgment: 'mark_email_read',
-  discussion: 'forum',
-  fyi: 'info',
-  loose_thought: 'lightbulb',
-  direct: 'chat'
+  to_do: 'check_circle',
+  to_review: 'rate_review',
+  to_decide: 'alt_route',
+  to_respond: 'reply',
+  to_meet: 'event',
+  to_discuss: 'forum',
+  to_remember: 'lightbulb',
+  to_know: 'info'
 }
 
-const TERMINAL: ReadonlySet<string> = new Set([
-  'acknowledged',
-  'answered',
-  'scheduled',
-  'delivered',
-  'reviewed',
-  'completed',
-  'discussed',
-  'dismissed',
-  'reclassified',
-  'archived'
-])
+/** DEC-043 — each class's hue, drawn from the PlexiSuite brand family
+ *  (styles/tokens.css: the same seven vivid accents the product groups use,
+ *  so the queues read as part of the SAME system). Applied SUBTLY by design:
+ *  icon tints, a 10%-alpha wash on the active tab, a soft underline — never
+ *  a colored panel. Remember takes the lightbulb's yellow; Know stays a
+ *  neutral slate (information carries no temperature). */
+export const QUEUE_COLOR: Record<string, string> = {
+  to_do: '#0ea5e9', //     sky    (PlexiData)
+  to_review: '#8b5cf6', // violet (PlexiAI)
+  to_decide: '#f59e0b', // amber  (PlexiOffice)
+  to_respond: '#14b8a6', // teal  (PlexiOps)
+  to_meet: '#10b981', //   green  (PlexiBuild)
+  to_discuss: '#6366f1', // indigo (PlexiConnect)
+  to_remember: '#eab308', // yellow (the lightbulb)
+  to_know: '#64748b' //    slate  (neutral)
+}
+
+/** hex + alpha → rgba() for the subtle washes. */
+/** DEC-095 — the same hex as a SPACE-SEPARATED RGB triplet ("14 165 233"),
+ *  for CSS custom properties that get alpha modifiers downstream
+ *  (`rgb(var(--kpi-tone) / 0.2)`). GAP-018/019: a comma triplet or a
+ *  complete color in that position is invalid CSS and paints nothing. */
+export function toneTriplet(hex: string): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
+}
+
+export function queueTint(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+}
+
+/** The confirm card / reclassify / manual-form choice set — ONE copy (the
+ *  pre-alignment build had drifting duplicates in the card and the view). */
+export const CLASS_CHOICES: ReadonlyArray<{ value: string; label: string; hint: string }> = [
+  { value: 'to_do', label: 'To Do', hint: 'Something to be done' },
+  { value: 'to_review', label: 'Review', hint: 'Needs judgment or sign-off' },
+  { value: 'to_decide', label: 'Decide', hint: 'A choice between options' },
+  { value: 'to_respond', label: 'Respond', hint: 'Someone awaits words back' },
+  { value: 'to_meet', label: 'Meet', hint: 'Time and calendar' },
+  { value: 'to_discuss', label: 'Discuss', hint: 'Talk it through live' },
+  { value: 'to_remember', label: 'Remember', hint: 'Keep it around, may fade' },
+  { value: 'to_know', label: 'Know', hint: 'Worth knowing, nothing owed' }
+]
+
+export const CLASS_LABEL: Record<string, string> = Object.fromEntries(
+  CLASS_CHOICES.map((c) => [c.value, c.label])
+)
+
+const TERMINAL: ReadonlySet<string> = new Set(TERMINAL_WORK_ITEM_STATES)
 
 export function isTerminalState(state: string | null | undefined): boolean {
   return state != null && TERMINAL.has(state)
 }
 
+/** An item's class in canonical form (legacy values map forward; missing or
+ *  unknown falls to the default queue). The one lookup key for every map here. */
+export function queueOf(i: Pick<FbNode, 'intentClass'>): string {
+  return canonicalIntentClass(i.intentClass) ?? i.intentClass ?? DEFAULT_INTENT_CLASS
+}
+
 /** The class-appropriate closing verb: what "done" means per queue. */
 export const PRIMARY_ACTION: Record<string, { state: string; label: string }> = {
-  action: { state: 'completed', label: 'Done' },
-  review: { state: 'reviewed', label: 'Reviewed' },
-  scheduling: { state: 'scheduled', label: 'Scheduled' },
-  acknowledgment: { state: 'acknowledged', label: 'Acknowledge' },
-  discussion: { state: 'discussed', label: 'Discussed' },
-  fyi: { state: 'acknowledged', label: 'Got it' },
-  loose_thought: { state: 'dismissed', label: 'Let it go' },
-  direct: { state: 'acknowledged', label: 'Acknowledge' }
+  to_do: { state: 'completed', label: 'Done' },
+  to_review: { state: 'reviewed', label: 'Reviewed' },
+  to_decide: { state: 'decided', label: 'Decided' },
+  to_respond: { state: 'answered', label: 'Responded' },
+  to_meet: { state: 'scheduled', label: 'Scheduled' },
+  to_discuss: { state: 'discussed', label: 'Discussed' },
+  to_remember: { state: 'dismissed', label: 'Let it go' },
+  to_know: { state: 'acknowledged', label: 'Got it' }
 }
 
 /** Items needing the person, snooze-respecting, grouped by queue in the fixed
@@ -80,7 +131,7 @@ export function groupIntoQueues(
   )
   const byQueue = new Map<string, FbNode[]>()
   for (const i of active) {
-    const q = i.intentClass ?? 'action'
+    const q = queueOf(i)
     const list = byQueue.get(q) ?? []
     list.push(i)
     byQueue.set(q, list)
@@ -119,8 +170,73 @@ export function rankScore(i: FbNode, nowMs: number): number {
   return score
 }
 
+// Mirrors intentRules' ACTIONABLE set (deadline-bearing commitment classes).
 function isActionableIntent(c: string | null | undefined): boolean {
-  return c === 'action' || c === 'review' || c === 'scheduling'
+  const q = canonicalIntentClass(c)
+  return q === 'to_do' || q === 'to_review' || q === 'to_meet' || q === 'to_decide' || q === 'to_respond'
+}
+
+/** DEC-047 (D-1) — desk clusters in the Queue lens, DERIVED from parentId
+ *  (analysis/23: never stored — a stored mirror of parentId is the drift
+ *  trap). Rows keep their given order; a desk becomes a cluster only when it
+ *  holds ≥2 rows in this section (a single item's chips already name its
+ *  desk — a header over one row is noise). Cluster order = first appearance,
+ *  so the ranker still decides what leads. */
+export interface DeskCluster<R> {
+  deskId: string | null
+  rows: R[]
+}
+
+export function clusterByDesk<R extends { item: Pick<FbNode, 'parentId'> }>(
+  rows: R[]
+): DeskCluster<R>[] {
+  const byDesk = new Map<string, R[]>()
+  for (const r of rows) {
+    const d = r.item.parentId ?? ''
+    byDesk.set(d, [...(byDesk.get(d) ?? []), r])
+  }
+  const out: DeskCluster<R>[] = []
+  const emitted = new Set<string>()
+  for (const r of rows) {
+    const d = r.item.parentId ?? ''
+    if (emitted.has(d)) continue
+    const group = byDesk.get(d)!
+    if (d && group.length >= 2) {
+      emitted.add(d)
+      out.push({ deskId: d, rows: group })
+    } else if (!d) {
+      // Standalone items collect into ONE trailing pseudo-cluster in order.
+      if (!emitted.has('')) {
+        emitted.add('')
+        out.push({ deskId: null, rows: byDesk.get('')! })
+      }
+    } else {
+      emitted.add(d)
+      out.push({ deskId: null, rows: group }) // single-item desk: render flat
+    }
+  }
+  // Merge the flat clusters (null deskId) preserving order of appearance.
+  const merged: DeskCluster<R>[] = []
+  for (const c of out) {
+    const last = merged[merged.length - 1]
+    if (c.deskId === null && last && last.deskId === null) last.rows.push(...c.rows)
+    else merged.push({ ...c })
+  }
+  return merged
+}
+
+/** DEC-045 — the desk-widget scope. Items whose home is THIS desk; when the
+ *  desk holds no ACTIVE item the widget falls back to everything (the
+ *  operator's ruling: "if there are none, it can default to all") and says
+ *  so, rather than sitting empty next to a full queue. */
+export function scopeItemsForDesk(
+  items: FbNode[],
+  deskId: string
+): { scoped: FbNode[]; fellBack: boolean } {
+  const mine = items.filter((i) => i.parentId === deskId)
+  const active = mine.filter((i) => !isTerminalState(i.workItemState) && i.detachedFromId == null)
+  if (active.length === 0) return { scoped: items, fellBack: true }
+  return { scoped: mine, fellBack: false }
 }
 
 /** The Detached shelf (F-M6/F-M7″): park-local items whose desk was purged or
@@ -223,6 +339,13 @@ export function archivedItems(items: FbNode[]): FbNode[] {
   return items
     .filter((i) => i.workItemState === 'archived')
     .sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+/** The item's full, unedited text for reading or copying: the title, then the
+ *  notes verbatim. A queue row truncates for scannability, so this is the ONE
+ *  place the whole capture is reconstituted — expand and copy both use it. */
+export function itemFullText(i: Pick<FbNode, 'title' | 'description'>): string {
+  return [i.title?.trim(), (i.description ?? '').trim()].filter(Boolean).join('\n\n')
 }
 
 /** One plain-language reason per item (SPEC-018 v1): due proximity beats

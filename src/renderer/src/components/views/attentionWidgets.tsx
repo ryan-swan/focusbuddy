@@ -1,10 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
+import { useWidgetStore } from '../../stores/widgets'
+import WidgetFrame from '../widgets/WidgetFrame'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
-import { isTerminalState, itemReason, QUEUE_ICON } from '../../lib/attentionQueues'
+import {
+  isTerminalState,
+  itemReason,
+  queueOf,
+  scopeItemsForDesk,
+  queueTint,
+  PRIMARY_ACTION,
+  QUEUE_COLOR,
+  QUEUE_ICON
+} from '../../lib/attentionQueues'
+import ItemStatusPill, { statusLabel, statusTone } from '../attention/ItemStatusPill'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import type { WidgetSize } from './homeWidgetDefs'
 
 // The Attention widget family (S6, SPEC-014): the command center's face on the
@@ -39,16 +52,16 @@ function WidgetShell({
 }): JSX.Element {
   const goAttention = useViewStore((s) => s.goAttention)
   return (
-    <button
-      onClick={goAttention}
-      className="w-full h-full text-left flex flex-col p-3 fb-press"
-      title="Open Attention"
-    >
-      <div className="flex items-center gap-2">
+    <div className="w-full h-full text-left flex flex-col p-3">
+      <button
+        onClick={goAttention}
+        title="Open Attention"
+        className="flex items-center gap-2 fb-press text-left"
+      >
         <Icon name={icon} size={15} className="text-[var(--ink-40)]" />
         <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{title}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
-      </div>
+      </button>
       <div className="mt-2 flex-1 min-h-0 overflow-hidden">
         {count === 0 ? (
           <div className="text-[11px] text-[var(--ink-30)]">{emptyLine}</div>
@@ -56,20 +69,100 @@ function WidgetShell({
           children
         )}
       </div>
-    </button>
+    </div>
   )
 }
 
-function ItemLines({ items, max }: { items: FbNode[]; max: number }): JSX.Element {
+/**
+ * DEC-050/051 — the widget row, carrying the SAME anatomy as the Attention
+ * page: a card with the queue's colour as a left spine, a completion circle
+ * that closes with the queue's own verb, the status, and the due date. Only
+ * the density differs — `dense` (small widgets) shows a status DOT where a
+ * roomy widget shows the full pill.
+ *
+ * Closing runs through useCloseWorkItem, the same path the page uses, so the
+ * desk-done and open-subtask offers cannot quietly go missing out here.
+ */
+function ItemLines({
+  items,
+  max,
+  dense = false
+}: {
+  items: FbNode[]
+  max: number
+  dense?: boolean
+}): JSX.Element {
   const now = Date.now()
+  const goAttention = useViewStore((s) => s.goAttention)
+  const setState = useWorkItemStore((s) => s.setState)
+  const closeItem = useCloseWorkItem()
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       {items.slice(0, max).map((i) => {
         const reason = itemReason(i, now)
+        const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
+        const closed = isTerminalState(i.workItemState)
+        const tone = statusTone(i.workItemState)
+        const overdue = i.dueAt && Date.parse(i.dueAt) < now
         return (
-          <div key={i.id} className="min-w-0">
-            <div className="text-[12px] text-[var(--ink-90)] truncate">{i.title}</div>
-            {reason && <div className="text-[10px] text-[var(--ink-40)]">{reason}</div>}
+          <div
+            key={i.id}
+            className="group relative flex items-center gap-2 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] hover:bg-accent/[0.045] transition-colors pl-2.5 pr-2 py-1.5"
+          >
+            <span
+              aria-hidden
+              className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full"
+              style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55) }}
+            />
+            {!closed && (
+              <button
+                onClick={() => void closeItem(i, primary.state)}
+                title={`${primary.label} — close this item`}
+                className="shrink-0 h-[15px] w-[15px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
+              >
+                <Icon name="check" size={10} />
+              </button>
+            )}
+            <button
+              onClick={goAttention}
+              title={i.title}
+              className="min-w-0 flex-1 text-left fb-press"
+            >
+              <span className="block text-[12px] text-[var(--ink-90)] truncate">{i.title}</span>
+              {reason && !dense && (
+                <span className="block text-[10px] text-[var(--ink-40)] truncate">{reason}</span>
+              )}
+            </button>
+            {i.dueAt && (
+              <span
+                className={`shrink-0 text-[10px] fb-tabular ${
+                  overdue ? 'text-rose-500' : 'text-[var(--ink-40)]'
+                }`}
+              >
+                {new Date(i.dueAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </span>
+            )}
+            {closed ? (
+              <Icon name="task_alt" size={13} className="shrink-0 text-emerald-500" />
+            ) : dense ? (
+              <span
+                title={statusLabel(i.workItemState, primary.label)}
+                className="shrink-0 h-2 w-2 rounded-full"
+                style={{ backgroundColor: tone.fg }}
+              />
+            ) : (
+              <ItemStatusPill
+                state={i.workItemState}
+                closeChoice={{ state: primary.state, label: primary.label }}
+                onPick={(next) => {
+                  if (next === primary.state) void closeItem(i, next)
+                  else void setState(i.id, next)
+                }}
+              />
+            )}
           </div>
         )
       })}
@@ -82,7 +175,7 @@ function activeOf(items: FbNode[], queue: string): FbNode[] {
   return items
     .filter(
       (i) =>
-        (i.intentClass ?? 'action') === queue &&
+        queueOf(i) === queue &&
         !isTerminalState(i.workItemState) &&
         !(i.snoozeUntil != null && i.snoozeUntil > now) &&
         i.detachedFromId == null
@@ -114,7 +207,7 @@ export function AttentionQueueWidget({
       count={active.length}
       emptyLine={emptyLine}
     >
-      <ItemLines items={active} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={active} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -130,7 +223,7 @@ export function AttentionCalendarWidget({ size = 'sm' }: { size?: WidgetSize }):
         (i) =>
           !isTerminalState(i.workItemState) &&
           i.detachedFromId == null &&
-          (i.dueAt != null || (i.intentClass ?? '') === 'scheduling')
+          (i.dueAt != null || queueOf(i) === 'to_meet')
       )
       .sort((a, b) => {
         const da = a.dueAt ? Date.parse(a.dueAt) : now + 365 * DAY
@@ -145,7 +238,7 @@ export function AttentionCalendarWidget({ size = 'sm' }: { size?: WidgetSize }):
       count={upcoming.length}
       emptyLine="Nothing dated. Clear runway."
     >
-      <ItemLines items={upcoming} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={upcoming} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -173,7 +266,7 @@ export function AttentionCompletedWidget({ size = 'sm' }: { size?: WidgetSize })
       count={done.length}
       emptyLine="Loops close here as you finish things."
     >
-      <ItemLines items={done} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={done} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
@@ -196,37 +289,60 @@ export function AttentionSystemWidget({ size = 'sm' }: { size?: WidgetSize }): J
       count={sys.length}
       emptyLine="No system signals. All quiet."
     >
-      <ItemLines items={sys} max={size === 'sm' ? 2 : 5} />
+      <ItemLines items={sys} max={size === 'sm' ? 2 : 5} dense={size === 'sm'} />
     </WidgetShell>
   )
 }
 
 // ── The unified Attention widget (DEC-019c) ─────────────────────────────────
-// One widget, a section slider: All · Tasks · Reviews · Coming up · Ack ·
+// One widget, a section slider: All · To Do · Review · Coming up · Respond ·
 // Completed · Stale desks · System. Replaces the seven separates (retired in
 // the registry; stored placements keep rendering their old cases).
 
 const SECTIONS = [
   { key: 'all', icon: 'notifications', label: 'All' },
-  { key: 'action', icon: 'check_circle', label: 'Tasks' },
-  { key: 'review', icon: 'rate_review', label: 'Reviews' },
+  { key: 'to_do', icon: 'check_circle', label: 'To Do' },
+  { key: 'to_review', icon: 'rate_review', label: 'Review' },
   { key: 'upcoming', icon: 'event', label: 'Coming up' },
-  { key: 'acknowledgment', icon: 'mark_email_read', label: 'Acknowledgments' },
+  { key: 'to_respond', icon: 'reply', label: 'Respond' },
   { key: 'completed', icon: 'task_alt', label: 'Completed' },
   { key: 'stale', icon: 'bedtime', label: 'Stale desks' },
   { key: 'system', icon: 'settings_suggest', label: 'System' }
 ] as const
 
-export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Element {
-  const items = useAttentionItems()
+// Persisted section keys from before the taxonomy alignment map forward once.
+const LEGACY_SECTION: Record<string, string> = {
+  action: 'to_do',
+  review: 'to_review',
+  acknowledgment: 'to_respond'
+}
+
+export function AttentionWidget({
+  size = 'md',
+  itemsOverride,
+  showStale = true,
+  storageKey = 'attention.widget.section'
+}: {
+  size?: WidgetSize
+  /** DEC-045: the desk widget hands in a pre-scoped set; the home widget
+   *  keeps reading everything. */
+  itemsOverride?: FbNode[]
+  /** Stale desks are a GLOBAL feeder — hidden in desk scope (CR-09 lean:
+   *  a desk's widget showing that desk's own staleness is circular). */
+  showStale?: boolean
+  storageKey?: string
+}): JSX.Element {
+  const allItems = useAttentionItems()
+  const items = itemsOverride ?? allItems
   const goAttention = useViewStore((s) => s.goAttention)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
-  const [section, setSection] = useState<string>(
-    () => localStorage.getItem('attention.widget.section') || 'all'
-  )
+  const [section, setSection] = useState<string>(() => {
+    const stored = localStorage.getItem(storageKey) || 'all'
+    return LEGACY_SECTION[stored] ?? stored
+  })
   const pick = (k: string): void => {
-    localStorage.setItem('attention.widget.section', k)
+    localStorage.setItem(storageKey, k)
     setSection(k)
   }
   const [stale, setStale] = useState<Array<{ id: string; title: string; daysQuiet: number }>>([])
@@ -266,7 +382,7 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
           (i) =>
             !isTerminalState(i.workItemState) &&
             i.detachedFromId == null &&
-            (i.dueAt != null || (i.intentClass ?? '') === 'scheduling')
+            (i.dueAt != null || queueOf(i) === 'to_meet')
         )
         .sort((a, b) => {
           const da = a.dueAt ? Date.parse(a.dueAt) : now + 365 * DAY
@@ -294,14 +410,14 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
 
   const listFor = (): { list: FbNode[]; empty: string } => {
     switch (section) {
-      case 'action':
-        return { list: active('action'), empty: 'No open tasks. Capture with ⌘K.' }
-      case 'review':
-        return { list: active('review'), empty: 'No reviews waiting.' }
+      case 'to_do':
+        return { list: active('to_do'), empty: 'Nothing to do. Capture with ⌘K.' }
+      case 'to_review':
+        return { list: active('to_review'), empty: 'No reviews waiting.' }
       case 'upcoming':
         return { list: upcoming, empty: 'Nothing dated. Clear runway.' }
-      case 'acknowledgment':
-        return { list: active('acknowledgment'), empty: 'Nothing to acknowledge.' }
+      case 'to_respond':
+        return { list: active('to_respond'), empty: 'No one waiting on you.' }
       case 'completed':
         return { list: completed, empty: 'Loops close here as you finish things.' }
       case 'system':
@@ -318,7 +434,7 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
   return (
     <div className="w-full h-full flex flex-col p-3">
       <div className="flex items-center gap-1.5">
-        {SECTIONS.map((s) => (
+        {SECTIONS.filter((s) => showStale || s.key !== 'stale').map((s) => (
           <button
             key={s.key}
             onClick={() => pick(s.key)}
@@ -363,7 +479,7 @@ export function AttentionWidget({ size = 'md' }: { size?: WidgetSize }): JSX.Ele
         ) : count === 0 ? (
           <div className="text-[11px] text-[var(--ink-30)]">{empty}</div>
         ) : (
-          <ItemLines items={list} max={max} />
+          <ItemLines items={list} max={max} dense={size === 'sm'} />
         )}
       </div>
     </div>
@@ -418,5 +534,76 @@ export function StaleDesksWidget({ size = 'sm' }: { size?: WidgetSize }): JSX.El
         )}
       </div>
     </div>
+  )
+}
+
+// ── The desk-placed Attention widget (DEC-045, CR-09 D-B) ───────────────────
+// The SAME face as the home widget, scoped to the desk it sits on. Scope
+// persists in widget.content ({"scope":"desk"|"all"}); "desk" with an empty
+// desk falls back to everything and says so, rather than sitting blank next
+// to a full queue.
+
+export function DeskAttentionWidget({
+  widget
+}: {
+  widget: import('@shared/types').Widget
+}): JSX.Element {
+  const items = useAttentionItems()
+  const update = useWidgetStore((s) => s.update)
+  const scope = useMemo<'desk' | 'all'>(() => {
+    try {
+      const c = JSON.parse(widget.content || '{}') as { scope?: string }
+      return c.scope === 'all' ? 'all' : 'desk'
+    } catch {
+      return 'desk'
+    }
+  }, [widget.content])
+  const pickScope = (next: 'desk' | 'all'): void => {
+    void update(widget.id, { content: JSON.stringify({ scope: next }) })
+  }
+  const { scoped, fellBack } = useMemo(
+    () => scopeItemsForDesk(items, widget.taskId),
+    [items, widget.taskId]
+  )
+  const effective = scope === 'all' ? items : scoped
+  const deskCount = fellBack ? 0 : scoped.length
+  return (
+    <WidgetFrame widget={widget} headerLabel="attention" headerAccent="bg-violet-300/60 dark:bg-violet-400/25">
+      <div className="w-full h-full flex flex-col bg-[var(--surface-raised)]">
+        <div className="flex items-center gap-1 px-3 pt-2.5">
+          {(
+            [
+              ['desk', `This desk${deskCount ? ` · ${deskCount}` : ''}`],
+              ['all', 'All']
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => pickScope(k)}
+              className={`px-2 h-6 rounded-full fb-t-caption fb-press ${
+                scope === k
+                  ? 'bg-[var(--surface-sunken)] text-[var(--ink-100)]'
+                  : 'text-[var(--ink-40)] hover:text-[var(--ink-80)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {scope === 'desk' && fellBack && (
+            <span className="fb-t-caption text-[var(--ink-30)] truncate">
+              nothing here yet — showing all
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-h-0">
+          <AttentionWidget
+            size="lg"
+            itemsOverride={effective}
+            showStale={scope === 'all'}
+            storageKey={`attention.widget.section:${widget.id}`}
+          />
+        </div>
+      </div>
+    </WidgetFrame>
   )
 }

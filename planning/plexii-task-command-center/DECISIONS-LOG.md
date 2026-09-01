@@ -605,4 +605,1917 @@ all entangled with the work_item schema. Known cost: when the fork branch
 next merges main after PR #2 lands, the six shared files conflict textually
 (branch is the semantic superset — resolve keep-branch).
 
+---
+
+## DEC-030 — Leave it landed; iteration continues on main's substrate
+**Date:** 2026-08-26 · **Status:** RULED (operator)
+**Context:** After PR #4 merged, the operator revealed "declare ready" had been
+a misunderstanding — he believed he was confirming the groundwork split
+(DEC-029b), not authorizing the full landing, and his standing intent had been
+wait-until-finished (the fork-only rule). He asked whether reverting the
+Attention layer off main was feasible without pain.
+**Analysis given:** (1) a revert cannot un-reveal anything — PR #4's diff, the
+shared-repo branch, and the in-repo planning corpus are permanently visible in
+history; the real usage gate is `workItems.enabled` default-OFF; (2) reverting
+a merged branch plants the revert-then-re-merge trap (git treats the 91 commits
+as already-in-history; re-landing later requires revert-of-the-revert); (3) the
+layer is dormant for Michael + Caleb until they toggle it.
+**Ruling:** **"Leave it landed, let's keep working through the attention
+layer."** The landing stands. Future Attention work iterates on the branch and
+lands in rounds via PRs when the operator chooses — no revert, no freeze.
+**Owed:** the operator sends Michael + Caleb the WIP framing note (drafted in
+session: the big PR is the Attention layer, work-in-progress, off by default,
+don't toggle it on yet).
+**Process lesson (standing):** before any big irreversible or outward-facing
+action, the assistant restates CONCRETELY what is about to happen ("this
+merges 91 commits into main, visible to the team immediately") and gets fresh
+explicit confirmation — never executes off a pre-agreed codeword alone.
+**Numbering note:** the CR-09 brainstorm rulings (D-A…D-K, analysis/21) will
+record as DEC-031+; older pointers saying "→ DEC-029/030" mean "the next DEC."
+
+
+
+---
+
+## DEC-031 — @attention is deterministic ANYWHERE in the message
+**Date:** 2026-08-26 · **Status:** RULED (operator: "yes to all three — do them") + IMPLEMENTED
+**Context:** DEC-027 made a LEADING @attention deterministic and deliberately
+left mid-sentence/trailing on the AI proposal path. Operator live QA broke that
+premise: "i need to create a pitch deck for cetra by friday @attention" produced
+only a create-page card — the item never reached the queue. A prompt rule the
+model can ignore is not a capture guarantee.
+**Ruling:** the token is an ADDRESS, not a topic. Wherever it sits, the capture
+happens deterministically. What position still decides is the fate of the REST
+of the message: **leading** = pure capture (the model never sees it, DEC-028's
+inline card); **inline** = capture AND still send the message with the token
+stripped, so a "build me X @attention" gets both halves — the build action the
+operator liked AND the tracking item he was missing.
+**Implementation:** ONE shared grammar (`lib/attentionCommand.ts`) read by the
+chat composer, ⌘K, the home bar, and the chat store — four private regexes
+could not be kept honest. Two bypasses were found only by driving the real UI:
+(a) ⌘K's omni rows hard-score "Ask Plexii" at 2000 and outranked the capture
+entry (the operator's exact 30s path) — omni rows now yield while the token is
+present; (b) ⌘K/home/voice call `chatStore.send()` DIRECTLY, bypassing the
+composer where the interception lived — `send()` is now the last-mile guarantee.
+The composer strips the token before calling it, so double capture is
+impossible by construction.
+**Alternatives:** strengthening the prompt rule only (rejected — tried first
+this same session; it is a nudge, and the operator asked for a guarantee);
+pure-deterministic with no message sent (rejected — it would have silently
+removed the buildable half he explicitly valued).
+
+---
+
+## DEC-032 — desk-placed proposals carry their own target
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Context:** operator QA: "It's making me manually select the desk even though
+it already identifies the right desk." True, and structural — `create-page`
+carried no desk field at all, so the card genuinely could not know; a desk named
+in the model's PROSE is not machine-readable. Off a desk, every desk-kind card
+dead-ended into the chooser.
+**Ruling:** desk-placed proposals may name their destination. Optional `deskId`
+on create-page / create-widget / create-todo-list / create-table; the model is
+shown a real desk ROSTER (ids + titles, capped at 25, newest first) in both the
+chat and agent-loop prompts, and is told to use an exact id and never invent
+one. The card resolves id-then-title against the live node store and applies
+there without asking.
+**Safety rule:** an id (or title) matching nothing live resolves to null and the
+normal chooser runs — a stale or hallucinated id must NEVER silently retarget a
+different desk. Pure resolver in `lib/proposalDesk.ts`, unit-tested including
+that refusal.
+**Cost noted:** the roster rides the cached system prefix; desks change rarely
+enough for that to hold, and it is capped.
+
+---
+
+## DEC-033 — the ask-latency trail (and what it already proved)
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED + MEASURED
+**Context:** operator QA: a ⌘K ask "took over 30 seconds" with no visible
+progress, and nothing in the app could say where the time went.
+**Ruling:** instrument before optimising. `[ask-latency]` in `sendChatStream`
+reports total / retrieval / time-to-first-token / generate, the system-prompt
+size, token counts, cache reads, the model, and — decisively — whether the turn
+actually STREAMED.
+**First measurement on the operator's own setup:** `total=7350ms
+retrieval=831ms ttft=6518ms generate=1ms streamed=false in=660 out=252`.
+**What it proves:** retrieval is not the problem (<1s). `streamed=false` is: the
+PlexiDesk-credits proxy rejects streaming outright (a known constraint, see the
+credits arm in `sendChatStream`), so the ENTIRE answer is generated before a
+single character reaches the screen. At ~40 output tokens/sec, the operator's
+"thorough" answer was simply ~30s of generation with **zero feedback by
+construction** — not a hidden inefficiency, and not something a code fix in
+this repo can shorten.
+**Open (needs a ruling, not yet built):** the honest levers are (a) BYOK — his
+own Anthropic key streams, and the wait becomes visible progress; (b) a real
+progress affordance for credits mode; (c) trimming output size for simple asks.
+(a) is the only one that removes the wait rather than dressing it.
+
+
+
+---
+
+## DEC-034 — Capture is task + optional notes, then a PREVIEW of the finished item
+**Date:** 2026-08-26 · **Status:** RULED (operator, from his own queued items 3+4) + IMPLEMENTED
+**Context:** two of the operator's own captured to-dos, built as one round because
+they are one flow. (3) "There should be an optional notes section on attention
+items… write the task, hit tab, add some additional context, then hit enter."
+(4) "instead of the button being 'Classify' it should just be 'Enter'… the next
+section should be an example of the tidied up version… formatted how the final
+task will look, and if the user approves all they have to do is click enter,
+otherwise… 'Enter As Is' which doesn't clean up any of the title or notes."
+**Ruling + implementation:** the console gains a second, optional NOTES field
+(Tab into it, Enter from either field files; Shift+Enter still newlines). The
+button says **Enter ↵** — "Classify" named an implementation detail and
+mis-described the key. The confirm card stops ASKING what the capture will
+become and instead PREVIEWS the finished item — class icon, title, notes, due
+chip, target desk — laid out as it will sit in the queue.
+**The tidy moved INTO the preview** (amends DEC-026's presentation, not its
+principle): it used to sit beside the card as a "Use tidied" offer; it now
+lands in the preview when it arrives, marked "Tidied · undo", with **Enter as
+is** filing the operator's own title and notes untouched. Approve-before-apply
+still holds — approval is now the Enter he was already pressing. "Enter as is"
+appears ONLY when a tidy actually changed something, else both buttons file an
+identical item.
+**Latency contract intact (R011):** the tidy is still requested AFTER the screen
+is up; a capture never waits. A slow or absent tidy means the preview shows the
+operator's own words — a correct outcome, not a degraded one. The tidy now reads
+the notes too, so a crisp task line with a rambling note qualifies and the note
+is cleaned rather than replaced by a summary of the title.
+**Preservation:** verbatim capture is never lost on any path — tidied items keep
+the original under "— as captured —"; untidied ones keep BOTH the notes and the
+typed text whenever the derived title dropped part of it (a stripped "fyi:", or
+only the first sentence becoming the title). Letting notes win alone would have
+silently discarded the rest; caught in review, pinned by test.
+
+---
+
+## DEC-035 — Grouping + manual order in the queue (the six-dot handle)
+**Date:** 2026-08-26 · **Status:** RULED (operator, his queued item 2) + IMPLEMENTED
+**Context:** "if I have 2 tasks created at different times but they end up being
+related there should be that six dot icon thing next to the tasks that allow me
+rearrange tasks, move them to other sections, or even attach to already existing
+tasks for grouped tasks/related task or subtask."
+**The architectural constraint that shaped it:** work items are LEAF nodes
+(§2.5 leaf invariant — nothing nests under a work item, enforced at create AND
+at sync apply), and `parent_id` already means "the desk this lives on". A
+subtask via parent_id was therefore structurally unavailable.
+**Ruling:** grouping is a **SIBLING reference** — `group_id` = the leading
+item's id — joining the column manifest, so it syncs / is allowlisted / is
+emitted without touching a transport by hand. **Exactly ONE level**, enforced
+at the DB and not merely in the UI: a leader can never be grouped, self-grouping
+refused, a non-item leader refused, and grouping onto a CHILD flattens to that
+child's leader. A group can never become a tree, whatever writes it.
+**Three gestures, one handle:** drop on a row's middle = attach; top/bottom =
+reorder; on a section header = move sections (a reclassify, machinery that
+already existed). Native HTML5 drag — the house pattern; there is no dnd
+library in this codebase.
+**Ordering:** manual placement beats the ranker ONLY where the operator placed
+something (`sortOrder` 0 = never dragged → keeps its ranked position); a drop
+renumbers the whole queue from 1, which keeps order stable and tie-free as items
+come and go. `sort_order` is a base nodes column already in the sync body, so a
+hand-ordered queue travels between devices without joining the manifest.
+**The failure mode it must never have:** a child whose leader leaves the queue
+(completed / reclassified / snoozed) is **PROMOTED to standing alone, never
+hidden** — an item vanishing because of something that happened to a DIFFERENT
+item would be unforgivable. Pinned by test.
+**Scope:** Queue lens only; Due and Origin answer a different question and stay
+ranked. Deferred: multi-select drag, cross-queue grouping.
+
+
+
+---
+
+## DEC-036 — Double-click opens the whole item for editing
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Decision:** double-clicking a queue row opens an editor over the ENTIRE item —
+title, notes, classification, due date, urgency, tags, and the desk it lives on.
+Closes the oldest Layer-0 gap (analysis/21 §12 "no post-creation editing").
+Only CHANGED fields are written, so editing one field can never restamp another;
+the desk change is a node MOVE (the Detached-shelf recovery's own call), not a
+work-item field. Guard lesson: "ignore double-clicks on buttons" blocked nearly
+the whole row (the title and expander ARE buttons) — the exemption is scoped to
+the action cluster only, pinned by test.
+
+---
+
+## DEC-037 — Context chips (derived) + tags/urgency (chosen), and the two doors
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Decision:** every row shows what it is ABOUT, in two deliberately different
+kinds. **DERIVED** (never typed, never stale): the desk it lives on, the PLAN
+enclosing that desk, what it was marked from — plan chip opens the plan, desk
+chip opens the desk. **CHOSEN** (never mandatory): `wi_urgency`
+(low/normal/high/urgent — 'normal' renders NO chip; a badge every row wears
+says nothing) and free-form `tags` (new manifest column; comma-delimited,
+normalized, capped; empty = NULL). A tag bar shows the vocabulary in use with
+counts; one tag filters at a time — narrowing to a thread of work, not a query
+language. **The two doors (the Notion finding):** the desk button opens a
+CANVAS, and what the canvas hosts does its own thing — marking a Notion tool
+and pressing "desk" launched the external Notion app. "Open it here" now puts
+the marked object into Focus Mode full-screen inside Plexi; the desk button
+remains the whole-canvas door. Verification note for the record: a manifest
+column can EXIST in the DB while main still runs pre-column code — reads come
+back undefined and look like a write failure; restart first.
+
+---
+
+## DEC-038 — "Start it with Plexii" = a PREFILLED CHAT, staged never sent
+**Date:** 2026-08-26 · **Status:** RULED (operator: "start it should open a
+prefilled chat") + IMPLEMENTED
+**Decision:** the bridge from a captured intent to the work itself. Each row
+gains "Start it with Plexii"; a Select mode (the index pages' own bulk shape)
+gains "Get started with Plexii" over a multi-selection. The prompt is composed
+from what was ALREADY captured — title, notes verbatim, desk, plan, due,
+urgency, tags — with a PER-CLASS ask (deciding is not doing: to_decide lays
+out options and costs, to_respond drafts a reply, to_review says what to look
+at first…). No model call builds it; it works with the key removed.
+**The hard rule:** it is STAGED in the composer (fb:composer-stage — the same
+seam Expand uses) and NEVER auto-sent; the assistant must not start acting
+because the operator glanced at his queue. Pinned by test (the hand-off
+contains no .send call). A single-item start navigates to the item's desk
+first so the chat carries that desk's context; a multi-start lists the items
+with their context and asks for sequencing, deliberately NOT inlining N
+notes-paragraphs. **Verification:** prompt composer + stage-not-send are
+unit/pin-tested; the live click-through was not visually confirmed — the
+operator was actively using the app and driving it further would have
+interrupted him.
+
+
+
+---
+
+## DEC-039 — Capture-time context: urgency + tags on the preview; tags become @-MENTIONS
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED (P0 half)
+**Decision:** the confirm card's preview screen carries the chosen context —
+an urgency row and ONE shared TagMentionInput — so an item can arrive in the
+queue already tagged; both ride the CREATE itself, not a follow-up patch. The
+same input serves the manual form and the item editor, so the @ grammar
+cannot fork. Grammar: a plain word is a free-form tag; "@" opens a typeahead
+over the PRIMARY GROUPINGS — people (org directory), desks, rooms, plans —
+and picking one attaches a TYPED mention ({kind,id,title} in the new
+`mentions` manifest column; JSON, defensively parsed — the column rides sync
+and a peer could write anything; title frozen at pick time so a dangling
+mention degrades to text, never a blank).
+**Chips:** mention chips render on rows after tags. Desk/room/plan mentions
+NAVIGATE (goTask/goRoom/goProject). A PERSON mention is stored and shown with
+honest copy — "notifications arrive with routing" — because pinging them is
+SPEC-027; the reference is captured NOW so nothing is re-entered when the
+rails land.
+**THE BIGGER PROGRAM (registered, not built):** the operator's directive —
+@-mentions of people/desks/rooms/plans THROUGHOUT the app (docs, sticky
+notes, messaging, any surface) to bring someone's attention to a thing. This
+is the cross-reference rail (analysis/21 §13) + SPEC-027 routing converging:
+mention-in-any-surface → a to_respond item in the mentioned person's queue.
+The chat composer's mention machinery (tiptap MentionSuggestion) and this
+input's grammar are the two seeds; unifying them + the routed-notification
+half is its own initiative with Caleb's surfaces involved (docs/stickies are
+core PlexiDesk). Sequenced with SPEC-027; nothing else rides it quietly.
+**Session note (two sessions, one worktree):** a second Claude session was
+mid-flight on tidy/auto-arrange in this SAME working tree. Its four files
+(FloatingPill, autoArrange, two tidy tests) were left untouched and
+uncommitted here; its two failing tests are its own WIP, not this round's.
+One earlier commit (`1d0ac432`) had already swept 28 additive lines of its
+autoArrange work via a broad `git add` — disclosed, harmless (suite was
+green), and staging is explicit-file-list from now on.
+
+
+
+---
+
+## DEC-040 · DEC-041 — (parallel session) tidy geometry + widget-menu honesty
+**Date:** 2026-08-26 · **Status:** IMPLEMENTED by the PARALLEL session, recorded here for continuity
+A second session working this same branch shipped two rounds without log
+entries: `860644fd` "tidy stops stretching widgets, and square grid picks its
+own shape" (claims DEC-040) and `e846113e` "the widget menu only offers what
+it can actually do" (claims DEC-041). Numbers honored as theirs by commit
+order. Cross-check done here: the Attention menu row (CR-09 D-A) survived
+their contextMenu changes; resolver + preset suites green after their commit.
+
+---
+
+## DEC-042 — Notes on EVERY capture path; the tidy always attempts on real content
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**⚠ Numbering note:** commit `bbe2c397` and its code/test comments say
+"DEC-040" — written before the parallel session's commits surfaced and took
+040/041. THIS log is canonical: the notes/tidy round is **DEC-042**.
+**Finding 1 — "I lost the ability to add a note… in the ai chat… sometimes
+I see it."** The notes stage lived on the console's textarea screen; the
+chat's inline card and every prefilled console open (armed ⌘K pill,
+@attention) render the confirm card DIRECTLY and never visit that stage.
+**Fix:** the preview itself carries an editable notes area on every path.
+Enter inside it = newline; ⌘/Ctrl+Enter files. Card-typed notes are the
+operator's own words: the tidy never clobbers them (notesEdited guard) and
+"Enter as is" keeps them while reverting only the AI's title rewording. The
+bare manual form gains a notes field (it never had one).
+**Finding 2 — "sometimes I get the tidied up version, other times I don't."**
+The DEC-026 messiness gate only requested a tidy for 30+ words / filler /
+run-ons; medium captures showed raw. Per the operator's restated contract
+(Enter → ALWAYS the tidied version → Enter files the cleaned version),
+`qualifiesForTidy` now fires on 8+ words, multi-sentence text, attached
+notes, or the messiness signs; tiny fragments still skip ("call Bob
+Thursday" IS its own tidy). The armed second Enter waits (4s cap) for the
+in-flight tidy so it files the cleaned version. Regex lesson pinned: the
+first multi-sentence probe used `[.!?;]\S` and missed normal prose — the
+slice(0,-1) trick from needsCleanup is the correct test.
+
+
+
+---
+
+## DEC-043 — A page per class; on-brand subtle colors; drag-only reclassify; light tidy
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**(a) Tabs.** The eight classes become PAGES: a tab row (All + the eight, with
+counts) above the queue. A class tab shows only that queue — no scrolling past
+the others; All is the old full-list view. Tabs are DROP TARGETS, which is what
+makes drag-reclassify work on a single-class page. Due/Origin lenses still show
+everything. **(b) Colors from the ONE palette:** each class takes a PlexiSuite
+brand-family hue (tokens.css — the product groups' own accents): To Do sky,
+Review violet, Decide amber, Respond teal, Meet green, Discuss indigo, Remember
+lightbulb yellow, Know neutral slate. Subtle by construction — icon tints, a
+10%-alpha wash + soft underline on the active tab, never a colored panel.
+**(c) The row reclassify button is REMOVED** per the ruling; the two paths are
+drag (section or tab) and the editor's class chips. **(d) Tidy calibration:**
+the model-tidy bar drops 8→5 words, and BELOW it a deterministic light tidy
+capitalizes every derived title (first letter, standalone "i", weekdays/months
+with "may" excluded, a name after a person-verb unless stopword) — "call bob
+thursday" → "Call Bob Thursday" with zero model calls; only ever ADDS capitals,
+idempotent, reaches secondaries.
+
+
+
+---
+
+## DEC-044 — A highlight IS the capture: full selection → notes, on every surface
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Finding:** marking a highlighted passage ("Add to Attention" on a desk page)
+produced a good title and EMPTY notes — the mark used the widget-level preset
+and never read `ctx.selection`; the highlighted text was dropped. And the AI
+chat's selection menu offered only sticky/note/copy — no attention option.
+**Ruling + implementation:** `presetForSelection` — the selection's first line
+titles the item ("+N more" when a list was highlighted), the FULL selection
+rides the notes verbatim; one-line selections keep empty notes rather than
+repeating the title; class still from the host kind. The notes travel the whole
+path (menu → seam's new `notes` field → console store `initialNotes` → notes
+field → card → item), pinned at every hop. The chat menu gains "Add to
+Attention…" as its FIRST row, deliberately NOT desk-gated (an item files
+standalone; sticky/note need a canvas). Class call worth recording: an AI-chat
+selection routes to the DEFAULT to_do, not chat→to_respond — a highlighted AI
+answer is something to act on; nobody awaits words back from a bot.
+
+
+
+---
+
+## DEC-045 — The Attention widget on any desk (CR-09 D-B, ruled)
+**Date:** 2026-08-26 · **Status:** RULED (operator) + IMPLEMENTED
+**Decision:** 'attention' becomes a real CANVAS widget kind — catalog entry
+(Tools, 380×340), picker row, renderer case — so the home screen's
+command-center face is placeable on any desk. **Scope:** defaults to THIS
+desk's items; a two-chip header control (This desk · N / All) widens it, and
+the choice persists per-widget in `widget.content` ({"scope":"desk"|"all"}).
+**The fallback is the operator's own rule:** a desk holding no active item
+shows everything with an honest "nothing here yet — showing all" line, never
+a blank box beside a full queue. **One component, not a fork:** the desk
+variant WRAPS the home AttentionWidget (itemsOverride + per-widget section
+storageKey), so look-and-feel cannot drift. Stale-desks (a global feeder)
+hides in desk scope per CR-09's own lean — a desk's widget reporting that
+desk's staleness is circular. Cross-version: old builds render an unknown
+kind as nothing; the row itself syncs like any widget.
+
+
+
+---
+
+## DEC-046 — A highlighted LIST becomes several items (pressure-tested shape); the tidy formats
+**Date:** 2026-08-26 · **Status:** RULED (operator, with an explicit "decline if
+problematic" bar) + IMPLEMENTED in the shape that survived the pressure test
+**The pressure test, and what it killed:** rendered lists (pages, the AI chat)
+usually arrive FLATTENED — the browser's selection serializer strips markers
+and indentation, so header-vs-child structure is unrecoverable there. A model
+could guess it, but that fails BOTH of the operator's stated bars (as fast as
+today; high accuracy). Model inference was therefore rejected.
+**The shape that shipped — deterministic, previewed, capped:**
+- Markdown-source selections (markers + indentation survive): header bullets
+  → PRIMARY items, sub-bullets → CHILDREN grouped under them via DEC-035's
+  one-level sibling grouping. Numbered lists, checkboxes, continuation lines,
+  and mid-list orphan children (promoted, never dropped) all handled.
+- Flattened selections: 3+ short entry-like lines → SIBLINGS. Nesting is
+  never guessed.
+- PROSE never splits (short/punctuated-line heuristics, tested).
+- Cap 12; over it falls back to one item + full notes.
+- The split ALWAYS renders as the confirm card's pre-checked chips (DEC-025's
+  pattern) before anything files — a wrong split costs one uncheck, not a
+  wrong item. Filing preserves the previewed structure: children group under
+  the item their header created; a child whose header was unchecked stands
+  alone. List rows inherit the primary's class chip and the marked source.
+**Formatting (the second finding):** selection notes are whitespace-normalized
+deterministically (the "two or three spaces between items" complaint), and the
+tidy prompt now treats FORMATTING as part of the job — multi-point notes come
+back as "- " bullet lines, not a paragraph. Marked captures with substantial
+prose notes (the chat-summary case) now request the tidy too, for its
+formatting: the note lands as bullets, the preset title stands, and operator-
+edited notes are never overwritten.
+
+
+
+---
+
+## DEC-047 — Desk ⇄ Attention: the derived shape (analysis/23 D-1…D-6, ruled "proceed with all")
+**Date:** 2026-08-26 · **Status:** RULED (operator: "your plan is better, proceed
+with all your recommendations") + IMPLEMENTED
+**D-1/D-2 — desk clusters, DERIVED:** in the Queue lens, items sharing a
+`parentId` render under a desk header (title · "Desk: <status>" — prefixed per
+the naming caution · due · open count · click opens the desk). A desk clusters
+only at ≥2 rows in a section (a single item's chips already name its desk).
+Pure `clusterByDesk` over the already-ordered rows — the ranker still decides
+what leads; storage untouched; the rejected stored-grouping trap is PINNED
+rejected (the cluster function provably never writes groupId).
+**D-3 — suggestions, never writes:** closing the LAST active item on a
+still-open desk offers "mark the desk done?" once, right then; accepting uses
+the same user-owned status write every desk surface uses. Plan-promotion at
+accumulation stays with CR-09 D-C (its threshold is that brainstorm's DEC).
+**D-4 — All-Desks reverse signal:** each desk card's meta line gains
+"N open · M due" (48h window), derived with the queues' own active-set rules;
+the status groups are untouched.
+**D-5 — capture-time status:** items can be BORN open / in progress / waiting /
+blocked (`CAPTURE_STATES` + `initialWorkItemState`, unit-pinned: terminal at
+birth refused — it would skip closure notifications; 'suggested' still
+approval-driven). Compact status rows on the confirm card and the manual form.
+**D-6 — coordination:** desk `status` remains user-owned; nothing here
+auto-writes it, and any future change to how it is WRITTEN goes to Caleb first
+(core-surface field, preservation doctrine).
+
+---
+
+## DEC-048 — The Attention COMMAND CENTER (overhaul, operator-ruled 8-part spec)
+**Date:** 2026-08-26 · **Status:** IMPLEMENTED (both parts)
+**The ruling:** the Attention page becomes a personal dashboard/command center
+— wide grid, widget blocks, analytics, bulk operations, real nesting — "the
+most useful personalized command center possible: everything needing
+attention, prioritized, most important first, including AI recommendations on
+where to start."
+
+**Part 1 — layout, blocks, analytics (commit `DEC-048 (part 1)`):**
+- Two-column grid (queue column at a readable measure + 340px block rail);
+  firmer row dividers (`--edge-firm`) and more row breathing room.
+- ONE component per widget, `variant="compact" | "full"`
+  (`attentionBlocks.tsx`): Pulse, Overdue radar, Today's agenda, Recent
+  activity, Analytics, Start here. The Attention page renders full; the home
+  dashboard's four cases render the SAME components compact — the legacy
+  task-data-backed renderers are gone, so the surfaces cannot drift.
+- `attentionAnalytics.ts`: every number derives from work_item_state +
+  timestamps only (no pretend event history). Honesty rule: a claim that
+  would need a real event log is NOT made. Status breakdown per class ×
+  state; plain-language trends (closing streaks, week-over-week class swings,
+  arrival/closure balance, oldest untouched); `startRecommendations` = the
+  queues' own ranker, top-3 with reasons, one-click Start-with-Plexii.
+
+**Part 2 — nesting + bulk (this commit). SUPERSEDES DEC-035/DEC-047's
+one-level rule by explicit operator instruction:**
+- **Nesting to depth 3** (`MAX_GROUP_DEPTH` in shared/workItems.ts). The db
+  guard walks UP from the new parent (level + cycle refusal) and DOWN through
+  the item's own subtree (it rides along): `level + height ≤ 3` or the write
+  refuses — whatever writes it (drag, agent, sync replay). Dropping onto a
+  child now genuinely nests (the DEC-035 flatten is gone).
+- `orderWithGroups` renders the tree (depth 0/1/2, childCount, descendants);
+  an absent parent PROMOTES its subtree (never hides), cycles render flat.
+- **Collapsible parents:** "N subtasks" fold on every parent row, persisted;
+  `visibleRows` is the pure filter. Verified live (8→7→8 rows).
+- **Drop planners mirror the cap:** planDrop/planDropMulti refuse over-deep
+  or cyclic drops, and the dwell affordance never ARMS an illegal nest
+  (`canNestUnder`). Cross-queue drops reclassify the WHOLE subtree — children
+  follow their parent, never strand.
+- **Marquee selection:** Shift+drag sweeps a rectangle (Shift because bare
+  drag = reorder); auto-enters Select mode; the post-sweep click is
+  swallowed.
+- **Bulk verbs:** Complete all (each item's OWN queue verb — honest record),
+  Dismiss all, Archive all. "Delete" maps to dismiss BY DESIGN: work items
+  have no hard delete; parked and recoverable.
+- **Bulk drag:** dragging a selected row moves the whole selection — reorder,
+  reclassify, or drop ON an item to nest them all as its subtasks (selection
+  tops re-parent; internal structure rides).
+- **Parent completion accounts for subtasks:** closing a parent with open
+  descendants offers close-all-with-it / just-this-one / cancel — an offer,
+  never a silent cascade, and closures use each child's own queue verb.
+
+**Gates:** suite 2,963 green (attentionGrouping rewritten, 30 tests;
+workItemsVerbs guard block rewritten for depth/cycle/subtree; analytics 9);
+typecheck clean; live CDP smoke — zero console errors, blocks live, real
+nested data rendering, collapse verified.
+
+---
+
+## DEC-049 — Command-center LAYOUT: KPI band, the day top-right, a short rail
+**Date:** 2026-08-26 · **Status:** RULED (operator, on the DEC-048 build:
+"way too many widgets along the right-hand column… you have to scroll down too
+far… analytics should be across the top, think KPI metrics on a CRM
+dashboard… top right should be today's agenda or today's calendar, underneath
+the primary banner header… with analytics is where the start here section
+should be — that should be the AI prompt and recommendation") + IMPLEMENTED
+**The arrangement** (pinned in tests so it cannot silently drift):
+- **Analytics across the top** as a `variant="band"` — six KPI tiles (Open,
+  Due today, Overdue, In progress, Waiting, Closed·7d) with a closed-per-day
+  sparkline and any honest trend lines beneath, plus a "Breakdown" disclosure
+  that opens the per-class stacked bars two-up. Pulse is GONE from this page:
+  its numbers ARE the KPI tiles, so the widget count drops instead of
+  duplicating (Pulse still serves the home dashboard compact).
+- **Start here sits with analytics**, directly beneath the band, and is now an
+  AI strip: a prompt box ("Ask Plexii about your queue") that stages the
+  question together with the ranked top-3 and their reasons, plus the three
+  recommendation cards. Staged, never sent (DEC-038 holds).
+- **Today, top right, under the banner** — and it is the real CALENDAR now:
+  `dayTimeline` merges today's time blocks (meeting blocks marked) with the
+  work due in the day. It loads today's range ONLY when the store's window
+  doesn't already cover it, so the Calendar view's own range is never
+  clobbered.
+- **The rail is two blocks and STICKY** (Today + Overdue radar, ~180px): it
+  no longer scrolls away, which is what made the old six-widget column feel
+  long. Recent activity moved to the FOOT of the working column beside the
+  other history shelves (Recently closed, Archived) — history belongs with
+  history, live work belongs in the rail.
+**KPI tiles are filters.** Pressing a tile narrows the queues; the count and
+the rows come from the SAME predicate (`KPI_FILTERS`, exported and used by
+both), so they can never disagree — unit-pinned. A narrowed queue always says
+"Showing <what> only" with a Clear beside it. Closed·7d opens the
+Recently-closed shelf instead (it is not a queue filter).
+**Variant rule extended:** `BlockVariant` gains `'band'` — still ONE component
+per widget, one more display branch, never a per-surface fork.
+**Gates:** 2,974 green (KPI/timeline math + count-equals-filter honesty +
+layout pins); typecheck clean; live CDP — 6 tiles, ask box, 3 recommendations,
+rail computed `position: sticky` at 181px, tile-click filter verified against
+its own count, zero console errors.
+
+---
+
+## DEC-050 — Item rows get real project-tool anatomy (ClickUp/Jira grammar)
+**Date:** 2026-08-27 · **Status:** RULED (operator: "the items shouldn't be
+stacked seamlessly together… there needs to be either a line or even a tiny
+bit of spacing… it should look and feel more like a true project management
+app like ClickUp or Jira — incorporate those UI/UX elements") + IMPLEMENTED
+**The bug underneath the complaint.** The list DID carry
+`divide-y divide-[var(--edge-firm)]` — and drew nothing. `clusterByDesk`
+wraps rows in one div PER DESK, so the dividers landed between clusters; a
+queue rendering a single cluster (the common case) got zero lines. Separation
+was never a taste question — it was broken and invisible in review because
+the class looked correct.
+**Rows are now cards.** Each row is its own rounded, bordered surface with a
+6px rhythm between them, a hover lift (a low-alpha accent wash — `sunken`
+would read as recessed on a raised card, and no `--surface-hover` token
+exists), and a 3px spine down the left edge in the QUEUE's colour, so what
+kind of work a row is stays readable without reading. Nesting reads as a
+26px indent per level (capped with the DEC-048 depth rule). The desk-signals
+shelf and the detached shelf follow the same rhythm — one page, one grammar.
+**The anatomy, borrowed deliberately:**
+- **Completion circle first** (the ClickUp gesture): closes with the QUEUE's
+  own verb, so one click never mislabels a Meet item as "done".
+- **Subtask chevron in a fixed slot** so every title starts at the same x
+  whether or not the row has children, plus a **progress bar + "2/5
+  subtasks"** counted over the WHOLE subtree (`subtaskProgress`, pure and
+  tested).
+- **An always-visible meta rail** aligned down the right: priority flag ·
+  interactive status pill · due chip · assignee avatars (initials from person
+  mentions, +N overflow). Always visible — not hover-only — because a list
+  you cannot scan is not a command center.
+- **Status changes in place** (`ItemStatusPill`): Not started / In progress /
+  Waiting / Blocked / Delegated, plus the queue's own closing verb. Colours
+  come from the derived projection, so a state added later can never render
+  unstyled. Picking the closing verb routes through `closeWithOffer`, so the
+  desk-done offer and the open-subtask accounting fire the same as the
+  circle — a status change can never bypass them.
+- Hover actions (copy, open here, desk, Plexii, snooze, archive, open) stay
+  where they were; the old duplicate "Done" button retired, since the circle
+  and the pill both close.
+**Gates:** 2,977 green (subtask progress + row-anatomy and pill pins);
+typecheck clean; live CDP — 8 card rows at 6px separation with correct
+indents, 8 pills, 2 progress bars, the pill menu opened with REAL mouse input
+and a full round-trip verified (menu click → db write → re-render), zero
+console errors.
+
+---
+
+## DEC-051 — Widget parity (one row renderer) + the credits streaming 400
+**Date:** 2026-08-27 · **Status:** IMPLEMENTED (operator: "now do the same for
+the desk and home widget versions" + "im getting this error" — a raw
+`400 {"error":…"Streaming is not supported on PlexiDesk credits."}` printed
+where the chat answer belongs)
+
+### A. The streaming 400 — a race, not a config problem
+Both streaming call sites already guarded against the credits proxy (which
+rejects streaming outright). The guard asked POLICY:
+`shouldUseCredits() && getCreditClient() === c` — and policy is re-derived
+long after the client was chosen, so it drifts inside a single turn:
+1. `c = getClient()` at the top of `sendChat` → the credits proxy.
+2. `prepareChatCall()` runs retrieval, whose own AI calls update the credit
+   cache (balance → 0 flips auto-mode to BYOK) or a settings change calls
+   `invalidateCreditClient()` (breaking the `===` identity check).
+3. The guard now answers "not credits" while `c` still IS the proxy → it
+   streams → the proxy 400s → the raw error lands in the transcript.
+**Fix:** ask the CLIENT, not policy. `isCreditClient(c)` reads the instance's
+own `baseURL`, which cannot drift out from under the request it is about to
+make (prefix-matched against SIGNAL_BASE, so a look-alike host cannot spoof
+it). Both sites now use it. **Plus a safety net:** `isStreamingUnsupported(e)`
+matches only that refusal, and the site re-runs the SAME request body
+non-streamed — so any future route that reaches a streaming-refusing endpoint
+answers instead of erroring. The `[ask-latency]` trail now logs what actually
+happened (`streamed=${streamed}`), not what was planned — the old field would
+have logged a lie through a fallback, which is part of why this stayed
+invisible.
+*(Unchanged and deliberate: the BYOK-vs-credits billing choice is still the
+operator's. This makes credits work correctly, it does not switch modes.)*
+
+### B. Widget parity — ONE row renderer
+`ItemLines` is the row for every widget in the family (the four queue
+widgets, and the big `AttentionWidget` that the DESK widget delegates to), so
+upgrading it upgraded all three surfaces at once. Widget rows now carry the
+DEC-050 anatomy at widget scale: a bordered card with the queue's colour as a
+left spine, a working completion circle, the due date, and status — the full
+`ItemStatusPill` in roomy widgets, a coloured status dot (with the same
+label as its tooltip) in small ones, via a `dense` prop.
+**The bug that blocked it:** `WidgetShell` wrapped the ENTIRE widget in one
+`<button>`, so nothing inside could be interactive — nested buttons are
+invalid and every inner click became "open Attention". The header keeps that
+job; the body is now free to hold controls.
+**Closing is one code path.** `useCloseWorkItem` (new) owns the DEC-047 D-3
+desk-done offer and the DEC-048 open-subtask accounting; the page and both
+widgets call it. Forking that logic per surface is exactly how a widget
+quietly stops asking about subtasks while the page still does — so it is now
+impossible by construction, and pinned.
+### C. The agenda stops re-ranging the shared calendar
+Found by inspection while wiring the widgets: DEC-049's AgendaBlock called
+`useTimeBlockStore.loadRange()` to fetch today. That store holds ONE range for
+whatever surface last asked, and `WeekTimeGrid` loads a whole WEEK into it —
+so a mounted agenda widget could narrow the range to today underneath an open
+calendar, blanking the rest of its week until it remounted. The block now
+fetches today's blocks straight from `window.api.timeBlocks.list()` into local
+state and never writes the store; it re-fetches when the calendar's block
+count changes and when the day rolls over. Pinned.
+
+**Gates:** 2,992 green (9 new credit-streaming tests incl. the drift race and
+"other 400s still surface"; widget-parity, one-renderer, and read-only-agenda
+pins); typecheck clean. **Live verification was not possible this round:** the
+dev app opens a window and then loses it (0 windows, main process idle, CDP
+unreachable) — and it reproduces with ALL of this work stashed, at the
+DEC-050 commit, so it is not caused by these changes. Flagged to the operator
+rather than worked around.
+
+---
+
+## DEC-052 — Calendar: the operator's full ruling on Analysis 24
+**Date:** 2026-08-27 · **Status:** RULED (operator, in full) — build begins
+
+**(1) Coordination overruled.** The nav row does NOT need to go through Caleb.
+"We can solve whatever needs to be solved in service of this feature as long
+as it doesn't ruin other critical developments that already exist." A-006
+("nobody uses the calendar") is confirmed FACTUAL by the operator; the
+calendars are barely usable and the user base is small and knows this is
+active development. Rewiring is pre-approved; a destructive approach is also
+on the table IF it serves the best outcome — but only with a clear plan laid
+out first: what is lost, and the downstream effects, for the operator to
+decide. Default remains rewire.
+
+**(2) OAuth audit performed (operator asked for a double check).** Verdict:
+NO reusable OAuth exists. Mail = IMAP + app-specific passwords (safeStorage);
+zero token storage in main; zero provider SDKs; popupRouter's "OAuth" is
+popup ROUTING so sign-ins complete inside webviews — sessions live in the
+webview cookie jar, the app never holds a token, and cookies cannot
+authenticate Calendar API calls. Foundation must be laid fresh.
+
+**(3) External sync: design + foundation ONLY, no build now.** Schema fields
+and the connector contract land so it layers in later; the sync itself waits.
+
+**(4) Research consensus + Analysis 24 recommendation = the direction.**
+Everything not explicitly addressed in the operator's message is approved
+as written.
+
+**(5) Calendar pollution is THE problem being solved.** Neither a calendar
+chock-full of blocks nor an empty one. The model: users explicitly drag what
+they WANT time-blocked; for the rest, two AI modes, both preview-first —
+(a) "Let Plexii plan your day": fill empty slots by priority/urgency/due;
+(b) intent-driven: describe the day in natural language ("I'm feeling
+motivated to take on the CETRA project today"), the system compiles the
+relevant open items, previews a schedule, the user rearranges/accepts, and it
+lands as time blocks with clear deliverables.
+
+**(6) THE most important thing: completion clears the task — with approval.**
+When work is completed in Plexi, the system offers "complete this task or
+leave it?" — one keystroke. NEVER auto-complete without approval; the human
+stays in the loop about everything happening on their behalf. This is the
+feature that removes list maintenance as a job.
+
+**(7) Unlogged work counts.** A user who works a desk without ever logging an
+attention item should still see completions in analytics — "things completed
+and desks closed based on the work that was done rather than checkboxes
+ticked." The attention layer watches silently; it surfaces only when needed.
+
+**(8) The philosophy, verbatim spirit:** attention goes where the user needs
+it, when they need it. The layer sits silently in the background — collecting,
+watching, interpreting, ready — and stays out of the way otherwise.
+Flow state is sacred: if the user is active and getting things done, even if
+it isn't what the calendar intended, the system recognises that rather than
+nagging about the plan. Balance freedom and organisation through
+ADAPTABILITY, not forced structure. The quality bar: a perfect executive
+assistant at a CEO's side. Treat with the respect that implies.
+
+**Build order (per Analysis 24, now unblocked):** Track A (calendar tells the
+truth + rail row + day column) → B1 (drag-to-schedule) → B2/C-foundation
+(schema) → B3 (plan-my-day, preview-first) → D (completion loop, in-Plexi
+first). D is elevated in importance by ruling (6) but still sequenced after
+the surface exists.
+
+**Build status (same day, four commits, both remotes):**
+- **Foundation** `9900e80c` — scheduling+sync columns (origin/locked/
+  push_policy/transparency/visibility/external_*), status → 4 states via a
+  dynamic CHECK-drop rebuild (FK restated by hand; live DB migrated clean,
+  backup `focusbuddy.db.bak-20260827-pre-dec052`), work_items.source_url.
+- **Track A** `786530c8` — CalendarView rebuilt on work items + rankScore
+  (second ranker gone); queue rail drags with `text/fb-workitem`; grid
+  parameterised (days 1/3/7, compact) with the deadline band and
+  drop-books-immediately; Attention rail = the same grid narrow; Calendar
+  back in the sidebar (both states). A-006 → CONFIRMED.
+- **Track B** `cdbe25e8` — the planner: pure engine (honesty filter: waiting/
+  blocked never scheduled; 330-min ceiling; gaps; session cap; clock floor;
+  momentum by desk), Plan-my-day + intent mode (Haiku select w/ stopworded
+  keyword floor), dashed-ghost preview, Accept = ONE undo batch, replan-
+  undone marks missed + re-proposes (never moves), 1-hour grace.
+- **Track D tier 1** `5068a7d4` — the typed ledger (wi_signal +
+  wi_signal_match; device-local; once-ever pairing as a DB guarantee), four
+  emitters (block done, focus finished, chat message sent, desk closed),
+  pure matcher, the Enter-to-complete toast through useCloseWorkItem, and
+  quiet-wins analytics ("counted from the work, not the checkboxes").
+
+Gates across the day: suite grew 2,992 → 3,041 green; typecheck clean at
+every commit; live smokes on the real DB (calendar surfaces, planner ghost
+preview with zero writes). Remaining under this ruling: working-hours
+settings UI (engine reads them; no editor yet), Track D tiers 3a/3b (email
+via IMAP, then Slack behind the shared OAuth layer), Track C itself.
+
+---
+
+## DEC-053 — Calendar QA round one + the premium row pass
+**Date:** 2026-08-27 · **Status:** RULED (operator live QA, seven items) + IMPLEMENTED
+
+**(1) Planner settings editor** — a gear on the plan bar opens the editor:
+day start/end (12-hour options), planned-work ceiling, longest sitting,
+breathing room. Writes the same persisted settings the engine reads on every
+plan run.
+**(2) Drag-to-create** — Google-style: press empty grid, drag a span at the
+15-minute snap (live overlay shows the range), release → the composer opens
+at exactly that length. A press that never travels stays a plain click.
+**(3) 12-hour clock** — the gutter reads 6 AM…9 PM (compact: 6a…9p). No
+military time anywhere.
+**(4) Today's column** — raised surface with a purple ring, replacing the
+too-faint purple wash; other days stay grayed. Ruled colour treatment.
+**(5) Drag a block back to the list** — a block pointer-dragged onto the
+queue rail UNSCHEDULES it (the rail lights "Drop here to unschedule" during
+the drag; delete is undo-able; the item resurfaces in To-schedule by
+construction). A LOCKED block refuses — the pin means what it says.
+**(6) Classification dropdown + New** — a class filter (All + the eight)
+that narrows the rail, the deadline band, the month lens and the planner
+pool together, persisted; a New button beside it opens the capture console.
+**(7) The rows** — the operator: "text isn't centered; too blocky… needs to
+feel premium like ClickUp." Root cause measured, not guessed: the row was
+`items-start`, so the 18px title top-aligned against 26–28px controls.
+Now: vertically centred, min-h 42px, py-1.5, rounded-md, slimmer hover
+actions (h-6), the desk chip suppressed inside its own desk cluster
+(the header already says it), spacing kept, no dividers (per ruling).
+
+Suite 3,047 green (six new DEC-053 pins + the DEC-050 card pin updated to
+the new anatomy); typecheck clean.
+
+---
+
+## DEC-054 — One visual system: Attention + Calendar adopt the Home material
+**Date:** 2026-08-27 · **Status:** RULED (operator: "adopt the UI, UX and design
+principles of the home page… dotted texture, shadowing so widgets pop… start
+to feel like a unified app") + IMPLEMENTED
+
+**The material, shared not copied.** Home's ground is `.paper-texture` (a
+dotted radial-gradient over `--surface-base`, theme-aware) and its widgets ride
+`.fb-widget-tile` — a Liquid Glass fill with a four-layer depth shadow and an
+inset highlight. Attention and Calendar now sit on the SAME paper, and their
+cards use a new `.fb-glass-card` (plus a quieter `.fb-glass-row` for list
+rows). Card and tile read the identical tokens — `--glass-pillow-fill`,
+`--glass-pillow-blur`, `--shadow-inset-highlight` — so a change to the
+material reaches every surface at once.
+**Why a second class rather than reusing the tile:** `.fb-widget-tile > *`
+forces its children into a flex column, because a widget INTERIOR must
+distribute its rows. A page card owns its own layout — applying the tile
+would have turned every card header into a stacked column. One material, two
+jobs, no drift.
+
+**The sidebar problem, root-caused.** The left panel reserves its width with
+PADDING on `<main>`, so the window width is identical whether it is open or
+closed — which means Tailwind's `xl:` breakpoints (viewport-based) fired the
+same either way, and the two-column pages simply got ~260px narrower with no
+layout response. That is the "clunky when the menu opens" the operator saw.
+Both pages now use **container queries** (`container-type: inline-size` +
+`@container`): the grid columns and the rail's visibility respond to the space
+the page ACTUALLY has, at 1040/1360px for Calendar and 1080/1400px for
+Attention. Verified at both sidebar states.
+
+**Calendar toolbar breathes.** The header is two stable rows — title/actions,
+then a toolbar — instead of one that reflowed. Mode buttons carry a min-width
+and `whitespace-nowrap` so Day/3-Day/Week/Month can never compress; the class
+filter has a min-width; nav controls sit at h-9 with real spacing.
+
+**Legibility fixes (operator: "some things get cut off").** The hour gutter
+widened (w-14 / w-8 compact) so "12 PM" cannot clip; day headers carry a full
+title attribute and their own tint for today; blocks show two title lines and
+the start time when tall enough and truncate cleanly when short (instead of
+clipping both); ghosts and deadline chips follow the same rule; month cells
+grew to 104px with larger chip text.
+
+Suite 3,061 green (six DEC-054 pins; the DEC-049 rail pin and DEC-050 row pin
+updated to the new chrome); typecheck clean for these files.
+
+*(The React max-update-depth warning from the CRDT sync layer is being fixed
+in a separate session — untouched here.)*
+
+---
+
+## DEC-055 — The queue box, the tight left edge, the rail panel
+**Date:** 2026-08-27 · **Status:** RULED (operator live QA, five items) + IMPLEMENTED
+
+**(1) One box around the queue, (2) rows touching with a hairline between**
+— reversing DEC-050's spaced cards, and this time fixing the CAUSE rather
+than working around it. The first divider attempt drew nothing because
+`clusterByDesk` wrapped rows in per-desk `<div>`s: `divide-y` on the list
+then only fell BETWEEN clusters, so a queue with one cluster had no lines at
+all (DEC-050 shipped spacing instead). The per-desk grouping is now a
+**Fragment**, so every row is a direct child of the box and the dividers
+reach all of them. Rows lost their own card, gap and hover-lift; the box owns
+the surface, the row owns a hover tint.
+
+**(3) The dead space left of the checkbox** was a column reserved for a
+hover-only affordance: the drag handle sat in the flex flow at all times,
+even at opacity 0. It is now absolutely placed in the spine gutter, the
+chevron slot narrowed to 3.5, and the row's left padding dropped — the
+completion circle now sits near the edge where the eye expects it.
+Nesting moved from `marginLeft` to `paddingLeft` so an indented row still
+spans the full box and its divider runs edge to edge; the spine and the
+floating handle step in with the indent so hierarchy still reads.
+
+**(4) The calendar's queue rail is a solid panel** — new `.fb-glass-panel`
+(the same family as the card, but sitting on `--surface-raised` at 94%
+rather than a translucent fill), so a standing column of items reads as its
+own surface instead of text lying on the dotted paper.
+
+**(5) The rail filters by CLASSIFICATION, not free text.** The "Filter items…"
+input is gone, replaced by a dropdown (All open items + the eight classes).
+It writes the SAME `classFilter` the header control shows — one truth, two
+places to reach it — so the two can never disagree, and the empty state names
+the class it filtered to.
+
+Suite 3,061 green (three DEC-055 pins; the DEC-050 card and indent pins
+rewritten to the superseding truth, keeping the divider-bug history in the
+comment); typecheck clean.
+
+## DEC-072 — Plan reasons state checkable facts
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator: "make them say something real") · committed `d5a47571`
+
+DEC-071 made `reason` visible, and visibility exposed it: both blocks in the
+operator's test read "Top of the queue" — the fallback was doing most of the
+talking, because `reasonFor` asked only two questions (due within 2 days?
+momentum ≥2 on the desk?) before giving up. Most items have neither.
+
+The rewrite (`attentionPlanner.ts`): the reason is the item's strongest
+CHECKABLE fact, strongest first — deadline (now with day counts, "Overdue by
+2 days", and weekday names out to 7 days) → the person's own urgency call
+("You marked it urgent" — chosen outranks derived, DEC-037) → momentum
+(strings deliberately unchanged — pinned since DEC-052) → already-started →
+days waited → then WHY-THE-PLAN-CHOSE-IT: a replan says "Slipped earlier —
+proposing a fresh slot", intent mode says "Matches your intent", and ranked
+mode does the day arithmetic — "Nothing else needs today" only when no other
+schedulable item is due by the planned day's end, "Everything due already has
+a slot" only when each such item verifiably has one (dragged or proposed
+ahead of this row). The generic tail ("Next by rank") survives only for the
+mixed case none of those cover. **Found while wiring it:** both intent mode
+and replan-undone pass `onlyItemIds`, so the two were indistinguishable
+inside the planner — a replanned block would have claimed an intent match.
+`PlanDayOptions.source` now names the mode.
+
+Same honesty pass on the start strip (`attentionAnalytics`): its fallback
+claimed "Waiting the longest" on up to three cards at once and "Top of the
+queue" on cards #2–3 — superlatives only one card can hold. Now day counts
+("Waiting 9 days"), and only card #1 says "Top of your queue".
+
+Verified two ways: 15 new pins (suite 3,196 → 3,211, both typechecks clean)
+and LIVE over CDP 9223 — the planner module run read-only against the real
+store (107 items, 15 schedulable, 2 blocks already booked) returned seven
+proposals with SIX distinct reasons and zero generic strings: "Overdue by a
+day" / "Overdue by 2 days" ×2 / "Due tomorrow" / "Waiting 3 days" / "Already
+started — finish it" / "Everything due already has a slot". `planDay` is
+pure; the check wrote nothing.
+
+## DEC-073…076 — The operator's four-feature build round
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator spec, verbatim asks) · committed `e781d7d8`
+
+**DEC-073 — "New Desk": named, prefilled, and it OPENS.** The header button
+said "New" with a tooltip claiming "New room" while creating a desk; creation
+called `setActive` but never changed the VIEW, so the desk was born off-screen
+and had to be found under All Desks. Now: the button says **New Desk**, the
+set-up dialog pre-fills the title with the moment ("Aug 30, 12:52 PM" —
+`lib/deskDefaults.ts`), the field arrives focused with the text SELECTED so
+overwriting costs one keystroke, Enter files it, and creation navigates
+straight in (`goTask`). The prefill rides every create-desk entry (⌘K pill,
+Stage Manager) by construction — same dialog; Rooms and edits keep their text.
+
+**DEC-074 — calendar items open and complete in place.** Double-click a queue-
+rail row, a grid block, or a deadline chip → the DEC-036 item editor (centre
+peek); a desk-linked block's double-click opens the desk. The rail rows grew a
+visible completion circle; the grid block's check, on a work-item block, now
+closes the ITEM — each queue's own verb (PRIMARY_ACTION), through the ONE
+close path with its subtask and desk-complete offers — and marks the block
+done only if the close actually happened (the subtask offer can be cancelled;
+the store's setState refreshes the row before resolving, so re-reading it is
+the authoritative test). Undo on a done block stays calendar-local: it revives
+the block; the item reopens from Attention, never from here.
+
+**DEC-075 — missed items greet the launch.** Blocks still 'planned' whose
+whole span lies before today are "untriaged" — DERIVED, never stored
+(`lib/missedTriage.ts`; 14-day lookback so the first run can't wall the user
+with pre-feature history; a block straddling midnight is not missed — its day
+is not over). One prompt per app session (`MissedTriagePrompt` at App level):
+per row **Done** (item closed with its verb + block done), **Today** /
+**pick-a-day** (the original flips to 'missed' — the honest record, DEC-052 B4
+— and a FRESH block lands in the day's first opening, same clock time visibly
+overlapping if the day is full, never dropped), selection + **Complete
+selected**, **Add all back to the calendar** (first openings today→+7d, one
+undo batch), and **Later**, which costs nothing and returns next launch.
+Intra-day slips stay DEC-052 B4's replan flow; this owns the day boundary.
+
+**DEC-076 — the widget bell.** Every WidgetFrame header carries a bell:
+outlined = not in Attention, filled = a LIVE work item points at this widget —
+DERIVED from the queue's own rows (`lib/widgetAttention.ts`: sourceType
+'widget'/'widgets', comma-joined multi-marks honoured, exact-id match, newest
+live mark speaks), so the operator's "two-way sync" holds by construction
+rather than by events. An outlined bell runs the SAME flow as the context
+menu's "Add to Attention…" (preset → confirm console → item points at the
+widget; nothing files without Enter). A filled bell opens the queue.
+**Interpretive choice, flagged:** the spec said only "clicking adds" — a
+filled bell re-adding would duplicate, so filled-click = open the queue; say
+the word to change it. The check beside it appears ONLY when there is
+something to complete, and closes through the one path. Gated on
+workItemsEnabled(), like the menu.
+
+**Gates:** suite 3,211 → **3,244** (33 new: missedTriage 12, widgetAttention 7,
+wiring pins 14), both typechecks clean. **Live (CDP, read-only):** "New Desk"
+in the DOM; both mounted grid blocks carry the complete control; prefill
+returns the real moment; **the triage prompt fired itself on the HMR remount
+and found 4 genuinely-slipped Thursday blocks on the live DB** — the launch
+behaviour, observed. Widget bells: no desk canvas was mounted at verify time —
+23 live widget-marked items exist, so bells will light on first desk open;
+pinned by tests, awaiting the operator's eyes.
+
+## DEC-077 — The refinement round: one circle, a bell that fills, rows that drag themselves
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator QA on DEC-073…076) · UNCOMMITTED · committed `e88ee5c3`
+
+**(a) The bell now actually fills.** Root cause was a brand-system collision:
+`Icon`'s `filled` prop is a deliberate no-op for Plexii brand icons (they are
+line SVGs; "state is carried by color at the call site") — and 'notifications'
+maps to one, so the active bell only recoloured its outline. Fix: `BellIcon`
+in WidgetFrame renders the SAME brand path (one source, `PLEXII_ICONS`) with
+`fill: currentColor` when active. Icon itself is untouched — honoring `filled`
+globally would have restyled every brand-mapped `filled` call site in the app.
+
+**(b) ONE completion circle.** The queue's DEC-050 form factor is extracted to
+`attention/CompleteCircle.tsx` and adopted by all four surfaces — the
+Attention queue (byte-identical rendering), the Calendar rail, grid blocks
+(now a VISIBLE 12px circle on active work-item blocks; the hover cluster's
+check narrows to plain blocks + done-undo), and the widget header. The
+component swallows mousedown/pointerdown/dblclick because every host is a
+gesture surface — a completion click must never start a drag or open an
+editor.
+
+**(c) Bell + circle moved beside the title** in the widget header, out of the
+right-side control array where they got lost — the pair reads as the widget's
+attention state, not two more chrome buttons.
+
+**(d) The six-dot handle is RETIRED from both queues; the row drags itself.**
+Calendar rail: the icon was decoration (the row was already draggable).
+Attention queue: the handle owned dragstart — `draggable` moved to the row,
+payload contract unchanged (`text/fb-workitem` — the calendar still reads
+it), DEC-048 multi-drag preserved, and DEC-035's setDragImage plumbing died
+with the handle (the row IS the source, so the browser ghosts it natively).
+**Boundary: an EXPANDED row does not drag** — its notes are selectable
+(DEC-030 read/copy) and a draggable ancestor would eat the selection;
+collapse to move. Three DEC-055/070/035 pins rewritten to this superseding
+truth, histories kept in their comments.
+
+**(e) Nesting feedback lights the WHOLE target row** — accent tint + inset
+ring while the drag dwells "into", unmistakable against the before/after
+placement lines. Found while wiring: the row could carry TWO bg-* utilities
+at once (select-mode + into), resolved by stylesheet order, not intent — the
+backgrounds now live in one ternary chain, one owner per state.
+
+**Gates:** suite 3,244 → **3,254** (net +10; 4 superseded pins rewritten,
+dec077Refinements adds 9), both typechecks clean. **Live (CDP, real DOM,
+view driven and then RESTORED via the real Back button):** Attention — 15
+rows, 14 draggable (the non-draggable one is expanded/detached, the designed
+opt-outs), ZERO six-dot handles, 15 circles at 18×18 round; Calendar — 15
+rail circles at 15×15, 10 blocks with 4 carrying the visible circle (exactly
+the active work-item ones), zero handles. Bell fill awaits the operator's
+desk (no canvas was mounted); the mechanics are pinned.
+
+## DEC-078 — The calendar breathes: its own scroll window, uniform days, a real outline
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator QA, three verbatim asks)
+
+**(1) Taller hours, fewer on screen.** `HOUR_PX` 44 → 56. Forty-four showed
+all seventeen rows at once and every one was cramped; the scroll window owns
+how many are visible now (eleven at the operator's viewport).
+
+**(2) The hours scroll in their OWN window (Google-style).** The grid split
+into a pinned band (day headers + deadline chips) over a time area that is
+its own scroll container — `overflow-y-auto overscroll-contain`, bounded
+`max(280px, calc(100vh − 380px))`, opening with the current hour one row
+below the top edge. Hover the grid and the wheel moves through the day;
+outside it, the page scrolls as before. Side effect worth naming: the
+deadline band used to live INSIDE each column, so a tall chip stack pushed
+its own column's canvas out of line with the others — pinned, that class of
+misalignment is gone. The rail's compact mode keeps its full-height habit
+(no scroller; its card owns it).
+
+**(3) No graying; today is an outline ALONE.** Every day column is the same
+raised surface now; the sunken wash that made the week read as
+six-sevenths disabled is gone, and today carries a light accent outline
+(`ring-accent/35`) as its only column-level differentiator.
+
+**Found while verifying (3): DEC-053's today ring NEVER painted.** The class
+was `ring-[rgba(var(--accent),0.45)]`, which substitutes to
+`rgba(124 58 237,0.45)` — space-separated RGB with a comma alpha, invalid
+CSS — so the ring's box-shadow computed to `none` from the day it shipped.
+The suite stayed green throughout because source-pins pin strings, not
+paint. Measurement over CDP caught it (the DEC-056 lesson shape again). The
+sanctioned form is the CONFIGURED accent with slash opacity
+(`accent: 'rgb(var(--accent) / <alpha-value>)'` → `ring-accent/35`); all
+nine `rgba(var(--accent),…)` occurrences in this round's two files were
+converted (rings, hover washes, the mode-switcher active state, an inset
+shadow). **The same broken pattern exists in ~10 more files → GAP-018** —
+registered for its own sweep, not absorbed mid-round (several sit in the
+parallel session's working set).
+
+**Verification (live, CDP, by measurement):** hour row 56.0px · scroller
+`overflow-y: auto` + `overscroll-behavior: contain`, window 618px = 11.0
+hours · auto-open scrollTop 334.7 vs 335 expected (clamped at max,
+mid-afternoon) · commanded −150px moved the columns exactly −150px while
+the header band's y held and the PAGE scroll position was unchanged ·
+all day columns computed the same background (one distinct value) · today's
+ring computes `rgba(124,58,237,0.35) 0 0 0 2px` — it paints. Suite 3,255
+(one net new pin; the DEC-053 ring pin rewritten to the superseding truth
+with its history).
+
+**Follow-up (same day, operator): the day runs MIDNIGHT TO MIDNIGHT.**
+`START_HOUR` 6 → 0, `END_HOUR` 23 → 24. The old 6am–10pm window silently
+HID anything booked outside it — an early flight or a late call rendered
+off-canvas with no hint it existed; the scroll window is what decides how
+many of the 24 hours are visible, which is why this is safe now and wasn't
+before DEC-078. Measured live: 24 gutter labels 12 AM → 11 PM, grid 1344px
+(= 24×56), auto-open landed at the current hour UNCLAMPED for the first
+time (704.7 vs 705.6 expected). Live bonus proof: the operator clicked a
+3 PM slot mid-verification and the composer opened at exactly 3:00 PM —
+the y→time math holds on the new origin. The compact rail grows to
+24×30px full-height by the same constants (its card scrolls; acceptable,
+revisit only if the operator flags it).
+
+## DEC-079 — Calendar QA round two: the rail windows, a swipe pages the range, 12 AM breathes
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator, three verbatim asks)
+
+**(1) The rail's Today widget windows twelve hours.** Midnight-to-midnight
+(DEC-078 follow-up) made the rail's full-height habit a 720px column of
+mostly night. The compact grid now gets the same scroll window as the big
+one — `12 * hourPx` = 360px, all 24 hours a scroll away — and the
+autoscroll's compact guard was removed, so the rail opens at the current
+hour too (clamped to the bottom in the evening, same as the big grid).
+
+**(2) Trackpad horizontal swipe pages the range.** One swipe = one
+`shift()` — the same function the chevrons call, so day/3-day/week page by
+their span and month by month with zero new range math. The handler sits on
+the calendar surface (plan bar + both views): horizontal-DOMINANT deltas
+only (vertical belongs to the time window), accumulated to a 120px
+threshold, fired ONCE, and the gesture's momentum tail swallowed until the
+stream is quiet for 250ms. Swipe left = forward in time.
+
+**(3) The 12 AM clip.** The first gutter label translates 6px up to sit ON
+its hour line (as every label does), and the DEC-078 restructure removed
+the old header padding that had been its headroom — so its top half clipped
+at the scroll edge (operator's screenshot). `pt-2` on the time window is
+the headroom; the label now sits at a designed 2px inset, both surfaces.
+
+**Verified live over CDP against the REAL handler and both surfaces:** a
+12-event 300px synthetic swipe paged exactly once (Aug 30–Sep 1 →
+Sep 2–Sep 4); a 6-event tail inside the same gesture changed nothing; the
+back-swipe returned; 12 vertical-dominant events with sideways drift paged
+nothing. Rail: window 360px exact, scrollH 729 (all 24h reachable),
+opens clamped-to-now, `12a` at 2.0px inset. Big grid: `12 AM` at 2.0px
+inset at scrollTop 0. Operator's view restored to Calendar after. Suite
+3,256; the two DEC-078 pins the restructure superseded were rewritten with
+their history.
+
+## DEC-080 — The Book time dialog: spec steps 1–9, edit mode, the option-B grammar
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator spec, reviewed pass by pass) · committed `34feaab1`
+
+The drag-select dialog rebuilt to the operator's book-time spec across five
+reviewed passes. The shape: the mode slider IS the header (Cmd+M; Framer
+thumb + reveal, reduced motion honoured); the title is the act of intent —
+empty commits the RESOLVED placeholder (attached → guest names → "Meeting" →
+room → "Focus"), with the refusal of date/time defaults pinned alongside its
+deliberate DEC-073 divergence (a block carries its time; a desk doesn't);
+one time row (pickers, the 15/25/30/45/60/90/120 cycling end chip with
+DEC-053's display-as-is + nearest-step entry, Repeat never says "Does not
+repeat"); meeting-only fields behind the reveal with the ENTER GUARD (chips
+commit on Enter/comma/Tab, suggestions ranked by recency of shared meetings
+from real past invitees; Where autofocuses its revealed input; agenda takes
+Shift+Enter). Commit closes FIRST, toasts Booked/Scheduled through the house
+recordWithToast with Undo, and meeting invites HOLD a stated 10s window Undo
+cancels — nothing sends (CR-08/09), the expiry callback is the future send
+site. The Attendant-proposed state is native (same dialog, accent-soft
+banner, countdown that BOOKS at zero, Esc dismisses; manual trigger only —
+hold-time unruled). Inline create ships FLAGGED OFF by operator ruling: a
+drag-highlight opens the FULL dialog; the flag opts into naming-in-place.
+Double-click on any meeting or plain block reopens the dialog seeded with
+everything; Save patches in place, preserves the block's own roomId, Undo
+restores every prior field. Work-item and desk blocks keep their DEC-074
+routes.
+
+**Step 5 ruled OPTION B:** one shared token grammar (`parseBlockTokens`) —
+durations strip and set, #room resolves and attaches (unmatched #words stay
+visible), meet/call/sync/1:1 flip mode WITHOUT being stripped, every effect
+echoed; deliberately NO @ tokens (@ stays Attention's in ⌘K and mentions' in
+chat — @-as-guest is its own later ruling). Parsing fires on token
+completion or blur, so "45min" is never clipped at "45m". Acceptance live:
+"Roadmap sync 30m " → "Roadmap sync", 30m, Meeting on Plexii Meet, echo
+"Set 30m, meeting".
+
+BlockComposer deleted per the spec's own step 9; the DEC-063
+link/location/end-time pin rewritten to the superseding surface with its
+history. `TimeBlockMeeting.agenda` added (JSON payload, no migration).
+Attach stays stubbed on desk_block (unruled; the stub id can never reach a
+real block). Every pass live-verified over CDP with real input events;
+suite closed at 3,310.
+
+---
+
+## DEC-081 — The name is Plexii: two i's, everywhere, enforced
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator ruling) · committed `327523f4`
+
+70 standalone single-i occurrences fixed across 36 files — "Plexii Meet",
+⌘K's "Opens in Plexii", chat/browser hints, "Plexii proposed an action",
+the changelog, the slide theme's display name (stable id untouched), and
+the wordmark's screen-reader label, which said "Plexi" while the logo
+renders *plexii*. Functional catch: the wake word `/(hey )?plexi\b/` could
+never match a transcript spelled "Plexii" — now `plexii?\b`. Fused legacy
+identifiers (PlexiDesk, PlexiSuite, PlexiOffice…) deliberately stay
+single-i pending their own ruling. Enforcement is mechanical: a grep-lock
+test fails on any standalone Plexi in src, and the root CLAUDE.md carries
+the convention for every future session (plus the operator's memory).
+
+## DEC-082 — Plexii Meet video: two real defects and one OS verdict
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator: "root cause unknown… needs investigation") · committed `4f5e92c2`
+
+The investigation, all measured live over CDP against the running app:
+
+**The OS verdict (not a Plexii bug, and the reason nothing "turned on"):**
+camera permission looked granted — because our own `setPermissionCheckHandler`
+answers granted for anything not denylisted, so `navigator.permissions` was
+never evidence. The TCC log has the truth: the dev app launched from inside
+Claude Code inherits the LAUNCHING app's TCC identity
+(`com.anthropic.claude-code` as the responsible process), and that identity is
+**denied kTCCServiceCamera with "Policy disallows prompt"** — every capture
+silently refused at the OS layer. getUserMedia still resolves: the track
+arrives readyState 'live', enabled, and **muted forever** (zero frames — the
+requestVideoFrameCallback probe counted none from either camera). Mic works
+because Claude Code holds microphone permission; camera it does not.
+**Operator's move (I cannot change security settings):** System Settings →
+Privacy & Security → Camera → enable the app Plexii was launched from — or
+launch the dev app from Terminal so TCC attributes to Terminal and prompts.
+Packaged builds are unaffected (NSCameraUsageDescription already declared).
+
+**Defect 1 — tiles never played (fixed).** Even with frames, the meeting and
+call tiles could stay black: `autoPlay` does not start playback in this
+Electron build when `srcObject` lands after mount — measured `paused: true`,
+readyState 0, live track attached. VoiceRecorderWidget had already learned
+this and plays explicitly; MeetingOverlay + CallOverlay tiles now do too,
+with a loadedmetadata retry.
+
+**Defect 2 — the silent black tile (fixed).** An OS-muted track rendered as a
+pure black rectangle with no error anywhere. `useVideoBlocked` (new lib)
+listens to the track's mute/unmute — Chromium's own "no frames" signal — and
+both overlays now show the avatar plus an amber "Camera blocked by macOS"
+note whose tooltip names the System Settings path. Verified live against the
+currently-blocked camera: note rendered, ZERO black video tiles; the moment
+the grant lands, unmute flips the hook and the play() fix takes over.
+
+---
+
+## DEC-083 — Meeting-born items link back to their meeting
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator ask #2) · committed `4f5e92c2`
+
+An action item approved from the end-of-meeting wrap-up now POINTS at the
+meeting whose transcript produced it, and the queue links back.
+
+**Write side.** The wrap-up's Meeting record was created fire-and-forget, so
+its id was unknowable at approve time — now awaited (`wrapup.meetingId`; a
+failed save degrades to the old unlinked behaviour, never blocks the review).
+`applyProposal` gained `ctx.workItemSource`; the executor stamps
+`sourceType/sourceRef` from it with 'chat' as the unchanged default, so the
+model contract and every other surface are untouched. ProposalCards threads
+the prop (the toFiles document path deliberately omits it — it never files
+items), and WrapupOverlay passes `{sourceType:'meeting', sourceRef}`.
+
+**Read side.** The queue's source chip, for meeting-born items only, is now a
+LINK (groups icon, data-testid item-meeting-link): `openMeeting()` navigates
+via `goMeetings()` and hands the meeting id to PlexiMeetView with the same
+post-navigation handoff pattern `openHere` uses for widgets
+(`fb:open-meeting`, 250ms); the view selects it even if its list is still
+loading. `sourceLabel('meeting')` says what the click does. A deleted
+meeting degrades to the view's own empty selection — never a crash.
+
+**Gates:** suite → **3,332** (dec078_079Meet adds 9; a parallel session's
+capture rebuild landed alongside), full typecheck clean. **Live:** the exact
+`openMeeting` flow driven through the app's own `__fbView` store against a
+real meeting — PlexiMeet mounted, the meeting selected, transcript visible,
+operator's view restored. **Deliberately NOT started:** the Fireflies-level
+transcript UI rebuild — the operator gated it on this report.
+
+## DEC-084 — Capture rebuilt as Book time's sibling
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator spec) · committed `5b88490c`
+
+The Attention capture window rebuilt: no tab bar (Enter classifies,
+Cmd+Enter files verbatim — destinations on the commit, not modes; Expand
+left the dialog), two labelled fields with the rotating category
+placeholder (built — the old one was static), and the confirm step as FOUR
+labelled pills (CATEGORY/URGENCY/WHEN/DESK) opening one question-led drawer
+at a time on the SHARED AttentionConfirmCard (DEC-028 — chat's inline
+confirm inherits the look). Number keys 1–8; two-stage Esc; "back to your
+words" refocuses the words. CONFIDENCE is honest: accent = machine-guessed
+(category / inferred when / context desk); urgency can never light because
+nothing infers it. Status removed from capture (supersedes DEC-047 D-5 —
+a new item is open; W covers waiting). The @ input lives in the Desk drawer
+on the DEC-039 grammar. "File it" toasts with an R008-honest Undo. The New
+item button + inline form DELETED — capture is the only door. Title
+scaffolding ("remind me to…", "todo:") stripped from derived titles
+(main-process; takes effect on restart). Mid-verification the card was
+found deaf to keyboards (the rebuild dropped the old chip-autofocus) — it
+now takes focus on mount. Five superseded pins rewritten with history.
+
+**Recorded honestly:** during verification, a re-drive script skipped its
+surface assertions and typed into the operator's live Messages composer —
+two stray messages sent to a real conversation (operator handling them).
+The standing rule since: NO synthetic keystroke without an asserted,
+focused target — the corrected drives abort otherwise, and one such abort
+fired correctly the same hour.
+
+---
+
+## DEC-085 — Selecting Attention in ⌘K opens the Capture window
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator ruling) · committed `f31c7e24`
+
+⌘K → mention Attention (typed or clicked) → Capture opens; typing happens
+there. The DEC-028c armed pill is RETIRED from ⌘K (chat + home bar keep
+theirs; "@attention <text>" still files directly per DEC-031). The drive
+exposed the real bug underneath: the omni "Ask Plexii" row (score 2000)
+only yielded to the literal token, so Enter on plain "attention" asked the
+model — the yield now covers every Attention mention via one shared
+`attnAddressed` predicate. Live-proven with focus-asserted input both ways;
+the full Esc chain closes clean; zero strays.
+
+## DEC-086 — GAP-018 swept: the accent color always paints
+**Date:** 2026-08-30 · **Status:** EXECUTED (operator: "do the GAP-018 sweep")
+
+43 `rgba(var(--accent),…)` occurrences converted across 9 files — the
+register's census had missed **globals.css**, where fourteen of them were
+the futuristic/gemstone theme glows: accent-tinted background gradients,
+card glows and grid lines that have NEVER painted. Stylesheet instances
+became `rgb(var(--accent) / X)`; class utilities became the slash forms;
+embedded shadow/style occurrences became `rgb(var(--accent)/X)`.
+
+**The sweep exposed a sibling bug of the same species:** Tailwind's opacity
+modifier scale is multiples of 5 — `bg-accent/14` generates NO utility and
+paints nothing, silently (measured: transparent probe, no rule in the
+sheet; `/35` and `/45` work because they are on the scale). The sweep's own
+first pass produced seventeen such bare off-scale modifiers — caught by the
+live probe before commit and converted to arbitrary form (`accent/[0.14]`).
+Files that already used the arbitrary form (LiveDeskSharing, LiveDocSharing,
+NewNodeDialog) were correct all along and untouched.
+
+Both classes are grep-locked (`tests/unit/accentColorLock.test.ts`): no
+`rgba(var(--accent` anywhere in ts/tsx/css, and no bare non-÷5 accent
+modifier, ever again. Verified live: `/[0.14]`, `/10`, `/5` probes all
+computed real rgba values; zero old-pattern classes in the mounted DOM.
+Four superseded pins rewritten with history. Suite 3,334 / 312.
+
 <!-- Append below; increment DEC-NNN. -->
+
+## DEC-056…061 — The platform arc (one investigation, six landings)
+**Date:** 2026-08-27 → 08-28 · **Status:** EXECUTED · **Shipped separately to `main` as PR #5**
+
+Began as "the app won't boot" and became six defects, all one shape: **a guard
+that checked the request instead of the outcome.**
+
+- **DEC-056** (`1253aac3`) — the remote-change emitter fired one Event per
+  cascade-delete descendant. 596,754 of 768,169 Events were WidgetDeleted /
+  DeskDeleted that nothing can consume (a deleted object has no "changed since
+  your last visit" frame to light). Deletions now emit nothing; updates emit once
+  per object per pass. `pruneOutbox()` added — the outbox is delivery
+  bookkeeping, not history, so capping it destroys nothing PLX-EVT-030 protects.
+- **DEC-057** (`690aba29`) — `pruneActivity`/`pruneHistory` had **zero call
+  sites** since the initial commit. Wired, but only after a policy change: a
+  table-wide cap would have evicted 2,088 rows of real history to make room for
+  telemetry. Per-kind + per-org instead (`browser_nav` 2,000/org, 90-day ceiling).
+- **DEC-058** (`674ed227`) — the nav fan-in. Four webview events into one
+  unguarded recorder wrote 39,762 rows in 19 hours. `navTrail.ts` dedupes.
+- **DEC-059** (`4af921c1`, `7c363379`) — **the launch blocker.** `applyRemote`'s
+  tombstone branch had no echo suppression though the upsert branch three lines
+  below does. Re-applying a held tombstone is a no-op UPDATE, which is exactly
+  what `widgets_mark_dirty` fires on → dirty → pushed → server bumps rev →
+  tombstone returns. Measured at `sync_rev 7,319` on one widget and **10 server
+  writes/minute, forever**. Fixed with the guard the upsert branch already had.
+  Part 2: replayed writes declare `WriteOrigin`, so a replay stops minting
+  "user did this" Events. Clean boot went ~2,500 → **4 Events**.
+- **DEC-060** (`0bd8a77b`) — the boot hang. `emitObjectEvent → localActor() →
+  loadAccountState() → safeStorage`: every Event did a synchronous macOS
+  Keychain decrypt, to read `cachedEmail` — a field stored in PLAINTEXT. The
+  first one blocked the main thread behind an authorization prompt with no
+  visible parent. Cold boot: indefinite hang → **3s**, verified over three restarts.
+- **DEC-061** (`0e5d8a4e`) — `browsing_history.visit_count` corrupt from the same
+  handler (one Slack channel at 14,096 "visits", a number that is user-visible
+  AND fed to the LLM). Counter gated; counts repaired from the activity log,
+  which is their exact provenance (763 rows matched, zero disagreed).
+
+**The load-bearing lesson, recorded because it recurred:** every one of these
+was invisible to the test suite, which was green throughout. They were found by
+*measuring the live database*, not by reasoning about the code.
+
+---
+
+## DEC-062…067 — Sub-item chrome: four rounds that were the wrong approach
+**Date:** 2026-08-28 → 08-29 · **Status:** SUPERSEDED BY DEC-070 — kept for the lesson
+
+Operator QA on the queue's sub-item rows. Shipped in order: a clickable expander
+(the drag handle was absolutely positioned in the chevron's gutter and swallowed
+its clicks); an elbow connector; desk-cluster folding; queue-coloured desk
+headers; an inset block per indented row; a page-coloured gutter; the elbow
+raised onto the parent/child boundary; the elbow aligned to the parent's spine.
+
+**Each round fixed a seam and produced another.** The cause was structural and
+took four rounds to see: *the hierarchy was drawn as per-row line SEGMENTS*, and
+segments painted by different rows cannot be guaranteed to join. 1px offsets,
+corner touches that antialias into breaks, a bend repeated once per child.
+DEC-070 is the reset.
+
+**What survived the reset:** the expander z-order fix, desk-cluster folding, and
+queue-coloured desk headers. Those were real and are still in.
+
+---
+
+## DEC-063/064/068 — Meet items point at a meeting
+**Date:** 2026-08-28 → 08-29 · **Status:** RULED (operator: "go with option 2") + EXECUTED
+
+Operator ruling: a Meet item **points at** a meeting rather than **being** a time
+block. His own case decided it — *"the RSVP if it is for responding to"* is a
+meeting that is not on your calendar, so there is no block for it to be.
+
+- **DEC-063** (`9205d56d`) — six manifest columns (start, duration, join URL,
+  location, attendees, RSVP). `meet_start_at` is deliberately NOT `due_at`: a
+  meeting's start is not a deadline, and collapsing them would drop every
+  invitation into the overdue radar. Rows render as invitations — time, a Join
+  button labelled by provider read from the link, address, attendee count, and
+  the RSVP inline. Guarded by `isInvite`: a bare "meet with Sam" stays a plain row.
+- **DEC-064** (`48e5f8f3`) — the capture flow, and **the manifest gap it
+  uncovered**: `PATCHABLE` and `rowToNode` both hand-listed the manifest, so a
+  new column got DDL, sync, CRDT allowlists and emit — but no way in or out.
+  `source_url` had been **write-only since DEC-052**. Both now derive from
+  `WORK_ITEM_COLUMNS`, with an explicit `NOT_PATCHABLE` refusal list that must
+  state its reasons.
+- **DEC-068** (`ac8dcd0c`) — the calendar link. `TimeBlock.taskId` already
+  pointed at a node, so the association needed nothing new; the translation is
+  `meetSchedule.ts`. Refuses rather than guesses (no start time → nothing to
+  reserve), and matches "already scheduled" on the LINK, never the time.
+
+---
+
+## DEC-065 — The item editor fits the screen it opens on
+**Date:** 2026-08-29 · **Status:** EXECUTED (`a590ce86`)
+
+Regression from DEC-064: the dialog was pinned 14vh from the top with no height
+cap, so a Meet item ran **172px past the bottom** of a 997px laptop viewport with
+Save unreachable. Centring alone could not fix it — content was taller than the
+screen — so Join link and Location were paired onto one row and Notes trimmed.
+1029px → 924px. The max-height with internal scroll is the FLOOR beneath the
+sizing, not the fix: content that cannot be reached is worse than content that
+scrolls.
+
+---
+
+## DEC-069/070 — The re-baseline: one animated group, one dashed connector
+**Date:** 2026-08-29 · **Status:** RULED (operator called the reset) + EXECUTED (`72cd7199`)
+
+Operator, after four rounds: *"this colored vertical / horizontal line thing is
+really starting to piss me off… we need to refresh and reset to get this down
+right from the beginning"* — with an inspiration component supplied.
+
+**The re-baseline.** A parent and its subtree are now ONE animated group holding
+ONE dashed connector spanning it. A single element has no joins to misalign, so
+the seam category is gone *by construction rather than by care*, and because the
+connector lives inside the height-animated wrapper it grows and shrinks WITH the
+expansion.
+
+What it bought beyond the bug: `nestRows()` turns the flat depth list into a tree
+once instead of every consumer re-deriving it; the box's `divide-y` now separates
+UNITS so a hairline never cuts through a subtree; desk clusters get the same
+connector language as subtasks (one grammar for "these belong together"); the
+solid queue spine became a TOP-LEVEL cue only, since an indented row's colour cue
+is its group's connector and having both put two vertical lines beside every
+sub-item. Motion: height 0 ↔ auto, staggered children, `AnimatePresence` so a
+collapse animates rather than snaps, `prefers-reduced-motion` honoured.
+
+Also fixed the drag handle, which floated at the INDENT column — a coordinate
+belonging to the previous depth — so on sub-items it hung in the parent's gutter.
+
+**The pins now assert the ABSENCE of the segment machinery**, so nobody
+reintroduces it.
+
+**LIVE VERIFICATION 2026-08-30 (the owed photograph, done by measurement):**
+the prior session shipped this pinned-and-tested but never saw it on a
+multi-sub-item case — none was mounted (cause found: the one real group was
+COLLAPSED, persisted in `attention.collapsed`). Verified on the operator's
+live data over CDP 9223 — a real leader ("Add in-browser video streaming…")
+with THREE open sub-items, expanded via its own chevron (the DEC-062
+click-fix path), all geometry by getBoundingClientRect/getComputedStyle at
+dpr 1.7, full-viewport screenshot only:
+· ONE dashed connector per group — a single element, h=114px spanning all
+  three 40px child rows; inset 14.0px (= 8 + ind·28 + 6 exact); top gap 0.0;
+  bottom gap 6.0px (bottom-1.5); rgba(14,165,233,0.5) = queueTint(to_do, .5).
+· Children tile the wrapper exactly (718.3→838.3, zero gaps), borderTop 0px
+  on every child — no hairline cuts the subtree; the next UNIT gets the
+  divide-y hairline (0.588px = 1px @ dpr 1.7). Child pads 36px (= 8+28).
+· Spine is TOP-LEVEL only: leader carries the 3px sky bar (2.996px computed
+  — device-pixel snap), children carry none.
+· Drag handle rides its own row's depth: children 14px (= 8+28−22, ON the
+  connector line by design), leader 2px. Zero stray vertical-line elements
+  in the subtree — the old segment machinery is absent from the DOM, not
+  just the code.
+· Collapse unmounts children + wrapper (AnimatePresence exit), re-expand
+  reproduces identical geometry (inset 14, h 114 both passes) — no drift.
+· The DESK-CLUSTER variant (LakeDash, 3 rows) measured too: same grammar —
+  one connector, h=135.3px unbroken across the run, 6px bottom inset, pads
+  36px, no spines, zero strays. A 0.6px inter-row offset there is
+  device-pixel rounding of fractional row heights (nothing paints in it:
+  borders and margins all 0px), not a seam.
+No data writes; the one state change is the group now sits EXPANDED on the
+operator's screen (the toggle path updated `attention.collapsed`), which is
+what the verification required. DEC-069/070's construction claim holds on
+the real thing.
+
+---
+
+## DEC-071 — The day plan is reviewable before it is accepted
+**Date:** 2026-08-29 · **Status:** EXECUTED (`4dc603de`)
+
+Three failures in one flow, all the same shape: the plan had the information and
+nowhere to put it.
+
+The intent prompt was a single-line `<input>`, so a real sentence scrolled out of
+sight while being written — now a textarea that grows and shrinks, capped at ~7
+lines, Enter plans / Shift+Enter newlines. The summary line truncated, which made
+it *an assurance wearing the clothes of an explanation*. And the ghosts on the
+grid are not real blocks, so the plan was un-inspectable **by construction** — a
+proposal you cannot examine is a prompt to trust it.
+
+A landed plan now opens a centre-peek review (DEC-065's shape) showing the prompt
+in full, the note in full, and every block grouped by day with time, duration and
+**the `reason` the planner had computed all along and never displayed**. Blocks
+can be dropped individually; accept takes what remains, still ONE undo batch.
+Opening it books nothing — DEC-052's propose-never-apply stance holds.
+
+Also: the note's `slice(0, 120)` was a DISPLAY limit at the DATA layer, cutting
+mid-word ("…Cetra pitch deck—all high-cr"). Widened, word-boundary aware,
+ellipsised, still bounded because it is model output.
+
+---
+
+## DEC-087 — Phase 1 of the demo-feedback plan: the three blockers
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Plan:** analysis/27
+
+Caleb's demo surfaced 20 items; analysis/27 consolidates them into 12 threads
+across 5 phases. Phase 1 is the three that made the demo stumble, and each
+turned out to be one honest mechanism, not mystery:
+
+**(a) The capture card ran off the screen.** `fb-card` had no height cap and
+no internal scroll, so the Desk drawer + mention input rendered below the
+viewport with nothing to grab. Now: `max-h-[76vh]` (the card already sits
+16vh down; 86vh would overhang), header pinned, body scrolls
+(`min-h-0 flex-1 overflow-y-auto overscroll-contain`).
+
+**(b) "Plan my day" at 6pm reported a full day.** Two truths compounding:
+`freeSlots` floors at *now* against a `dayStart..17:00` window, so an evening
+plan has zero slots by construction — and intent mode picked *items* but
+never the *day*, so "before noon tomorrow" still planned the viewed day. Two
+pure functions in attentionPlanner: `parsePlanDay` (tomorrow/today/tonight/
+weekday → local-midnight target; same-weekday means NEXT week) and
+`effectivePlanDay` (a requested TODAY with no usable slot rolls to tomorrow).
+CalendarView wires them into runPlan and SAYS what happened — "Today's
+working window has closed — this plans tomorrow instead." — because a rolled
+plan that pretends to be today's plan would be a lie with a calendar.
+
+**(c) Editing a block duplicated it or grew it.** Three compounding causes,
+measured: single click on a block did NOTHING (stopPropagation only), so
+people clicked, got silence, clicked beside it — and the column's plain-click
+booked a NEW slot. The 6px resize lips snapped ±15min off a ~7px slip
+(`Math.round` over a 56px hour). And any 1px jitter counted as a drag. Now:
+a 5px dead zone before ANY block drag engages (move and both resize modes —
+below it the press stays a click); a drag that actually moved consumes the
+click event that follows pointerup (`dragConsumedClickRef`); and a clean
+single click routes through the SAME ladder as double-click (meeting/plain →
+Book time dialog, work item → item editor, desk link → jump). Double-click
+stays for habit.
+
+Verified live over CDP (record in analysis/27): capture card capped at
+exactly 76vh with the drawer reachable; a 22:19 Plan-my-day produced
+tomorrow's proposals with the honest note; scratch-block matrix — click
+opens editor, 3px slip moves nothing and still opens it, 56px drag moves
+60min and opens nothing, lip wobble resizes nothing. 13 new pins in
+tests/unit/dec087DemoFixes.test.ts; 3,347 green; scratch blocks deleted.
+
+Also this round: a stray `npx prettier --write` reformatted CaptureConsole to
+prettier defaults (double quotes/semis — not house style; the repo has no
+prettier config). Caught by diff size, reverted, re-applied by hand. Rule
+absorbed: no formatter passes in this repo, the house style is the file.
+
+## DEC-088 — Phase 2 of the demo-feedback plan: the People workstream
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Plan:** analysis/27 (#2 #3 #4 #6 #12)
+
+The demo's people complaints were one decision wearing four costumes: the @
+field lived inside the Desk drawer, so people looked buried, missing, and
+inconsistent all at once. Three builds, one workstream:
+
+**PEOPLE is its own pill.** The confirm stop now has five dimensions —
+CATEGORY / URGENCY / WHEN / PEOPLE / DESK, who before where. The People
+drawer asks "Who is this about or with?", offers the org directory as
+one-click chips (filter appears past six), shows the item's person mentions
+as removable chips, and states the honest boundary in place: *"A mention
+keeps the person with the item — it doesn't send them anything yet."*
+Routing TO a person remains SPEC-027; nothing here pretends otherwise. The
+Desk drawer keeps the full DEC-039 @ grammar (one input, grammar never
+forks) — person chips render in both because the state is one array.
+
+**Capture text seeds mentions — directory-grounded, deterministic.** New
+`src/main/ai/peopleExtract.ts`: full names, then handles, then single
+names, word-boundary matched against the directory the app genuinely
+loaded (peopleDirectory's honesty contract: empty directory extracts
+nobody, ever). Names that are also English words ("Will", "Mark", "Grace")
+match only in their capitalized form, so "will follow up" never becomes a
+person — and every suggestion arrives accent-marked at the confirm stop,
+which is the real safety net. `classifyCapture` carries the scan on all
+three paths (rules/model/fallback) at zero model cost; marked captures —
+which skip the classifier by design — get a dedicated `workItems:scanPeople`
+IPC, so a highlighted "Caleb needs to…" also arrives pre-mentioned. Self is
+filtered renderer-side by account email (a mention of yourself is noise).
+The directory prefetches when capture opens (attempted-guarded, never
+awaited): a cold first capture may honestly offer nobody — capture never
+waits (R011).
+
+**Ambiguity is the question, not a guess.** Two Calebs and a bare "caleb"
+produce NO mention and ONE clarify: the People drawer auto-opens asking
+"Which Caleb?" with both candidates (handle as the hint). A full name binds
+its person and SATISFIES later bare references — "Caleb Swan… remind
+caleb…" never silently binds the other Caleb. One clarify max, and the
+deadline question still outranks it at auto-open (DEC-016: one question) —
+outranked, the lit pill carries it until opened. This is demo item #4 — the
+one-off "Is this Caleb from your workspace?" behavior — made a system.
+
+Boundary noted: meeting-WRAPUP proposals (the transcribe→deliverables
+pipeline) don't ride this yet — that surface is Phase 4's transcript
+rebuild, gated on the operator's go, and gets mention-wiring there.
+
+Verified live over CDP after a full restart (main-process round): five
+pills render; empty-directory drawer shows the honest "Nobody to offer" +
+boundary line; with a scratch directory published-then-reset — "ask
+michael…" filed the card with PEOPLE = Michael Roe in accent; "ask
+caleb…" auto-opened the drawer with both Calebs, picking Swan set the pill
+and killed the accent; "Caleb Swan owns this; remind caleb monday"
+suggested Swan alone. 20 new tests (extraction matrix + wiring pins); one
+DEC-084 four-pill pin rewritten to five with history; 3,367 green; both
+typechecks clean.
+
+## DEC-089 — The plan review is a workbench; widget chrome survives dark mode
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Trigger:** operator live QA off
+the DEC-087 review sheet + the dark-mode desk
+
+**(A) The review sheet stopped being read-only.** The operator's ask: move
+things, change times, change lengths — without leaving the approval moment.
+Three additions, one honest rule each:
+
+- **Drag to reorder** — whole row is the drag surface (the Attention queues'
+  grammar, DEC-077). The SLOT LADDER HOLDS: the times the planner found (plus
+  any hand edits) keep their positions; items reassign over them, each
+  keeping its own duration (`reorderOverSlots`, pure, in attentionPlanner).
+  Dragging never invents new times.
+- **Inline when/duration** — click the time range → date + time inputs in
+  place (focus leaving both commits); click the duration → minutes input
+  (Enter/blur commits, snapped to 5). Accept books exactly what the rows say.
+- **Overlap warnings, not auto-fixes** — a longer item in a tighter slot, or
+  a hand-set time over an existing block, shows "Overlaps another block" on
+  every row involved. The sheet never silently reflows the day; the
+  operator's own edits are the repair tool.
+
+Rows carry client uids (itemId repeats on session splits; startMs is mutable
+now) — dropProposal and the editors key on them. Live-verified over CDP: 11
+draggable rows; duration 30→45 in place; start 9:00→8:00 in place; dragging
+row 3 before row 1 gave it the FIRST slot (the edited 8:00) with everything
+else stepping down one slot, times unmoved; a 240-min row lit 5 overlap
+warnings; Discard booked nothing.
+
+**(B) Widget chrome in dark mode.** The bell and completion circle weren't
+low-contrast by accident — the header wash under them was `bg-stone-200/70`
+(and 25 siblings), light-only, so dark mode floated LIGHT ink on a LIGHT
+wash. Every header wash now carries a dark companion (26 call sites + the
+default; hue identity kept — violet stays violet). The resting frame edge
+gets a real 1px `--edge-firm` border in dark (the 9%-white hairline melts
+into the canvas); the idle bell drops its extra dimming (ink-50 @ 80%).
+Measured on a live desk: header rgba(255,255,255,0.09) / violet 0.25, bell
+ink-50 @ 0.8, frame edge white 19%.
+
+**Found while measuring: GAP-019.** Two widget headers (Table, MindMap) had
+NO wash at all — `bg-[var(--edge-firm)]/60` is invalid CSS (an opacity
+modifier on an opaque var() token) and paints NOTHING, both themes. Fixed
+those two under this round; the ~40-site repo-wide disease is filed as
+GAP-019 with live paint-probe evidence, its own sweep round. The DEC-089
+lock already forbids the pattern in headerAccent, and the four-pill→
+five-pill DEC-084 pin got its history note last round.
+
+13 new tests (reorder math + editability pins + the two-clause chrome lock);
+3,380 green; both typechecks clean.
+
+## DEC-090 — The plan intent stops hallucinating and learns to tell time
+**Date:** 2026-08-30 · **Status:** EXECUTED · **Trigger:** operator live QA
+("cetra partners, first half of tomorrow" pulled random items; "later in the
+day" packed the morning)
+
+**The hallucination had a mechanism, not a mystery.** planSelect's model was
+already told an empty selection was valid — but the CODE overrode an empty
+answer with the keyword fallback (`if (!ids.length) return fallback()`), and
+the fallback's stopword list was so thin that scaffolding words ("items",
+"open", "related", "first", "half") matched dozens of unrelated items. The
+model said "no Cetra items are open"; the code replaced that honesty with
+noise and confidently scheduled it. Three fixes:
+
+- An EMPTY model selection now SURVIVES — only a FAILED call falls back.
+- The stopword list grew planner scaffolding + all time language, and moved
+  to `src/shared/planLanguage.ts` (ONE list, shared with the renderer's
+  topic detector, or the two drift).
+- The zero lands as the operator ruled it: the model's own note ("No items
+  found related to Cetra Partners…") plus a one-click offer — **Plan the
+  rest of the day instead** — rather than the intent silently doing that
+  anyway. The offer plans the full queue and does NOT echo the no-match ask
+  above unrelated blocks.
+
+**Time language now goes somewhere.** Two deterministic parsers join
+DEC-087's parsePlanDay: `parsePlanWindow` ("first half", "before noon",
+"later in the day", "after 2pm", "between 2 and 4", morning/afternoon/
+evening — each with a speakable label folded into the note) narrows the
+slot window by overriding dayStart/dayEnd for that plan; `parsePlanSpread`
+("across/throughout the week", "over the next few days") switches to
+`planSpread`, which plans up to five WORKDAYS (weekends skipped, each item
+placed once, stops when the queue is exhausted). effectivePlanDay now runs
+against the WINDOWED settings, so "this evening" at 6pm keeps today instead
+of rolling to tomorrow.
+
+**Topic-less intents never reach the model.** "spread my open items across
+the week during work hours" names no topic — every token is scheduling
+language. `intentNamesTopic` routes such intents straight to the full queue
+deterministically; live QA showed even the sharpened prompt could misread
+"my open items" as a topic search and return zero. Selection is only paid
+for — and can only come back empty — when a topic is actually named.
+
+Live-verified across two restarts: the Cetra intent → 0 rows, the model's
+own note, the offer; the offer → the full 11-block plan; "fantasy football
+league work, later in the day tomorrow" → 4 fantasy items starting 2:00 PM
+(not 9:00); "spread my open items across the week" → 21 blocks over Monday
++ Tuesday, day-grouped, "Spreading across the week." noted. 16 new tests
+(window/spread/topic matrices, the operator's verbatim failing intent
+selecting nothing, honest-empty pins); six DEC-052/087 pins rewritten to
+the superseding truth with history; 3,396 green; both typechecks clean.
+
+## DEC-091 — Phase 3 of the demo-feedback plan: context fidelity
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Plan:** analysis/27 (#7 #11 #14)
+
+**(#7) A mark freezes the page it was made on.** `source_url` had been in the
+schema since DEC-052 and written by NOTHING (DEC-064 fixed the read side and
+noted it was write-only). Now both mark dispatchers — the widget bell and
+the right-click / highlight menu — freeze the browser widget's live URL
+onto the item at mark time (`browserMarkUrl`: only webview/browser kinds,
+only real http(s); a browser's `content` IS its current URL via
+persistNavUrl). The item then deep-links back: a queue-row action ("Open
+the source page") and a Source row in the item editor, both through
+`files:openExternal` — because the WIDGET may have browsed away since, and
+the frozen URL has not. This is the Slack-thread gap: mark a message view,
+and the item carries the exact page, not just the widget. Verified live on
+the 759 desk: the bell froze `sleeper.com/leagues/…/team` into the mark
+event; a scratch item's URL survived write→readback; queue + editor both
+rendered the link. (Follow-up noted, not built: "Open it here" could also
+re-navigate the widget to the frozen URL.)
+
+**(#14) Created documents announce themselves.** New house primitive: the
+NOTICE toast (stores/notice.ts + NoticeToast.tsx) — asserts a fact, offers
+a door, leaves. Deliberately not the UndoToast (reverses things) nor the
+CompletionToast (awaits a decision); bottom-right, steps above the
+completion offer when both are up, never takes focus. All four document
+success paths (create-blank, widget-fill, to-Files, desk-widget) raise
+"Created/Filled {kind} “{title}”" with Open → goDocument. A DEV-only drive
+seam (fb:dev-notice, the __plexiiProposeBlock precedent) makes it
+verifiable without a model call.
+
+**(#11) Mail: the recipient stop and the sent fact.** The first Send now
+ARMS: a strip states every recipient in full (to/cc/bcc) and the button
+becomes "Confirm send"; the second press sends. Editing ANY field disarms.
+Mail has no undo — the honest moment to catch a wrong address is before
+the wire. On success the dialog no longer just vanishes: the notice states
+"Sent to …" (with the cc/bcc count); failure says "nothing left your
+mailbox". The AI compose path was already draft-only (unchanged). Verified
+live without sending: arm → strip named probe@example.com + "Confirm
+send"; a focus-asserted edit disarmed both; Discard sent nothing. (The
+first disarm probe failed its focus assertion — the armed strip re-centres
+the modal and stale coordinates missed the field; the DEC-084 abort rule
+caught it, coordinates re-measured, verified clean.)
+
+13 new tests; 3,409 green; both typechecks clean. Renderer-only round (the
+preload change is type-level) — no restart was needed.
+
+## DEC-092 — The planner learns the calendar it is writing into
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Trigger:** operator live QA
+(a replan crammed items against existing blocks; "reschedule my day, split
+between tomorrow and wednesday" answered "No open items match that"; the ii
+mark floated high in the intent bar)
+
+**Breathing room is now the calendar's, not just the plan's.** freeSlots
+padded NOTHING around existing blocks — a slot began the instant a block
+ended, which is exactly the cramming in the operator's screenshot. Every
+planned block now carries the house gap on BOTH sides, and an actual
+MEETING (a block with a meeting payload) carries `meetingBufferMin`
+(default 15, adjustable in the planner popover, floor-ed at the gap so
+"off" never gives a meeting less room than a plain block). Done blocks get
+no padding — history needs no breathing room. When a target day holds
+meetings, the plan note says "Kept 15 min clear around your meetings."
+
+**Placement stopped being first-fit.** Each item now scores every open
+interval: an earliness prior keeps days front-loaded, and NEIGHBOR AFFINITY
+pulls related work together — the existing block bordering a slot (or the
+proposal just placed in it) scores by `relatedness` (same desk 3, shared
+tag 2, shared mention 2, same class 1). The after-border only counts by
+PROXIMITY (landing at the start of a three-hour slot is not "beside" the
+block at its far end — the first test caught exactly that flaw).
+Discretionary pool items also CLUSTER (`chainRelated`): one desk-mate may
+be pulled forward after each head, but never across an item due by day's
+end — deadline-first is a promise; the rest is preference. When affinity
+places something, the reason SAYS so: "Grouped beside “…”." — live QA
+showed a 759-desk item landing right after the done 759 block, labelled.
+
+**"Reschedule my day" is a MOVE, not a topic search.** The operator's
+verbatim prompt reached the selection model, which honestly found no "day
+off" items and answered nothing. A new route runs FIRST: `parseReschedule`
+(a move verb + a reference to today) + `parsePlanDays` (EVERY named day —
+"between tomorrow and wednesday" is two) → `movableToday` (future, planned,
+item-linked; meetings and pinned blocks are untouchable by construction) →
+`planSplit` (round-robin across the named days, then per-day planDay with
+all buffers and affinity). The review states the contract: "Moving N of
+today's blocks — tomorrow + Wednesday. Accepting removes them from today."
+plus who stays and what didn't fit. Accept books the new blocks AND removes
+the sources in ONE undo batch; a dropped row keeps its old block — nothing
+is ever silently unscheduled (a source block whose item got no proposal
+stays put). Live QA found the empty-reschedule trap: passing `placedIds`
+excluded the very items being moved (scheduled today by definition) —
+fixed and pinned.
+
+**On the operator's "call a more powerful model if needed":** placement
+stays deterministic on purpose. The observed failure was mechanical
+first-fit, not a knowledge gap — a scoring rule is instant, testable, and
+explains itself in the reasons, where a model placement is none of those.
+The selection step already routes through modelRouting and can be upgraded
+per-purpose if selection quality ever lags; placement earns a model only
+if a failure appears that rules cannot express.
+
+Also: the ii mark in the intent bar now centres on the textarea's first
+line (measured 0.1px off; was ~6px high — items-start is deliberate for
+the growable field, the mark just needed the first-line offset).
+
+Verified live: the verbatim day-off prompt → 3 blocks split Tue + Wed with
+the honest note and leftover count, discarded clean; affinity grouping
+visible in a real reason. 19 new tests; three DEC-052-era pins rewritten
+to the padded truth with history; 3,428 green; both typechecks clean.
+
+## DEC-093 — Deadline chips drag onto the grid
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Trigger:** operator live QA
+("the items that live above the time slots aren't able to be moved, but I
+should be able to drag those onto my calendar")
+
+The deadline band (DEC-052) rendered due items above the grid as click /
+double-click affordances only — the one thing you'd reach for, dragging a
+deadline into a time slot, was the one thing it refused. The receiving half
+already existed: day columns have accepted `text/fb-workitem` drops from the
+queue rail since DEC-052, booking a 30-minute linked block on the spot (the
+drag is the decision; undo covers regret). So this is one payload and one
+drop handler with a second source — not a new mechanism.
+
+The chip keeps its click (open Attention) and double-click (details); its
+title now teaches all three gestures. Deliberately NOT firing
+`onBlockDragActive`: that rings the queue rail as an UNSCHEDULE target
+(DEC-053), which would be a lie for an item that has no block yet.
+
+The chip STAYS after the drop — it marks the due date, which booking time
+does not move. (A "this is now scheduled" mark on the band is a separate
+question; the new block appearing under the pointer is its own feedback.)
+
+Also: the hour scroller now autoscrolls at its edges during a work-item
+drag. The band sits above a window showing about half a day, so without it
+you could only drop onto hours that happened to be in view — the feature
+would have been half-usable. 56px edge zones, speed scaled by depth.
+
+Verified live: a `[TEST]` LakeDash chip carried the payload, the drop
+created one linked 30-minute block (14 → 15), and the probe's block was
+deleted after. 5 new pins; 3,433 green; both typechecks clean.
+
+## DEC-094 — The plan review joins the family
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Scope:** presentation only,
+by operator ruling
+
+The operator sent a full redesign spec (native-picker replacement, a
+computed cascade with pinning, locked already-booked rows, a capacity line
+from velocity history, a keyboard map) and then cut it back: *"forget all
+that back-end stuff… anything that contradicts what currently exists takes
+preference to the way it's currently built so you don't risk side effects.
+Just change the visual interface."* So: every handler, every model and every
+behaviour from DEC-071/089/092 is byte-for-byte intact. Nothing was added
+that needed data the dialog doesn't already hold.
+
+What changed is what it looks like:
+
+- **Header** — the mark sits in an accent tile (this dialog is Plexii
+  speaking); the title carries real weight; the subtitle speaks in hours
+  ("25 blocks · 12h 30m across 3 days") instead of raw minutes, naming the
+  day span only when there is one. DEC-071's promise sentence is unchanged.
+- **Prompt echo** — the labelled grey block became one quiet italic quoted
+  line. The requirement it existed for (the prompt is shown, in full, beside
+  the plan it produced) is unchanged.
+- **The planner note** — now an accent-tinted panel with an info mark, so it
+  reads as a note rather than as body copy.
+- **Rows** — ONE start time in a fixed 82px tabular column (the range said
+  one fact twice and wrapped; the end time moved to the tooltip). The title
+  takes the weight. Duration became a real chip. An overlap became an amber
+  "overlaps" chip instead of a sentence competing with the reason.
+- **Gap rules** — the empty time between consecutive rows, which the list
+  hid completely, is now a thin rule carrying the span; 30m+ reads "open" in
+  stronger ink. Computed from data that was already there.
+- **Day headers** — a hairline rule with the day's total as a span.
+- **Footer** — its own rule, a quiet two-line hint, a de-emphasised Discard,
+  and "Accept plan ↵" as an unmistakably primary button.
+- **Native pickers stay** (spec wanted them replaced; replacing them is new
+  interaction code and would have removed arbitrary-duration typing). They
+  now wear `accent-color`, so the OS chrome picks up the brand.
+
+Found while looking at the result: DEC-092's affinity note concatenated bare
+onto the lateness clause ("Due Saturday Grouped beside “…") and clipped
+mid-word inside its quotes. Separated with a middot and clipped on a word
+boundary (`clipTitle`) — a copy defect the polish made visible.
+
+Two DEC-071 pins rewritten to the superseding presentation with history.
+15 new pins (including a behaviour-untouched clause listing every DEC-089
+control); 3,448 green; both typechecks clean.
+
+## DEC-095 — The Attention analytics band, made of material
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Scope:** presentation only
+
+Same ruling as DEC-094: the numbers, the filters and every handler are
+untouched; this is what they look like. The KPI tiles were flat swatches —
+a single flat tint, no edge, no depth, and nothing at all on hover.
+
+The house recipe, now in globals.css as `.fb-kpi-tile`: a tone-tinted
+gradient (160°), a hairline ring in the same tone, the shared
+`--shadow-inset-highlight` every fb-card uses, and a gloss sweep across the
+top 42% — theme-aware (28% white in light, 7% in dark), pointer-events off,
+and painted UNDER the content by z-order. Hover lifts 2px and deepens the
+tint and ring; active settles back; `prefers-reduced-motion` drops both.
+The selected state (DEC-049 — a tile is also the queue filter) closes the
+ring to 1.5px and holds the tint at hover strength, so "this one is on"
+reads without hovering it, and its label takes the tone.
+
+The tone rides in as `--kpi-tone`, a SPACE-separated RGB triplet via a new
+`toneTriplet()` — the `rgb(var(--x) / a)` form is the only one that survives
+an alpha modifier (GAP-018/019: a comma triplet or a complete colour there
+paints nothing). `queueTint` is untouched and still serves the inline fills.
+
+Also: the 14-day sparkline gained rounded caps and a vertical gradient, and
+its EMPTY days now read as absent (a neutral stub) instead of a sliver of
+the same success green. The status bars sit in a recessed track with a
+highlight on each segment. The "Breakdown" toggle became a chip that turns
+accent when open, rather than loose caption text.
+
+**Found while measuring: GAP-020.** `--ink-80` (52 uses), `--ink-45`,
+`--ink-55`, `--ink-35`, `--ink-25` and `--ink-300` are referenced but never
+defined — the declaration is invalid, so those elements silently inherit
+their parent's colour (paint-probed live: `var(--ink-80)` resolves to
+ink-100). Defining or rewriting them changes text colour in ~68 places at
+once, so it is its own round; two fixes I had already made outside this
+component were REVERTED to keep that diff whole. `accentColorLock` now
+freezes the offender set — it may shrink, a new one fails the build.
+
+11 new pins; 3,460 green; both typechecks clean.
