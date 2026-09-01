@@ -461,6 +461,53 @@ export default function DocEditor({
     }
   }
 
+  // ── Table right-click menu ────────────────────────────────────────────────
+  // Tables are the one block with a per-table page-layout choice (repeat the
+  // header row on continuation pages), and a right-click on the table itself is
+  // where Word and Docs put it. Kept local to the editor DOM so it never fires
+  // over the rest of the app chrome.
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number; pos: number; on: boolean } | null>(null)
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom as HTMLElement
+    const onCtx = (e: MouseEvent): void => {
+      const found = editor.view.posAtCoords({ left: e.clientX, top: e.clientY })
+      if (!found) return
+      const $pos = editor.state.doc.resolve(found.pos)
+      for (let d = $pos.depth; d > 0; d--) {
+        if ($pos.node(d).type.name === 'table') {
+          e.preventDefault()
+          setTableMenu({
+            x: e.clientX,
+            y: e.clientY,
+            pos: $pos.before(d),
+            on: $pos.node(d).attrs.headerRepeat === true
+          })
+          return
+        }
+      }
+    }
+    dom.addEventListener('contextmenu', onCtx)
+    return () => dom.removeEventListener('contextmenu', onCtx)
+  }, [editor])
+  function toggleHeaderRepeat(): void {
+    if (!editor || !tableMenu) return
+    const { pos } = tableMenu
+    editor
+      .chain()
+      .focus()
+      .command(({ tr, dispatch }) => {
+        const node = tr.doc.nodeAt(pos)
+        if (!node || node.type.name !== 'table') return false
+        if (dispatch) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, headerRepeat: !node.attrs.headerRepeat })
+        }
+        return true
+      })
+      .run()
+    setTableMenu(null)
+  }
+
   if (!editor) return <div />
 
   // Continuous flow keeps its comfortable reading measure; page view hands the
@@ -474,6 +521,26 @@ export default function DocEditor({
 
   return (
     <div className={`relative flex h-full ${scopeClass} ${focusMode ? 'fb-focus-mode' : ''}`}>
+      {tableMenu && (
+        <>
+          {/* Click-away closes without changing anything. */}
+          <div className="fixed inset-0 z-[80]" onMouseDown={() => setTableMenu(null)} />
+          <div
+            data-testid="doc-table-menu"
+            className="fixed z-[81] min-w-[232px] rounded-[var(--radius-row)] fb-glass-panel py-1 fb-t-label"
+            style={{ left: tableMenu.x, top: tableMenu.y }}
+          >
+            <button
+              data-testid="doc-table-header-repeat"
+              onClick={toggleHeaderRepeat}
+              className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-sunken)] text-[var(--ink-90)] fb-press flex items-center gap-2"
+            >
+              <Icon name={tableMenu.on ? 'check_box' : 'check_box_outline_blank'} size={15} />
+              Repeat header row on every page
+            </button>
+          </div>
+        </>
+      )}
       {/* Named heading styles: one rule per configured level, scoped to this editor. */}
       <style dangerouslySetInnerHTML={{ __html: headingCss(scopeClass, headingStyles) }} />
       <style dangerouslySetInnerHTML={{ __html: FOCUS_CSS }} />

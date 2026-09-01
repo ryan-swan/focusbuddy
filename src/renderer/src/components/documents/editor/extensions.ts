@@ -25,6 +25,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { TableKit } from '@tiptap/extension-table'
+import { TableHeaderRepeat } from './tableHeaderRepeat'
 import { Markdown } from 'tiptap-markdown'
 import { createLowlight, common } from 'lowlight'
 import { ResizableImage } from './ResizableImage'
@@ -94,6 +95,11 @@ export function buildDocExtensions(opts: BuildOptions = {}): AnyExt[] {
     Superscript,
     // Tables with interactive column resizing.
     TableKit.configure({ table: { resizable: true } }) as AnyExt,
+    // Word/Docs behaviour, opt-in per table from the right-click menu: when a
+    // table is split across pages, repeat its header row at the top of each
+    // continuation so the columns stay readable. Stored on the table node so it
+    // travels with the document and survives reload and export.
+    TableHeaderRepeat as AnyExt,
     TaskList,
     TaskItem.configure({ nested: true }),
     CodeBlockLowlight.configure({ lowlight }),
