@@ -100,6 +100,8 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
+import { saveTranscriptSegments, listTranscriptSegments } from '../db/transcripts'
+import type { TranscriptSegmentDraft } from '@shared/meetings'
 import { extractPeople } from '../ai/peopleExtract'
 import { listPeopleDirectory } from '../peopleDirectory'
 import { selectItemsForPlan } from '../ai/planSelect'
@@ -2472,6 +2474,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('agents:undoLast', () => undoLastApply())
 
   ipcMain.handle('voice:getProvider', () => getTranscriptionProvider())
+  // M2 — warm the on-device model WITHOUT flipping the provider preference:
+  // meetings always transcribe locally (CR-11), so the download/load cost is
+  // paid while the meeting runs, not after it ends.
+  ipcMain.handle('voice:preloadLocal', () => preloadLocalWhisper())
   ipcMain.handle('voice:setProvider', async (_e, p: TranscriptionProvider) => {
     setTranscriptionProvider(p)
     if (p === 'local') {
@@ -2577,6 +2583,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('meetings:list', () => listMeetings())
   ipcMain.handle('meetings:get', (_e, id: string) => getMeeting(id))
   ipcMain.handle('meetings:create', (_e, draft: MeetingDraft) => createMeeting(draft))
+  // M2 — the transcript as segments (SPEC-003): saved by the wrap-up after
+  // per-track transcription, read by the Thread rendering and Recall.
+  ipcMain.handle('meetings:saveSegments', (_e, meetingId: string, segments: TranscriptSegmentDraft[]) =>
+    saveTranscriptSegments(String(meetingId), Array.isArray(segments) ? segments : [])
+  )
+  ipcMain.handle('meetings:segments', (_e, meetingId: string) =>
+    listTranscriptSegments(String(meetingId))
+  )
   ipcMain.handle('meetings:update', (_e, id: string, patch: MeetingPatch) => updateMeeting(id, patch))
   ipcMain.handle('meetings:delete', (_e, id: string) => deleteMeeting(id))
 

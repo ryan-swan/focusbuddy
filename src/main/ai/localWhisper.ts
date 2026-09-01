@@ -30,11 +30,25 @@ import { app } from 'electron'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 
+// M2 (SPEC-003 S3-DEC-021) — a transcript is SEGMENTS, not a string: the
+// provenance tiers and every anchor depend on start/end offsets. Confidence
+// is per-segment where the engine provides it (cloud logprobs) and an
+// HONEST null where it does not (transformers.js exposes none) — a
+// fabricated confidence is exactly the confidently-wrong sin the spec
+// teardown documents, so we never invent one.
+export interface EngineSegment {
+  startMs: number
+  endMs: number
+  text: string
+  confidence: number | null
+}
+
 interface TranscribeResultOk {
   ok: true
   transcript: string
   durationSec: number | null
   language: string | null
+  segments: EngineSegment[] | null
 }
 
 interface TranscribeResultErr {
@@ -57,7 +71,10 @@ interface TranscribePipeline {
   (
     audio: Float32Array,
     opts: { language?: string; task?: string; return_timestamps?: boolean }
-  ): Promise<{ text: string }>
+  ): Promise<{
+    text: string
+    chunks?: Array<{ timestamp: [number, number | null]; text: string }>
+  }>
 }
 
 async function getPipeline(): Promise<TranscribePipeline> {
@@ -168,16 +185,30 @@ export async function transcribeLocal(
   try {
     const result = await pipe(samples, {
       task: 'transcribe',
-      return_timestamps: false
+      // M2 — timestamps are the whole point now: every downstream anchor
+      // (provenance tiers, moments, Recall citations) resolves against them.
+      return_timestamps: true
     })
     const text = typeof result.text === 'string' ? result.text.trim() : ''
+    const segments: EngineSegment[] = Array.isArray(result.chunks)
+      ? result.chunks
+          .filter((c) => Array.isArray(c.timestamp) && typeof c.text === 'string' && c.text.trim())
+          .map((c) => ({
+            startMs: Math.max(0, Math.round((c.timestamp[0] ?? 0) * 1000)),
+            // A null end (the model's last open chunk) closes at the clip end.
+            endMs: Math.round((c.timestamp[1] ?? samples.length / sampleRate) * 1000),
+            text: c.text.trim(),
+            confidence: null // transformers.js exposes no logprobs — honest null
+          }))
+      : []
     // eslint-disable-next-line no-console
-    console.log(`[localWhisper] ok: ${text.length} chars`)
+    console.log(`[localWhisper] ok: ${text.length} chars, ${segments.length} segments`)
     return {
       ok: true,
       transcript: text,
       durationSec: samples.length / sampleRate,
-      language: null // tiny model doesn't reliably surface this; cloud does
+      language: null, // tiny model doesn't reliably surface this; cloud does
+      segments: segments.length ? segments : null
     }
   } catch (err) {
     // eslint-disable-next-line no-console

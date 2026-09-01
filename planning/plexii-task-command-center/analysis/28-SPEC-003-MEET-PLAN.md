@@ -160,6 +160,10 @@ The no-AI phase, and the one that fixes a live liability.
 - **Ship test:** two-machine QA (the synced-docs session pairs with this).
 
 ### M2 — Transcript truth + the Record  *(spec P2 · C2 C3 C5)*
+**M2a (transcript truth) DONE — DEC-099**: segments from both engines,
+per-track attributed pipeline, CR-11 local-only meeting audio + in-meeting
+model warmup, `fb_transcript_segments` with delete cascade. **M2b (the
+Record: renderings, provenance, node container, export, retention) is next.**
 - `transcript_segments` schema (speaker accountId, start/end ms, text,
   **confidence required**); per-track transcription through the existing
   provider layer, merged on the shared clock; **local default, cloud only

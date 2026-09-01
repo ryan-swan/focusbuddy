@@ -38,7 +38,7 @@ import { CREATE_TASK_DEFINITION, VOICE_WORK_ITEM_SHAPE } from './vocabulary'
 import { normalizeIntentClass } from '@shared/workItems'
 import { isWorkItemsEnabled } from '../workItemsPref'
 import { resolveAnthropicKey, resolveOpenAIKey } from '../settingsStore'
-import { transcribeLocal } from './localWhisper'
+import { transcribeLocal, type EngineSegment } from './localWhisper'
 import { getTranscriptionProvider } from '../voiceProviderPref'
 
 // Fourth processing mode joined the family when speaker diarisation
@@ -62,7 +62,11 @@ export interface TranscribeResult {
   transcript: string
   durationSec: number | null
   language: string | null
+  /** M2 — timestamped segments when the engine yields them (cloud always;
+   *  local via return_timestamps). Null = engine gave text only. */
+  segments: EngineSegment[] | null
 }
+export type { EngineSegment }
 
 export interface TranscribeError {
   ok: false
@@ -93,12 +97,19 @@ export interface TranscribeInput {
   mimeType?: string
   samples?: Float32Array
   sampleRate?: number
+  /** M2 (CR-11) — force an engine; meetings force 'local'. */
+  forceProvider?: TranscriptionProvider
 }
 
+/** M2 (CR-11) — a caller may FORCE a provider. Meetings force 'local': you
+ *  cannot ask four people to consent to a local-first recording and then
+ *  ship their voices to a third party they were never told about. There is
+ *  deliberately NO cloud fallback on that path — failing honestly beats a
+ *  silent second disclosure. */
 export async function transcribeAudio(
   input: TranscribeInput
 ): Promise<TranscribeResult | TranscribeError> {
-  const provider = getTranscriptionProvider()
+  const provider = input.forceProvider ?? getTranscriptionProvider()
   if (provider === 'local') {
     if (!input.samples || !input.sampleRate) {
       return {
@@ -183,6 +194,8 @@ async function transcribeCloud(
       text?: string
       duration?: number
       language?: string
+      // verbose_json has ALWAYS carried these; the old parser threw them away.
+      segments?: Array<{ start?: number; end?: number; text?: string; avg_logprob?: number }>
     }
     if (typeof body.text !== 'string') {
       return { ok: false, error: 'Whisper returned no text.', reason: 'api' }
@@ -191,11 +204,28 @@ async function transcribeCloud(
     console.log(
       `[voiceNote] cloud transcribe ok: ${body.text.length} chars, lang=${body.language ?? '?'}`
     )
+    const segments: EngineSegment[] = Array.isArray(body.segments)
+      ? body.segments
+          .filter((s) => typeof s.text === 'string' && s.text.trim())
+          .map((s) => ({
+            startMs: Math.max(0, Math.round((s.start ?? 0) * 1000)),
+            endMs: Math.round((s.end ?? 0) * 1000),
+            text: (s.text as string).trim(),
+            // Whisper's avg_logprob → a 0..1 confidence. exp() of a mean
+            // token logprob is the standard, honest reading of what the
+            // engine itself believes about this span.
+            confidence:
+              typeof s.avg_logprob === 'number'
+                ? Math.max(0, Math.min(1, Math.exp(s.avg_logprob)))
+                : null
+          }))
+      : []
     return {
       ok: true,
       transcript: body.text.trim(),
       durationSec: typeof body.duration === 'number' ? body.duration : null,
-      language: typeof body.language === 'string' ? body.language : null
+      language: typeof body.language === 'string' ? body.language : null,
+      segments: segments.length ? segments : null
     }
   } catch (err) {
     const aborted = err instanceof Error && err.name === 'AbortError'

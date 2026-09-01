@@ -2635,3 +2635,57 @@ throughout). A missed-triage dialog (z-330) over the meeting overlay
 24 new tests (the consent decision table in full, wire-envelope kinds,
 recorder degradation, choke-point and no-auto-start pins); 3,486 green;
 both typechecks clean.
+
+## DEC-099 — M2a: transcript truth
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M2, first half) · **Branch:** ryan-next
+
+The transcript stops being a string. Everything provenance promises later
+(S3-DEC-021's heard-requires-anchor, moments, Recall citations) resolves
+against what this round built:
+
+**Both engines yield timestamps.** Cloud has requested `verbose_json` since
+day one and the parser THREW THE SEGMENTS AWAY — they are now parsed, with
+`exp(avg_logprob)` as the engine's own 0–1 confidence. Local flips
+`return_timestamps: true` and parses the chunks; transformers.js exposes no
+logprobs, so local confidence is an HONEST NULL — a fabricated confidence
+is exactly the confidently-wrong sin the field teardown documents, and we
+never invent one.
+
+**The attributed pipeline (C1 pays off).** The wrap-up transcribes each
+per-track take separately and merges on the shared clock
+(`lib/transcriptMerge.ts`, pure and matrix-tested): interleaving is
+arithmetic, not inference — attribution came from capture and stays exact.
+A track whose engine gave text only degrades to one attributed span
+(attribution survives even when in-track timing is lost). The summariser
+now reads `[m:ss] Name: words` — real attribution replaces the old
+"AI guesses Speaker 1–4 from prose" mode on this path. Speaker names are
+resolved from the roster at leave time, before teardown erases it.
+
+**Meeting audio never leaves the machine (CR-11, ruled).** The track path
+pins the on-device engine (`forceLocal`) with NO cloud fallback — failing
+honestly beats a silent second disclosure; the error says exactly that.
+The meeting handoff marks even its legacy mixed-blob fallback
+`forceLocalTranscription`. The local model warms when recording STARTS
+(a bare `voice:preloadLocal` channel that never touches the provider
+preference), so the ~80MB whisper-tiny download happens during the meeting,
+not appended to its end. Calls (PlexiCam) keep the provider preference
+until their own consent round — same boundary as DEC-098.
+
+**The segments have a home.** `fb_transcript_segments` (speaker accountId
+nullable for genuinely unattributed speech, start/end ms, text, confidence
+REAL NULL), written atomically per meeting after the record exists, read
+back sorted. Live round-trip on the real build: three drafts saved out of
+order → read back clock-ordered with null confidence and null speaker
+intact; atomic replace 3 → 1. The round-trip CAUGHT a real defect —
+deleting a meeting orphaned its segments — fixed (explicit cascade in
+deleteMeeting), pinned, and the stray row cleaned.
+
+Ops note for the record: the first restart's app couldn't bind :9223 (an
+orphaned Electron held it) and the probe talked to the OLD build — the
+"preload functions undefined" symptom. Port-holder kill via lsof before
+relaunch is now part of the restart ritual.
+
+16 new tests; 3,502 green; both typechecks clean. M2b (the Record object,
+three renderings, provenance CSS, meeting-node container, export,
+retention) is next.

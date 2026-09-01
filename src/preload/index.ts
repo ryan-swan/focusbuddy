@@ -93,7 +93,7 @@ interface DocCommentDto {
   resolved: boolean
   createdAt: number
 }
-import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
+import type { Meeting, MeetingDraft, MeetingPatch, TranscriptSegment, TranscriptSegmentDraft } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 import type { PlexiSignRequest, PlexiSignDraft, PlexiSignPatch, SignAction } from '@shared/sign'
@@ -1260,12 +1260,16 @@ const api = {
       mimeType?: string
       samples?: Float32Array
       sampleRate?: number
+      /** M2 (CR-11) — meetings force 'local'; no silent cloud fallback. */
+      forceProvider?: 'cloud' | 'local'
     }): Promise<
       | {
           ok: true
           transcript: string
           durationSec: number | null
           language: string | null
+          /** M2 — timestamped spans when the engine yields them. */
+          segments: Array<{ startMs: number; endMs: number; text: string; confidence: number | null }> | null
         }
       | { ok: false; error: string; reason?: 'no_key' | 'network' | 'api' | 'unknown' | 'model_load' | 'decode' }
     > => ipcRenderer.invoke('ai:transcribeAudio', input),
@@ -1297,6 +1301,9 @@ const api = {
     // the first recording isn't blocked on the download.
     getProvider: (): Promise<'cloud' | 'local'> =>
       ipcRenderer.invoke('voice:getProvider'),
+    /** M2 — warm the local model without touching the preference. */
+    preloadLocal: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('voice:preloadLocal'),
     setProvider: (
       p: 'cloud' | 'local'
     ): Promise<{ ok: boolean; error?: string }> =>
@@ -1616,6 +1623,11 @@ const api = {
     list: (): Promise<Meeting[]> => ipcRenderer.invoke('meetings:list'),
     get: (id: string): Promise<Meeting | null> => ipcRenderer.invoke('meetings:get', id),
     create: (draft: MeetingDraft): Promise<Meeting> => ipcRenderer.invoke('meetings:create', draft),
+    /** M2 — replace a meeting's attributed transcript segments (derived data). */
+    saveSegments: (meetingId: string, segments: TranscriptSegmentDraft[]): Promise<TranscriptSegment[]> =>
+      ipcRenderer.invoke('meetings:saveSegments', meetingId, segments),
+    segments: (meetingId: string): Promise<TranscriptSegment[]> =>
+      ipcRenderer.invoke('meetings:segments', meetingId),
     update: (id: string, patch: MeetingPatch): Promise<Meeting | null> =>
       ipcRenderer.invoke('meetings:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('meetings:delete', id)

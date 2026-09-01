@@ -34,7 +34,28 @@ type TranscribeResult = Awaited<ReturnType<typeof window.api.voiceNote.transcrib
 
 // Transcribe a recorded blob, decoding for the local provider. Returns the same
 // shape as window.api.voiceNote.transcribe so callers are unchanged otherwise.
-export async function transcribeRecording(buffer: ArrayBuffer, mimeType: string): Promise<TranscribeResult> {
+export async function transcribeRecording(
+  buffer: ArrayBuffer,
+  mimeType: string,
+  opts: { forceLocal?: boolean } = {}
+): Promise<TranscribeResult> {
+  // M2 (CR-11) — MEETING audio never leaves the machine: forceLocal decodes
+  // and pins the on-device engine regardless of the provider preference,
+  // and there is no cloud fallback on failure. You cannot ask people to
+  // consent to a local-first recording and then ship their voices to a
+  // third party they were never told about.
+  if (opts.forceLocal) {
+    try {
+      const samples = await decodeToMono16k(buffer)
+      return await window.api.voiceNote.transcribe({ samples, sampleRate: 16000, forceProvider: 'local' })
+    } catch (err) {
+      return {
+        ok: false,
+        reason: 'decode',
+        error: `Could not decode the recording for on-device transcription: ${(err as Error)?.message ?? 'unknown error'}.`
+      } as TranscribeResult
+    }
+  }
   let provider: 'cloud' | 'local' = 'cloud'
   try {
     provider = await window.api.voiceNote.getProvider()

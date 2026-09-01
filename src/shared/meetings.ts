@@ -35,3 +35,28 @@ export interface MeetingPatch {
   actionItems?: string[]
   durationSec?: number | null
 }
+
+// M2 (SPEC-003 S3-DEC-021) — one attributed, timestamped span of speech.
+// speakerAccountId is null only when attribution was genuinely unavailable
+// (legacy mixed-blob transcriptions); per-track capture makes it exact for
+// native meetings. confidence is the ENGINE's own belief (cloud logprobs),
+// or null where the engine exposes none (local) — never fabricated.
+export interface TranscriptSegment {
+  id: string
+  meetingId: string
+  speakerAccountId: string | null
+  speakerName: string
+  startMs: number
+  endMs: number
+  text: string
+  confidence: number | null
+}
+
+export interface TranscriptSegmentDraft {
+  speakerAccountId: string | null
+  speakerName: string
+  startMs: number
+  endMs: number
+  text: string
+  confidence: number | null
+}

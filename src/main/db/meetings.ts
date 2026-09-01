@@ -93,6 +93,10 @@ export function updateMeeting(id: string, patch: MeetingPatch): Meeting | null {
 }
 
 export function deleteMeeting(id: string): boolean {
+  // M2 — a meeting's segments die with it (no FK cascade in this schema;
+  // the delete is explicit so a removed meeting never leaves orphaned
+  // attributed speech lying in the store).
+  getDb().prepare('DELETE FROM fb_transcript_segments WHERE meeting_id = ?').run(id)
   const db = getDb()
   const r = db.prepare('DELETE FROM fb_meetings WHERE id = ?').run(id)
   return r.changes > 0

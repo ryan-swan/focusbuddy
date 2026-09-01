@@ -525,6 +525,11 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     setTranscribing: (on) => {
       const me = useAccountStore.getState().account?.id ?? ''
       if (on && !recorder && get().status === 'in') {
+        // M2 (CR-11) — meeting audio transcribes on-device, so warm the
+        // local model NOW: the download/load cost is paid while the meeting
+        // runs, never appended to its end. Fire-and-forget; a failure
+        // surfaces at wrap-up with an honest error, not a silent cloud send.
+        void window.api.voiceNote.preloadLocal().catch(() => {})
         recorder = new MeetingTrackRecorder()
         const local = get().localStream
         if (local) recorder.tap(me || 'me', local)
@@ -677,6 +682,15 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       const rec = recorder
       recorder = null
       if (rec) {
+        // M2 — resolve names for attribution NOW, from the roster we hold;
+        // after teardown the map is gone.
+        const speakers: Record<string, string> = {}
+        const selfName = personDisplayName(useAccountStore.getState().account ?? {}, 'You')
+        speakers[me || 'me'] = selfName
+        if (me) speakers.me = selfName
+        for (const p of Object.values(get().participants)) {
+          speakers[p.accountId] = personDisplayName(p, p.handle)
+        }
         void rec.stop().then((take) => {
           if (take.mixed && take.mixed.durationSec >= 2) {
             void useWrapupStore.getState().begin({
@@ -685,6 +699,9 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
               mimeType: take.mixed.mimeType,
               durationSec: take.mixed.durationSec,
               tracks: take.tracks,
+              speakers,
+              // CR-11 — this is MEETING audio: on-device only, no fallback.
+              forceLocalTranscription: true,
               notes,
               moments
             })
