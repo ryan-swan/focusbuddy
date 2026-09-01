@@ -36,6 +36,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.2.0',
+    date: '2026-09-01T12:00:00Z',
+    title: 'PlexiDesk 4.2.0 — Attention: everything you owe, in one place',
+    tag: 'feature',
+    summary:
+      'Everything you have said you would do now lands in one place. Capture a task from anywhere \u2014 a note, a highlight on any surface, or the command palette \u2014 and it comes back written up as a finished item you can check before you keep it; highlight a list and it becomes several. The new Attention command centre puts your queue, the day ahead and your numbers on one screen, with rows that carry the anatomy you expect from a project tool: status, urgency, tags and sub-items, dragged to reorder or to reclassify. The calendar beside it is a real one now, with a rail you can page through, deadlines you drag straight onto the grid, and a Book time dialog for putting work into the day. Plexii can plan the day for you, and you review that plan before it is accepted, with a reason on every block you can check against your own calendar.',
+    highlights: [
+      'Capture from anywhere \u2014 notes, a highlight on any surface, or the command palette \u2014 and see the finished item before you keep it.',
+      'Highlight a list and it becomes several items, tidied and written up.',
+      'The Attention command centre: your queue, the day ahead and your numbers on one screen.',
+      'Item rows with real project-tool anatomy \u2014 status, urgency, tags and sub-items, dragged to reorder or reclassify.',
+      'A calendar you can page through, with deadline chips you drag onto the grid and a Book time dialog.',
+      'Plexii plans your day and you review it first \u2014 every block states a reason you can check.',
+      'Attention rides along as a widget on any desk, and items born in a meeting link back to it.'
+    ]
+  },
+  {
     version: '4.1.1',
     date: '2026-08-26T12:00:00Z',
     title: 'PlexiDesk 4.1.1 — share and duplicate, Plexii included free, minimap fix',
