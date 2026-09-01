@@ -13,6 +13,9 @@ import { useNodeStore } from '../../stores/nodes'
 import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { Meeting, TranscriptSegment } from '@shared/meetings'
+import { validateRecordSpans } from '../../lib/recordSpans'
+import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
+import { useViewStore } from '../../stores/view'
 import type { ActionProposal } from '@shared/types'
 
 // PlexiMeet: meetings that turn into actions. Record a meeting and it is
@@ -47,6 +50,10 @@ export default function PlexiMeetView(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
   const [whisper, setWhisper] = useState(whisperEnabled())
+  const [retention, setRetention] = useState<'0' | '7' | '30' | '90' | 'keep'>('30')
+  useEffect(() => {
+    void window.api.meetings.getAudioRetention().then(setRetention).catch(() => {})
+  }, [])
   const recRef = useRef<MediaRecorder | null>(null)
 
   useEffect(() => {
@@ -264,11 +271,13 @@ export default function PlexiMeetView(): JSX.Element {
             <Icon name="video_call" size={17} /> Start or schedule a meeting
           </button>
 
-          {/* Whisper opt-in. Off by default (never forced); turning it on also
-              becomes the default for future meetings until turned off. */}
+          {/* DEC-098 made meeting recording consent-only: this preference no
+              longer starts anything in a MEETING (recording begins in the
+              room, with everyone asked). It still governs 1:1 PlexiCam calls
+              until their own consent round — the copy says what is true. */}
           <label
             className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
-            title="When on, your live meetings are recorded, transcribed and summarised into a doc with suggested tasks and follow-ups. Off by default."
+            title="Applies to 1:1 calls. Meetings never auto-record — recording starts in the room and every participant is asked first."
           >
             <input
               type="checkbox"
@@ -280,7 +289,30 @@ export default function PlexiMeetView(): JSX.Element {
               data-testid="meet-whisper-toggle"
               className="accent-[rgb(var(--accent))]"
             />
-            <span>Transcribe &amp; summarise my meetings (Whisper)</span>
+            <span>Transcribe &amp; summarise my 1:1 calls</span>
+          </label>
+
+          {/* M2c (CR-13) — audio retention. Local disk only, never uploaded. */}
+          <label className="flex items-center justify-between gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)]">
+            <span title="Meeting audio stays on this machine and expires after this window. 'Keep' on a meeting overrides it.">
+              Keep meeting audio
+            </span>
+            <select
+              value={retention}
+              onChange={(e) => {
+                const v = e.target.value as '0' | '7' | '30' | '90' | 'keep'
+                setRetention(v)
+                void window.api.meetings.setAudioRetention(v)
+              }}
+              data-testid="meet-retention-select"
+              className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[11.5px]"
+            >
+              <option value="0">never (discard at wrap-up)</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+              <option value="keep">forever</option>
+            </select>
           </label>
 
           {/* Secondary: recording is one option, not the whole feature. */}
@@ -561,6 +593,49 @@ function MeetingDetail({
     const s = Math.floor(ms / 1000)
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   }
+  // M2c — audio presence + the per-meeting keep override (CR-13), export,
+  // template rebuild, and the door to the meeting's desk (S3-DEC-020).
+  const [audio, setAudio] = useState<{ present: boolean; files: number; bytes: number; kept: boolean } | null>(null)
+  const [rebuilding, setRebuilding] = useState(false)
+  const [exported, setExported] = useState<string | null>(null)
+  const refreshMeetings = useMeetingsStore((s) => s.load)
+  const goTask = useViewStore((s) => s.goTask)
+  useEffect(() => {
+    let alive = true
+    setAudio(null)
+    setExported(null)
+    void window.api.meetings.audioInfo(meeting.id).then((a) => {
+      if (alive) setAudio(a)
+    })
+    return () => {
+      alive = false
+    }
+  }, [meeting.id])
+  async function rebuildBrief(sections: string[]): Promise<void> {
+    if (rebuilding || segments.length === 0) return
+    setRebuilding(true)
+    try {
+      const enh = await window.api.meetings.enhanceRecord({
+        title: meeting.title,
+        // yours spans were minted at wrap-up from the live notes; reuse their
+        // text as context — the user's words are already in the record.
+        notes: (meeting.record?.spans ?? [])
+          .filter((s) => s.tier === 'yours')
+          .map((s) => s.text)
+          .join('\n'),
+        sections,
+        segments: segments.map((s) => ({ id: s.id, startMs: s.startMs, speakerName: s.speakerName, text: s.text }))
+      })
+      if (enh.ok) {
+        const yours = (meeting.record?.spans ?? []).filter((s) => s.tier === 'yours')
+        const spans = [...yours, ...validateRecordSpans(enh.spans, segments)]
+        await window.api.meetings.update(meeting.id, { record: { spans, generatedAt: Date.now() } })
+        await refreshMeetings()
+      }
+    } finally {
+      setRebuilding(false)
+    }
+  }
   const jumpToSegment = (segmentId: string): void => {
     setView('thread')
     setTimeout(() => {
@@ -585,10 +660,36 @@ function MeetingDetail({
           className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)]"
           data-testid="meet-title"
         />
+        {meeting.deskNodeId && (
+          <button
+            onClick={() => goTask(meeting.deskNodeId!)}
+            className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-80)]"
+            title="Open this meeting's desk — its documents live there"
+            data-testid="meet-open-desk"
+          >
+            <Icon name="desk" size={13} /> Desk
+          </button>
+        )}
+        <button
+          onClick={() => void window.api.meetings.export(meeting.id, 'markdown').then((r) => r.ok && setExported(r.path ?? null))}
+          className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-80)]"
+          title="Export as Markdown — notes, brief, commitments and transcript, provenance kept"
+          data-testid="meet-export-md"
+        >
+          <Icon name="download" size={13} /> .md
+        </button>
+        <button
+          onClick={() => void window.api.meetings.export(meeting.id, 'json').then((r) => r.ok && setExported(r.path ?? null))}
+          className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-80)]"
+          title="Export as JSON — the full record, segments and audio manifest"
+          data-testid="meet-export-json"
+        >
+          <Icon name="download" size={13} /> .json
+        </button>
         <button
           onClick={onDelete}
           className="p-1.5 rounded-md text-[var(--ink-40)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-          title="Delete meeting" aria-label="Delete meeting"
+          title="Delete meeting — its transcript segments and audio go with it" aria-label="Delete meeting"
           data-testid="meet-delete"
         >
           <Icon name="delete" size={16} />
@@ -649,7 +750,29 @@ function MeetingDetail({
       )}
 
       {view === 'brief' && (
-        <div className="px-5 py-4" data-testid="rendering-brief">
+        <div className="px-5 py-4 space-y-4" data-testid="rendering-brief-outer">
+          {/* M2c (§3.5) — rebuild the Brief under a different template. The
+              Commitments rendering is never templated: its shape is the
+              product. yours spans survive every rebuild untouched. */}
+          {segments.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap" data-testid="record-templates">
+              {RECORD_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  disabled={rebuilding}
+                  onClick={() => void rebuildBrief(tpl.sections)}
+                  title={`Rebuild the Brief as “${tpl.name}” — sections: ${tpl.sections.join(' · ')}`}
+                  className="h-7 px-2.5 rounded-full text-[11.5px] fb-press bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-50"
+                >
+                  {rebuilding ? '…' : tpl.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {view === 'brief' && (
+        <div className="px-5 pb-4" data-testid="rendering-brief">
           {meeting.record && meeting.record.spans.length > 0 ? (
             <div className="space-y-4">
               {/* yours first — the reader's own words lead. */}
@@ -738,6 +861,46 @@ function MeetingDetail({
             </pre>
           ) : (
             <p className="text-[13px] text-[var(--ink-50)]">No transcript for this meeting.</p>
+          )}
+        </div>
+      )}
+
+      {(audio?.present || exported) && (
+        <div className="px-5 pb-2 space-y-1.5">
+          {audio?.present && (
+            <div className="flex items-center gap-2 text-[11.5px] text-[var(--ink-50)]" data-testid="meet-audio-row">
+              <Icon name="graphic_eq" size={13} className="shrink-0" />
+              <span className="flex-1">
+                {audio.files} audio track{audio.files === 1 ? '' : 's'} on this machine (
+                {(audio.bytes / 1_000_000).toFixed(1)} MB) — never uploaded.
+              </span>
+              <button
+                onClick={() =>
+                  void window.api.meetings.keepAudio(meeting.id, !audio.kept).then(() =>
+                    window.api.meetings.audioInfo(meeting.id).then(setAudio)
+                  )
+                }
+                className={`fb-press text-[11px] px-2 py-0.5 rounded-full ${
+                  audio.kept ? 'bg-accent/15 text-[rgb(var(--accent))]' : 'bg-[var(--surface-sunken)] text-[var(--ink-60)]'
+                }`}
+                title={audio.kept ? 'Kept forever — click to return to the retention window' : 'Keep this meeting’s audio past the retention window'}
+                data-testid="meet-keep-audio"
+              >
+                {audio.kept ? 'Kept' : 'Keep'}
+              </button>
+              <button
+                onClick={() => void window.api.meetings.revealAudio(meeting.id)}
+                className="fb-press text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-100)]"
+                title="Show the audio files in Finder"
+              >
+                Reveal
+              </button>
+            </div>
+          )}
+          {exported && (
+            <div className="text-[11.5px] text-[var(--ink-50)]" data-testid="meet-exported">
+              Exported to {exported}
+            </div>
           )}
         </div>
       )}

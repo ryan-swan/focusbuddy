@@ -102,6 +102,18 @@ import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
 import { saveTranscriptSegments, listTranscriptSegments } from '../db/transcripts'
 import { enhanceRecord, type EnhanceInput } from '../ai/enhanceRecord'
+import {
+  saveAudioTakes,
+  audioInfo,
+  setKeepAudio,
+  revealAudio,
+  getAudioRetention,
+  setAudioRetention,
+  sweepMeetingAudio,
+  type AudioTakeIn,
+  type RetentionMode
+} from '../meetingAudio'
+import { exportMeeting } from '../meetingExport'
 import type { TranscriptSegmentDraft } from '@shared/meetings'
 import { extractPeople } from '../ai/peopleExtract'
 import { listPeopleDirectory } from '../peopleDirectory'
@@ -754,6 +766,13 @@ export function registerIpcHandlers(): void {
   // S5: the capture classifier (hard rules first — zero model latency on the
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
+  // M2c (CR-13) — retention sweep at start: takes older than the window go,
+  // keep-flagged and 'keep'-mode takes stay. Best-effort, never blocking.
+  try {
+    sweepMeetingAudio()
+  } catch {
+    /* a failed sweep costs disk, not correctness */
+  }
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
   // DEC-088 — the people scan alone, for MARKED captures (whose class the
   // preset table already decided — that path deliberately never classifies,
@@ -2592,6 +2611,20 @@ export function registerIpcHandlers(): void {
   // M2b — the Enhance pass (SPEC-003 §3.4). The renderer validates every
   // returned span against the real segments and downgrades the unprovable.
   ipcMain.handle('ai:enhanceRecord', (_e, input: EnhanceInput) => enhanceRecord(input))
+  // M2c — audio retention (CR-13) + export (the non-negotiable).
+  ipcMain.handle('meetings:saveAudioTakes', (_e, meetingId: string, takes: AudioTakeIn[]) =>
+    saveAudioTakes(String(meetingId), Array.isArray(takes) ? takes : [])
+  )
+  ipcMain.handle('meetings:audioInfo', (_e, meetingId: string) => audioInfo(String(meetingId)))
+  ipcMain.handle('meetings:keepAudio', (_e, meetingId: string, keep: boolean) =>
+    setKeepAudio(String(meetingId), !!keep)
+  )
+  ipcMain.handle('meetings:revealAudio', (_e, meetingId: string) => revealAudio(String(meetingId)))
+  ipcMain.handle('meetings:getAudioRetention', () => getAudioRetention())
+  ipcMain.handle('meetings:setAudioRetention', (_e, mode: RetentionMode) => setAudioRetention(mode))
+  ipcMain.handle('meetings:export', (_e, meetingId: string, format: 'markdown' | 'json') =>
+    exportMeeting(String(meetingId), format === 'json' ? 'json' : 'markdown')
+  )
   ipcMain.handle('meetings:segments', (_e, meetingId: string) =>
     listTranscriptSegments(String(meetingId))
   )

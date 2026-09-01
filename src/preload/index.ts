@@ -1628,11 +1628,30 @@ const api = {
       ipcRenderer.invoke('meetings:saveSegments', meetingId, segments),
     segments: (meetingId: string): Promise<TranscriptSegment[]> =>
       ipcRenderer.invoke('meetings:segments', meetingId),
+    /** M2c — audio retention (CR-13) + export. */
+    saveAudioTakes: (
+      meetingId: string,
+      takes: Array<{ speaker: string; bytes: Uint8Array; mimeType: string; offsetMs: number }>
+    ): Promise<{ ok: boolean; path: string }> =>
+      ipcRenderer.invoke('meetings:saveAudioTakes', meetingId, takes),
+    audioInfo: (meetingId: string): Promise<{ present: boolean; files: number; bytes: number; kept: boolean; path: string }> =>
+      ipcRenderer.invoke('meetings:audioInfo', meetingId),
+    keepAudio: (meetingId: string, keep: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('meetings:keepAudio', meetingId, keep),
+    revealAudio: (meetingId: string): Promise<boolean> =>
+      ipcRenderer.invoke('meetings:revealAudio', meetingId),
+    getAudioRetention: (): Promise<'0' | '7' | '30' | '90' | 'keep'> =>
+      ipcRenderer.invoke('meetings:getAudioRetention'),
+    setAudioRetention: (mode: '0' | '7' | '30' | '90' | 'keep'): Promise<void> =>
+      ipcRenderer.invoke('meetings:setAudioRetention', mode),
+    export: (meetingId: string, format: 'markdown' | 'json'): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('meetings:export', meetingId, format),
     /** M2b — the Enhance pass; renderer validates + downgrades unprovable spans. */
     enhanceRecord: (input: {
       title: string
       notes: string
       segments: Array<{ id: string; startMs: number; speakerName: string; text: string }>
+      sections?: string[]
     }): Promise<
       | { ok: true; spans: Array<{ tier: 'heard' | 'inferred'; text: string; segmentId?: string; section?: string }> }
       | { ok: false; error: string }

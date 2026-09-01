@@ -164,8 +164,9 @@ The no-AI phase, and the one that fixes a live liability.
 per-track attributed pipeline, CR-11 local-only meeting audio + in-meeting
 model warmup, `fb_transcript_segments` with delete cascade. **M2b (the Record
 object, Enhance with the anchor-or-downgrade contract, three renderings
-with provenance) DONE — DEC-100.** M2c remains: node container (C5),
-templates, export, audio retention (CR-13).
+with provenance) DONE — DEC-100. M2c (container, templates, export,
+retention) DONE — DEC-101. M2 COMPLETE.** Remaining C5 sliver (the Record
+widget on the meeting desk) rides with M3's sourceUrl anchors.
 - `transcript_segments` schema (speaker accountId, start/end ms, text,
   **confidence required**); per-track transcription through the existing
   provider layer, merged on the shared clock; **local default, cloud only

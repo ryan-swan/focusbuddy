@@ -2731,3 +2731,53 @@ segments (DEC-099's cascade doing its job).
 Still open in M2 (M2c): the meeting-node container (C5), templates,
 export, audio retention (CR-13). 12 new tests; 3,514 green; both
 typechecks clean.
+
+## DEC-101 — M2c: container, templates, export, retention — M2 complete
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M2, final third) · **Branch:** ryan-next
+
+**Retention (CR-13), exactly as ruled.** Meeting audio lives at
+userData/meeting-audio/<meetingId>/ — per-speaker takes plus a take.json of
+offsets — and NEVER leaves the machine. Modes 0/7/30/90/keep, default 30,
+set from the Meet view. Zero means zero: the wrap-up skips the save call
+entirely, so the takes die with renderer memory at the end of the Enhance
+pass, not at a nightly sweep. The per-meeting "Keep" override is a flag
+file; the boot sweep honours both it and keep-mode. A declined participant
+has no take to save (DEC-098 never captured one). Deleting a meeting
+deletes its audio — the same cascade rule as its segments.
+
+**Export (Part V §6, the non-negotiable).** Markdown and JSON from the
+meeting detail, through the OS save dialog. Provenance SURVIVES the file:
+your notes lead, commitments are checkboxes, heard spans export as
+timestamped quotes, inferred spans are marked "(inferred)", and the
+transcript is the attributed segment list. JSON carries the full object —
+meeting, record, segments, audio manifest. Audio itself is already open
+files on disk; a Reveal button shows them in Finder rather than
+re-encoding anything.
+
+**Templates (§3.5).** The four ruled: Decisions & Actions (default),
+Client Call, 1:1, Interview — a section-list registry, not a second
+template mechanism. The wrap-up briefs under the default; the Brief view
+offers one-click rebuilds under any of the four, and every rebuild
+preserves the yours spans byte-for-byte — the user's words survive every
+template. Commitments is never templated: its shape is the product.
+
+**The container (S3-DEC-020), first honest increment.** A recorded MEETING
+mints a desk node at wrap-up, holding the transcript document as a widget,
+with desk_node_id on the meeting row and a "Desk" door in the detail
+header. Calls stay lightweight; a failed desk never blocks the review. The
+Record itself still renders in the Meet view — the Record WIDGET on the
+desk is the remaining sliver of C5, deferred to ride with M3's sourceUrl
+anchors rather than shipped as an empty shell now.
+
+**And the preference finally tells the truth.** The old toggle said
+"Transcribe & summarise my meetings" while DEC-098 had made meeting
+recording consent-only — it now says what it governs (1:1 calls) and that
+meetings never auto-record.
+
+Verified live on the real build: the full audio lifecycle (two takes
+saved with offsets, keep-flag flip, default 30, audio gone with the
+meeting's delete); export surface present (the OS dialog needs a human
+hand — honest limit of solo verification). 14 new tests; 3,528 green;
+both typechecks clean. **M2 is complete** — M3 (routing into Attention)
+is next.

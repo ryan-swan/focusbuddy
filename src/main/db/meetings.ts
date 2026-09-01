@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
 import { getActiveOrgId } from './activeOrg'
+import { deleteAudioFor } from '../meetingAudio'
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 
 // ── fb_meetings (PlexiMeet) ──────────────────────────────────────────────────
@@ -15,6 +16,7 @@ interface MeetingRow {
   action_items_json: string
   duration_sec: number | null
   record_json: string | null
+  desk_node_id: string | null
   created_at: number
   updated_at: number
 }
@@ -41,6 +43,7 @@ function parseItems(raw: string): string[] {
 function rowToMeeting(row: MeetingRow): Meeting {
   return {
     record: parseRecord(row.record_json),
+    deskNodeId: row.desk_node_id ?? null,
     id: row.id,
     title: row.title,
     transcript: row.transcript,
@@ -102,13 +105,14 @@ export function updateMeeting(id: string, patch: MeetingPatch): Meeting | null {
         : existing.record
           ? JSON.stringify(existing.record)
           : null,
+    desk_node: patch.deskNodeId !== undefined ? patch.deskNodeId : existing.deskNodeId,
     updated_at: Date.now(),
     id
   }
   db.prepare(
     `UPDATE fb_meetings SET title = @title, transcript = @transcript, summary = @summary,
        action_items_json = @items, duration_sec = @duration, record_json = @record,
-       updated_at = @updated_at WHERE id = @id`
+       desk_node_id = @desk_node, updated_at = @updated_at WHERE id = @id`
   ).run(next)
   return getMeeting(id)
 }
@@ -118,6 +122,8 @@ export function deleteMeeting(id: string): boolean {
   // the delete is explicit so a removed meeting never leaves orphaned
   // attributed speech lying in the store).
   getDb().prepare('DELETE FROM fb_transcript_segments WHERE meeting_id = ?').run(id)
+  // M2c — and its audio takes go with it (CR-13's own cascade).
+  deleteAudioFor(id)
   const db = getDb()
   const r = db.prepare('DELETE FROM fb_meetings WHERE id = ?').run(id)
   return r.changes > 0

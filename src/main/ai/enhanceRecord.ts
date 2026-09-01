@@ -15,6 +15,8 @@ export interface EnhanceInput {
   title: string
   notes: string
   segments: Array<{ id: string; startMs: number; speakerName: string; text: string }>
+  /** M2c (§3.5) — the Brief's section headings, from the chosen template. */
+  sections?: string[]
 }
 
 export interface EnhanceSpanRaw {
@@ -46,7 +48,7 @@ export async function enhanceRecord(
         'If you cannot point at the segment, the tier is "inferred". A heard claim without its segmentId will be discarded as unproven.\n' +
         '- "inferred" = your synthesis (summaries, connections, context). No segmentId.\n' +
         '- Never restate the attendee\'s notes as your own spans — their words are rendered separately, verbatim.\n' +
-        '- Group spans under sections: "What happened", "Decisions", "Open questions". 6-14 spans total.\n' +
+        `- Group spans under sections: ${(input.sections ?? ['What happened', 'Decisions', 'Open questions']).map((s) => `"${s}"`).join(', ')}. 6-14 spans total.\n` +
         'No prose outside the JSON.',
       messages: [
         {

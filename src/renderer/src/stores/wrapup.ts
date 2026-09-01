@@ -6,6 +6,9 @@ import { ensureMeetingFolder, saveTranscriptDoc, saveMeetingNotesDoc } from '../
 import { transcribeRecording } from '../lib/transcribeRecording'
 import { mergeTrackSegments, formatAttributedTranscript } from '../lib/transcriptMerge'
 import { buildYoursSpans, validateRecordSpans } from '../lib/recordSpans'
+import { DEFAULT_RECORD_TEMPLATE } from '../lib/recordTemplates'
+import { useNodeStore } from './nodes'
+import { useWidgetStore } from './widgets'
 
 // End-of-conversation wrap-up. When a meeting or call ends with a recording, this
 // drives the one honest pipeline: transcribe the mixed audio, ask the AI for a
@@ -241,6 +244,7 @@ async function runWrapup(
       .enhanceRecord({
         title,
         notes: notes ?? '',
+        sections: DEFAULT_RECORD_TEMPLATE.sections,
         segments: savedSegments.map((s) => ({
           id: s.id,
           startMs: s.startMs,
@@ -254,6 +258,54 @@ async function runWrapup(
       await window.api.meetings
         .update(meeting.id, { record: { spans, generatedAt: Date.now() } })
         .catch(() => null)
+    }
+  }
+
+  // M2c (CR-13) — persist the audio takes, retention permitting. Zero means
+  // zero: no save call at all, so the takes die with this function's scope
+  // at the end of the Enhance pass — not at a nightly sweep. A declined
+  // participant has no take to save (DEC-098 never captured one).
+  if (meeting?.id && tracks && tracks.length && forceLocalTranscription) {
+    const retention = await window.api.meetings.getAudioRetention().catch(() => '30' as const)
+    if (retention !== '0') {
+      await window.api.meetings
+        .saveAudioTakes(
+          meeting.id,
+          tracks.map((tr) => ({
+            speaker: speakers?.[tr.accountId] || tr.accountId,
+            bytes: new Uint8Array(tr.buffer),
+            mimeType: tr.mimeType,
+            offsetMs: tr.offsetMs
+          }))
+        )
+        .catch(() => null)
+    }
+  }
+
+  // M2c (S3-DEC-020) — the meeting's CONTAINER: a desk node holding its
+  // documents as widgets, so sharing, ACL, search and staging all come for
+  // free. Meetings only (calls stay lightweight); best-effort — a failed
+  // desk never blocks the review.
+  if (meeting?.id && forceLocalTranscription) {
+    try {
+      const desk = await useNodeStore.getState().create({
+        parentId: null,
+        kind: 'task',
+        title: `${title || 'Meeting'} — ${new Date().toLocaleDateString()}`
+      })
+      if (desk) {
+        let x = 40
+        for (const docId of [transcriptDocId].filter((d): d is string => !!d)) {
+          await useWidgetStore
+            .getState()
+            .create({ taskId: desk.id, kind: 'doc', content: docId, x, y: 40, width: 560, height: 420 })
+            .catch(() => null)
+          x += 600
+        }
+        await window.api.meetings.update(meeting.id, { deskNodeId: desk.id }).catch(() => null)
+      }
+    } catch {
+      /* the review still shows; the meeting simply has no desk */
     }
   }
 

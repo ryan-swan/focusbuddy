@@ -19,6 +19,9 @@ export interface Meeting {
   /** M2b — the Record: one object, three renderings (SPEC-003 §3.4). Null
    *  until an Enhance pass has run for this meeting. */
   record: MeetingRecord | null
+  /** M2c (S3-DEC-020) — the desk node minted for this meeting, when one
+   *  was. The container everything else hangs off. */
+  deskNodeId: string | null
   createdAt: number
   updatedAt: number
 }
@@ -63,6 +66,7 @@ export interface MeetingPatch {
   actionItems?: string[]
   durationSec?: number | null
   record?: MeetingRecord | null
+  deskNodeId?: string | null
 }
 
 // M2 (SPEC-003 S3-DEC-021) — one attributed, timestamped span of speech.
