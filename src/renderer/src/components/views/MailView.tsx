@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMailStore, selectMailUnread } from '../../stores/mail'
 import { useViewStore } from '../../stores/view'
 import type { MailAccountInput } from '@shared/types'
@@ -563,6 +563,37 @@ export default function MailView(): JSX.Element {
   // Group the inbox into conversation threads (Gmail-style), newest first.
   const threads = useMemo(() => threadMailbox(messages), [messages])
 
+  // Keep the highlighted thread inside the list's visible window. The list is
+  // its own scroller under a fixed header bar, and nothing used to scroll it:
+  // j/k (and an archive's advance, and a deep link from the Inbox) moved the
+  // selection freely, so walking up landed on rows hidden above the fold —
+  // tucked under the header — and walking down ran off the bottom, with the
+  // reading pane showing a message whose row was nowhere on screen.
+  //
+  // Only this element's own scrollTop is touched. scrollIntoView() would also
+  // scroll every scrollable ancestor (the PlexiOffice comms wrapper, the page
+  // shell), which can shift the whole view for a row that is already in place.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (openUid == null) return
+    const list = listRef.current
+    const row = list?.querySelector<HTMLElement>('[data-mail-thread-active="true"]')
+    if (!list || !row) return
+    const listBox = list.getBoundingClientRect()
+    const rowBox = row.getBoundingClientRect()
+    if (rowBox.top < listBox.top) {
+      // Walking up onto the newest thread shows the top of the list — the
+      // keyboard-hint line above it included — rather than parking that thread
+      // flush under the header with the hint still scrolled away.
+      const first = !row.previousElementSibling?.matches('[data-testid="mail-thread"]')
+      list.scrollTop = first ? 0 : list.scrollTop - (listBox.top - rowBox.top)
+    } else if (rowBox.bottom > listBox.bottom) {
+      list.scrollTop += rowBox.bottom - listBox.bottom
+    }
+    // `threads` is a dependency because archiving replaces the list under the
+    // selection: the row for the newly-opened uid only exists after that render.
+  }, [openUid, threads])
+
   // Keyboard triage (power-user ask): j/k move through threads, Enter opens
   // the highlighted one, r starts a reply to the open message, a archives it.
   // Only when not typing, so the composer and search stay unaffected.
@@ -671,7 +702,7 @@ export default function MailView(): JSX.Element {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div ref={listRef} className="flex-1 overflow-auto">
           {error && (
             <div className="m-2 fb-t-label text-rose-500 bg-rose-500/10 border border-rose-500/25 rounded-[var(--radius-row)] px-3 py-2">
               {error}
@@ -699,6 +730,7 @@ export default function MailView(): JSX.Element {
                 <button
                   key={t.id}
                   data-testid="mail-thread"
+                  data-mail-thread-active={active ? 'true' : undefined}
                   onClick={() => void openMessage(t.latest.uid)}
                   style={{ animationDelay: `${Math.min(i * 25, 250)}ms` }}
                   className={`w-full text-left px-3 py-2.5 border-b border-[var(--edge-soft)] hover:bg-[var(--surface-sunken)] fb-press fb-fade-in-up transition-colors ${
