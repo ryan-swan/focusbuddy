@@ -36,6 +36,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.2.1',
+    date: '2026-09-01T14:00:00Z',
+    title: 'PlexiDesk 4.2.1 \u2014 the mail list follows your selection',
+    tag: 'fix',
+    summary:
+      'Moving through your inbox with j and k now scrolls the mail list to follow you. The conversations at the top could end up hidden above the fold, tucked under the header bar, with the reading pane showing a message whose row was nowhere on screen. PlexiOffice is also signed and notarised by Apple now, the same as PlexiDesk, so it opens without a security warning \u2014 the one update that moves you onto a signed build may need a manual reinstall.',
+    highlights: [
+      'j and k scroll the mail list so the highlighted conversation stays in view.',
+      'The newest messages no longer sit hidden above the fold, underneath the header bar.',
+      'PlexiOffice is signed and notarised by Apple, so it opens without a security warning.'
+    ]
+  },
+  {
     version: '4.2.0',
     date: '2026-09-01T12:00:00Z',
     title: 'PlexiDesk 4.2.0 — Attention: everything you owe, in one place',
