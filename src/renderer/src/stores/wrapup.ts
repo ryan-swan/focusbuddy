@@ -3,6 +3,7 @@ import type { ActionProposal } from '@shared/types'
 import { useMeetingsStore } from './meetings'
 import { getMeetingOrigin, clearMeetingOrigin } from '../lib/startMeeting'
 import type { CarriedItem } from '@shared/meetings'
+import { sendBriefsToAttendees } from '../lib/briefOutbox'
 import { ensureMeetingFolder, saveTranscriptDoc, saveMeetingNotesDoc } from '../lib/meetingWrapup'
 import { transcribeRecording } from '../lib/transcribeRecording'
 import { mergeTrackSegments, formatAttributedTranscript } from '../lib/transcriptMerge'
@@ -63,6 +64,9 @@ interface WrapupState {
     /** The Stage notepad + ⌘⇧M anchors, saved verbatim beside the transcript. */
     notes?: string
     moments?: number[]
+    /** Q14 — the roster with handles, so a series meeting's brief can be
+     *  DM'd to the other attendees (host shareBriefs knob permitting). */
+    attendees?: Array<{ accountId: string; handle: string }>
   }) => Promise<void>
   dismiss: () => void
 }
@@ -83,7 +87,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   commitments: [],
   carried: [],
 
-  begin: async ({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, moments }) => {
+  begin: async ({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, moments, attendees }) => {
     set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [], carried: [] })
     // M1 — the notes are the user's words and must survive REGARDLESS of how
     // transcription goes: saved first, not gated on the pipeline succeeding.
@@ -91,7 +95,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
       void saveMeetingNotesDoc(title, notes ?? '', moments ?? [], Date.now())
     }
     try {
-      await runWrapup({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes }, set)
+      await runWrapup({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, attendees }, set)
     } catch (err) {
       // Any thrown/rejected step (IPC failure, network, an AI provider error)
       // resolves to an honest error state instead of an unhandled rejection —
@@ -109,6 +113,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
 // The wrap-up pipeline, extracted so `begin` can wrap the whole thing in one
 // try/catch. Sets state through the store's setter.
 interface WrapupInput {
+  attendees?: Array<{ accountId: string; handle: string }>
   title: string
   buffer: ArrayBuffer
   mimeType: string
@@ -120,7 +125,7 @@ interface WrapupInput {
 }
 
 async function runWrapup(
-  { title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes }: WrapupInput,
+  { title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, attendees }: WrapupInput,
   set: (partial: Partial<WrapupState>) => void
 ): Promise<void> {
   let transcript = ''
@@ -351,6 +356,29 @@ async function runWrapup(
       })
       .then(() => window.dispatchEvent(new CustomEvent('fb:workitems-changed')))
       .catch(() => null)
+  }
+
+  // Q14, the delivery half — the brief goes to the OTHER attendees as a DM
+  // (server-persisted; an away attendee meets it on their next open). Gated
+  // by the host's per-series shareBriefs knob, default OFF — sending is its
+  // own act. Filing on the far side is the recipient's own choice
+  // (briefInbox). Best-effort: a failed send never touches the review.
+  if (meeting?.seriesId && meeting?.id && summary.trim() && attendees?.length) {
+    const share = await window.api.meetings
+      .getSeriesPrefs(meeting.seriesId)
+      .then((p) => p.shareBriefs)
+      .catch(() => false)
+    if (share) {
+      const selfId = useAccountStore.getState().account?.id ?? null
+      void sendBriefsToAttendees({
+        seriesId: meeting.seriesId,
+        meetingId: meeting.id,
+        title: title || 'Meeting',
+        summary: summary.trim(),
+        attendees,
+        selfAccountId: selfId
+      }).catch(() => 0)
+    }
   }
 
   // M2c (CR-13) — persist the audio takes, retention permitting. Zero means

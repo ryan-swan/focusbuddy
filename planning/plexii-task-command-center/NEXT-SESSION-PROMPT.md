@@ -59,10 +59,17 @@
 > READ-ONLY attributed tools (search / meeting / recent), refusals
 > stated where enforced; proven live over real HTTP end-to-end. Suite:
 > 3,624 tests / 333 files.
-> Next: operator's pick — two-machine QA (meetings consent, live pane,
-> Stage PREP, guest capture, calls consent round-trip); briefs for
-> other attendees (out-of-room delivery); or back to analysis/27
-> Phase 4 (AI-suggested tags, home widgets) / Phase 5 process items.
+> **Briefs for other attendees is complete (DEC-109) — Q14 closed, and
+> with it EVERY named build round from SPEC-003 (DEC-098…109).** The
+> brief rides PlexiChat DMs (server-persisted — the away channel that
+> already existed): host opts in to SEND per series (shareBriefs,
+> default off), recipient opts in to FILE per series (first arrival
+> asks via notice; nothing files until they say so); prose always
+> survives for old clients. Suite: 3,637 tests / 334 files.
+> Next: the operator's two-machine QA sweep (meetings consent, live
+> pane, Stage PREP, guest capture in a real call, calls consent
+> round-trip, brief DM sender→recipient loop); or analysis/27 Phase 4
+> (AI-suggested tags, home widgets) / Phase 5 process items.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

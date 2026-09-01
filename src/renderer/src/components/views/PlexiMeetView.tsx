@@ -652,6 +652,7 @@ function MeetingDetail({
   const [carried, setCarried] = useState<CarriedItem[]>([])
   const [lastMeeting, setLastMeeting] = useState<{ id: string; title: string; createdAt: number } | null>(null)
   const [seriesBriefs, setSeriesBriefs] = useState<boolean | null>(null)
+  const [seriesShare, setSeriesShare] = useState<boolean | null>(null)
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const threadRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -668,7 +669,9 @@ function MeetingDetail({
     void window.api.meetings
       .getSeriesPrefs(meeting.seriesId)
       .then((prefs) => {
-        if (alive) setSeriesBriefs(prefs.briefs)
+        if (!alive) return
+        setSeriesBriefs(prefs.briefs)
+        setSeriesShare(prefs.shareBriefs)
       })
       .catch(() => {})
     return () => {
@@ -1072,6 +1075,28 @@ function MeetingDetail({
             />
             <span>Brief me after each meeting in this series</span>
           </label>
+          {/* Q14, the delivery half — OFF by default: sending is its own
+              act. On: the wrap-up DMs the brief to the other attendees
+              (server-persisted, so an away teammate meets it on next open);
+              whether it FILES on their side is their own per-series choice. */}
+          {seriesShare !== null && (
+            <label className="mt-1 flex items-center gap-2 text-[11.5px] text-[var(--ink-50)] cursor-pointer" data-testid="series-share-row">
+              <input
+                type="checkbox"
+                checked={seriesShare}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setSeriesShare(next)
+                  void window.api.meetings
+                    .setSeriesPrefs(meeting.seriesId!, { shareBriefs: next })
+                    .catch(() => setSeriesShare(!next))
+                }}
+                className="accent-[rgb(var(--accent))]"
+                data-testid="series-share-toggle"
+              />
+              <span>Send the brief to the other attendees too</span>
+            </label>
+          )}
         </div>
       )}
       {(audio?.present || exported) && (

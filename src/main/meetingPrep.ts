@@ -150,7 +150,16 @@ export function buildMeetingPrep(input: {
 // and the wrap-up finishes after everyone left).
 
 export interface SeriesPrefs {
+  /** Host-side: mint MY To Know brief at wrap-up (DEC-104). Default on. */
   briefs: boolean
+  /** Host-side: SEND the brief to the other attendees as a DM after each
+   *  meeting of this series (Q14's delivery half). Default OFF — sending is
+   *  its own act (the SPEC-027 doctrine); the host turns it on per series. */
+  shareBriefs: boolean
+  /** Recipient-side: file arriving briefs of this series into Attention.
+   *  null = never asked (the first arrival asks); false = leave them as
+   *  plain chat messages. Q14's per-series opt-in, held by the RECIPIENT. */
+  followBriefs: boolean | null
 }
 
 type SeriesPrefsFile = Record<string, Partial<SeriesPrefs>>
@@ -173,7 +182,12 @@ function readSeriesPrefsFile(): SeriesPrefsFile {
 
 export function getSeriesPrefs(seriesId: string): SeriesPrefs {
   const all = readSeriesPrefsFile()
-  return { briefs: all[seriesId]?.briefs !== false }
+  const p = all[seriesId] ?? {}
+  return {
+    briefs: p.briefs !== false,
+    shareBriefs: p.shareBriefs === true,
+    followBriefs: typeof p.followBriefs === 'boolean' ? p.followBriefs : null
+  }
 }
 
 export function setSeriesPrefs(seriesId: string, patch: Partial<SeriesPrefs>): SeriesPrefs {

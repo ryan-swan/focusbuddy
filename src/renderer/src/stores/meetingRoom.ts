@@ -740,6 +740,12 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
         for (const p of Object.values(get().participants)) {
           speakers[p.accountId] = personDisplayName(p, p.handle)
         }
+        // Q14 — the roster with handles survives teardown too, so a series
+        // meeting's brief can be DM'd to the other attendees at wrap-up.
+        const attendees = Object.values(get().participants).map((p) => ({
+          accountId: p.accountId,
+          handle: p.handle
+        }))
         void rec.stop().then((take) => {
           if (take.mixed && take.mixed.durationSec >= 2) {
             void useWrapupStore.getState().begin({
@@ -752,7 +758,8 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
               // CR-11 — this is MEETING audio: on-device only, no fallback.
               forceLocalTranscription: true,
               notes,
-              moments
+              moments,
+              attendees
             })
           }
         })

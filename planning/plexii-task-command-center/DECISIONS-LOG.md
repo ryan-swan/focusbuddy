@@ -3150,3 +3150,54 @@ disabled back to its prior state — the port answers nothing again.
 3,624 green across 333 files; both typechecks clean. **G3 is closed.**
 Remaining named rounds: briefs for other attendees (out-of-room
 delivery); two-machine QA (operator-owed); analysis/27 Phase 4/5.
+
+## DEC-109 — Briefs for other attendees — Q14 completed
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** the last named
+follow-up (deferred at DEC-102, machinery half-built at DEC-104: "needs an
+out-of-room delivery channel") · **Branch:** ryan-next
+
+**The channel was in the house all along.** The blocker read "the
+meetingSignal relay dies with the room, and the wrap-up finishes after
+everyone left" — true, but PlexiChat DMs are server-persisted and
+delivered live or on next open: the same channel "record a message for a
+teammate who is away" already trusts. The brief rides it as a READABLE
+message — prose first, one plexii://brief marker as the last line
+(meetingLink build/parse, unit-pinned) — so an attendee on an old client
+gets a useful DM; the machine layer degrades to prose, never to noise.
+
+**Two-sided sovereignty, both defaults honest.** The HOST opts in to SEND
+per series — a new shareBriefs knob, default OFF because sending is its
+own act (the SPEC-027 doctrine), toggled on the series meeting itself
+("Send the brief to the other attendees too"). The RECIPIENT opts in to
+FILE per series — followBriefs, default null meaning never-asked: the
+first arriving brief raises a notice that IS the opt-in ("Dana shared the
+meeting brief for 'Weekly sync'" → "File it + follow this series"), and
+NOTHING files until they say so — the confirm-stop doctrine reduced to
+one toast. Following files quietly with the door OUT on the same notice;
+declining leaves the chat message readable and does nothing else. The
+filed item is sourceType 'note' — the meeting row lives on the host's
+machine, and a chip pointing at a meeting this client does not have would
+be a dead door dressed as a live one.
+
+**The plumbing.** The roster (with handles) survives room teardown into
+the wrap-up; the outbox speaks messagingClient DIRECTLY (the store's
+startDm would hijack the user's open conversation mid-wrap-up) and skips
+self; ingestion feeds from BOTH points a message can arrive — the live
+socket and every history load — made exactly-once by a capped
+processed-id ledger. SeriesPrefs widened to {briefs, shareBriefs,
+followBriefs}; DEC-104's pin rewritten to the wider truth with history.
+
+**Verified live:** the widened prefs round-tripped through the real IPC
+(default {briefs on, share off, follow unasked}; both directions
+persisted); both toggles rendered on a series meeting with share
+correctly unchecked; clean boot with the new ingest hooks. The full
+sender→server→recipient loop inherently needs two signed-in accounts —
+it joins the operator's two-machine QA, with the wire format and the
+whole recipient decision table proven by unit (13 tests incl. the
+never-asked/following/declined table, idempotence, self- and
+deleted-message guards).
+
+13 new tests; 3,637 green across 334 files; both typechecks clean.
+**Q14 is complete — and with it, every named build round from SPEC-003 is
+closed** (DEC-098…109). Remaining: the operator's two-machine QA sweep;
+analysis/27 Phase 4/5 on the operator's go.

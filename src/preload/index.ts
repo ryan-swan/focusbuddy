@@ -1648,9 +1648,14 @@ const api = {
       invitees?: string[]
       agenda?: string | null
     }): Promise<MeetingPrep> => ipcRenderer.invoke('meetings:prep', input),
-    getSeriesPrefs: (seriesId: string): Promise<{ briefs: boolean }> =>
+    getSeriesPrefs: (
+      seriesId: string
+    ): Promise<{ briefs: boolean; shareBriefs: boolean; followBriefs: boolean | null }> =>
       ipcRenderer.invoke('meetings:getSeriesPrefs', seriesId),
-    setSeriesPrefs: (seriesId: string, patch: { briefs?: boolean }): Promise<{ briefs: boolean }> =>
+    setSeriesPrefs: (
+      seriesId: string,
+      patch: { briefs?: boolean; shareBriefs?: boolean; followBriefs?: boolean }
+    ): Promise<{ briefs: boolean; shareBriefs: boolean; followBriefs: boolean | null }> =>
       ipcRenderer.invoke('meetings:setSeriesPrefs', seriesId, patch),
     /** M2c — audio retention (CR-13) + export. */
     saveAudioTakes: (

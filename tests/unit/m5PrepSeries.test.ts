@@ -145,11 +145,15 @@ describe('buildMeetingPrepDb — the staging assembly', () => {
 describe('series prefs — the Q14 knob', () => {
   it('defaults to briefs ON; off persists; corrupt file reads as default', async () => {
     const { getSeriesPrefs, setSeriesPrefs } = await import('../../src/main/meetingPrep')
-    expect(getSeriesPrefs('s-new')).toEqual({ briefs: true })
-    expect(setSeriesPrefs('s-off', { briefs: false })).toEqual({ briefs: false })
-    expect(getSeriesPrefs('s-off')).toEqual({ briefs: false })
+    // History: DEC-104 shipped one knob ({briefs}); the Q14 delivery round
+    // (DEC-109) widened the record — shareBriefs defaults OFF (sending is
+    // its own act) and followBriefs defaults null (the recipient has not
+    // been asked). The original truths hold inside the wider shape.
+    expect(getSeriesPrefs('s-new')).toEqual({ briefs: true, shareBriefs: false, followBriefs: null })
+    expect(setSeriesPrefs('s-off', { briefs: false }).briefs).toBe(false)
+    expect(getSeriesPrefs('s-off').briefs).toBe(false)
     // Another series is untouched by that write.
-    expect(getSeriesPrefs('s-other')).toEqual({ briefs: true })
+    expect(getSeriesPrefs('s-other').briefs).toBe(true)
   })
 })
 

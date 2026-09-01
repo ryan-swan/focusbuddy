@@ -33,3 +33,60 @@ export function parseMeetingMomentUrl(
   }
   return { meetingId, segmentId }
 }
+
+// ── The brief wire (Q14 — briefs for other attendees) ───────────────────────
+// A brief travels as a PlexiChat DM: readable prose for the human, plus one
+// trailing plexii://brief URL the recipient's client parses to offer the
+// per-series follow. An old client simply shows a normal, useful message —
+// the machine layer degrades to prose, never to noise.
+
+const BRIEF_PREFIX = 'plexii://brief/'
+
+export function buildBriefUrl(seriesId: string, meetingId: string): string {
+  return `${BRIEF_PREFIX}${encodeURIComponent(seriesId)}?meeting=${encodeURIComponent(meetingId)}`
+}
+
+export function parseBriefUrl(
+  url: string | null | undefined
+): { seriesId: string; meetingId: string | null } | null {
+  if (!url || !url.startsWith(BRIEF_PREFIX)) return null
+  const rest = url.slice(BRIEF_PREFIX.length)
+  const q = rest.indexOf('?')
+  const seriesId = decodeURIComponent(q === -1 ? rest : rest.slice(0, q))
+  if (!seriesId) return null
+  let meetingId: string | null = null
+  if (q !== -1) {
+    const m = /(?:^|&)meeting=([^&]+)/.exec(rest.slice(q + 1))
+    if (m) meetingId = decodeURIComponent(m[1])
+  }
+  return { seriesId, meetingId }
+}
+
+/** Compose the DM body. The marker URL is the LAST line by contract. */
+export function buildBriefMessage(input: {
+  title: string
+  summary: string
+  seriesId: string
+  meetingId: string
+}): string {
+  return `📋 Meeting brief — ${input.title}
+
+${input.summary.trim()}
+
+${buildBriefUrl(input.seriesId, input.meetingId)}`
+}
+
+/** Parse a DM body back into a brief, or null when it is not one. */
+export function parseBriefMessage(
+  body: string | null | undefined
+): { title: string; summary: string; seriesId: string; meetingId: string | null } | null {
+  if (!body) return null
+  const lines = body.split('\n')
+  const wire = parseBriefUrl(lines[lines.length - 1]?.trim())
+  if (!wire) return null
+  const head = lines[0] ?? ''
+  const m = /^📋 Meeting brief — (.+)$/.exec(head.trim())
+  if (!m) return null
+  const summary = lines.slice(1, -1).join('\n').trim()
+  return { title: m[1], summary, seriesId: wire.seriesId, meetingId: wire.meetingId }
+}

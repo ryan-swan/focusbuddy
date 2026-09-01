@@ -2661,8 +2661,10 @@ export function registerIpcHandlers(): void {
       buildMeetingPrep(input ?? {})
   )
   ipcMain.handle('meetings:getSeriesPrefs', (_e, seriesId: string) => getSeriesPrefs(String(seriesId)))
-  ipcMain.handle('meetings:setSeriesPrefs', (_e, seriesId: string, patch: { briefs?: boolean }) =>
-    setSeriesPrefs(String(seriesId), patch ?? {})
+  ipcMain.handle(
+    'meetings:setSeriesPrefs',
+    (_e, seriesId: string, patch: { briefs?: boolean; shareBriefs?: boolean; followBriefs?: boolean }) =>
+      setSeriesPrefs(String(seriesId), patch ?? {})
   )
   ipcMain.handle('meetings:update', (_e, id: string, patch: MeetingPatch) => updateMeeting(id, patch))
   ipcMain.handle('meetings:delete', (_e, id: string) => deleteMeeting(id))
