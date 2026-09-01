@@ -424,3 +424,56 @@ test('table header repeat: right-click toggle, repeated headers, persistence', a
   })
   console.log('  stored body headerRepeat = ' + persisted)
 })
+
+test('an image taller than the page is capped to the content band, not overflowed', async () => {
+  launched = await launchApp()
+  const { window } = launched
+  await waitForReady(window)
+  await window.evaluate(async () => {
+    const api = (window as unknown as { api: typeof window.api }).api
+    await api.documents.create({ docType: 'doc', title: 'Tall Image Probe', body: { type: 'doc', content: [{ type: 'paragraph' }] } })
+  })
+  await window.reload()
+  await waitForReady(window)
+  await window.evaluate(() => {
+    const w = window as unknown as { __fbView?: { getState: () => Record<string, () => void> } }
+    w.__fbView?.getState()['goDocuments']?.()
+  })
+  await window.waitForTimeout(600)
+  await window.locator('text=Tall Image Probe').first().click()
+  await expect(window.locator('[data-testid="doc-editor-surface"]')).toBeVisible({ timeout: 10_000 })
+  const btn = window.locator('[data-testid="doc-pageview-btn"]')
+  if (await btn.count()) await btn.click()
+  await expect(window.locator('[data-testid="doc-page"]')).toBeVisible({ timeout: 8_000 })
+
+  // A 600x2400 SVG — far taller than a Letter page's 864px content band.
+  const svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="2400"><rect width="600" height="2400" fill="#4444aa"/></svg>')
+  await clearDoc(window)
+  await paste(window, 'x', `<img src="data:image/svg+xml;utf8,${svg}" />`)
+  await window.waitForTimeout(2500)
+
+  const r = await window.evaluate(() => {
+    const GAP = 28
+    const sheet = document.querySelector('[data-testid="doc-page"]') as HTMLElement
+    const sh = sheet.getBoundingClientRect()
+    const pages = Number(sheet.dataset.pages ?? 1)
+    const pageH = Math.round((Math.round(sh.height) - (pages - 1) * GAP) / pages)
+    const img = document.querySelector('.ProseMirror img') as HTMLElement | null
+    if (!img) return { found: false }
+    const ir = img.getBoundingClientRect()
+    const band = pageH - 96 * 2
+    const top = ir.top - sh.top
+    const pg = Math.floor(top / (pageH + GAP))
+    const bandBottom = pg * (pageH + GAP) + pageH - 96
+    return {
+      found: true,
+      pages,
+      imgTop: Math.round(top),
+      imgHeight: Math.round(ir.height),
+      band,
+      spacers: document.querySelectorAll('.fb-page-spacer').length,
+      overflow: Math.max(0, Math.round(ir.bottom - sh.top - bandBottom))
+    }
+  })
+  console.log('  image: ' + JSON.stringify(r))
+})

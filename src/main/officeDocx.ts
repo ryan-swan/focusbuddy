@@ -168,6 +168,68 @@ export async function importDocx(): Promise<OfficeImportResult> {
   }
 }
 
+
+/**
+ * Which tables in the editor's HTML asked to repeat their header row, in
+ * document order. Exported for testing.
+ */
+export function repeatHeaderFlags(html: string): boolean[] {
+  return [...html.matchAll(/<table\b[^>]*>/gi)].map((m) =>
+    /data-header-repeat\s*=\s*"true"/i.test(m[0])
+  )
+}
+
+/**
+ * Write <w:tblHeader/> onto the first row of each flagged table in a docx's
+ * document.xml — the element Word reads to repeat a header row across pages.
+ *
+ * html-to-docx has no notion of a repeating header (there is no "tblHeader"
+ * anywhere in the library), so the flag cannot survive the conversion and has to
+ * be written into the finished package afterwards.
+ *
+ * Tables are matched by ORDER: the nth <table> of the source HTML is the nth
+ * <w:tbl> of the output, which holds because the converter walks the HTML once.
+ * A nested table is not matched — the non-greedy block match stops at the inner
+ * close tag — so it simply misses the flag, which is the safe way to be wrong.
+ *
+ * Pure and synchronous, so the XML rewrite is testable without a zip.
+ */
+export function withRepeatingHeaders(xml: string, wanted: boolean[]): string {
+  let i = 0
+  return xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, (tbl) => {
+    const repeat = wanted[i++] === true
+    if (!repeat) return tbl
+    let done = false
+    // The first row only — that is the header Word repeats. Merge into an
+    // existing <w:trPr> rather than emitting a second one, which is invalid.
+    return tbl.replace(/<w:tr\b[^>]*>(<w:trPr>)?/, (match, trPr: string | undefined) => {
+      if (done) return match
+      done = true
+      return trPr ? `${match}<w:tblHeader/>` : `${match}<w:trPr><w:tblHeader/></w:trPr>`
+    })
+  })
+}
+
+/**
+ * Reopen the finished .docx (a zip) and apply the header-repeat flags. Never
+ * throws: a failure returns the original document rather than losing the user's
+ * export over a formatting nicety.
+ */
+async function markRepeatingHeaders(buf: Buffer, html: string): Promise<Buffer> {
+  try {
+    const wanted = repeatHeaderFlags(html)
+    if (!wanted.some(Boolean)) return buf
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(buf)
+    const entry = zip.file('word/document.xml')
+    if (!entry) return buf
+    zip.file('word/document.xml', withRepeatingHeaders(await entry.async('string'), wanted))
+    return (await zip.generateAsync({ type: 'nodebuffer' })) as Buffer
+  } catch {
+    return buf
+  }
+}
+
 // Save the editor's HTML as a .docx via html-to-docx, honouring the document's
 // own page setup (size, orientation, per-side margins) so Word opens the file
 // with the same pages the writer set on screen.
@@ -225,7 +287,8 @@ export async function exportDocx(input: { html: string; title: string; page?: Pa
       },
       footerHtml
     )) as Buffer | ArrayBuffer
-    const buf = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as ArrayBuffer)
+    const raw = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as ArrayBuffer)
+    const buf = await markRepeatingHeaders(raw, input.html)
     await writeFile(res.filePath, buf)
     return { ok: true, path: res.filePath }
   } catch (e) {

@@ -1293,6 +1293,18 @@ function PageSheet({
           floor lets a wide child (a long code line, a big table) stretch the whole
           page past the paper edge, dragging the margins and sheet backgrounds with
           it. Pinned here, wide content is instead contained by overflowCss above. */}
+      {/* An image or figure cannot be split across a page, so pagination moves it
+          whole — and one taller than the content band had nowhere to go but
+          through the bottom margin and the sheets below. Capping it to the band
+          makes an oversized image fit the page it lands on instead, which is what
+          Word and Docs do. Scoped to page view: continuous flow has no band to
+          fit, and `width:auto` keeps the aspect ratio while overflowCss's
+          `max-width:100%` still holds the column. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `[data-testid="doc-page"] .ProseMirror :is(img, figure) { max-height: ${usable}px; width: auto; object-fit: contain; }`
+        }}
+      />
       <div className="relative" data-testid="doc-page" data-orientation={page.orientation} data-pages={pageCount} style={{ width: geom.w, minWidth: 0, maxWidth: geom.w, flexShrink: 0, minHeight: totalH }}>
         {/* One white sheet per page, each the real paper height, stacked with the
             gap between them so the grey canvas shows through as a true page split. */}
