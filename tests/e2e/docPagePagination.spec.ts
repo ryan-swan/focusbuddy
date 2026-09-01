@@ -142,6 +142,10 @@ test('pasted content stays inside the margins and the sheet', async () => {
       (landed ? '' : '  [PASTE DID NOT LAND]') +
       ((m.colOverR > 1 || m.colOverL > 1 || m.worstRight > 1 || m.worstLeft > 1 || m.sheetOverflow > 1) ? '  <== OUTSIDE MARGINS' : '')
     )
+    expect(landed, `${c.name}: paste did not land, so the measurement means nothing`).toBe(true)
+    expect(m.worstRight, `${c.name} overflows the column on the right`).toBeLessThanOrEqual(1)
+    expect(m.worstLeft, `${c.name} overflows the column on the left`).toBeLessThanOrEqual(1)
+    expect(m.sheetOverflow, `${c.name} makes the sheet itself scroll`).toBeLessThanOrEqual(1)
   }
 })
 
@@ -230,6 +234,10 @@ test('pasted markdown spanning several pages stays inside each page band', async
   console.log('  pages=' + r.pages + '  pageH=' + r.pageH + '  topMargin=' + r.mTop + '  spacers=' + r.spacers)
   console.log('  LINES OUTSIDE THEIR PAGE BAND: ' + r.violations)
   r.sample.forEach((v) => console.log('    ' + v))
+  expect(r.pages, 'the paste should span several pages or this proves nothing').toBeGreaterThan(3)
+  // <=1 tolerates a single line box sitting 1px above the measured top margin,
+  // which is leading, not a layout fault.
+  expect(r.violations, 'prose lines drawn outside their page band').toBeLessThanOrEqual(1)
 })
 
 test('pasted markdown with a long table or code block vs the page band', async () => {
@@ -323,6 +331,7 @@ test('pasted markdown with a long table or code block vs the page band', async (
       String(r.bad).padEnd(19) + String(r.worst) + (r.bad > 0 ? '   <== OVERFLOWS' : '')
     )
     r.detail.forEach((d) => console.log('      ' + d))
+    expect(r.bad, `${c.name}: blocks running past the page band`).toBe(0)
   }
 })
 
@@ -398,6 +407,10 @@ test('table header repeat: right-click toggle, repeated headers, persistence', a
   })
   console.log('  repeated headers outside their page band: ' + bands.bad + '  (pageH=' + bands.pageH + ')')
   bands.detail.forEach((d) => console.log('    ' + d))
+  expect(before.repeated, 'no headers should repeat before the setting is on').toBe(0)
+  expect(after.repeated, 'one repeated header per page break').toBe(after.rowSpacers)
+  expect(after.rowSpacers, 'the table should break across pages at all').toBeGreaterThan(0)
+  expect(bands.bad, 'repeated headers drawn outside the page band').toBe(0)
 
   // Persistence across a reload.
   await window.waitForTimeout(1200)
@@ -423,6 +436,7 @@ test('table header repeat: right-click toggle, repeated headers, persistence', a
     return m ? m[1] : 'attribute absent from stored body'
   })
   console.log('  stored body headerRepeat = ' + persisted)
+  expect(persisted, 'the setting must survive a reload').toBe('true')
 })
 
 test('an image taller than the page is capped to the content band, not overflowed', async () => {
@@ -472,8 +486,21 @@ test('an image taller than the page is capped to the content band, not overflowe
       imgHeight: Math.round(ir.height),
       band,
       spacers: document.querySelectorAll('.fb-page-spacer').length,
+      structure: Array.from(document.querySelector('.ProseMirror')!.children).map((el) => {
+        const b = (el as HTMLElement).getBoundingClientRect()
+        return `${el.tagName.toLowerCase()}${el.querySelector('img') ? '[img]' : ''} top=${Math.round(b.top - sh.top)} h=${Math.round(b.height)}`
+      }),
+      spacerAt: Array.from(document.querySelectorAll('.fb-page-spacer')).map((el) => {
+        const b = (el as HTMLElement).getBoundingClientRect()
+        return `${el.tagName.toLowerCase()} top=${Math.round(b.top - sh.top)} h=${Math.round(b.height)} parent=${el.parentElement?.tagName.toLowerCase()}`
+      }),
       overflow: Math.max(0, Math.round(ir.bottom - sh.top - bandBottom))
     }
   })
   console.log('  image: ' + JSON.stringify(r))
+  expect(r.found, 'the image did not paste').toBe(true)
+  // Capped well below its natural 2400px, and the whole BLOCK fits the band —
+  // capping the image alone left a 931px block inside an 864px band.
+  expect(r.imgHeight!).toBeLessThanOrEqual(r.band!)
+  expect(r.overflow, 'the image block runs past the page band').toBe(0)
 })

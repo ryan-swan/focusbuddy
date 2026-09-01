@@ -1299,10 +1299,19 @@ function PageSheet({
           makes an oversized image fit the page it lands on instead, which is what
           Word and Docs do. Scoped to page view: continuous flow has no band to
           fit, and `width:auto` keeps the aspect ratio while overflowCss's
-          `max-width:100%` still holds the column. */}
+          `max-width:100%` still holds the column.
+
+          The 6em allowance is the image's own BLOCK chrome. The node view wraps
+          the image in a block that carries the prose margins, so an image capped
+          at exactly the band still produced a block taller than the band (864px
+          of image inside a 931px block) — and because such an image is the first
+          thing on its page, pagination rightly refuses to push it: the next page
+          would be just as short. Expressed in em because those margins are
+          em-based, so the allowance tracks the type size instead of assuming
+          one. */}
       <style
         dangerouslySetInnerHTML={{
-          __html: `[data-testid="doc-page"] .ProseMirror :is(img, figure) { max-height: ${usable}px; width: auto; object-fit: contain; }`
+          __html: `[data-testid="doc-page"] .ProseMirror :is(img, figure) { max-height: calc(${usable}px - 6em); width: auto; object-fit: contain; }`
         }}
       />
       <div className="relative" data-testid="doc-page" data-orientation={page.orientation} data-pages={pageCount} style={{ width: geom.w, minWidth: 0, maxWidth: geom.w, flexShrink: 0, minHeight: totalH }}>
