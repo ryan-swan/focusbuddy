@@ -73,13 +73,17 @@
 > rebuild marked SATISFIED by SPEC-003; #17 home widgets stays gated
 > on the operator SHAPING it (which home? embedding what?). Suite:
 > 3,647 tests / 335 files.
-> Next: the operator's two-machine QA sweep (meetings consent, live
-> pane, Stage PREP, guest capture in a real call, calls consent
-> round-trip, brief DM loop); #17 once shaped; or Phase 5 process
-> items (Caleb checkout note, taxonomy ruling with queue-usage data,
-> Michael review → landing).
+> **Phase 5 is prepared (DEC-111)**: main (4.2.2) merged back — zero
+> conflicts, 3,655 tests / 336 files green on the merged tree — and
+> **analysis/29 is the review → landing package** (Michael's review
+> guide + Caleb's two-line checkout + flags note + the two-machine QA
+> sheet + the deferred list). Remaining acts belong to people: Michael
+> reviews and lands; Caleb checks out; the operator runs the
+> two-machine QA sheet and shapes #17; the taxonomy ruling waits on
+> real queue-usage data (dismiss the [TEST] seeds by tag `test-seed`
+> before measuring).
 
-**Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
+**Last updated:** 2026-09-01 — through DEC-111 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

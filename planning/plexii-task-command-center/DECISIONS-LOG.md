@@ -3249,3 +3249,31 @@ before any code does.
 10 new tests (p4TagSuggest: real-SQLite vocabulary + scoring + the
 tokenization drift + pins); 3,647 green across 335 files; both
 typechecks clean.
+
+## DEC-111 — main merged back (4.2.2) + the review → landing package
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/27 Phase 5
+(Caleb checkout note · Michael review → landing) · **Branch:** ryan-next
+
+**Michael kept shipping while we built.** origin/main moved to 4.2.2
+(4.2.1: mail-list selection scrolling + PlexiOffice notarised; 4.2.2:
+page-respecting tables, code blocks and images). The standing promise —
+ryan-next stays zero-conflict mergeable — was re-earned: main merged back
+(`9e26b73c`), ZERO conflicts (his work is doc-pagination/mail; ours is
+meetings — disjoint by construction), and the merged tree runs **3,655
+tests green across 336 files** (his tableHeaderRepeat suite beside ours),
+0 type errors. Pushed to both remotes.
+
+**analysis/29 is the landing package** — written for its two readers:
+Michael's review guide (the commits in order with the five places review
+attention pays most: the consent invariants, the forceProvider seam fix
+that touches every wrap-up, the /mcp surface behind PlexiAPI's guards,
+the all-additive schema deltas, the shared-surface touches outside
+PlexiMeet) and Caleb's checkout (the two-line instruction + the flags
+note resolved: the Settings work-items capability toggle). Plus the
+two-machine QA sheet in one place, and the deliberately-deferred list so
+nothing reads as forgotten.
+
+Phase 5 ledger: checkout note DONE · review package DONE (Michael's
+actual review + merge is his act) · taxonomy ruling still waits on real
+queue-usage data (the [TEST] seeds would poison a snapshot taken today) ·
+synced-docs QA rides the two-machine session.
