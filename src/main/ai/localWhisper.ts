@@ -1,47 +1,29 @@
-// Local Whisper provider — runs OpenAI's Whisper model entirely on the
-// user's machine via @xenova/transformers (a JS port of HF Transformers
-// using ONNX Runtime under the hood).
+// Local Whisper — on-device transcription via @xenova/transformers.
 //
-// Audio input contract: the renderer must pre-decode audio to a 16kHz
-// mono Float32Array (PCM samples in -1..1). This module passes those
-// samples DIRECTLY to the pipeline — we never call its built-in
-// `read_audio`, because that uses Web Audio API which doesn't exist
-// in Node main. The earlier file-path approach failed with
-// "AudioContext is not available in your environment" exactly
-// because of that. The renderer has Web Audio API natively, so
-// decoding there + transferring a Float32Array via IPC is the clean
-// boundary.
+// The engine runs IN THE MAIN PROCESS. An earlier round chased a phantom
+// "ORT corrupts output in Electron main" theory and briefly moved this to a
+// child process; the real cause was never the process context — it was one
+// decode option (`task: 'transcribe'`, now removed in whisperCore). The main
+// process transcribes cleanly, so this stays simple: no worker, no IPC.
 //
-// Why this and not whisper.cpp:
-//   - Zero native build. The package ships pre-compiled ONNX runtime
-//     bindings for every platform Electron supports. No node-gyp,
-//     no electron-builder ASAR-unpack gymnastics for a Mach-O binary.
-//   - Same model architecture, same audio preprocessing, same accuracy
-//     ceiling — it's literally Whisper running on ONNX instead of CUDA.
-//
-// Tradeoffs:
-//   - First call downloads ~80MB of model weights to the HuggingFace
-//     cache directory. We pre-warm this on settings toggle so the
-//     first recording isn't a 90-second wait.
-//   - CPU-bound. A 30-second audio clip takes ~5-15s on an M1. Cloud
-//     Whisper is ~2x faster for the same clip but bills per minute.
+// The pure logic (models, decode options, the repeat-collapse net, segment
+// shaping) lives in whisperCore and is re-exported so callers and tests keep
+// their imports.
 
 import { app } from 'electron'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
+import {
+  MODEL_IDS,
+  DECODE_OPTS,
+  shapeSegments,
+  collapseRepeatRuns,
+  type EngineSegment,
+  type LocalWhisperModel
+} from './whisperCore'
 
-// M2 (SPEC-003 S3-DEC-021) — a transcript is SEGMENTS, not a string: the
-// provenance tiers and every anchor depend on start/end offsets. Confidence
-// is per-segment where the engine provides it (cloud logprobs) and an
-// HONEST null where it does not (transformers.js exposes none) — a
-// fabricated confidence is exactly the confidently-wrong sin the spec
-// teardown documents, so we never invent one.
-export interface EngineSegment {
-  startMs: number
-  endMs: number
-  text: string
-  confidence: number | null
-}
+export { collapseRepeatRuns }
+export type { EngineSegment, LocalWhisperModel }
 
 interface TranscribeResultOk {
   ok: true
@@ -57,68 +39,45 @@ interface TranscribeResultErr {
   reason?: 'no_key' | 'network' | 'api' | 'unknown' | 'model_load' | 'decode'
 }
 
-// Lazy-init pipeline holder. The first transcribeLocal() call triggers
-// model download + load; subsequent calls reuse the in-memory pipeline.
-// transformers ships from node_modules but the imports are async / ESM
-// inside CJS; we import dynamically so the module loads cleanly under
-// Electron's main-process bundler (electron-vite).
-let pipelinePromise: Promise<TranscribePipeline> | null = null
-
-// The transformers package's pipeline returns a callable function; we
-// only care about a narrow subset of its shape, so we type just what
-// we need.
 interface TranscribePipeline {
   (
     audio: Float32Array,
-    opts: { language?: string; task?: string; return_timestamps?: boolean }
-  ): Promise<{
-    text: string
-    chunks?: Array<{ timestamp: [number, number | null]; text: string }>
-  }>
+    opts: typeof DECODE_OPTS
+  ): Promise<{ text: string; chunks?: Array<{ timestamp: [number, number | null]; text: string }> }>
 }
 
-async function getPipeline(): Promise<TranscribePipeline> {
-  if (pipelinePromise) return pipelinePromise
-  pipelinePromise = (async () => {
-    // Cache the downloaded model under userData so it persists across
-    // app updates without re-downloading. Setting `env.cacheDir`
-    // BEFORE the first pipeline() call is what wires the cache.
+// One lazily-loaded pipeline per model, reused across calls.
+const pipelines = new Map<LocalWhisperModel, Promise<TranscribePipeline>>()
+
+async function getPipeline(model: LocalWhisperModel): Promise<TranscribePipeline> {
+  const existing = pipelines.get(model)
+  if (existing) return existing
+  const made = (async () => {
     const transformers = await import('@xenova/transformers')
     const cacheDir = join(app.getPath('userData'), 'whisper-cache')
     mkdirSync(cacheDir, { recursive: true })
     transformers.env.cacheDir = cacheDir
-    // Disable remote cache check for offline starts after first DL.
     transformers.env.allowRemoteModels = true
-    // 'Xenova/whisper-tiny' is the standard tiny model port, ~80MB.
-    // Larger sizes available (base 145MB, small 480MB) — tiny is the
-    // right default for "good enough on CPU".
-    const pipeline = (await transformers.pipeline(
+    return (await transformers.pipeline(
       'automatic-speech-recognition',
-      'Xenova/whisper-tiny'
+      MODEL_IDS[model]
     )) as unknown as TranscribePipeline
-    return pipeline
   })()
-  return pipelinePromise
+  pipelines.set(model, made)
+  return made
 }
 
-/**
- * True if the model has already been downloaded + loaded into memory.
- * Renderer uses this to decide whether to show a "Downloading model…"
- * progress indicator on first local-mode use.
- */
+/** True once at least one model has begun loading. */
 export function isLocalWhisperReady(): boolean {
-  return pipelinePromise !== null
+  return pipelines.size > 0
 }
 
-/**
- * Pre-warm the model — settings toggles call this immediately after
- * the user picks 'local', so the first recording doesn't pay the
- * download/load cost. Idempotent: returns the same promise after the
- * first call.
- */
-export async function preloadLocalWhisper(): Promise<{ ok: boolean; error?: string }> {
+/** Warm a model (default base — the wrap-up's truth model). */
+export async function preloadLocalWhisper(
+  model: LocalWhisperModel = 'base'
+): Promise<{ ok: boolean; error?: string }> {
   try {
-    await getPipeline()
+    await getPipeline(model)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -126,42 +85,16 @@ export async function preloadLocalWhisper(): Promise<{ ok: boolean; error?: stri
 }
 
 /**
- * Run local Whisper against pre-decoded PCM samples. Returns the same
- * tagged union as the cloud provider so callers can branch on `.ok`
- * without caring which engine produced the result.
- *
- * The samples MUST be:
- *   - mono (single channel — take channelData[0] from the AudioBuffer)
- *   - 16kHz sample rate (Whisper's training input)
- *   - Float32 in the range [-1, 1]
- *
- * Decoding happens in the renderer via Web Audio API. See the
- * VoiceRecorderWidget for the AudioContext recipe.
+ * Transcribe pre-decoded 16kHz mono PCM. Same tagged-union result the cloud
+ * path returns. Defaults to whisper-base (the model ruling); the live pane
+ * passes { model: 'tiny' } for latency.
  */
 export async function transcribeLocal(
   samples: Float32Array,
-  sampleRate: number
+  sampleRate: number,
+  opts: { model?: LocalWhisperModel } = {}
 ): Promise<TranscribeResultOk | TranscribeResultErr> {
-  let pipe: TranscribePipeline
-  try {
-    pipe = await getPipeline()
-  } catch (err) {
-    return {
-      ok: false,
-      error:
-        err instanceof Error
-          ? `Local Whisper model load failed: ${err.message}`
-          : 'Local Whisper model load failed.',
-      reason: 'model_load'
-    }
-  }
-
-  // Sample-rate guard — Whisper was trained at 16kHz mono. If the
-  // renderer hands us something else, the model will still run but
-  // produce gibberish. We don't resample here (would pull in another
-  // dep); we surface a clear error so the renderer-side recipe is
-  // obvious. In practice the renderer's AudioContext should already
-  // be configured for 16kHz before it calls decodeAudioData.
+  const model = opts.model ?? 'base'
   if (sampleRate !== 16000) {
     return {
       ok: false,
@@ -170,53 +103,36 @@ export async function transcribeLocal(
     }
   }
   if (!samples || samples.length === 0) {
+    return { ok: false, error: 'Empty audio sample buffer — recording too short or decoder failed.', reason: 'decode' }
+  }
+  let pipe: TranscribePipeline
+  try {
+    pipe = await getPipeline(model)
+  } catch (err) {
     return {
       ok: false,
-      error: 'Empty audio sample buffer — recording too short or decoder failed.',
-      reason: 'decode'
+      error: err instanceof Error ? `Local Whisper model load failed: ${err.message}` : 'Local Whisper model load failed.',
+      reason: 'model_load'
     }
   }
-
   // eslint-disable-next-line no-console
-  console.log(
-    `[localWhisper] transcribing ${samples.length} samples (${Math.round(samples.length / sampleRate)}s) @ ${sampleRate}Hz`
-  )
-
+  console.log(`[localWhisper:${model}] transcribing ${samples.length} samples (${Math.round(samples.length / sampleRate)}s)`)
   try {
-    const result = await pipe(samples, {
-      task: 'transcribe',
-      // M2 — timestamps are the whole point now: every downstream anchor
-      // (provenance tiers, moments, Recall citations) resolves against them.
-      return_timestamps: true
-    })
+    const result = await pipe(samples, DECODE_OPTS)
     const text = typeof result.text === 'string' ? result.text.trim() : ''
-    const segments: EngineSegment[] = Array.isArray(result.chunks)
-      ? result.chunks
-          .filter((c) => Array.isArray(c.timestamp) && typeof c.text === 'string' && c.text.trim())
-          .map((c) => ({
-            startMs: Math.max(0, Math.round((c.timestamp[0] ?? 0) * 1000)),
-            // A null end (the model's last open chunk) closes at the clip end.
-            endMs: Math.round((c.timestamp[1] ?? samples.length / sampleRate) * 1000),
-            text: c.text.trim(),
-            confidence: null // transformers.js exposes no logprobs — honest null
-          }))
-      : []
+    const segments = shapeSegments(result.chunks, samples.length, sampleRate)
     // eslint-disable-next-line no-console
-    console.log(`[localWhisper] ok: ${text.length} chars, ${segments.length} segments`)
+    console.log(`[localWhisper:${model}] ok: ${text.length} chars, ${segments.length} segments`)
     return {
       ok: true,
       transcript: text,
       durationSec: samples.length / sampleRate,
-      language: null, // tiny model doesn't reliably surface this; cloud does
+      language: null,
       segments: segments.length ? segments : null
     }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[localWhisper] transcription failed:', err)
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-      reason: 'decode'
-    }
+    return { ok: false, error: err instanceof Error ? err.message : String(err), reason: 'decode' }
   }
 }

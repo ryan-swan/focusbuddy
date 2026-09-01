@@ -112,8 +112,7 @@ import {
   setAudioRetention,
   sweepMeetingAudio,
   type AudioTakeIn,
-  type RetentionMode
-} from '../meetingAudio'
+  type RetentionMode, loadAudioTakes } from '../meetingAudio'
 import { ensureSegmentRecall, searchMeetingSegments } from '../segmentRecall'
 import { buildMeetingPrep, getSeriesPrefs, setSeriesPrefs } from '../meetingPrep'
 import { exportMeeting } from '../meetingExport'
@@ -2638,6 +2637,8 @@ export function registerIpcHandlers(): void {
     saveAudioTakes(String(meetingId), Array.isArray(takes) ? takes : [])
   )
   ipcMain.handle('meetings:audioInfo', (_e, meetingId: string) => audioInfo(String(meetingId)))
+  // Re-transcribe fuel: the retained takes, bytes and offsets intact.
+  ipcMain.handle('meetings:loadAudioTakes', (_e, meetingId: string) => loadAudioTakes(String(meetingId)))
   ipcMain.handle('meetings:keepAudio', (_e, meetingId: string, keep: boolean) =>
     setKeepAudio(String(meetingId), !!keep)
   )

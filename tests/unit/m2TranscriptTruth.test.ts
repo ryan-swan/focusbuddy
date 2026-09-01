@@ -80,9 +80,13 @@ const read = (p: string): string => readFileSync(join(ROOT, p), 'utf-8')
 
 describe('M2a — both engines yield timestamps', () => {
   it('local: return_timestamps on, chunks parsed, confidence an HONEST null', () => {
-    const lw = read('main/ai/localWhisper.ts')
-    expect(lw).toContain('return_timestamps: true')
-    expect(lw).toContain('confidence: null // transformers.js exposes no logprobs — honest null')
+    // The pure decode/shaping logic moved to whisperCore in the
+    // transcription-quality round (the `task` root-cause fix) — the pins
+    // follow it, and its history comment names why.
+    const core = read('main/ai/whisperCore.ts')
+    expect(core).toContain('return_timestamps: true')
+    expect(core).toContain('confidence: null')
+    expect(core).toContain('transformers.js exposes no logprobs')
   })
   it('cloud: verbose_json segments finally parsed, exp(avg_logprob) as confidence', () => {
     const vn = read('main/ai/voiceNote.ts')

@@ -114,6 +114,33 @@ export function audioInfo(meetingId: string): AudioInfo {
   return { present: files > 0, files, bytes, kept: existsSync(join(dir, 'keep.flag')), path: dir }
 }
 
+/** Read a meeting's retained takes back — the raw material for a
+ *  RE-TRANSCRIBE (the engine got better; the audio was kept for exactly
+ *  this). Bytes stay on this machine: they go renderer-ward over IPC for
+ *  the same on-device decode the wrap-up uses, never anywhere else. */
+export function loadAudioTakes(
+  meetingId: string
+): Array<{ speaker: string; offsetMs: number; mimeType: string; bytes: Uint8Array }> {
+  const dir = meetingDir(meetingId)
+  const metaPath = join(dir, 'take.json')
+  if (!existsSync(metaPath)) return []
+  try {
+    const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as {
+      takes?: Array<{ file: string; speaker: string; offsetMs: number; mimeType: string }>
+    }
+    return (meta.takes ?? [])
+      .filter((tk) => tk.file && !tk.file.includes('/') && !tk.file.includes('..'))
+      .map((tk) => ({
+        speaker: tk.speaker || 'Speaker',
+        offsetMs: tk.offsetMs ?? 0,
+        mimeType: tk.mimeType || 'audio/webm',
+        bytes: new Uint8Array(readFileSync(join(dir, tk.file)))
+      }))
+  } catch {
+    return []
+  }
+}
+
 /** The per-meeting override (CR-13): "the meetings you'll want to replay
  *  are known at the time and are rare." */
 export function setKeepAudio(meetingId: string, keep: boolean): boolean {

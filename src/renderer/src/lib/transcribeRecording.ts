@@ -11,23 +11,38 @@
 
 // Decode an arbitrary audio blob (webm/opus etc) into mono 16 kHz Float32 PCM,
 // the format the local Whisper model expects.
+//
+// The decode is TWO stages on purpose. The old one-stage recipe —
+// `new AudioContext({ sampleRate: 16000 })` + decodeAudioData — makes
+// Chromium resample DURING the opus decode with a low-quality path, and on
+// the operator's real meeting take that mush cost the first 24 seconds of
+// an otherwise-clean whisper-base transcription (ffmpeg-decoded PCM of the
+// SAME bytes transcribed near-perfectly — the model was never the problem
+// there, the feed was). So: decode at the clip's native rate first, then
+// let an OfflineAudioContext do the resample to 16 kHz — its render path
+// is the high-quality resampler, and connecting any channel count to a
+// mono destination downmixes correctly for free.
 async function decodeToMono16k(arrayBuffer: ArrayBuffer): Promise<Float32Array> {
   const AC: typeof AudioContext =
     (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext ||
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!
-  const ctx = new AC({ sampleRate: 16000 })
+  const probe = new AC()
+  let decoded: AudioBuffer
   try {
-    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0))
-    if (decoded.numberOfChannels === 1) return decoded.getChannelData(0)
-    const len = decoded.length
-    const mono = new Float32Array(len)
-    const ch0 = decoded.getChannelData(0)
-    const ch1 = decoded.getChannelData(1)
-    for (let i = 0; i < len; i++) mono[i] = (ch0[i] + ch1[i]) * 0.5
-    return mono
+    decoded = await probe.decodeAudioData(arrayBuffer.slice(0))
   } finally {
-    await ctx.close().catch(() => {})
+    await probe.close().catch(() => {})
   }
+  if (decoded.sampleRate === 16000 && decoded.numberOfChannels === 1) {
+    return decoded.getChannelData(0)
+  }
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000)
+  const src = off.createBufferSource()
+  src.buffer = decoded
+  src.connect(off.destination)
+  src.start()
+  const rendered = await off.startRendering()
+  return rendered.getChannelData(0)
 }
 
 type TranscribeResult = Awaited<ReturnType<typeof window.api.voiceNote.transcribe>>

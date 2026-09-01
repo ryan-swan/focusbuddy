@@ -1665,6 +1665,11 @@ const api = {
       ipcRenderer.invoke('meetings:saveAudioTakes', meetingId, takes),
     audioInfo: (meetingId: string): Promise<{ present: boolean; files: number; bytes: number; kept: boolean; path: string }> =>
       ipcRenderer.invoke('meetings:audioInfo', meetingId),
+    /** Re-transcribe fuel — the retained takes (local bytes, never uploaded). */
+    loadAudioTakes: (
+      meetingId: string
+    ): Promise<Array<{ speaker: string; offsetMs: number; mimeType: string; bytes: Uint8Array }>> =>
+      ipcRenderer.invoke('meetings:loadAudioTakes', meetingId),
     keepAudio: (meetingId: string, keep: boolean): Promise<boolean> =>
       ipcRenderer.invoke('meetings:keepAudio', meetingId, keep),
     revealAudio: (meetingId: string): Promise<boolean> =>

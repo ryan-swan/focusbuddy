@@ -31,7 +31,9 @@ async function pump(): Promise<void> {
   try {
     while (queue.length > 0) {
       const job = queue.shift()!
-      const r = await transcribeLocal(job.samples, 16000)
+      // The live pane is the latency courtesy: tiny, explicitly — the
+      // wrap-up's base pass writes the truth afterwards (the model ruling).
+      const r = await transcribeLocal(job.samples, 16000, { model: 'tiny' })
       job.resolve(
         r.ok ? { ok: true, text: r.transcript.trim() } : { ok: false, error: r.error }
       )

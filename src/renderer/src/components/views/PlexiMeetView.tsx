@@ -665,6 +665,11 @@ function MeetingDetail({
   // M2b — Commitments opens by default: the person who just left the room
   // is the most common reader and needs the shortest artifact (S3-DEC-022).
   const [view, setView] = useState<RecordView>('commitments')
+  // The engine-repair door: the retained takes re-run through the CURRENT
+  // local engine (the model ruling moved wrap-ups to whisper-base after tiny
+  // looped a real recording), replacing segments, transcript and summary.
+  // Audio never leaves the machine — same decode path as the wrap-up.
+  const [retranscribing, setRetranscribing] = useState<string | null>(null)
   // M5 — series memory: the previous instance and what it left open, plus
   // the Q14 per-series brief knob. Database facts; absent for ad-hoc meetings.
   const [carried, setCarried] = useState<CarriedItem[]>([])
@@ -817,6 +822,70 @@ function MeetingDetail({
         ?.querySelector(`[data-segment-id="${segmentId}"]`)
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }, 60)
+  }
+
+  async function retranscribe(): Promise<void> {
+    if (retranscribing) return
+    setRetranscribing('Loading the saved audio…')
+    try {
+      const takes = await window.api.meetings.loadAudioTakes(meeting.id)
+      if (!takes.length) {
+        setRetranscribing(null)
+        return
+      }
+      const drafts: Array<{
+        speakerAccountId: string | null
+        speakerName: string
+        startMs: number
+        endMs: number
+        text: string
+        confidence: number | null
+      }> = []
+      for (let i = 0; i < takes.length; i++) {
+        const take = takes[i]
+        setRetranscribing(`Transcribing on-device — ${take.speaker} (${i + 1} of ${takes.length})…`)
+        const buf = take.bytes.buffer.slice(
+          take.bytes.byteOffset,
+          take.bytes.byteOffset + take.bytes.byteLength
+        ) as ArrayBuffer
+        const r = await transcribeRecording(buf, take.mimeType, { forceLocal: true })
+        if (!r.ok) {
+          setRetranscribing(null)
+          return
+        }
+        const segs = r.segments ?? [
+          { startMs: 0, endMs: Math.round((r.durationSec ?? 0) * 1000), text: r.transcript, confidence: null }
+        ]
+        for (const s of segs) {
+          if (!s.text.trim()) continue
+          drafts.push({
+            speakerAccountId: null,
+            speakerName: take.speaker,
+            startMs: take.offsetMs + s.startMs,
+            endMs: take.offsetMs + s.endMs,
+            text: s.text.trim(),
+            confidence: s.confidence
+          })
+        }
+      }
+      drafts.sort((a, b) => a.startMs - b.startMs)
+      const saved = await window.api.meetings.saveSegments(meeting.id, drafts)
+      const transcriptText = drafts
+        .map((d) => `[${fmtOffset(d.startMs)}] ${d.speakerName}: ${d.text}`)
+        .join('\n')
+      setRetranscribing('Summarising…')
+      const sum = await window.api.voiceNote
+        .process({ transcript: transcriptText, mode: 'summary' })
+        .catch(() => null)
+      onChange({ transcript: transcriptText, ...(sum?.ok ? { summary: sum.text } : {}) })
+      setTranscript(transcriptText)
+      if (sum?.ok) setSummary(sum.text)
+      setSegments(saved)
+      // The commitments door reopens over the corrected transcript.
+      setFoundCommitments(null)
+    } finally {
+      setRetranscribing(null)
+    }
   }
 
   async function makeTask(idx: number, text: string): Promise<void> {
@@ -1148,6 +1217,15 @@ function MeetingDetail({
                 title="Show the audio files in Finder"
               >
                 Reveal
+              </button>
+              <button
+                onClick={() => void retranscribe()}
+                disabled={!!retranscribing}
+                className="fb-press text-[11px] text-[var(--ink-50)] hover:text-[var(--ink-100)] disabled:opacity-50"
+                title="Run the saved audio through the current on-device engine again — segments, transcript and summary are rewritten; audio never leaves this machine"
+                data-testid="meet-retranscribe"
+              >
+                {retranscribing ?? 'Re-transcribe'}
               </button>
             </div>
           )}
