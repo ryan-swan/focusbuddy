@@ -82,6 +82,13 @@
 > two-machine QA sheet and shapes #17; the taxonomy ruling waits on
 > real queue-usage data (dismiss the [TEST] seeds by tag `test-seed`
 > before measuring).
+> **DEC-112**: PlexiMeet restyled into the house material (desk paper,
+> raised rail, glossy rose primary, RECORDING card, sunken segmented
+> track, sticky raised detail header) — presentation only, 7 material
+> pins; and a verification lesson: an OCCLUDED window serves stale
+> compositor tiles to CDP screenshots (layerized elements especially) —
+> captureBeyondViewport + a damage nudge is the honest capture. Suite:
+> 3,662 tests / 337 files.
 
 **Last updated:** 2026-09-01 — through DEC-111 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
