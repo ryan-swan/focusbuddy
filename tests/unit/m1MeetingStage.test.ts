@@ -143,7 +143,11 @@ describe('M1 — the Stage surface', () => {
   it('the notepad is the surface: verbatim notes, moments, the honest transcript line', () => {
     expect(ui).toContain('data-testid="meeting-notes"')
     expect(ui).toContain('Type anything. Or nothing.')
-    expect(ui).toContain('The transcript arrives after the call')
+    // History: M1 shipped one static note ('The transcript arrives after the
+    // call'). M4 made ⌘⇧T a real live pane, so the idle branch now teaches
+    // what pressing record does instead of describing a pane that no longer
+    // waits for the call to end.
+    expect(ui).toContain('Nothing is being recorded or transcribed.')
     expect(ui).toContain('⌘⇧M mark moment · ⌘⇧T transcript')
   })
   it('notes are saved first, never gated on the pipeline succeeding', () => {

@@ -17,6 +17,8 @@
 // participants `mayCapture` allows) — but tap() is also the single choke
 // point, which is what makes "a decline is never captured" provable.
 
+import { PcmChunker } from './livePcm'
+
 export interface TrackTake {
   accountId: string
   buffer: ArrayBuffer
@@ -39,7 +41,15 @@ interface Tap {
   startedWall: number
   stoppedWall: number | null
   src: MediaStreamAudioSourceNode | null
+  // M4 — the live tap: a ScriptProcessor sipping raw PCM off the same
+  // consent-gated source node. Present only while the live transcript pane
+  // is open (enableLive/disableLive) — the decode cost is view-driven.
+  liveProc: ScriptProcessorNode | null
+  liveSink: GainNode | null
+  chunker: PcmChunker | null
 }
+
+export type LivePcmCallback = (accountId: string, pcm16k: Float32Array) => void
 
 export class MeetingTrackRecorder {
   private ctx: AudioContext | null = null
@@ -49,6 +59,7 @@ export class MeetingTrackRecorder {
   private taps = new Map<string, Tap>()
   private t0 = Date.now()
   private supported = true
+  private liveCb: LivePcmCallback | null = null
 
   constructor() {
     try {
@@ -91,7 +102,10 @@ export class MeetingTrackRecorder {
       offsetMs: Date.now() - this.t0,
       startedWall: Date.now(),
       stoppedWall: null,
-      src: null
+      src: null,
+      liveProc: null,
+      liveSink: null,
+      chunker: null
     }
     rec.ondataavailable = (e) => {
       if (e.data.size > 0) tap.chunks.push(e.data)
@@ -107,6 +121,9 @@ export class MeetingTrackRecorder {
       }
     }
     this.taps.set(accountId, tap)
+    // A participant consented into a room whose live pane is already open
+    // starts flowing immediately — same choke point, no second gate.
+    if (this.liveCb) this.attachLive(accountId, tap)
   }
 
   /** Is this participant currently being captured? */
@@ -130,6 +147,62 @@ export class MeetingTrackRecorder {
     } catch {
       /* already disconnected */
     }
+    this.detachLive(tap)
+  }
+
+  // ── M4: the live PCM tap ─────────────────────────────────────────────────
+  // Consent is inherited, not re-decided: a live processor exists only on a
+  // tap, and taps exist only for participants mayCapture allowed (the M1
+  // choke point). Closing the pane detaches every processor — zero ambient
+  // cost when nobody is watching.
+
+  enableLive(cb: LivePcmCallback): void {
+    this.liveCb = cb
+    for (const [accountId, tap] of this.taps) {
+      if (tap.stoppedWall == null) this.attachLive(accountId, tap)
+    }
+  }
+
+  disableLive(): void {
+    this.liveCb = null
+    for (const tap of this.taps.values()) this.detachLive(tap)
+  }
+
+  private attachLive(accountId: string, tap: Tap): void {
+    if (!this.ctx || !tap.src || tap.liveProc) return
+    try {
+      const proc = this.ctx.createScriptProcessor(4096, 1, 1)
+      const chunker = new PcmChunker(this.ctx.sampleRate)
+      proc.onaudioprocess = (e) => {
+        chunker.append(new Float32Array(e.inputBuffer.getChannelData(0)))
+        const chunk = chunker.flushIfReady()
+        if (chunk && this.liveCb) this.liveCb(accountId, chunk)
+      }
+      // A ScriptProcessor only runs while connected to the destination; the
+      // zero-gain sink keeps it silent.
+      const sink = this.ctx.createGain()
+      sink.gain.value = 0
+      tap.src.connect(proc)
+      proc.connect(sink)
+      sink.connect(this.ctx.destination)
+      tap.liveProc = proc
+      tap.liveSink = sink
+      tap.chunker = chunker
+    } catch {
+      /* live view degrades to nothing; the recording itself is untouched */
+    }
+  }
+
+  private detachLive(tap: Tap): void {
+    try {
+      tap.liveProc?.disconnect()
+      tap.liveSink?.disconnect()
+    } catch {
+      /* already detached */
+    }
+    tap.liveProc = null
+    tap.liveSink = null
+    tap.chunker = null
   }
 
   /** Stop everything and hand back the take: per-track, attributed, on one

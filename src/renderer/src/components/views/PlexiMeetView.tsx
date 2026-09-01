@@ -12,7 +12,8 @@ import { startDm, uploadAttachment, sendMessage } from '../../lib/messagingClien
 import { useNodeStore } from '../../stores/nodes'
 import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
-import type { Meeting, TranscriptSegment } from '@shared/meetings'
+import type { Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
+import { fmtOffset } from '../../lib/transcriptMerge'
 import { validateRecordSpans } from '../../lib/recordSpans'
 import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
 import MeetingCommitmentsCard from '../MeetingCommitmentsCard'
@@ -48,6 +49,13 @@ export default function PlexiMeetView(): JSX.Element {
 
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // M4 — Recall: segment hits across EVERY meeting for the current query.
+  // The citation is the answer: a speaker, a timestamp and a door into the
+  // Thread. Pure FTS — no model call sits between the question and the quote.
+  const [recallHits, setRecallHits] = useState<TranscriptSearchHit[]>([])
+  // A segment to land on once the detail's segments load (from a Recall hit
+  // or an fb:open-meeting with a segmentId).
+  const [pendingSegment, setPendingSegment] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
@@ -68,7 +76,10 @@ export default function PlexiMeetView(): JSX.Element {
   useEffect(() => {
     function onOpen(e: Event): void {
       const id = (e as CustomEvent).detail?.id as string | undefined
+      const segmentId = (e as CustomEvent).detail?.segmentId as string | undefined
       if (id) setSelectedId(id)
+      // M4 — a caller may name the exact line: land the Thread on it.
+      if (segmentId) setPendingSegment(segmentId)
     }
     window.addEventListener('fb:open-meeting', onOpen)
     return () => window.removeEventListener('fb:open-meeting', onOpen)
@@ -79,6 +90,31 @@ export default function PlexiMeetView(): JSX.Element {
     if (!q) return meetings
     return meetings.filter((m) => `${m.title} ${m.summary} ${m.transcript}`.toLowerCase().includes(q))
   }, [meetings, query])
+
+  useEffect(() => {
+    const q = query.trim()
+    // Two characters is the floor — a single letter matches half the corpus
+    // and the hit list would just be noise under the meeting rows.
+    if (q.length < 2 || typeof window.api.meetings.searchSegments !== 'function') {
+      setRecallHits([])
+      return
+    }
+    let alive = true
+    const t = setTimeout(() => {
+      void window.api.meetings
+        .searchSegments(q, 12)
+        .then((hits) => {
+          if (alive) setRecallHits(hits)
+        })
+        .catch(() => {
+          if (alive) setRecallHits([])
+        })
+    }, 220)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [query])
 
   const selected = meetings.find((m) => m.id === selectedId) ?? null
   const now = Date.now()
@@ -422,6 +458,30 @@ export default function PlexiMeetView(): JSX.Element {
         </div>
 
         <div className="flex-1 overflow-auto px-2 pb-2">
+          {recallHits.length > 0 && (
+            <div className="mb-2" data-testid="recall-hits">
+              <div className="px-3 pt-1 pb-1 text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">
+                FROM THE TRANSCRIPTS
+              </div>
+              {recallHits.map((h) => (
+                <button
+                  key={h.segmentId}
+                  onClick={() => {
+                    setSelectedId(h.meetingId)
+                    setPendingSegment(h.segmentId)
+                  }}
+                  data-testid={`recall-hit-${h.segmentId}`}
+                  className="w-full text-left rounded-lg px-3 py-2 mb-0.5 hover:bg-[var(--surface-sunken)] transition-colors"
+                >
+                  <div className="text-[11.5px] text-[var(--ink-90)] leading-snug line-clamp-2">
+                    <span className="fb-tabular text-[var(--ink-50)]">[{fmtOffset(h.startMs)}]</span>{' '}
+                    <span className="font-medium">{h.speakerName || 'Unknown'}:</span> {h.text}
+                  </div>
+                  <div className="mt-0.5 text-[10.5px] text-[var(--ink-50)] truncate">{h.meetingTitle}</div>
+                </button>
+              ))}
+            </div>
+          )}
           {!loaded ? (
             <div className="px-3 py-10 flex items-center justify-center gap-2 text-[12px] text-[var(--ink-70)]">
               <Icon name="progress_activity" size={15} className="text-[rgb(var(--accent))] animate-spin" /> Loading…
@@ -466,6 +526,8 @@ export default function PlexiMeetView(): JSX.Element {
           <MeetingDetail
             key={selected.id}
             meeting={selected}
+            initialSegmentId={pendingSegment}
+            onJumpConsumed={() => setPendingSegment(null)}
             onChange={(patch) => void updateMeeting(selected.id, patch)}
             onDelete={() => {
               void removeMeeting(selected.id)
@@ -552,11 +614,17 @@ type RecordView = 'commitments' | 'brief' | 'thread'
 function MeetingDetail({
   meeting,
   onChange,
-  onDelete
+  onDelete,
+  initialSegmentId,
+  onJumpConsumed
 }: {
   meeting: Meeting
   onChange: (patch: { title?: string; summary?: string; transcript?: string; actionItems?: string[] }) => void
   onDelete: () => void
+  // M4 — a Recall hit names its line: once segments load, the Thread opens
+  // scrolled to it. Consumed exactly once so later renders stay put.
+  initialSegmentId?: string | null
+  onJumpConsumed?: () => void
 }): JSX.Element {
   const createNode = useNodeStore((s) => s.create)
   const [title, setTitle] = useState(meeting.title)
@@ -673,6 +741,15 @@ function MeetingDetail({
       setRebuilding(false)
     }
   }
+  // M4 — consume a named landing line once its segment exists on screen.
+  useEffect(() => {
+    if (!initialSegmentId || segments.length === 0) return
+    if (!segments.some((s) => s.id === initialSegmentId)) return
+    jumpToSegment(initialSegmentId)
+    onJumpConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSegmentId, segments])
+
   const jumpToSegment = (segmentId: string): void => {
     setView('thread')
     setTimeout(() => {

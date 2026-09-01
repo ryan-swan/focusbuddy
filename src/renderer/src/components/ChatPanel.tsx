@@ -915,6 +915,14 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         // exactly like picking it from the history rail.
         await useChatStore.getState().openConversation(target.conversationId)
         break
+      case 'meeting':
+        // A cited meeting opens in PlexiMeet at that meeting — the same door
+        // an Attention item's meeting chip uses (DEC-079's seam).
+        view.goMeetings()
+        window.dispatchEvent(
+          new CustomEvent('fb:open-meeting', { detail: { id: target.meetingId } })
+        )
+        break
     }
   }
 

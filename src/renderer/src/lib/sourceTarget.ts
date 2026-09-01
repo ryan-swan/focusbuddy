@@ -50,6 +50,9 @@ export type SourceTarget =
   | { kind: 'file'; fileId: string }
   // A past Plexii conversation (A2, #17) — docId is the conversation id.
   | { kind: 'chat'; conversationId: string }
+  // A meeting transcript (M4, SPEC-003 P4) — docId is the meeting id; opens
+  // the meeting in PlexiMeet, where the Thread carries the cited lines.
+  | { kind: 'meeting'; meetingId: string }
   // Nothing we know how to open. Better to render a citation as plain text than
   // to offer a click that goes nowhere.
   | null
@@ -68,6 +71,7 @@ export function targetForSource(source: { docId: string; docType: string }): Sou
   if (type === 'note' || WIDGET_TYPES.has(type)) return { kind: 'widget', widgetId: id }
   if (type === 'file') return { kind: 'file', fileId: id }
   if (type === 'chat') return { kind: 'chat', conversationId: id }
+  if (type === 'meeting') return { kind: 'meeting', meetingId: id }
   if (DOCUMENT_TYPES.has(type)) return { kind: 'document', documentId: id }
   return null
 }

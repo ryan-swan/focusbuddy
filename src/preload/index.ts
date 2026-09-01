@@ -93,7 +93,7 @@ interface DocCommentDto {
   resolved: boolean
   createdAt: number
 }
-import type { Meeting, MeetingDraft, MeetingPatch, TranscriptSegment, TranscriptSegmentDraft } from '@shared/meetings'
+import type { Meeting, MeetingDraft, MeetingPatch, TranscriptSearchHit, TranscriptSegment, TranscriptSegmentDraft } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 import type { PlexiSignRequest, PlexiSignDraft, PlexiSignPatch, SignAction } from '@shared/sign'
@@ -1304,6 +1304,11 @@ const api = {
     /** M2 — warm the local model without touching the preference. */
     preloadLocal: (): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke('voice:preloadLocal'),
+    /** M4 — decode one live 16kHz chunk (serial queue; may report dropped). */
+    transcribeLive: (
+      pcm: ArrayBuffer
+    ): Promise<{ ok: boolean; text?: string; dropped?: boolean; error?: string }> =>
+      ipcRenderer.invoke('voice:transcribeLive', pcm),
     setProvider: (
       p: 'cloud' | 'local'
     ): Promise<{ ok: boolean; error?: string }> =>
@@ -1628,6 +1633,9 @@ const api = {
       ipcRenderer.invoke('meetings:saveSegments', meetingId, segments),
     segments: (meetingId: string): Promise<TranscriptSegment[]> =>
       ipcRenderer.invoke('meetings:segments', meetingId),
+    /** M4 — Recall: search every meeting's transcript at segment level. */
+    searchSegments: (query: string, limit?: number): Promise<TranscriptSearchHit[]> =>
+      ipcRenderer.invoke('meetings:searchSegments', query, limit),
     /** M2c — audio retention (CR-13) + export. */
     saveAudioTakes: (
       meetingId: string,

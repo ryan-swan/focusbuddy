@@ -2834,3 +2834,64 @@ round, where sourceUrl anchors get built once for both.
 13 new tests (m3Routing); 3,541 green across 326 files; both typechecks
 clean. **M3 is complete** — M4 (Recall, G2/G3 spikes first) is next on
 the operator's go.
+
+## DEC-103 — M4: Recall + the live transcript — the corpus pays out
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+P4 + C8's deferred half; G2/G3 spikes ruled first) · **Branch:** ryan-next
+
+**The G2 spike reversed the plan's caution — with numbers.** analysis/28
+budgeted for live decode being too expensive and Recall shipping alone.
+Measured on this machine over REAL speech (a `say`-generated 19.3s clip,
+16kHz mono, whisper-tiny through the repo's own @xenova/transformers):
+batch RTF 0.09, and live-style 5s chunks at ~0.6s each — a ~15% duty cycle
+of one core. Not ugly; live shipped. **G3 (MCP) ruled to its own round**,
+as the plan allowed: no MCP server surface exists in the app, and one
+means a transport + auth design (a GUI app can't speak stdio), not a
+route on anything existing.
+
+**Recall — the citation IS the answer.** fb_segments_fts (FTS5, the same
+trigger-synced pattern as fb_chunks_fts, with a backfill for pre-M4 rows
+at IPC-register time) mirrors the segment table WITHOUT flattening it:
+where the chunk index cuts paragraphs, this keeps segment identity, so
+every hit is a speaker + a timestamp + a door. Org-scoped through the
+meetings join; an orphaned segment is not a citable answer; searches
+degrade to [] rather than throwing through an ask (the chunkIndexActive
+precedent). Three consumers:
+- **The Meet view's search box** now answers from the corpus: "FROM THE
+  TRANSCRIPTS" hits under the query, each an attributed line, and
+  clicking one opens that meeting's Thread scrolled to the exact segment
+  (fb:open-meeting learned an optional segmentId for the same trip).
+  Pure FTS — no model call between the question and the quote.
+- **The assistant grounds on what was said**: a meetings pool rides
+  retrieveSources round-robin, its grounding text the attributed lines
+  themselves, so the model cites who said it and when.
+- **A meeting citation routes**: sourceTarget 'meeting' → PlexiMeet via
+  the DEC-079 door, with its own trace identity (video_call, office tone).
+
+**The live transcript — ⌘⇧T finally shows the words.** A ScriptProcessor
+PCM tap rides the recorder's OWN taps — consent is inherited, not
+re-decided: processors exist only on taps, and taps exist only for
+participants the M1 choke point allowed. Cost is view-driven: the tap
+attaches when the initiator opens the pane and detaches when it closes or
+the recording ends — nothing decodes while nobody watches. Chunks decode
+serially in main (whisper-tiny, 16kHz, linear resample); a backlog SHEDS
+the oldest chunk rather than lagging — the pane is a courtesy, the
+wrap-up's per-track pass writes the Record. Every branch of the pane is
+honest: idle says nothing is being recorded; a non-initiator is told only
+the recording machine hears the room; live is labelled "rough and local".
+
+Verified live on the real build: searchSegments ranked Dana's
+countersignature line first with full attribution and left the small talk
+alone; the typed query rendered both Recall hits and clicking one landed
+the Thread scrolled to the exact segment, visible in-viewport; a silence
+chunk through voice:transcribeLive came back ok-and-empty (the honest
+decode); deleting the meeting swept its FTS rows through the trigger
+cascade. Not driven live: a full grounded ask citing a meeting (the pool
+is pinned + unit-proven over real FTS5) and the in-call speak→pane loop
+(needs a real mic in a real room — rides the operator's two-machine QA).
+
+26 new tests (m4Recall real-FTS5 + m4Live); 3,567 green across 328 files;
+both typechecks clean. One M1 pin rewritten to the pane's new truth (the
+static "arrives after the call" note became three honest branches). **M4
+is complete** — M5 (Prep + series) next on the operator's go; MCP is a
+named follow-up round.

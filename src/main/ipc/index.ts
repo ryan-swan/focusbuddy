@@ -114,6 +114,7 @@ import {
   type AudioTakeIn,
   type RetentionMode
 } from '../meetingAudio'
+import { ensureSegmentRecall, searchMeetingSegments } from '../segmentRecall'
 import { exportMeeting } from '../meetingExport'
 import type { TranscriptSegmentDraft } from '@shared/meetings'
 import { extractPeople } from '../ai/peopleExtract'
@@ -334,6 +335,7 @@ import {
   type TranscriptionProvider
 } from '../ai/voiceNote'
 import { preloadLocalWhisper } from '../ai/localWhisper'
+import { enqueueLiveChunk } from '../ai/liveDecode'
 import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
 import {
   createAgentRun,
@@ -771,6 +773,8 @@ export function registerIpcHandlers(): void {
   // keep-flagged and 'keep'-mode takes stay. Best-effort, never blocking.
   try {
     sweepMeetingAudio()
+    // M4 — build (or backfill) the transcript FTS before the first Recall query.
+    ensureSegmentRecall()
   } catch {
     /* a failed sweep costs disk, not correctness */
   }
@@ -2499,6 +2503,11 @@ export function registerIpcHandlers(): void {
   // meetings always transcribe locally (CR-11), so the download/load cost is
   // paid while the meeting runs, not after it ends.
   ipcMain.handle('voice:preloadLocal', () => preloadLocalWhisper())
+  // M4 — live transcript chunks: serial queue, oldest shed under backlog.
+  ipcMain.handle('voice:transcribeLive', (_e, pcm: ArrayBuffer | Float32Array) => {
+    const samples = pcm instanceof Float32Array ? pcm : new Float32Array(pcm)
+    return enqueueLiveChunk(samples)
+  })
   ipcMain.handle('voice:setProvider', async (_e, p: TranscriptionProvider) => {
     setTranscriptionProvider(p)
     if (p === 'local') {
@@ -2630,6 +2639,10 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('meetings:segments', (_e, meetingId: string) =>
     listTranscriptSegments(String(meetingId))
+  )
+  // M4 — Recall: segment-level FTS across every meeting's transcript.
+  ipcMain.handle('meetings:searchSegments', (_e, query: string, limit?: number) =>
+    searchMeetingSegments(String(query ?? ''), typeof limit === 'number' ? limit : 12)
   )
   ipcMain.handle('meetings:update', (_e, id: string, patch: MeetingPatch) => updateMeeting(id, patch))
   ipcMain.handle('meetings:delete', (_e, id: string) => deleteMeeting(id))

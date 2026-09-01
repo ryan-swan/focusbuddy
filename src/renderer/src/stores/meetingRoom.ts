@@ -98,6 +98,12 @@ interface MeetingRoomStore {
   consent: ConsentMap
   /** A consent prompt awaiting MY answer, when someone else started. */
   consentAsk: { by: string; byName: string } | null
+  // M4 — the live transcript pane (⌘⇧T while recording). Lines exist only
+  // on the initiator's client: capture happens on the machine that holds the
+  // recorder, so only it can hear anything to decode. Rough by design — the
+  // wrap-up's per-track pass writes the Record; this is a courtesy view.
+  liveOpen: boolean
+  liveLines: Array<{ accountId: string; name: string; atMs: number; text: string }>
   /** The Stage notepad — my words, verbatim, saved on leave. */
   notes: string
   /** ⌘⇧M anchors: ms offsets on the meeting clock (recording t0 when live,
@@ -110,6 +116,8 @@ interface MeetingRoomStore {
   setDockSide: (side: DockSide) => void
   /** Start the consent flow + recording, or stop a recording I started. */
   setTranscribing: (on: boolean) => void
+  /** Open/close the live transcript pane; the PCM tap follows it. */
+  setLiveOpen: (open: boolean) => void
   answerConsent: (choice: ConsentChoice) => void
   setNotes: (text: string) => void
   markMoment: () => void
@@ -305,6 +313,8 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       muted: false,
       cameraOff: false,
       transcribing: false,
+    liveOpen: false,
+    liveLines: [],
       recordingBy: null,
       consent: {},
       consentAsk: null,
@@ -437,7 +447,7 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
             set({ consentAsk: { by: wire.by, byName: initiator ? personDisplayName(initiator, initiator.handle) : 'The host' } })
           }
         } else if (wire.kind === 'recording-stopped') {
-          set({ transcribing: false, recordingBy: null, consent: {}, consentAsk: null })
+          set({ transcribing: false, recordingBy: null, consent: {}, consentAsk: null, liveOpen: false, liveLines: [] })
         }
         return
       }
@@ -500,6 +510,8 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
     layout: 'stage',
     dockSide: loadDockSide(),
     transcribing: false,
+    liveOpen: false,
+    liveLines: [],
     recordingBy: null,
     consent: {},
     consentAsk: null,
@@ -539,13 +551,49 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
         const myName = personDisplayName(useAccountStore.getState().account ?? {}, 'The host')
         for (const id of others) signalTo(id, { kind: 'consent-request', by: me, byName: myName })
       } else if (!on && recorder && get().recordingBy === me) {
+        recorder.disableLive()
         void recorder.stop()
         recorder = null
         for (const id of Object.keys(get().participants)) signalTo(id, { kind: 'recording-stopped' })
-        set({ transcribing: false, recordingBy: null, consent: {}, consentAsk: null })
+        set({ transcribing: false, recordingBy: null, consent: {}, consentAsk: null, liveOpen: false, liveLines: [] })
       }
       // Anyone else's recording is not mine to stop; the button is disabled
       // for non-initiators in the UI, and this is the belt to that brace.
+    },
+
+    // M4 — the live pane owns the decode cost: opening it attaches the PCM
+    // taps (consent inherited from the recorder's choke point), closing it
+    // detaches them. Nothing decodes while nobody is watching.
+    setLiveOpen: (open) => {
+      set({ liveOpen: open })
+      if (!recorder) return
+      if (!open) {
+        recorder.disableLive()
+        return
+      }
+      const me = useAccountStore.getState().account?.id ?? ''
+      recorder.enableLive((accountId, pcm) => {
+        const atMs = Date.now() - (recorder?.startedAt ?? Date.now())
+        void window.api.voiceNote
+          .transcribeLive(pcm.buffer as ArrayBuffer)
+          .then((r) => {
+            if (!r.ok || !r.text) return
+            const who =
+              accountId === me || accountId === 'me'
+                ? 'You'
+                : personDisplayName(
+                    get().participants[accountId] ?? {},
+                    get().participants[accountId]?.handle ?? 'Someone'
+                  )
+            set({
+              liveLines: [
+                ...get().liveLines,
+                { accountId, name: who, atMs, text: r.text }
+              ].slice(-60)
+            })
+          })
+          .catch(() => {})
+      })
     },
 
     // My answer to someone else's recording. 'declined' means my audio is
@@ -682,6 +730,7 @@ export const useMeetingRoomStore = create<MeetingRoomStore>((set, get) => {
       const rec = recorder
       recorder = null
       if (rec) {
+        rec.disableLive()
         // M2 — resolve names for attribution NOW, from the roster we hold;
         // after teardown the map is gone.
         const speakers: Record<string, string> = {}

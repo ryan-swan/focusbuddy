@@ -74,6 +74,20 @@ export interface MeetingPatch {
 // (legacy mixed-blob transcriptions); per-track capture makes it exact for
 // native meetings. confidence is the ENGINE's own belief (cloud logprobs),
 // or null where the engine exposes none (local) — never fabricated.
+// M4 — one Recall hit: a segment with its meeting identity, so the answer
+// is a speaker + a timestamp + a door (never a bare string).
+export interface TranscriptSearchHit {
+  segmentId: string
+  meetingId: string
+  meetingTitle: string
+  speakerAccountId: string | null
+  speakerName: string
+  startMs: number
+  endMs: number
+  text: string
+  rank: number
+}
+
 export interface TranscriptSegment {
   id: string
   meetingId: string

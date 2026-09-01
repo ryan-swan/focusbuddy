@@ -104,6 +104,8 @@ export default function MeetingOverlay(): JSX.Element | null {
   const dockSide = useMeetingRoomStore((s) => s.dockSide)
   const transcribing = useMeetingRoomStore((s) => s.transcribing)
   const recordingBy = useMeetingRoomStore((s) => s.recordingBy)
+  const liveLines = useMeetingRoomStore((s) => s.liveLines)
+  const setLiveOpen = useMeetingRoomStore((s) => s.setLiveOpen)
   const consent = useMeetingRoomStore((s) => s.consent)
   const consentAsk = useMeetingRoomStore((s) => s.consentAsk)
   const notes = useMeetingRoomStore((s) => s.notes)
@@ -162,6 +164,21 @@ export default function MeetingOverlay(): JSX.Element | null {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [status, markMoment])
+
+  // M4 — the live tap follows the pane: decode runs only while the initiator
+  // has the transcript pane open. Closing it (or the recording ending)
+  // detaches every processor — the cost is view-driven, never ambient.
+  useEffect(() => {
+    const wantLive = showTranscriptNote && transcribing && recordingBy === myId
+    setLiveOpen(wantLive)
+    return () => setLiveOpen(false)
+  }, [showTranscriptNote, transcribing, recordingBy, myId, setLiveOpen])
+
+  const liveScrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = liveScrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [liveLines])
 
   // Active screen shares to present: my own (when sharing) plus any peer who is
   // presenting. These render whole (object-contain), separate from camera tiles.
@@ -391,9 +408,33 @@ export default function MeetingOverlay(): JSX.Element | null {
           ))}
         </div>
       )}
-      {showTranscriptNote && (
+      {showTranscriptNote && !transcribing && (
         <div className="px-3 py-2 border-t border-white/10 text-[11px] text-white/50" data-testid="transcript-note">
-          The transcript arrives after the call — Plexii transcribes when the meeting ends. Your ⚑ moments will anchor into it.
+          Nothing is being recorded or transcribed. Start a recording (everyone will be asked) and ⌘⇧T shows the words live.
+        </div>
+      )}
+      {showTranscriptNote && transcribing && recordingBy !== myId && (
+        <div className="px-3 py-2 border-t border-white/10 text-[11px] text-white/50" data-testid="transcript-note-remote">
+          Only the recording machine hears the room — your transcript arrives with the Record after the call. Your ⚑ moments will anchor into it.
+        </div>
+      )}
+      {showTranscriptNote && transcribing && recordingBy === myId && (
+        <div className="border-t border-white/10" data-testid="live-transcript">
+          <div className="px-3 pt-2 text-[10px] font-semibold tracking-wider text-white/40">
+            LIVE · rough and local — the Record is written at wrap-up
+          </div>
+          <div ref={liveScrollRef} className="px-3 py-2 max-h-[140px] overflow-y-auto">
+            {liveLines.length === 0 ? (
+              <div className="text-[11px] text-white/40">Listening — lines appear as people speak.</div>
+            ) : (
+              liveLines.slice(-12).map((l, i) => (
+                <div key={i} className="text-[11.5px] text-white/80 leading-snug mb-1">
+                  <span className="text-white/40 fb-tabular">[{fmtMoment(l.atMs)}]</span>{' '}
+                  <span className="font-medium text-white/60">{l.name}:</span> {l.text}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-white/10 text-[10.5px] text-white/40">

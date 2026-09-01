@@ -199,6 +199,13 @@ widget on the meeting desk) rides with M3's sourceUrl anchors.
 - Artifact deliverables stay on ProposalCards (C6).
 
 ### M4 — Recall + the live transcript  *(spec P4 + deferred half of C8)*
+
+> **STATUS 2026-09-01: DONE — DEC-103. M4 COMPLETE.** The G2 spike measured
+> whisper-tiny at RTF 0.09 / ~15% of one core on 5s chunks — live decode is
+> cheap, so BOTH halves shipped: segment-FTS Recall (Meet search box,
+> assistant grounding pool, meeting citations) and the ⌘⇧T live pane
+> (consent-inherited tap, view-driven cost, shed-don't-lag queue). G3: no
+> MCP surface exists — ruled to its own round.
 - Corpus query over segments (FTS + the existing retrieval layer), every
   answer with speaker + timestamp + Thread link; ACL = node ACL.
 - Live transcript behind ⌘⇧T via chunked local decode (G2 spike first);

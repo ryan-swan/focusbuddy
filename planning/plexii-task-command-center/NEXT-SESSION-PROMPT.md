@@ -20,11 +20,17 @@
 > templates, export, CR-13 retention). **M3 is COMPLETE (DEC-102)**:
 > anchored commitment extraction, the batch confirm stop (other-owned
 > unchecked, owner as mention — never a send), the C6 split, and the
-> host's To Know brief; verified live end-to-end. Suite: 3,541 tests /
-> 326 files. Next: M4 — Recall over segments (G2 live-decode and G3 MCP
-> spikes first; Recall alone is the value if the spikes say no).
-> Owed: two-machine consent QA; the PlexiCam calls consent follow-up;
-> per-item moment anchors + the Record widget (C5 sliver, one round).
+> host's To Know brief; verified live end-to-end. **M4 is COMPLETE
+> (DEC-103)**: the G2 spike measured live decode CHEAP (RTF 0.09, ~15%
+> of a core), so both halves shipped — segment-FTS Recall (Meet search
+> box, assistant grounding pool, meeting citations that route) AND the
+> ⌘⇧T live transcript (consent-inherited tap, view-driven cost,
+> shed-don't-lag queue). G3: MCP ruled to its own round (no server
+> surface exists). Suite: 3,567 tests / 328 files. Next: M5 — Prep +
+> series (seriesId, "carried from last time", Q14 per-series opt-in).
+> Owed: two-machine consent QA (now incl. the speak→live-pane loop);
+> the PlexiCam calls consent follow-up; per-item moment anchors + the
+> Record widget (C5 sliver, one round); Recall-over-MCP round.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
