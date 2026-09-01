@@ -280,7 +280,7 @@ export default function SectionWidget({
                   setEditing(false)
                 }
               }}
-              className="bg-[var(--surface-raised)]/95 text-[var(--ink-100)] px-1.5 py-0.5 rounded text-xs w-40"
+              className="bg-[color-mix(in_oklab,var(--surface-raised)_95%,transparent)] text-[var(--ink-100)] px-1.5 py-0.5 rounded text-xs w-40"
             />
           ) : (
             <span
@@ -317,7 +317,7 @@ export default function SectionWidget({
                 }}
                 title={`Layout: ${opt.label}`}
                 className={`h-4 w-4 inline-flex items-center justify-center rounded ${
-                  opt.value === layout ? 'bg-[var(--surface-raised)]/30' : 'hover:bg-[var(--surface-raised)]/15'
+                  opt.value === layout ? 'bg-[color-mix(in_oklab,var(--surface-raised)_30%,transparent)]' : 'hover:bg-[color-mix(in_oklab,var(--surface-raised)_15%,transparent)]'
                 }`}
               >
                 <Icon name={opt.icon} size={11} className="text-white" />
@@ -352,7 +352,7 @@ export default function SectionWidget({
                 e.stopPropagation()
                 linkDrag.start(widget.id)
               }}
-              className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--surface-raised)]/20 cursor-cell"
+              className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[color-mix(in_oklab,var(--surface-raised)_20%,transparent)] cursor-cell"
               title="Click, then click another widget to connect them"
               aria-label="Link from this section"
             >
@@ -365,7 +365,7 @@ export default function SectionWidget({
               void togglePin(widget.id)
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--surface-raised)]/20"
+            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[color-mix(in_oklab,var(--surface-raised)_20%,transparent)]"
             title={isPinned ? 'Unpin from screen' : 'Pin to screen'}
             aria-label={isPinned ? 'Unpin' : 'Pin'}
           >
@@ -390,7 +390,7 @@ export default function SectionWidget({
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[var(--surface-raised)]/20"
+            className="h-4 w-4 inline-flex items-center justify-center rounded hover:bg-[color-mix(in_oklab,var(--surface-raised)_20%,transparent)]"
             title="Remove section"
             aria-label="Remove"
           >

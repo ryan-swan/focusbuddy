@@ -105,7 +105,7 @@ export default function HistoryPanel({ taskId, onClose }: Props): JSX.Element {
     <div className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div
         ref={ref}
-        className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[var(--surface-sunken)]/95 flex flex-col"
+        className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[color-mix(in_oklab,var(--surface-sunken)_95%,transparent)] flex flex-col"
         data-testid="history-panel"
       >
         <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between">

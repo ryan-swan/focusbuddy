@@ -135,7 +135,7 @@ export default function PortalWidget({ widget, inline = false }: Props): JSX.Ele
           <button
             onClick={() => pick('')}
             title="Point at a desk instead"
-            className="inline-flex items-center justify-center h-5 w-5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)]/70 shrink-0"
+            className="inline-flex items-center justify-center h-5 w-5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] shrink-0"
             data-testid="portal-change"
           >
             <Icon name="swap_horiz" size={13} />
@@ -213,7 +213,7 @@ export default function PortalWidget({ widget, inline = false }: Props): JSX.Ele
           <button
             onClick={openTarget}
             title="Open this desk"
-            className="inline-flex items-center justify-center h-5 w-5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)]/70 shrink-0"
+            className="inline-flex items-center justify-center h-5 w-5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] shrink-0"
             data-testid="portal-open"
           >
             <Icon name="login" size={13} />
@@ -221,7 +221,7 @@ export default function PortalWidget({ widget, inline = false }: Props): JSX.Ele
           <button
             onClick={() => pick('')}
             title="Point at a different desk"
-            className="inline-flex items-center justify-center h-5 w-5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-[var(--surface-sunken)]/70 shrink-0"
+            className="inline-flex items-center justify-center h-5 w-5 rounded text-[var(--ink-50)] hover:text-accent hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] shrink-0"
             data-testid="portal-change"
           >
             <Icon name="swap_horiz" size={13} />

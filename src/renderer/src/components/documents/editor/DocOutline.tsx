@@ -96,7 +96,7 @@ export default function DocOutline({
               className={`w-full text-left px-3 py-1 text-[12px] truncate transition-colors fb-spring-soft ${
                 it.pos === activePos
                   ? 'text-accent font-medium bg-accent/10'
-                  : 'text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]/70'
+                  : 'text-[var(--ink-70)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'
               }`}
               style={{ paddingLeft: `${10 + (it.level - 1) * 12}px` }}
               title={it.text}

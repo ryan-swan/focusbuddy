@@ -145,7 +145,7 @@ export default function InsightsView(): JSX.Element {
                       setActive(t.id)
                       goTask(t.id)
                     }}
-                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)]/70"
+                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]"
                   >
                     <Icon name="task_alt" size={15} className="text-[var(--ink-40)] shrink-0" />
                     <span className="flex-1 min-w-0 text-[13px] text-[var(--ink-90)] truncate">
@@ -216,7 +216,7 @@ export default function InsightsView(): JSX.Element {
                         setActive(t.id)
                         goTask(t.id)
                       }}
-                      className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-[var(--surface-sunken)]/70"
+                      className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]"
                     >
                       <span className="flex-1 min-w-0 text-[13px] text-[var(--ink-90)] truncate">
                         {t.title}

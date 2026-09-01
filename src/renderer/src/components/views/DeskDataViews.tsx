@@ -111,7 +111,7 @@ export default function DeskDataViews({
                       key={w.id}
                       onClick={() => open(w)}
                       data-testid={`data-item-${w.id}`}
-                      className="border-b border-[var(--edge-soft)]/60 last:border-b-0 hover:bg-[var(--surface-sunken)] cursor-pointer"
+                      className="border-b border-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] last:border-b-0 hover:bg-[var(--surface-sunken)] cursor-pointer"
                     >
                       <td className="px-3 py-2 text-[13px] text-[var(--ink-100)]">
                         <span className="inline-flex items-center gap-2">

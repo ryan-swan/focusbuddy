@@ -2544,3 +2544,37 @@ carry the full 13-step scale — a NEW theme cannot ship a partial one.
 Verified live across all three themes by computed-style probe: every step
 resolves; `var(--ink-80)` paints 79% in dark (its own step) where it used
 to paint 96% (inherited ink-100). 3,461 green; both typechecks clean.
+
+## DEC-097 — GAP-019 swept: every wash finally paints
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Closes:** GAP-019 ·
+**Branch:** ryan-next (first round on the new branch)
+
+The register said each site needed a judgment call. It didn't — the right
+fix made the judgment unnecessary: `[var(--x)]/N` rewrote mechanically to
+`[color-mix(in_oklab,var(--x)_N%,transparent)]`, which is the SAME token at
+the SAME opacity the author wrote, as valid CSS. No site's intended look
+was re-decided; the intended look simply started rendering. 117
+occurrences, 57 files, every property prefix (bg/border/divide/via, plus
+hover: and group-hover: variants), one regex.
+
+The census had said ~40 sites — the real count was 117. Translucent panel
+washes, hover states, frosted `backdrop-blur` cards whose tint never
+painted behind the blur, a scrim gradient's mid-stop: all silently
+transparent in both themes, some likely since they were written.
+
+Verified live after HMR: 34 color-mix rules generated; 17 elements on the
+current screen, all painting; and the definitive pair — a probe div wearing
+the OLD class computes `rgba(0, 0, 0, 0)` while the NEW class computes
+`oklab(0.145 … / 0.6)`. The oklab mix space keeps the token's perceived
+hue and lightness on the way to transparent.
+
+Locked repo-wide beside its siblings in accentColorLock.test.ts (GAP-018
+accent forms, GAP-020 ink steps, now GAP-019 var()+modifier): any
+slash-modified var() token anywhere in renderer source fails the build.
+The edges-codemod FIXTURE keeps one deliberately (it is sample input to an
+AST scanner, not app source) — the lock scopes to src. One DEC-089 pin
+rewritten to the superseding hover-wash form with history.
+
+3,462 green; both typechecks clean. All three paint-integrity gaps are now
+closed: the accent family (GAP-018/DEC-086), the wash family
+(GAP-019/DEC-097), the ink scale (GAP-020/DEC-096).

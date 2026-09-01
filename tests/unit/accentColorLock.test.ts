@@ -84,3 +84,34 @@ describe('DEC-096 — every ink token referenced is defined (GAP-020 closed)', (
     }
   })
 })
+
+// ── DEC-097 — var()+opacity-modifier utilities (GAP-019, CLOSED) ────────────
+// `bg-[var(--surface-sunken)]/60` emits `rgb(var(--surface-sunken) / 0.6)`,
+// and since the token is a COMPLETE color the declaration is invalid — the
+// element paints NOTHING, both themes, silently (117 sites, measured by
+// paint-probe under DEC-089/095). The working form is a color-mix arbitrary
+// value: `bg-[color-mix(in_oklab,var(--x)_60%,transparent)]` — same token,
+// same opacity, valid CSS. This lock keeps the broken form out of the app
+// source for every property prefix (bg/border/divide/via/…). The codemod
+// test fixture in tests/ is sample input, deliberately out of scope.
+describe('DEC-097 — no var()+modifier utilities anywhere (GAP-019 closed)', () => {
+  it('app source never alpha-modifies a var() token with the slash form', () => {
+    const { readFileSync, readdirSync, statSync } = require('node:fs') as typeof import('node:fs')
+    const { join } = require('node:path') as typeof import('node:path')
+    const root = join(__dirname, '../..', 'src/renderer/src')
+    const offenders: string[] = []
+    const walk = (dir: string): void => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name)
+        if (statSync(p).isDirectory()) walk(p)
+        else if (/\.(tsx|ts)$/.test(name)) {
+          const body = readFileSync(p, 'utf-8')
+          for (const m of body.matchAll(/\[var\((--[a-z-]+)\)\]\/(\d+)/g))
+            offenders.push(`${name}: [var(${m[1]})]/${m[2]}`)
+        }
+      }
+    }
+    walk(root)
+    expect(offenders).toEqual([])
+  })
+})

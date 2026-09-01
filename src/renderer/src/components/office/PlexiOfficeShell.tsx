@@ -550,7 +550,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                             key={d.id}
                             onClick={() => setOpenDocId(d.id)}
                             data-testid={`office-recent-row-${d.id}`}
-                            className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[var(--edge-soft)]/60 cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
+                            className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
                           >
                             <span className="flex items-center gap-2 min-w-0">
                               <Icon name={ti.icon} size={16} className={ti.tint} />
@@ -594,7 +594,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                             key={d.id}
                             onClick={() => setOpenDocId(d.id)}
                             data-testid={`office-file-${d.id}`}
-                            className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[var(--edge-soft)]/60 cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
+                            className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 py-2 items-center border-b border-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] cursor-pointer hover:bg-[var(--surface-sunken)] rounded"
                           >
                             <span className="flex items-center gap-2 min-w-0">
                               <Icon name={ti.icon} size={16} className={ti.tint} />

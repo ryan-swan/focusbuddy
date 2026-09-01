@@ -1504,7 +1504,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         className={
           fullscreenHome
             ? 'p-3 pt-0 mb-auto w-full max-w-[640px] mx-auto'
-            : 'absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-10 pointer-events-none bg-gradient-to-t from-[var(--surface-base)] via-[var(--surface-base)]/85 to-transparent'
+            : 'absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-10 pointer-events-none bg-gradient-to-t from-[var(--surface-base)] via-[color-mix(in_oklab,var(--surface-base)_85%,transparent)] to-transparent'
         }
       >
         {!fullscreenHome && showJump && (

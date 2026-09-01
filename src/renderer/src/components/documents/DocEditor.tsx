@@ -527,14 +527,14 @@ export default function DocEditor({
             <span className="inline-flex rounded-full bg-[var(--surface-sunken)] overflow-hidden" data-testid="doc-layout-toggle">
               <button
                 onClick={() => setPageView(false)}
-                className={`px-2 py-1 ${!pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
+                className={`px-2 py-1 ${!pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'}`}
                 title="Continuous view — one flowing column"
               >
                 Continuous
               </button>
               <button
                 onClick={() => setPageView(true)}
-                className={`px-2 py-1 ${pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
+                className={`px-2 py-1 ${pageView ? 'bg-accent/10 text-accent' : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'}`}
                 title="Page view — paper sheets with margins"
                 data-testid="doc-pageview-btn"
               >
@@ -545,7 +545,7 @@ export default function DocEditor({
               <>
                 <button
                   onClick={() => updatePageSetup({ orientation: page.orientation === 'portrait' ? 'landscape' : 'portrait' })}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] fb-spring-soft"
                   title="Toggle portrait / landscape"
                   data-testid="doc-orientation-btn"
                 >
@@ -554,7 +554,7 @@ export default function DocEditor({
                 </button>
                 <button
                   onClick={() => updatePageSetup({ size: page.size === 'letter' ? 'a4' : 'letter' })}
-                  className="px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
+                  className="px-2 py-1 rounded-full hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] fb-spring-soft"
                   title="Paper size"
                   data-testid="doc-paper-btn"
                 >
@@ -563,7 +563,7 @@ export default function DocEditor({
                 <div className="relative">
                   <button
                     onClick={() => setShowMargins((v) => !v)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] fb-spring-soft"
                     title="Page margins"
                     data-testid="doc-margins-btn"
                   >
@@ -576,7 +576,7 @@ export default function DocEditor({
                 </div>
                 <button
                   onClick={toggleRuler}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${showRuler ? 'bg-accent/10 text-accent' : 'hover:bg-[var(--surface-sunken)]/70'}`}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${showRuler ? 'bg-accent/10 text-accent' : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'}`}
                   title="Show the ruler — drag the markers to set page margins"
                   data-testid="doc-ruler-btn"
                 >
@@ -586,7 +586,7 @@ export default function DocEditor({
                 <div className="relative">
                   <button
                     onClick={() => setShowHeaderFooter((v) => !v)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] fb-spring-soft"
                     title="Header & footer"
                     data-testid="doc-headerfooter-btn"
                   >
@@ -619,7 +619,7 @@ export default function DocEditor({
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
                   panelOpen && panelTab === 'outline'
                     ? 'text-accent bg-accent/10'
-                    : 'hover:bg-[var(--surface-sunken)]/70'
+                    : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'
                 }`}
                 title="Show the document outline"
                 data-testid="doc-outline-toggle"
@@ -638,7 +638,7 @@ export default function DocEditor({
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
                   panelOpen && panelTab === 'comments'
                     ? 'text-accent bg-accent/10'
-                    : 'hover:bg-[var(--surface-sunken)]/70'
+                    : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'
                 }`}
                 title="Show comments"
                 data-testid="doc-comments-toggle"
@@ -662,7 +662,7 @@ export default function DocEditor({
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
                   !hasGlobalAssistant && panelOpen && panelTab === 'ai'
                     ? 'text-accent bg-accent/10'
-                    : 'hover:bg-[var(--surface-sunken)]/70'
+                    : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'
                 }`}
                 title="Show the AI assistant"
                 data-testid="doc-assistant-toggle"
@@ -672,7 +672,7 @@ export default function DocEditor({
               </button>
               <button
                 onClick={() => setFocusMode(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[var(--surface-sunken)]/70 fb-spring-soft"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] fb-spring-soft"
                 title="Enter focus mode — dims everything but the line you're writing"
                 data-testid="doc-focus-toggle"
               >
@@ -687,7 +687,7 @@ export default function DocEditor({
                   editor?.commands.setSuggesting(next)
                 }}
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-full fb-spring-soft ${
-                  suggesting ? 'bg-accent/[0.14] text-accent' : 'hover:bg-[var(--surface-sunken)]/70'
+                  suggesting ? 'bg-accent/[0.14] text-accent' : 'hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]'
                 }`}
                 title="Suggesting mode — record edits as tracked changes to accept or reject"
                 data-testid="doc-suggest-toggle"
@@ -732,7 +732,7 @@ export default function DocEditor({
         >
           <Icon name="center_focus_strong" size={13} className="text-accent" />
           <span className="font-medium">Focus</span>
-          <span className="w-px h-3 bg-[var(--edge-firm)]/60" />
+          <span className="w-px h-3 bg-[color-mix(in_oklab,var(--edge-firm)_60%,transparent)]" />
           <ReadingMeta editor={editor} />
           <button
             onClick={() => setFocusMode(false)}
@@ -1157,7 +1157,7 @@ function PageSheet({
             style={{ width: geom.w, height: RULER_PX, background: 'var(--surface-raised)', border: '1px solid var(--edge-soft)', borderRadius: 3 }}
           >
             {inchTicks(geom.w).map((x, k) => (
-              <div key={k} className="absolute top-0 bottom-0 w-px bg-[var(--edge-firm)]/50" style={{ left: x }}>
+              <div key={k} className="absolute top-0 bottom-0 w-px bg-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)]" style={{ left: x }}>
                 {k > 0 && <span className="absolute top-0.5 left-1 text-[9px] text-[var(--ink-40)] fb-tabular">{k}</span>}
               </div>
             ))}
@@ -1196,7 +1196,7 @@ function PageSheet({
             style={{ width: RULER_PX, height: geom.h, background: 'var(--surface-raised)', border: '1px solid var(--edge-soft)', borderRadius: 3, marginRight: 4 }}
           >
             {inchTicks(geom.h).map((y, k) => (
-              <div key={k} className="absolute left-0 right-0 h-px bg-[var(--edge-firm)]/50" style={{ top: y }} />
+              <div key={k} className="absolute left-0 right-0 h-px bg-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)]" style={{ top: y }} />
             ))}
             <div className="absolute left-0 right-0 top-0 bg-[var(--ink-40)]/20" style={{ height: geom.mTop }} />
             <div className="absolute left-0 right-0 bottom-0 bg-[var(--ink-40)]/20" style={{ height: geom.mBottom }} />

@@ -6,8 +6,9 @@
 > the merge-back), pushed to BOTH remotes and zero-conflict mergeable —
 > Michael pulls it whenever. **New work starts on `ryan-next`** (branched
 > from this tip, on both remotes); ryan-command-center is maintenance-only
-> until DEC-096 lands in main. Still open: GAP-019 sweep (next round),
-> GAP-017 ruling, Phase 4 on the operator's go, the ten [TEST] seed items
+> until DEC-096 lands in main. Still open: GAP-017 ruling (naming,
+> needs usage data), Phase 4 on the operator's go (GAP-019 closed by
+> DEC-097 — all three paint-integrity gaps now closed), the ten [TEST] seed items
 > in the operator's LOCAL database (dismiss by tag `test-seed` before
 > demos — they are data, not code).
 
@@ -30,7 +31,7 @@ comprehension. **GAP-019 remains open** (`bg-[var(--token)]/N` invalid CSS,
 Phase 5 rulings/process. DECISIONS-LOG carries DEC-072…092 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,461 tests green. Full typecheck clean.
+**Suite:** 3,462 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
@@ -44,13 +45,12 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…096**, append-only. DEC-072…096 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…097**, append-only. DEC-072…097 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)
-4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages) and GAP-019
-   (invalid var()+modifier utilities, ~40 sites) are the live ones (GAP-020
-   closed by DEC-096)
+4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages) is the last
+   live one (GAP-018/019/020 all closed — the paint-integrity family is done)
 
 Pre-flight:
 ```bash

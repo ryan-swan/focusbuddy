@@ -677,9 +677,9 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
               </button>
               <span className="absolute top-1 left-1 text-[9px] font-semibold text-white bg-black/40 rounded px-1">{i + 1}</span>
               <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex flex-col gap-0.5">
-                <button onClick={() => moveSlide(i, -1)} className="bg-[var(--surface-raised)]/90 rounded p-0.5" title="Move up"><Icon name="keyboard_arrow_up" size={12} /></button>
-                <button onClick={() => moveSlide(i, 1)} className="bg-[var(--surface-raised)]/90 rounded p-0.5" title="Move down"><Icon name="keyboard_arrow_down" size={12} /></button>
-                <button onClick={() => deleteSlide(i)} className="bg-[var(--surface-raised)]/90 rounded p-0.5 text-red-500" title="Delete"><Icon name="close" size={12} /></button>
+                <button onClick={() => moveSlide(i, -1)} className="bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] rounded p-0.5" title="Move up"><Icon name="keyboard_arrow_up" size={12} /></button>
+                <button onClick={() => moveSlide(i, 1)} className="bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] rounded p-0.5" title="Move down"><Icon name="keyboard_arrow_down" size={12} /></button>
+                <button onClick={() => deleteSlide(i)} className="bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] rounded p-0.5 text-red-500" title="Delete"><Icon name="close" size={12} /></button>
               </div>
             </div>
           ))}
@@ -707,18 +707,18 @@ export default function SlidesEditor({ body: rawBody, title, onChange }: Props):
                 <AlignBtn icon="align_horizontal_left" title="Align left edges" onClick={() => doAlign('left')} />
                 <AlignBtn icon="align_horizontal_center" title="Align horizontal centres" onClick={() => doAlign('centerX')} />
                 <AlignBtn icon="align_horizontal_right" title="Align right edges" onClick={() => doAlign('right')} />
-                <span className="w-px h-4 bg-[var(--edge-firm)]/50 mx-0.5" />
+                <span className="w-px h-4 bg-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)] mx-0.5" />
                 <AlignBtn icon="align_vertical_top" title="Align top edges" onClick={() => doAlign('top')} />
                 <AlignBtn icon="align_vertical_center" title="Align vertical centres" onClick={() => doAlign('middleY')} />
                 <AlignBtn icon="align_vertical_bottom" title="Align bottom edges" onClick={() => doAlign('bottom')} />
                 {selectedIds.length >= 3 && (
                   <>
-                    <span className="w-px h-4 bg-[var(--edge-firm)]/50 mx-0.5" />
+                    <span className="w-px h-4 bg-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)] mx-0.5" />
                     <AlignBtn icon="horizontal_distribute" title="Distribute horizontally" onClick={() => doDistribute('h')} />
                     <AlignBtn icon="vertical_distribute" title="Distribute vertically" onClick={() => doDistribute('v')} />
                   </>
                 )}
-                <span className="w-px h-4 bg-[var(--edge-firm)]/50 mx-0.5" />
+                <span className="w-px h-4 bg-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)] mx-0.5" />
                 <AlignBtn icon="group_work" title="Group (⌘G)" onClick={doGroup} testid="slides-group" />
                 {anyGrouped && <AlignBtn icon="category" title="Ungroup (⇧⌘G)" onClick={doUngroup} testid="slides-ungroup" />}
               </div>

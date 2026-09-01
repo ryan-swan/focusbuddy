@@ -1023,7 +1023,7 @@ export default function MessagesView(): JSX.Element {
             </div>
             {pins.length > 0 && (
               <div
-                className="shrink-0 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 px-4 py-1.5"
+                className="shrink-0 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] px-4 py-1.5"
                 data-testid="pinned-bar"
               >
                 <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-45)] mb-1 inline-flex items-center gap-1">

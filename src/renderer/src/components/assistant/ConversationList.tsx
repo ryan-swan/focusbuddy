@@ -63,7 +63,7 @@ export default function ConversationList({
       data-testid={isRail ? 'conversation-rail' : 'conversation-overlay'}
       className={
         isRail
-          ? 'w-[220px] shrink-0 h-full flex flex-col border-r border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40'
+          ? 'w-[220px] shrink-0 h-full flex flex-col border-r border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_40%,transparent)]'
           : 'absolute inset-x-2 top-11 z-30 max-h-[60%] flex flex-col rounded-[var(--radius-card)] border border-[var(--edge-firm)] bg-[var(--surface-raised)] shadow-[var(--shadow-cast)] overflow-hidden'
       }
     >

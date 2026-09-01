@@ -18,7 +18,7 @@ export default function SheetTabStrip({ body, onSwitch, onAdd, onRename, onDelet
   const [editing, setEditing] = useState<number | null>(null)
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60" data-testid="sheet-tab-strip">
+    <div className="flex items-center gap-1 px-2 py-1 border-t border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]" data-testid="sheet-tab-strip">
       {body.sheets.map((s, i) => (
         <div
           key={s.id}

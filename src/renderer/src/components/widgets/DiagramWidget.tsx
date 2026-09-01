@@ -85,7 +85,7 @@ function ShapeNode({ id, data, selected }: NodeProps): JSX.Element {
     shapeCls = `${base} bg-transparent`
     style = { color: d.color, minWidth: 60 }
   } else {
-    shapeCls = `${base} rounded-md bg-[var(--surface-raised)]/60 border border-dashed border-[var(--edge-firm)]`
+    shapeCls = `${base} rounded-md bg-[color-mix(in_oklab,var(--surface-raised)_60%,transparent)] border border-dashed border-[var(--edge-firm)]`
     style = { minWidth: 60, minHeight: 60, padding: 4 }
   }
 
@@ -280,7 +280,7 @@ function DiagramInner({ widget, inline = false }: Props): JSX.Element {
 
   const body = (
     <div className="h-full w-full flex flex-col bg-[var(--surface-raised)]">
-      <div className="shrink-0 flex items-center gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)]">
         {tools.map((t) => (
           <button
             key={t.shape}

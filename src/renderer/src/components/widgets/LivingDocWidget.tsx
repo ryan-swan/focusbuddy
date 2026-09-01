@@ -144,7 +144,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
   )
 
   const header = (
-    <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/70 flex items-center gap-1.5">
+    <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] flex items-center gap-1.5">
       <Icon name="auto_awesome" size={12} className="text-accent shrink-0" />
       {editingBrief ? (
         <input

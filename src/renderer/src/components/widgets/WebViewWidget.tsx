@@ -413,7 +413,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
               }}
               disabled={pinning}
               title="Pin this site to Connected Apps (shares session + enables vault auto-fill)"
-              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] disabled:opacity-60"
+              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)] disabled:opacity-60"
             >
               <Icon name="push_pin" size={11} />
               <span>{pinning ? 'pinning…' : 'pin to apps'}</span>
@@ -422,7 +422,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           {sourceApp && (
             <span
               title={`Linked to "${sourceApp.title}" — session + auto-fill shared`}
-              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] text-[var(--ink-70)]"
+              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] border border-[var(--edge-firm)] text-[var(--ink-70)]"
             >
               <Icon name="link" size={11} />
               <span className="truncate max-w-[120px]">{sourceApp.title}</span>
@@ -434,7 +434,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
               setEditing(true)
             }}
             title="Change URL (full form)"
-            className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
+            className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
           >
             <Icon name="edit" size={11} />
             <span>edit</span>
@@ -572,7 +572,7 @@ export default function WebViewWidget({ widget, inline = false }: Props): JSX.El
           onNav={handleNav}
           onWebviewEl={setWvEl}
           linkClicks="ignore"
-          toolbarClassName="border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80 !px-1.5 !py-1"
+          toolbarClassName="border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)] !px-1.5 !py-1"
           toolbarTrailing={toolbarTrailing}
           overlay={overlay}
         />

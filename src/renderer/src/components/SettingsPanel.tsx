@@ -701,7 +701,7 @@ export default function SettingsPanel({
         )}
       </div>
 
-      <div className="px-3 py-2 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/50 fb-t-caption text-[var(--ink-70)] shrink-0">
+      <div className="px-3 py-2 border-t border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_50%,transparent)] fb-t-caption text-[var(--ink-70)] shrink-0">
         Preferences saved locally.
       </div>
 

@@ -550,7 +550,7 @@ function ActionStrip({ actions }: { actions: IndexAction[] }): JSX.Element | nul
             a.onClick()
           }}
           title={a.title ?? a.label}
-          className="inline-flex items-center justify-center h-6 w-6 rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/95 shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-soft)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press"
+          className="inline-flex items-center justify-center h-6 w-6 rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_95%,transparent)] shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-soft)] text-[var(--ink-60)] hover:text-[var(--ink-100)] fb-press"
         >
           <Icon name={a.icon} size={14} />
         </button>
@@ -703,7 +703,7 @@ function GalleryCard(props: {
           className={`absolute top-1.5 left-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full shadow-[0_0_0_1px_var(--edge-hairline)] ${
             props.selected
               ? 'bg-[rgb(var(--accent))] text-white'
-              : 'bg-[var(--surface-raised)]/95 text-[var(--ink-40)]'
+              : 'bg-[color-mix(in_oklab,var(--surface-raised)_95%,transparent)] text-[var(--ink-40)]'
           }`}
         >
           <Icon name={props.selected ? 'check' : 'radio_button_unchecked'} size={15} />

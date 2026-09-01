@@ -361,7 +361,7 @@ export default function LiveFolderView({ liveFolderId }: Props): JSX.Element {
             {entries.map((e) => (
               <div
                 key={e.id}
-                className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-[var(--surface-sunken)]/70"
+                className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]"
                 data-testid="livefolder-entry"
               >
                 <Icon name={iconFor(e)} size={18} className={e.kind === 'folder' ? 'text-accent' : 'text-[var(--ink-40)]'} />

@@ -355,7 +355,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
       {exportMsg && (
         <div
           data-testid="md-export-status"
-          className="px-3 py-1 text-[10px] text-[var(--ink-50)] border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60"
+          className="px-3 py-1 text-[10px] text-[var(--ink-50)] border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]"
         >
           {exportMsg}
         </div>

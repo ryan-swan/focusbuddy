@@ -97,7 +97,7 @@ function ProductTile({ product }: { product: PlexiProduct }): JSX.Element {
       className={`group relative rounded-xl border p-3 transition-all ${
         ready
           ? `${PLEXI_CARD} fb-lift`
-          : 'border-[var(--edge-soft)]/50 bg-[var(--surface-sunken)]/60'
+          : 'border-[color-mix(in_oklab,var(--edge-soft)_50%,transparent)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]'
       }`}
     >
       <button

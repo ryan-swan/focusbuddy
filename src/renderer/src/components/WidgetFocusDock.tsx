@@ -239,7 +239,7 @@ export default function WidgetFocusDock({
             A vertical hairline (mirrors the StageManagerStrip separator) that
             visually splits "your open tabs" from the two fixed action tabs. */}
         <div
-          className="self-stretch w-px bg-[var(--edge-soft)]/60 shrink-0 mx-1"
+          className="self-stretch w-px bg-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] shrink-0 mx-1"
           aria-hidden="true"
         />
 

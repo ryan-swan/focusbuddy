@@ -417,7 +417,7 @@ function GenericFilePreview({
     <button
       type="button"
       onClick={onOpen}
-      className="h-full w-full flex flex-col bg-[var(--surface-sunken)] hover:bg-[var(--surface-sunken)]/70 transition-colors group relative"
+      className="h-full w-full flex flex-col bg-[var(--surface-sunken)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] transition-colors group relative"
       data-testid="file-open-local"
       title={file ? `Open ${file.originalName} in default app` : 'Open file'}
     >
