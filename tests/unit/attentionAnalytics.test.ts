@@ -209,19 +209,28 @@ describe('DEC-049 — the KPI band', () => {
 })
 
 describe('DEC-049 — dayTimeline (today\'s calendar + dated work)', () => {
+  // dayTimeline windows on the LOCAL day (setHours(0,0,0,0)…(23,59,59,999)), so
+  // this block needs a reference "now" that sits mid-local-day. The file-wide NOW
+  // is 12:00 UTC, which is 21:30 at UTC+9:30 — there NOW + 4h falls into tomorrow,
+  // the late block is correctly filtered out, and the merge test below failed for
+  // anyone east of about UTC+8 while staying green on CI's UTC runners. Anchoring
+  // to local noon makes the block timezone-independent without weakening it.
+  const REF_DAY = new Date(NOW)
+  const NOON = new Date(REF_DAY.getFullYear(), REF_DAY.getMonth(), REF_DAY.getDate(), 12, 0, 0, 0).getTime()
+
   const block = (over: Partial<{ id: string; title: string; startMs: number; durationMin: number; meeting: unknown }>) => ({
     id: 'b1',
     title: 'Block',
-    startMs: NOW,
+    startMs: NOON,
     durationMin: 30,
     ...over
   })
 
   it('merges calendar blocks with dated items in time order', () => {
-    const early = block({ id: 'b-early', title: 'Standup', startMs: NOW - 3 * 60 * 60 * 1000 })
-    const late = block({ id: 'b-late', title: 'Review', startMs: NOW + 4 * 60 * 60 * 1000 })
-    const due = wi({ dueAt: new Date(NOW + 60 * 60 * 1000).toISOString() })
-    const t = dayTimeline([due], [late, early], NOW)
+    const early = block({ id: 'b-early', title: 'Standup', startMs: NOON - 3 * 60 * 60 * 1000 })
+    const late = block({ id: 'b-late', title: 'Review', startMs: NOON + 4 * 60 * 60 * 1000 })
+    const due = wi({ dueAt: new Date(NOON + 60 * 60 * 1000).toISOString() })
+    const t = dayTimeline([due], [late, early], NOON)
     expect(t.map((e) => (e.kind === 'event' ? e.title : 'ITEM'))).toEqual([
       'Standup',
       'ITEM',
@@ -230,16 +239,16 @@ describe('DEC-049 — dayTimeline (today\'s calendar + dated work)', () => {
   })
 
   it('ignores blocks outside today and sorts undated work last', () => {
-    const tomorrow = block({ id: 'b-tom', startMs: NOW + 2 * DAY })
+    const tomorrow = block({ id: 'b-tom', startMs: NOON + 2 * DAY })
     const meetItem = wi({ intentClass: 'to_meet' }) // undated, still agenda-worthy
-    const dated = wi({ dueAt: new Date(NOW + 60_000).toISOString() })
-    const t = dayTimeline([meetItem, dated], [tomorrow], NOW)
+    const dated = wi({ dueAt: new Date(NOON + 60_000).toISOString() })
+    const t = dayTimeline([meetItem, dated], [tomorrow], NOON)
     expect(t.some((e) => e.kind === 'event')).toBe(false)
     expect(t[t.length - 1].id).toBe(meetItem.id)
   })
 
   it('marks meeting blocks so the row can offer to join', () => {
-    const t = dayTimeline([], [block({ meeting: { roomId: 'r1' } })], NOW)
+    const t = dayTimeline([], [block({ meeting: { roomId: 'r1' } })], NOON)
     expect(t[0].kind === 'event' && t[0].isMeeting).toBe(true)
   })
 })
