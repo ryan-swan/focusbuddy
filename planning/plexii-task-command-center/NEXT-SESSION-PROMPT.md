@@ -1,5 +1,16 @@
 # Next Session — Resume Prompt
 
+> **SHIPPED 2026-09-01: Release 4.2.0.** Michael merged ryan-command-center
+> into main and released it (everything through DEC-095, plus his timezone
+> fixture fix). `ryan-command-center` sits at main + 2 (DEC-096 ink sweep +
+> the merge-back), pushed to BOTH remotes and zero-conflict mergeable —
+> Michael pulls it whenever. **New work starts on `ryan-next`** (branched
+> from this tip, on both remotes); ryan-command-center is maintenance-only
+> until DEC-096 lands in main. Still open: GAP-019 sweep (next round),
+> GAP-017 ruling, Phase 4 on the operator's go, the ten [TEST] seed items
+> in the operator's LOCAL database (dismiss by tag `test-seed` before
+> demos — they are data, not code).
+
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
