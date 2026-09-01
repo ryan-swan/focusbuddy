@@ -3277,3 +3277,39 @@ Phase 5 ledger: checkout note DONE · review package DONE (Michael's
 actual review + merge is his act) · taxonomy ruling still waits on real
 queue-usage data (the [TEST] seeds would poison a snapshot taken today) ·
 synced-docs QA rides the two-machine session.
+
+## DEC-112 — PlexiMeet wears the house material
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** operator request
+("this page still feels very vibe-coded") · **Branch:** ryan-next ·
+**Scope rule:** DEC-094's — presentation ONLY; every testid, handler and
+copy string exactly where it was, proven by the untouched m1–m6 suites.
+
+**The recipes, applied whole.** The view now sits on the desk paper (the
+dotted house texture every canvas wears, with its dark/futuristic
+variants for free); the rail is a raised color-mix panel with the
+display-type header and a rose identity chip; the primary is glossy rose
+(gradient + inset highlight + fb-press — the kpi-tile gloss language on a
+button); the recording preferences gather into ONE eyebrowed fb-card
+("RECORDING") instead of loose labels; the four actions sit on a 2×2
+grid of uniform h-8 fb-btn-surface buttons; search is a sunken field with
+an accent focus ring; rows carry fb-press and an inset-highlight selected
+state; the detail header is a sticky raised bar over the paper; the three
+Record renderings are a sunken segmented TRACK with a glossy accent
+active pill; and every rendering reads as an editorial max-w column.
+
+**Two live-caught layout wraps** fixed in the round: the retention label
+colliding with its select (nowrap + bounded select) and four actions
+squeezed into one flex row (the grid).
+
+**A verification lesson worth keeping:** three dark-mode screenshots in a
+row showed light patches over correctly-dark computed styles — stale
+compositor tiles in the OCCLUDED window (throttled rendering reuses
+cached textures for layerized elements; the backdrop-blur rail and
+resizable textareas each own layers). The definitive capture is
+`captureBeyondViewport` + a display-none/restore damage nudge — dark mode
+was then fully correct on the first honest frame. Recorded so the next
+CDP visual round doesn't chase ghosts. Light and dark screenshots
+delivered to the operator.
+
+7 material pins (meetHouseMaterial — paper, chip, gloss, eyebrow, track,
+sticky bar, column); 3,662 green across 337 files; both typechecks clean.

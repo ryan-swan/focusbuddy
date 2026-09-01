@@ -289,15 +289,25 @@ export default function PlexiMeetView(): JSX.Element {
   }
 
   return (
-    <div className="h-full w-full flex bg-[var(--surface-base)] text-[var(--ink-100)]" data-testid="pleximeet-view">
+    // House material (the operator's "still feels vibe-coded" round): the
+    // detail side sits on the desk paper (the dotted house texture every
+    // canvas view wears), the rail is a raised panel over it, and every
+    // control below speaks the shared recipes — fb-card, fb-btn-surface,
+    // eyebrow labels, the kpi-gloss primary. Presentation ONLY: every
+    // testid, handler and copy string is exactly where it was.
+    <div className="h-full w-full flex desk-paper no-tod text-[var(--ink-100)]" data-testid="pleximeet-view">
       {/* List */}
-      <div className="w-[330px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+      <div className="w-[330px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col bg-[color-mix(in_oklab,var(--surface-raised)_88%,transparent)] backdrop-blur-[2px]">
         <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
-          <div className="flex items-center gap-2">
-            <Icon name="groups" size={18} className="text-rose-500" filled />
-            <h1 className="text-[15px] font-bold tracking-tight text-[var(--ink-100)]">PlexiMeet</h1>
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] bg-rose-500/10 text-rose-500 shadow-[inset_0_0_0_1px_rgb(244_63_94/0.18)]">
+              <Icon name="groups" size={17} filled />
+            </span>
+            <div className="min-w-0">
+              <h1 className="fb-display text-[15px] font-bold tracking-tight text-[var(--ink-100)] leading-tight">PlexiMeet</h1>
+              <p className="text-[11.5px] text-[var(--ink-50)] leading-tight">Meetings that turn into actions.</p>
+            </div>
           </div>
-          <p className="mt-0.5 text-[11.5px] text-[var(--ink-70)]">Meetings that turn into actions.</p>
         </div>
 
         <div className="px-3 py-2.5 space-y-2">
@@ -305,7 +315,7 @@ export default function PlexiMeetView(): JSX.Element {
           <button
             onClick={openNew}
             data-testid="meet-start-live"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-md bg-rose-500 text-white text-[12.5px] font-semibold hover:bg-rose-600"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-[var(--radius-field)] text-white text-[12.5px] font-semibold fb-press bg-gradient-to-b from-rose-500 to-rose-600 shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.12)] hover:from-rose-400 hover:to-rose-600"
           >
             <Icon name="video_call" size={17} /> Start or schedule a meeting
           </button>
@@ -315,6 +325,8 @@ export default function PlexiMeetView(): JSX.Element {
               expresses MY side: on a call it records my mic and ASKS the
               other person — their voice is captured when they say yes, and
               a decline is honoured by construction (never tapped). */}
+          <div className="fb-card px-2.5 py-2 space-y-1.5">
+          <div className="text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">RECORDING</div>
           <label
             className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
             title="Applies to 1:1 calls: your mic is recorded and the other person is asked before their voice is captured — declining keeps them out entirely. Meetings never auto-record."
@@ -334,7 +346,10 @@ export default function PlexiMeetView(): JSX.Element {
 
           {/* M2c (CR-13) — audio retention. Local disk only, never uploaded. */}
           <label className="flex items-center justify-between gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)]">
-            <span title="Meeting audio stays on this machine and expires after this window. 'Keep' on a meeting overrides it.">
+            <span
+              className="whitespace-nowrap"
+              title="Meeting audio stays on this machine and expires after this window. 'Keep' on a meeting overrides it."
+            >
               Keep meeting audio
             </span>
             <select
@@ -345,7 +360,7 @@ export default function PlexiMeetView(): JSX.Element {
                 void window.api.meetings.setAudioRetention(v)
               }}
               data-testid="meet-retention-select"
-              className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[11.5px]"
+              className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[11.5px] max-w-[150px] truncate"
             >
               <option value="0">never (discard at wrap-up)</option>
               <option value="7">7 days</option>
@@ -354,9 +369,10 @@ export default function PlexiMeetView(): JSX.Element {
               <option value="keep">forever</option>
             </select>
           </label>
+          </div>
 
           {/* Secondary: recording is one option, not the whole feature. */}
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {recording ? (
               <button
                 onClick={stopRecording}
@@ -370,7 +386,7 @@ export default function PlexiMeetView(): JSX.Element {
                 onClick={() => void startRecording()}
                 data-testid="meet-record"
                 disabled={!!busy}
-                className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap disabled:opacity-50"
                 title="Record audio, transcribe it and extract action items"
               >
                 <Icon name="mic" size={15} /> Record notes
@@ -381,7 +397,7 @@ export default function PlexiMeetView(): JSX.Element {
                 void useGuestCaptureStore.getState().start({ title: 'External meeting' })
               }
               data-testid="meet-record-external"
-              className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap"
               title="Record a meeting happening outside Plexii (Zoom, Meet, Teams) — your mic + this machine's audio, transcribed locally"
             >
               <Icon name="radio_button_checked" size={15} /> Record external
@@ -389,7 +405,7 @@ export default function PlexiMeetView(): JSX.Element {
             <button
               onClick={() => setShowMsg((v) => !v)}
               data-testid="meet-message"
-              className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap"
               title="Record a quick message and send it to a teammate who is away"
             >
               <Icon name="voicemail" size={15} /> Message
@@ -398,7 +414,7 @@ export default function PlexiMeetView(): JSX.Element {
               onClick={() => void addManual()}
               data-testid="meet-add"
               disabled={!!busy}
-              className="fb-btn-surface inline-flex items-center gap-1 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap"
               title="Add a meeting from notes" aria-label="Add a meeting from notes"
             >
               <Icon name="edit_note" size={15} />
@@ -457,8 +473,8 @@ export default function PlexiMeetView(): JSX.Element {
         )}
 
         <div className="px-3 pb-2">
-          <div className="fb-card flex items-center gap-1.5 px-2 py-1.5">
-            <Icon name="search" size={14} className="text-[var(--ink-70)]" />
+          <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
+            <Icon name="search" size={14} className="text-[var(--ink-50)]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -513,8 +529,10 @@ export default function PlexiMeetView(): JSX.Element {
                 key={m.id}
                 onClick={() => setSelectedId(m.id)}
                 data-testid={`meet-row-${m.id}`}
-                className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 transition-colors ${
-                  m.id === selectedId ? 'bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.30)]' : 'hover:bg-[var(--surface-sunken)] border border-transparent'
+                className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 fb-press transition-colors ${
+                  m.id === selectedId
+                    ? 'bg-[rgb(var(--accent)/0.10)] border border-[rgb(var(--accent)/0.30)] shadow-[inset_0_1px_0_rgb(255_255_255/0.35)]'
+                    : 'hover:bg-[var(--surface-sunken)] border border-transparent'
                 }`}
               >
                 <div className="text-[13px] font-semibold text-[var(--ink-100)] truncate">{m.title}</div>
@@ -808,12 +826,12 @@ function MeetingDetail({
 
   return (
     <div className="h-full flex flex-col overflow-auto" data-testid="meet-detail">
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)]">
+      <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)] backdrop-blur-[3px]">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== meeting.title && onChange({ title })}
-          className="flex-1 bg-transparent text-[17px] font-bold text-[var(--ink-100)]"
+          className="flex-1 bg-transparent fb-display text-[17px] font-bold text-[var(--ink-100)] outline-none"
           data-testid="meet-title"
         />
         {meeting.deskNodeId && (
@@ -853,32 +871,34 @@ function MeetingDetail({
       </div>
 
       {/* M2b — the segmented control: three renderings, one Record. */}
-      <div className="px-5 pt-3 flex items-center gap-1" data-testid="record-views">
-        {(
-          [
-            ['commitments', 'Commitments', '1'],
-            ['brief', 'Brief', '2'],
-            ['thread', 'Thread', '3']
-          ] as const
-        ).map(([v, label, key]) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            data-testid={`record-view-${v}`}
-            className={`h-8 px-3 rounded-[var(--radius-chip)] text-[12.5px] font-medium fb-press transition-colors inline-flex items-center gap-1.5 ${
-              view === v
-                ? 'bg-[rgb(var(--accent))] text-white'
-                : 'text-[var(--ink-60)] hover:text-[var(--ink-100)] hover:bg-[var(--surface-sunken)]'
-            }`}
-          >
-            {label}
-            <span className={`text-[10px] ${view === v ? 'text-white/60' : 'text-[var(--ink-30)]'}`}>{key}</span>
-          </button>
-        ))}
+      <div className="px-5 pt-3" data-testid="record-views">
+        <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
+          {(
+            [
+              ['commitments', 'Commitments', '1'],
+              ['brief', 'Brief', '2'],
+              ['thread', 'Thread', '3']
+            ] as const
+          ).map(([v, label, key]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              data-testid={`record-view-${v}`}
+              className={`h-7 px-3 rounded-full text-[12.5px] font-medium fb-press transition-colors inline-flex items-center gap-1.5 ${
+                view === v
+                  ? 'bg-[rgb(var(--accent))] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]'
+                  : 'text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+              }`}
+            >
+              {label}
+              <span className={`text-[10px] ${view === v ? 'text-white/60' : 'text-[var(--ink-30)]'}`}>{key}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {view === 'commitments' && (
-        <div className="px-5 py-4 space-y-5" data-testid="rendering-commitments">
+        <div className="px-5 py-4 space-y-5 max-w-[780px]" data-testid="rendering-commitments">
           {carried.length > 0 && (
             <CarriedFromLastTime
               items={carried}
@@ -939,7 +959,7 @@ function MeetingDetail({
       )}
 
       {view === 'brief' && (
-        <div className="px-5 py-4 space-y-4" data-testid="rendering-brief-outer">
+        <div className="px-5 py-4 space-y-4 max-w-[780px]" data-testid="rendering-brief-outer">
           {/* M2c (§3.5) — rebuild the Brief under a different template. The
               Commitments rendering is never templated: its shape is the
               product. yours spans survive every rebuild untouched. */}
@@ -961,7 +981,7 @@ function MeetingDetail({
         </div>
       )}
       {view === 'brief' && (
-        <div className="px-5 pb-4" data-testid="rendering-brief">
+        <div className="px-5 pb-4 max-w-[780px]" data-testid="rendering-brief">
           {meeting.record && meeting.record.spans.length > 0 ? (
             <div className="space-y-4">
               {/* yours first — the reader's own words lead. */}
@@ -1018,7 +1038,7 @@ function MeetingDetail({
       )}
 
       {view === 'thread' && (
-        <div className="px-5 py-4" data-testid="rendering-thread" ref={threadRef}>
+        <div className="px-5 py-4 max-w-[780px]" data-testid="rendering-thread" ref={threadRef}>
           {segments.length > 0 ? (
             <div className="space-y-2">
               {segments.map((s) => (
