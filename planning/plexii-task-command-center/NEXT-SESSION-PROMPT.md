@@ -66,10 +66,18 @@
 > default off), recipient opts in to FILE per series (first arrival
 > asks via notice; nothing files until they say so); prose always
 > survives for old clients. Suite: 3,637 tests / 334 files.
+> **analysis/27 Phase 4 is now open and nearly done (DEC-110)**: #16
+> AI-suggested tags shipped (deterministic, vocabulary-grounded, the
+> DEC-088 pattern — lit desk pill, accent chips, click-to-accept,
+> never auto-applied; two live-caught fixes pinned); #13 transcript
+> rebuild marked SATISFIED by SPEC-003; #17 home widgets stays gated
+> on the operator SHAPING it (which home? embedding what?). Suite:
+> 3,647 tests / 335 files.
 > Next: the operator's two-machine QA sweep (meetings consent, live
 > pane, Stage PREP, guest capture in a real call, calls consent
-> round-trip, brief DM sender→recipient loop); or analysis/27 Phase 4
-> (AI-suggested tags, home widgets) / Phase 5 process items.
+> round-trip, brief DM loop); #17 once shaped; or Phase 5 process
+> items (Caleb checkout note, taxonomy ruling with queue-usage data,
+> Michael review → landing).
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

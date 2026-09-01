@@ -1871,6 +1871,8 @@ const api = {
         phrase: string
         candidates: Array<{ id: string; title: string; hint: string }>
       } | null
+      /** #16 — existing tags the capture evokes; suggested, never applied. */
+      tags: string[]
     }> => ipcRenderer.invoke('workItems:classify', text),
     /** DEC-088 — the people scan alone (marked captures skip classify). */
     scanPeople: (

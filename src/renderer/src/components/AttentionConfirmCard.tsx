@@ -132,6 +132,11 @@ export default function AttentionConfirmCard({
   // the preview screen, so an item can arrive in the queue already tagged.
   const [urgency, setUrgency] = useState<string>('normal')
   const [capTags, setCapTags] = useState<string[]>([])
+  // #16 (analysis/27 P4) — tags the capture's own words evoke, drawn from the
+  // vocabulary already in use (deterministic, tagSuggest.ts). SUGGESTED, not
+  // applied: they render accent-marked like every inference, and only a click
+  // moves one into the chosen set. Tags stay never-mandatory.
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
   const [capMentions, setCapMentions] = useState<ItemMention[]>([])
   // DEC-040: notes are editable ON the preview. The chat's inline card and
   // every prefilled console open render the card directly — the console's
@@ -318,6 +323,8 @@ export default function AttentionConfirmCard({
         // otherwise the lit pill carries it until opened.
         const pc = seedPeople({ people: c.people ?? [], clarify: c.personClarify ?? null })
         if (c.clarify == null && pc) setOpenDrawer('people')
+        // #16 — vocabulary-grounded tag suggestions ride the same result.
+        setTagSuggestions(c.tags ?? [])
         // Notes typed in the console can name people the title didn't.
         if (rawNotes.trim()) {
           void window.api.workItems
@@ -578,9 +585,16 @@ export default function AttentionConfirmCard({
   const eyebrow = 'text-[10.5px] font-semibold tracking-wider text-[var(--ink-40)] mb-1'
   const catAccent = !catTouched
   const whenAccent = whenInferred && !whenTouched
-  const deskAccent = deskPick === undefined && !!deskCtx
-  const deskValue =
+  // #16 — unaccepted tag suggestions light the DESK pill (tags live in its
+  // drawer): accent = an inference is waiting, the DEC-088 pill doctrine.
+  const pendingTagSuggestions = tagSuggestions.filter((s) => !capTags.includes(s))
+  const deskAccent = (deskPick === undefined && !!deskCtx) || pendingTagSuggestions.length > 0
+  const deskBase =
     deskPick === undefined ? (deskCtx?.title ?? 'No desk') : (deskPick?.title ?? 'No desk')
+  const deskValue =
+    pendingTagSuggestions.length > 0 && capTags.length === 0
+      ? `${deskBase} · ${pendingTagSuggestions.length} tag${pendingTagSuggestions.length === 1 ? '' : 's'}?`
+      : deskBase
   const whenValue =
     whenChoice === 'someday'
       ? 'Someday'
@@ -991,6 +1005,28 @@ export default function AttentionConfirmCard({
                       onTags={setCapTags}
                       onMentions={setCapMentions}
                     />
+                    {/* #16 — suggested tags: accent = inferred (the house
+                        doctrine). A click ACCEPTS one into the chosen set;
+                        nothing applies on its own. Already-chosen tags stop
+                        being suggestions. */}
+                    {tagSuggestions.filter((s) => !capTags.includes(s)).length > 0 && (
+                      <div className="mt-1.5 flex items-center gap-1.5 flex-wrap" data-testid="tag-suggestions">
+                        <span className="text-[10.5px] text-[var(--ink-40)]">Suggested</span>
+                        {tagSuggestions
+                          .filter((s) => !capTags.includes(s))
+                          .map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => setCapTags([...capTags, s])}
+                              className="h-6 px-2 rounded-full text-[11px] fb-press border border-[rgb(var(--accent)/0.35)] text-[rgb(var(--accent))] bg-[rgb(var(--accent)/0.08)] hover:bg-[rgb(var(--accent)/0.15)]"
+                              title={`Used on your items before — click to tag this one “${s}”`}
+                              data-testid={`tag-suggestion-${s}`}
+                            >
+                              #{s}
+                            </button>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}

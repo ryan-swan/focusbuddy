@@ -3201,3 +3201,51 @@ deleted-message guards).
 **Q14 is complete — and with it, every named build round from SPEC-003 is
 closed** (DEC-098…109). Remaining: the operator's two-machine QA sweep;
 analysis/27 Phase 4/5 on the operator's go.
+
+## DEC-110 — #16 AI-suggested tags — analysis/27 Phase 4 opens
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/27 Phase 4
+(item #16; the phase was gated on operator go — "keep going" was the go) ·
+**Branch:** ryan-next
+
+**The ruled shape, built exactly.** Tags stay deliberately never-mandatory;
+the fix is SUGGESTED tags at the confirm stop, accent-marked as inferred
+like every other inference. And the DEC-088 people pattern is the template,
+applied whole: suggestions are DETERMINISTIC and grounded in what already
+exists — a tag is suggested only when the capture's own words (whole-word,
+punctuation-folded) match a tag ALREADY IN USE on live work items, ranked
+by the user's own usage counts. No model call — the rules fast path stays
+model-free. No invented taxonomy — the module can never mint a vocabulary,
+only echo the user's back (the DEC-029 taxonomy law holds). Empty whenever
+the workspace's tag population is: honesty over recall.
+
+**Discoverable the house way.** Tags live in the DESK drawer, so waiting
+suggestions LIGHT the desk pill (accent + "No desk · 3 tags?") — the
+DEC-088 pill doctrine: accent means an inference is waiting and the
+operator hasn't touched the dimension. Inside the drawer, suggestions are
+accent-bordered chips under the tag input; a CLICK accepts one into the
+chosen set, an accepted chip stops being a suggestion, and nothing ever
+applies on its own.
+
+**Two live-caught fixes worth the round:** (1) hyphenated tags never
+matched — the text side folds punctuation to spaces and the tag side
+didn't; tokenization aligned and pinned ('test-seed' now matches both
+"test-seed" and "test seed" in prose). (2) the first placement was
+invisible — suggestions sat in a closed drawer with no signal; the lit
+pill closed the gap. Verified live against the operator's REAL vocabulary:
+"Call the LakeDash client about the rush order" suggested exactly
+#client, #lakedash, #rush (usage-ranked); the pill lit with the count;
+clicking #lakedash accepted it and the suggestion row shrank to two —
+the filter reading the chosen set is itself the proof the state took.
+Escape closed the card; nothing filed.
+
+**Phase 4 ledger:** #16 DONE (this entry). **#13 "transcript UI rebuild"
+is SATISFIED by SPEC-003** — the Fireflies-level rebuild it queued is
+DEC-099…103's attributed Thread, provenance Record, moment anchors and
+Recall; marked in analysis/27, no separate build owed. **#17 home
+widgets / live doc embed stays gated**: "new product build" is a shaping
+question (which home? embedding what, for whom?) the operator owns
+before any code does.
+
+10 new tests (p4TagSuggest: real-SQLite vocabulary + scoring + the
+tokenization drift + pins); 3,647 green across 335 files; both
+typechecks clean.

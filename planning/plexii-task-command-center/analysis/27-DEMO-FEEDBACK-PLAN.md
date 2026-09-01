@@ -94,7 +94,7 @@ send-state feedback.
 | **1 — Demo-blockers** | Capture modal scroll/cutoff · Plan-my-day day-targeting + after-hours fallback · calendar duplicate-vs-edit guard | ~1 session | **DONE — DEC-087** |
 | **2 — People** | People pill/drawer split · capture names → structured mentions · person-clarify lane (groundwork for SPEC-027; routing itself stays deferred) | 1–2 sessions | **DONE — DEC-088** (wrapup-proposal mentions ride Phase 4's transcript rebuild) |
 | **3 — Context fidelity** | Slack/webview `source_url` capture · doc-created toast + linkage · mail send verification | ~1 session | **DONE — DEC-091** |
-| **4 — Polish & intelligence** | Transcript UI rebuild · AI-suggested tags · home-page widgets / live doc embed | on operator go, per-item | gated |
+| **4 — Polish & intelligence** | Transcript UI rebuild · AI-suggested tags · home-page widgets / live doc embed | on operator go, per-item | **#13 SATISFIED by SPEC-003** (DEC-099…103: attributed Thread, provenance Record, moment anchors, Recall) · **#16 DONE — DEC-110** · #17 gated on operator shaping |
 | **5 — Rulings & process** | Caleb checkout note · synced-docs QA session · taxonomy ruling with queue-usage data · Michael review → landing | as scheduled | open |
 
 ## Phase 1 verification record (2026-08-30, live app over CDP :9223)
