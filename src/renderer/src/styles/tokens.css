@@ -48,6 +48,16 @@
   --ink-40: oklch(53.5% 0.007 264);    /* faint meta, section eyebrows */
   --ink-30: oklch(78% 0.006 264);      /* hairlines, dim — decorative only, not used for text */
   --ink-10: oklch(94% 0.004 264);      /* surface tone */
+  /* DEC-096 (GAP-020) — the in-between steps ~68 call sites had been
+     referencing for months while the sheet never defined them, so every one
+     silently inherited its parent's colour. Each is the midpoint of its
+     neighbours, per theme. ink-35/ink-25 inherit ink-30's caveat: dim,
+     decorative-leaning — not for body text. */
+  --ink-80: oklch(37% 0.010 264);      /* between secondary and tertiary */
+  --ink-55: oklch(53.3% 0.009 264);
+  --ink-45: oklch(53% 0.008 264);
+  --ink-35: oklch(65.8% 0.007 264);
+  --ink-25: oklch(86% 0.005 264);
 
   /* ── Brand group ink — PLX-A11Y-001 ───────────────────────────────────────
      The PlexiSuite home (PlexiSuiteHome.tsx) sets each product-group heading's
@@ -203,6 +213,12 @@
   --ink-40: oklch(61.5% 0.011 264);
   --ink-30: oklch(38% 0.012 264);
   --ink-10: oklch(22% 0.015 264);
+  /* DEC-096 (GAP-020) — see :root. Midpoints of the dark scale. */
+  --ink-80: oklch(79% 0.007 264);
+  --ink-55: oklch(63.3% 0.010 264);
+  --ink-45: oklch(62% 0.010 264);
+  --ink-35: oklch(50% 0.011 264);
+  --ink-25: oklch(30% 0.013 264);
 
   /* PLX-A11Y-001: dark-surface variants of the brand group ink — the vivid
      accents already clear 4.5:1 against the dark surface for 5 of 7 groups,
@@ -289,6 +305,13 @@
   --ink-40: oklch(60.1% 0.019 80);
   --ink-30: oklch(36% 0.020 80);
   --ink-10: oklch(22% 0.024 250);
+  /* DEC-096 (GAP-020) — see :root. Midpoints of the Atelier scale (warm
+     hue 80 throughout; ink-10's 250 is the navy surface-tone special). */
+  --ink-80: oklch(77.5% 0.015 80);
+  --ink-55: oklch(61.6% 0.018 80);
+  --ink-45: oklch(60.7% 0.018 80);
+  --ink-35: oklch(48% 0.020 80);
+  --ink-25: oklch(29% 0.022 80);
 
   /* PLX-A11Y-001: same brand group ink treatment as .dark, re-checked against
      Atelier's own (slightly lighter, warmer) surface-base. */

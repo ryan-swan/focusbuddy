@@ -2519,3 +2519,28 @@ component were REVERTED to keep that diff whole. `accentColorLock` now
 freezes the offender set — it may shrink, a new one fails the build.
 
 11 new pins; 3,460 green; both typechecks clean.
+
+## DEC-096 — GAP-020 swept: the ink scale is whole
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Closes:** GAP-020
+
+Define, don't rewrite: the ~60 sites referencing `--ink-80/55/45/35/25`
+all WANTED an in-between step — the authors were writing against a scale
+they assumed existed. So the five steps now exist, in all three themes
+(:root, .dark, .atelier), each the midpoint of its neighbours on that
+theme's own scale. The visible change is the intended one: text that had
+been silently inheriting its parent's colour (usually full ink-100) now
+renders at the weight its author chose — including DEC-094's own prompt
+echo, which had been quietly using undefined `--ink-55`. ink-35/ink-25
+inherit ink-30's documented caveat (decorative-leaning, not body text).
+
+The `--ink-300` sites (8, across ExternalMdEditorView and AgenticOpsView)
+were Tailwind gray-300 muscle memory meaning "muted secondary" — rewritten
+to `--ink-60`, the house token for exactly that.
+
+The lock (accentColorLock.test.ts) is strict again: any undefined ink step
+anywhere fails the build, and a second clause requires every theme block to
+carry the full 13-step scale — a NEW theme cannot ship a partial one.
+
+Verified live across all three themes by computed-style probe: every step
+resolves; `var(--ink-80)` paints 79% in dark (its own step) where it used
+to paint 96% (inherited ink-100). 3,461 green; both typechecks clean.

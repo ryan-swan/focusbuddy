@@ -274,8 +274,11 @@ value. Then a repo-wide lock (accentColorLock's pattern) closes the class.
 DEC-089's lock already forbids the pattern in `headerAccent` specifically.
 
 ## GAP-020 — Six `--ink-*` steps are referenced but never defined
-**Found:** 2026-08-31 (DEC-095's analytics restyle) · **Status:** OPEN —
-locked against growth, cleanup is its own round.
+**Found:** 2026-08-31 (DEC-095's analytics restyle) · **Status:** CLOSED
+(DEC-096) — the five real steps are DEFINED in all three themes as midpoints
+of their neighbours; the `--ink-300` typo (8 sites, gray-300 muscle memory)
+rewrote to `--ink-60`; the lock is strict (any undefined step fails the
+build, and every theme block must carry the full 13-step scale).
 
 `var(--ink-80)` and friends are not in tokens.css. An undefined custom
 property makes the whole declaration invalid, so the element **silently
