@@ -1623,6 +1623,11 @@ const api = {
     // True once entries are embedded (an embedding key is set and indexed).
     semanticActive: (): Promise<boolean> => ipcRenderer.invoke('knowledge:semanticActive')
   },
+  /** M6 — arm one picker-free display-media grant (screen + loopback audio)
+   *  for guest capture. One-shot: it disarms the moment a request fires. */
+  guestCapture: {
+    arm: (): Promise<boolean> => ipcRenderer.invoke('guestCapture:arm')
+  },
   // PlexiMeet — meetings with transcript, summary and action items.
   meetings: {
     list: (): Promise<Meeting[]> => ipcRenderer.invoke('meetings:list'),

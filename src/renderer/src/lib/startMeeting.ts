@@ -116,6 +116,20 @@ export async function joinMeetingRoom(
   await useMeetingRoomStore.getState().join(roomId, title || 'Meeting')
 }
 
+// M6 — guest capture records an EXTERNAL meeting (Zoom/Meet/Teams); there is
+// no room to join, but the wrap-up still stamps series identity from the
+// origin, so an external series meeting gets prep and "carried from last
+// time" exactly like a native one.
+export function markCalendarOrigin(meta: {
+  title: string
+  blockId?: string
+  seriesId?: string | null
+  agenda?: string | null
+  invitees?: string[]
+}): void {
+  currentOrigin = { kind: 'calendar', ...meta }
+}
+
 // A fresh room id for a scheduled meeting, matching the live-room format so the
 // same id is valid whether the room is opened now or later.
 export function newMeetingRoomId(): string {

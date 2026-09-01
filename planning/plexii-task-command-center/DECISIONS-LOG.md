@@ -2951,3 +2951,62 @@ calls) — it rides the operator's two-machine QA.
 3,582 green across 329 files; both typechecks clean. **M5 is complete** —
 M6 (Guest Capture) starts with the G1 ScreenCaptureKit spike, on the
 operator's go.
+
+## DEC-105 — M6: Guest Capture — SPEC-003 lands complete
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+P6, CR-12 · G1) · **Branch:** ryan-next
+
+**G1 answered YES, with numbers.** The spike everything was gated on:
+an armed display-media grant (primary screen + `audio: 'loopback'`,
+ScreenCaptureKit under Electron 37) returned a track literally labelled
+"System audio" — RMS 0.000 in silence, 0.369 while the Mac spoke through
+its own output. Real loopback, proven through the PRODUCTION handler, no
+virtual driver, no picker. The arming is one-shot over IPC: screen SHARE
+keeps the native system picker; exactly one armed request bypasses it and
+the handler re-registers the picker path the moment it fires.
+
+**Reduced mode, exactly per CR-12.** Guest Capture records an EXTERNAL
+meeting (Zoom/Meet/Teams) with no roster handshake — guests are not
+Plexii users; the person responsible is the one who presses record, and
+the disclosure bar on their screen is NON-DISMISSIBLE: two verbs (⚑
+moment, Stop), an elapsed clock, and a mode line that names exactly what
+is heard. Attribution is by construction, never by guess: mic = "You",
+system audio = "Them" — and guests NEVER enter the extractor roster
+(wrap-up filter), so nothing is owner-attributed to or sent toward
+someone who never consented into the system. A guest's spoken commitment
+still surfaces — ownerless, behind its "[m:ss] Them: …" anchor.
+**Mic-only is the honest floor**, named in the bar as ruled: "Plexii can
+hear you, not them." The vehicle video track is stopped the instant the
+stream arrives — nothing visual is ever recorded.
+
+**Everything rides the existing foundations.** MeetingTrackRecorder
+(shared clock, per-track takes), CR-11 local-only transcription, the same
+wrap-up (Record, commitments confirm stop, To Know brief, retention), and
+series identity stamped from the calendar origin — an external weekly
+booked with a joinUrl gets prep and "carried from last time" exactly like
+a native meeting. Doors: a Record button on external-joinUrl calendar
+blocks (explicitly separate from Join — recording is its own act, never a
+side effect of opening a link) and "Record external" in the Meet view.
+
+**The live round caught an M2-era latent bug worth the whole exercise:**
+the ai:transcribeAudio IPC handler DROPPED forceProvider — the renderer
+forced 'local' (CR-11), the bridge never passed it, and the cloud
+PREFERENCE answered instead. On this machine (preference: cloud) every
+real per-track meeting wrap-up would have errored — failing CLOSED only
+because meeting callers send samples without bytes, so nothing could ever
+have leaked to the cloud; it just failed. Fixed at the seam and pinned.
+The re-run then proved the whole pipeline: door → bar (mode 'both') →
+real speech through loopback → ⚑ → Stop → on-device wrap-up → a meeting
+record with attributed segments — "You" from the mic (which heard the
+room acoustically) and "Them" from loopback (which heard it electrically),
+the same sentence transcribed twice by two different physical paths.
+Scratch data cleaned (item dismissed per R008, meeting deleted).
+
+12 new tests (m6GuestCapture: mode behaviours + contract pins incl. the
+CR-11 seam); 3,593 green across 330 files; both typechecks clean.
+
+**SPEC-003 is COMPLETE: M1–M6 all landed** (DEC-098…105). Still owed,
+named: two-machine consent QA (live pane, Stage PREP, real-room guest
+coexistence); PlexiCam 1:1 calls consent round; C5 Record widget +
+per-item moment anchors; Recall-over-MCP round; briefs for other
+attendees (out-of-room delivery).

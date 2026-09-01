@@ -287,7 +287,12 @@ async function runWrapup(
     const roster = [
       ...new Map(
         savedSegments
-          .filter((s) => s.speakerAccountId)
+          // M6 (CR-12) — the guest capture's system-audio track ('guests',
+          // labelled Them) is speech, not a person: guests are NEVER owners,
+          // so they never enter the roster the extractor may assign from. A
+          // guest's spoken commitment still surfaces — ownerless, with its
+          // "[m:ss] Them: …" anchor showing exactly who said it.
+          .filter((s) => s.speakerAccountId && s.speakerAccountId !== 'guests')
           .map((s) => [s.speakerAccountId as string, { accountId: s.speakerAccountId as string, name: s.speakerName }])
       ).values(),
       ...(selfId ? [{ accountId: selfId, name: speakers?.[selfId] || speakers?.me || 'You' }] : [])

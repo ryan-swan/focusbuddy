@@ -2336,6 +2336,7 @@ export function registerIpcHandlers(): void {
         mimeType?: string
         samples?: ArrayBuffer | Float32Array
         sampleRate?: number
+        forceProvider?: 'cloud' | 'local'
       }
     ) => {
       // Float32Array travels via structured-clone over IPC and tends to
@@ -2351,7 +2352,15 @@ export function registerIpcHandlers(): void {
         bytes: input.buffer ? new Uint8Array(input.buffer) : undefined,
         mimeType: input.mimeType,
         samples,
-        sampleRate: input.sampleRate
+        sampleRate: input.sampleRate,
+        // M6 live round caught this seam dropping forceProvider on the
+        // floor: the renderer forced 'local' (CR-11), this handler didn't
+        // pass it, and the cloud PREFERENCE answered instead — failing
+        // closed only because meeting callers send samples without bytes.
+        forceProvider:
+          input.forceProvider === 'local' || input.forceProvider === 'cloud'
+            ? input.forceProvider
+            : undefined
       })
     }
   )

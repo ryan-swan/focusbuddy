@@ -232,6 +232,14 @@ widget on the meeting desk) rides with M3's sourceUrl anchors.
   merge only.
 
 ### M6 — Guest Capture  *(spec P6, CR-12 · G1)*
+
+> **STATUS 2026-09-01: DONE — DEC-105. M6 COMPLETE — and with it SPEC-003
+> (M1–M6, DEC-098…105).** G1 answered YES: ScreenCaptureKit loopback proven
+> live (RMS 0.369 speaking / 0.000 silent) through a one-shot armed grant
+> that leaves screen share's system picker untouched. CR-12 reduced mode
+> built exactly: non-dismissible bar, You/Them by construction, guests
+> never owners, mic-only floor named. The round also caught and fixed an
+> M2-era seam: the transcribe IPC bridge dropped forceProvider (CR-11).
 - Starts with the ScreenCaptureKit spike (G1). Mic-only is the floor and
   says so. Reduced mode exactly per CR-12: no roster handshake, the
   non-dismissible disclosure line, `Speaker 1/2` labels, no outbound-ask

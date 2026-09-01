@@ -30,13 +30,22 @@
 > the calendar origin, prep as pure database facts in the Stage's PREP
 > pane, "Carried from last time" atop the wrap-up AND the Record (with
 > a Done verb — house state 'completed', a live-caught fix), and Q14's
-> per-series brief knob. Suite: 3,582 tests / 329 files. Next: M6 —
-> Guest Capture, which STARTS with the G1 ScreenCaptureKit spike
-> (mic-only is the honest floor: "Plexii can hear you, not them").
-> Owed: two-machine consent QA (speak→live-pane loop + Stage PREP pane
-> in a real room); the PlexiCam calls consent follow-up; per-item
-> moment anchors + the Record widget (C5 sliver); Recall-over-MCP
-> round; briefs for other attendees (needs out-of-room delivery).
+> per-series brief knob. **M6 is COMPLETE (DEC-105) — and with it ALL
+> of SPEC-003 (M1–M6, DEC-098…105)**: G1 proved ScreenCaptureKit
+> loopback live (a one-shot armed grant; screen share keeps its native
+> picker), and Guest Capture shipped in CR-12 reduced mode —
+> non-dismissible disclosure bar, You/Them attribution by construction,
+> guests never in the extractor roster, mic-only as the named floor —
+> riding the existing recorder/wrap-up/series foundations. The round
+> also caught + fixed an M2-era seam: the transcribe IPC bridge dropped
+> forceProvider (CR-11 forced-local never reached main; failed closed).
+> Suite: 3,593 tests / 330 files.
+> Next: operator's pick — the named follow-up rounds: two-machine
+> consent QA (live pane, Stage PREP, guest capture in a real call);
+> PlexiCam 1:1 calls consent; C5 Record widget + per-item moment
+> anchors; Recall-over-MCP; briefs for other attendees (out-of-room
+> delivery); or back to analysis/27 Phase 4 (AI-suggested tags, home
+> widgets) / Phase 5 process items.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored

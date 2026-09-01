@@ -13,6 +13,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { CarriedItem, Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
+import { useGuestCaptureStore } from '../../stores/guestCapture'
 import { fmtOffset } from '../../lib/transcriptMerge'
 import { validateRecordSpans } from '../../lib/recordSpans'
 import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
@@ -374,6 +375,16 @@ export default function PlexiMeetView(): JSX.Element {
                 <Icon name="mic" size={15} /> Record notes
               </button>
             )}
+            <button
+              onClick={() =>
+                void useGuestCaptureStore.getState().start({ title: 'External meeting' })
+              }
+              data-testid="meet-record-external"
+              className="fb-btn-surface flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[var(--ink-90)] text-[12px] hover:bg-[var(--surface-sunken)]"
+              title="Record a meeting happening outside Plexii (Zoom, Meet, Teams) — your mic + this machine's audio, transcribed locally"
+            >
+              <Icon name="radio_button_checked" size={15} /> Record external
+            </button>
             <button
               onClick={() => setShowMsg((v) => !v)}
               data-testid="meet-message"

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, Menu, MenuItem, protocol, session, shell, net } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, MenuItem, protocol, session, shell, net } from 'electron'
 import { join, resolve as resolvePath, sep } from 'path'
 import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
@@ -169,22 +169,51 @@ function applyPermissionPolicy(ses: Electron.Session): void {
 // system picker exists we fall back to the primary screen so the feature still
 // works rather than throwing. Screen recording itself is still gated by the OS
 // permission prompt, which is the honest place for that consent to live.
+// M6 (SPEC-003 P6, G1) — guest capture arms ONE display-media grant that
+// bypasses the system picker: primary screen + system-audio loopback
+// (ScreenCaptureKit under Electron ≥31). Armed per-request over IPC and
+// disarmed the moment it fires, so screen SHARE keeps the native picker and
+// nothing else can ride the no-picker path. The video track is a vehicle —
+// the renderer stops it immediately; only the loopback audio is kept. On a
+// platform where loopback is unsupported the stream simply arrives with no
+// audio track, and the renderer degrades to mic-only ("Plexii can hear you,
+// not them") rather than pretending.
+let guestCaptureArmed = false
+let displayMediaSession: Electron.Session | null = null
+
+ipcMain.handle('guestCapture:arm', () => {
+  guestCaptureArmed = true
+  if (displayMediaSession) applyDisplayMediaHandler(displayMediaSession)
+  return true
+})
+
 function applyDisplayMediaHandler(ses: Electron.Session): void {
+  displayMediaSession = ses
   ses.setDisplayMediaRequestHandler(
     (_request, callback) => {
+      const forGuestCapture = guestCaptureArmed
+      guestCaptureArmed = false
       desktopCapturer
         .getSources({ types: ['screen', 'window'] })
         .then((sources) => {
-          // Only reached on platforms without a system picker. Default to the
-          // whole primary screen, which is what "share my screen" means; the
-          // user can still stop from the in-app control or the OS overlay.
+          // Guest capture — or platforms without a system picker: default to
+          // the whole primary screen. For a share that is what "share my
+          // screen" means; for guest capture the screen is only the loopback
+          // vehicle. The user can stop from the in-app control either way.
           const primary = sources.find((s) => s.id.startsWith('screen:')) ?? sources[0]
-          if (primary) callback({ video: primary })
+          if (primary) callback(forGuestCapture ? { video: primary, audio: 'loopback' } : { video: primary })
           else callback({})
+          // Restore the picker path once an armed grant has fired.
+          if (forGuestCapture) applyDisplayMediaHandler(ses)
         })
-        .catch(() => callback({}))
+        .catch(() => {
+          callback({})
+          if (forGuestCapture) applyDisplayMediaHandler(ses)
+        })
     },
-    { useSystemPicker: true }
+    // An armed request must reach the handler, so the system picker steps
+    // aside for exactly that one grant.
+    { useSystemPicker: !guestCaptureArmed }
   )
 }
 

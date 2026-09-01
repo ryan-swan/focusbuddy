@@ -22,6 +22,7 @@ import {
 import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { joinMeetingRoom } from '../../lib/startMeeting'
+import { useGuestCaptureStore } from '../../stores/guestCapture'
 import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
@@ -881,6 +882,30 @@ export default function WeekTimeGrid({
                             data-testid="block-join-meeting"
                           >
                             <Icon name="videocam" size={9} />
+                          </button>
+                        )}
+                        {/* M6 — an EXTERNAL meeting (Zoom/Meet/Teams) can be
+                            recorded on this machine: mic + system audio,
+                            local transcription, the same wrap-up. Explicitly
+                            separate from Join — recording is its own act,
+                            never a side effect of opening a link. */}
+                        {block.meeting?.joinUrl && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void useGuestCaptureStore.getState().start({
+                                title: block.title || 'Meeting',
+                                blockId: block.id,
+                                seriesId: block.seriesId ?? null,
+                                agenda: block.meeting?.agenda ?? null
+                              })
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-rose-500/90 !text-white fb-press"
+                            title="Record this external meeting — your mic + this machine's audio, transcribed locally"
+                            data-testid="block-record-external"
+                          >
+                            <Icon name="radio_button_checked" size={9} />
                           </button>
                         )}
                         {block.meeting && (
