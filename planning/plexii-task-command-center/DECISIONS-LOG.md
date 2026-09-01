@@ -3104,3 +3104,49 @@ R008, meeting deleted with segments, desk trashed).
 across 332 files; both typechecks clean. **C5 is fully closed.**
 Remaining named rounds: Recall-over-MCP; briefs for other attendees;
 two-machine QA (operator-owed); analysis/27 Phase 4/5.
+
+## DEC-108 — Recall over MCP — G3 closed
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** named follow-up
+(G3, deferred at DEC-103: "a transport + auth design, not a route on
+anything existing") · **Branch:** ryan-next
+
+**G3's cost collapsed on contact with the codebase.** The deferral read
+"no MCP server surface exists" — true — but PlexiAPI already existed:
+127.0.0.1-only, scoped bearer tokens, Origin rejection, a DNS-rebind host
+guard, enabled only by the user. Transport and auth were SOLVED problems;
+only the protocol layer was new. So Recall-over-MCP is POST /mcp on that
+server, behind every guard PlexiAPI already enforces — asking for the
+READ scope explicitly, since MCP speaks POST for reads and the server's
+method-based write gate would have demanded the wrong thing.
+
+**The protocol layer is hand-rolled and dependency-free** (mcpRecall.ts):
+JSON-RPC 2.0 — initialize with honest version negotiation (a known offer
+is echoed; an unknown one gets our default, not a lie), ping, tools/list,
+tools/call, notifications answered 202 with no body, batches tolerated
+for older clients. Stateless by design; plain JSON replies, which the
+Streamable HTTP spec permits. The full SDK would have been a dependency
+for three read-only tools.
+
+**Three tools, every answer attributed:** recall_search (segment FTS —
+"[0:15] Dana: … — in 'Weekly sync' (meetingId: …)"; an empty result says
+"an honest zero, not a failure"), recall_meeting (title, date, summary,
+action items, the attributed transcript — truncation announced, never
+silent), recall_recent_meetings. **The refusals, stated where enforced:**
+READ-ONLY forever — no tool on this surface writes, files, or sends; no
+audio — bytes never leave the machine (CR-11/CR-13), MCP gets text;
+loopback only, token required — both inherited from PlexiAPI, both real.
+The PlexiAPI view documents the endpoint and teaches the client config
+(`claude mcp add --transport http plexii-recall …`).
+
+**Verified live over real HTTP against the running app:** 401 without a
+token; 403 with a forged Origin header; initialize echoed 2025-06-18 and
+named the server at the real app version; the initialized notification
+got its 202; tools/list returned the three; recall_search answered with
+Dana's attributed line and its meeting identity; recall_meeting rendered
+the full record. Scratch meeting deleted, probe token revoked, server
+disabled back to its prior state — the port answers nothing again.
+
+13 new tests (mcpRecall: the JSON-RPC contract on fakes + wiring pins);
+3,624 green across 333 files; both typechecks clean. **G3 is closed.**
+Remaining named rounds: briefs for other attendees (out-of-room
+delivery); two-machine QA (operator-owed); analysis/27 Phase 4/5.

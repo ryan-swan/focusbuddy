@@ -53,11 +53,16 @@
 > <id>?seg=<segId> stamped on anchored commitments; the Attention chip
 > parses before it opens (moments inside, DEC-091 web marks still
 > external). Suite: 3,611 tests / 332 files.
+> **Recall-over-MCP is closed (DEC-108)**: POST /mcp on the existing
+> PlexiAPI server (its auth, loopback, Origin + rebind guards all
+> inherited), a hand-rolled dependency-free JSON-RPC layer, three
+> READ-ONLY attributed tools (search / meeting / recent), refusals
+> stated where enforced; proven live over real HTTP end-to-end. Suite:
+> 3,624 tests / 333 files.
 > Next: operator's pick — two-machine QA (meetings consent, live pane,
-> Stage PREP, guest capture, calls consent round-trip); Recall-over-MCP;
-> briefs for other attendees (out-of-room delivery); or back to
-> analysis/27 Phase 4 (AI-suggested tags, home widgets) / Phase 5
-> process items.
+> Stage PREP, guest capture, calls consent round-trip); briefs for
+> other attendees (out-of-room delivery); or back to analysis/27
+> Phase 4 (AI-suggested tags, home widgets) / Phase 5 process items.
 
 **Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
