@@ -72,7 +72,9 @@ describe('calls consent — the hole is closed', () => {
   })
 
   it('the preference copy tells the new truth', () => {
-    expect(meetView).toContain('Transcribe &amp; summarise my 1:1 calls (the other person is asked)')
+    // History: DEC-114 tightened the copy, the canon test (Part IV — state
+    // the AI's role plainly) rewrote it again to a full sentence.
+    expect(meetView).toContain('Transcribe &amp; summarise my 1:1 calls. The other person is always asked first.')
     expect(meetView).toContain('declining keeps them out entirely')
   })
 

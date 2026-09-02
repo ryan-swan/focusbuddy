@@ -88,6 +88,8 @@ describe('M2c — the whisper preference tells the truth now', () => {
     const ui = read('renderer/src/components/views/PlexiMeetView.tsx')
     expect(ui).toContain('Transcribe &amp; summarise my 1:1 calls')
     expect(ui).toContain('Meetings never auto-record')
-    expect(ui).toContain('data-testid="meet-retention-select"')
+    // History: the canon test (Part III + Part VII — no native selects)
+    // replaced the retention <select> with a labelled pill + option chips.
+    expect(ui).toContain('data-testid="meet-retention-pill"')
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
+import { AnimatePresence, motion } from 'framer-motion'
 import { whisperEnabled, setWhisperEnabled } from '../../lib/whisperPref'
 import ModuleDashboard from '../ModuleDashboard'
 import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
@@ -36,6 +37,15 @@ function proposalLabels(p: ActionProposal): string[] {
   return []
 }
 
+// Canon Part IV — name the value, not the mechanism; tabular where numeric.
+const RETENTION_LABEL: Record<'0' | '7' | '30' | '90' | 'keep', string> = {
+  '0': 'Discarded at wrap-up',
+  '7': '7 days',
+  '30': '30 days',
+  '90': '90 days',
+  keep: 'Kept forever'
+}
+
 function fmtDate(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
@@ -62,6 +72,8 @@ export default function PlexiMeetView(): JSX.Element {
   const [recording, setRecording] = useState(false)
   const [whisper, setWhisper] = useState(whisperEnabled())
   const [retention, setRetention] = useState<'0' | '7' | '30' | '90' | 'keep'>('30')
+  // Canon Part III — the retention pill opens ONE drawer of option chips.
+  const [retentionOpen, setRetentionOpen] = useState(false)
   useEffect(() => {
     void window.api.meetings.getAudioRetention().then(setRetention).catch(() => {})
   }, [])
@@ -290,11 +302,13 @@ export default function PlexiMeetView(): JSX.Element {
 
   return (
     // House material (the operator's "still feels vibe-coded" round): the
-    // detail side sits on the desk paper (the dotted house texture every
-    // canvas view wears), the rail is a raised panel over it, and every
-    // control below speaks the shared recipes — fb-card, fb-btn-surface,
-    // eyebrow labels, the kpi-gloss primary. Presentation ONLY: every
-    // testid, handler and copy string is exactly where it was.
+    // DESIGN-CANON TEST (operator, 2026-09-02): PlexiMeet redesigned against
+    // the draft Plexii Design Canon — accent-as-commit (Part III), labelled
+    // pills + option-chip drawers (Part III), the white-thumb segmented
+    // control (Part II signature element), filled fields, micro-labels
+    // (Law 6), tabular numerics (Part II), and the copy laws (Part IV). Not
+    // adopted as canon — an experiment to see whether the principles
+    // translate. Every handler and testid preserved.
     <div className="h-full w-full flex desk-paper no-tod text-[var(--ink-100)]" data-testid="pleximeet-view">
       {/* List */}
       <div className="w-[330px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col bg-[color-mix(in_oklab,var(--surface-raised)_88%,transparent)] backdrop-blur-[2px]">
@@ -315,7 +329,7 @@ export default function PlexiMeetView(): JSX.Element {
           <button
             onClick={openNew}
             data-testid="meet-start-live"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-[var(--radius-field)] text-white text-[12.5px] font-semibold fb-press bg-gradient-to-b from-rose-500 to-rose-600 shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.12)] hover:from-rose-400 hover:to-rose-600"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-[11px] text-white text-[13px] font-semibold fb-press bg-gradient-to-b from-[rgb(var(--accent))] to-[rgb(var(--accent-hover))] shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_1px_2px_rgb(0_0_0/0.12)] hover:brightness-[1.06]"
           >
             <Icon name="video_call" size={17} /> Start or schedule a meeting
           </button>
@@ -325,10 +339,11 @@ export default function PlexiMeetView(): JSX.Element {
               expresses MY side: on a call it records my mic and ASKS the
               other person — their voice is captured when they say yes, and
               a decline is honoured by construction (never tapped). */}
-          <div className="fb-card px-2.5 py-2 space-y-1.5">
-          <div className="text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">RECORDING</div>
+          <div className="fb-card px-2.5 py-2.5 space-y-2.5">
+          {/* Law 6 — name the dimension. */}
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.075em] text-[var(--ink-40)]">Recording preferences</div>
           <label
-            className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
+            className="flex items-start gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer leading-snug"
             title="Applies to 1:1 calls: your mic is recorded and the other person is asked before their voice is captured — declining keeps them out entirely. Meetings never auto-record."
           >
             <input
@@ -339,36 +354,62 @@ export default function PlexiMeetView(): JSX.Element {
                 setWhisperEnabled(e.target.checked)
               }}
               data-testid="meet-whisper-toggle"
-              className="accent-[rgb(var(--accent))]"
+              className="accent-[rgb(var(--accent))] mt-0.5 shrink-0"
             />
-            <span>Transcribe &amp; summarise my 1:1 calls (the other person is asked)</span>
+            {/* Part IV — the AI's role stated plainly, where it acts. */}
+            <span>Transcribe &amp; summarise my 1:1 calls. The other person is always asked first.</span>
           </label>
 
-          {/* M2c (CR-13) — audio retention. Local disk only, never uploaded. */}
-          <label className="flex items-center justify-between gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)]">
-            <span
-              className="whitespace-nowrap"
-              title="Meeting audio stays on this machine and expires after this window. 'Keep' on a meeting overrides it."
+          {/* M2c (CR-13) — audio retention. Canon Part III: a labelled pill
+              that opens ONE drawer of option chips, with a one-line question.
+              Native <select> retired (Part VII favours the app's own chrome). */}
+          <div className="px-0.5">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.075em] text-[var(--ink-40)] mb-1">Audio kept on this machine</div>
+            <button
+              type="button"
+              onClick={() => setRetentionOpen((v) => !v)}
+              aria-expanded={retentionOpen}
+              data-testid="meet-retention-pill"
+              className="w-full h-9 px-2.5 rounded-[var(--radius-field)] bg-[var(--surface-raised)] border border-[var(--edge-strong)] inline-flex items-center justify-between gap-1.5 text-[12.5px] text-[var(--ink-100)] fb-press hover:border-[rgb(var(--accent))]"
             >
-              Keep meeting audio
-            </span>
-            <select
-              value={retention}
-              onChange={(e) => {
-                const v = e.target.value as '0' | '7' | '30' | '90' | 'keep'
-                setRetention(v)
-                void window.api.meetings.setAudioRetention(v)
-              }}
-              data-testid="meet-retention-select"
-              className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[11.5px] max-w-[150px] truncate"
-            >
-              <option value="0">never (discard at wrap-up)</option>
-              <option value="7">7 days</option>
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="keep">forever</option>
-            </select>
-          </label>
+              <span className="fb-tabular">{RETENTION_LABEL[retention]}</span>
+              <Icon name="expand_more" size={16} className={`text-[var(--ink-40)] transition-transform ${retentionOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence initial={false}>
+              {retentionOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.3, 0.9, 0.3, 1] }}
+                  className="overflow-hidden"
+                  data-testid="meet-retention-drawer"
+                >
+                  <p className="mt-1.5 mb-1 text-[11.5px] text-[var(--ink-50)] leading-snug">How long should a meeting keep its audio here? It never leaves this machine.</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(['0', '7', '30', '90', 'keep'] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => {
+                          setRetention(v)
+                          void window.api.meetings.setAudioRetention(v)
+                          setTimeout(() => setRetentionOpen(false), 150)
+                        }}
+                        data-testid={`meet-retention-opt-${v}`}
+                        className={`h-7 px-2.5 rounded-full text-[11.5px] fb-press border transition-colors ${
+                          retention === v
+                            ? 'bg-[rgb(var(--accent))] text-white border-transparent'
+                            : 'bg-transparent text-[var(--ink-70)] border-[var(--edge-strong)] hover:border-[rgb(var(--accent))]'
+                        }`}
+                      >
+                        {RETENTION_LABEL[v]}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           </div>
 
           {/* Secondary: recording is one option, not the whole feature. */}
@@ -815,6 +856,22 @@ function MeetingDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSegmentId, segments])
 
+  // Canon Law 12 — number keys select the rendering directly (1/2/3), but
+  // never while a text field is focused (they'd type into notes/summary).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const el = document.activeElement
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement | null)?.isContentEditable) return
+      if (e.key === '1') setView('commitments')
+      else if (e.key === '2') setView('brief')
+      else if (e.key === '3') setView('thread')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const jumpToSegment = (segmentId: string): void => {
     setView('thread')
     setTimeout(() => {
@@ -900,7 +957,7 @@ function MeetingDetail({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== meeting.title && onChange({ title })}
-          className="flex-1 bg-transparent fb-display text-[17px] font-bold text-[var(--ink-100)] outline-none"
+          className="flex-1 bg-transparent fb-display text-[20px] font-semibold tracking-[-0.018em] text-[var(--ink-100)] outline-none"
           data-testid="meet-title"
         />
         {meeting.deskNodeId && (
@@ -939,7 +996,10 @@ function MeetingDetail({
         </button>
       </div>
 
-      {/* M2b — the segmented control: three renderings, one Record. */}
+      {/* Canon Part II/III — the segmented control: a --field track with a
+          single WHITE RAISED THUMB (the one signature raised element on the
+          screen), sliding by layoutId (Part V). Three renderings of one
+          Record; number keys 1/2/3 select directly (Law 12). */}
       <div className="px-5 pt-3" data-testid="record-views">
         <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
           {(
@@ -953,14 +1013,17 @@ function MeetingDetail({
               key={v}
               onClick={() => setView(v)}
               data-testid={`record-view-${v}`}
-              className={`h-7 px-3 rounded-full text-[12.5px] font-medium fb-press transition-colors inline-flex items-center gap-1.5 ${
-                view === v
-                  ? 'bg-[rgb(var(--accent))] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]'
-                  : 'text-[var(--ink-60)] hover:text-[var(--ink-100)]'
-              }`}
+              className="relative h-7 px-3 rounded-full text-[12.5px] font-medium fb-press inline-flex items-center gap-1.5"
             >
-              {label}
-              <span className={`text-[10px] ${view === v ? 'text-white/60' : 'text-[var(--ink-30)]'}`}>{key}</span>
+              {view === v && (
+                <motion.span
+                  layoutId="record-view-thumb"
+                  transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                  className="absolute inset-0 rounded-full bg-[var(--surface-raised)] shadow-[0_1px_2px_rgb(0_0_0/0.14),inset_0_1px_0_rgb(255_255_255/0.6)]"
+                />
+              )}
+              <span className={`relative z-10 ${view === v ? 'text-[var(--ink-100)]' : 'text-[var(--ink-60)] hover:text-[var(--ink-100)]'}`}>{label}</span>
+              <span className={`relative z-10 fb-tabular text-[10px] ${view === v ? 'text-[var(--ink-40)]' : 'text-[var(--ink-30)]'}`}>{key}</span>
             </button>
           ))}
         </div>
@@ -976,16 +1039,22 @@ function MeetingDetail({
             />
           )}
           {segments.length > 0 && foundCommitments === null && (
-            <button
-              onClick={() => void findCommitments()}
-              disabled={extracting}
-              className="fb-btn-surface inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 text-[var(--ink-90)] disabled:opacity-50"
-              data-testid="find-commitments"
-              title="Extract commitments from the transcript — they go through the confirm stop, never silently into Attention"
-            >
-              <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-              {extracting ? 'Reading the transcript…' : 'Find commitments'}
-            </button>
+            <div className="space-y-2">
+              {/* Part IV — explain the AI's role once, plainly, where it acts;
+                  Law 4/14 — nothing files until you accept. */}
+              <p className="text-[12px] text-[var(--ink-50)] leading-snug">
+                Plexii can read this transcript for commitments. Nothing files until you confirm each one, and anything owned by someone else stays a reference, never an assignment.
+              </p>
+              <button
+                onClick={() => void findCommitments()}
+                disabled={extracting}
+                className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-[11px] text-white text-[12.5px] font-semibold fb-press bg-gradient-to-b from-[rgb(var(--accent))] to-[rgb(var(--accent-hover))] shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_1px_2px_rgb(0_0_0/0.12)] hover:brightness-[1.06] disabled:opacity-50"
+                data-testid="find-commitments"
+              >
+                <Icon name="auto_awesome" size={14} />
+                {extracting ? 'Reading the transcript…' : 'Find commitments'}
+              </button>
+            </div>
           )}
           {foundCommitments !== null &&
             (foundCommitments.length > 0 ? (
@@ -1239,22 +1308,26 @@ function MeetingDetail({
 
       <div className="px-5 py-4 space-y-5 border-t border-[var(--edge-soft)]">
         <section>
-          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Summary</h2>
+          {/* Law 6 — micro-label names the dimension. Part III — a filled
+              field (--field bg, no border, accent focus ring). */}
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.075em] text-[var(--ink-40)] mb-1.5">Summary</div>
           <textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             onBlur={() => summary !== meeting.summary && onChange({ summary })}
-            placeholder="The AI summary appears here after recording, or write your own notes."
-            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent)/0.40)]"
+            placeholder="The summary appears here after recording, or write your own."
+            className="w-full min-h-[80px] resize-y rounded-[12px] bg-[var(--surface-sunken)] border border-transparent focus:border-[rgb(var(--accent))] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] outline-none transition-colors"
           />
         </section>
 
         <section>
+          {/* Law 5 — a disclosure with a visible affordance (chevron rotates). */}
           <button
             onClick={() => setShowTranscript((v) => !v)}
-            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5"
+            aria-expanded={showTranscript}
+            className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-[0.075em] text-[var(--ink-40)] mb-1.5 fb-press"
           >
-            <Icon name={showTranscript ? 'expand_less' : 'expand_more'} size={14} /> Transcript
+            <Icon name="expand_more" size={14} className={`transition-transform ${showTranscript ? 'rotate-180' : ''}`} /> Transcript
           </button>
           {showTranscript && (
             <textarea
@@ -1262,7 +1335,7 @@ function MeetingDetail({
               onChange={(e) => setTranscript(e.target.value)}
               onBlur={() => transcript !== meeting.transcript && onChange({ transcript })}
               placeholder="The full transcript appears here after recording, or paste your own."
-              className="fb-card w-full min-h-[160px] resize-y px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)]"
+              className="w-full min-h-[160px] resize-y rounded-[12px] bg-[var(--surface-sunken)] border border-transparent focus:border-[rgb(var(--accent))] px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)] outline-none transition-colors"
             />
           )}
         </section>

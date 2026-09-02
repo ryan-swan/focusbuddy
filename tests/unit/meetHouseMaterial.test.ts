@@ -22,18 +22,25 @@ describe('PlexiMeet wears the house material', () => {
     expect(view).toContain('fb-display text-[15px] font-bold')
   })
 
-  it('the primary is glossy rose — gradient, inset highlight, house press', () => {
-    expect(view).toContain('bg-gradient-to-b from-rose-500 to-rose-600')
-    expect(view).toContain('shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.12)]')
+  it('the primary is a glossy accent commit (canon Part III — accent = commit)', () => {
+    // History: DEC-112 shipped a glossy ROSE primary; the design-canon test
+    // (Part III: the primary commit is accent) moved it to the app accent.
+    expect(view).toContain('bg-gradient-to-b from-[rgb(var(--accent))] to-[rgb(var(--accent-hover))]')
   })
 
   it('the recording preferences live in one eyebrowed card', () => {
-    expect(view).toContain('>RECORDING</div>')
+    // History: DEC-112 labelled it 'RECORDING'; the canon test (Law 6 — name
+    // the dimension in words) relabelled it 'Recording preferences'.
+    expect(view).toContain('>Recording preferences</div>')
   })
 
-  it('the record views are a sunken segmented track with a glossy active pill', () => {
+  it('the record views are a sunken segmented track with a WHITE raised thumb', () => {
+    // History: DEC-112 used an accent-filled active pill; the canon test
+    // (Part II — one signature raised element, the white thumb) slides a
+    // --surface-raised thumb by layoutId instead.
     expect(view).toContain('rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]')
-    expect(view).toContain('shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]')
+    expect(view).toContain("layoutId=\"record-view-thumb\"")
+    expect(view).toContain('absolute inset-0 rounded-full bg-[var(--surface-raised)]')
   })
 
   it('the detail header is a sticky raised bar over the paper', () => {
