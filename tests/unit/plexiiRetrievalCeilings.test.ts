@@ -43,7 +43,8 @@ vi.mock('../../src/main/db/nodes', () => ({
 }))
 vi.mock('../../src/main/db/tables', () => ({
   listTables: () => [],
-  listRows: () => []
+  listRows: () => [],
+  listAllRowsByTable: () => new Map()
 }))
 // The additive pools (meetings, decisions, calendar) are stubbed empty here: this
 // spec is about document ceilings, and an empty pool contributes nothing to the

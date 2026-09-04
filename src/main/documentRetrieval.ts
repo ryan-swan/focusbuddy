@@ -34,6 +34,49 @@ interface DocItem {
 // skipping archived docs (listDocuments already excludes them) and any that
 // extract to nothing so an empty doc never becomes a phantom source. AI-enriched
 // metadata is joined in one query so retrieval + grounding can use it.
+// The document corpus, cached against a signature of the documents themselves.
+//
+// loadDocItems() reads EVERY document body and extracts its text on every call,
+// and it is called on every assistant turn: 139 documents on a real workspace,
+// re-parsed before the model sees a word. The content is query-independent, so
+// it is built once and reused until a document actually changes.
+//
+// Keyed on a data signature rather than on bumpAnswerCacheVersion(), which
+// fires on document saves but says nothing about the enriched metadata joined
+// in here — and stale context is a worse failure than a slow answer.
+let docCache: { sig: string; items: DocItem[] } | null = null
+
+/** Test seam: drop the cache so a test can observe a rebuild. */
+export function _resetDocCache(): void {
+  docCache = null
+}
+
+/**
+ * Fingerprint the document set from the SAME api the corpus is built from.
+ *
+ * An earlier version fingerprinted the underlying SQL tables, which is unsound
+ * the moment the two disagree: a caller reading documents through a seam that
+ * is not that table gets a signature that never moves while the data does, and
+ * the cache then serves the first corpus it ever built. listDocuments() is a
+ * single indexed query, so this costs nothing next to the extraction it guards.
+ */
+function docSetSignature(): string {
+  let n = 0
+  let newest = 0
+  for (const m of listDocuments()) {
+    n++
+    const u = (m as { updatedAt?: number }).updatedAt ?? 0
+    if (u > newest) newest = u
+  }
+  return `${n}:${newest}`
+}
+
+function loadDocItemsCached(): DocItem[] {
+  const sig = docSetSignature()
+  if (!docCache || docCache.sig !== sig) docCache = { sig, items: loadDocItems() }
+  return docCache.items
+}
+
 function loadDocItems(): DocItem[] {
   const metaMap = listDocMetadata()
   const items: DocItem[] = []
@@ -143,7 +186,7 @@ export async function reindexDocuments(force = false): Promise<{ embedded: numbe
 // pure keyword, identical to the old rankSources behaviour.
 export async function semanticSearchDocuments(query: string, limit = 6): Promise<WorkspaceSource[]> {
   if (!query.trim()) return []
-  const items = loadDocItems()
+  const items = loadDocItemsCached()
   if (items.length === 0) return []
   const q = await embedQueryTagged(query)
   const vectors = q

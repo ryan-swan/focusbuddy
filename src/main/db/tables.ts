@@ -177,6 +177,29 @@ export function listRows(tableId: string): FbRow[] {
   return rows.map(rowToFbRow)
 }
 
+/**
+ * Every live row, grouped by table, in ONE query.
+ *
+ * listRows() per table is an N+1: a workspace with 127 tables paid 127 round
+ * trips every time the assistant assembled its context. Same ordering as
+ * listRows so callers see identical results.
+ */
+export function listAllRowsByTable(): Map<string, FbRow[]> {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      'SELECT * FROM fb_rows WHERE trashed_at IS NULL ORDER BY table_id ASC, sort_order ASC, created_at ASC'
+    )
+    .all() as RowRow[]
+  const out = new Map<string, FbRow[]>()
+  for (const r of rows) {
+    const list = out.get(r.table_id)
+    if (list) list.push(rowToFbRow(r))
+    else out.set(r.table_id, [rowToFbRow(r)])
+  }
+  return out
+}
+
 export function createRow(draft: FbRowDraft): FbRow {
   const db = getDb()
   // WS01 lifecycle: honour a client-provided id (create-if-missing by primary key).

@@ -6,12 +6,14 @@
 // with no term hits contributes nothing).
 
 import { listNodes } from "./db/nodes";
-import { listTables, listRows } from "./db/tables";
+import { listTables } from "./db/tables";
 import { listWidgetsByKind } from "./db/widgets";
 import { listMeetings } from "./db/meetings";
 import { listBlocksInRange } from "./db/timeBlocks";
 import { createDecisionStore } from "./db/decisionStore";
 import { getDb } from "./db/database";
+import { corpusSignature } from "./corpusSignature";
+import { listAllRowsByTable } from "./db/tables";
 import { getActiveOrgId } from "./db/activeOrg";
 import {
   rankSources,
@@ -27,6 +29,12 @@ type Candidate = {
   docType: string;
   text: string;
 };
+
+// A built corpus entry. `taskId` is the desk it belongs to, or null for the
+// things that belong to no desk (meetings, calendar blocks, documents) and are
+// therefore never demoted by scope. Membership of the org was already resolved
+// when the entry was built, so the per-query pass does no lookups.
+type Entry = { cand: Candidate; taskId: string | null };
 
 // A transcript can be very long; its head carries the framing and most of what a
 // question matches on, and rankSources selects the best passage from what it is given.
@@ -84,19 +92,29 @@ export function noteWidgetText(kind: string, content: string): string {
 // of the active org's nodes never enters the pool at all. (Before this check
 // an unscoped search read every org's tables and canvas notes — a leak, not a
 // demotion candidate.)
-export function collectExtraSources(
-  query: string,
-  limit = 6,
-  scopeNodeIds?: string[],
-): WorkspaceSource[] {
-  const scope =
-    scopeNodeIds && scopeNodeIds.length > 0 ? new Set(scopeNodeIds) : null;
+// The built corpus, cached against a signature of the data it was built from.
+// Rebuilding it per turn was the dominant cost of every assistant reply: on a
+// real workspace, ~170 nodes, 127 table queries, 880 widgets, every meeting
+// transcript and six weeks of calendar, reassembled before the model saw a
+// word — and repeated for turns as slight as "thanks".
+let corpusCache: { sig: string; entries: Entry[] } | null = null
+
+/** Test seam: drop the cache so a test can observe a rebuild. */
+export function _resetExtrasCache(): void {
+  corpusCache = null;
+}
+
+function buildCorpus(): Entry[] {
   const orgNodeIds = new Set<string>();
-  const inPool: Candidate[] = [];
-  const offPool: Candidate[] = [];
+  const entries: Entry[] = [];
+  // Scoped things: kept only if their desk is in this org, exactly as before.
   const add = (taskId: string | null | undefined, c: Candidate): void => {
     if (taskId == null || !orgNodeIds.has(taskId)) return;
-    (!scope || scope.has(taskId) ? inPool : offPool).push(c);
+    entries.push({ cand: c, taskId });
+  };
+  // Unscoped things: no desk, never demoted.
+  const addLoose = (c: Candidate): void => {
+    entries.push({ cand: c, taskId: null });
   };
 
   for (const n of listNodes()) {
@@ -110,11 +128,14 @@ export function collectExtraSources(
       docType: "task",
       text,
     };
-    (!scope || scope.has(n.id) ? inPool : offPool).push(cand);
+    // A task node is scoped by its OWN id; it is in orgNodeIds by now, so this
+    // is the same in/off decision the inline split used to make.
+    add(n.id, cand);
   }
 
+  const rowsByTable = listAllRowsByTable();
   for (const t of listTables()) {
-    const text = tableToText(t, listRows(t.id));
+    const text = tableToText(t, rowsByTable.get(t.id) ?? []);
     if (text)
       add(t.taskId, {
         docId: t.id,
@@ -161,7 +182,7 @@ export function collectExtraSources(
         .join("\n")
         .trim();
       if (text)
-        inPool.push({
+        addLoose({
           docId: m.id,
           title: m.title || "Untitled meeting",
           docType: "meeting",
@@ -181,7 +202,7 @@ export function collectExtraSources(
         .join("\n")
         .trim();
       if (text)
-        inPool.push({
+        addLoose({
           docId: d.id,
           title: d.title || "Decision",
           docType: "decision",
@@ -226,13 +247,48 @@ export function collectExtraSources(
       };
       // A block with no desk belongs to no scope; keep it in the near pool rather
       // than demoting it, the same treatment meetings and documents get.
-      if (b.taskId == null) inPool.push(cand);
+      if (b.taskId == null) addLoose(cand);
       else add(b.taskId, cand);
     }
   } catch {
     /* no calendar store in this context */
   }
 
+  return entries;
+}
+
+export function collectExtraSources(
+  query: string,
+  limit = 6,
+  scopeNodeIds?: string[],
+): WorkspaceSource[] {
+  // A null signature means the data cannot be fingerprinted here, so caching
+  // would be unsound — build fresh, exactly as before the cache existed.
+  // getActiveOrgId() reads the database too, so it is inside the guard: this
+  // whole step is an optimisation and must never be why a caller fails.
+  let sig: string | null = null;
+  try {
+    sig = corpusSignature(getActiveOrgId());
+  } catch {
+    sig = null;
+  }
+  let entries: Entry[];
+  if (sig === null) {
+    entries = buildCorpus();
+  } else {
+    if (!corpusCache || corpusCache.sig !== sig) {
+      corpusCache = { sig, entries: buildCorpus() };
+    }
+    entries = corpusCache.entries;
+  }
+  const scope =
+    scopeNodeIds && scopeNodeIds.length > 0 ? new Set(scopeNodeIds) : null;
+  const inPool: Candidate[] = [];
+  const offPool: Candidate[] = [];
+  for (const e of entries) {
+    if (e.taskId === null || !scope || scope.has(e.taskId)) inPool.push(e.cand);
+    else offPool.push(e.cand);
+  }
   return mergeScopedPools(
     rankSources(query, inPool, limit),
     rankSources(query, offPool, limit),

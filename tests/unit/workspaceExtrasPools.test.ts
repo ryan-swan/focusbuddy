@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Meetings, recorded decisions and the calendar existed in the database and were
 // reachable by NO retrieval path: asking "what did we decide" or "what am I
@@ -8,7 +8,11 @@ import { describe, it, expect, vi } from 'vitest'
 const NODES = [{ id: 'desk1', kind: 'task', title: 'Renewals', description: '' }]
 
 vi.mock('../../src/main/db/nodes', () => ({ listNodes: () => NODES }))
-vi.mock('../../src/main/db/tables', () => ({ listTables: () => [], listRows: () => [] }))
+vi.mock('../../src/main/db/tables', () => ({
+  listTables: () => [],
+  listRows: () => [],
+  listAllRowsByTable: () => new Map()
+}))
 vi.mock('../../src/main/db/widgets', () => ({ listWidgetsByKind: () => [] }))
 vi.mock('../../src/main/db/database', () => ({ getDb: () => ({}) }))
 vi.mock('../../src/main/db/activeOrg', () => ({ getActiveOrgId: () => 'personal' }))
@@ -42,7 +46,14 @@ vi.mock('../../src/main/db/decisionStore', () => ({
   })
 }))
 
-const { collectExtraSources } = await import('../../src/main/workspaceExtras')
+
+
+const { collectExtraSources, _resetExtrasCache } = await import('../../src/main/workspaceExtras')
+
+// The extras corpus is cached against a signature of the data it was built from.
+// The mocked getDb cannot produce one, so every test clears it explicitly rather
+// than reading the previous test's workspace.
+beforeEach(() => _resetExtrasCache())
 
 describe('collectExtraSources reaches meetings, decisions and the calendar', () => {
   it('retrieves a meeting by something said in it', () => {
