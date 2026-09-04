@@ -1,5 +1,6 @@
 import { exec, execFile } from 'child_process'
 import { app, BrowserWindow, dialog, shell, systemPreferences } from 'electron'
+import { openExternalSafe } from './safeOpenExternal'
 import { promisify } from 'util'
 import type {
   KeyComboAction,
@@ -273,7 +274,11 @@ async function openApp(action: OpenAppAction): Promise<void> {
 
 async function openUrl(action: OpenUrlAction): Promise<void> {
   if (!action.url) throw new Error('URL is empty.')
-  await shell.openExternal(action.url)
+  // The URL comes from the button's saved configuration, so it is user data
+  // rather than a constant: route it through the scheme check instead of handing
+  // an arbitrary string to the OS.
+  const opened = await openExternalSafe(action.url)
+  if (!opened) throw new Error('Only http and https links can be opened.')
 }
 
 async function keyCombo(action: KeyComboAction): Promise<void> {

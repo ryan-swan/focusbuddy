@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Widget } from '@shared/types'
+import { eligibleDestinations, destinationLabel } from '../../lib/agentDestination'
+import { catalogFor } from '../../lib/widgetCatalog'
+import type { Widget, WidgetKind } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import Icon from '../Icon'
 import { useWidgetStore } from '../../stores/widgets'
@@ -38,7 +40,10 @@ interface Props {
   inline?: boolean
 }
 
-type Editable = Pick<AgentConfig, 'instruction' | 'trigger' | 'intervalSec' | 'enabled' | 'profileId'>
+type Editable = Pick<
+  AgentConfig,
+  'instruction' | 'trigger' | 'intervalSec' | 'enabled' | 'profileId' | 'destinationWidgetId' | 'destinationMode' | 'destinationAutoApply'
+>
 
 function editableOf(c: AgentConfig): Editable {
   return {
@@ -46,7 +51,10 @@ function editableOf(c: AgentConfig): Editable {
     trigger: c.trigger,
     intervalSec: c.intervalSec,
     enabled: c.enabled,
-    profileId: c.profileId
+    profileId: c.profileId,
+    destinationWidgetId: c.destinationWidgetId ?? null,
+    destinationMode: c.destinationMode ?? 'append',
+    destinationAutoApply: c.destinationAutoApply ?? false
   }
 }
 
@@ -71,6 +79,32 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
   const running = useAgentRunStore((s) => s.running[widget.id] ?? false)
   const agentProposals = useAgentRunStore((s) => s.proposals[widget.id])
   const clearAgentProposals = useAgentRunStore((s) => s.clearProposals)
+  const agentAttribution = useAgentRunStore((s) => s.attribution[widget.id])
+
+  // What the user does with a proposal is the only real signal about whether
+  // this agent is useful, and it was being thrown away: desk-agent runs recorded
+  // no invocation, so there was nothing to attribute an outcome to. Best-effort
+  // by design — a failure to record must never interfere with applying the
+  // change the user actually asked for.
+  const recordProposalOutcome = async (
+    proposalId: string,
+    action: 'applied' | 'dismissed'
+  ): Promise<void> => {
+    if (!agentAttribution) return
+    const proposal = agentProposals?.find((p) => p.id === proposalId)
+    if (!proposal) return
+    try {
+      await window.api.agents.recordOutcome({
+        invocationId: agentAttribution.invocationId,
+        agentSlug: agentAttribution.agentSlug,
+        proposalId,
+        proposalKind: proposal.kind,
+        action
+      })
+    } catch (err) {
+      console.warn('[AgentWidget] recordOutcome failed:', err)
+    }
+  }
   const [appliedProposals, setAppliedProposals] = useState<Record<string, AppliedProposal>>({})
 
   // Live config (output/history/lastError) read fresh each render.
@@ -128,6 +162,28 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
 
   const set = (patch: Partial<Editable>): void => setEdit((e) => ({ ...e, ...patch }))
 
+  // Only widgets on THIS desk that can actually hold written output. Offering a
+  // timer or a colour swatch as a destination would be offering nonsense.
+  const allWidgets = useWidgetStore((st) => st.widgets)
+  const destinations = eligibleDestinations(allWidgets, widget.taskId, widget.id)
+
+  // "Add a … to this desk" — create the target and select it in one step, so
+  // setting an agent up does not mean leaving it to go find the widget picker.
+  async function createDestination(kind: WidgetKind): Promise<void> {
+    const entry = catalogFor(kind)
+    const created = await useWidgetStore.getState().create({
+      taskId: widget.taskId,
+      kind,
+      title: widget.title ? `${widget.title} output` : 'Agent output',
+      content: '',
+      x: Math.round(widget.x + widget.width + 24),
+      y: widget.y,
+      width: entry?.defaultWidth,
+      height: entry?.defaultHeight
+    })
+    set({ destinationWidgetId: created.id })
+  }
+
   // ── Profile ("job description") ──────────────────────────────────────────
   const customProfiles = useAgentProfilesStore((s) => s.custom)
   const upsertProfile = useAgentProfilesStore((s) => s.upsert)
@@ -184,6 +240,9 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
         ...DEFAULT_AGENT,
         instruction: edit.instruction,
         trigger: edit.trigger,
+        destinationWidgetId: edit.destinationWidgetId ?? null,
+        destinationMode: edit.destinationMode ?? 'append',
+        destinationAutoApply: edit.destinationAutoApply ?? false,
         intervalSec: edit.intervalSec,
         enabled: edit.enabled,
         profileId
@@ -487,6 +546,69 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
         </div>
       </div>
 
+      {/* Destination — where this agent's output goes.
+          Wiring alone only told the model what FORMAT to write; it delivered
+          nothing. Naming a destination here is what makes the result actually
+          land somewhere, as a review card the user accepts. */}
+      <div className="px-2.5 py-1.5 flex items-center gap-1.5 border-b border-[var(--edge-soft)]">
+        <span className="text-[10px] text-[var(--ink-50)] shrink-0">Write to</span>
+        <select
+          value={edit.destinationWidgetId ?? ''}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v.startsWith('new:')) void createDestination(v.slice(4) as WidgetKind)
+            else set({ destinationWidgetId: v || null })
+          }}
+          className="flex-1 min-w-0 bg-transparent border border-[var(--edge-soft)] rounded px-1.5 py-1 text-[10px] text-[var(--ink-90)]"
+          data-testid="agent-destination"
+        >
+          <option value="">Nowhere — just show the result</option>
+          {destinations.map((d) => (
+            <option key={d.id} value={d.id}>
+              {destinationLabel(d)}
+            </option>
+          ))}
+          <option disabled>──────────</option>
+          <option value="new:page">Add a Page to this desk…</option>
+          <option value="new:markdown">Add a Markdown note…</option>
+          <option value="new:note">Add a Note…</option>
+          <option value="new:table">Add a Table…</option>
+        </select>
+        {edit.destinationWidgetId && (
+          <button
+            onClick={() =>
+              set({ destinationMode: edit.destinationMode === 'replace' ? 'append' : 'replace' })
+            }
+            className="shrink-0 text-[10px] px-1.5 py-1 rounded border border-[var(--edge-soft)] text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]"
+            data-testid="agent-destination-mode"
+            title={
+              edit.destinationMode === 'replace'
+                ? 'Each run replaces what is there'
+                : 'Each run adds to what is there'
+            }
+          >
+            {edit.destinationMode === 'replace' ? 'replace' : 'append'}
+          </button>
+        )}
+      </div>
+      {edit.destinationWidgetId && (
+        <div className="px-2.5 pb-1.5 -mt-0.5">
+          <label className="flex items-center gap-1.5 text-[10px] text-[var(--ink-60)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={edit.destinationAutoApply ?? false}
+              onChange={(e) => set({ destinationAutoApply: e.target.checked })}
+              data-testid="agent-destination-auto"
+            />
+            {/* The review card is worth keeping when the write is a surprise.
+                Once a destination is named, it is not — so this is offered,
+                and left off by default because an interval agent writing
+                unattended is the case that needs the extra beat. */}
+            Write without asking me first
+          </label>
+        </div>
+      )}
+
       <div className="px-2.5 py-1.5 flex items-center gap-2 border-b border-[var(--edge-soft)]">
         {edit.trigger === 'interval' && (
           <label className="flex items-center gap-1 text-[10px] text-[var(--ink-70)]">
@@ -557,8 +679,15 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
               proposals={agentProposals}
               activeTaskId={widget.taskId}
               appliedProposals={appliedProposals}
-              onApplied={(id, applied) => setAppliedProposals((m) => ({ ...m, [id]: applied }))}
+              onApplied={(id, applied) => {
+                setAppliedProposals((m) => ({ ...m, [id]: applied }))
+                void recordProposalOutcome(id, 'applied')
+              }}
               onConsume={(id) => {
+                // A card leaves the list either because it was applied (already
+                // recorded above) or because the user dismissed it. Both are
+                // signal; only the second is recorded here.
+                if (!appliedProposals[id]) void recordProposalOutcome(id, 'dismissed')
                 const remaining = agentProposals.filter((p) => p.id !== id)
                 if (remaining.length === 0) clearAgentProposals(widget.id)
                 else useAgentRunStore.getState().setProposals(widget.id, remaining)

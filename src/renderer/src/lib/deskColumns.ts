@@ -122,7 +122,7 @@ export function reorderColumns(columns: DeskColumn[], dragId: string, targetId: 
 // The width a widget wants to be shown at in a column. Uses the catalog's ideal
 // width for the kind (docs/sheets/slides/design/maps are wide; stickies,
 // calculators, colours are narrow), falling back to the widget's own width, then
-// clamped so a single very wide kind (e.g. webview at 1366) doesn't make a column
+// clamped so a single very wide kind (e.g. webview at 1920) doesn't make a column
 // absurdly wide, and nothing gets narrower than a legible minimum.
 const ITEM_MIN_W = 240
 const ITEM_MAX_W = 760

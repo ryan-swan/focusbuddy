@@ -139,7 +139,10 @@ module.exports = {
   // no-creds fallback. With a real Developer ID + notarisation, electron-builder
   // signs properly and running the ad-hoc pass afterwards would stomp that
   // signature and break notarisation, so the hook is omitted in that mode.
-  afterPack: hasNotaryCreds ? undefined : 'build/adhoc-sign.cjs',
+  // Always runs: fuses harden the binary and MUST be flipped before signing,
+  // because flipping one rewrites bytes and invalidates a prior signature. The
+  // hook itself decides whether an ad-hoc signature is needed afterwards.
+  afterPack: 'build/harden.cjs',
 
   dmg: {
     title: 'PlexiDesk ${version}',

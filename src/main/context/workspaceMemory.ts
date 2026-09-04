@@ -55,6 +55,12 @@ export interface RetentionPolicy {
 // Applying a retention policy emits an auditable Event (PRD-034 / DATA-010) and
 // refuses protected targets — Events and Decision alternatives are never prunable
 // (DATA-012).
+// probe-ignore: INV-007 - intentionally not called by the retention sweep. Its
+// RetentionPolicy is age-based (maxAgeDays); the real caps are count-based and
+// hybrid, so routing them through this helper would record a maxAgeDays that was
+// never applied - a false number in an auditable record. The reasoning is
+// written out at both call-less sites in src/main/db/retention.ts (sweepOutbox,
+// sweepActivity), which call assertRetentionTarget() directly instead.
 export function applyRetentionPolicyEvent(organisationId: string, actor: string, policy: RetentionPolicy): AppendInput {
   assertRetentionTarget(policy.target) // throws for 'events' / 'alternatives' (DATA-012)
   return {

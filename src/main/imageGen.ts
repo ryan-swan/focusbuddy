@@ -7,6 +7,7 @@
 // data URI, ready to drop onto the canvas as an image element.
 
 import { resolveOpenAIKey } from './settingsStore'
+import { ingestFromBuffer } from './db/files'
 
 export interface ImageGenResult {
   ok: boolean
@@ -64,5 +65,68 @@ export async function generateImage(input: { prompt: string; width?: number; hei
     return { ok: false, error: 'The image service returned no image.' }
   } catch (e) {
     return { ok: false, error: `Could not reach the image service: ${(e as Error).message}` }
+  }
+}
+
+export interface ImageGenFileResult {
+  ok: boolean
+  fileId?: string
+  originalName?: string
+  error?: string
+  needsKey?: boolean
+}
+
+/**
+ * Generate an image and store it as a real file, returning its id.
+ *
+ * The design editor keeps the data-URI form because it drops the bytes straight
+ * into a design document. A DESK widget must not: a 1024x1024 PNG is roughly two
+ * megabytes of base64, and widget content is synced and CRDT-merged, so holding
+ * images there would bloat the database and every sync payload with binary that
+ * has a perfectly good home already. Storing it in the files store means the
+ * widget carries a short id and renders through the existing fb-file:// pipeline,
+ * exactly like any other image on a desk.
+ */
+export async function generateImageToFile(input: {
+  prompt: string
+  width?: number
+  height?: number
+}): Promise<ImageGenFileResult> {
+  const r = await generateImage(input)
+  if (!r.ok || !r.dataUrl) return { ok: false, error: r.error, needsKey: r.needsKey }
+
+  try {
+    let bytes: Buffer
+    let mimeType = 'image/png'
+    const m = /^data:([^;]+);base64,(.*)$/s.exec(r.dataUrl)
+    if (m) {
+      mimeType = m[1] || 'image/png'
+      bytes = Buffer.from(m[2], 'base64')
+    } else {
+      // The API can answer with a URL instead of inline base64; fetch it so the
+      // image is on disk and keeps working after the link expires.
+      const res = await fetch(r.dataUrl)
+      if (!res.ok) return { ok: false, error: `Could not download the generated image (${res.status}).` }
+      mimeType = res.headers.get('content-type') ?? 'image/png'
+      bytes = Buffer.from(await res.arrayBuffer())
+    }
+    if (bytes.length === 0) return { ok: false, error: 'The image service returned an empty image.' }
+
+    // A readable name, since this file shows up in Files like any other.
+    const slug =
+      input.prompt
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48) || 'generated-image'
+    const ext = mimeType.includes('jpeg') ? '.jpg' : mimeType.includes('webp') ? '.webp' : '.png'
+    const file = ingestFromBuffer({
+      buffer: bytes,
+      originalName: `${slug}${ext}`,
+      mimeType
+    })
+    return { ok: true, fileId: file.id, originalName: file.originalName }
+  } catch (e) {
+    return { ok: false, error: `Could not save the generated image: ${(e as Error).message}` }
   }
 }

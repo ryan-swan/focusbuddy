@@ -103,16 +103,38 @@ export async function embedDocument(docId: string): Promise<void> {
 
 // Backfill embeddings for documents lacking one (or all, when force). Returns the
 // count embedded and, if it could not, why (e.g. no_key) so the UI stays honest.
+// Embedding batch size. The whole backlog used to go in ONE request: with a
+// large workspace that is hundreds of kilobytes of text in a single call, and
+// because a failure returned `embedded: 0` and wrote nothing, a backlog too big
+// to embed in one shot could never shrink — it failed identically every time.
+// Batching makes progress durable: each batch that succeeds is persisted, and a
+// later failure leaves the earlier work in place.
+const EMBED_BATCH = 16
+
 export async function reindexDocuments(force = false): Promise<{ embedded: number; reason?: string }> {
   const items = loadDocItems()
   const todo = force ? items : items.filter((d) => !hasEmbedding(KIND, d.docId))
   if (todo.length === 0) return { embedded: 0 }
-  const r = await embedTexts(todo.map(embedText))
-  if (!r.ok) return { embedded: 0, reason: r.reason }
-  todo.forEach((d, i) => {
-    if (r.vectors[i]) setEmbedding(KIND, d.docId, r.vectors[i], r.model)
-  })
-  return { embedded: todo.length }
+  let embedded = 0
+  let reason: string | undefined
+  for (let i = 0; i < todo.length; i += EMBED_BATCH) {
+    const batch = todo.slice(i, i + EMBED_BATCH)
+    const r = await embedTexts(batch.map(embedText))
+    if (!r.ok) {
+      // Stop on the first failing batch and report why, keeping everything
+      // already written. A missing key fails the first batch and reports
+      // honestly rather than looking like a partial success.
+      reason = r.reason
+      break
+    }
+    batch.forEach((d, j) => {
+      if (r.vectors[j]) {
+        setEmbedding(KIND, d.docId, r.vectors[j], r.model)
+        embedded++
+      }
+    })
+  }
+  return reason ? { embedded, reason } : { embedded }
 }
 
 // Semantic + keyword blended search over documents, returned as WorkspaceSource

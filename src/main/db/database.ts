@@ -478,6 +478,11 @@ CREATE TABLE IF NOT EXISTS wire_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_wire_runs_wire ON wire_runs(wire_id, at DESC);
 CREATE INDEX IF NOT EXISTS idx_wire_runs_task ON wire_runs(task_id, at DESC);
+-- SQLite indexes the PARENT side of a foreign key automatically and the child
+-- side never, so without these two every widget delete has to scan all of
+-- wire_runs once per row to enforce the ON DELETE CASCADE.
+CREATE INDEX IF NOT EXISTS idx_wire_runs_source_widget ON wire_runs(source_widget_id);
+CREATE INDEX IF NOT EXISTS idx_wire_runs_target_widget ON wire_runs(target_widget_id);
 
 -- ── Outgoing share links ────────────────────────────────────────────────────
 -- Each row is a link the local user minted to share one of their folders /
@@ -555,6 +560,10 @@ export function getDb(): Database.Database {
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
+  // Bound how much of each index ANALYZE samples. Without a limit, ANALYZE on a
+  // large table is a full scan; with one, PRAGMA optimize on close is cheap
+  // enough to run every session. 400 is SQLite's own suggested value.
+  db.pragma('analysis_limit = 400')
   // Pre-upgrade safety backup. Before running any schema migration on an
   // existing database with real data, snapshot it so a failed migration always
   // has a restore point. Reading user_version and sqlite_master does not mutate
@@ -1255,6 +1264,38 @@ export function getDb(): Database.Database {
   // knows this database is already at the current schema and skips the
   // pre-upgrade snapshot until MIGRATION_VERSION is bumped again.
   db.pragma(`user_version = ${MIGRATION_VERSION}`)
+  // Collect index statistics once, on a database that has never had them.
+  //
+  // Without sqlite_stat1 the planner falls back to fixed guesses about how many
+  // rows an index will match, which is exactly where it picks a scan over the
+  // right index on tables that have grown large and skewed. That does not
+  // reproduce on a small test database — it only appears after months of real
+  // use, as "the app got slower the more I put in it". analysis_limit above
+  // keeps this bounded; PRAGMA optimize in closeDb keeps it current afterwards.
+  try {
+    const hasStats = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_stat1'")
+      .get() != null
+    if (!hasStats) {
+      // Deferred on purpose. Measured against the real 225 MB database this is
+      // ~700 ms of synchronous work — once, on the first launch after upgrade —
+      // and launch is the one path the user actually waits on. Running it a few
+      // seconds in costs nothing anybody notices. Once sqlite_stat1 exists this
+      // branch never runs again; PRAGMA optimize in closeDb (1 ms) keeps the
+      // statistics current from then on.
+      setTimeout(() => {
+        try {
+          db?.exec('ANALYZE')
+        } catch (err) {
+          console.warn('[db] deferred ANALYZE failed:', err)
+        }
+      }, 15_000).unref?.()
+    }
+  } catch (err) {
+    // Statistics are an optimisation, never a correctness requirement: a
+    // database that cannot collect them still works, just less well.
+    console.warn('[db] could not check for planner statistics:', err)
+  }
   return db
 }
 
@@ -1438,6 +1479,14 @@ function migrateShareKindChecks(d: Database.Database): void {
 
 export function closeDb(): void {
   if (db) {
+    // Refresh planner statistics on the way out. PRAGMA optimize re-ANALYZEs
+    // only the tables that changed enough to matter, so this is cheap, and
+    // shutdown is the one moment the cost is invisible to the user.
+    try {
+      db.pragma('optimize')
+    } catch (err) {
+      console.warn('[db] PRAGMA optimize on close failed:', err)
+    }
     db.close()
     db = null
   }

@@ -153,8 +153,29 @@ export function docBodyToText(docType: string, body: unknown): string {
     return squash(out.join('\n')).slice(0, 12000)
   }
   // design or unknown: best-effort element text.
+  //
+  // A design element carries its copy the same way a slide element does —
+  // paragraphs[].runs[].text — not as a flat `text` property. Reading only the
+  // flat one meant every design in the workspace extracted to nothing, so
+  // designs were invisible to retrieval, embedding and enrichment alike. The
+  // flat read stays as the fallback for any other element shape.
   const els = Array.isArray(b.elements) ? (b.elements as Array<Record<string, unknown>>) : []
-  const txt = els.map((e) => (typeof e.text === 'string' ? e.text : '')).filter(Boolean).join('\n')
+  const txt = els
+    .map((e) => {
+      const paras = Array.isArray(e.paragraphs) ? (e.paragraphs as Array<Record<string, unknown>>) : []
+      if (paras.length) {
+        return paras
+          .map((para) => {
+            const runs = Array.isArray(para.runs) ? (para.runs as Array<{ text?: unknown }>) : []
+            return runs.map((r) => (typeof r.text === 'string' ? r.text : '')).join('')
+          })
+          .filter(Boolean)
+          .join('\n')
+      }
+      return typeof e.text === 'string' ? e.text : ''
+    })
+    .filter(Boolean)
+    .join('\n')
   return squash(txt).slice(0, 12000)
 }
 
@@ -204,6 +225,15 @@ export function widgetToText(w: Widget, r: WidgetTextResolvers = {}): WidgetText
     case 'living-doc':
       return { ...base, text: contentToPlainText(raw) }
 
+    case 'image-gen': {
+      // The prompt IS the description of this image, so retrieval can find "the
+      // image I generated of the golden-hour desk" later. Without this the widget
+      // would be a file id and nothing else — unreadable to every AI surface.
+      const d = safeParse<{ prompt?: string; fileId?: string }>(raw)
+      const prompt = typeof d?.prompt === 'string' ? d.prompt.trim() : ''
+      if (!prompt) return { ...base, text: d?.fileId ? 'Generated image' : 'Image generator (empty)' }
+      return { ...base, text: squash(`Generated image: ${prompt}`) }
+    }
     case 'card': {
       const p = safeParse<{ title?: string; body?: string }>(raw)
       if (p) return { ...base, text: squash([p.title ?? '', p.body ?? ''].filter(Boolean).join('\n')) }

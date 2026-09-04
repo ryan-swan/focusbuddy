@@ -7,6 +7,7 @@ import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
 import WidgetErrorBoundary from './WidgetErrorBoundary'
 import StickyWidget from './widgets/StickyWidget'
+import ImageGenWidget from './widgets/ImageGenWidget'
 import WebViewWidget from './widgets/WebViewWidget'
 import NoteWidget from './widgets/NoteWidget'
 import MarkdownWidget from './widgets/MarkdownWidget'
@@ -187,6 +188,8 @@ function renderWidgetInner(w: Widget): JSX.Element | null {
   switch (w.kind) {
     case 'sticky':
       return <StickyWidget widget={w} />
+    case 'image-gen':
+      return <ImageGenWidget widget={w} />
     case 'note':
       return <NoteWidget widget={w} />
     case 'markdown':

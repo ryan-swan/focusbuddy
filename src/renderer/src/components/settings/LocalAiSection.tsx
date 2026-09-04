@@ -6,6 +6,20 @@ import { useEffect, useState } from 'react'
 // retrieval + grounding — privately, offline and free. Nothing here fabricates:
 // with no local model it says so and the button is disabled.
 
+interface Coverage {
+  documents: {
+    total: number
+    withText: number
+    indexed: number
+    embedded: number
+    enriched: number
+    memoryScanned: number
+  }
+  files: { total: number; indexed: number }
+  conversations: { total: number; indexed: number }
+  knowledge: { total: number }
+}
+
 interface LocalStatus {
   available: boolean
   baseUrl: string
@@ -15,6 +29,7 @@ interface LocalStatus {
 
 export default function LocalAiSection(): JSX.Element {
   const [status, setStatus] = useState<LocalStatus | null>(null)
+  const [coverage, setCoverage] = useState<Coverage | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -23,6 +38,13 @@ export default function LocalAiSection(): JSX.Element {
       setStatus(await window.api.localAi.status())
     } catch {
       setStatus({ available: false, baseUrl: '', chatModel: null, embedModel: null })
+    }
+    // Coverage is reported separately: a failure here must leave the number
+    // ABSENT rather than showing a zero that reads like a real measurement.
+    try {
+      setCoverage(await window.api.localAi.coverage())
+    } catch {
+      setCoverage(null)
     }
   }
 
@@ -86,6 +108,43 @@ export default function LocalAiSection(): JSX.Element {
         </div>
       )}
 
+      {coverage && (
+        <div
+          className="fb-card rounded-[var(--radius-field)] px-2.5 py-2 mb-2 fb-t-caption"
+          data-testid="brain-coverage"
+        >
+          <div className="text-[var(--ink-50)] uppercase tracking-wider mb-1">
+            What the assistant can see
+          </div>
+          <div className="text-[var(--ink-70)] leading-snug">
+            {/*
+              Denominator is documents that actually hold text: a blank document
+              is not a coverage gap, and counting it as one would invent one.
+            */}
+            Searchable: <Stat n={coverage.documents.indexed} of={coverage.documents.withText} /> documents
+            {coverage.documents.total > coverage.documents.withText && (
+              <span className="text-[var(--ink-50)]">
+                {' '}
+                ({coverage.documents.total - coverage.documents.withText} empty)
+              </span>
+            )}
+            , <Stat n={coverage.files.indexed} of={coverage.files.total} /> files,{' '}
+            <Stat n={coverage.conversations.indexed} of={coverage.conversations.total} /> conversations.
+            <br />
+            Described: <Stat n={coverage.documents.enriched} of={coverage.documents.withText} />
+            {' · '}Ranked by meaning:{' '}
+            <Stat n={coverage.documents.embedded} of={coverage.documents.withText} />
+            {' · '}Read for memory:{' '}
+            <Stat n={coverage.documents.memoryScanned} of={coverage.documents.withText} />
+          </div>
+          {status?.available && (
+            <div className="text-[var(--ink-50)] leading-snug mt-1">
+              Anything outstanding is picked up automatically in the background.
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <button
           onClick={() => void enrich()}
@@ -106,5 +165,16 @@ export default function LocalAiSection(): JSX.Element {
         </div>
       )}
     </div>
+  )
+}
+
+// One "n of m" pair. An incomplete count is weighted so a shortfall is visible
+// at a glance — a gap the user cannot see is a gap they cannot act on.
+function Stat({ n, of }: { n: number; of: number }): JSX.Element {
+  const complete = of === 0 || n >= of
+  return (
+    <span className={complete ? 'text-[var(--ink-90)]' : 'text-[var(--ink-100)] font-semibold'}>
+      {n} of {of}
+    </span>
   )
 }

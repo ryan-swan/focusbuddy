@@ -59,7 +59,15 @@ export function extractDocText(docType: string, body: unknown): string {
       return collectTiptapText(root).trim().slice(0, DOC_TEXT_CAP)
     }
     if (docType === 'sheet') {
-      const sheets = (b.sheets as Array<{ columns?: string[]; rows?: string[][] }>) ?? []
+      // Two shapes exist in the field: V2 nests tabs under `sheets`, V1 puts
+      // `columns`/`rows` at the top level. Only V2 was handled here, so every
+      // legacy sheet extracted to nothing and never reached retrieval. The
+      // shared extractor already knew about V1; this branch did not.
+      const v2 = b.sheets as Array<{ columns?: string[]; rows?: string[][] }> | undefined
+      const sheets =
+        Array.isArray(v2) && v2.length
+          ? v2
+          : [{ columns: b.columns as string[] | undefined, rows: b.rows as string[][] | undefined }]
       return sheets
         .map((t) => {
           const header = (t.columns ?? []).join(' | ')

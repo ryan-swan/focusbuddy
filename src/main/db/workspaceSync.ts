@@ -179,11 +179,11 @@ export function sharedApplyVerdict(opts: {
 }
 
 // Which locally-materialized shared desks are no longer granted (a revoke): the
-// local set minus the server's granted set. Pure so the prune diff is testable.
-export function rootsToPrune(local: string[], granted: string[]): string[] {
-  const g = new Set(granted)
-  return local.filter((r) => !!r && !g.has(r))
-}
+// local set minus the server's granted set. The implementation moved to
+// @shared/sharedDesks so the renderer's sync loop — which is what actually runs
+// this diff — uses the same tested function instead of its own inline copy.
+// Re-exported here so existing importers and tests keep their path.
+export { rootsToPrune } from '@shared/sharedDesks'
 
 // Columns we never round-trip through the server body (local-only sync bookkeeping,
 // plus team_id which travels as its own scope field, and the __team_id alias the

@@ -106,7 +106,10 @@ module.exports = {
   // Ad-hoc signing is the FALLBACK only. With credentials present electron-builder
   // does the real Developer ID signing itself, and running the ad-hoc hook after
   // it would overwrite that signature with `codesign --sign -`.
-  afterPack: hasNotaryCreds ? undefined : 'build/adhoc-sign.cjs',
+  // Always runs: fuses harden the binary and MUST be flipped before signing,
+  // because flipping one rewrites bytes and invalidates a prior signature. The
+  // hook itself decides whether an ad-hoc signature is needed afterwards.
+  afterPack: 'build/harden.cjs',
 
   win: { target: [{ target: 'nsis', arch: ['x64'] }] },
 

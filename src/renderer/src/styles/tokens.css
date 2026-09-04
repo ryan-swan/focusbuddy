@@ -45,7 +45,11 @@
      Relative order is preserved (ink-50 stays a touch more contrasty than
      ink-40) with a small safety margin above the 4.5:1 floor. */
   --ink-50: oklch(52.5% 0.008 264);    /* placeholder, disabled */
-  --ink-40: oklch(53.5% 0.007 264);    /* faint meta, section eyebrows */
+  /* 53.5% measured 4.468:1 on --surface-sunken (#6b6d71 on #edeef1) — under the
+     4.5:1 floor this group was tuned to, and the one tone in the set that
+     missed. 53.0% clears it on all three surface tones (sunken 4.53, base 4.91,
+     raised 5.13) and keeps ink-50 the more contrasty of the pair as intended. */
+  --ink-40: oklch(53% 0.007 264);      /* faint meta, section eyebrows */
   --ink-30: oklch(78% 0.006 264);      /* hairlines, dim — decorative only, not used for text */
   --ink-10: oklch(94% 0.004 264);      /* surface tone */
 

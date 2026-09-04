@@ -1,4 +1,7 @@
 import { create } from 'zustand'
+import { applyProposal } from './actionExecutor'
+import { destinationLabel } from './agentDestination'
+import { buildDelivery } from './agentDestination'
 import type { ActionProposal } from '@shared/types'
 import { useLinksStore } from '../stores/links'
 import { useWidgetStore } from '../stores/widgets'
@@ -48,20 +51,34 @@ interface AgentRunState {
   // review on the agent widget. Keyed by agent id. Cleared as the user applies
   // or dismisses them, or when the agent runs again.
   proposals: Record<string, ActionProposal[]>
-  setProposals: (id: string, proposals: ActionProposal[]) => void
+  // Which run produced the pending proposals, so applying or dismissing one can
+  // be recorded against it. Absent for a run that proposed nothing.
+  attribution: Record<string, { invocationId: string; agentSlug: string }>
+  setProposals: (
+    id: string,
+    proposals: ActionProposal[],
+    attribution?: { invocationId: string; agentSlug: string }
+  ) => void
   clearProposals: (id: string) => void
 }
 export const useAgentRunStore = create<AgentRunState>((set) => ({
   running: {},
   setRunning: (id, on) => set((s) => ({ running: { ...s.running, [id]: on } })),
   proposals: {},
-  setProposals: (id, proposals) => set((s) => ({ proposals: { ...s.proposals, [id]: proposals } })),
+  attribution: {},
+  setProposals: (id, proposals, attribution) =>
+    set((s) => ({
+      proposals: { ...s.proposals, [id]: proposals },
+      attribution: attribution ? { ...s.attribution, [id]: attribution } : s.attribution
+    })),
   clearProposals: (id) =>
     set((s) => {
       if (!(id in s.proposals)) return s
       const next = { ...s.proposals }
       delete next[id]
-      return { proposals: next }
+      const nextAttr = { ...s.attribution }
+      delete nextAttr[id]
+      return { proposals: next, attribution: nextAttr }
     })
 }))
 
@@ -139,15 +156,81 @@ export async function runAgent(agentId: string): Promise<void> {
       })
       return
     }
+    // Deterministic delivery to the configured destination.
+    //
+    // This is the fix for the review's main finding: a wired output was only ever
+    // a format hint, so whether the output reached it depended on the model
+    // choosing to propose an update-widget. With a destination set, the card is
+    // ALWAYS offered — and it leads, because it is the thing the user configured
+    // this agent to do. It is still a proposal: nothing is written until accepted.
+    const liveCfg = parseAgent(latestContent(agentId) ?? agent.content)
+    const proposals = [...(res.proposals ?? [])]
+    // Set when delivery was refused, so the widget reports it rather than the
+    // run looking successful with nothing to show for it.
+    let deliveryNote: string | null = null
+    // Where an auto-applied write landed, so the run log can state it plainly.
+    let autoApplied: string | null = null
+    if (liveCfg.destinationWidgetId) {
+      const target = useWidgetStore.getState().widgets.find((w) => w.id === liveCfg.destinationWidgetId)
+      if (target) {
+        const delivery = buildDelivery(
+          res.output ?? '',
+          target,
+          liveCfg.destinationMode ?? 'append',
+          agent.title ?? ''
+        )
+        if (delivery.ok) {
+          // Drop any update-widget the model already aimed at the same target,
+          // so an accepted card is not silently applied twice.
+          const deduped = proposals.filter(
+            (p) => !(p.kind === 'update-widget' && p.widgetId === target.id)
+          )
+          proposals.length = 0
+          if (liveCfg.destinationAutoApply) {
+            // Written straight through, because the user configured this exact
+            // destination and turned the confirmation off for it. Never silent:
+            // the run log says what was written and where.
+            const r = await applyProposal(delivery.proposal, { activeTaskId: agent.taskId })
+            deliveryNote = r.ok
+              ? null
+              : `Could not write to ${destinationLabel(target)}: ${r.message}`
+            if (r.ok) autoApplied = destinationLabel(target)
+            proposals.push(...deduped)
+          } else {
+            proposals.push(delivery.proposal, ...deduped)
+          }
+        } else if (delivery.reason === 'narration') {
+          // The agent described its work instead of doing it. Writing that
+          // description into the destination is how a page ends up containing
+          // "I've written … and saved it to the linked page" instead of the
+          // document. Refuse, and say so where the user is already looking.
+          deliveryNote =
+            'The agent described its work instead of writing it, so nothing was saved. Run it again — its instruction may need to ask for the finished text directly.'
+        }
+      }
+    }
+
+    // Logged AFTER the delivery decision so a refusal is recorded on the run
+    // rather than the run reading as a clean success with nothing to show.
     await writeLog(agentId, parseAgent(latestContent(agentId) ?? agent.content), {
       at,
-      output: res.output ?? '',
-      inputCount
+      output: autoApplied ? `Written to ${autoApplied}.\n\n${res.output ?? ''}` : res.output ?? '',
+      inputCount,
+      error: deliveryNote ?? undefined
     })
+
     // Surface any proposed workspace changes for the user to review on the
     // widget. Replaces any prior pending set from an earlier run.
-    if (res.proposals && res.proposals.length > 0) {
-      useAgentRunStore.getState().setProposals(agentId, res.proposals)
+    if (proposals.length > 0) {
+      useAgentRunStore
+        .getState()
+        .setProposals(
+          agentId,
+          proposals,
+          res.invocationId && res.agentSlug
+            ? { invocationId: res.invocationId, agentSlug: res.agentSlug }
+            : undefined
+        )
     } else {
       useAgentRunStore.getState().clearProposals(agentId)
     }

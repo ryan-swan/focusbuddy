@@ -36,7 +36,9 @@
     "test": "npm run test:unit && npm run test:e2e",
     "merge-check": "node scripts/merge-check.mjs",
     "spec:trace": "node scripts/spec-trace.mjs",
-    "hooks:install": "sh scripts/install-git-hooks.sh"
+    "hooks:install": "sh scripts/install-git-hooks.sh",
+    "verify:liveness": "node ../plexii-probe/bin/liveness.mjs",
+    "audit": "node ../plexii-probe/bin/probe.mjs"
   },
   "engines": {
     "node": ">=20.0.0 <23.0.0"
@@ -117,6 +119,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
     "@electron-toolkit/tsconfig": "^1.0.1",
+    "@electron/fuses": "^2.1.3",
     "@electron/rebuild": "^3.7.2",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/typography": "^0.5.20",

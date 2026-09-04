@@ -36,6 +36,19 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     isWebBased: false
   },
   {
+    // Prompt-to-image on the desk. The generation already existed for the design
+    // editor; this makes it a first-class canvas tool.
+    kind: 'image-gen',
+    category: 'Tools',
+    label: 'Image',
+    icon: 'auto_awesome',
+    hint: 'Describe an image and generate it here',
+    defaultWidth: 420,
+    defaultHeight: 460,
+    defaultContent: '',
+    isWebBased: false
+  },
+  {
     kind: 'sticky',
     category: 'Notes',
     label: 'Sticky',
@@ -239,10 +252,12 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     label: 'Browser',
     icon: 'public',
     hint: 'Any URL — a focused browser tab for this task',
-    // Open at Laptop size (1366 × 768) so sites render their desktop layout
-    // instead of a cramped mobile one. The size presets can change it after.
-    defaultWidth: 1366,
-    defaultHeight: 768,
+    // Open at Desktop size (1920 × 1080) — a full 1080p viewport, and one of the
+    // presets in the browser's own size menu. Sites lay out for this width, so
+    // pages render the way they were designed rather than in a narrowed column;
+    // the canvas zoom is what makes a widget this size comfortable to work at.
+    defaultWidth: 1920,
+    defaultHeight: 1080,
     defaultContent: '',
     urlPlaceholder: 'https://…',
     isWebBased: true

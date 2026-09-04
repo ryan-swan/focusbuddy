@@ -27,7 +27,7 @@ function relativeTime(ms: number | null): string {
 
 export default function BackupSection(): JSX.Element {
   const [info, setInfo] = useState<BackupInfo | null>(null)
-  const [busy, setBusy] = useState<null | 'export' | 'restore'>(null)
+  const [busy, setBusy] = useState<'export' | 'restore' | 'exportJson' | 'importJson' | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const refresh = useCallback(async () => {
@@ -49,6 +49,55 @@ export default function BackupSection(): JSX.Element {
       } else if (!r.canceled) {
         setMessage({ kind: 'err', text: r.error ?? 'Export failed.' })
       }
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // Portable export is a different promise from a backup. A .fbbackup restores
+  // THIS app; the JSON is the one you can read, keep, and take somewhere else.
+  async function onExportJson(): Promise<void> {
+    setBusy('exportJson')
+    setMessage(null)
+    try {
+      const r = await window.api.workspaceExport.exportJson()
+      if ('canceled' in r && r.canceled) return
+      if (r.ok) {
+        const total = Object.values(r.counts).reduce((a, b) => a + b, 0)
+        setMessage({
+          kind: 'ok',
+          text: `Exported ${total.toLocaleString()} records to ${r.path.split('/').pop()} (${(r.bytes / 1e6).toFixed(1)} MB). File contents are referenced, not embedded — see the note inside.`
+        })
+      } else {
+        setMessage({ kind: 'err', text: r.error ?? 'Export failed.' })
+      }
+    } catch (e) {
+      setMessage({ kind: 'err', text: (e as Error).message })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onImportJson(): Promise<void> {
+    setBusy('importJson')
+    setMessage(null)
+    try {
+      const r = await window.api.workspaceExport.importJson()
+      if (r.canceled) return
+      if (!r.ok) {
+        setMessage({ kind: 'err', text: r.reason ?? 'Import failed.' })
+        return
+      }
+      setMessage({
+        kind: 'ok',
+        text:
+          `Imported ${r.imported.toLocaleString()} records` +
+          (r.skipped > 0 ? `, skipped ${r.skipped.toLocaleString()} already here` : '') +
+          (r.exportedAt ? ` (from an export made ${new Date(r.exportedAt).toLocaleDateString()})` : '') +
+          '. Nothing existing was overwritten.'
+      })
+    } catch (e) {
+      setMessage({ kind: 'err', text: (e as Error).message })
     } finally {
       setBusy(null)
     }
@@ -102,6 +151,27 @@ export default function BackupSection(): JSX.Element {
         </button>
       </div>
 
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          onClick={() => void onExportJson()}
+          disabled={busy !== null}
+          data-testid="workspace-export-json"
+          className="fb-btn-surface inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
+        >
+          <Icon name="file_save" size={13} />
+          <span>{busy === 'exportJson' ? 'Exporting…' : 'Export my work (JSON)'}</span>
+        </button>
+        <button
+          onClick={() => void onImportJson()}
+          disabled={busy !== null}
+          data-testid="workspace-import-json"
+          className="fb-btn-surface inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-chip)] fb-t-caption hover:bg-[var(--surface-sunken)] hover:border-accent transition-colors disabled:opacity-50"
+        >
+          <Icon name="upload_file" size={13} />
+          <span>{busy === 'importJson' ? 'Importing…' : 'Import an export…'}</span>
+        </button>
+      </div>
+
       <div className="flex items-center justify-between fb-t-caption text-[var(--ink-50)]">
         <span>
           {info ? `${info.count} snapshot${info.count === 1 ? '' : 's'} · last ${relativeTime(info.lastBackupMs)}` : 'Checking…'}
@@ -127,7 +197,11 @@ export default function BackupSection(): JSX.Element {
       )}
 
       <p className="fb-t-caption text-[var(--ink-40)] leading-snug">
-        Restoring replaces all current data. Your current data is snapshotted first, so a restore
+        A backup restores this app. The JSON export is the one you can read and take
+        elsewhere: it holds your desks, documents, tables, notes and knowledge in a
+        documented format, never your vault, and it references file contents rather
+        than embedding them. Importing only ever adds — it cannot overwrite what is
+        already here. Restoring replaces all current data. Your current data is snapshotted first, so a restore
         is itself reversible. API keys are stored in your system keychain and are not included in a
         backup, so re-enter them after restoring on a new machine.
       </p>

@@ -73,16 +73,35 @@ interface VotesState {
   countFor: (key: string) => number
 }
 
+// Latched for the session once the server says the endpoint is not there, so a
+// missing backend costs one request rather than one per component mount.
+let votesEndpointUnavailable = false
+
 export const useFeatureVotesStore = create<VotesState>((set, get) => ({
   counts: {},
   mine: loadLocalMine(),
   serverSynced: false,
 
   load: async () => {
-    const { json } = await call<{ ok: boolean; counts?: Record<string, number>; mine?: string[] }>(
-      'GET',
-      '/features/votes'
-    )
+    // Two guards, both about not making a request that cannot succeed.
+    //
+    // The aggregate is per-account, so with no session there is nobody to ask
+    // about; and if the endpoint answers 404 once it will answer 404 every time,
+    // so retrying on each mount only repeats a failed request and the console
+    // error Chromium logs for it. Neither guard invents a count: serverSynced
+    // stays false and the UI keeps showing only the votes we genuinely know.
+    if (votesEndpointUnavailable) return
+    if (!useAccountStore.getState().sessionToken) return
+
+    const { status, json } = await call<{
+      ok: boolean
+      counts?: Record<string, number>
+      mine?: string[]
+    }>('GET', '/features/votes')
+    if (status === 404) {
+      votesEndpointUnavailable = true
+      return
+    }
     if (json?.ok) {
       const mine: Record<string, true> = {}
       for (const k of json.mine ?? []) mine[k] = true

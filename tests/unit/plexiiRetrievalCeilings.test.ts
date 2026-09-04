@@ -45,6 +45,12 @@ vi.mock('../../src/main/db/tables', () => ({
   listTables: () => [],
   listRows: () => []
 }))
+// The additive pools (meetings, decisions, calendar) are stubbed empty here: this
+// spec is about document ceilings, and an empty pool contributes nothing to the
+// merge, so the assertions below still measure exactly what they did before.
+vi.mock('../../src/main/db/meetings', () => ({ listMeetings: () => [] }))
+vi.mock('../../src/main/db/timeBlocks', () => ({ listBlocksInRange: () => [] }))
+vi.mock('../../src/main/db/decisionStore', () => ({ createDecisionStore: () => ({ all: () => [] }) }))
 vi.mock('../../src/main/db/widgets', () => ({
   listWidgetsByKind: () => []
 }))

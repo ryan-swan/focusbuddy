@@ -10,7 +10,11 @@
 // (the sticky's canonical yellow) are data, not chrome; everything else is
 // tokens and the canonical area tones.
 
+import { useState } from 'react'
 import type { ActionProposal } from '@shared/types'
+import Modal from '../plexi/Modal'
+import { renderMarkdown } from '../../lib/renderMarkdownLite'
+import { useWidgetStore } from '../../stores/widgets'
 import Icon from '../Icon'
 import { areaTone } from '../../lib/areaTones'
 
@@ -129,6 +133,124 @@ function PageMini({ title, text }: { title: string; text: string }): React.JSX.E
   )
 }
 
+const WRITE_PREVIEW_CHARS = 400
+
+// Which destinations hold Markdown. Read from the live widget rather than the
+// proposal, because the proposal carries no kind — and guessing from the text
+// would render a plain note as headings the moment it began with a '#'.
+const MARKDOWN_KINDS = new Set(['page', 'markdown', 'living-doc', 'scratchpad'])
+function destinationStoresMarkdown(widgetId: string): boolean {
+  const w = useWidgetStore.getState().widgets.find((x) => x.id === widgetId)
+  return !!w && MARKDOWN_KINDS.has(w.kind)
+}
+
+function WriteMini({
+  label,
+  text,
+  mode,
+  markdown
+}: {
+  label: string
+  text: string
+  mode: 'append' | 'replace'
+  // True when the destination stores Markdown, so the reader can show it
+  // formatted instead of as source.
+  markdown: boolean
+}): React.JSX.Element {
+  const [full, setFull] = useState(false)
+  const truncated = text.length > WRITE_PREVIEW_CHARS
+  return (
+    // The WHOLE miniature opens the reader. A trailing link was a small target
+    // for the one thing a reviewer most needs to do — read what they are about
+    // to approve — and left the rest of the card looking inert.
+    <div
+      role="button"
+      tabIndex={0}
+      data-testid="write-preview-open"
+      onClick={(e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        setFull(true)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.stopPropagation()
+          e.preventDefault()
+          setFull(true)
+        }
+      }}
+      title="Read the full text"
+      className="max-w-[300px] rounded-[var(--radius-chip)] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline),var(--shadow-soft)] px-2.5 py-2 flex flex-col gap-1 cursor-pointer hover:shadow-[0_0_0_1px_rgb(var(--accent)/0.4),var(--shadow-soft)] transition-shadow"
+    >
+      <span className="flex items-center gap-1.5">
+        <span className="fb-t-caption font-semibold text-[var(--ink-100)] truncate">{label}</span>
+        {/* Which of the two things this does is the whole risk of the card:
+            replace destroys what is there, append does not. */}
+        <span
+          className={`fb-t-caption shrink-0 px-1 rounded ${
+            mode === 'replace'
+              ? 'bg-amber-500/15 text-amber-600'
+              : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
+          }`}
+        >
+          {mode === 'replace' ? 'replaces' : 'adds to'}
+        </span>
+      </span>
+      {text ? (
+        <span className="fb-t-caption text-[var(--ink-60)] line-clamp-4 leading-snug whitespace-pre-wrap">
+          {text.slice(0, WRITE_PREVIEW_CHARS)}
+        </span>
+      ) : (
+        <span className="fb-t-caption text-[var(--ink-40)]">(no text)</span>
+      )}
+      {/* Says what the click does and how much is hidden. The handler lives on
+          the container above; this is a label, so there is one target, not two. */}
+      <span className="fb-t-caption text-accent self-start" data-testid="write-preview-expand">
+        {truncated ? `Read all ${text.length.toLocaleString()} characters` : 'Read in full'}
+      </span>
+      {full && (
+        <Modal
+          onClose={() => setFull(false)}
+          label={`What will be written to ${label}`}
+          className="w-[min(760px,92vw)] max-h-[82vh] flex flex-col"
+          testId="write-preview-modal"
+        >
+          <div className="flex items-baseline gap-2 px-4 pt-3 pb-2 border-b border-[var(--edge-soft)]">
+            <span className="fb-t-label font-semibold text-[var(--ink-100)] truncate">{label}</span>
+            <span
+              className={`fb-t-caption shrink-0 px-1 rounded ${
+                mode === 'replace'
+                  ? 'bg-amber-500/15 text-amber-600'
+                  : 'bg-[var(--surface-sunken)] text-[var(--ink-50)]'
+              }`}
+            >
+              {mode === 'replace' ? 'replaces what is there' : 'adds to what is there'}
+            </span>
+            <span className="fb-t-caption text-[var(--ink-40)] ml-auto shrink-0">
+              {text.length.toLocaleString()} characters
+            </span>
+          </div>
+          {/* The whole thing, unmodified. A preview that silently drops the end
+              is how you approve something you did not read.
+
+              Rendered as Markdown for the destinations that STORE Markdown, so
+              what you review looks like what will land. A note or a table holds
+              plain text, and dressing that up would misrepresent it. */}
+          <div className="flex-1 min-h-0 overflow-auto px-4 py-3">
+            {markdown ? (
+              renderMarkdown(text)
+            ) : (
+              <pre className="fb-t-body text-[var(--ink-90)] whitespace-pre-wrap break-words font-sans">
+                {text}
+              </pre>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 function KnowledgeMini({ title, body, tags }: { title: string; body: string; tags?: string[] }): React.JSX.Element {
   return (
     <div className="max-w-[280px] rounded-[var(--radius-chip)] bg-[var(--surface-raised)] shadow-[0_0_0_1px_var(--edge-hairline)] px-2.5 py-2 flex flex-col gap-1">
@@ -197,6 +319,22 @@ export default function ProposalPreview({ p }: { p: ActionProposal }): React.JSX
       return <DocumentMini docType={p.docType} title={p.title} />
     case 'create-task':
       return <DeskMini title={p.title} notes={p.notes} />
+    case 'update-widget': {
+      // The one card an agent produces on every run, and until now the only
+      // mutating card with nothing to look at: it rendered as an empty row, so
+      // "apply" was a decision made blind. Show what will actually be written,
+      // and whether it lands on top of the existing content or after it.
+      const text = (p.content ?? '').trim()
+      if (!text && p.title === undefined) return null
+      return (
+        <WriteMini
+          label={p.label}
+          text={text}
+          mode={p.operation === 'replace' ? 'replace' : 'append'}
+          markdown={destinationStoresMarkdown(p.widgetId)}
+        />
+      )
+    }
     case 'create-widget': {
       const text = (p.content ?? '').trim()
       if (p.widgetKind === 'sticky') return <StickyMini text={text || p.title || ''} />

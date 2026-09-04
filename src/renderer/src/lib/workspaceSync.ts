@@ -1,4 +1,5 @@
 import { signalConfig } from './signalConfig'
+import { rootsToPrune } from '@shared/sharedDesks'
 import { initPreviewGuard, previewSyncBlocked } from './previewGuard'
 import { useSyncStatus } from '../stores/syncStatus'
 import { useAccountStore } from '../stores/account'
@@ -575,11 +576,11 @@ async function syncSharedWorkspaceOnce(token: string): Promise<number> {
   // Prune desks I no longer have access to: any locally-materialized shared desk the
   // server did not list in my granted set has been revoked. Only ever runs after a
   // successful pull, so an offline cycle never wrongly prunes.
-  const granted = new Set(pulled.roots)
   const local = await window.api.workspaceSync.localSharedRoots()
   let pruned = 0
-  for (const root of local) {
-    if (!granted.has(root)) pruned += await window.api.workspaceSync.pruneSharedDesk(root)
+  // The revoke diff is one tested function, not an inline loop restating it.
+  for (const root of rootsToPrune(local, pulled.roots)) {
+    pruned += await window.api.workspaceSync.pruneSharedDesk(root)
   }
 
   if (applied > 0 || pruned > 0) {

@@ -1,4 +1,5 @@
-import { app, ipcMain, BrowserWindow, dialog, shell, webContents as allWebContents, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, dialog, webContents as allWebContents, type WebContents } from 'electron'
+import { openExternalSafe } from '../safeOpenExternal'
 import { detectPreviewBuild } from '../appMode'
 import { writeFile } from 'node:fs/promises'
 import { join as pathJoin } from 'node:path'
@@ -124,7 +125,7 @@ import { staleDesks } from '../db/nodeActivity'
 import { createDeskLayoutStore } from '../db/deskLayoutStore'
 import type { DeskLayout, DeviceClass } from '@shared/deskLayout'
 import { generateDocument, processMeetingEnd, generateDesignContent, generateDesignVariations, setConversationSnapshot } from '../ai/anthropic'
-import { generateImage } from '../imageGen'
+import { generateImage, generateImageToFile } from '../imageGen'
 import { exportDesign } from '../designExport'
 import { exportMap } from '../mapExport'
 import { importVsdx } from '../mapImport'
@@ -396,6 +397,13 @@ import {
 } from '../documentRetrieval'
 import { reindexDocumentChunks } from '../chunkIndex'
 import { enrichDocument, enrichAllDocuments } from '../ai/enrichDocuments'
+import { brainCoverage } from '../brainCoverage'
+import {
+  exportWorkspaceJson,
+  importWorkspaceJson,
+  defaultWorkspaceExportName
+} from '../db/workspaceExport'
+import { recordInvocation } from '../ai/agentHistory'
 import { localModelStatus } from '../ai/localModel'
 import { getDocMetadata } from '../db/docMetadata'
 import { listMemories, addMemory, forgetMemory } from '../db/memory'
@@ -1343,6 +1351,24 @@ export function registerIpcHandlers(): void {
         .filter((l) => l.sourceWidgetId === agentId)
         .map((l) => getWidget(l.targetWidgetId))
         .filter((w): w is NonNullable<ReturnType<typeof getWidget>> => !!w && !w.archived)
+      // The agent's CONFIGURED destination counts as an output even when no wire
+      // points at it. Without this the model is never told the format the target
+      // actually needs, and writes prose into a table or an outline into a field.
+      // A destination is a stronger statement of intent than a wire, so it is
+      // included whether or not the two agree.
+      try {
+        const self = getWidget(agentId)
+        const destId = self?.content
+          ? (JSON.parse(self.content) as { destinationWidgetId?: string | null }).destinationWidgetId
+          : null
+        if (destId && !outputWidgets.some((w) => w.id === destId)) {
+          const dest = getWidget(destId)
+          if (dest && !dest.archived) outputWidgets.push(dest)
+        }
+      } catch {
+        // A malformed agent config must not stop the run; it simply contributes
+        // no destination.
+      }
       const outputs = outputWidgets.map((w) => ({
         kind: w.kind,
         title: w.title ?? '',
@@ -1384,7 +1410,47 @@ export function registerIpcHandlers(): void {
       // Only enable action-proposals for non-browser agents (browser agents stay
       // research-and-report) and only when there is something real to act on.
       const actionContext = !browserWcId && actionParts.length > 0 ? actionParts.join('\n') : undefined
-      return runDeskAgent({ instruction, inputs, persona, browserWcId, outputs, actionContext })
+      const result = await runDeskAgent({ instruction, inputs, persona, browserWcId, outputs, actionContext })
+
+      // Record the run so a desk agent has a history like every other agent
+      // surface. Until now runDeskAgent recorded nothing at all: the 21 agent
+      // widgets on a real workspace had no invocation rows, which meant their
+      // proposals could not be attributed and agents:recordOutcome had no id to
+      // record against — the learning loop could not close by construction.
+      //
+      // Only runs that PROPOSE something are recorded. A research-and-report run
+      // has no outcome to learn from, and a row per idle run would bury the ones
+      // that matter.
+      if (result.ok && result.proposals && result.proposals.length > 0) {
+        try {
+          const agentWidget = getWidget(agentId)
+          const agentName = agentWidget?.title?.trim() || 'Desk agent'
+          // Stable across renames (the widget id) but readable when it has a
+          // title, mirroring how file-based agents derive a slug from filename.
+          const slug =
+            agentName
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '') || `desk-agent-${agentId}`
+          const desk = listNodes().find((n) => n.id === taskId)
+          const record = recordInvocation({
+            agentSlug: slug,
+            agentName,
+            nodeId: taskId,
+            nodeLabel: desk?.title ?? '',
+            rootPath: [],
+            reply: result.output ?? '',
+            proposals: result.proposals,
+            conversationKey: `${taskId}:${agentId}`
+          })
+          return { ...result, invocationId: record.id, agentSlug: slug }
+        } catch (err) {
+          // History is observability, never the run itself: a failure to record
+          // must not lose the user their agent's output.
+          console.error('[agents] could not record desk-agent invocation:', err)
+        }
+      }
+      return result
     }
   )
 
@@ -1628,6 +1694,12 @@ export function registerIpcHandlers(): void {
   // ── Office interop for the document editor (.docx / PDF / image) ───────────
   ipcMain.handle('office:importDocx', () => importDocx())
   ipcMain.handle('design:generateImage', (_e, input: { prompt: string; width?: number; height?: number }) => generateImage(input))
+  // Desk-facing variant: stores the result in the files store and returns its id,
+  // so a widget carries a short reference rather than megabytes of base64 through
+  // sync. See generateImageToFile for why the two differ.
+  ipcMain.handle('image:generateToFile', (_e, input: { prompt: string; width?: number; height?: number }) =>
+    generateImageToFile(input)
+  )
   ipcMain.handle('design:export', (_e, input: { design: DesignBody; title: string; format: 'png' | 'pdf' }) => exportDesign(input))
   ipcMain.handle('map:export', (_e, input: Parameters<typeof exportMap>[0]) => exportMap(input))
   ipcMain.handle('map:import', () => importVsdx())
@@ -1694,7 +1766,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:topUpCredits', async (_e, amountUsd: number) => {
     const result = await startTopUp(amountUsd)
     if (result.ok && result.url) {
-      await shell.openExternal(result.url)
+      // Server-supplied, so trusted-ish — but a checkout URL is always https and
+      // costs nothing to verify, and this is the one call that opens a link the
+      // user did not type.
+      await openExternalSafe(result.url)
     }
     return result
   })
@@ -1960,6 +2035,45 @@ export function registerIpcHandlers(): void {
       return { ok: false as const, error: (e as Error).message }
     }
   })
+  // Portable export: one readable JSON of authored content, versioned and honest
+  // about what it omits. A .fbbackup answers "restore yesterday"; this answers
+  // "let me leave with my work", which is a different promise and needs a
+  // different file.
+  ipcMain.handle('workspace:exportJson', async () => {
+    const parent = BrowserWindow.getFocusedWindow()
+    const opts = {
+      title: 'Export your workspace',
+      defaultPath: defaultWorkspaceExportName(),
+      filters: [{ name: 'Plexii workspace export', extensions: ['json'] }]
+    }
+    const { canceled, filePath } = parent
+      ? await dialog.showSaveDialog(parent, opts)
+      : await dialog.showSaveDialog(opts)
+    if (canceled || !filePath) return { ok: false as const, canceled: true as const }
+    try {
+      const r = exportWorkspaceJson(filePath)
+      return { ok: true as const, path: r.path, bytes: r.bytes, counts: r.counts }
+    } catch (e) {
+      return { ok: false as const, error: (e as Error).message }
+    }
+  })
+  ipcMain.handle('workspace:importJson', async () => {
+    const parent = BrowserWindow.getFocusedWindow()
+    const openOpts = {
+      title: 'Import a workspace export',
+      properties: ['openFile' as const],
+      filters: [{ name: 'Plexii workspace export', extensions: ['json'] }]
+    }
+    const open = parent
+      ? await dialog.showOpenDialog(parent, openOpts)
+      : await dialog.showOpenDialog(openOpts)
+    if (open.canceled || !open.filePaths[0]) return { ok: false as const, canceled: true as const }
+    try {
+      return importWorkspaceJson(open.filePaths[0])
+    } catch (e) {
+      return { ok: false as const, imported: 0, skipped: 0, byTable: {}, reason: (e as Error).message }
+    }
+  })
   ipcMain.handle('backup:restore', async () => {
     const parent = BrowserWindow.getFocusedWindow()
     const open = parent
@@ -2157,6 +2271,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'workspace:ask',
     async (_e, question: string, history?: Array<{ question: string; answer: string }>) => {
+      // Answer the empty case before doing any work. Without this a missing or
+      // blank question still ran retrieval and a local embedding pass, so the
+      // renderer's promise sat unsettled for seconds with nothing to settle it.
+      if (typeof question !== 'string' || question.trim() === '') {
+        return { ok: false as const, error: 'Ask a question first.', sources: [], proposals: [] as ActionProposal[] }
+      }
       const hist = Array.isArray(history) ? history.slice(-4) : []
       // Retrieve using the recent thread so a bare follow-up ("what about year two?")
       // still pulls the documents the conversation is actually about.
@@ -2945,6 +3065,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ai:localModelStatus', () => localModelStatus())
   ipcMain.handle('documents:metadata', (_e, docId: string) => getDocMetadata(docId))
   ipcMain.handle('documents:enrich', (_e, docId: string) => enrichDocument(docId))
+  // What the assistant can actually see, so the settings surface can state it
+  // rather than leaving a half-indexed workspace looking like a whole one.
+  ipcMain.handle('brain:coverage', () => brainCoverage())
   ipcMain.handle('documents:enrichAll', async (_e, force?: boolean) => {
     const res = await enrichAllDocuments(force === true)
     // Refresh vectors so the freshly-enriched metadata lands in the embeddings

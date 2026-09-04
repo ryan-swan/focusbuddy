@@ -997,6 +997,23 @@ const api = {
     decrypt: (iv: string, ciphertext: string): Promise<string | null> =>
       ipcRenderer.invoke('vault:decrypt', iv, ciphertext)
   },
+  workspaceExport: {
+    // "Can I leave with my work?" — one readable JSON of authored content.
+    exportJson: (): Promise<
+      | { ok: true; path: string; bytes: number; counts: Record<string, number> }
+      | { ok: false; canceled?: true; error?: string }
+    > => ipcRenderer.invoke('workspace:exportJson'),
+    importJson: (): Promise<{
+      ok: boolean
+      canceled?: true
+      imported: number
+      skipped: number
+      byTable: Record<string, { imported: number; skipped: number }>
+      reason?: string
+      exportedAt?: string
+      fromVersion?: string
+    }> => ipcRenderer.invoke('workspace:importJson')
+  },
   backup: {
     info: (): Promise<{ dir: string; count: number; lastBackupMs: number | null }> =>
       ipcRenderer.invoke('backup:info'),
@@ -1388,6 +1405,11 @@ const api = {
       ok: boolean
       output?: string
       proposals?: ActionProposal[]
+      // Present when the run proposed something and was therefore recorded, so
+      // the widget can attribute what the user does with each proposal back to
+      // the run that suggested it.
+      invocationId?: string
+      agentSlug?: string
       needsApiKey?: boolean
       error?: string
     }> =>
@@ -2052,7 +2074,20 @@ const api = {
       baseUrl: string
       chatModel: string | null
       embedModel: string | null
-    }> => ipcRenderer.invoke('ai:localModelStatus')
+    }> => ipcRenderer.invoke('ai:localModelStatus'),
+    coverage: (): Promise<{
+      documents: {
+        total: number
+        withText: number
+        indexed: number
+        embedded: number
+        enriched: number
+        memoryScanned: number
+      }
+      files: { total: number; indexed: number }
+      conversations: { total: number; indexed: number }
+      knowledge: { total: number }
+    }> => ipcRenderer.invoke('brain:coverage')
   },
   agent: {
     // One round of the autonomous agent loop, driven by lib/agentRunner. The
@@ -2392,6 +2427,18 @@ const api = {
       height?: number
     }): Promise<{ ok: boolean; dataUrl?: string; error?: string; needsKey?: boolean }> =>
       ipcRenderer.invoke('design:generateImage', input),
+    // Generates and SAVES the image, returning its file id for a desk widget.
+    generateToFile: (input: {
+      prompt: string
+      width?: number
+      height?: number
+    }): Promise<{
+      ok: boolean
+      fileId?: string
+      originalName?: string
+      error?: string
+      needsKey?: boolean
+    }> => ipcRenderer.invoke('image:generateToFile', input),
     generateContent: (input: {
       prompt: string
       designKind: string

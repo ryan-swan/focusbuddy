@@ -65,7 +65,7 @@ mac:
       PlexiDesk records video notes when you choose to capture them, stored
       locally and transcribed only via your configured provider.
 
-afterPack: build/adhoc-sign.cjs
+afterPack: build/harden.cjs
 
 win:
   target:

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useGrowToFit, GROW_MAX_HEIGHT } from '../../lib/useGrowToFit'
 import { promptText } from '../plexi/PromptDialog'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
@@ -83,6 +84,10 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
   const [selected, setSelected] = useState<string | null>(null)
   const [tplMenu, setTplMenu] = useState(false)
   const [, forceTpl] = useState(0)
+  const growRef = useRef<HTMLDivElement | null>(null)
+  // Show the whole form without the reader having to resize first.
+  // Grow-only and capped — see useGrowToFit.
+  useGrowToFit(widget, growRef, { maxHeight: GROW_MAX_HEIGHT['custom-block'], disabled: inline }, [widget.content, mode])
   const lastSaved = useRef(widget.content)
 
   useEffect(() => subscribe(() => forceTpl((n) => n + 1)), [])
@@ -347,6 +352,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
 
       {/* Field surface */}
       <div
+        ref={growRef}
         className={`relative flex-1 min-h-0 overflow-auto ${
           mode === 'design'
             ? 'bg-[radial-gradient(circle,_rgba(120,113,108,0.18)_1px,_transparent_1px)] [background-size:16px_16px]'

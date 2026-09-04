@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useGrowToFit, GROW_MAX_HEIGHT } from '../../lib/useGrowToFit'
 import { promptText } from '../plexi/PromptDialog'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -135,6 +136,11 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
   const saveTimerRef = useRef<number | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; selectionText?: string } | null>(null)
   // Slash insert menu, anchored at the caret within this container.
+  const growRef = useRef<HTMLDivElement | null>(null)
+
+  // Show the whole of what is written here without the reader having to
+  // resize first. Grow-only and capped — see useGrowToFit.
+  useGrowToFit(widget, growRef, { maxHeight: GROW_MAX_HEIGHT['markdown'], disabled: inline }, [widget.content])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [slashOpen, setSlashOpen] = useState(false)
   const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null)
@@ -362,6 +368,7 @@ export default function MarkdownWidget({ widget, inline = false }: Props): JSX.E
       )}
 
       <div
+        ref={growRef}
         className="flex-1 overflow-auto md-rendered tiptap-editor px-4 py-3 text-[var(--ink-100)]"
         onMouseDown={(e) => e.stopPropagation()}
         onContextMenu={(e) => {

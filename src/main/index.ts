@@ -20,8 +20,10 @@ import { installAutoUpdater, checkForUpdates } from './autoUpdate'
 import { detectOfficeBuild, detectPreviewBuild } from './appMode'
 import { runDueFlows } from './db/flows'
 import { sweepDocumentChunks, sweepWidgetChunks, sweepChatChunks, sweepFileChunks } from './chunkIndex'
+import { sweepDocumentEnrichment, sweepDocumentMemory, sweepEmbeddings } from './ai/localAiSweeps'
 import { runDueReports } from './db/reports'
 import { installMainCrashHandlers, recordCrash } from './db/crashLog'
+import { installIpcErrorBoundary } from './ipc/errorBoundary'
 import { startNotificationScheduler } from './notifications/scheduler'
 
 // Capture uncaught errors + unhandled rejections from the main process before
@@ -29,6 +31,12 @@ import { startNotificationScheduler } from './notifications/scheduler'
 // handlers only touch the DB when a crash actually fires, by which point it is
 // ready, so installing this early is safe.
 installMainCrashHandlers()
+
+// Wrap every invoke handler registered from here on, so a handler that lets a
+// raw error escape cannot hand the renderer a database error, a filesystem
+// errno, or a main-process stack trace. Must run before registerIpcHandlers()
+// and before any module registers a channel of its own.
+installIpcErrorBoundary()
 
 // Load .env for dev/prod, but NOT under the Playwright harness (FB_TEST_USER_DATA):
 // the e2e suite strips API keys from the launch env to stay hermetic, and loading a
@@ -386,6 +394,34 @@ function createCommandCenter(): BrowserWindow {
 }
 
 app.on('web-contents-created', (_, contents) => {
+  // ── <webview> attach policy ─────────────────────────────────────────────
+  // The moment a <webview> attaches is the only point its privileges can still
+  // be changed, and the preferences arrive from the PAGE. Anything script in the
+  // renderer could set — a preload of its own choosing, Node integration — is
+  // stripped here rather than trusted: without this, script that reaches the
+  // renderer can attach a <webview> carrying its own preload and escape the
+  // sandbox entirely.
+  //
+  // This fires on the HOST contents (the app's own renderer), which is why it is
+  // registered above the webview-only guard below rather than inside it.
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    // The app's own browser widgets never set a preload; only an attacker would.
+    delete webPreferences.preload
+    webPreferences.nodeIntegration = false
+    webPreferences.nodeIntegrationInSubFrames = false
+    webPreferences.contextIsolation = true
+    webPreferences.webSecurity = true
+
+    // Browser widgets legitimately load arbitrary web pages, so the scheme
+    // allowlist stays deliberately wide. A guest loading from disk is the case
+    // nothing in this app asks for and an attacker does.
+    const src = String(params.src ?? '')
+    if (src && /^(file|blob):/i.test(src)) {
+      console.warn(`[webview] refused a guest loading from ${src.slice(0, 12)}`)
+      event.preventDefault()
+    }
+  })
+
   // Only attach to <webview> tag contents — not the main window's React renderer
   if (contents.getType() !== 'webview') return
 
@@ -605,6 +641,67 @@ app.whenReady().then(() => {
       console.error('[chunk-index] sweep failed:', err)
     }
   }, 12_000)
+
+  // Local-AI passes: document enrichment + memory extraction.
+  //
+  // Both run on the LOCAL model, so they cost nothing and leave nothing. Both
+  // were previously reachable only from a button in Settings, which is why a
+  // year-old workspace had zero enriched documents — and therefore why the
+  // enriched grounding header (Category / Dates / Mentions / Summary) that
+  // groundingBlock renders had never appeared in a single prompt.
+  //
+  // Deliberately gentle: a small batch per tick, several minutes apart, so a
+  // backlog drains over an hour of normal use instead of pinning a core at
+  // launch. Each pass is ledgered by content hash, so once the backlog is clear
+  // these ticks do nothing until a document actually changes. No local model
+  // means both return a reason and write nothing.
+  const LOCAL_AI_FIRST_RUN_MS = 45_000
+  const LOCAL_AI_INTERVAL_MS = 5 * 60_000
+  let localAiQuiet = false
+  const runLocalAiPasses = async (): Promise<void> => {
+    try {
+      // Embeddings go FIRST. They are batched and fast, and they are what makes
+      // a question about churn find a document about attrition — the single
+      // cheapest gain of the three. Enrichment and memory are per-document model
+      // calls measured in seconds, so running them first starves embeddings
+      // behind a backlog that can take an hour to drain.
+      const v = await sweepEmbeddings()
+      if (v.documents + v.knowledge > 0) {
+        // eslint-disable-next-line no-console
+        console.log(`[local-ai] embedded ${v.documents} document(s), ${v.knowledge} knowledge entr(ies)`)
+      } else if (v.reason) {
+        // A backlog that embeds nothing must say why. Silence here is what made
+        // the shortfall invisible: coverage simply sat below 100% with no
+        // explanation anywhere.
+        // eslint-disable-next-line no-console
+        console.log(`[local-ai] embedding backfill made no progress: ${v.reason}`)
+      }
+      const e = await sweepDocumentEnrichment()
+      const m = await sweepDocumentMemory()
+      if (e.reason === 'no_local_model' || m.reason === 'no_local_model') {
+        if (!localAiQuiet) {
+          localAiQuiet = true
+          // eslint-disable-next-line no-console
+          console.log('[local-ai] no local model available — enrichment and memory are idle, nothing written')
+        }
+        return
+      }
+      localAiQuiet = false
+      if (e.processed + m.processed > 0) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[local-ai] enriched ${e.processed} (${e.remaining} left), ` +
+            `memory scanned ${m.processed} (+${m.added} remembered, ${m.remaining} left)`
+        )
+      }
+    } catch (err) {
+      console.error('[local-ai] sweep failed:', err)
+    }
+  }
+  setTimeout(() => {
+    void runLocalAiPasses()
+    setInterval(() => void runLocalAiPasses(), LOCAL_AI_INTERVAL_MS).unref?.()
+  }, LOCAL_AI_FIRST_RUN_MS).unref?.()
 
   // Wire `fb-file://<id>` → file on disk. Uses Electron's modern `protocol.handle`
   // which supports Range requests transparently (critical for streaming

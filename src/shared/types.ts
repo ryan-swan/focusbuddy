@@ -22,6 +22,10 @@ export type SectionLayout = 'free' | 'grid' | 'stacks' | 'icons' | 'list'
 export type PinZone = 'tl' | 'tr' | 'bl' | 'br'
 
 export type WidgetKind =
+  // Prompt-to-image on the canvas. Content is the fb_files id of the generated
+  // image (never the image bytes — see generateImageToFile), so it renders
+  // through the same fb-file:// path as any other image on a desk.
+  | 'image-gen'
   | 'sticky'
   | 'note'
   | 'markdown'

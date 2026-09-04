@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useGrowToFit, GROW_MAX_HEIGHT } from '../../lib/useGrowToFit'
 import type { Widget } from '@shared/types'
 import WidgetFrame from './WidgetFrame'
 import { useWidgetStore } from '../../stores/widgets'
@@ -60,18 +61,9 @@ export default function StickyWidget({ widget, inline = false }: Props): JSX.Ele
 
   // Auto-grow: grow the note by whatever its content overflows, in whichever
   // view is showing, so a longer note stays readable without manual resizing.
-  // Grow-only and capped so a runaway paste can't fill the canvas.
-  const MAX_STICKY_HEIGHT = 640
-  useEffect(() => {
-    if (inline) return
-    const el = scrollRef.current
-    if (!el || el.clientHeight === 0) return
-    const overflow = el.scrollHeight - el.clientHeight
-    if (overflow > 4) {
-      const target = Math.min(MAX_STICKY_HEIGHT, widget.height + overflow)
-      if (target > widget.height) void update(widget.id, { height: Math.round(target) })
-    }
-  }, [text, editing, widget.height, widget.id, inline, update])
+  // The rule (grow-only, capped, skipped inline) now lives in useGrowToFit so
+  // every content widget behaves the same way — this was the original.
+  useGrowToFit(widget, scrollRef, { maxHeight: GROW_MAX_HEIGHT.sticky, disabled: inline }, [text, editing])
 
   // Adopt the store's content on a NEW widget, or on a genuine EXTERNAL change
   // (sync, AI, sync-group mirror). Never re-adopt the echo of our own debounced

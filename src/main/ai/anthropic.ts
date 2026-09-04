@@ -382,10 +382,13 @@ const ACTION_KINDS_CATALOG =
   'Each action object has a "kind" plus its required fields. Valid kinds:\n' +
   '\n' +
   '  { "kind": "create-todo-list", "title": "Launch checklist", "items": ["Buy hosting", "Record pilot"], "reason": "checklist for launch" }\n' +
-  '  { "kind": "open-url", "url": "https://docs.google.com/...", "title": "Brief draft", "reason": "..." }\n' +
-  '  { "kind": "agent-browse", "task": "Search this site for a 2-bedroom under $2400 and open the best listing", "url": "https://...", "reason": "..." }  (Plexii drives the in-app browser step by step — visible, stoppable, consent-gated. Use when the user asks you to DO something on a website: search within it, fill a form, walk a flow. For simply showing a page, use open-url. It never signs in, pays, solves CAPTCHAs, or moves files — if the task needs that, say that part is theirs. "url" is where to start; omit it to act on the page already open.)\n' +
+  '  { "kind": "open-url", "url": "https://docs.google.com/...", "title": "Brief draft", "reason": "..." }  (An EXTERNAL web address only — the url MUST begin http:// or https://. Never use this for anything INSIDE Plexii: to make a page use create-page, and to OPEN something that already exists use drill-in-widget / focus-widget / navigate-to below.)\n' +
+  '  { "kind": "drill-in-widget", "widgetId": "the id from the desk index", "label": "Email sequences", "reason": "..." }  (Opens ONE widget full-screen in focus mode. This is what "open X in focus view", "show me X full screen", "zoom into X" mean.)\n' +
+  '  { "kind": "focus-widget", "widgetId": "the id from the desk index", "label": "Email sequences", "reason": "..." }  (Scrolls the canvas to a widget and highlights it, leaving the desk in view. Use when the user wants to be SHOWN where something is rather than to open it.)\n' +
+  '  { "kind": "navigate-to", "target": "documents"|"desks"|"files"|"mail"|"calendar"|"knowledge"|"home", "targetId": "optional exact id", "label": "Documents", "reason": "..." }  (Goes to a place in Plexii. For a specific document use target "documents" with its id.)\n' +
+  '  { "kind": "agent-browse", "task": "Search this site for a 2-bedroom under $2400 and open the best listing", "url": "https://...", "reason": "..." }  (Plexii drives the in-app browser step by step — visible, stoppable, consent-gated. Use when the user asks you to DO something on a website: search within it, fill a form, walk a flow. For simply showing a web page, use open-url. It never signs in, pays, solves CAPTCHAs, or moves files — if the task needs that, say that part is theirs. "url" is where to start; omit it to act on the page already open.)\n' +
   '  { "kind": "create-widget", "widgetKind": "sticky"|"note"|"markdown"|"calculator"|"color"|"timer", "title": "...", "content": "...", "reason": "..." }\n' +
-  '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "deskId": "optional — the desk id this belongs on", "reason": "..." }\n' +
+  '  { "kind": "create-page", "title": "Project brief", "sections": [{"heading":"Goals","body":"..."}], "deskId": "optional — the desk id this belongs on", "reason": "..." }  (A Page is a DOCUMENT inside Plexii, not a web address. This is what "make me a page", "a page to write in", and "a page for an agent to write to" all mean.)\n' +
   '  (DESK PLACEMENT: create-page, create-widget, create-todo-list and create-table all accept an optional "deskId". ' +
   'When the user names a desk, or the request plainly belongs to one in the roster above, SET IT to that exact id — ' +
   'the action then applies straight to that desk instead of stopping to ask the user where it goes. ' +
@@ -628,6 +631,19 @@ function latestConversationSummaries(): Array<{ id: string; label: string }> {
 //
 // Returns { reply, proposals }. If the model returned NO valid JSON the
 // caller treats the entire text as the reply with no proposals.
+
+// Proposals that are structurally incapable of applying, and so should never be
+// offered. Deliberately narrow: this drops only what is provably broken, never
+// what is merely unusual — a judgement call about whether an action is a GOOD
+// idea belongs to the user, not to this filter.
+export function isUnapplicableProposal(p: { kind?: string; url?: unknown }): boolean {
+  // open-url hands its value to the OS as a web address; anything that is not
+  // http(s) is refused downstream, so offering it is offering a dead end.
+  if (p.kind === 'open-url') return !(typeof p.url === 'string' && /^https?:\/\//i.test(p.url))
+  return false
+}
+
+
 export function parseChatJson(raw: string): {
   reply: string
   proposals: ActionProposal[]
@@ -1383,7 +1399,15 @@ function buildChatResponse(
   // transcript green-lights it. Held builds are stated in the reply and, where
   // the surface renders question cards, replaced by an explicit offer.
   const gated = gateCreation({
-    proposals: parsed.proposals,
+    // Drop proposals that cannot possibly apply before they become cards.
+    //
+    // An open-url whose url is not a web address is a misclassification — the
+    // model reached for "open a link" to make something inside Plexii. The
+    // executor already refuses it, but by then the user has been shown an
+    // action card that was never going to work. A card that cannot succeed is
+    // worse than no card: it reads as the app being broken. The reply text
+    // still stands, so the model's explanation survives.
+    proposals: parsed.proposals.filter((p) => !isUnapplicableProposal(p)),
     question: parsed.question,
     discovery: gate?.discovery ?? false,
     greenLit: gate?.greenLit ?? true,
@@ -4379,17 +4403,36 @@ export async function runDeskAgent(input: {
   const formats = Array.from(new Set(outs.map((o) => o.format).filter(Boolean)))
   const outputBlock =
     outs.length > 0
-      ? `\n\nYour output is automatically saved into these linked widgets, each in its own format:\n` +
+      ? // Two things this block has to get right, both learned from a real failure
+        // where an agent replied "I've written a 7-touch sequence ... and saved it
+        // to the linked page" and the page then contained THAT SENTENCE.
+        //
+        // 1. The reply IS the artefact. Saying "produce the content" was too soft
+        //    against a model trained to report on its work, so the prohibition is
+        //    now explicit and gives the failure mode by name.
+        // 2. Never tell it the output is "automatically saved". It is offered to
+        //    the user as a card they accept, so a model told otherwise writes a
+        //    claim that is false at the moment it is written.
+        `\n\nWHAT TO WRITE — this matters more than anything else here.\n` +
+        `Your reply IS the document. It is written verbatim into:\n` +
         outs
           .map((o) => `- a ${o.kind}${o.title ? ` "${o.title}"` : ''}: provide ${o.format ?? 'plain text'}`)
           .join('\n') +
         (formats.length <= 1
-          ? `\n\nWrite your output as ${formats[0] ?? 'plain text'}.`
-          : `\n\nThese formats differ, so write your findings as well-structured Markdown; the app reshapes it for each widget automatically.`) +
-        ` You never access those widgets yourself; just produce the content.`
+          ? `\n\nWrite it as ${formats[0] ?? 'plain text'}.`
+          : `\n\nThose formats differ, so write well-structured Markdown; the app reshapes it per widget.`) +
+        `\n\nSo: produce the finished thing, never a description of it. Do NOT write ` +
+        `"I've written…", "I've drafted…", "Here's a…", "…ready to edit", or ` +
+        `"saved to the linked page". There is no preamble and no sign-off: the FIRST ` +
+        `line of your reply is the first line of the document itself. If you were ` +
+        `asked for a 7-email sequence, your reply is the seven emails.\n` +
+        `Nothing is saved by you and nothing is saved yet — the user is shown what ` +
+        `you wrote and accepts it, so never claim it has been saved or is live.`
       : ''
 
-  const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}${outputBlock}\n\nProduce your output now.`
+  const user = `Standing instruction:\n${instruction}\n\nWired inputs:\n${inputBlock}${outputBlock}\n\n${
+    outs.length > 0 ? 'Write the document now — the content itself, nothing about it.' : 'Produce your output now.'
+  }`
 
   try {
     // Browser research loop — when a browser is wired in, the agent can call

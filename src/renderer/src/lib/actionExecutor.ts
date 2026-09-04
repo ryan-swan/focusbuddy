@@ -750,7 +750,15 @@ async function applyOpenUrl(
   ctx: { activeTaskId: string | null }
 ): Promise<ApplyResult> {
   if (!/^https?:\/\//i.test(p.url)) {
-    return { ok: false, message: 'Skipped — URL must start with https://' }
+    // Say what arrived, not just what was wanted. This fires most often when the
+    // model reached for open-url to make something INSIDE Plexii — a page to
+    // write in is create-page — and "must start with https://" left the user
+    // with no idea which part went wrong.
+    const got = p.url?.trim() ? `"${p.url.trim().slice(0, 60)}"` : 'nothing'
+    return {
+      ok: false,
+      message: `Skipped — "Open link" needs a web address starting http:// or https://, but got ${got}. If you meant a page inside Plexii, ask for a page or a document instead.`
+    }
   }
   // R4/R13: the web never leaves Plexii and never demands a canvas. With no
   // desk open, the in-app browser panel is the destination — the old

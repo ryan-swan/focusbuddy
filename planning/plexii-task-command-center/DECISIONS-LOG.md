@@ -2519,3 +2519,59 @@ component were REVERTED to keep that diff whole. `accentColorLock` now
 freezes the offender set — it may shrink, a new one fails the build.
 
 11 new pins; 3,460 green; both typechecks clean.
+
+
+## DEC-096 — The liveness gate, real-data verification, and process weight by reversibility
+**Date:** 2026-09-03 · **Status:** EXECUTED · **Trigger:** market-readiness review +
+a capability audit against the operator's real workspace
+
+**Every gate we had asked whether the code was correct. None asked whether the
+capability produced anything.** The audit found six wiring failures that all shipped
+through green gates: document enrichment built, consumed by the grounding path, and
+sitting at **zero rows for the life of the product**; agent delivery wired and
+delivering nothing; desk agents recording no invocation history, so outcomes could
+never be attributed; `focus-widget` / `drill-in-widget` / `navigate-to` implemented
+in the executor and never offered to the model; and 63 of 139 documents extracting
+to nothing — invisible to retrieval, embedding and memory alike. 3,460 tests were
+green throughout, and had to be: every one is a *wiring* failure, and a unit test
+verifies the code you wrote, not whether anything calls it.
+
+This is the shape CLAUDE.md already names — *"every cap in this repo was once
+declared and never called, which is a comment, not a cap"*. **G-LIVE** turns that
+lesson into a gate: a stage is done when its capability has been OBSERVED producing
+output, not when its tests pass. `npm run verify:liveness` copies the real database
+into a throwaway profile, runs the app, and exits non-zero if anything with work
+available still produced nothing.
+
+**Verification moves to real data.** Every one of those defects is invisible on a
+fresh profile — enrichment looks correct when there is nothing to enrich, retrieval
+looks correct with three documents, and the extraction gap only appeared against a
+real 139-document corpus. "Live verification" in the Phase-6 gate now means a COPY
+of the operator's database, never an empty one. The live file is never the target.
+
+**Process weight now scales with reversibility.** Phases 0-6 with dual validation
+and the Crossroads Protocol are right for anything that can corrupt data or reshape
+a shared surface, and they are overhead for a prompt line or a new widget kind — a
+process heavy enough to discourage cheap experiments becomes the reason none get
+run. Three tiers (REVERSIBLE / RESHAPE / FOUNDATIONAL), declared when a stage opens,
+not argued afterwards; a REVERSIBLE stage that turns out to touch a shared surface
+halts and re-opens higher, the same rule as a mid-build collision.
+
+Also reconciled: the market-readiness roadmap had not been updated since 2026-06-05
+and contained none of the work actually done since — the Attention layer (this
+initiative), real-time collaboration, or PlexiOffice as a distributed product. A
+roadmap that does not contain the work is not managing it. **Wave 1.5 (Evidence)**
+was inserted before the monetization wave, because Wave 2 spends 4-6 weeks building
+pricing around a value proposition no user outside the operator has yet tested.
+
+Suite scope is raised as [ADR-0008](../../docs/adr/ADR-0008-suite-scope-and-gtm-sequencing.md),
+PROPOSED with options priced — POSITIONING.md and the brochure currently sell
+different products, and roadmap hours are being allocated by whichever was read most
+recently rather than by a recorded decision. Not self-granted: the Crossroads
+Protocol applies, and the ruling is the operator's.
+
+Audit state at close: **2 findings, both low, both operational calls on the live
+database** (a VACUUM's worth of free pages, and the append-only event store's share
+of the file). Zero high or critical. `capability-liveness` clean — all five
+capabilities producing output, including agent outcome learning, which had been at
+zero since the feature was built.

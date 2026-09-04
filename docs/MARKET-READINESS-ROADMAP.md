@@ -2,7 +2,38 @@
 
 **From:** 38/100 (not shippable as a paid product) · **To:** an elite, market-ready "next big thing"
 **Companion to:** [SYSTEM-REVIEW-2026-06](./SYSTEM-REVIEW-2026-06.md) · [BROWSER-ADR-001](./BROWSER-ADR-001-in-canvas-browser.md)
-**Updated:** 2026-06-05
+**Updated:** 2026-09-03 (reconciled — see "What actually happened" below)
+
+---
+
+## What actually happened since this was written (reconciled 2026-09-03)
+
+This plan was written on 2026-06-05 and then diverged from reality for three
+months. Reconciled here, because a roadmap that does not contain the work is not
+managing it — it is being overtaken by it.
+
+**Shipped, and not in any wave below:**
+
+- **4.2.0 — the Attention layer, command centre, calendar and day plan.** A large
+  branch merge (DEC-029…DEC-095) with its own phase structure under
+  `planning/plexii-task-command-center/`. Substantial, shipped, unplanned here.
+- **4.0.13 — real-time collaboration**, check-out lock retired.
+- **PlexiOffice as a distributed product** — its own electron-builder config,
+  release pipeline and notarisation (4.2.1). Never appeared in a wave.
+- **Signing + notarisation** — Wave 1 #2 is effectively done for both products.
+
+**Audited 2026-09-03 and fixed** (see [QUALITY-FRAMEWORK §6](../planning/plexii-task-command-center/QUALITY-FRAMEWORK.md)):
+a set of *wiring* failures in the AI layer — enrichment producing nothing, agent
+delivery delivering nothing, agent runs recording no history, 63 of 139 documents
+invisible to retrieval. All shipped through green gates, which is why **G-LIVE**
+now exists as a release gate.
+
+**Still open from Wave 1:** durable data (#3), vault rotation (#4), and the
+remaining command-execution review (#1).
+
+**The 38/100 figure at the top of this document is from June and is stale.** It is
+left as written rather than re-scored, because a number invented without a
+re-review would be worse than an obviously dated one.
 
 ---
 
@@ -13,6 +44,7 @@ You cannot make a product elite before it is safe to trust, and you cannot sell 
 ```
   Wave 0  ✅ DONE      Quick wins (security + browser + data) — shipped & proven this session
   Wave 1  ▢ SAFE       Close the RCE/injection holes · sign+notarize · durable data · vault re-key
+  Wave 1.5 ▢ EVIDENCE  Ten real users · watch first-run · instrument what they use
   Wave 2  ▢ SELLABLE   Server-enforced gating · metered hosted-AI wedge · in-app billing
   Wave 3  ▢ ELITE      Browser phases 2-4 · fix+harden AI · canvas nav+undo · perf · onboarding
   Wave 4  ▢ MOAT       canvas + flow insight loop · native browser + vetted extensions
@@ -47,7 +79,16 @@ Six fixes, implemented and verified GREEN (`plexidesk-tester`: 66/66 unit + 18/1
 
 ### 2. Trustworthy distribution: sign, notarize, fuse  · `M (~1 week, mostly cert procurement)`
 - Apple **Developer ID** signing + **notarization** (`mac.identity`, `hardenedRuntime:true`, `mac.notarize:true`, entitlements plist preserving camera/mic); remove the ad-hoc `build/adhoc-sign.cjs` hook **after** Developer-ID signing works (sequence carefully — removing it while misconfigured yields a "damaged" app).
-- Add **`@electron/fuses`**: disable `RUN_AS_NODE`, enable ASAR integrity validation, disable Node CLI inspect.
+- ✅ **`@electron/fuses` added 2026-09-03** (`build/harden.cjs`, wired into all three
+  builder configs; fuses flip BEFORE signing, since flipping rewrites the binary and
+  invalidates a prior signature). Live: `RunAsNode=false`, `EnableNodeOptionsEnvironmentVariable=false`,
+  `EnableNodeCliInspectArguments=false`. Verified: `ELECTRON_RUN_AS_NODE=1 <app> -e '…'`
+  executes arbitrary code on an unfused build and is **refused** on the hardened one.
+  **Still open, deliberately:** `EnableCookieEncryption` breaks an ad-hoc-signed build —
+  it launches, stays alive and never initialises (no database) because the key comes from
+  the keychain and an ad-hoc identity cannot hold it; re-test under a real Developer ID
+  signature. `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` need their
+  own verified build; this app unpacks native modules by necessity.
 - **Harden the release path BEFORE the first signed release** (branch protection + required review on `saasmouth/focusbuddy` publish, scoped token, tag-gated CI release instead of local `dist:release`) — otherwise the very release that fixes this could be the poisoned one.
 - Interim only (does *not* close the hole): set `autoInstallOnAppQuit=false` + `autoDownload=false`.
 - **Done when:** a notarized build installs without Gatekeeper warnings and electron-updater verifies publisher provenance.
@@ -66,6 +107,35 @@ Six fixes, implemented and verified GREEN (`plexidesk-tester`: 66/66 unit + 18/1
 
 ### 5. IPC hardening  · *(folds into #2/#1)*  · `M`
 - Runtime **zod** validation on the ~130-handler IPC boundary; `setPermissionRequestHandler` allowlist (tighten the Wave-0 denylist to per-origin); `will-navigate` pinning on the main window; justify or remove `sandbox:false`; validate the `haptyx://` auth token's origin/signature (`authProtocol.ts`).
+
+---
+
+## Wave 1.5 — Make it EVIDENCED  *(demand; ~2 weeks, no new features)*
+
+> Added 2026-09-03. Wave 2 spends 4-6 weeks building a monetization spine. This
+> wave costs two weeks and can invalidate its shape entirely, so it goes first.
+
+The load-bearing gap is not "can we charge safely" — Wave 1 handles that. It is
+that **no one outside the operator has used this product**. POSITIONING.md carries
+confidence 0.77 with `LOW_CONFIDENCE` and lists *"Real users today?"* as an open
+question; that question is still open, and every claim downstream of it is
+unvalidated.
+
+1. **Ten users** from the ICP — builders, consultants, founders. Not a launch.
+2. **Watch first run.** The load-bearing assumption is that someone reaches a
+   working canvas without a support call. Watch it happen, or watch it not.
+3. **Read what they actually use.** The instrumentation now exists: the coverage
+   panel (Settings → Local AI), `agent_invocations`, and `npm run audit` for a full
+   read of any profile.
+
+**Gate:** ten first-run observations written up, and a usage profile per user. The
+question it answers: *does anyone else's profile look like the operator's — heavy
+canvas, near-zero AI?* If it does, Wave 3's "fix & harden the AI layer" is not the
+priority the June plan assumed, and the roadmap changes shape.
+
+**Why it is a gate and not a task:** Wave 2 builds pricing and gating around a
+value proposition. Building that before knowing which half of the product people
+value is the most expensive way to find out.
 
 ---
 
@@ -136,9 +206,16 @@ Six fixes, implemented and verified GREEN (`plexidesk-tester`: 66/66 unit + 18/1
 | Wave | Theme | Effort | Gate |
 |---|---|---|---|
 | 0 ✅ | Quick wins | done | logins work for most; criticals #2/#4-class closed |
-| 1 | Safe | ~3-4w | **no paid launch before this** |
+| 1 | Safe | ~3-4w (partly done: signing ✅) | **no paid launch before this** |
+| 1.5 | Evidenced | ~2w | **ten first-run observations + a usage profile each** |
 | 2 | Sellable | ~4-6w | **cut-line: can charge money** |
 | 3 | Elite | ~8-12w | wins on experience |
 | 4 | Moat | ~6-8w | the next big thing |
 
-**Recommended immediate next step:** Wave 1 #1 (gate `run-shell`) + #2 (signing/notarization — start the cert procurement now, since it has lead time). Both are launch-blockers with the longest tail.
+**Recommended immediate next step (2026-09-03):** signing/notarisation is done, so
+Wave 1 narrows to #1 (gate `run-shell`), #3 (durable data) and #4 (vault rotation).
+Run those in parallel with **Wave 1.5**, which needs calendar time rather than
+engineering time and is the only wave that can change the shape of everything after it.
+
+Every release from here also passes **G-LIVE** (`npm run verify:liveness`) — see
+[QUALITY-FRAMEWORK §6](../planning/plexii-task-command-center/QUALITY-FRAMEWORK.md).
