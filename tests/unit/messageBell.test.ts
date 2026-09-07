@@ -38,16 +38,20 @@ describe('DEC-124 — the message bell', () => {
     expect(messages).toContain("sourceType: 'message',")
     expect(messages).toContain('sourceRef: m.conversationId,')
     expect(messages).toContain("intentClass: 'to_respond',")
-    expect(messages).toContain('sourceUrl: buildMessageUrl(m.conversationId, m.id)')
+    // DEC-127: a reply names its parent too, so the way back can open its thread
+    expect(messages).toContain('sourceUrl: buildMessageUrl(m.conversationId, m.id, m.parentId ?? null)')
     // nothing files from the bell itself — the confirm card does, on the person's say-so
     expect(messages).not.toContain('workItems.create(')
   })
 
   it('the Attention page routes a message link back to its conversation, at the message', () => {
     expect(attention).toContain("import { parseMessageUrl } from '../../lib/messageLink'")
-    expect(attention).toContain('function openConversationAt(conversationId: string, messageId: string | null): void {')
-    expect(attention).toContain('void useMessagingStore.getState().openConversation(conversationId)')
-    expect(attention).toContain('else if (msg) openConversationAt(msg.conversationId, msg.messageId)')
-    expect(attention).toContain("? 'Open the conversation at this message'")
+    // DEC-127: the route is the shared router (lib/openMessage) — the floating
+    // assistant on PlexiiMessage — not the Chat page; openConversationAt is gone.
+    expect(attention).toContain("import { openMessageLink } from '../../lib/openMessage'")
+    expect(attention).toContain('else if (!openMessageLink(i.sourceUrl)) void window.api.files.openExternal(i.sourceUrl!)')
+    expect(attention).not.toContain('function openConversationAt(')
+    expect(attention).not.toContain("from '../../stores/messaging'")
+    expect(attention).toContain("? 'Open the message in PlexiiMessage — the conversation, at this message'")
   })
 })

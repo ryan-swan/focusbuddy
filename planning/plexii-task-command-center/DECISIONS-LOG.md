@@ -3971,3 +3971,53 @@ near edge on theirs, the thread keeps it on yours. Suite: 3,817 tests / 348
 files; both typechecks clean. Pins rewritten with history: DEC-124's bell
 usage lines → the one cluster; DEC-125's Translate label → the menu's;
 e2e P2100-6 opens the ⋯ menu before looking for Translate.
+
+## DEC-127 — The way back: an Attention item opens the floating assistant on PlexiiMessage, on the person, at the message
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("when I add a message to the attention queue…
+it needs to link me back to that exact message with that exact person. And
+it should open up in the PlexiiMessage tab within the AI assistant menu
+that follows you from page to page… it should automatically open up in
+the floating box with the PlexiiMessage tab opened to the person that it
+came from").
+
+**What changed.**
+- **One router** — `lib/openMessage.ts`: `openMessageInPanel(conversation,
+  message, parent)` asks the messaging store to land on the message
+  (`landOn`), opens the conversation, then opens the persistent assistant
+  on its PlexiiMessage tab. `openMessageLink(url)` routes an internal
+  `plexii://message/…` link and returns false for anything else, so every
+  caller falls through to its own door for web marks. DEC-124's Chat-page
+  route (`openConversationAt`) is retired.
+- **The store carries the landing** — `messaging.landOnMessage`
+  `{messageId, parentId, at}`; MessagesView consumes it once, in an effect
+  declared AFTER its pin-to-newest effect so the landing wins the scroll:
+  in the panel it shows the thread pane first (a list pane sent back by
+  the arrow is brought forward), for a reply it opens the parent's thread
+  first and lands inside it, and a message that never appears expires
+  after 8 s instead of firing weeks later. The landing is the Recall
+  citation's own `jumpToMessage` — centred, flashed.
+- **A reply names its parent** — `buildMessageUrl` / `parseMessageUrl`
+  gained `p=` (backward compatible; the bell files `m.parentId` for a
+  thread reply).
+- **Every door on the Attention page routes**: the row's `message` chip is
+  a button now (the DEC-079 meeting chip, for messages;
+  `item-message-link`), the row's source door (forum icon; title "Open the
+  message in PlexiiMessage — the conversation, at this message"), and the
+  item editor's Source link (reads "The message, in PlexiiMessage", no
+  external-link mark; DEC-091's web deep links still open externally).
+
+**Verified live** over CDP, 9/9, DOM-read only (after a store file is
+hot-swapped a probe's own `import('/src/stores/…')` is a stale instance —
+the DOM and the real buttons are the truth), the operator's data untouched,
+panel and page restored: from a closed panel the chip and the source door
+each open the floating assistant on PlexiiMessage on Caleb with the exact
+message in view and flashed; with the panel already open on the Attention
+tab and the thread pane sent back to the list, the chip switches the tab,
+brings the thread pane back and lands; the editor's Source link reads as
+designed and lands the same way. Not exercised live: a reply inside a
+thread (no such item exists yet) — the thread-first landing is pinned by
+messageLanding.test.ts. Suite: 3,828 tests / 349 files; both typechecks
+clean. Pins rewritten with history: DEC-124's `openConversationAt` pins →
+the router; DEC-124's parsed-link shapes gained `parentId: null`; C5's door
+pin → the fall-through.

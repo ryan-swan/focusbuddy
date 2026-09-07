@@ -5,7 +5,7 @@ import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { parseMessageUrl } from '../../lib/messageLink'
-import { useMessagingStore } from '../../stores/messaging'
+import { openMessageLink } from '../../lib/openMessage'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
@@ -135,7 +135,6 @@ export default function AttentionView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
-  const goMessages = useViewStore((s) => s.goMessages)
   const goMeetings = useViewStore((s) => s.goMeetings)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goRoom)
@@ -642,14 +641,10 @@ export default function AttentionView(): JSX.Element {
     )
   }
 
-  // DEC-124 — a message moment: open the conversation on the Chat page and
-  // land on the message once it is on screen.
-  function openConversationAt(conversationId: string, messageId: string | null): void {
-    void useMessagingStore.getState().openConversation(conversationId)
-    goMessages()
-    if (messageId)
-      setTimeout(() => document.getElementById(`msg-${messageId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 400)
-  }
+  // DEC-124 routed a message moment to the Chat page; DEC-127 routes it to
+  // the floating assistant instead (lib/openMessage — the panel on its
+  // PlexiiMessage tab, the conversation on that person, landed on the
+  // message), so the way back follows you page to page.
 
   function openSource(i: FbNode): void {
     if (i.parentId && nodes.some((n) => n.id === i.parentId && n.kind === 'task')) {
@@ -950,6 +945,21 @@ export default function AttentionView(): JSX.Element {
                     <Icon name="groups" size={10} />
                     meeting
                   </button>
+                ) : ctx.source && ctx.source.type === 'message' && parseMessageUrl(i.sourceUrl) ? (
+                  /* DEC-127 — an item filed from a message links BACK to it: the
+                     floating assistant opens on PlexiiMessage, on that person,
+                     landed on the exact message (the DEC-079 meeting chip, for
+                     messages). */
+                  <button
+                    data-row-action
+                    onClick={() => openMessageLink(i.sourceUrl)}
+                    title={sourceLabel(ctx.source.type)}
+                    data-testid="item-message-link"
+                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-full text-[10.5px] bg-[var(--surface-sunken)] text-[var(--ink-50)] hover:text-[var(--ink-100)] fb-press"
+                  >
+                    <Icon name="forum" size={10} />
+                    message
+                  </button>
                 ) : ctx.source ? (
                   <span
                     title={sourceLabel(ctx.source.type)}
@@ -1187,17 +1197,17 @@ export default function AttentionView(): JSX.Element {
                     // (the Slack thread, the ticket), frozen at mark time —
                     // the widget may have browsed away; this has not.
                     const moment = parseMeetingMomentUrl(i.sourceUrl)
-                    const msg = parseMessageUrl(i.sourceUrl)
                     if (moment) openMeeting(moment.meetingId, moment.segmentId)
-                    else if (msg) openConversationAt(msg.conversationId, msg.messageId)
-                    else void window.api.files.openExternal(i.sourceUrl!)
+                    // DEC-127 — a message link opens the floating assistant on
+                    // PlexiiMessage, on that person, at the exact message.
+                    else if (!openMessageLink(i.sourceUrl)) void window.api.files.openExternal(i.sourceUrl!)
                   }}
                   data-row-action
                   title={
                     parseMeetingMomentUrl(i.sourceUrl)
                       ? 'Jump to the spoken moment in the meeting'
                       : parseMessageUrl(i.sourceUrl)
-                        ? 'Open the conversation at this message'
+                        ? 'Open the message in PlexiiMessage — the conversation, at this message'
                         : `Open the source page — ${i.sourceUrl}`
                   }
                   className="icon-btn !h-6 !w-6"

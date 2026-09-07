@@ -160,6 +160,11 @@ interface MessagingStore {
   // ChatComposer when its conversation becomes active. Draft only — the human
   // presses send.
   pendingDraft: { conversationId: string; text: string } | null
+  // DEC-127 — a message to land on once its conversation (and, for a reply,
+  // its thread) is on screen: set by the route back from an Attention item,
+  // consumed once by the view that lands. `at` lets a landing that never
+  // finds its message expire instead of firing weeks later.
+  landOnMessage: { messageId: string; parentId: string | null; at: number } | null
 
   connect: (token: string) => Promise<void>
   disconnect: () => void
@@ -180,6 +185,7 @@ interface MessagingStore {
   consumeProposal: (conversationId: string, messageId: string, proposalId: string) => void
   openThread: (parentId: string) => Promise<void>
   closeThread: () => void
+  landOn: (messageId: string | null, parentId?: string | null) => void
   sendThreadReply: (parentId: string, body: string) => Promise<void>
   notifyTyping: () => void
   browseChannels: (orgId: string) => Promise<api.OrgChannel[]>
@@ -247,6 +253,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   pinsByConv: {},
   activity: [],
   activeThreadId: null,
+  landOnMessage: null,
 
   connect: async (token) => {
     set({ token, connected: true })
@@ -515,6 +522,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   },
 
   closeThread: () => set({ activeThreadId: null }),
+  landOn: (messageId, parentId = null) =>
+    set({ landOnMessage: messageId ? { messageId, parentId: parentId ?? null, at: Date.now() } : null }),
 
   sendThreadReply: async (parentId, body) => {
     const { token, activeId } = get()

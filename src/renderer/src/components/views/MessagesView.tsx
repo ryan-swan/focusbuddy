@@ -558,6 +558,9 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
   const typingByConv = useMessagingStore((s) => s.typingByConv)
   const openThread = useMessagingStore((s) => s.openThread)
   const activeThreadId = useMessagingStore((s) => s.activeThreadId)
+  const threadsByParent = useMessagingStore((s) => s.threadsByParent)
+  const landOnMessage = useMessagingStore((s) => s.landOnMessage)
+  const landOn = useMessagingStore((s) => s.landOn)
   const startCall = useCallStore((s) => s.startCall)
   const goMeetings = useViewStore((s) => s.goMeetings)
   const open = useMessagingStore((s) => s.openConversation)
@@ -646,6 +649,33 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
     const el = threadRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages.length, activeId])
+
+  // DEC-127 — land on the message the route back from Attention named. Runs
+  // AFTER the pin-to-newest effect above (declaration order), so the landing
+  // wins the scroll. In the panel the thread pane must be showing first; a
+  // reply needs its thread open first; a message that never appears expires.
+  useEffect(() => {
+    if (!landOnMessage || !activeId) return
+    if (Date.now() - landOnMessage.at > 8000) {
+      landOn(null)
+      return
+    }
+    if (compact && compactPane !== 'thread') {
+      setCompactPane('thread')
+      return
+    }
+    const { messageId, parentId } = landOnMessage
+    if (parentId) {
+      if (activeThreadId !== parentId) {
+        if (messages.some((m) => m.id === parentId)) void openThread(parentId)
+        return
+      }
+      if (!(threadsByParent[parentId] ?? []).some((m) => m.id === messageId)) return
+    } else if (!messages.some((m) => m.id === messageId)) return
+    if (!document.getElementById(`msg-${messageId}`)) return
+    jumpToMessage(messageId)
+    landOn(null)
+  }, [landOnMessage, activeId, activeThreadId, messages, threadsByParent, compact, compactPane, openThread, landOn])
 
   if (!account) {
     return (
@@ -756,7 +786,8 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
             sourceType: 'message',
             sourceRef: m.conversationId,
             intentClass: 'to_respond',
-            sourceUrl: buildMessageUrl(m.conversationId, m.id)
+            // DEC-127 — a reply names its parent too, so the way back can open its thread.
+            sourceUrl: buildMessageUrl(m.conversationId, m.id, m.parentId ?? null)
           }
         }
       })

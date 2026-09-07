@@ -193,8 +193,15 @@
 > (Edit / Delete still yours only); the palette and the menu close on a
 > click anywhere outside or Esc (`hooks/useClickAway.ts`, the house
 > pattern extracted). 16/16 live; suite 3,817 tests / 348 files.
+> **DEC-127**: the way back — an Attention item filed from a message (the
+> row's `message` chip, its source door, the editor's Source link) opens
+> the floating assistant on PlexiiMessage, on that person, landed on the
+> exact message (`lib/openMessage.ts` + `messaging.landOnMessage`,
+> consumed once by MessagesView after its pin-to-newest; replies open
+> their thread first via the link's new `p=`). 9/9 live; suite 3,828
+> tests / 349 files.
 
-**Last updated:** 2026-09-06 — through DEC-126 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-127 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
