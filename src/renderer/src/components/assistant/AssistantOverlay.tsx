@@ -6,7 +6,6 @@ import PlexiiMark from '../brand/PlexiiMark'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
 import { useVoiceHold, useVoiceHoldKeys, startHold, stopHold } from '../../lib/voiceHold'
-import AssistantTasksTab from './tabs/AssistantTasksTab'
 import AssistantAttentionTab from './tabs/AssistantAttentionTab'
 import AssistantMessagesTab from './tabs/AssistantMessagesTab'
 import AssistantAgentTab from './tabs/AssistantAgentTab'
@@ -61,17 +60,18 @@ const FULLSCREEN_TAKEOVER = 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
 const FULLSCREEN_PAGE =
   'fixed top-10 bottom-0 right-0 z-[190] bg-[var(--surface-base)] border-l border-[var(--edge-soft)]'
 
-// The persistent assistant's tabs (spec §5.3, rearranged by DEC-121). Attention
-// is every attention item (the home widget's face), Chat is the conversation,
-// Agent holds the autonomous agent with desk agents as its sub-view, Tasks reads
-// real workspace state, PlexiChat is messaging people — the Office Chat tab in
-// the panel. Order matches the store's ASSISTANT_TABS.
-const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
+// The persistent assistant's tabs (spec §5.3, rearranged by DEC-121/122).
+// First the conversation, worn as the animated double-ii mark alone (the
+// brand's own sign for the AI — one blink on mount, a wink on hover, breathing
+// while it thinks); then Attention (every attention item — Tasks folded in),
+// PlexiiMessage (messaging people — the Office Chat tab in the panel), and
+// Agents (the autonomous agent with desk agents as its sub-view). Order
+// matches the store's ASSISTANT_TABS.
+const TAB_META: { id: AssistantTab; label: string; icon?: string; mark?: boolean }[] = [
+  { id: 'chat', label: 'Plexii AI', mark: true },
   { id: 'attention', label: 'Attention', icon: 'notifications' },
-  { id: 'chat', label: 'Chat', icon: 'forum' },
-  { id: 'agent', label: 'Agent', icon: 'rocket_launch' },
-  { id: 'tasks', label: 'Tasks', icon: 'checklist' },
-  { id: 'messages', label: 'PlexiChat', icon: 'chat' }
+  { id: 'messages', label: 'PlexiiMessage', icon: 'chat' },
+  { id: 'agent', label: 'Agents', icon: 'rocket_launch' }
 ]
 
 // The always-mounted web panel (A2, R4): it rides this component because it
@@ -456,14 +456,23 @@ function AssistantOverlayChrome(): JSX.Element {
                 onClick={() => setTab(t.id)}
                 data-testid={`assistant-tab-${t.id}`}
                 title={t.label}
+                aria-label={t.label}
                 className={`flex-1 min-w-0 inline-flex items-center justify-center gap-1 h-7 rounded-md text-[11px] font-medium transition-colors ${
                   isActive
                     ? 'bg-accent/10 text-[rgb(var(--accent))]'
                     : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]'
                 }`}
               >
-                <Icon name={t.icon} size={14} className="shrink-0" />
-                <span className="truncate">{t.label}</span>
+                {t.mark ? (
+                  /* The mark IS the label: the brand's sign for the AI, animated
+                     the brand way — and breathing while a reply is in flight. */
+                  <PlexiiMark height={16} motion={'once+hover'} title={null} className="shrink-0" />
+                ) : (
+                  <>
+                    <Icon name={t.icon!} size={14} className="shrink-0" />
+                    <span className="truncate">{t.label}</span>
+                  </>
+                )}
               </button>
             )
           })}
@@ -478,7 +487,6 @@ function AssistantOverlayChrome(): JSX.Element {
           </div>
           {activeTab === 'attention' && <AssistantAttentionTab />}
           {activeTab === 'agent' && <AssistantAgentTab />}
-          {activeTab === 'tasks' && <AssistantTasksTab />}
           {activeTab === 'messages' && <AssistantMessagesTab />}
         </div>
       </div>

@@ -167,9 +167,12 @@
 > Desk agents sub-view — Work folded in), Tasks, PlexiChat (the Office
 > `MessagesView`, compact: one pane at a time with a way back). Today,
 > Activity and Work are gone; saved tabs migrate. 13/13 live; suite
-> 3,793 tests / 344 files.
+> 3,793 tests / 344 files. **DEC-122**: the strip is now the animated
+> double-ii mark (the conversation, "Plexii AI") · Attention ·
+> PlexiiMessage (two i's) · Agents; Tasks retired into Attention; the
+> default is the conversation. 7/7 live; suite 3,794 tests / 344 files.
 
-**Last updated:** 2026-09-06 — through DEC-121 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-122 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

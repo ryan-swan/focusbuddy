@@ -19,30 +19,36 @@ const agentTab = read('renderer/src/components/assistant/tabs/AssistantAgentTab.
 const widgets = read('renderer/src/components/views/attentionWidgets.tsx')
 const messages = read('renderer/src/components/views/MessagesView.tsx')
 
-describe('DEC-121 — the tab set', () => {
-  it('Attention · Chat · Agent · Tasks · PlexiChat, in that order, in the store and the strip', () => {
-    expect(ASSISTANT_TABS).toEqual(['attention', 'chat', 'agent', 'tasks', 'messages'])
+describe('DEC-121/122 — the tab set', () => {
+  it('the mark · Attention · PlexiiMessage · Agents, in that order, in the store and the strip', () => {
+    expect(ASSISTANT_TABS).toEqual(['chat', 'attention', 'messages', 'agent'])
     const order = [
+      "{ id: 'chat', label: 'Plexii AI', mark: true }",
       "{ id: 'attention', label: 'Attention', icon: 'notifications' }",
-      "{ id: 'chat', label: 'Chat', icon: 'forum' }",
-      "{ id: 'agent', label: 'Agent', icon: 'rocket_launch' }",
-      "{ id: 'tasks', label: 'Tasks', icon: 'checklist' }",
-      "{ id: 'messages', label: 'PlexiChat', icon: 'chat' }"
+      "{ id: 'messages', label: 'PlexiiMessage', icon: 'chat' }",
+      "{ id: 'agent', label: 'Agents', icon: 'rocket_launch' }"
     ].map((s) => overlay.indexOf(s))
     for (const i of order) expect(i).toBeGreaterThan(-1)
     expect(order).toEqual([...order].sort((a, b) => a - b))
-    for (const gone of ["'today'", "'activity'", "'work'", 'StandupHome', 'AssistantActivityTab', 'AssistantWorkTab'])
+    for (const gone of ["'today'", "'activity'", "'work'", "'tasks'", 'StandupHome', 'AssistantActivityTab', 'AssistantWorkTab', 'AssistantTasksTab', 'PlexiChat'])
       expect(overlay).not.toContain(gone)
   })
 
-  it('a tab saved before the change still lands somewhere sensible; the default is Attention', () => {
-    expect(LEGACY_TAB).toEqual({ today: 'attention', activity: 'messages', work: 'agent' })
-    expect(store).toContain('if (raw && LEGACY_TAB[raw]) return LEGACY_TAB[raw]')
-    expect(store).toContain("return 'attention'\n}")
+  it('the conversation tab wears the animated double-ii mark alone — the label is its accessible name', () => {
+    expect(overlay).toContain('{t.mark ? (')
+    expect(overlay).toMatch(/<PlexiiMark height=\{16\} motion=\{[^}]*'once\+hover'[^}]*\} title=\{null\}/)
+    expect(overlay).toContain('aria-label={t.label}')
   })
 
-  it('the retired Activity tab is gone; the Work tab survives as the Agent sub-view', () => {
+  it('a tab saved before still lands somewhere sensible; the default is the conversation', () => {
+    expect(LEGACY_TAB).toEqual({ today: 'attention', tasks: 'attention', activity: 'messages', work: 'agent' })
+    expect(store).toContain('if (raw && LEGACY_TAB[raw]) return LEGACY_TAB[raw]')
+    expect(store).toContain("return 'chat'\n}")
+  })
+
+  it('the retired Activity and Tasks tabs are gone; the Work tab survives as the Agents sub-view', () => {
     expect(existsSync(join(ROOT, 'src/renderer/src/components/assistant/tabs/AssistantActivityTab.tsx'))).toBe(false)
+    expect(existsSync(join(ROOT, 'src/renderer/src/components/assistant/tabs/AssistantTasksTab.tsx'))).toBe(false)
     expect(existsSync(join(ROOT, 'src/renderer/src/components/assistant/tabs/AssistantWorkTab.tsx'))).toBe(true)
   })
 })

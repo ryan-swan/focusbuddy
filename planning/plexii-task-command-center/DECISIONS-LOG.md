@@ -3776,3 +3776,29 @@ its turn. **To look at (not asserted):** main's decay path writes
 `work_item_state = 'dismissed', reason_code = 'decayed'` in raw SQL with no
 sync emit — by the same mechanism a later upsert of that row could reopen a
 decayed item. Worth a read of the upsert's guard before ruling it.
+
+## DEC-122 — The strip: the double-ii mark · Attention · PlexiiMessage · Agents
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("change the tab named chat to the animated
+double ii logo, which represents AI functionality, then change the name of
+plexichat to PlexiiMessage but make sure there are 2 i's in Plexii. And
+we're removing the tasks tab altogether since everything is now
+consolidated under Attention. Then… from left to right… Plexi AI with just
+the double ii animated logo, then Attention, then PlexiiMessage, lastly
+Agents").
+
+**What changed.** The conversation tab is the brand's own sign for the AI:
+`PlexiiMark` alone — the double-ii, one blink on mount and a wink on hover
+(the kit's `once+hover`; there is no "breathe" mode yet, so nothing
+pretends to think) — with "Plexii AI" as its accessible name and tooltip,
+no text. PlexiChat is **PlexiiMessage** (two i's, per the spelling rule).
+Tasks is gone — its list lives under Attention now — and a saved Tasks tab
+lands on Attention. Agent reads **Agents**. Order: mark · Attention ·
+PlexiiMessage · Agents; the default for a fresh install is the
+conversation, first in the strip. `AssistantTasksTab.tsx` deleted.
+
+**Verified live** over CDP, 7/7, the panel restored as found (it was open
+on PlexiiMessage): the strip's titles read Plexii AI · Attention ·
+PlexiiMessage · Agents; the first tab is an SVG with no text; PlexiiMessage
+carries two i's; no Tasks tab; each tab still opens its body. Suite: 3,794
+tests / 344 files; both typechecks clean.
