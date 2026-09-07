@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import MentionText from './chat/MentionText'
 import { useMessagingStore } from '../../stores/messaging'
 import { buildMessageUrl } from '../../lib/messageLink'
@@ -52,13 +52,17 @@ import { useWidgetStore } from '../../stores/widgets'
 import { catalogFor } from '../../lib/widgetCatalog'
 import { spawnPositionFor } from '../../lib/spawnPosition'
 import { personDisplayName } from '../../lib/personName'
+import { useClickAway } from '../../hooks/useClickAway'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '👀']
 
 function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Element {
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  useClickAway(ref, open, close) // DEC-126 — anywhere outside, or Esc, closes it
   return (
-    <div className="relative self-center">
+    <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Add reaction"
@@ -282,6 +286,13 @@ export function MessageRow({
   const [translated, setTranslated] = useState<string | null>(null)
   const [showOriginal, setShowOriginal] = useState(false)
   const [translating, setTranslating] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  useClickAway(menuRef, menuOpen, closeMenu) // DEC-126 — anywhere outside, or Esc, closes it
+  // DEC-126 — the ⋯ menu is on EVERY message now: Translate for anyone's
+  // words (it left the meta row), Edit / Delete on your own. No entries, no
+  // door.
+  const menuEntries = (m.body ? 1 : 0) + (mine && onEdit ? 1 : 0) + (mine && onDelete ? 1 : 0)
 
   async function onTranslate(): Promise<void> {
     if (!token) return
@@ -297,27 +308,47 @@ export function MessageRow({
       setShowOriginal(false)
     }
   }
-  return (
+  // DEC-126 — the row's doors (the reaction palette, the bell, the ⋯ menu)
+  // hang off the BUBBLE, not the column: absolutely positioned beside it on
+  // its vertical centre, so whatever rides under the bubble (the time, the
+  // pin, the thread, reactions) cannot push them off the message they name.
+  const actions = !deleted && !editing && (
     <div
-      id={`msg-${m.id}`}
-      className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'} rounded-lg transition-colors`}
+      className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 ${mine ? 'right-full mr-1.5' : 'left-full ml-1.5'}`}
+      data-testid={`msg-actions-${m.id}`}
     >
-      {mine && !deleted && !editing && <ReactPicker onPick={onReact} />}
-      {mine && !deleted && !editing && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}
-      {/* Own-message menu (edit / delete) */}
-      {mine && !deleted && (onEdit || onDelete) && !editing && (
-        <div className="relative self-center">
+      <ReactPicker onPick={onReact} />
+      {onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}
+      {menuEntries > 0 && (
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
             aria-label="Message actions"
+            aria-expanded={menuOpen}
             data-testid={`msg-menu-${m.id}`}
             className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] transition-opacity"
           >
             <Icon name="more_horiz" size={14} />
           </button>
           {menuOpen && (
-            <div className="fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-20 bottom-full mb-1 right-0 py-1 w-28">
-              {onEdit && (
+            <div
+              className={`fb-glass-panel rounded-[var(--radius-row)] fb-pop-in absolute z-20 bottom-full mb-1 ${mine ? 'right-0' : 'left-0'} py-1 min-w-[8.5rem] whitespace-nowrap`}
+              data-testid={`msg-menu-panel-${m.id}`}
+            >
+              {m.body && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void onTranslate()
+                  }}
+                  disabled={translating}
+                  data-testid={`msg-translate-${m.id}`}
+                  className="block w-full text-left px-3 py-1.5 text-[12px] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
+                >
+                  {translating ? 'Translating…' : translated ? (showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original') : `Translate to ${translateLang || 'English'}`}
+                </button>
+              )}
+              {mine && onEdit && (
                 <button
                   onClick={() => {
                     setEditText(m.body)
@@ -330,7 +361,7 @@ export function MessageRow({
                   Edit
                 </button>
               )}
-              {onDelete && (
+              {mine && onDelete && (
                 <button
                   onClick={() => {
                     setMenuOpen(false)
@@ -346,79 +377,85 @@ export function MessageRow({
           )}
         </div>
       )}
+    </div>
+  )
+  return (
+    <div
+      id={`msg-${m.id}`}
+      className={`group flex ${mine ? 'justify-end' : 'justify-start'} rounded-lg transition-colors`}
+    >
       <div className={`flex flex-col max-w-[70%] ${mine ? 'items-end' : 'items-start'}`}>
-        <div
-          className={`rounded-2xl px-3 py-1.5 text-[13px] ${
-            deleted
-              ? 'bg-[var(--surface-sunken)] text-[var(--ink-50)] italic'
-              : mine
-                ? 'bg-accent text-white rounded-br-sm'
-                : 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 rounded-bl-sm'
-          }`}
-        >
-          {deleted ? (
-            <div className="text-[12px]">This message was deleted</div>
-          ) : editing ? (
-            <div className="flex flex-col gap-1">
-              <textarea
-                autoFocus
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    const t = editText.trim()
-                    if (t) onEdit?.(t)
-                    setEditing(false)
-                  } else if (e.key === 'Escape') {
-                    setEditing(false)
-                  }
-                }}
-                rows={1}
-                data-testid={`msg-edit-input-${m.id}`}
-                className="resize-none rounded-md px-2 py-1 text-[13px] text-stone-900 bg-white/95 min-w-[180px]"
-              />
-              <div className="flex items-center gap-2 text-[10px] text-white/80">
-                <button onClick={() => { const t = editText.trim(); if (t) onEdit?.(t); setEditing(false) }} className="underline">Save</button>
-                <button onClick={() => setEditing(false)} className="underline">Cancel</button>
-                <span>Enter to save, Esc to cancel</span>
-              </div>
-            </div>
-          ) : (
-            <>
-              {m.body && (
-                <div className="whitespace-pre-wrap break-words">
-                  {translated && !showOriginal ? translated : <MentionBody m={m} />}
+        <div className="relative max-w-full">
+          {actions}
+          <div
+            className={`rounded-2xl px-3 py-1.5 text-[13px] ${
+              deleted
+                ? 'bg-[var(--surface-sunken)] text-[var(--ink-50)] italic'
+                : mine
+                  ? 'bg-accent text-white rounded-br-sm'
+                  : 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 rounded-bl-sm'
+            }`}
+          >
+            {deleted ? (
+              <div className="text-[12px]">This message was deleted</div>
+            ) : editing ? (
+              <div className="flex flex-col gap-1">
+                <textarea
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      const t = editText.trim()
+                      if (t) onEdit?.(t)
+                      setEditing(false)
+                    } else if (e.key === 'Escape') {
+                      setEditing(false)
+                    }
+                  }}
+                  rows={1}
+                  data-testid={`msg-edit-input-${m.id}`}
+                  className="resize-none rounded-md px-2 py-1 text-[13px] text-stone-900 bg-white/95 min-w-[180px]"
+                />
+                <div className="flex items-center gap-2 text-[10px] text-white/80">
+                  <button onClick={() => { const t = editText.trim(); if (t) onEdit?.(t); setEditing(false) }} className="underline">Save</button>
+                  <button onClick={() => setEditing(false)} className="underline">Cancel</button>
+                  <span>Enter to save, Esc to cancel</span>
                 </div>
-              )}
-              <AttachmentView m={m} mine={mine} />
-            </>
-          )}
+              </div>
+            ) : (
+              <>
+                {m.body && (
+                  <div className="whitespace-pre-wrap break-words">
+                    {translated && !showOriginal ? translated : <MentionBody m={m} />}
+                  </div>
+                )}
+                <AttachmentView m={m} mine={mine} />
+              </>
+            )}
+          </div>
         </div>
-        {/* DEC-125 — the meta row, OUTSIDE the bubble: the time and the doors
-            on the left, the thread on the right edge. */}
+        {/* DEC-125/126 — the meta row, OUTSIDE the bubble: the time (on hover)
+            and the pin on the left, the thread on the right edge. Translate
+            moved into the ⋯ menu (DEC-126). */}
         {!editing && (
           <div
             className="mt-0.5 w-full flex items-center gap-2 text-[10px] text-[var(--ink-40)]"
             data-testid={`msg-meta-${m.id}`}
           >
-            <span className="fb-tabular shrink-0">
+            <span
+              className="fb-tabular shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+              data-testid={`msg-time-${m.id}`}
+            >
               {fmtTime(m.createdAt)}
               {!deleted && m.editedAt ? ' · edited' : ''}
+              {translated && !showOriginal ? ' · translated' : ''}
             </span>
-            {!deleted && m.body && (
-              <button
-                onClick={() => void onTranslate()}
-                disabled={translating}
-                className={`inline-flex items-center gap-0.5 hover:text-[var(--ink-90)] transition-opacity ${
-                  translated ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
-                }`}
-                title={translated ? (showOriginal ? `Show the ${translateLang || 'translation'}` : 'Show the original') : `Translate to ${translateLang || 'English'}`}
-                data-testid={`msg-translate-${m.id}`}
-              >
-                <Icon name="translate" size={11} />{' '}
-                {translating ? '…' : translated ? (showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original') : 'Translate'}
-              </button>
+            {translating && (
+              <span className="shrink-0" data-testid={`msg-translating-${m.id}`}>
+                translating…
+              </span>
             )}
             {onTogglePin && !deleted && (
               <button
@@ -492,8 +529,6 @@ export function MessageRow({
           </div>
         )}
       </div>
-      {!mine && <ReactPicker onPick={onReact} />}
-      {!mine && !deleted && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}
     </div>
   )
 }

@@ -63,7 +63,7 @@ describe('DEC-125 — the bell on a message is the widget\'s bell', () => {
 })
 
 describe('DEC-125 — the meta lives under the bubble', () => {
-  it('time, Translate and the pin icon on the left; the thread on the right edge; nothing of it inside the bubble', () => {
+  it('time and the pin icon on the left; the thread on the right edge; nothing of it inside the bubble', () => {
     expect(messages).toContain('data-testid={`msg-meta-${m.id}`}')
     expect(messages).toContain('className="mt-0.5 w-full flex items-center gap-2 text-[10px] text-[var(--ink-40)]"')
     expect(messages).toContain('<span className="ml-auto shrink-0">')
@@ -72,6 +72,8 @@ describe('DEC-125 — the meta lives under the bubble', () => {
     expect(messages).not.toContain('msg-translate-toggle-')
     // the bubble no longer carries the time
     expect(messages).not.toContain("text-[9px] mt-0.5 flex items-center gap-1.5")
-    expect(messages).toContain("{translating ? '…' : translated ? (showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original') : 'Translate'}")
+    // DEC-126: Translate left the meta row for the ⋯ menu — one door, the
+    // same three states, now naming the target language.
+    expect(messages).toContain("{translating ? 'Translating…' : translated ? (showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original') : `Translate to ${translateLang || 'English'}`}")
   })
 })

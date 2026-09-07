@@ -187,8 +187,14 @@
 > left the bubble (time · Translate · pin icon on the left, the thread at
 > the right edge). 5/5 read-only + 7/7 check-off on one `test-seed`
 > scratch (left closed on disk); suite 3,809 tests / 347 files.
+> **DEC-126**: a message's doors — palette · bell · ⋯ — are one cluster
+> hung off the bubble on its vertical centre (both sides); the time shows
+> on hover; Translate lives in the ⋯ menu, which every message has now
+> (Edit / Delete still yours only); the palette and the menu close on a
+> click anywhere outside or Esc (`hooks/useClickAway.ts`, the house
+> pattern extracted). 16/16 live; suite 3,817 tests / 348 files.
 
-**Last updated:** 2026-09-06 — through DEC-125 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-126 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

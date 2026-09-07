@@ -169,7 +169,8 @@ test('P2100-6 — translate action and language select render on an active conve
   await window.waitForTimeout(500)
 
   await expect(window.locator('[data-testid="messages-translate-lang"]')).toBeVisible({ timeout: 4_000 })
-  // DEC-125: the translate door lives in the meta row under the bubble now (one button, toggling after a translation)
+  // DEC-126: Translate lives in the message's ⋯ menu (on every message, not just your own)
+  await window.locator('[data-testid="msg-menu-msg-1"]').click()
   await expect(window.locator('[data-testid="msg-translate-msg-1"]')).toBeVisible({ timeout: 4_000 })
 })
 

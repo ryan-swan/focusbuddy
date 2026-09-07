@@ -24,8 +24,11 @@ describe('DEC-124 — the message bell', () => {
     // DEC-125 renamed the bell (CaptureBell → MessageBell) when it learned the widget's marked state
     expect(messages).toContain('function MessageBell({')
     expect(messages).toContain('data-testid={`msg-attention-${m.id}`}')
-    expect(messages).toContain('{mine && !deleted && !editing && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}')
-    expect(messages).toContain('{!mine && !deleted && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}')
+    // DEC-126: one action cluster serves both sides (mine to the left of the
+    // bubble, theirs to the right), so the bell is rendered once, guarded by
+    // the cluster's own `!deleted && !editing`.
+    expect(messages).toContain('const actions = !deleted && !editing && (')
+    expect(messages).toContain('{onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}')
     expect(messages).toContain('onCapture={() => captureMessage(m)}')
   })
 

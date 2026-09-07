@@ -3916,3 +3916,58 @@ dismiss by tag with the others. Suite: 3,809 tests / 347 files; both
 typechecks clean. Pins rewritten with history, never deleted: DEC-076/077's
 frame-bell pins now point at the shared definition; DEC-124's `CaptureBell`
 pins → `MessageBell`; e2e P2100-6's translate toggle → the meta-row door.
+
+## DEC-126 — A message's doors: centred on the bubble, the time on hover, Translate in the ⋯ menu, click-away closes
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("make the time stamp invisible unless I'm
+hovering over it; the emoji icon and the bell icon and the ellipses need to
+be centered on the message they are in reference to — right now they're
+slightly off center, so if it's a one-line message it's hard to know
+exactly what message they're associated with; get rid of the translate
+button visible on screen and instead add it to the drop down menu within
+the ellipses; when I click on the ellipse button or the emojis button, the
+only way to get rid of those menus is to click on it again — I should be
+able to click anywhere off screen to get rid of those things").
+
+**What changed** (`MessagesView.tsx`, every message — list and thread).
+- **Centred on the bubble.** The row centred its doors against the whole
+  column (bubble + the DEC-125 meta row + reactions), so on a one-line
+  message they sat a few pixels low. The doors — reaction palette, bell,
+  ⋯ — are now one cluster hung off the bubble alone: absolutely positioned
+  beside it (left of yours, right of theirs) on its vertical centre, so
+  nothing that rides under the bubble can push them off the message they
+  name. One cluster serves both sides; the theirs-side doors after the
+  bubble are gone.
+- **The time on hover.** The meta row's time (with "· edited" and, when a
+  translation is showing, "· translated") is opacity-0 until the row is
+  hovered or focused — opacity, not display, so nothing jumps. The pin
+  (when pinned) and the reply count (when there are replies) stay
+  visible, as before.
+- **Translate in the ⋯ menu.** The visible Translate button left the meta
+  row. The ⋯ menu is on EVERY message with words now — "Translate to
+  ‹language›", then "Show original" / "Show ‹language›" — with Edit and
+  Delete still only on your own; a message with no entries has no ⋯. While
+  a translation is in flight the meta row says "translating…" (the menu
+  has closed).
+- **Click-away.** A new `hooks/useClickAway.ts` — the house pattern from
+  SettingsPanel / ThemeBuilder, extracted: armed 50 ms after opening,
+  mousedown on window (so the outside target's own click still lands —
+  opening another row's door closes this one in the same gesture), and
+  Esc. Both the palette and the ⋯ menu use it. The composer's emoji and
+  GIF pickers already closed this way; unchanged.
+
+**Verified live** over CDP, 16/16, panel restored as found, no data
+touched: on a one-line message on each side the cluster sits on the
+bubble's vertical centre to the pixel (dy 0) and on the correct side; the
+time is opacity 0 at rest and 1 with `:hover` forced through CDP (an
+occluded window never sees a real pointer); no Translate on screen at rest;
+their ⋯ menu holds "Translate to English" alone, mine holds Translate ·
+Edit · Delete; an outside mousedown closes the menu and the palette, Esc
+closes both, and opening the palette on another row closes the open menu in
+the same gesture with the click landing. Known and accepted: when the
+bubble is narrower than the meta row (short messages), the row extends
+beyond the bubble on the far side on hover — the time keeps the bubble's
+near edge on theirs, the thread keeps it on yours. Suite: 3,817 tests / 348
+files; both typechecks clean. Pins rewritten with history: DEC-124's bell
+usage lines → the one cluster; DEC-125's Translate label → the menu's;
+e2e P2100-6 opens the ⋯ menu before looking for Translate.
