@@ -100,8 +100,21 @@
 > deliverables surface as commitments. **DEC-114**: Stage + wrap-up
 > wear the house material (presentation only). Suite: 3,675 tests /
 > 338 files.
+> **DEC-115**: the meeting Record reorganised on operator direction
+> (three reference screenshots — "a design direction, not the trump
+> card"): the transcript ALWAYS on screen beside Overview / Action
+> items (default) / Analytics — tagged by speaker, searchable (`/`),
+> filterable, every timestamp a link; a click-to-seek speaker timeline
+> with heard/action-item markers; Action items with a checkbox (house
+> `completed`) and a bell into Attention (human-origin, approved,
+> pointing back at the meeting — promoted, not duplicated); Analytics
+> as neutral facts (SPEC-003 refusal pinned by banned words); links
+> BOTH ways (transcript lines wear "In Brief · <section>" / "Action
+> item" chips). `lib/meetingRecordStats.ts` unit-tested; 42 live CDP
+> checks; the transcription engine itself was NOT re-tested this round.
+> Suite: 3,693 tests / 339 files.
 
-**Last updated:** 2026-09-01 — through DEC-111 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-115 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
@@ -124,7 +137,8 @@ assuming).
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
-**Gated on the operator's go:** the Fireflies-level transcript UI rebuild.
+**The transcript-UI rebuild is DONE (DEC-115)** — the operator's three
+reference screenshots were the go; it shipped as the reorganised Record.
 
 ## <<<PROMPT BEGIN>>>
 

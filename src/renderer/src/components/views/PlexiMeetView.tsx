@@ -20,7 +20,25 @@ import { validateCommitments, type ValidatedCommitment } from '../../lib/commitm
 import MeetingCommitmentsCard, { CarriedFromLastTime } from '../MeetingCommitmentsCard'
 import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
 import { useViewStore } from '../../stores/view'
-import type { ActionProposal } from '@shared/types'
+import type { ActionProposal, FbNode } from '@shared/types'
+import { useWorkItemStore } from '../../stores/workItems'
+import { parseMeetingMomentUrl } from '../../lib/meetingLink'
+import { CLASS_LABEL, isTerminalState } from '../../lib/attentionQueues'
+import { StatTile, StatusPill } from '../plexi'
+import {
+  speakerOrder,
+  speakerColor,
+  speakerInitials,
+  spokenMsBySpeaker,
+  speakerChanges,
+  questionCount,
+  transcriptSpanMs,
+  timelineBands,
+  segmentAtMs,
+  filterSegments,
+  fmtClock,
+  fmtDuration
+} from '../../lib/meetingRecordStats'
 
 // PlexiMeet: meetings that turn into actions. Record a meeting and it is
 // transcribed, summarised, and its action items extracted; or capture notes by
@@ -639,7 +657,26 @@ export default function PlexiMeetView(): JSX.Element {
 //              hover; clicking jumps to the moment in Thread.
 //   inferred — lighter ink, no rule, no anchor. The machine's guess LOOKS
 //              like a guess (the same accent-vs-ink doctrine as capture).
-type RecordView = 'commitments' | 'brief' | 'thread'
+// The meeting Record, reorganised (operator direction, 2026-09-06): the
+// transcript is ALWAYS on screen — tagged by speaker, searchable, and every
+// timestamp a link — beside three renderings of what the meeting produced.
+// The tabs are Overview (the Brief + summary, organised by section), Action
+// items (commitments with a checkbox and a bell) and Analytics (facts derived
+// from the segments). A speaker timeline sits above both; clicking it moves
+// through the call by jumping the transcript.
+//
+// Provenance is unchanged and is the entire trust model (M2b):
+//   yours    — full ink, no marker. The user's words, never rewritten.
+//   heard    — normal ink with a hairline left rule and its timestamp;
+//              clicking jumps to the moment in the transcript.
+//   inferred — lighter ink, no rule, no anchor. The machine's guess LOOKS
+//              like a guess (the same accent-vs-ink doctrine as capture).
+type RecordView = 'commitments' | 'brief' | 'analytics'
+
+/** The state of a filed work item as the list exposes it. */
+function itemState(i: FbNode): string {
+  return (i.workItemState ?? (i as { state?: string | null }).state ?? i.status ?? 'open') as string
+}
 
 function MeetingDetail({
   meeting,
@@ -651,8 +688,8 @@ function MeetingDetail({
   meeting: Meeting
   onChange: (patch: { title?: string; summary?: string; transcript?: string; actionItems?: string[] }) => void
   onDelete: () => void
-  // M4 — a Recall hit names its line: once segments load, the Thread opens
-  // scrolled to it. Consumed exactly once so later renders stay put.
+  // M4 — a Recall hit names its line: once segments load, the transcript
+  // scrolls to it. Consumed exactly once so later renders stay put.
   initialSegmentId?: string | null
   onJumpConsumed?: () => void
 }): JSX.Element {
@@ -662,8 +699,9 @@ function MeetingDetail({
   const [transcript, setTranscript] = useState(meeting.transcript)
   const [showTranscript, setShowTranscript] = useState(false)
   const [madeTasks, setMadeTasks] = useState<Record<number, boolean>>({})
-  // M2b — Commitments opens by default: the person who just left the room
-  // is the most common reader and needs the shortest artifact (S3-DEC-022).
+  // M2b — Commitments (Action items) opens by default: the person who just
+  // left the room is the most common reader and needs the shortest artifact
+  // (S3-DEC-022). Overview sits first in the tab order; the default needn't.
   const [view, setView] = useState<RecordView>('commitments')
   // The engine-repair door: the retained takes re-run through the CURRENT
   // local engine (the model ruling moved wrap-ups to whisper-base after tiny
@@ -678,6 +716,12 @@ function MeetingDetail({
   const [seriesShare, setSeriesShare] = useState<boolean | null>(null)
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const threadRef = useRef<HTMLDivElement | null>(null)
+  const searchRef = useRef<HTMLInputElement | null>(null)
+  // The transcript panel's own state: who, what, and where we are in the call.
+  const [speakerFilter, setSpeakerFilter] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   useEffect(() => {
     if (!meeting.seriesId || typeof window.api.meetings.prep !== 'function') return
     let alive = true
@@ -705,6 +749,9 @@ function MeetingDetail({
   useEffect(() => {
     let alive = true
     setSegments([])
+    setSpeakerFilter(null)
+    setQuery('')
+    setActiveSegmentId(null)
     void window.api.meetings.segments(meeting.id).then((s) => {
       if (alive) setSegments(s)
     })
@@ -712,22 +759,25 @@ function MeetingDetail({
       alive = false
     }
   }, [meeting.id])
-  // 1/2/3 pick the rendering (SPEC-003 §3.10), never while typing.
+  // 1/2/3 pick the rendering (SPEC-003 §3.10) and "/" lands in the transcript
+  // search — never while typing.
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
-      if (e.key === '1') setView('commitments')
-      if (e.key === '2') setView('brief')
-      if (e.key === '3') setView('thread')
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === '1') setView('brief')
+      if (e.key === '2') setView('commitments')
+      if (e.key === '3') setView('analytics')
+      if (e.key === '/') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-  const fmtMs = (ms: number): string => {
-    const s = Math.floor(ms / 1000)
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-  }
+  const fmtMs = fmtClock
   // M2c — audio presence + the per-meeting keep override (CR-13), export,
   // template rebuild, and the door to the meeting's desk (S3-DEC-020).
   const [audio, setAudio] = useState<{ present: boolean; files: number; bytes: number; kept: boolean } | null>(null)
@@ -815,8 +865,16 @@ function MeetingDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSegmentId, segments])
 
+  // Land on a line: it becomes the active moment, any filter that would hide
+  // it is cleared, and the transcript scrolls it to centre. The transcript
+  // is always mounted now, so no view switch is needed.
   const jumpToSegment = (segmentId: string): void => {
-    setView('thread')
+    const target = segments.find((s) => s.id === segmentId)
+    if (target) {
+      if (speakerFilter && (target.speakerName?.trim() || 'Speaker') !== speakerFilter) setSpeakerFilter(null)
+      if (query.trim() && !target.text.toLowerCase().includes(query.trim().toLowerCase())) setQuery('')
+    }
+    setActiveSegmentId(segmentId)
     setTimeout(() => {
       threadRef.current
         ?.querySelector(`[data-segment-id="${segmentId}"]`)
@@ -893,45 +951,229 @@ function MeetingDetail({
     setMadeTasks((m) => ({ ...m, [idx]: true }))
   }
 
+  // ── The Attention side of Action items ───────────────────────────────────
+  // Filed items are the work items that POINT at this meeting (DEC-079's
+  // sourceRef). The checkbox closes one with the house terminal state; the
+  // bell on a legacy line files it — with the meeting as its source, so its
+  // chip in the queue is a door straight back here.
+  const allItems = useWorkItemStore((s) => s.items)
+  const refreshItems = useWorkItemStore((s) => s.refresh)
+  const setItemState = useWorkItemStore((s) => s.setState)
+  const createItem = useWorkItemStore((s) => s.create)
+  // Re-read on every open: a dismissal or a snooze expiry that happened
+  // elsewhere (the queue, another session, the main process) must show
+  // here without a reload — one list call per open.
+  useEffect(() => {
+    void refreshItems()
+  }, [meeting.id, refreshItems])
+  const filedItems = useMemo(
+    () =>
+      allItems.filter((i) => {
+        if (i.sourceRef !== meeting.id) return false
+        const st = itemState(i)
+        return st !== 'dismissed' && st !== 'archived'
+      }),
+    [allItems, meeting.id]
+  )
+  // A summary line the bell has filed now lives in the list above with a
+  // real checkbox — it is not repeated below. Matched on the exact text, so
+  // dismissing the item from Attention returns the line to the summary.
+  const unfiledLegacy = useMemo(() => {
+    const filedTitles = new Set(filedItems.map((i) => i.title.trim().toLowerCase()))
+    return meeting.actionItems
+      .map((text, i) => ({ text, i }))
+      .filter(({ text }) => !filedTitles.has(text.trim().toLowerCase()))
+  }, [meeting.actionItems, filedItems])
+  // In-flight guard only: once the item exists the line is promoted out of
+  // this list by `unfiledLegacy`, and if it is later dismissed the line comes
+  // back with a live bell — no sticky "already sent" state to go stale.
+  const [filing, setFiling] = useState<Record<number, boolean>>({})
+  // The store refreshes the row and raises fb:workitems-changed itself, so
+  // the badge and the queue learn of both without a second call.
+  async function toggleItemDone(i: FbNode): Promise<void> {
+    const done = isTerminalState(itemState(i))
+    await setItemState(i.id, done ? 'open' : 'completed')
+  }
+  async function sendLegacyToAttention(idx: number, text: string): Promise<void> {
+    if (filing[idx]) return
+    setFiling((m) => ({ ...m, [idx]: true }))
+    try {
+      await createItem({
+        title: text,
+        notes: `From the meeting “${meeting.title}”.`,
+        parentId: meeting.deskNodeId ?? null,
+        intentClass: 'to_do',
+        dueAt: null,
+        confidence: 1,
+        approvalState: 'approved',
+        wiOrigin: 'human',
+        sourceType: 'meeting',
+        sourceRef: meeting.id
+      }).catch(() => null)
+    } finally {
+      setFiling((m) => ({ ...m, [idx]: false }))
+    }
+  }
+
+  // ── Derived facts: speakers, timeline, analytics ─────────────────────────
+  const speakers = useMemo(() => speakerOrder(segments), [segments])
+  const colorOf = (name: string): string => speakerColor(name, speakers)
+  const totalMs = useMemo(
+    () => Math.max(transcriptSpanMs(segments), (meeting.durationSec ?? 0) * 1000),
+    [segments, meeting.durationSec]
+  )
+  const bands = useMemo(() => timelineBands(segments, totalMs), [segments, totalMs])
+  const visibleSegments = useMemo(
+    () => filterSegments(segments, { speaker: speakerFilter, query }),
+    [segments, speakerFilter, query]
+  )
+  const spokenMs = useMemo(() => spokenMsBySpeaker(segments), [segments])
+  const spokenTotal = [...spokenMs.values()].reduce((a, b) => a + b, 0)
+  const activeSegment = segments.find((s) => s.id === activeSegmentId) ?? null
+  // Moments on the timeline: heard spans of the Record (filled) and filed
+  // items that carry a moment anchor (hollow). Both are doors.
+  const markers = useMemo(() => {
+    const out: Array<{
+      key: string
+      ms: number
+      segmentId: string
+      kind: 'heard' | 'item'
+      label: string
+      section?: string
+      itemId?: string
+    }> = []
+    for (const s of meeting.record?.spans ?? []) {
+      if (s.tier === 'heard' && s.segmentId && s.startMs != null)
+        out.push({
+          key: `h-${s.segmentId}`,
+          ms: s.startMs,
+          segmentId: s.segmentId,
+          kind: 'heard',
+          label: s.text,
+          section: s.section ?? 'Notes'
+        })
+    }
+    for (const i of filedItems) {
+      const m = parseMeetingMomentUrl(i.sourceUrl)
+      if (m?.segmentId) {
+        const seg = segments.find((s) => s.id === m.segmentId)
+        if (seg) out.push({ key: `i-${i.id}`, ms: seg.startMs, segmentId: seg.id, kind: 'item', label: i.title, itemId: i.id })
+      }
+    }
+    return out
+  }, [meeting.record, filedItems, segments])
+  // The reverse door — links run both ways. A transcript line that anchors
+  // a Brief entry or an action item wears a chip; the chip opens that
+  // rendering and scrolls to the entry, the way the entry jumps to the line.
+  const recordRef = useRef<HTMLDivElement | null>(null)
+  function openAnchor(a: { kind: 'heard' | 'item'; section?: string; itemId?: string }): void {
+    const sel =
+      a.kind === 'heard'
+        ? `[data-brief-section="${CSS.escape(a.section ?? 'Notes')}"]`
+        : `[data-testid="meet-item-${a.itemId ?? ''}"]`
+    setView(a.kind === 'heard' ? 'brief' : 'commitments')
+    setTimeout(() => recordRef.current?.querySelector(sel)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60)
+  }
+
+  function seekTimeline(e: React.MouseEvent<HTMLDivElement>): void {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    const hit = segmentAtMs(segments, frac * totalMs)
+    if (hit) jumpToSegment(hit.id)
+  }
+
+  const whenLine = fmtDate(meeting.createdAt)
+  const durationLine = totalMs > 0 ? fmtDuration(totalMs) : null
+  const captureState: { tone: 'emerald' | 'stone'; label: string } =
+    segments.length > 0
+      ? { tone: 'emerald', label: 'Transcribed' }
+      : meeting.transcript.trim()
+        ? { tone: 'stone', label: 'Transcript pasted' }
+        : { tone: 'stone', label: 'Notes only' }
+
+  // Highlight the search hits inside a line without touching the text.
+  function highlight(text: string): React.ReactNode {
+    const q = query.trim()
+    if (!q) return text
+    const parts = text.split(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig'))
+    return parts.map((part, i) =>
+      part.toLowerCase() === q.toLowerCase() ? (
+        <mark key={i} className="bg-[rgb(var(--accent)/0.18)] text-inherit rounded-[3px] px-0.5">
+          {part}
+        </mark>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    )
+  }
+
+  const tabs = [
+    ['brief', 'Overview', '1'],
+    ['commitments', 'Action items', '2'],
+    ['analytics', 'Analytics', '3']
+  ] as const
+  const actionCount = filedItems.length + (foundCommitments?.length ?? 0) + unfiledLegacy.length
+
   return (
     <div className="h-full flex flex-col overflow-auto" data-testid="meet-detail">
+      {/* ── Header: title, doors, export ─────────────────────────────────── */}
       <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)] backdrop-blur-[3px]">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== meeting.title && onChange({ title })}
-          className="flex-1 bg-transparent fb-display text-[17px] font-bold text-[var(--ink-100)] outline-none"
+          className="flex-1 min-w-0 bg-transparent fb-display text-[18px] font-bold tracking-tight text-[var(--ink-100)] outline-none"
           data-testid="meet-title"
         />
         {meeting.deskNodeId && (
           <button
             onClick={() => goTask(meeting.deskNodeId!)}
-            className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-80)]"
+            className="fb-btn-surface fb-press inline-flex items-center gap-1 text-[11.5px] h-8 px-2.5 text-[var(--ink-80)]"
             title="Open this meeting's desk — its documents live there"
             data-testid="meet-open-desk"
           >
             <Icon name="desk" size={13} /> Desk
           </button>
         )}
-        <button
-          onClick={() => void window.api.meetings.export(meeting.id, 'markdown').then((r) => r.ok && setExported(r.path ?? null))}
-          className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-80)]"
-          title="Export as Markdown — notes, brief, commitments and transcript, provenance kept"
-          data-testid="meet-export-md"
-        >
-          <Icon name="download" size={13} /> .md
-        </button>
-        <button
-          onClick={() => void window.api.meetings.export(meeting.id, 'json').then((r) => r.ok && setExported(r.path ?? null))}
-          className="fb-btn-surface inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-80)]"
-          title="Export as JSON — the full record, segments and audio manifest"
-          data-testid="meet-export-json"
-        >
-          <Icon name="download" size={13} /> .json
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setExportOpen((v) => !v)}
+            aria-expanded={exportOpen}
+            className="fb-btn-surface fb-press inline-flex items-center gap-1 text-[11.5px] h-8 px-2.5 text-[var(--ink-80)]"
+            title="Export this Record — notes, brief, action items and transcript, provenance kept"
+            data-testid="meet-export"
+          >
+            <Icon name="download" size={13} /> Export
+            <Icon name="expand_more" size={13} className={`transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {exportOpen && (
+            <div className="absolute right-0 top-9 z-20 fb-card p-1 min-w-[180px]" onMouseLeave={() => setExportOpen(false)}>
+              <button
+                onClick={() => {
+                  setExportOpen(false)
+                  void window.api.meetings.export(meeting.id, 'markdown').then((r) => r.ok && setExported(r.path ?? null))
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-md text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                data-testid="meet-export-md"
+              >
+                Markdown (.md) — readable, provenance kept
+              </button>
+              <button
+                onClick={() => {
+                  setExportOpen(false)
+                  void window.api.meetings.export(meeting.id, 'json').then((r) => r.ok && setExported(r.path ?? null))
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-md text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                data-testid="meet-export-json"
+              >
+                JSON — the full record, segments and audio manifest
+              </button>
+            </div>
+          )}
+        </div>
         <button
           onClick={onDelete}
-          className="p-1.5 rounded-md text-[var(--ink-40)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+          className="p-1.5 rounded-md text-[var(--ink-40)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 fb-press"
           title="Delete meeting — its transcript segments and audio go with it" aria-label="Delete meeting"
           data-testid="meet-delete"
         >
@@ -939,210 +1181,616 @@ function MeetingDetail({
         </button>
       </div>
 
-      {/* M2b — the segmented control: three renderings, one Record. */}
-      <div className="px-5 pt-3" data-testid="record-views">
-        <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
-          {(
-            [
-              ['commitments', 'Commitments', '1'],
-              ['brief', 'Brief', '2'],
-              ['thread', 'Thread', '3']
-            ] as const
-          ).map(([v, label, key]) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              data-testid={`record-view-${v}`}
-              className={`h-7 px-3 rounded-full text-[12.5px] font-medium fb-press transition-colors inline-flex items-center gap-1.5 ${
-                view === v
-                  ? 'bg-[rgb(var(--accent))] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]'
-                  : 'text-[var(--ink-60)] hover:text-[var(--ink-100)]'
-              }`}
-            >
-              {label}
-              <span className={`text-[10px] ${view === v ? 'text-white/60' : 'text-[var(--ink-30)]'}`}>{key}</span>
-            </button>
-          ))}
-        </div>
+      {/* ── Meta: state, when, how long, who ─────────────────────────────── */}
+      <div className="px-5 pt-3 pb-1 flex items-center gap-3 flex-wrap" data-testid="meet-meta">
+        <StatusPill tone={captureState.tone} label={captureState.label} />
+        <span className="text-[12.5px] text-[var(--ink-60)] fb-tabular">{whenLine}</span>
+        {durationLine && (
+          <>
+            <span className="text-[var(--ink-30)]">·</span>
+            <span className="text-[12.5px] text-[var(--ink-60)] fb-tabular">{durationLine}</span>
+          </>
+        )}
+        {speakers.length > 0 && (
+          <span className="ml-auto inline-flex items-center gap-2" data-testid="meet-speakers">
+            <span className="flex -space-x-1.5">
+              {speakers.map((name) => (
+                <span
+                  key={name}
+                  title={name}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-raised)]"
+                  style={{ backgroundColor: colorOf(name) }}
+                >
+                  {speakerInitials(name)}
+                </span>
+              ))}
+            </span>
+            <span className="text-[12px] text-[var(--ink-50)] fb-tabular">
+              {speakers.length} {speakers.length === 1 ? 'speaker' : 'speakers'}
+            </span>
+          </span>
+        )}
       </div>
 
-      {view === 'commitments' && (
-        <div className="px-5 py-4 space-y-5 max-w-[780px]" data-testid="rendering-commitments">
-          {carried.length > 0 && (
-            <CarriedFromLastTime
-              items={carried}
-              lastTitle={lastMeeting?.title}
-              lastAt={lastMeeting?.createdAt}
-            />
-          )}
-          {segments.length > 0 && foundCommitments === null && (
-            <button
-              onClick={() => void findCommitments()}
-              disabled={extracting}
-              className="fb-btn-surface inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 text-[var(--ink-90)] disabled:opacity-50"
-              data-testid="find-commitments"
-              title="Extract commitments from the transcript — they go through the confirm stop, never silently into Attention"
-            >
-              <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
-              {extracting ? 'Reading the transcript…' : 'Find commitments'}
-            </button>
-          )}
-          {foundCommitments !== null &&
-            (foundCommitments.length > 0 ? (
-              <MeetingCommitmentsCard
-                commitments={foundCommitments}
-                meetingId={meeting.id}
-                meetingTitle={meeting.title}
-                deskNodeId={meeting.deskNodeId}
-                onFiled={() => setFoundCommitments(null)}
-              />
-            ) : (
-              <p className="text-[12.5px] text-[var(--ink-50)]">
-                Nothing in this transcript reads as a commitment — an honest zero, not a failure.
-              </p>
-            ))}
-          {meeting.actionItems.length === 0 ? (
-            <p className="text-[13px] text-[var(--ink-50)]">
-              Nothing was committed to in this meeting — or nothing was recorded. Owners and
-              routing into Attention arrive with extraction.
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {meeting.actionItems.map((item, i) => (
-                <div key={i} className="fb-card flex items-center gap-2 px-3 py-2">
-                  <Icon name="task_alt" size={15} className="text-[rgb(var(--accent))] shrink-0" />
-                  <span className="flex-1 text-[13px] text-[var(--ink-90)]">{item}</span>
+      {/* ── Timeline: who was talking when; click to move through the call ── */}
+      {segments.length > 0 && (
+        <div className="px-5 pt-2 pb-3">
+          <div className="fb-card px-4 pt-3 pb-2.5" data-testid="meet-timeline">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <span className="text-[12.5px] fb-tabular text-[var(--ink-70)]">
+                {activeSegment ? fmtMs(activeSegment.startMs) : '0:00'}
+                <span className="text-[var(--ink-30)]"> / </span>
+                {fmtMs(totalMs)}
+              </span>
+              <span className="flex items-center gap-3 text-[11.5px] text-[var(--ink-60)]">
+                {speakers.map((name) => (
                   <button
-                    onClick={() => void makeTask(i, item)}
-                    disabled={madeTasks[i]}
-                    className="fb-btn-surface shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] disabled:opacity-50"
-                    data-testid={`meet-make-task-${i}`}
+                    key={name}
+                    onClick={() => setSpeakerFilter((cur) => (cur === name ? null : name))}
+                    className={`inline-flex items-center gap-1.5 fb-press ${speakerFilter === name ? 'text-[var(--ink-100)] font-medium' : ''}`}
+                    title={`Show only ${name} in the transcript`}
                   >
-                    <Icon name={madeTasks[i] ? 'check' : 'add_task'} size={13} /> {madeTasks[i] ? 'Added' : 'Task'}
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorOf(name) }} />
+                    {name}
                   </button>
-                </div>
-              ))}
+                ))}
+              </span>
             </div>
-          )}
+            <div
+              className="relative h-9 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] cursor-pointer"
+              onClick={seekTimeline}
+              title="Click the timeline to move through the call"
+              data-testid="meet-timeline-bar"
+            >
+              {bands.map((b) => (
+                <span
+                  key={b.id}
+                  className={`absolute top-0 h-full transition-opacity ${
+                    speakerFilter && speakerFilter !== b.speaker ? 'opacity-25' : 'opacity-90'
+                  } ${activeSegmentId === b.id ? 'ring-2 ring-inset ring-[var(--ink-100)]' : ''}`}
+                  style={{ left: `${b.leftPct}%`, width: `${b.widthPct}%`, backgroundColor: colorOf(b.speaker) }}
+                  title={`[${fmtMs(b.startMs)}] ${b.speaker}`}
+                />
+              ))}
+              {activeSegment && (
+                <span
+                  className="absolute top-0 h-full w-0.5 bg-[var(--ink-100)] pointer-events-none"
+                  style={{ left: `${Math.min(100, (activeSegment.startMs / totalMs) * 100)}%` }}
+                />
+              )}
+            </div>
+            {markers.length > 0 && (
+              <div className="relative h-4 mt-1" data-testid="meet-timeline-markers">
+                {markers.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => jumpToSegment(m.segmentId)}
+                    title={`[${fmtMs(m.ms)}] ${m.kind === 'heard' ? 'Heard: ' : 'Action item: '}${m.label}`}
+                    className="absolute -translate-x-1/2 top-0.5 h-2.5 w-2.5 rotate-45 fb-press"
+                    style={{
+                      left: `${Math.min(100, (m.ms / totalMs) * 100)}%`,
+                      backgroundColor: m.kind === 'heard' ? 'rgb(var(--accent))' : 'transparent',
+                      border: m.kind === 'heard' ? 'none' : '1.5px solid var(--ink-60)'
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-[var(--ink-40)] fb-tabular">
+              <span>0:00</span>
+              <span className="text-[var(--ink-40)]">Click the timeline to move through the call</span>
+              <span>{fmtMs(totalMs)}</span>
+            </div>
+          </div>
         </div>
       )}
 
-      {view === 'brief' && (
-        <div className="px-5 py-4 space-y-4 max-w-[780px]" data-testid="rendering-brief-outer">
-          {/* M2c (§3.5) — rebuild the Brief under a different template. The
-              Commitments rendering is never templated: its shape is the
-              product. yours spans survive every rebuild untouched. */}
-          {segments.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap" data-testid="record-templates">
-              {RECORD_TEMPLATES.map((tpl) => (
+      {/* ── Two columns: renderings left, transcript always on the right ──── */}
+      <div className="flex-1 min-h-0 px-5 pb-4 flex flex-col lg:flex-row gap-4 items-start">
+        <div className="flex-1 min-w-0 w-full fb-card overflow-hidden" data-testid="meet-record-pane" ref={recordRef}>
+          {/* M2b — the segmented control: three renderings, one Record. */}
+          <div className="px-4 pt-3 pb-2 border-b border-[var(--edge-soft)]" data-testid="record-views">
+            <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
+              {tabs.map(([v, label, key]) => (
                 <button
-                  key={tpl.id}
-                  disabled={rebuilding}
-                  onClick={() => void rebuildBrief(tpl.sections)}
-                  title={`Rebuild the Brief as “${tpl.name}” — sections: ${tpl.sections.join(' · ')}`}
-                  className="h-7 px-2.5 rounded-full text-[11.5px] fb-press bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-50"
+                  key={v}
+                  onClick={() => setView(v)}
+                  data-testid={`record-view-${v}`}
+                  title={`${label} — press ${key}`}
+                  className={`h-7 px-3 rounded-full text-[12.5px] font-medium fb-press transition-colors inline-flex items-center gap-1.5 ${
+                    view === v
+                      ? 'bg-[rgb(var(--accent))] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]'
+                      : 'text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+                  }`}
                 >
-                  {rebuilding ? '…' : tpl.name}
+                  {label}
+                  {v === 'commitments' && actionCount > 0 && (
+                    <span className={`fb-tabular rounded-full px-1.5 text-[10px] ${view === v ? 'bg-white/20 text-white' : 'bg-[var(--surface-raised)] text-[var(--ink-60)]'}`}>
+                      {actionCount}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
-          )}
-        </div>
-      )}
-      {view === 'brief' && (
-        <div className="px-5 pb-4 max-w-[780px]" data-testid="rendering-brief">
-          {meeting.record && meeting.record.spans.length > 0 ? (
-            <div className="space-y-4">
-              {/* yours first — the reader's own words lead. */}
-              {meeting.record.spans.filter((s) => s.tier === 'yours').length > 0 && (
-                <div className="space-y-1" data-testid="brief-yours">
-                  {meeting.record.spans
-                    .filter((s) => s.tier === 'yours')
-                    .map((s, i) => (
-                      <p key={`y${i}`} className="text-[13.5px] leading-relaxed text-[var(--ink-100)]">
-                        {s.text}
-                      </p>
-                    ))}
+          </div>
+
+          {/* ── Action items ─────────────────────────────────────────────── */}
+          {view === 'commitments' && (
+            <div className="px-4 py-4 space-y-5" data-testid="rendering-commitments">
+              <p className="text-[12.5px] text-[var(--ink-50)] leading-snug">
+                Pulled from the transcript. Checking one off marks it complete everywhere in Plexii; the bell sends it to your Attention queue with a link back to the moment it was said.
+              </p>
+              {carried.length > 0 && (
+                <CarriedFromLastTime
+                  items={carried}
+                  lastTitle={lastMeeting?.title}
+                  lastAt={lastMeeting?.createdAt}
+                />
+              )}
+              {segments.length > 0 && foundCommitments === null && (
+                <button
+                  onClick={() => void findCommitments()}
+                  disabled={extracting}
+                  className="fb-btn-surface inline-flex items-center gap-1.5 text-[12px] h-8 px-3 text-[var(--ink-90)] fb-press disabled:opacity-50"
+                  data-testid="find-commitments"
+                  title="Extract commitments from the transcript — they go through the confirm stop, never silently into Attention"
+                >
+                  <Icon name="auto_awesome" size={14} className="text-[rgb(var(--accent))]" />
+                  {extracting ? 'Reading the transcript…' : 'Find commitments'}
+                </button>
+              )}
+              {foundCommitments !== null &&
+                (foundCommitments.length > 0 ? (
+                  <MeetingCommitmentsCard
+                    commitments={foundCommitments}
+                    meetingId={meeting.id}
+                    meetingTitle={meeting.title}
+                    deskNodeId={meeting.deskNodeId}
+                    onFiled={() => {
+                      setFoundCommitments(null)
+                      void refreshItems()
+                    }}
+                  />
+                ) : (
+                  <p className="text-[12.5px] text-[var(--ink-50)]">
+                    Nothing in this transcript reads as a commitment — an honest zero, not a failure.
+                  </p>
+                ))}
+
+              {filedItems.length > 0 && (
+                <div data-testid="meet-filed-items">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">In Attention</div>
+                  <div className="divide-y divide-[var(--edge-soft)]">
+                    {filedItems.map((i) => {
+                      const done = isTerminalState(itemState(i))
+                      const moment = parseMeetingMomentUrl(i.sourceUrl)
+                      const seg = moment?.segmentId ? segments.find((s) => s.id === moment.segmentId) : null
+                      return (
+                        <div key={i.id} className="flex items-start gap-3 py-2.5" data-testid={`meet-item-${i.id}`}>
+                          <button
+                            onClick={() => void toggleItemDone(i)}
+                            aria-pressed={done}
+                            title={done ? 'Completed — click to reopen' : 'Mark complete everywhere in Plexii'}
+                            data-testid={`meet-item-done-${i.id}`}
+                            className={`mt-0.5 h-5 w-5 shrink-0 rounded-full border-[1.5px] inline-flex items-center justify-center fb-press transition-colors ${
+                              done
+                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                : 'border-[var(--edge-strong)] hover:border-[rgb(var(--accent))]'
+                            }`}
+                          >
+                            {done && <Icon name="check" size={13} />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-[13.5px] leading-snug ${done ? 'line-through text-[var(--ink-50)]' : 'text-[var(--ink-100)]'}`}>
+                              {i.title}
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 flex-wrap text-[11.5px] text-[var(--ink-50)]">
+                              {i.intentClass && (
+                                <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[var(--ink-70)]">
+                                  {CLASS_LABEL[i.intentClass] ?? i.intentClass}
+                                </span>
+                              )}
+                              {i.dueAt && (
+                                <span className="fb-tabular">
+                                  due {new Date(i.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                              {seg && (
+                                <button
+                                  onClick={() => jumpToSegment(seg.id)}
+                                  className="fb-tabular text-[rgb(var(--accent))] hover:underline fb-press"
+                                  data-testid={`meet-item-moment-${i.id}`}
+                                >
+                                  {fmtMs(seg.startMs)} in transcript
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-[rgb(var(--accent))]"
+                            title="This item is in your Attention queue and points back at this meeting"
+                          >
+                            <Icon name="notifications" size={14} filled /> In Attention
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
-              {[...new Set(meeting.record.spans.filter((s) => s.tier !== 'yours').map((s) => s.section ?? 'Notes'))].map(
-                (section) => (
-                  <section key={section}>
-                    <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">
-                      {section}
-                    </h2>
-                    <div className="space-y-1.5">
-                      {meeting.record!.spans
-                        .filter((s) => s.tier !== 'yours' && (s.section ?? 'Notes') === section)
-                        .map((s, i) =>
-                          s.tier === 'heard' && s.segmentId ? (
-                            <button
-                              key={`h${i}`}
-                              onClick={() => jumpToSegment(s.segmentId!)}
-                              title={s.startMs != null ? `Heard at ${fmtMs(s.startMs)} — click to jump to the moment` : undefined}
-                              data-tier="heard"
-                              className="block w-full text-left text-[13px] leading-relaxed text-[var(--ink-90)] border-l-2 border-[var(--edge-strong)] pl-2.5 hover:border-[rgb(var(--accent))] fb-press"
-                            >
-                              {s.text}
-                            </button>
-                          ) : (
-                            <p key={`i${i}`} data-tier="inferred" className="text-[13px] leading-relaxed text-[var(--ink-50)]">
-                              {s.text}
-                            </p>
-                          )
-                        )}
+
+              {meeting.actionItems.length === 0 && filedItems.length === 0 && foundCommitments === null ? (
+                <p className="text-[13px] text-[var(--ink-50)]">
+                  Nothing was committed to in this meeting — or nothing was recorded. Owners and
+                  routing into Attention arrive with extraction.
+                </p>
+              ) : (
+                unfiledLegacy.length > 0 && (
+                  <div data-testid="meet-legacy-items">
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">From the summary</div>
+                    <div className="divide-y divide-[var(--edge-soft)]">
+                      {unfiledLegacy.map(({ text: item, i }) => (
+                        <div key={i} className="flex items-start gap-3 py-2.5">
+                          {/* Hollow: this line has no state of its own yet — the
+                              bell gives it one, and a real checkbox, above. */}
+                          <Icon name="radio_button_unchecked" size={18} className="mt-0.5 text-[var(--ink-30)] shrink-0" />
+                          <span className="flex-1 text-[13.5px] leading-snug text-[var(--ink-90)]">{item}</span>
+                          <button
+                            onClick={() => void sendLegacyToAttention(i, item)}
+                            disabled={!!filing[i]}
+                            className="inline-flex items-center gap-1 text-[11px] h-7 px-2 rounded-full fb-press transition-colors text-[var(--ink-50)] hover:text-[rgb(var(--accent))] hover:bg-[rgb(var(--accent)/0.08)] disabled:opacity-50"
+                            title="Send to Attention — it will point back at this meeting"
+                            data-testid={`meet-legacy-bell-${i}`}
+                          >
+                            <Icon name="notifications" size={14} />
+                            {filing[i] ? 'Filing…' : 'Attention'}
+                          </button>
+                          <button
+                            onClick={() => void makeTask(i, item)}
+                            disabled={madeTasks[i]}
+                            className="fb-btn-surface shrink-0 inline-flex items-center gap-1 text-[11px] h-7 px-2 text-[var(--ink-90)] disabled:opacity-50"
+                            title="Make a desk for this"
+                            data-testid={`meet-make-task-${i}`}
+                          >
+                            <Icon name={madeTasks[i] ? 'check' : 'add_task'} size={13} /> {madeTasks[i] ? 'Added' : 'Desk'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  </section>
+                  </div>
                 )
               )}
             </div>
-          ) : (
-            <p className="text-[13px] text-[var(--ink-50)]">
-              {meeting.summary
-                ? meeting.summary
-                : 'No record yet — it is built when a recorded meeting ends.'}
-            </p>
           )}
-        </div>
-      )}
 
-      {view === 'thread' && (
-        <div className="px-5 py-4 max-w-[780px]" data-testid="rendering-thread" ref={threadRef}>
-          {segments.length > 0 ? (
-            <div className="space-y-2">
-              {segments.map((s) => (
-                <div
-                  key={s.id}
-                  data-segment-id={s.id}
-                  className={`flex items-start gap-2.5 ${
-                    s.confidence != null && s.confidence < 0.5 ? 'opacity-60' : ''
-                  }`}
-                  title={
-                    s.confidence != null
-                      ? `Engine confidence ${(s.confidence * 100).toFixed(0)}%`
-                      : 'Engine confidence unknown (on-device)'
-                  }
-                >
-                  <span className="fb-tabular text-[11px] text-[var(--ink-40)] w-10 shrink-0 pt-0.5">
-                    {fmtMs(s.startMs)}
-                  </span>
-                  <span className="text-[12px] font-semibold text-[var(--ink-70)] w-20 shrink-0 truncate pt-0.5">
-                    {s.speakerName || 'Speaker'}
-                  </span>
-                  <span className="flex-1 text-[13px] leading-relaxed text-[var(--ink-90)]">{s.text}</span>
+          {/* ── Overview: the Brief, organised by section ─────────────────── */}
+          {view === 'brief' && (
+            <div className="px-4 py-4 space-y-4" data-testid="rendering-brief-outer">
+              <section>
+                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Summary</div>
+                <textarea
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  onBlur={() => summary !== meeting.summary && onChange({ summary })}
+                  placeholder="The summary appears here after recording, or write your own."
+                  className="w-full min-h-[72px] resize-y rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus:border-[rgb(var(--accent))] px-3 py-2.5 text-[13.5px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] outline-none transition-colors"
+                  data-testid="meet-summary"
+                />
+              </section>
+              {/* M2c (§3.5) — rebuild the Brief under a different template. The
+                  Commitments rendering is never templated: its shape is the
+                  product. yours spans survive every rebuild untouched. */}
+              {segments.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap" data-testid="record-templates">
+                  <span className="text-[11px] text-[var(--ink-40)] mr-1">Brief as</span>
+                  {RECORD_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      disabled={rebuilding}
+                      onClick={() => void rebuildBrief(tpl.sections)}
+                      title={`Rebuild the Brief as “${tpl.name}” — sections: ${tpl.sections.join(' · ')}`}
+                      className="h-7 px-2.5 rounded-full text-[11.5px] fb-press bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:text-[var(--ink-100)] disabled:opacity-50"
+                    >
+                      {rebuilding ? '…' : tpl.name}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          ) : meeting.transcript ? (
-            <pre className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-[var(--ink-80)] font-[inherit]">
-              {meeting.transcript}
-            </pre>
-          ) : (
-            <p className="text-[13px] text-[var(--ink-50)]">No transcript for this meeting.</p>
+          )}
+          {view === 'brief' && (
+            <div className="px-4 pb-4" data-testid="rendering-brief">
+              {meeting.record && meeting.record.spans.length > 0 ? (
+                <div className="space-y-5">
+                  {/* yours first — the reader's own words lead. */}
+                  {meeting.record.spans.filter((s) => s.tier === 'yours').length > 0 && (
+                    <div className="space-y-1" data-testid="brief-yours">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Your notes</div>
+                      {meeting.record.spans
+                        .filter((s) => s.tier === 'yours')
+                        .map((s, i) => (
+                          <p key={`y${i}`} className="text-[13.5px] leading-relaxed text-[var(--ink-100)]">
+                            {s.text}
+                          </p>
+                        ))}
+                    </div>
+                  )}
+                  {[...new Set(meeting.record.spans.filter((s) => s.tier !== 'yours').map((s) => s.section ?? 'Notes'))].map(
+                    (section) => (
+                      <section key={section} data-brief-section={section}>
+                        <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)] mb-2">{section}</h2>
+                        <div className="space-y-1.5">
+                          {meeting.record!.spans
+                            .filter((s) => s.tier !== 'yours' && (s.section ?? 'Notes') === section)
+                            .map((s, i) =>
+                              s.tier === 'heard' && s.segmentId ? (
+                                <button
+                                  key={`h${i}`}
+                                  onClick={() => jumpToSegment(s.segmentId!)}
+                                  title={s.startMs != null ? `Heard at ${fmtMs(s.startMs)} — click to jump to the moment` : undefined}
+                                  data-tier="heard"
+                                  className="flex w-full items-start gap-3 text-left text-[13px] leading-relaxed text-[var(--ink-90)] border-l-2 border-[var(--edge-strong)] pl-2.5 hover:border-[rgb(var(--accent))] fb-press"
+                                >
+                                  <span className="flex-1">{s.text}</span>
+                                  {s.startMs != null && (
+                                    <span className="fb-tabular text-[11px] text-[var(--ink-40)] shrink-0 pt-0.5">{fmtMs(s.startMs)}</span>
+                                  )}
+                                </button>
+                              ) : (
+                                <p key={`i${i}`} data-tier="inferred" className="flex items-start gap-3 text-[13px] leading-relaxed text-[var(--ink-50)] pl-2.5">
+                                  <span className="flex-1">{s.text}</span>
+                                  <span className="text-[10px] uppercase tracking-wider text-[var(--ink-30)] shrink-0 pt-1" title="No transcript anchor — the machine's reading">inferred</span>
+                                </p>
+                              )
+                            )}
+                        </div>
+                      </section>
+                    )
+                  )}
+                </div>
+              ) : (
+                <p className="text-[13px] text-[var(--ink-50)]">
+                  {meeting.summary
+                    ? 'The Brief is built when a recorded meeting ends — the summary above is what this meeting has.'
+                    : 'No record yet — it is built when a recorded meeting ends.'}
+                </p>
+              )}
+              {/* The plain transcript text stays editable for notes-only
+                  meetings (paste your own); with segments present it is the
+                  same fact rendered twice, so it folds away. */}
+              <section className="mt-5">
+                <button
+                  onClick={() => setShowTranscript((v) => !v)}
+                  aria-expanded={showTranscript || segments.length === 0}
+                  className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5 fb-press"
+                >
+                  <Icon name="expand_more" size={14} className={`transition-transform ${showTranscript || segments.length === 0 ? 'rotate-180' : ''}`} />
+                  Plain transcript text
+                </button>
+                {(showTranscript || segments.length === 0) && (
+                  <textarea
+                    value={transcript}
+                    onChange={(e) => setTranscript(e.target.value)}
+                    onBlur={() => transcript !== meeting.transcript && onChange({ transcript })}
+                    placeholder="The full transcript appears here after recording, or paste your own."
+                    className="w-full min-h-[140px] resize-y rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus:border-[rgb(var(--accent))] px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)] outline-none transition-colors"
+                  />
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* ── Analytics: facts from the segments, never scores ──────────── */}
+          {view === 'analytics' && (
+            <div className="px-4 py-4 space-y-5" data-testid="rendering-analytics">
+              {segments.length === 0 ? (
+                <p className="text-[13px] text-[var(--ink-50)]">
+                  Analytics need an attributed transcript. Record a meeting and they appear here — empty is an honest answer, not a failure.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
+                    <StatTile icon="schedule" label="Duration" value={fmtDuration(totalMs)} tone="accent" />
+                    <StatTile icon="swap_horiz" label="Speaker changes" value={speakerChanges(segments)} tone="sky" />
+                    <StatTile icon="help" label="Questions asked" value={questionCount(segments)} tone="violet" />
+                    <StatTile icon="notes" label="Lines" value={segments.length} tone="stone" />
+                  </div>
+                  <section data-testid="meet-who-spoke">
+                    <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)]">Who spoke</h2>
+                    <p className="text-[12px] text-[var(--ink-50)] mb-2.5">
+                      Share of the transcript by speaker — a fact from the attributed lines, not a score. Click a name to read only them.
+                    </p>
+                    <div className="space-y-2">
+                      {speakers.map((name) => {
+                        const ms = spokenMs.get(name) ?? 0
+                        const pct = spokenTotal > 0 ? Math.round((ms / spokenTotal) * 100) : 0
+                        return (
+                          <button
+                            key={name}
+                            onClick={() => setSpeakerFilter((cur) => (cur === name ? null : name))}
+                            className={`w-full flex items-center gap-3 fb-press rounded-md px-1 py-0.5 ${speakerFilter === name ? 'bg-[rgb(var(--accent)/0.08)]' : 'hover:bg-[var(--surface-sunken)]'}`}
+                            data-testid={`meet-speaker-share-${name}`}
+                          >
+                            <span className="inline-flex items-center gap-1.5 w-28 shrink-0 text-[13px] text-[var(--ink-90)] truncate">
+                              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: colorOf(name) }} />
+                              {name}
+                            </span>
+                            <span className="flex-1 h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                              <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colorOf(name) }} />
+                            </span>
+                            <span className="fb-tabular text-[12px] text-[var(--ink-60)] w-24 text-right shrink-0">
+                              {pct}% · {fmtMs(ms)}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
+                  {markers.length > 0 && (
+                    <section>
+                      <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)]">Moments</h2>
+                      <p className="text-[12px] text-[var(--ink-50)] mb-2">
+                        Where the Record and your action items point into the call. Each one opens the line.
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[...markers]
+                          .sort((a, b) => a.ms - b.ms)
+                          .map((m) => (
+                            <button
+                              key={m.key}
+                              onClick={() => jumpToSegment(m.segmentId)}
+                              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[11.5px] fb-press bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:text-[var(--ink-100)] max-w-[260px]"
+                              title={m.label}
+                            >
+                              <span className="fb-tabular text-[var(--ink-40)]">{fmtMs(m.ms)}</span>
+                              <span className="truncate">{m.label}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
-      )}
 
+        {/* ── Transcript: always visible, tagged, searchable, linked ────────── */}
+        <div className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 fb-card flex flex-col lg:sticky lg:top-[60px] lg:max-h-[calc(100vh-140px)]" data-testid="meet-transcript-pane">
+          <div className="px-3 pt-3 pb-2 border-b border-[var(--edge-soft)] space-y-2">
+            <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
+              <Icon name="search" size={14} className="text-[var(--ink-50)]" />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search the transcript"
+                className="flex-1 bg-transparent text-[12.5px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)] outline-none"
+                data-testid="meet-transcript-search"
+              />
+              {query ? (
+                <button onClick={() => setQuery('')} className="text-[var(--ink-40)] hover:text-[var(--ink-100)]" aria-label="Clear search">
+                  <Icon name="close" size={14} />
+                </button>
+              ) : (
+                <kbd className="text-[10.5px] text-[var(--ink-40)] px-1.5 py-0.5 rounded bg-[var(--surface-raised)] border border-[var(--edge-soft)]">/</kbd>
+              )}
+            </div>
+            {speakers.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap" data-testid="meet-speaker-chips">
+                <button
+                  onClick={() => setSpeakerFilter(null)}
+                  className={`h-7 px-2.5 rounded-full text-[11.5px] fb-press transition-colors ${
+                    speakerFilter === null
+                      ? 'bg-[var(--ink-100)] text-[var(--surface-raised)]'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-70)] hover:text-[var(--ink-100)]'
+                  }`}
+                  data-testid="meet-speaker-chip-all"
+                >
+                  All speakers
+                </button>
+                {speakers.map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => setSpeakerFilter((cur) => (cur === name ? null : name))}
+                    className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[11.5px] fb-press border transition-colors ${
+                      speakerFilter === name
+                        ? 'border-[var(--ink-100)] text-[var(--ink-100)] bg-[var(--surface-raised)]'
+                        : 'border-[var(--edge-soft)] text-[var(--ink-70)] hover:text-[var(--ink-100)]'
+                    }`}
+                    data-testid={`meet-speaker-chip-${name}`}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorOf(name) }} />
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto px-3 py-2" data-testid="rendering-thread" ref={threadRef}>
+            {segments.length > 0 ? (
+              visibleSegments.length > 0 ? (
+                <div className="space-y-0.5">
+                  {visibleSegments.map((s) => {
+                    const name = s.speakerName?.trim() || 'Speaker'
+                    const active = s.id === activeSegmentId
+                    const rowAnchors = markers.filter((m) => m.segmentId === s.id)
+                    return (
+                      <div
+                        key={s.id}
+                        data-segment-id={s.id}
+                        onClick={() => setActiveSegmentId(s.id)}
+                        className={`flex items-start gap-3 rounded-lg px-2 py-2 transition-colors cursor-default ${
+                          active ? 'bg-[rgb(var(--accent)/0.10)]' : 'hover:bg-[var(--surface-sunken)]'
+                        } ${s.confidence != null && s.confidence < 0.5 ? 'opacity-60' : ''}`}
+                        title={
+                          s.confidence != null
+                            ? `Engine confidence ${(s.confidence * 100).toFixed(0)}%`
+                            : 'Engine confidence unknown (on-device)'
+                        }
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            jumpToSegment(s.id)
+                          }}
+                          className="fb-tabular text-[11px] text-[var(--ink-40)] hover:text-[rgb(var(--accent))] w-10 shrink-0 pt-0.5 text-left fb-press"
+                          title="Move the timeline here"
+                        >
+                          {fmtMs(s.startMs)}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: colorOf(name) }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: colorOf(name) }} />
+                            {name}
+                          </span>
+                          <div className="text-[13px] leading-relaxed text-[var(--ink-90)]">{highlight(s.text)}</div>
+                          {rowAnchors.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1" data-testid={`meet-row-anchors-${s.id}`}>
+                              {rowAnchors.map((a) => (
+                                <button
+                                  key={a.key}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openAnchor(a)
+                                  }}
+                                  className="inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10.5px] font-medium bg-[rgb(var(--accent)/0.08)] text-[rgb(var(--accent))] hover:bg-[rgb(var(--accent)/0.14)] fb-press"
+                                  title={
+                                    a.kind === 'heard'
+                                      ? `This line is the source of a Brief entry under ${a.section} — open it`
+                                      : `This line is where “${a.label}” was committed to — open the action item`
+                                  }
+                                >
+                                  <Icon name={a.kind === 'heard' ? 'article' : 'task_alt'} size={11} />
+                                  {a.kind === 'heard' ? `In Brief · ${a.section}` : 'Action item'}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="px-2 py-6 text-[12.5px] text-[var(--ink-50)]" data-testid="meet-transcript-empty-filter">
+                  {query.trim()
+                    ? `Nothing in the transcript matches “${query.trim()}”${speakerFilter ? ` from ${speakerFilter}` : ''}.`
+                    : `${speakerFilter} has no lines in this transcript.`}
+                </p>
+              )
+            ) : meeting.transcript ? (
+              <pre className="whitespace-pre-wrap px-2 text-[12.5px] leading-relaxed text-[var(--ink-80)] font-[inherit]">
+                {meeting.transcript}
+              </pre>
+            ) : (
+              <p className="px-2 py-6 text-[13px] text-[var(--ink-50)]">No transcript for this meeting.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Footer facts: series knobs, audio on disk, export receipt ──────── */}
       {/* M5 (Q14) — the per-series brief knob, on the series meeting itself:
           a series whose briefs are noise gets silenced here, and the wrap-up
           asks before minting the next one. */}
@@ -1189,7 +1837,7 @@ function MeetingDetail({
         </div>
       )}
       {(audio?.present || exported) && (
-        <div className="px-5 pb-2 space-y-1.5">
+        <div className="px-5 pb-3 space-y-1.5">
           {audio?.present && (
             <div className="flex items-center gap-2 text-[11.5px] text-[var(--ink-50)]" data-testid="meet-audio-row">
               <Icon name="graphic_eq" size={13} className="shrink-0" />
@@ -1236,37 +1884,6 @@ function MeetingDetail({
           )}
         </div>
       )}
-
-      <div className="px-5 py-4 space-y-5 border-t border-[var(--edge-soft)]">
-        <section>
-          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5">Summary</h2>
-          <textarea
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            onBlur={() => summary !== meeting.summary && onChange({ summary })}
-            placeholder="The AI summary appears here after recording, or write your own notes."
-            className="fb-card w-full min-h-[80px] resize-y px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-100)] placeholder:text-[var(--ink-50)] focus:border-[rgb(var(--accent)/0.40)]"
-          />
-        </section>
-
-        <section>
-          <button
-            onClick={() => setShowTranscript((v) => !v)}
-            className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-70)] mb-1.5"
-          >
-            <Icon name={showTranscript ? 'expand_less' : 'expand_more'} size={14} /> Transcript
-          </button>
-          {showTranscript && (
-            <textarea
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              onBlur={() => transcript !== meeting.transcript && onChange({ transcript })}
-              placeholder="The full transcript appears here after recording, or paste your own."
-              className="fb-card w-full min-h-[160px] resize-y px-3 py-2 text-[12.5px] leading-relaxed text-[var(--ink-90)] placeholder:text-[var(--ink-50)]"
-            />
-          )}
-        </section>
-      </div>
     </div>
   )
 }

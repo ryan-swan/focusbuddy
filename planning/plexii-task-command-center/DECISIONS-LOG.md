@@ -3375,3 +3375,86 @@ the chip-and-eyebrow treatment. The dark video stage stays dark by design.
 3 material pins added (wrap-up chip + display, glossy Done, premium Stage
 controls); 3,675 green across 338 files; both typechecks clean. Light and
 dark wrap-up screenshots delivered.
+
+## DEC-115 — The meeting Record reorganised: transcript beside the renderings, links both ways
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+(three reference screenshots of a mock transcript page — "this is not the
+trump card; this is just a design direction") · **Branch:** ryan-next ·
+**Scope rule:** UI/UX first, plus the linking the operator named as
+important ("linking to certain sections and instructions from a
+transcript"); core function unchanged; the transcription engine itself
+NOT re-tested this round (the operator's caveat stands — DEC-113 is
+verified on one real meeting).
+
+**What the operator asked to keep from the reference:** everything
+organised, bulleted and categorised; transcripts tagged by person,
+searchable and linked; action items with a checkbox and a bell into
+Attention; analytics filterable by person; transcripts broken out cleanly;
+the existing "Find commitments" button; all of it in the Plexii house
+material, not the reference's styling.
+
+**The frame.** Two columns. LEFT: the Record's renderings in the sunken
+segmented track — Overview (1), Action items (2 — still the DEFAULT per
+S3-DEC-022, now carrying a count), Analytics (3). RIGHT: the transcript,
+ALWAYS on screen — the Thread tab is gone because the transcript stopped
+being a destination. Lines are tagged by speaker (colour by order of first
+appearance, accent leads), searchable (`/` lands in the box; hits are
+`<mark>`ed; an honest empty line when nothing matches), filterable by
+speaker chip, every timestamp a link, the active line highlighted; DEC-100's
+confidence dimming and its hover truth survive verbatim. Above both: a meta
+strip (state pill, when, duration — seconds under a minute, "0 min" for a
+24-second call was a lie — speaker initials) and a speaker TIMELINE of
+proportional bands with markers (heard spans filled, action items hollow);
+clicking it moves through the call. No fake play button: there is no audio
+player and the Record does not pretend to be one.
+
+**Overview** = the Brief organised by section: SUMMARY field, "Brief as"
+templates, YOUR NOTES, then sections with heard rows (hairline rule +
+timestamp → jump) and inferred rows (lighter, labelled) — the M2b
+provenance treatment untouched; plain transcript text folds away once
+segments exist. **Action items**: Find commitments kept (its confirm stop
+unchanged); IN ATTENTION lists the work items that POINT at this meeting
+(DEC-079's sourceRef) — each with a circle checkbox that sets the house
+terminal state `completed` (and back to `open`), the class chip, due date,
+a "m:ss in transcript" moment link (DEC-107's anchor, parsed) and the bell
+mark; FROM THE SUMMARY lists the legacy lines with a hollow circle, a bell
+that files a human-origin, already-approved item pointing back at the
+meeting (no silent assignment), and Desk. A filed line is PROMOTED, not
+duplicated — it leaves the summary list for the checkbox list, and comes
+back if dismissed from Attention. **Analytics**: Duration / Speaker changes
+/ Questions asked / Lines tiles, "Who spoke" as per-speaker share bars
+(click = filter the transcript), Moments chips. SPEC-003's refusal holds
+and is now a banned-word pin: neutral facts, never a ranking, a score or a
+mood. **Links both ways**: a transcript line that anchors a Brief entry or
+an action item wears a chip ("In Brief · Decisions", "Action item") that
+opens the rendering and scrolls to the entry — the reverse of the jump.
+
+**Code:** `lib/meetingRecordStats.ts` (pure figures, unit-tested — speaker
+order/colour/initials, spoken time, hand-offs, questions, bands, seek,
+filter, clock/duration); `PlexiMeetView.tsx` MeetingDetail rewritten
+(1,272 → 1,860 lines; every functional pin from M1–M6, the calls round, C5
+and the briefs round survives verbatim). Superseded pins rewritten with
+history: m2b's tab tuples (Thread → Analytics, Overview leads) and
+DEC-114's 780px editorial column (→ the two-column frame). New suite
+`tests/unit/meetRecordLayout.test.ts`.
+
+**Verified live** over CDP on a scratch meeting (six attributed segments,
+yours/heard/inferred spans, a legacy line): 42 checks — search, speaker
+filter, timeline seek, heard-row jump that clears a hiding filter without
+switching tab, keys 1/2/3 and `/`, bell → one work item (meeting source,
+human origin, approved), checkbox → `completed` → `open`, promotion and
+return on dismissal, anchored-item moment link + hollow marker + reverse
+chips, Export menu. Scratch meeting removed; the items my bell filed were
+DISMISSED through the house path (work items are never deleted —
+`WorkItemDeleteRefusedError` — so the probe cleans up the way a person
+would). Light + dark screenshots via the DEC-112 honest capture. Suite:
+3,693 tests / 339 files; both typechecks clean.
+
+**Caught live, fixed in-round:** (1) the renderer store never sees a
+raw-IPC write, so a dismissal made elsewhere (the queue in another session,
+a snooze expiry) would not show on reopen — the Record now re-reads work
+items on every open; (2) a sticky "already sent" bell state would go stale
+after a dismissal — replaced by an in-flight guard, the promotion carries
+the truth; (3) the pills carried both a count and a key digit — the digit
+moved to the tooltip. **Probe lesson:** `textContent` includes Material
+ligature names ("article") — match labels, never equality.

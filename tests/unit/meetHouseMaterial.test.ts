@@ -41,8 +41,17 @@ describe('PlexiMeet wears the house material', () => {
     expect(view).toContain('bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)]')
   })
 
-  it('all three renderings read as an editorial column', () => {
-    expect(view.split('max-w-[780px]').length - 1).toBeGreaterThanOrEqual(4)
+  it('the renderings and the transcript sit side by side on the paper, each a raised card', () => {
+    // History: DEC-114 set every rendering in a single 780px editorial column
+    // (pinned as ≥4 `max-w-[780px]`). DEC-115 reorganised the Record into two
+    // columns — renderings left, the transcript always visible right — so the
+    // column cap went with it. What must survive is the two-column frame and
+    // that both halves are house cards.
+    expect(view).not.toContain('max-w-[780px]')
+    expect(view).toContain('flex flex-col lg:flex-row gap-4 items-start')
+    expect(view).toContain('fb-card overflow-hidden" data-testid="meet-record-pane"')
+    expect(view).toContain('lg:sticky lg:top-[60px]')
+    expect(view).toContain('data-testid="meet-transcript-pane"')
   })
 })
 

@@ -93,12 +93,20 @@ describe('M2b — the Enhance contract', () => {
 
 describe('M2b — three renderings, Commitments default', () => {
   const ui = read('renderer/src/components/views/PlexiMeetView.tsx')
-  it('the segmented control with 1/2/3, Commitments first', () => {
+  it('the segmented control with 1/2/3, Commitments the default', () => {
     expect(ui).toContain("useState<RecordView>('commitments')")
     // testids are template-generated per view key
     expect(ui).toContain('data-testid={`record-view-${v}`}')
-    for (const v of ["'commitments', 'Commitments', '1'", "'brief', 'Brief', '2'", "'thread', 'Thread', '3'"])
+    // History: M2b shipped Commitments / Brief / Thread as three tabs with
+    // Commitments first. The Record reorganisation (DEC-115) keeps Commitments
+    // as the DEFAULT (S3-DEC-022 still holds — the shortest artifact opens)
+    // but the Thread stopped being a tab: the transcript is always on screen
+    // beside the renderings, and the third tab became Analytics. Overview
+    // (the Brief + summary) leads the order because it reads left-to-right
+    // as "what happened → what I owe → the numbers".
+    for (const v of ["'brief', 'Overview', '1'", "'commitments', 'Action items', '2'", "'analytics', 'Analytics', '3'"])
       expect(ui).toContain(v)
+    expect(ui).not.toContain("'thread', 'Thread'")
   })
   it('the provenance treatment: yours full ink, heard ruled + jumpable, inferred lighter', () => {
     expect(ui).toContain('data-testid="brief-yours"')
