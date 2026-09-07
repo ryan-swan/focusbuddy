@@ -3759,3 +3759,20 @@ opens to its thread with a way back, back returns; Agent keeps the
 autonomous surface with the sub-tabs, Desk agents lists the desk agents,
 and back; Tasks unchanged. Suite: 3,793 tests / 344 files; both
 typechecks clean.
+**Addendum (probe residue, and a sync hazard to look at).** The Attention
+capture showed seven open "Send the revised numbers to Dana by Friday"
+items — my own DEC-115/116 probe residue, every one filed by the bell
+(through the STORE, which emits the create over the sync substrate) and
+then dismissed in each run's cleanup over RAW IPC (which emits nothing).
+`workspaceSync` applies remote rows as a plain `ON CONFLICT(id) DO UPDATE`
+upsert, so the substrate's copy — still `open` — came back and won; the
+raw-IPC-created "Book time with legal" items had no synced copy and stayed
+dismissed. Cleaned by dismissing exactly those seven through the store
+(`useWorkItemStore.setState`, which emits the attr), guarded by title,
+source and the scratch meeting no longer existing; rows re-read read-only
+at +8 s and +20 s: dismissed, stable. Probe rule from here: create and
+dismiss through the SAME path, and re-read the rows after the sync has had
+its turn. **To look at (not asserted):** main's decay path writes
+`work_item_state = 'dismissed', reason_code = 'decayed'` in raw SQL with no
+sync emit — by the same mechanism a later upsert of that row could reopen a
+decayed item. Worth a read of the upsert's guard before ruling it.
