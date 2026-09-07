@@ -4410,3 +4410,29 @@ and Transcript panes end inside the window, the Record body and the
 transcript thread are the scrollers, and at 640px all of rail, Record and
 Transcript end inside the window with the thread scrolling; no clipping
 anywhere. Suite: 3,896 tests / 356 files; both typechecks clean.
+
+## DEC-135 — The meeting detail header sits on a house card
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request, with a screenshot of a meeting open in PlexiMeet
+("the title card where it says 'Test', Transcribed, the date, the amount of
+time, the speaker, all the way extended to the right with Desk, Export and
+the trash icon — add a filled-in colored block behind it similar to the
+timeline block, just for that header title field").
+
+**What changed.** The detail header (`meet-detail-header`) wears the
+Timeline card's own material — `fb-card`: the raised fill, hairline, soft
+shadow and card radius — edge to edge with the Timeline and the panes below
+it, one card gap apart (`mb-4`), padded like the cards (`px-4 py-3.5`).
+Everything it held stays where it was: the editable title, the status pill,
+the date, the duration, the speaker stack and count on the left; Desk,
+Export and Delete on the right. The overlapping speaker avatars ring in the
+card's fill (`--surface-raised`) instead of the paper's, so their separators
+stay clean on the new ground. DEC-116's "title bare on the paper" pin is
+rewritten with this history; nothing else moved.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, view restored: the header's computed background, box-shadow and radius
+equal the Timeline card's; its left and right edges match the Timeline's and
+the Record pane's, 16px apart; the title, the meta line, Desk, Export and
+Delete all lie inside the card; the avatar ring colour equals the card's
+fill. Suite: 3,896 tests / 356 files; typecheck clean.

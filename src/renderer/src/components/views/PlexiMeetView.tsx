@@ -1164,9 +1164,13 @@ function MeetingDetail({
 
   return (
     <div className="flex flex-col lg:flex-1 lg:min-h-0" data-testid="meet-detail">
-      {/* ── Header: Home's idiom — the title on the paper, its facts beneath,
-          the doors as quiet surface buttons on the right ─────────────────── */}
-      <header className="flex items-start justify-between gap-4 flex-wrap mb-5 shrink-0" data-testid="meet-detail-header">
+      {/* ── Header: the title, its facts beneath, the doors as quiet surface
+          buttons on the right — on a house card. DEC-116 set the title bare
+          on the paper; DEC-135 (operator: "add a filled-in colored block
+          behind it similar to the timeline block, just for that header title
+          field") gives it the Timeline card's own material, edge to edge with
+          the cards below it. ───────────────────────────────────────────── */}
+      <header className="fb-card px-4 py-3.5 flex items-start justify-between gap-4 flex-wrap mb-4 shrink-0" data-testid="meet-detail-header">
         <div className="min-w-0 flex-1">
           <input
             value={title}
@@ -1189,10 +1193,12 @@ function MeetingDetail({
               <span className="inline-flex items-center gap-2" data-testid="meet-speakers">
                 <span className="flex -space-x-1.5">
                   {speakers.map((name) => (
+                    // The ring is the card's own fill now (DEC-135), so the
+                    // overlapping avatars keep a clean separator on it.
                     <span
                       key={name}
                       title={name}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-base)]"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-raised)]"
                       style={{ backgroundColor: colorOf(name) }}
                     >
                       {speakerInitials(name)}

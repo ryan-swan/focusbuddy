@@ -131,7 +131,8 @@ describe('dec_134 — the same rule for the Calendar and Meet pages', () => {
     expect(meet).toContain("className={`flex-1 min-w-0 w-full ${selected ? 'lg:min-h-0 lg:flex lg:flex-col' : 'lg:min-h-0 lg:overflow-y-auto'}`}")
     expect(meet).toContain('data-testid="meet-main"')
     expect(meet).toContain('<div className="flex flex-col lg:flex-1 lg:min-h-0" data-testid="meet-detail">')
-    expect(meet).toContain('<header className="flex items-start justify-between gap-4 flex-wrap mb-5 shrink-0" data-testid="meet-detail-header">')
+    // (DEC-135 put this header on a house card; the pin follows the card.)
+    expect(meet).toContain('<header className="fb-card px-4 py-3.5 flex items-start justify-between gap-4 flex-wrap mb-4 shrink-0" data-testid="meet-detail-header">')
     expect(meet).toContain('testId="meet-timeline"\n          className="mb-4 shrink-0"')
   })
   it('Meet: the Record and the Transcript hug short content and cap at the floor, each scrolling under its own pinned header', () => {

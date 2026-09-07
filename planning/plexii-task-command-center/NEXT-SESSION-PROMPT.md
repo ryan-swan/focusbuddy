@@ -252,9 +252,12 @@
 > its height across six weeks, the Meet rail hugging-or-shrinking, the
 > Record and Transcript hugging-or-capping); the four `100vh` caps and both
 > sticky rails are gone. 16/16 live at 2021×1105 and 1400×640; suite
+> 3,896 tests / 356 files. **DEC-135**: the meeting detail header sits on
+> a house card (the Timeline's own material), edge to edge with the cards
+> below it, the speaker avatars ringed in the card's fill. 4/4 live; suite
 > 3,896 tests / 356 files.
 
-**Last updated:** 2026-09-07 — through DEC-134 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-135 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

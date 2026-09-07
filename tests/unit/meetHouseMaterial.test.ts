@@ -72,7 +72,15 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
     expect(view).toContain('shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]')
   })
 
-  it('the detail header is the title on the paper with surface-button doors — no sticky bar', () => {
+  it("the detail header is the title on a house card — the Timeline's own material — with surface-button doors; no sticky bar", () => {
+    // History: DEC-112 gave the detail a sticky raised header bar; DEC-116
+    // set the title bare on the paper. DEC-135 (operator: "add a filled-in
+    // colored block behind it similar to the timeline block, just for that
+    // header title field") puts the title, its facts and the doors on the
+    // same `fb-card` the Timeline and the panes wear, edge to edge with them.
+    expect(view).toContain('<header className="fb-card px-4 py-3.5 flex items-start justify-between gap-4 flex-wrap mb-4 shrink-0" data-testid="meet-detail-header">')
+    // The overlapping speaker avatars ring in the card's fill, not the paper's.
+    expect(view).toContain('rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-raised)]')
     expect(view).toContain('data-testid="meet-detail-header"')
     expect(view).toContain('fb-display-hero text-[22px] leading-tight text-[var(--ink-100)] outline-none')
     expect(view).not.toContain('sticky top-0 z-10 flex items-center gap-2 px-5 py-3')
