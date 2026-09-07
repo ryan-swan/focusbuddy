@@ -143,8 +143,16 @@
 > stated before anything runs. `guestCapture.start` grew `notes` /
 > `micOnly`. 12/12 live with the mic stubbed to refuse; suite 3,759
 > tests / 341 files.
+> **DEC-119**: the Message door opens the twin too (`MessageDialog`:
+> Video / Voice slider sets the capture, the 23px field is the DM text,
+> TO is one teammate from live presence; the door becomes "Stop & send
+> to <name>" while recording — the popover is gone), and Meet's
+> embedded dashboard renders no header row (no Customize) so the tiles
+> start level with the rail. 10/10 live, mic stubbed; suite 3,778
+> tests / 342 files. **Every Meet door is now the composer's twin
+> (DEC-117/118/119).**
 
-**Last updated:** 2026-09-06 — through DEC-118 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-119 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

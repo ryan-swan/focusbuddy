@@ -75,8 +75,8 @@ export interface ModuleDashboardProps {
   activity?: { items: DashboardActivityItem[]; onViewAll?: () => void }
   recentItems?: { label?: string; items: ModuleItem[]; emptyHint: string; onCreate?: () => void; createLabel?: string }
   /** Rendered inside a page that already carries its own hero header and
-   *  padding (PlexiMeet's paper page): no outer padding, no title block — the
-   *  Customize door and `actions` stay, right-aligned. */
+   *  padding (PlexiMeet's paper page): no outer padding, no title block, no
+   *  Customize door — the tiles start level with whatever sits beside them. */
   embedded?: boolean
 }
 
@@ -195,15 +195,14 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
   return (
     <div className={embedded ? 'min-w-0' : 'flex-1 min-w-0 overflow-auto'} data-testid={`module-dashboard-${moduleKey}`}>
       <div className={embedded ? 'w-full' : 'w-full px-8 py-6'}>
+        {/* Embedded (PlexiMeet's paper page): the host page carries the hero and
+            there is no Customize — the tiles start level with the rail. */}
+        {!embedded && (
         <div className="flex items-start justify-between gap-3">
-          {embedded ? (
-            <div className="flex-1" />
-          ) : (
-            <div className="flex items-start gap-2.5">
-              <Icon name={icon} size={22} className={`mt-0.5 shrink-0 ${accentClass}`} filled />
-              <DashboardHeader title={title} greeting={greeting} subtitle={subtitle} />
-            </div>
-          )}
+          <div className="flex items-start gap-2.5">
+            <Icon name={icon} size={22} className={`mt-0.5 shrink-0 ${accentClass}`} filled />
+            <DashboardHeader title={title} greeting={greeting} subtitle={subtitle} />
+          </div>
           <div className="shrink-0 flex items-center gap-2">
             <div className="relative">
               <button
@@ -231,9 +230,10 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
             {actions}
           </div>
         </div>
+        )}
 
         {show('stats') && stats.length > 0 && (
-          <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={`${embedded ? '' : 'mt-5 '}grid grid-cols-2 sm:grid-cols-4 gap-3`}>
             {stats.map((s) => (
               <div key={s.label} className="relative">
                 <StatTile icon={s.icon} label={s.label} value={s.value} tone={s.tone} delta={s.delta} hint={s.hint} />

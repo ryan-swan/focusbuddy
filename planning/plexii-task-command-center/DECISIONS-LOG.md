@@ -3623,3 +3623,46 @@ with their disclosure lines; Start capturing with the mic refused raises no
 disclosure bar; Esc discards. One live-caught fix: a desk attached in notes
 mode kept naming the title after switching to external — the placeholder is
 mode-aware now. Suite: 3,759 tests / 341 files; both typechecks clean.
+
+## DEC-119 — The Message door opens the composer's twin; Meet's dashboard loses Customize and sits level with the rail
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("Now do the same for the Message button. Also, get rid of the customize
+button on the PlexiiMeet page and shift things upwards so the top row is in
+line with the top of the left column") · **Branch:** ryan-next · **Scope
+rule:** DEC-117's — BookTimeDialog's recipes verbatim; only fields that
+land somewhere.
+
+**The dialog.** `MessageDialog` — the header slider is the one real choice
+(Video message / Voice message: it sets the capture), the 23px field is the
+message TEXT (sent with the recording — blank sends the recording alone),
+the time row says now → until you stop, TO is one teammate as a chip on
+the filled field (from live presence, with the online-now strip; a DM
+needs an account, so no addresses), the "how" line states the capture and
+the delivery ("recorded on this Mac, then sent as a direct message in
+PlexiChat — they see it when they are back"), the Esc / ↵ footer.
+`messageDialogTwin.test.ts` holds the recipe strings in both files.
+
+**Meet's flow behind it.** The popover picker is gone. The Message door
+opens the dialog; once the camera / mic are live it closes and the door
+becomes "Stop & send to <name>" (red, pulsing) until you stop; the sent
+note lands beside busy / error. The kind decides `getUserMedia`'s video
+flag (video asked for but denied still sends a voice message, honestly;
+no mic at all is reported IN the dialog, which stays); the text rides the
+DM as its body. Start with no recipient says "Pick a teammate".
+
+**The dashboard.** `ModuleDashboard` in `embedded` mode renders no header
+row at all — no title, no Customize, no actions — and the tile grid drops
+its top margin, so the first row of tiles begins at the rail's own top
+edge (measured live: 149 px both). The Customize door still exists on
+every non-embedded module landing.
+
+**Verified live** over CDP, 10/10 with camera / mic stubbed to refuse —
+nothing recorded, nothing sent: no Customize, tiles level with the
+Meetings card; the dialog opens in video, focus in the text; the
+online-now strip (Michael) or the honest empty line; Start with no
+recipient refuses; picking a teammate chips them and names the primary;
+Voice flips the how-line to mic only; Start with the mic refused shows the
+error in the dialog and raises no Stop & send; Esc. e2e: plexiMeetLive #2
+now expects the dialog and its empty-state placeholder; moduleDashboard's
+Meet case expects NO customize door. Suite: 3,778 tests / 342 files; both
+typechecks clean.

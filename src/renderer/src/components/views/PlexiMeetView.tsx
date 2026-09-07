@@ -6,6 +6,8 @@ import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
 import { useMeetingsStore } from '../../stores/meetings'
 import NewMeetingDialog from '../NewMeetingDialog'
 import RecordDialog, { type RecordNotesDraft } from '../RecordDialog'
+import MessageDialog from '../MessageDialog'
+import type { PresencePeer } from '../../lib/messagingSocket'
 import { usePresenceStore } from '../../stores/presence'
 import { useAccountStore } from '../../stores/account'
 import { useQuickCreate } from '../../stores/quickCreate'
@@ -229,7 +231,7 @@ export default function PlexiMeetView(): JSX.Element {
   const [showNew, setShowNew] = useState(false)
   const presencePeers = usePresenceStore((s) => s.peers)
   const token = useAccountStore((s) => s.sessionToken)
-  const [showMsg, setShowMsg] = useState(false)
+  const [messageDialog, setMessageDialog] = useState(false)
   const [msgTo, setMsgTo] = useState<{ accountId: string; handle: string; firstName?: string | null; lastName?: string | null } | null>(null)
   const [msgRecording, setMsgRecording] = useState(false)
   const [msgNote, setMsgNote] = useState<string | null>(null)
@@ -254,21 +256,25 @@ export default function PlexiMeetView(): JSX.Element {
   // "they're away, leave them something" path, like a quick Loom. Reuses the real
   // chat attachment pipeline (video kind), so a failure surfaces honestly rather
   // than pretending it sent. Falls back to audio only if there is no camera.
-  async function recordMessageTo(peer: { accountId: string; handle: string; firstName?: string | null; lastName?: string | null }): Promise<void> {
+  // DEC-119 — opened from the Message dialog: the kind (video / voice) and
+  // the text ride in; the dialog owns the microphone message and stays
+  // open on false, so no view banner doubles it.
+  async function recordMessageTo(peer: PresencePeer, opts: { text: string; video: boolean }): Promise<boolean> {
     setMsgNote(null)
     setError(null)
     let stream: MediaStream
-    let isVideo = true
+    let isVideo = opts.video
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: opts.video })
     } catch {
-      // No camera (or denied): leave a voice message instead, still honest.
+      // Video asked for but no camera (or denied): a voice message still goes,
+      // honestly labelled. No mic at all: the dialog reports it.
+      if (!opts.video) return false
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         isVideo = false
       } catch {
-        setError('Could not access your camera or microphone. Check your system permissions.')
-        return
+        return false
       }
     }
     try {
@@ -301,7 +307,7 @@ export default function PlexiMeetView(): JSX.Element {
           setError('Could not upload the message.')
           return
         }
-        const sent = await sendMessage(token, conversationId, '', {
+        const sent = await sendMessage(token, conversationId, opts.text, {
           kind,
           id: att.id,
           name,
@@ -317,9 +323,10 @@ export default function PlexiMeetView(): JSX.Element {
       rec.start()
       setMsgTo(peer)
       setMsgRecording(true)
+      return true
     } catch {
       stream.getTracks().forEach((t) => t.stop())
-      setError('Could not start recording. Check your system permissions.')
+      return false
     }
   }
 
@@ -377,57 +384,25 @@ export default function PlexiMeetView(): JSX.Element {
             >
               <Icon name="radio_button_checked" size={16} /> Record external
             </button>
-            <div className="relative">
+            {msgRecording && msgTo ? (
               <button
-                onClick={() => setShowMsg((v) => !v)}
+                onClick={stopMessage}
+                data-testid="meet-message-stop"
+                className="inline-flex items-center gap-2 h-9 px-3.5 rounded-[10px] bg-red-500 text-white fb-t-body font-medium animate-pulse fb-press"
+                title="Stop and send the message"
+              >
+                <Icon name="stop_circle" size={16} /> Stop &amp; send to {personDisplayName(msgTo, msgTo.handle)}
+              </button>
+            ) : (
+              <button
+                onClick={() => setMessageDialog(true)}
                 data-testid="meet-message"
-                aria-expanded={showMsg}
-                className={`inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-press ${
-                  showMsg ? 'rounded-[10px] bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]' : 'fb-btn-surface text-[var(--ink-80)]'
-                }`}
+                className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
                 title="Record a quick message and send it to a teammate who is away"
               >
                 <Icon name="voicemail" size={16} /> Message
               </button>
-              {/* Record-a-message picker: choose a teammate (away ones flagged) and leave them a voice note. */}
-              {showMsg && (
-                <div className="absolute right-0 top-11 z-20 w-[300px] fb-card p-2" data-testid="meet-message-picker">
-              {msgRecording && msgTo ? (
-                <button
-                  onClick={stopMessage}
-                  data-testid="meet-message-stop"
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500 text-white text-[12px] font-medium animate-pulse"
-                >
-                  <Icon name="stop_circle" size={15} /> Stop &amp; send to {personDisplayName(msgTo, msgTo.handle)}
-                </button>
-              ) : (
-                <>
-                  <p className="px-1 pb-1 text-[11px] text-[var(--ink-50)]">Record a video message and send it to a teammate</p>
-                  {Object.values(presencePeers).length === 0 ? (
-                    <p className="px-1 py-2 text-[11.5px] text-[var(--ink-50)]">No teammates online right now.</p>
-                  ) : (
-                    Object.values(presencePeers).map((p) => (
-                      <button
-                        key={p.accountId}
-                        onClick={() => void recordMessageTo({ accountId: p.accountId, handle: p.handle, firstName: p.firstName, lastName: p.lastName })}
-                        data-testid={`meet-message-to-${p.accountId}`}
-                        className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md hover:bg-[var(--surface-sunken)] text-left"
-                      >
-                        <Icon name="account_circle" size={16} className="text-[var(--ink-50)]" />
-                        <span className="flex-1 text-[12px] text-[var(--ink-90)] truncate">{personDisplayName(p, p.handle)}</span>
-                        {(p.status === 'away' || p.status === 'busy' || p.status === 'focus') && (
-                          <span className="text-[10px] text-amber-600 dark:text-amber-400">{p.status}</span>
-                        )}
-                        <Icon name="videocam" size={14} className="text-[var(--ink-50)]" />
-                      </button>
-                    ))
-                  )}
-                </>
-              )}
-              {msgNote && <p className="mt-1.5 px-1 text-[11px] text-emerald-600 dark:text-emerald-400" data-testid="meet-message-note">{msgNote}</p>}
-                </div>
-              )}
-            </div>
+            )}
             <button
               onClick={() => void addManual()}
               data-testid="meet-add"
@@ -449,7 +424,7 @@ export default function PlexiMeetView(): JSX.Element {
           </div>
         </header>
 
-        {(busy || error) && (
+        {(busy || error || msgNote) && (
           <div className="mb-4 space-y-2">
             {busy && (
               <div className="flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
@@ -459,6 +434,11 @@ export default function PlexiMeetView(): JSX.Element {
             {error && (
               <div className="px-3 py-2 rounded-[var(--radius-row)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] leading-relaxed" data-testid="meet-error">
                 {error}
+              </div>
+            )}
+            {msgNote && (
+              <div className="px-3 py-2 rounded-[var(--radius-row)] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[12px] leading-relaxed" data-testid="meet-message-note">
+                {msgNote}
               </div>
             )}
           </div>
@@ -685,6 +665,13 @@ export default function PlexiMeetView(): JSX.Element {
       </div>
 
       {showNew && <NewMeetingDialog onClose={() => setShowNew(false)} />}
+      {messageDialog && (
+        <MessageDialog
+          peers={Object.values(presencePeers)}
+          onClose={() => setMessageDialog(false)}
+          onStart={(d) => recordMessageTo(d.to, { text: d.text, video: d.video })}
+        />
+      )}
       {recordDialog && (
         <RecordDialog
           initialMode={recordDialog}
