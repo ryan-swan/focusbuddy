@@ -4564,3 +4564,37 @@ database** (a VACUUM's worth of free pages, and the append-only event store's sh
 of the file). Zero high or critical. `capability-liveness` clean — all five
 capabilities producing output, including agent outcome learning, which had been at
 zero since the feature was built.
+## DEC-138 — Landed on main; `ryan-v1-beta` opened for the v1 beta refinement
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `main` → `ryan-v1-beta` ·
+**Plan:** operator ("Check GitHub to see if there's been any other developments
+pushed to main… See if Michael has done anything recently. If not, I want to
+go ahead and push all of our updates to main and then create a new branch…
+refining the app, getting rid of all the noise and unnecessary features to
+get this thing production ready for v1 launch in beta"; "don't push anything
+until you confirm with me"; "go, name it ryan-v1-beta").
+
+**What was checked first.** Main's last commit was Michael's Release 4.2.2
+of 2026-09-01; no commits, branches, reviews or comments by Michael or Caleb
+since, and the repo's event stream since then held only our pushes.
+`ryan-next` stood 31 ahead / 0 behind main, `ryan-assistant` 53 ahead / 0
+behind and containing `ryan-next` — conflict-free. Caleb's branches were
+untouched since August (`Caleb-4.3-ui` fully in main; `Caleb-4.1-brain` 13
+old commits, 504 behind). PR #5 (`fix/platform-stability`) was found
+superseded: DEC-056…061 reached main inside the ryan-command-center merge as
+different commits, and merging it would have conflicted in 12 files. All of
+this was reported before anything moved.
+
+**What was done, on the operator's go.** PR #6 (`ryan-next` → main) merged
+with a merge commit (`80592846`); PR #7 (`ryan-assistant` → main,
+DEC-120…137) opened, CI green (typecheck-and-unit), merged (`8579cbaf`);
+PR #5 closed with the reason. Main now carries everything through DEC-137.
+Landing is not a release — Michael cuts the version and the notarised
+builds. `ryan-v1-beta` branched from main `8579cbaf` and pushed to both
+remotes; `ryan-next` and `ryan-assistant` are landed and frozen. The rules
+are unchanged: main only via PR, never a direct push; the dual-push ritual
+for every branch.
+
+**The new branch's mission.** Refine the app for the v1 beta launch — take
+out the noise and the unnecessary features, make it production-ready.
+Nothing of that has started; the next session begins by taking stock of
+what counts as noise with the operator before removing anything.

@@ -1,5 +1,15 @@
 # Next Session — Resume Prompt
 
+> **LANDED 2026-09-07 (DEC-138).** On Ryan's go, PR #6 (`ryan-next`) and
+> PR #7 (`ryan-assistant`, DEC-120…137) were merged into `main` (now
+> `8579cbaf`, everything through DEC-137); PR #5 closed as superseded.
+> Michael cuts the release. **New work starts on `ryan-v1-beta`** (from
+> that main, on both remotes): refining the app for the v1 beta launch —
+> removing the noise and the unnecessary features, production-ready.
+> Nothing removed yet: start by agreeing with Ryan what counts as noise.
+> `ryan-next` / `ryan-assistant` are landed and frozen. Rules unchanged:
+> main only via PR, never a direct push; dual-push every branch.
+
 > **SHIPPED 2026-09-01: Release 4.2.0.** Michael merged ryan-command-center
 > into main and released it (everything through DEC-095, plus his timezone
 > fixture fix). `ryan-command-center` sits at main + 2 (DEC-096 ink sweep +
@@ -266,7 +276,7 @@
 > lives in `components/RecordSectionTitle.tsx`. 4/4 live; suite 3,898
 > tests / 356 files.
 
-**Last updated:** 2026-09-07 — through DEC-137 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-138; main carries DEC-098…137; new work on `ryan-v1-beta` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
