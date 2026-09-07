@@ -4598,3 +4598,108 @@ for every branch.
 out the noise and the unnecessary features, make it production-ready.
 Nothing of that has started; the next session begins by taking stock of
 what counts as noise with the operator before removing anything.
+
+
+## DEC-139 — Deleting a widget threw in the main process on every call (the `origin` that was never declared)
+**Date:** 2026-09-07 · **Status:** EXECUTED (code + pin; live run pending an app restart) · **Branch:** `ryan-v1-beta` ·
+**Plan:** found by the v1-beta audit's main-process map (read-only pass over
+`src/main/ipc/index.ts` and the operator's crash log), fixed on sight because
+it is a one-token defect in a shipped build.
+
+**What was wrong.** `widgets:delete` (`src/main/ipc/index.ts:1082`) carried
+DEC-059's real-delete guard — `if (origin !== 'sync' && isRealDelete(before))`
+— without declaring the `origin` parameter that `nodes:delete` (line 930)
+declares and that the preload already passes
+(`src/preload/index.ts:217`). It typechecked only because the node project's
+default lib includes DOM's global `origin`; in the main process at runtime
+the name does not exist. Sequence on every widget delete since DEC-059 part 2
+(`7c363379`): the row IS trashed (`deleteWidget` runs first), then the
+handler throws `ReferenceError: origin is not defined`, the renderer's
+`await window.api.widgets.delete(id)` rejects, and everything after it in
+`stores/widgets.ts remove` never runs — no CRDT delete tombstone (other
+devices never converge), no store prune (the widget stays on screen until a
+reload), no undo toast, no snapshot — and no `WidgetDeleted` event is
+written. The operator's crash log holds 53 rows of exactly this between
+2026-09-01 16:50 and 2026-09-07 00:42 (read-only:
+`select count(*) from crash_events where message like '%origin is not
+defined%'`). The commit is inside Release 4.2.0, so the shipped build has
+it.
+
+**What changed.** The parameter is declared
+(`(_e, id: string, origin?: WriteOrigin)`), matching its five siblings
+(`nodes:create/update/delete`, `widgets:create/update`). One token.
+
+**The pin.** `tests/unit/ipcHandlerOriginDeclared.test.ts` walks all 500
+`ipcMain.handle` callbacks in the file and refuses any whose body references
+`origin` without naming it as a parameter (or declaring it locally). Proven
+to fail on the pre-fix source (the same walker over `git show
+HEAD:src/main/ipc/index.ts` reports exactly `["widgets:delete"]`) and to
+pass after. Both typechecks clean.
+
+**Not yet done.** A live run needs the dev app restarted (main-process edit;
+`electron-vite dev` runs without `--watch`) — the operator's instance
+(PID 97113) was left running. When it restarts: delete a scratch widget,
+expect the undo toast, no new crash row, and a `WidgetDeleted` event.
+Follow-ups for the readiness pass, not this entry: the node project's lib
+should drop DOM so a bare browser global can never typecheck in main again;
+the same crash log shows 140 `mail:list: reply was never sent` rows from the
+boot-time IMAP fetch (`App.tsx:243`), which the Mail ruling will settle.
+**This deserves its own small PR to main ahead of the cull — Michael's
+call on a 4.2.3.**
+
+## DEC-140 — The v1 beta inventory: 168 surfaces audited, put in front of the operator to rule
+**Date:** 2026-09-07 · **Status:** AWAITING OPERATOR RULINGS · **Branch:** `ryan-v1-beta` ·
+**Plan:** the handoff's first hour (`planning/plexii-v1-beta/HANDOFF.md` §9 step 5) —
+"rebuild the inventory from the code and put it in front of Ryan as a
+Keep / Hide / Remove / Defer table with a first-guess column."
+
+**Pre-flight (reported before anything moved).** `ryan-v1-beta` at `0e3546ee`
+on both remotes; `origin/main` still `8579cbaf` (Michael's Release 4.2.2 of
+2026-09-01) with no commits, branches, reviews or PRs since — the event
+stream holds only our own pushes. `fork/main` is 272 behind and carries
+nothing of its own. Suite green at the start: both typechecks clean,
+3,898 tests / 356 files. The operator's dev app was already running
+(PID 97113, CDP 9223) and was NOT navigated — one DOM read and one
+screenshot only.
+
+**The audit.** Nine read-only passes over the tree and the operator's live
+database (`mode=ro` throughout), by family: the Desk segment and Rooms;
+Brain; People; Office and the standalone PlexiOffice build; all widget
+kinds; the shell, chrome, palette and onboarding; connected apps, the
+browser stack and Settings; the assistant, AI providers, voice and the
+legacy FocusBuddy stack; and the main-process map (IPC families, tables,
+background work, external services, the signal-server dependency map,
+packaging). Full write-ups are in the session scratchpad
+(`audit-1-desk-rooms.md`, `-2-brain-people`, `-3-office`, `-4-widgets`,
+`-5a-shell`, `-5b-apps-settings`, `-5c-assistant-legacy`, `-6-main-data`).
+
+**The deliverable.** A published ruling sheet — 168 surfaces in ten
+families, each with how it is reached, what it does from the code, its
+end-to-end health, its tests, its data, its coupling to the core loop, its
+authorship, whether it is already gated, a first-guess ruling and what
+hiding it would take — plus 21 verified findings. Rulings are made on the
+page itself (Keep / Hide / Remove / Defer, keyboard K/H/R/D) and persist to
+the artifact's own store, so this session can read them back.
+**https://claude.ai/code/artifact/b3b5ad7c-318a-48be-90ce-27789500d41b**
+
+**Corrections to the handoff's §5 inventory, from the code.** The widget
+union has **45** literals, not 44 (plus a 46th out-of-union `task-list`
+with three live rows that render as nothing). The PlexiSuite catalogue has
+**27** products, not 32 — the handoff counted group names. The Desk segment
+has **no sidebar door at all** (DEC-020), and the ⌘K palette — the escape
+hatch that ruling assumed — has no row for Rooms, the Plexii hub or the
+Attention view.
+
+**The mechanism the cull will ride.** `VIEW_CAPABILITY`
+(`src/renderer/src/lib/viewCapability.ts`) is the only thing in the tree
+that already hides a nav door AND locks its surface from one map, across
+MainPane and six navigation surfaces. Three things it does not cover, all
+of which the removal method must handle: the four segment shells take over
+the pane without mounting MainPane (`App.tsx:634-648`), so a capability
+never reaches them; the command palette gates only three entries; and no
+main-process background loop is gated by any view, capability or setting
+except the activity tracker, the updater and the API server.
+
+**Nothing has been removed.** The next round starts with the operator's
+rulings, outside in, one DEC per batch, each verified live and landed
+small.

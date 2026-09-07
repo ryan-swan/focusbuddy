@@ -1,5 +1,26 @@
 # Plexii v1 beta — session handoff
 
+> **UPDATE 2026-09-07 (DEC-139, DEC-140).** The first hour of §9 is done.
+> Pre-flight reported: `main` still `8579cbaf`, nobody else has pushed;
+> suite green (3,898 / 356). The §5 inventory has been REBUILT from the code
+> — 168 surfaces in ten families, each with reach, health, tests, data,
+> coupling, authorship, gating and a first-guess ruling — and published as a
+> ruling sheet the operator marks Keep / Hide / Remove / Defer on:
+> **https://claude.ai/code/artifact/b3b5ad7c-318a-48be-90ce-27789500d41b**
+> (rulings persist to the artifact's own store; this session reads them
+> back). Full audits are in the session scratchpad; the summary, the
+> corrections to §5 (45 widget kinds not 44; 27 suite products not 32) and
+> the 21 verified findings are in DEC-140.
+>
+> One defect was fixed on sight rather than filed (DEC-139): `widgets:delete`
+> threw `ReferenceError: origin is not defined` in main on EVERY widget
+> delete since v4.2.0 — the row was trashed, then the handler died, so no
+> CRDT tombstone, no store prune, no undo toast, no `WidgetDeleted` event.
+> One token plus a pin over all 500 `ipcMain.handle` callbacks. **It is on
+> `ryan-v1-beta` and deserves its own small PR to main ahead of the cull.**
+>
+> Nothing has been removed. The next round starts with the rulings.
+
 Written 2026-09-07 at the close of the DEC-138 session, for the session that
 starts the refinement. Everything a fresh session needs is here or linked;
 the paste-able opening prompt is at the end (§9).
