@@ -4,6 +4,7 @@ import ProposalCards from '../../ProposalCards'
 import { useAgentLoop } from '../../../stores/agentLoop'
 import { useNodeStore } from '../../../stores/nodes'
 import { startAgentRun } from '../../../lib/agentRunner'
+import AssistantWorkTab from './AssistantWorkTab'
 
 // The autonomous-agent surface: type a goal, the loop works it in rounds, applying
 // safe changes itself and deferring anything consequential for your approval. The
@@ -18,7 +19,13 @@ const STATUS_STYLE: Record<string, { label: string; cls: string; icon: string }>
   working: { label: 'Working', cls: 'text-[var(--ink-60)]', icon: 'autorenew' }
 }
 
+// DEC-121 — Agent and Work consolidated (operator direction): the autonomous
+// agent stays as it was, and the desk agents the Work tab used to list are a
+// sub-view inside it, one click away.
+type AgentSub = 'agent' | 'desks'
+
 export default function AssistantAgentTab(): JSX.Element {
+  const [sub, setSub] = useState<AgentSub>('agent')
   const [goal, setGoal] = useState('')
   const running = useAgentLoop((s) => s.running)
   const steps = useAgentLoop((s) => s.steps)
@@ -41,7 +48,38 @@ export default function AssistantAgentTab(): JSX.Element {
   const remainingApprovals = pendingApprovals.filter((p) => !approved.has(p.id))
 
   return (
-    <div className="h-full overflow-y-auto px-3 py-3 flex flex-col gap-3">
+    <div className="h-full flex flex-col">
+      <div className="shrink-0 px-3 pt-2.5" data-testid="agent-subtabs">
+        <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
+          {(
+            [
+              ['agent', 'rocket_launch', 'Autonomous agent'],
+              ['desks', 'smart_toy', 'Desk agents']
+            ] as const
+          ).map(([k, icon, label]) => (
+            <button
+              key={k}
+              onClick={() => setSub(k)}
+              aria-pressed={sub === k}
+              data-testid={`agent-subtab-${k}`}
+              className={`h-7 px-2.5 rounded-full text-[11.5px] font-medium fb-press transition-colors inline-flex items-center gap-1 ${
+                sub === k
+                  ? 'bg-[rgb(var(--accent))] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.15)]'
+                  : 'text-[var(--ink-60)] hover:text-[var(--ink-100)]'
+              }`}
+            >
+              <Icon name={icon} size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {sub === 'desks' ? (
+        <div className="flex-1 min-h-0" data-testid="agent-desks-body">
+          <AssistantWorkTab />
+        </div>
+      ) : (
+    <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 flex flex-col gap-3" data-testid="agent-autonomous-body">
       <div>
         <div className="text-[11px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
           Autonomous agent
@@ -158,6 +196,8 @@ export default function AssistantAgentTab(): JSX.Element {
             onConsume={(id) => setApproved((prev) => new Set(prev).add(id))}
           />
         </div>
+      )}
+    </div>
       )}
     </div>
   )

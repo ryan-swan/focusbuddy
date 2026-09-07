@@ -12,11 +12,18 @@ import { create } from 'zustand'
 
 export type AssistantMode = 'sidebar' | 'floating' | 'fullscreen'
 
-// The persistent assistant is a tabbed control surface (spec §5): Today (the daily
-// standup), Chat (the conversation), Tasks, Activity, Work (desk agents). The tab
-// is chrome, not conversation state, so it lives here beside mode/width.
-export type AssistantTab = 'today' | 'chat' | 'agent' | 'tasks' | 'activity' | 'work'
-export const ASSISTANT_TABS: AssistantTab[] = ['today', 'chat', 'agent', 'tasks', 'activity', 'work']
+// The persistent assistant is a tabbed control surface (spec §5), rearranged
+// on operator direction (DEC-121, 2026-09-06): Attention (every attention
+// item, the home widget's face), Chat (the conversation), Agent (the
+// autonomous agent, with desk agents as its sub-view — Work folded in),
+// Tasks, PlexiChat (messaging people — the Office Chat tab, in the panel).
+// The tab is chrome, not conversation state, so it lives here beside
+// mode/width.
+export type AssistantTab = 'attention' | 'chat' | 'agent' | 'tasks' | 'messages'
+export const ASSISTANT_TABS: AssistantTab[] = ['attention', 'chat', 'agent', 'tasks', 'messages']
+/** What a saved tab from before DEC-121 means now: Today → Attention,
+ *  Activity → PlexiChat, Work → Agent (its desk-agents sub-view). */
+export const LEGACY_TAB: Record<string, AssistantTab> = { today: 'attention', activity: 'messages', work: 'agent' }
 
 const OPEN_KEY = 'fb.assistant.open'
 const MODE_KEY = 'fb.assistant.mode'
@@ -68,10 +75,11 @@ function loadTab(): AssistantTab {
   try {
     const raw = localStorage.getItem(TAB_KEY)
     if (raw && (ASSISTANT_TABS as string[]).includes(raw)) return raw as AssistantTab
+    if (raw && LEGACY_TAB[raw]) return LEGACY_TAB[raw]
   } catch {
     /* ignore */
   }
-  return 'today'
+  return 'attention'
 }
 
 function persist(key: string, value: string): void {

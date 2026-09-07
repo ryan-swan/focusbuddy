@@ -3709,3 +3709,53 @@ no body-double button, four buttons total; the header persists across
 Today and Agent; Display mode lists Sidebar · Floating · Full screen; New
 chat lands on Chat; Minimize returns to the pill. Suite: 3,785 tests / 343
 files; both typechecks clean.
+
+## DEC-121 — The assistant's tabs rearranged: Attention, Chat, Agent (+ desk agents), Tasks, PlexiChat
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant`
+(new — the operator's AI-assistant series, branched from DEC-120; the Meet
+work shipped as PR #6 on `ryan-next`, see the branch note below) · **Plan:**
+operator request ("Replace the today button with an attention button… a
+view of all your attention items… similar to the home screen attention
+widget… replace the Activity Bar with Plexi Chat functionality… consolidate
+agent and work… a sub tab… within the agent button to see the desk agents").
+
+**Branches, first (operator instruction).** `ryan-next` rewound to DEC-119
+(`c9da6993`) so the ship excludes the assistant work, and opened as **PR #6
+ryan-next → main** on saasmouth/focusbuddy — zero conflicts against 4.2.2,
+green, marked ready to ship, visible to Michael and Caleb. Landing on main
+stays Michael's move per the standing rule (the operator can say "merge
+it"). `ryan-assistant` created from DEC-120 (`dea4fccb`) on both remotes;
+this and every following assistant round lives there.
+
+**Attention.** The tab IS the home Attention widget — the same
+`AttentionWidget` the home canvas and the desk render (section pills, rows
+with the queue spine, the closing verb, the doors) — uncapped and
+scrolling (`limit` / `scroll`, additive; the home and desk slices are
+untouched) under its own remembered section (`attention.assistant.section`)
+so the panel and the widget never fight over which slice is open. The daily
+standup (Today) keeps its home on the Home page.
+
+**PlexiChat.** The tab IS the Office Chat view — `MessagesView`, the same
+messaging store, conversations, groups, channels, search, activity,
+briefing, calls — in a `compact` dressing: no paper of its own and one pane
+at a time (the list, then the thread with a back arrow), because the panel
+has no width to give two. Every door into a conversation goes through one
+`openConv`, so the thread shows however you arrive; back never touches the
+store's active conversation (the Office page shares it).
+
+**Agent + Work.** The autonomous agent stays exactly as it was; the desk
+agents the Work tab listed are a sub-view inside Agent (a sunken segmented
+control: Autonomous agent · Desk agents). The Work and Activity tabs are
+gone; a tab saved before this round still lands somewhere sensible
+(Today → Attention, Activity → PlexiChat, Work → Agent); the default is
+Attention. AF-5's e2e geometry now counts the DEC-120 header.
+
+**Verified live** over CDP, 13/13, panel restored as found: the strip
+reads Attention · Chat · Agent · Tasks · PlexiChat and nothing else;
+Attention renders the widget's pills, label and count in the panel with
+the scrolling list; PlexiChat mounts compact, one pane at a time, the list
+with its New / Search / Channels doors (8 conversations), a conversation
+opens to its thread with a way back, back returns; Agent keeps the
+autonomous surface with the sub-tabs, Desk agents lists the desk agents,
+and back; Tasks unchanged. Suite: 3,793 tests / 344 files; both
+typechecks clean.

@@ -6,10 +6,9 @@ import PlexiiMark from '../brand/PlexiiMark'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
 import { useVoiceHold, useVoiceHoldKeys, startHold, stopHold } from '../../lib/voiceHold'
-import StandupHome from '../views/StandupHome'
 import AssistantTasksTab from './tabs/AssistantTasksTab'
-import AssistantActivityTab from './tabs/AssistantActivityTab'
-import AssistantWorkTab from './tabs/AssistantWorkTab'
+import AssistantAttentionTab from './tabs/AssistantAttentionTab'
+import AssistantMessagesTab from './tabs/AssistantMessagesTab'
 import AssistantAgentTab from './tabs/AssistantAgentTab'
 import AssistantHeader from './AssistantHeader'
 import { useChatStore } from '../../stores/chat'
@@ -62,16 +61,17 @@ const FULLSCREEN_TAKEOVER = 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
 const FULLSCREEN_PAGE =
   'fixed top-10 bottom-0 right-0 z-[190] bg-[var(--surface-base)] border-l border-[var(--edge-soft)]'
 
-// The persistent assistant's tabs (spec §5.3). Today is the daily standup, Chat is
-// the conversation, the rest read real workspace state. Order matches the store's
-// ASSISTANT_TABS.
+// The persistent assistant's tabs (spec §5.3, rearranged by DEC-121). Attention
+// is every attention item (the home widget's face), Chat is the conversation,
+// Agent holds the autonomous agent with desk agents as its sub-view, Tasks reads
+// real workspace state, PlexiChat is messaging people — the Office Chat tab in
+// the panel. Order matches the store's ASSISTANT_TABS.
 const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
-  { id: 'today', label: 'Today', icon: 'wb_sunny' },
+  { id: 'attention', label: 'Attention', icon: 'notifications' },
   { id: 'chat', label: 'Chat', icon: 'forum' },
   { id: 'agent', label: 'Agent', icon: 'rocket_launch' },
   { id: 'tasks', label: 'Tasks', icon: 'checklist' },
-  { id: 'activity', label: 'Activity', icon: 'bolt' },
-  { id: 'work', label: 'Work', icon: 'smart_toy' }
+  { id: 'messages', label: 'PlexiChat', icon: 'chat' }
 ]
 
 // The always-mounted web panel (A2, R4): it rides this component because it
@@ -476,15 +476,10 @@ function AssistantOverlayChrome(): JSX.Element {
           <div className="h-full w-full" style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
             <ChatPanel />
           </div>
-          {activeTab === 'today' && (
-            <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-today-body">
-              <StandupHome />
-            </div>
-          )}
+          {activeTab === 'attention' && <AssistantAttentionTab />}
           {activeTab === 'agent' && <AssistantAgentTab />}
           {activeTab === 'tasks' && <AssistantTasksTab />}
-          {activeTab === 'activity' && <AssistantActivityTab />}
-          {activeTab === 'work' && <AssistantWorkTab />}
+          {activeTab === 'messages' && <AssistantMessagesTab />}
         </div>
       </div>
     </div>

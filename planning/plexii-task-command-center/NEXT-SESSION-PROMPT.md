@@ -159,8 +159,17 @@
 > under it; ChatPanel keeps only a slim context strip (focused desk,
 > Discovery, linked desk, Clear). `recap` lives in the chat store. 10/10
 > live, panel restored as found; suite 3,785 tests / 343 files.
+> **BRANCHES (2026-09-06, operator instruction): the Meet work is PR #6
+> (`ryan-next` → main, frozen at DEC-119, zero conflicts, ready to
+> ship; Michael lands). The assistant series lives on `ryan-assistant`
+> (from DEC-120).** **DEC-121**: tabs rearranged — Attention (the home
+> Attention widget itself, uncapped + scrolling), Chat, Agent (with a
+> Desk agents sub-view — Work folded in), Tasks, PlexiChat (the Office
+> `MessagesView`, compact: one pane at a time with a way back). Today,
+> Activity and Work are gone; saved tabs migrate. 13/13 live; suite
+> 3,793 tests / 344 files.
 
-**Last updated:** 2026-09-06 — through DEC-120 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-121 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

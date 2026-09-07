@@ -433,7 +433,10 @@ function fmtTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-export default function MessagesView(): JSX.Element {
+// `compact` (DEC-121) — the same view inside the assistant panel: no paper
+// of its own, and one pane at a time (the list, then the thread with a way
+// back), because a 420px panel has no width to give two.
+export default function MessagesView({ compact = false }: { compact?: boolean } = {}): JSX.Element {
   const account = useAccountStore((s) => s.account)
   const sessionToken = useAccountStore((s) => s.sessionToken)
   const requestSignIn = useSignInPrompt((s) => s.requestOpen)
@@ -488,6 +491,17 @@ export default function MessagesView(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<SearchHit[]>([])
   const [viewingActivity, setViewingActivity] = useState(false)
+  // Compact mode's one-pane-at-a-time: opening a conversation shows the
+  // thread; the thread's back arrow returns to the list without touching
+  // the store's active conversation (the Office view shares it).
+  const [compactPane, setCompactPane] = useState<'list' | 'thread'>('thread')
+  useEffect(() => {
+    if (activeId) setCompactPane('thread')
+  }, [activeId])
+  const openConv = (id: string): void => {
+    void open(id)
+    setCompactPane('thread')
+  }
 
   useEffect(() => {
     if (viewingActivity) void loadActivity()
@@ -527,7 +541,7 @@ export default function MessagesView(): JSX.Element {
 
   if (!account) {
     return (
-      <div className="h-full flex items-center justify-center desk-paper no-tod px-6">
+      <div className={`h-full flex items-center justify-center px-6 ${compact ? '' : 'desk-paper no-tod'}`}>
         <div className="text-center max-w-sm">
           <Icon name="forum" size={32} className="text-stone-400 dark:text-stone-500 mx-auto mb-3" />
           <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-1">Messages</h1>
@@ -631,9 +645,16 @@ export default function MessagesView(): JSX.Element {
           : 'Several people are typing…'
 
   return (
-    <div className="h-full flex desk-paper no-tod">
+    <div className={compact ? 'h-full flex flex-col' : 'h-full flex desk-paper no-tod'} data-testid="messages-view" data-compact={compact || undefined}>
       {/* Conversation list */}
-      <div className="w-64 shrink-0 border-r border-[var(--edge-soft)] flex flex-col">
+      <div
+        className={
+          compact
+            ? `${activeId && compactPane === 'thread' ? 'hidden' : 'flex'} flex-1 min-h-0 w-full flex-col`
+            : 'w-64 shrink-0 border-r border-[var(--edge-soft)] flex flex-col'
+        }
+        data-testid="messages-list-pane"
+      >
         <div className="px-3 py-3 flex items-center justify-between">
           <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Messages</h1>
           <div className="flex items-center gap-1">
@@ -734,7 +755,7 @@ export default function MessagesView(): JSX.Element {
                 <button
                   key={a.messageId}
                   onClick={() => {
-                    void open(a.conversationId)
+                    openConv(a.conversationId)
                     setViewingActivity(false)
                   }}
                   data-testid="activity-item"
@@ -756,7 +777,7 @@ export default function MessagesView(): JSX.Element {
                 <button
                   key={h.messageId}
                   onClick={() => {
-                    void open(h.conversationId)
+                    openConv(h.conversationId)
                     setSearching(false)
                     setSearchQuery('')
                   }}
@@ -778,7 +799,7 @@ export default function MessagesView(): JSX.Element {
             conversations.map((c) => (
               <button
                 key={c.id}
-                onClick={() => void open(c.id)}
+                onClick={() => openConv(c.id)}
                 data-testid="conversation-row"
                 className={`w-full text-left px-3 py-2 border-b border-[var(--edge-soft)] hover:bg-stone-100 dark:hover:bg-stone-800/50 transition-colors ${
                   c.id === activeId ? 'bg-accent/[0.06]' : ''
@@ -819,7 +840,14 @@ export default function MessagesView(): JSX.Element {
       </div>
 
       {/* Thread */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className={
+          compact
+            ? `${activeId && compactPane === 'thread' ? 'flex' : 'hidden'} flex-1 min-h-0 flex-col min-w-0`
+            : 'flex-1 flex flex-col min-w-0'
+        }
+        data-testid="messages-thread-pane"
+      >
         {!activeId ? (
           <div className="flex-1 flex items-center justify-center text-[13px] text-stone-500 dark:text-stone-400">
             Pick a conversation, or start a new one.
@@ -830,7 +858,18 @@ export default function MessagesView(): JSX.Element {
           // list, and the receiver must be able to reply immediately. Title
           // falls back until the list catches up.
           <>
-            <div className="px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2">
+            <div className={`px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 ${compact ? 'flex-wrap' : ''}`}>
+              {compact && (
+                <button
+                  onClick={() => setCompactPane('list')}
+                  className="icon-btn shrink-0"
+                  title="All conversations"
+                  aria-label="All conversations"
+                  data-testid="messages-back"
+                >
+                  <Icon name="arrow_back" size={16} />
+                </button>
+              )}
               <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0">
                 <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
                 <span className="truncate">{headerTitle}</span>

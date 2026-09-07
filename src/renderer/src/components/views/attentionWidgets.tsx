@@ -321,7 +321,9 @@ export function AttentionWidget({
   size = 'md',
   itemsOverride,
   showStale = true,
-  storageKey = 'attention.widget.section'
+  storageKey = 'attention.widget.section',
+  limit,
+  scroll = false
 }: {
   size?: WidgetSize
   /** DEC-045: the desk widget hands in a pre-scoped set; the home widget
@@ -331,6 +333,10 @@ export function AttentionWidget({
    *  a desk's widget showing that desk's own staleness is circular). */
   showStale?: boolean
   storageKey?: string
+  /** DEC-121 — the assistant's Attention tab shows EVERYTHING in the
+   *  section, scrolling, where the home widget shows a sized slice. */
+  limit?: number
+  scroll?: boolean
 }): JSX.Element {
   const allItems = useAttentionItems()
   const items = itemsOverride ?? allItems
@@ -360,7 +366,7 @@ export function AttentionWidget({
   }, [])
 
   const now = Date.now()
-  const max = size === 'lg' ? 7 : size === 'md' ? 4 : 2
+  const max = limit ?? (size === 'lg' ? 7 : size === 'md' ? 4 : 2)
   const active = (q: string): FbNode[] => activeOf(items, q)
   const allActive = useMemo(
     () =>
@@ -453,7 +459,7 @@ export function AttentionWidget({
         <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{current.label}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
       </button>
-      <div className="mt-1.5 flex-1 min-h-0 overflow-hidden">
+      <div className={`mt-1.5 flex-1 min-h-0 ${scroll ? 'overflow-y-auto' : 'overflow-hidden'}`}>
         {section === 'stale' ? (
           stale.length === 0 ? (
             <div className="text-[11px] text-[var(--ink-30)]">Every open desk has a pulse.</div>
