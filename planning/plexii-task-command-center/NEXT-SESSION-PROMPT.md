@@ -235,9 +235,17 @@
 > camera, taller); a + on Attention that opens the capture prompt; a
 > Calendar tab after Attention (today's rail column, ‹ Today ›, the month
 > at a glance, a day click → Book-time dialog → `lib/bookBlock`, shared
-> with the grid). 12/12 live; suite 3,880 tests / 355 files.
+> with the grid). 12/12 live; suite 3,880 tests / 355 files. Addendum: the
+> Calendar tab's day column fills the tab (`WeekTimeGrid fill`).
+> **DEC-132**: home tiles scroll instead of clipping (the tile wrapper is
+> `overflow-y-auto`); RailCard `fill` pins the header and scrolls the body
+> (Rooms and desks' two columns each scroll; Continue; Quick actions); the
+> standup pins its title row over a scrolling body; the command-center
+> blocks scroll; `ItemStatusPill`'s menu is portalled at the pill's
+> coordinates (flips upward at the bottom). 5/5 live; suite 3,886 tests /
+> 356 files.
 
-**Last updated:** 2026-09-07 — through DEC-131 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-132 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

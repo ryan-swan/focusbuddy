@@ -4278,3 +4278,43 @@ under the day headers and the host owns the height; the Calendar tab passes
 it. Measured live: the window ends 8 px above the tab's edge (its padding),
 499 px tall, 16.6 hours on screen, the rest a scroll away. DEC-078's
 window pin follows the class.
+
+## DEC-132 — Home tiles scroll instead of clipping; the standup and navigator pin their headers
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator report ("On the home page, individual widgets get cut off,
+and there's no ability to scroll… 'Your Stand-Up'… 'worth a look'… gets cut
+off… 'Rooms & Desks'… doesn't actually show me all of the rooms and
+desks… either it needs to stop before something gets cut off mid-row, or
+there needs to be the ability to scroll").
+
+**What changed.**
+- **Every live tile scrolls.** The home grid's tile wrapper clipped
+  (`overflow-hidden`); it scrolls now (`overflow-y-auto overflow-x-hidden`),
+  so no widget can ever be cut off without a way to reach the rest. The
+  drag ghost keeps clipping (it is a picture).
+- **RailCard `fill`.** In a sized host the header stays pinned and the
+  body takes the rest and scrolls; a body with its own `bodyClassName`
+  gets the room and manages its own regions; unsized hosts (PlexiMeet,
+  People, the Office shell) are pixel-identical. The three RailCard tiles
+  (Rooms and desks, Continue, Quick actions) pass it.
+- **Rooms and desks**: the rooms column and the desks column each scroll
+  on their own, under the pinned header — the last room and the New desk
+  button are always reachable.
+- **Your standup**: the title row stays pinned; the narrative, "Worth a
+  look" and "Completed since last time" scroll beneath it.
+- **The command-center blocks** (Today, Pulse, Overdue radar, Recent
+  activity) scroll their body.
+- **The status menu rides a portal.** `ItemStatusPill`'s menu was
+  absolutely positioned inside its row; in a scrolling list a pill near
+  the edge opened clipped. It now renders in `<body>` at the pill's own
+  coordinates, below the pill when there is room and above it when there
+  is not, and closes on a click anywhere outside or Esc.
+
+**Verified live** over CDP on the home page, 5/5, view restored: all ten
+live tiles scroll rather than clip; the standup's title row stays put while
+its body scrolls and the last "Worth a look" row is fully reachable; the
+navigator's ten rooms scroll in their column with the last room reachable,
+the desks column reaches New desk, the header pinned; a status menu opened
+from the Attention tile lands through its portal fully inside the viewport
+and on top, and Esc closes it. Suite: 3,886 tests / 356 files; both
+typechecks clean.

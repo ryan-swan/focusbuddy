@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '../Icon'
 import { statusForWorkItemState } from '@shared/workItems'
 
@@ -72,11 +73,17 @@ export default function ItemStatusPill({
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement | null>(null)
+  // DEC-132 — the menu is portalled to <body> at the pill's own coordinates:
+  // the lists it lives in scroll now (home tiles, the widget, the panel), and
+  // an absolutely positioned menu near a list's bottom edge was clipped.
+  const menu = useRef<HTMLDivElement | null>(null)
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null)
 
   useEffect(() => {
     if (!open) return
     const away = (e: MouseEvent): void => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (!wrap.current?.contains(t) && !menu.current?.contains(t)) setOpen(false)
     }
     const esc = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
@@ -98,7 +105,16 @@ export default function ItemStatusPill({
   return (
     <div ref={wrap} className="relative shrink-0" data-row-action>
       <button
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={(e) => {
+          if (disabled) return
+          const r = e.currentTarget.getBoundingClientRect()
+          // Below the pill when there is room, above it when there is not —
+          // a pill at the bottom of a scrolled list must not open off-screen.
+          const est = (OPEN_STATUS_CHOICES.length + 1) * 30 + 10
+          const top = r.bottom + 4 + est <= window.innerHeight ? r.bottom + 4 : Math.max(8, r.top - 4 - est)
+          setAnchor({ top, right: Math.max(8, window.innerWidth - r.right) })
+          setOpen((v) => !v)
+        }}
         disabled={disabled}
         title={disabled ? undefined : 'Change status'}
         className="inline-flex items-center gap-1 h-6 px-2 rounded-full fb-t-label fb-press whitespace-nowrap max-w-[128px]"
@@ -111,8 +127,15 @@ export default function ItemStatusPill({
         <span className="truncate">{statusLabel(state, closeChoice.label)}</span>
         {!disabled && <Icon name="expand_more" size={12} />}
       </button>
-      {open && (
-        <div className="absolute right-0 top-7 z-30 min-w-[168px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1">
+      {open &&
+        anchor &&
+        createPortal(
+        <div
+          ref={menu}
+          style={{ position: 'fixed', top: anchor.top, right: anchor.right }}
+          className="z-[400] min-w-[168px] rounded-lg border border-[var(--edge-soft)] bg-[var(--surface-raised)] shadow-lg py-1"
+          data-testid="status-menu"
+        >
           {choices.map((c) => {
             const t = statusTone(c.state)
             const on = (state ?? 'open') === c.state
@@ -133,8 +156,9 @@ export default function ItemStatusPill({
               </button>
             )
           })}
-        </div>
-      )}
+        </div>,
+        document.body
+        )}
     </div>
   )
 }

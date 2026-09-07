@@ -140,9 +140,12 @@ export default function StandupHome(): JSX.Element | null {
   return (
     <section
       data-testid="standup-home"
-      className="mb-6 fb-card p-5"
+      // DEC-132 — inside the home tile (its only host) the card fills the
+      // tile: the title row stays pinned, everything under it scrolls, so
+      // "Worth a look" is never cut off mid-row.
+      className="mb-6 fb-card p-5 flex flex-col min-h-0"
     >
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-2 shrink-0">
         <span className="h-7 w-7 rounded-full bg-accent/10 inline-flex items-center justify-center">
           <Icon name="auto_awesome" size={15} className="text-accent" />
         </span>
@@ -177,6 +180,7 @@ export default function StandupHome(): JSX.Element | null {
         </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto" data-testid="standup-body">
       {loading && !state ? (
         <div className="text-[13px] text-[var(--ink-40)] py-3">Putting your standup together…</div>
       ) : state ? (
@@ -248,6 +252,7 @@ export default function StandupHome(): JSX.Element | null {
       ) : (
         <div className="text-[13px] text-[var(--ink-40)] py-3">Sign in to see your daily standup.</div>
       )}
+      </div>
     </section>
   )
 }

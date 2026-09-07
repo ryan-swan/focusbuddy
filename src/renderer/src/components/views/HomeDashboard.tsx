@@ -702,10 +702,15 @@ export default function HomeDashboard(): JSX.Element {
             icon="meeting_room"
             tone="sky"
             action={{ label: 'All rooms', onClick: () => v.goRooms() }}
+            fill
+            // DEC-132 — the tile owns the height; each column scrolls on its
+            // own (rooms on the left, desks on the right), so no room or desk
+            // is ever cut off mid-row and the header stays put.
+            bodyClassName="px-4 pb-4 flex flex-col"
           >
             <div className="grid grid-cols-1 sm:grid-cols-[minmax(150px,200px)_1fr] flex-1 min-h-0 gap-3" data-testid="home-navigator">
               {/* Rooms column */}
-              <div className="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible sm:border-r sm:border-[var(--edge-soft)] sm:pr-3">
+              <div className="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-y-auto min-h-0 sm:border-r sm:border-[var(--edge-soft)] sm:pr-3">
                 <button
                   onClick={() => setNavRoom(TOP_LEVEL)}
                   data-testid="home-nav-room-top"
@@ -760,7 +765,7 @@ export default function HomeDashboard(): JSX.Element {
               </div>
 
               {/* Desks column — the room you clicked opens out to the right. */}
-              <div className="min-w-0" data-testid="home-desks">
+              <div className="min-w-0 min-h-0 overflow-y-auto" data-testid="home-desks">
                 {navDesks.length === 0 ? (
                   <p className="py-6 text-center text-[12px] text-[var(--ink-50)]">
                     No desks in here yet.
@@ -805,6 +810,7 @@ export default function HomeDashboard(): JSX.Element {
       case 'continue':
         return (
           <RailCard
+            fill
             title="Continue where you left off"
             icon="history"
             tone="accent"
@@ -850,7 +856,7 @@ export default function HomeDashboard(): JSX.Element {
         return <AttentionPulseBlock variant="compact" />
       case 'quick':
         return (
-          <RailCard title="Quick actions" icon="bolt" tone="emerald">
+          <RailCard title="Quick actions" icon="bolt" tone="emerald" fill>
             <div className={`grid auto-rows-fr flex-1 min-h-0 gap-2 ${size === 'md' ? 'grid-cols-4' : 'grid-cols-2'}`}>
               <QuickAction testid="home-quick-create" icon="add" tone="accent" title="Create" blurb="New document" onClick={() => void onCreate()} />
               <QuickAction testid="home-quick-plan" icon="checklist" tone="sky" title="Plan" blurb="Plans and tasks" onClick={() => v.goPlexiDesk('plans')} />
@@ -1094,7 +1100,7 @@ export default function HomeDashboard(): JSX.Element {
                         cell, and the !bg/!shadow/!border overrides strip each
                         widget's own card chrome so nothing double-stacks. */}
                     <div
-                      className={`h-full overflow-hidden rounded-2xl fb-widget-tile [&>*]:h-full [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!border-0 ${customize ? 'pointer-events-none select-none' : ''}`}
+                      className={`h-full overflow-y-auto overflow-x-hidden rounded-2xl fb-widget-tile [&>*]:h-full [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!border-0 ${customize ? 'pointer-events-none select-none' : ''}`}
                     >
                       {renderWidget(inst)}
                     </div>

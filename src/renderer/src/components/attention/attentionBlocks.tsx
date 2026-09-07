@@ -86,7 +86,8 @@ function BlockShell({
         )}
         {trailing}
       </div>
-      <div className="flex-1 min-h-0">{children}</div>
+      {/* DEC-132 — a tile-sized block scrolls its body instead of clipping it. */}
+      <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
     </section>
   )
 }

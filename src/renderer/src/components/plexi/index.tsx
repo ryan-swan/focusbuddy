@@ -142,7 +142,8 @@ export function RailCard({
   children,
   className = '',
   bodyClassName,
-  testId
+  testId,
+  fill = false
 }: {
   title?: string
   icon?: string
@@ -153,11 +154,16 @@ export function RailCard({
   className?: string
   bodyClassName?: string
   testId?: string
+  /** DEC-132 — in a SIZED host (a home tile): the header stays pinned and the
+   *  body takes the rest and scrolls, so nothing is cut off mid-row. A body
+   *  with its own `bodyClassName` manages its own scroll regions and only
+   *  gets the room (`flex-1 min-h-0`). Unsized hosts are pixel-identical. */
+  fill?: boolean
 }): JSX.Element {
   return (
-    <section className={`${PLEXI_CARD} ${className}`} data-testid={testId}>
+    <section className={`${PLEXI_CARD} ${fill ? 'h-full flex flex-col min-h-0' : ''} ${className}`} data-testid={testId}>
       {title && (
-        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 shrink-0">
           <h3 className="fb-t-title text-[var(--ink-90)] flex items-center gap-2">
             {icon && <Icon name={icon} size={16} className={TONE_TEXT[tone]} />}
             {title}
@@ -174,7 +180,13 @@ export function RailCard({
           )}
         </div>
       )}
-      <div className={bodyClassName ?? (title ? 'px-4 pb-4' : 'p-4')}>{children}</div>
+      <div
+        className={`${fill ? 'flex-1 min-h-0 ' : ''}${bodyClassName ?? (title ? 'px-4 pb-4' : 'p-4')}${
+          fill && !bodyClassName ? ' overflow-y-auto' : ''
+        }`}
+      >
+        {children}
+      </div>
     </section>
   )
 }
