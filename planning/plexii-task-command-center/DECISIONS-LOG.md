@@ -3856,5 +3856,6 @@ conversation".
 bell gone, a bell on all 12 messages of a DM, the bell's title says what it
 does, the prompt opens prefilled with the message's words and "Plexii read
 it like this… Respond", and cancelling through the console's own door
-leaves the work-item count unchanged. Suite: 3,827 tests / 346 files; both
-typechecks clean.
+leaves the work-item count unchanged. Suite: 3,803 tests / 346 files; both
+typechecks clean. (The figure was first written as 3,827 — a guess made
+before the run finished, corrected here; the log stays honest.)

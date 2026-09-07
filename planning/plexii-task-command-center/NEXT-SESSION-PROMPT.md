@@ -179,7 +179,7 @@
 > bell left the panel; every message wears a bell that opens the house
 > capture prompt (Respond by default, the card asks), filing an item that
 > points back at the message (`plexii://message/<conv>?m=<id>`, routed
-> from the Attention page). 6/6 live; suite 3,827 tests / 346 files.
+> from the Attention page). 6/6 live; suite 3,803 tests / 346 files.
 
 **Last updated:** 2026-09-06 — through DEC-124 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
