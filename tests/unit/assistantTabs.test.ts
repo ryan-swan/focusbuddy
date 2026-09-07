@@ -61,8 +61,11 @@ describe('DEC-121 — Attention IS the home widget', () => {
   })
   it('the widget grew limit / scroll additively — the home and desk slices are untouched', () => {
     expect(widgets).toContain("const max = limit ?? (size === 'lg' ? 7 : size === 'md' ? 4 : 2)")
-    expect(widgets).toContain("${scroll ? 'overflow-y-auto' : 'overflow-hidden'}")
-    expect(widgets).toContain("storageKey = 'attention.widget.section',\n  limit,\n  scroll = false")
+    // DEC-128: every host scrolls now (an open row's in-place summary needs
+    // room); `scroll` stays in the signature for its callers.
+    expect(widgets).toContain('<div className="mt-1.5 flex-1 min-h-0 overflow-y-auto" data-testid="attention-widget-list">')
+    expect(widgets).toContain("storageKey = 'attention.widget.section',\n  limit,")
+    expect(widgets).toContain('scroll: _scroll = false')
   })
 })
 

@@ -4021,3 +4021,54 @@ messageLanding.test.ts. Suite: 3,828 tests / 349 files; both typechecks
 clean. Pins rewritten with history: DEC-124's `openConversationAt` pins →
 the router; DEC-124's parsed-link shapes gained `parentId: null`; C5's door
 pin → the fall-through.
+
+## DEC-128 — The Attention widget's row: three depths in place (home, desk, the assistant's Attention tab)
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("if I click on an attention item on a widget in
+the home screen or a desk, it takes me straight to the attention page, and
+it doesn't actually show me which attention item I clicked on… I should be
+able to click an attention item, get a drop-down for a quick summary, just
+like I can on the attention page itself, double-click for a full view of
+that item on the same page that I'm existing on, or have the ability to
+take me to… the title of that item visible with maybe the due date… when I
+click it, I get a drop-down [with] the different action items… that's going
+to need to apply in the Plexii app as well as the widget on the home screen
+and widgets that I add onto a desk").
+
+**What changed.** One component — `attention/WidgetItemRow.tsx` — is the
+row for every face of the widget family (`ItemLines` renders it for the
+five faces; the desk widget and the assistant tab are the same
+`AttentionWidget`), so the three hosts cannot drift.
+- **At rest**: the title and the due date — DEC-050's anatomy kept (queue
+  spine, completion circle through DEC-051's one path, status pill or dot,
+  date). A subtle chevron on hover says it opens.
+- **One click**: the page's quick summary IN PLACE — notes, the reason, the
+  chips (priority, due, plan, desk, meeting / message / source, mentions,
+  tags), a Meet invitation's when · where · RSVP, subtask progress — and the
+  page's row actions: the source door (a meeting moment → PlexiMeet at the
+  line; a message → the floating assistant at the message, DEC-127; a web
+  mark → the browser), the desk, Start with Plexii, Snooze until tomorrow
+  (the page's 9 am rule), Archive, Open the item, and one door to the
+  Attention page. The title click no longer navigates anywhere.
+- **Double-click**: the full item — the page's own `AttentionItemEditor`,
+  with the page's desk choices — over the page you are on, portalled to
+  `<body>` so the floating panel (overflow-hidden, z-120) cannot clip it.
+- **Shared doors, not copies**: `lib/startWithPlexii.ts` (desk first, the
+  panel on chat, the prompt staged twice, never sent) and
+  `lib/openMeeting.ts` (PlexiMeet, then the hand-off once mounted) are
+  extracted from the page, which now delegates to them. Every widget list
+  scrolls instead of clipping, so an open summary has room in a sized
+  widget; DEC-121's `scroll` prop stays for its callers.
+
+**Verified live** over CDP, 13/13, DOM-read, nothing closed / snoozed /
+archived, page and panel restored: on the home canvas, in the assistant's
+Attention tab, and on the LakeDash desk's widget, a row sits closed at rest
+in a scrolling list; one click opens the summary in place with the six
+actions (message door · Start · Snooze · Archive · Open · the page) and the
+message chip, and the view does not change; a double-click opens the editor
+portalled to `<body>`, on top (element-from-point), the view unchanged; the
+editor closes through its own door; from the panel, the summary's page door
+is the one trip to Attention. Suite: 3,838 tests / 350 files; both
+typechecks clean. Pins rewritten with history, never deleted: DEC-051's row
+anatomy pins follow the row to its file; DEC-121's overflow pin → every host
+scrolls; the start-flow and DEC-079 hand-off pins → the shared libs.

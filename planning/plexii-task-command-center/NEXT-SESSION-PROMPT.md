@@ -200,8 +200,15 @@
 > consumed once by MessagesView after its pin-to-newest; replies open
 > their thread first via the link's new `p=`). 9/9 live; suite 3,828
 > tests / 349 files.
+> **DEC-128**: the Attention widget's row, everywhere the widget lives
+> (home, desk, the assistant's Attention tab) — `attention/WidgetItemRow`:
+> title + date at rest; one click opens the page's quick summary and row
+> actions IN PLACE (source door, desk, Start with Plexii, Snooze, Archive,
+> Open the item, the page); double-click opens the page's editor over the
+> current page (portalled). Shared doors extracted: `lib/startWithPlexii`,
+> `lib/openMeeting`. 13/13 live; suite 3,838 tests / 350 files.
 
-**Last updated:** 2026-09-06 — through DEC-127 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-128 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

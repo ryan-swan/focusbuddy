@@ -6,14 +6,14 @@ import { useViewStore } from '../../stores/view'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { parseMessageUrl } from '../../lib/messageLink'
 import { openMessageLink } from '../../lib/openMessage'
+import { openMeetingMoment } from '../../lib/openMeeting'
+import { startWithPlexii as startItemsWithPlexii } from '../../lib/startWithPlexii'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
 import AttentionItemEditor from '../AttentionItemEditor'
 import CompleteCircle from '../attention/CompleteCircle'
 import { useWidgetStore } from '../../stores/widgets'
-import { useAssistantChrome } from '../../stores/assistantChrome'
-import { startPromptForItem, startPromptForMany } from '../../lib/startPrompt'
 import { parseMentions, mentionKey, MENTION_ICON } from '../../lib/itemMentions'
 import {
   OverdueRadarBlock,
@@ -135,12 +135,10 @@ export default function AttentionView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
-  const goMeetings = useViewStore((s) => s.goMeetings)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goRoom)
   const openConsole = useCaptureConsole((s) => s.openConsole)
   const setFocusedWidget = useWidgetStore((s) => s.setFocused)
-  const openAssistant = useAssistantChrome((s) => s.openPanel)
   const [nowMs, setNowMs] = useState(() => Date.now())
   // SPEC-017 lenses: the same active set through three groupings, persisted.
   const [lens, setLens] = useState<'queue' | 'due' | 'origin'>(
@@ -576,26 +574,10 @@ export default function AttentionView(): JSX.Element {
    *  When the work belongs to a desk we go there first, so the assistant has
    *  that desk's context in its prompt rather than answering in the abstract. */
   function startWithPlexii(list: FbNode[]): void {
-    if (list.length === 0) return
-    const prompt =
-      list.length === 1
-        ? startPromptForItem(list[0], nodesById)
-        : startPromptForMany(list, nodesById)
-    if (!prompt) return
-    const deskId = list.length === 1 ? list[0].parentId : null
-    if (deskId && nodes.some((n) => n.id === deskId && n.kind === 'task')) {
-      setActive(deskId)
-      goTask(deskId)
-    }
-    useAssistantChrome.getState().setTab('chat')
-    openAssistant()
-    const stage = (): void => {
-      window.dispatchEvent(new CustomEvent('fb:composer-stage', { detail: prompt }))
-    }
-    stage()
-    // The panel may still be mounting; the second dispatch covers that (same
-    // belt-and-braces the capture console uses).
-    setTimeout(stage, 400)
+    // DEC-128 — the door itself is shared with the widget rows
+    // (lib/startWithPlexii: desk first, the panel on its chat, the prompt
+    // staged twice); the page only clears its selection after.
+    if (!startItemsWithPlexii(list, nodes)) return
     setSelectMode(false)
     setSelected(new Set())
   }
@@ -629,16 +611,8 @@ export default function AttentionView(): JSX.Element {
    *  hand it the meeting to select once the view has mounted (the same
    *  post-navigation handoff pattern openHere uses for widgets). */
   function openMeeting(meetingId: string, segmentId?: string | null): void {
-    goMeetings()
-    setTimeout(
-      () =>
-        window.dispatchEvent(
-          new CustomEvent('fb:open-meeting', {
-            detail: segmentId ? { id: meetingId, segmentId } : { id: meetingId }
-          })
-        ),
-      250
-    )
+    // DEC-128 — one shared door (lib/openMeeting); the widget rows use it too.
+    openMeetingMoment(meetingId, segmentId)
   }
 
   // DEC-124 routed a message moment to the Chat page; DEC-127 routes it to
