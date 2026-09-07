@@ -5,6 +5,8 @@ import { listTables, getTable, listRows, createRow } from './db/tables'
 import { listKnowledge, createKnowledge } from './db/knowledge'
 import { getFlow, runFlow } from './db/flows'
 import type { ApiScope } from '@shared/apiAccess'
+import { app } from 'electron'
+import { handleMcpBody, liveMcpDeps } from './mcpRecall'
 
 // The PlexiAPI local server. A small REST surface over the workspace, bound only
 // to 127.0.0.1 so it is never reachable off the machine, and gated by a bearer
@@ -121,6 +123,33 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
   const scopes = authScopes(req)
   if (!scopes) return send(res, 401, { error: 'Missing or invalid bearer token.' })
+
+  // POST /mcp — Recall over MCP (Streamable HTTP, stateless JSON replies).
+  // MCP speaks POST for reads, so this route asks for the READ scope
+  // explicitly instead of riding the method-based write gate below. Every
+  // tool on the surface is read-only by contract (mcpRecall.ts states and
+  // enforces the refusals); auth, loopback and the Origin/rebind guards are
+  // the same ones every PlexiAPI request already passed.
+  if (path === '/mcp') {
+    if (method !== 'POST') return send(res, 405, { error: 'MCP speaks POST here.' })
+    if (!scopes.includes('read') && !scopes.includes('write'))
+      return send(res, 403, { error: 'This token has no read scope.' })
+    const b = await readBody(req)
+    if (!b.ok) {
+      return send(res, b.reason === 'too_large' ? 413 : 400, {
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: -32700, message: b.reason === 'too_large' ? 'Request too large.' : 'Parse error.' }
+      })
+    }
+    const reply = handleMcpBody(b.value, liveMcpDeps(app.getVersion()))
+    if (reply === null) {
+      res.writeHead(202)
+      res.end()
+      return
+    }
+    return send(res, 200, reply)
+  }
 
   const needWrite = method === 'POST'
   if (needWrite && !scopes.includes('write')) return send(res, 403, { error: 'This token is read-only.' })

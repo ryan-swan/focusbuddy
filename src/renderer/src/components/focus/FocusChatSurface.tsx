@@ -115,7 +115,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
     >
       {/* Header — the panel's identity language: icon + "Assistant" + a scope
           subtitle, controls on the right. */}
-      <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-[var(--edge-soft)]/60">
+      <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)]">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <Icon name="smart_toy" size={15} className="text-[var(--ink-70)]" />
@@ -165,7 +165,7 @@ export default function FocusChatSurface({ onOpenWidget }: Props): JSX.Element {
         {/* History panel — a list of past conversations, newest first. */}
         {historyOpen && (
           <div
-            className="w-64 shrink-0 border-r border-[var(--edge-soft)]/60 overflow-auto p-2"
+            className="w-64 shrink-0 border-r border-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] overflow-auto p-2"
             data-testid="focus-chat-history"
           >
             {conversations.length === 0 ? (

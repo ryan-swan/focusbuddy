@@ -100,6 +100,23 @@ import {
 } from '../db/workItems'
 import { postNotification, type PostInput } from '../notifications/substrate'
 import { classifyCapture } from '../ai/intentClassify'
+import { saveTranscriptSegments, listTranscriptSegments } from '../db/transcripts'
+import { enhanceRecord, type EnhanceInput } from '../ai/enhanceRecord'
+import { extractCommitments, type ExtractInput } from '../ai/extractCommitments'
+import {
+  saveAudioTakes,
+  audioInfo,
+  setKeepAudio,
+  revealAudio,
+  getAudioRetention,
+  setAudioRetention,
+  sweepMeetingAudio,
+  type AudioTakeIn,
+  type RetentionMode, loadAudioTakes } from '../meetingAudio'
+import { ensureSegmentRecall, searchMeetingSegments } from '../segmentRecall'
+import { buildMeetingPrep, getSeriesPrefs, setSeriesPrefs } from '../meetingPrep'
+import { exportMeeting } from '../meetingExport'
+import type { TranscriptSegmentDraft } from '@shared/meetings'
 import { extractPeople } from '../ai/peopleExtract'
 import { listPeopleDirectory } from '../peopleDirectory'
 import { selectItemsForPlan } from '../ai/planSelect'
@@ -318,6 +335,7 @@ import {
   type TranscriptionProvider
 } from '../ai/voiceNote'
 import { preloadLocalWhisper } from '../ai/localWhisper'
+import { enqueueLiveChunk } from '../ai/liveDecode'
 import { getVoiceCommandPrefs, setVoiceCommandPrefs } from '../voiceCommandPref'
 import {
   createAgentRun,
@@ -751,6 +769,15 @@ export function registerIpcHandlers(): void {
   // S5: the capture classifier (hard rules first — zero model latency on the
   // common cases; Haiku fallback; loose_thought floor) and the capability
   // probe surfaces can gate on.
+  // M2c (CR-13) — retention sweep at start: takes older than the window go,
+  // keep-flagged and 'keep'-mode takes stay. Best-effort, never blocking.
+  try {
+    sweepMeetingAudio()
+    // M4 — build (or backfill) the transcript FTS before the first Recall query.
+    ensureSegmentRecall()
+  } catch {
+    /* a failed sweep costs disk, not correctness */
+  }
   ipcMain.handle('workItems:classify', (_e, text: string) => classifyCapture(String(text ?? '')))
   // DEC-088 — the people scan alone, for MARKED captures (whose class the
   // preset table already decided — that path deliberately never classifies,
@@ -2308,6 +2335,7 @@ export function registerIpcHandlers(): void {
         mimeType?: string
         samples?: ArrayBuffer | Float32Array
         sampleRate?: number
+        forceProvider?: 'cloud' | 'local'
       }
     ) => {
       // Float32Array travels via structured-clone over IPC and tends to
@@ -2323,7 +2351,15 @@ export function registerIpcHandlers(): void {
         bytes: input.buffer ? new Uint8Array(input.buffer) : undefined,
         mimeType: input.mimeType,
         samples,
-        sampleRate: input.sampleRate
+        sampleRate: input.sampleRate,
+        // M6 live round caught this seam dropping forceProvider on the
+        // floor: the renderer forced 'local' (CR-11), this handler didn't
+        // pass it, and the cloud PREFERENCE answered instead — failing
+        // closed only because meeting callers send samples without bytes.
+        forceProvider:
+          input.forceProvider === 'local' || input.forceProvider === 'cloud'
+            ? input.forceProvider
+            : undefined
       })
     }
   )
@@ -2472,6 +2508,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('agents:undoLast', () => undoLastApply())
 
   ipcMain.handle('voice:getProvider', () => getTranscriptionProvider())
+  // M2 — warm the on-device model WITHOUT flipping the provider preference:
+  // meetings always transcribe locally (CR-11), so the download/load cost is
+  // paid while the meeting runs, not after it ends.
+  ipcMain.handle('voice:preloadLocal', () => preloadLocalWhisper())
+  // M4 — live transcript chunks: serial queue, oldest shed under backlog.
+  ipcMain.handle('voice:transcribeLive', (_e, pcm: ArrayBuffer | Float32Array) => {
+    const samples = pcm instanceof Float32Array ? pcm : new Float32Array(pcm)
+    return enqueueLiveChunk(samples)
+  })
   ipcMain.handle('voice:setProvider', async (_e, p: TranscriptionProvider) => {
     setTranscriptionProvider(p)
     if (p === 'local') {
@@ -2577,6 +2622,51 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('meetings:list', () => listMeetings())
   ipcMain.handle('meetings:get', (_e, id: string) => getMeeting(id))
   ipcMain.handle('meetings:create', (_e, draft: MeetingDraft) => createMeeting(draft))
+  // M2 — the transcript as segments (SPEC-003): saved by the wrap-up after
+  // per-track transcription, read by the Thread rendering and Recall.
+  ipcMain.handle('meetings:saveSegments', (_e, meetingId: string, segments: TranscriptSegmentDraft[]) =>
+    saveTranscriptSegments(String(meetingId), Array.isArray(segments) ? segments : [])
+  )
+  // M2b — the Enhance pass (SPEC-003 §3.4). The renderer validates every
+  // returned span against the real segments and downgrades the unprovable.
+  ipcMain.handle('ai:enhanceRecord', (_e, input: EnhanceInput) => enhanceRecord(input))
+  // M3 — the commitment extractor (anchors validated renderer-side).
+  ipcMain.handle('ai:extractCommitments', (_e, input: ExtractInput) => extractCommitments(input))
+  // M2c — audio retention (CR-13) + export (the non-negotiable).
+  ipcMain.handle('meetings:saveAudioTakes', (_e, meetingId: string, takes: AudioTakeIn[]) =>
+    saveAudioTakes(String(meetingId), Array.isArray(takes) ? takes : [])
+  )
+  ipcMain.handle('meetings:audioInfo', (_e, meetingId: string) => audioInfo(String(meetingId)))
+  // Re-transcribe fuel: the retained takes, bytes and offsets intact.
+  ipcMain.handle('meetings:loadAudioTakes', (_e, meetingId: string) => loadAudioTakes(String(meetingId)))
+  ipcMain.handle('meetings:keepAudio', (_e, meetingId: string, keep: boolean) =>
+    setKeepAudio(String(meetingId), !!keep)
+  )
+  ipcMain.handle('meetings:revealAudio', (_e, meetingId: string) => revealAudio(String(meetingId)))
+  ipcMain.handle('meetings:getAudioRetention', () => getAudioRetention())
+  ipcMain.handle('meetings:setAudioRetention', (_e, mode: RetentionMode) => setAudioRetention(mode))
+  ipcMain.handle('meetings:export', (_e, meetingId: string, format: 'markdown' | 'json') =>
+    exportMeeting(String(meetingId), format === 'json' ? 'json' : 'markdown')
+  )
+  ipcMain.handle('meetings:segments', (_e, meetingId: string) =>
+    listTranscriptSegments(String(meetingId))
+  )
+  // M4 — Recall: segment-level FTS across every meeting's transcript.
+  ipcMain.handle('meetings:searchSegments', (_e, query: string, limit?: number) =>
+    searchMeetingSegments(String(query ?? ''), typeof limit === 'number' ? limit : 12)
+  )
+  // M5 — prep (all database facts, no model call) + per-series prefs (Q14).
+  ipcMain.handle(
+    'meetings:prep',
+    (_e, input: { seriesId?: string | null; excludeMeetingId?: string; invitees?: string[]; agenda?: string | null }) =>
+      buildMeetingPrep(input ?? {})
+  )
+  ipcMain.handle('meetings:getSeriesPrefs', (_e, seriesId: string) => getSeriesPrefs(String(seriesId)))
+  ipcMain.handle(
+    'meetings:setSeriesPrefs',
+    (_e, seriesId: string, patch: { briefs?: boolean; shareBriefs?: boolean; followBriefs?: boolean }) =>
+      setSeriesPrefs(String(seriesId), patch ?? {})
+  )
   ipcMain.handle('meetings:update', (_e, id: string, patch: MeetingPatch) => updateMeeting(id, patch))
   ipcMain.handle('meetings:delete', (_e, id: string) => deleteMeeting(id))
 

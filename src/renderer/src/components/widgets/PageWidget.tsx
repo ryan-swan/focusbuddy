@@ -316,7 +316,7 @@ export default function PageWidget({ widget, inline = false }: Props): JSX.Eleme
         />
       )}
       {!isLiving && (
-        <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 shrink-0">
+        <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] shrink-0">
           <button
             onClick={() => {
               setAiOpen(true)

@@ -226,6 +226,15 @@ export default function PlexiApiView(): JSX.Element {
             Authenticate with a header: Authorization: Bearer your-token. Example: curl -H "Authorization: Bearer
             plx_..." {baseUrl || 'http://127.0.0.1:8787'}/api/tasks
           </p>
+          {/* Recall over MCP — the G3 round. Read-only by contract. */}
+          <p className="mt-2 text-[11.5px] text-[var(--ink-50)]" data-testid="mcp-howto">
+            AI tools can search your meeting transcripts over MCP (read-only — attributed lines, never audio).
+            Point an MCP client at {baseUrl || 'http://127.0.0.1:8787'}/mcp with a read token, e.g.:{' '}
+            <code className="text-[var(--ink-70)]">
+              claude mcp add --transport http plexii-recall {baseUrl || 'http://127.0.0.1:8787'}/mcp --header
+              "Authorization: Bearer plx_..."
+            </code>
+          </p>
         </div>
       </div>
     </div>

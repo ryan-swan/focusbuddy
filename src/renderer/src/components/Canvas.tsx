@@ -54,6 +54,7 @@ import ColumnsView from './ColumnsView'
 import DeskDataViews, { type DataLayout } from './views/DeskDataViews'
 import { useDeskViewStore } from '../stores/deskView'
 import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
+import MeetingRecordWidget from './widgets/MeetingRecordWidget'
 import MindMapWidget from './widgets/MindMapWidget'
 import DiagramWidget from './widgets/DiagramWidget'
 import ScratchpadWidget from './widgets/ScratchpadWidget'
@@ -238,6 +239,9 @@ function renderWidgetInner(w: Widget): JSX.Element | null {
       return <DeskAttentionWidget widget={w} />
     case 'voice-recorder':
       return <VoiceRecorderWidget widget={w} />
+    case 'meeting-record':
+      // C5 — the Record on the meeting's own desk, provenance intact.
+      return <MeetingRecordWidget widget={w} />
     case 'mindmap':
       return <MindMapWidget widget={w} />
     case 'diagram':

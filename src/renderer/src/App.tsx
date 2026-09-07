@@ -65,6 +65,7 @@ import { useActionHistory } from './stores/actionHistory'
 import UndoToast from './components/UndoToast'
 import CompletionToast from './components/CompletionToast'
 import NoticeToast from './components/NoticeToast'
+import GuestCaptureBar from './components/GuestCaptureBar'
 import MissedTriagePrompt from './components/MissedTriagePrompt'
 import { PromptDialogHost, confirmDialog } from './components/plexi/PromptDialog'
 import { DocHistoryPanelHost } from './components/documents/DocHistoryPanel'
@@ -675,6 +676,7 @@ export default function App(): JSX.Element {
       <FocusSessionOverlay />
       <CallOverlay />
       <MeetingOverlay />
+      <GuestCaptureBar />
       <MeetingLaunchDialog />
       <WrapupOverlay />
       <KnockOverlay />

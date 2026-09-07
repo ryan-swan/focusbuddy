@@ -223,7 +223,7 @@ export default function WidgetEmbed({ widgetId }: Props): JSX.Element {
   const entry = WIDGET_CATALOG.find((e) => e.kind === widget.kind)
   return (
     <div className={shell} data-testid="widget-embed">
-      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
+      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)]">
         <Icon name={entry?.icon ?? 'widgets'} size={14} className="text-accent shrink-0" />
         <span className="text-[12px] font-medium text-[var(--ink-90)] truncate">
           {widget.title || entry?.label || widget.kind}

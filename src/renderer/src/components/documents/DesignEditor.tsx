@@ -931,7 +931,7 @@ export default function DesignEditor({ content, title, onChange, foldExternal = 
           />
         </div>
         {/* Page rail — switch, add, delete pages of a multi-page document. */}
-        <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 overflow-x-auto" data-testid="design-page-rail">
+        <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] overflow-x-auto" data-testid="design-page-rail">
           {pages.map((pg, i) => (
             <div key={pg.id} className="relative group/pg shrink-0">
               <button

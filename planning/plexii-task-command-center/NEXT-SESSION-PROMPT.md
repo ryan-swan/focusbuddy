@@ -1,16 +1,167 @@
 # Next Session — Resume Prompt
 
-**Last updated:** 2026-08-31 — through DEC-092 (the planner learns the
+> **SHIPPED 2026-09-01: Release 4.2.0.** Michael merged ryan-command-center
+> into main and released it (everything through DEC-095, plus his timezone
+> fixture fix). `ryan-command-center` sits at main + 2 (DEC-096 ink sweep +
+> the merge-back), pushed to BOTH remotes and zero-conflict mergeable —
+> Michael pulls it whenever. **New work starts on `ryan-next`** (branched
+> from this tip, on both remotes); ryan-command-center is maintenance-only
+> until DEC-096 lands in main. Still open: GAP-017 ruling (naming,
+> needs usage data), Phase 4 on the operator's go (GAP-019 closed by
+> DEC-097 — all three paint-integrity gaps now closed), the ten [TEST] seed items
+> in the operator's LOCAL database (dismiss by tag `test-seed` before
+> demos — they are data, not code).
+>
+> **Meet (SPEC-003) is underway on ryan-next** — analysis/28 is the plan;
+> M1 landed as DEC-098; M2a (transcript truth) as DEC-099 — segments from
+> both engines, the attributed per-track pipeline, CR-11 local-only
+> meeting audio. M2 is COMPLETE: DEC-099 (transcript
+> truth), DEC-100 (the Record + three renderings), DEC-101 (container,
+> templates, export, CR-13 retention). **M3 is COMPLETE (DEC-102)**:
+> anchored commitment extraction, the batch confirm stop (other-owned
+> unchecked, owner as mention — never a send), the C6 split, and the
+> host's To Know brief; verified live end-to-end. **M4 is COMPLETE
+> (DEC-103)**: the G2 spike measured live decode CHEAP (RTF 0.09, ~15%
+> of a core), so both halves shipped — segment-FTS Recall (Meet search
+> box, assistant grounding pool, meeting citations that route) AND the
+> ⌘⇧T live transcript (consent-inherited tap, view-driven cost,
+> shed-don't-lag queue). G3: MCP ruled to its own round (no server
+> surface exists). **M5 is COMPLETE (DEC-104)**: series_id stamped from
+> the calendar origin, prep as pure database facts in the Stage's PREP
+> pane, "Carried from last time" atop the wrap-up AND the Record (with
+> a Done verb — house state 'completed', a live-caught fix), and Q14's
+> per-series brief knob. **M6 is COMPLETE (DEC-105) — and with it ALL
+> of SPEC-003 (M1–M6, DEC-098…105)**: G1 proved ScreenCaptureKit
+> loopback live (a one-shot armed grant; screen share keeps its native
+> picker), and Guest Capture shipped in CR-12 reduced mode —
+> non-dismissible disclosure bar, You/Them attribution by construction,
+> guests never in the extractor roster, mic-only as the named floor —
+> riding the existing recorder/wrap-up/series foundations. The round
+> also caught + fixed an M2-era seam: the transcribe IPC bridge dropped
+> forceProvider (CR-11 forced-local never reached main; failed closed).
+> Suite: 3,593 tests / 330 files.
+> **PlexiCam calls consent is CLOSED (DEC-106)**: the 1:1 form of the
+> M1 hole — the whisper pref now records MY mic and ASKS the peer over
+> the callSignal relay (capture-on-answer, decline never tapped,
+> standing-pref auto-answer, worded states both sides, requester-only
+> Stop with a held take); calls ride the meeting pipeline (per-track,
+> attributed, on-device) and ConversationRecorder is deleted. Suite:
+> 3,602 tests / 331 files.
+> **C5 is fully closed (DEC-107)**: widget kind 'meeting-record' minted
+> first on the meeting desk (live store read, provenance tiers, heard
+> lines are doors), plus per-item moment anchors — plexii://meeting/
+> <id>?seg=<segId> stamped on anchored commitments; the Attention chip
+> parses before it opens (moments inside, DEC-091 web marks still
+> external). Suite: 3,611 tests / 332 files.
+> **Recall-over-MCP is closed (DEC-108)**: POST /mcp on the existing
+> PlexiAPI server (its auth, loopback, Origin + rebind guards all
+> inherited), a hand-rolled dependency-free JSON-RPC layer, three
+> READ-ONLY attributed tools (search / meeting / recent), refusals
+> stated where enforced; proven live over real HTTP end-to-end. Suite:
+> 3,624 tests / 333 files.
+> **Briefs for other attendees is complete (DEC-109) — Q14 closed, and
+> with it EVERY named build round from SPEC-003 (DEC-098…109).** The
+> brief rides PlexiChat DMs (server-persisted — the away channel that
+> already existed): host opts in to SEND per series (shareBriefs,
+> default off), recipient opts in to FILE per series (first arrival
+> asks via notice; nothing files until they say so); prose always
+> survives for old clients. Suite: 3,637 tests / 334 files.
+> **analysis/27 Phase 4 is now open and nearly done (DEC-110)**: #16
+> AI-suggested tags shipped (deterministic, vocabulary-grounded, the
+> DEC-088 pattern — lit desk pill, accent chips, click-to-accept,
+> never auto-applied; two live-caught fixes pinned); #13 transcript
+> rebuild marked SATISFIED by SPEC-003; #17 home widgets stays gated
+> on the operator SHAPING it (which home? embedding what?). Suite:
+> 3,647 tests / 335 files.
+> **Phase 5 is prepared (DEC-111)**: main (4.2.2) merged back — zero
+> conflicts, 3,655 tests / 336 files green on the merged tree — and
+> **analysis/29 is the review → landing package** (Michael's review
+> guide + Caleb's two-line checkout + flags note + the two-machine QA
+> sheet + the deferred list). Remaining acts belong to people: Michael
+> reviews and lands; Caleb checks out; the operator runs the
+> two-machine QA sheet and shapes #17; the taxonomy ruling waits on
+> real queue-usage data (dismiss the [TEST] seeds by tag `test-seed`
+> before measuring).
+> **DEC-112**: PlexiMeet restyled into the house material (desk paper,
+> raised rail, glossy rose primary, RECORDING card, sunken segmented
+> track, sticky raised detail header) — presentation only, 7 material
+> pins; and a verification lesson: an OCCLUDED window serves stale
+> compositor tiles to CDP screenshots (layerized elements especially) —
+> captureBeyondViewport + a damage nudge is the honest capture. Suite:
+> 3,662 tests / 337 files.
+> **DEC-113 (the real bug fix)**: meeting transcription was garbage —
+> `task: 'transcribe'` poisoned whisper (looped one sentence a dozen
+> times; "Find commitments" honestly found nothing). Fixed by dropping
+> `task`, defaulting to whisper-base (tiny only for the live pane),
+> anti-loop guards + a collapse net, an OfflineAudioContext resample,
+> and a "Re-transcribe" recovery button. A long child-process detour was
+> a red herring, fully reverted — engine stays in-process. Verified live
+> on the operator's own broken meeting: clean transcript + both
+> deliverables surface as commitments. **DEC-114**: Stage + wrap-up
+> wear the house material (presentation only). Suite: 3,675 tests /
+> 338 files.
+> **DEC-115**: the meeting Record reorganised on operator direction
+> (three reference screenshots — "a design direction, not the trump
+> card"): the transcript ALWAYS on screen beside Overview / Action
+> items (default) / Analytics — tagged by speaker, searchable (`/`),
+> filterable, every timestamp a link; a click-to-seek speaker timeline
+> with heard/action-item markers; Action items with a checkbox (house
+> `completed`) and a bell into Attention (human-origin, approved,
+> pointing back at the meeting — promoted, not duplicated); Analytics
+> as neutral facts (SPEC-003 refusal pinned by banned words); links
+> BOTH ways (transcript lines wear "In Brief · <section>" / "Action
+> item" chips). `lib/meetingRecordStats.ts` unit-tested; 42 live CDP
+> checks; the transcription engine itself was NOT re-tested this round.
+> Suite: 3,693 tests / 339 files.
+> **DEC-116**: PlexiMeet moved onto Home's own substrate and idioms
+> (operator: "look and feel more like the main home screen") —
+> `paper-texture` (not desk-paper) inside Home's page shell, a hero
+> header with the rose module chip, Home's surface-button doors and
+> ACCENT primary (the rose primary retired to the chip — a judgment
+> call, one line to revert), the rail and the three Record panels as
+> floating kit `RailCard`s with icon headers (kit grew `trailing` /
+> `bodyClassName` / `testId`, Home pixel-identical), the module
+> dashboard `embedded` as the empty state. Live-caught: duplicate
+> marker keys when two Brief entries cite one line. Suite: 3,695
+> tests / 339 files.
+> **DEC-117**: the New meeting dialog is the Calendar composer's twin
+> (operator: "nearly identical" to the booking page) — BookTimeDialog's
+> recipes verbatim (slider, 23px title, date/start → end chips, Repeat,
+> GUESTS chips, WHERE segmented, AGENDA, Attach, Esc/↵ footer; a twin
+> test holds the strings in both files) over Meet's behaviour: Start
+> now opens the room, rings picked online teammates, emails the rest;
+> Schedule writes a real meeting block (room id, guests, where, agenda,
+> attached desk, repeat) and emails invites. Attach is REAL here (the
+> composer's is still the DEC-019 stub); the invite email is
+> where-aware (`composeInviteBody`). 18/18 live; suite 3,737 tests /
+> 340 files.
+> **DEC-118**: Record notes / Record external open the same twin
+> (`RecordDialog`): title, "now → until you stop", NOTES → `yours`
+> spans, a real desk for Record notes (the meeting's deskNodeId), and
+> for Record external WHERE — a call on this Mac (You / Them) or in the
+> room (mic only, the picker never raised) — with the CR-12 disclosure
+> stated before anything runs. `guestCapture.start` grew `notes` /
+> `micOnly`. 12/12 live with the mic stubbed to refuse; suite 3,759
+> tests / 341 files.
+> **DEC-119**: the Message door opens the twin too (`MessageDialog`:
+> Video / Voice slider sets the capture, the 23px field is the DM text,
+> TO is one teammate from live presence; the door becomes "Stop & send
+> to <name>" while recording — the popover is gone), and Meet's
+> embedded dashboard renders no header row (no Customize) so the tiles
+> start level with the rail. 10/10 live, mic stubbed; suite 3,778
+> tests / 342 files. **Every Meet door is now the composer's twin
+> (DEC-117/118/119).**
+
+**Last updated:** 2026-09-06 — through DEC-119 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
 split between tomorrow and wednesday" now moves today's remaining blocks
 across the named days, replacing them on accept in one undo batch).
-DEC-095 restyled the Attention analytics tiles as house material (gloss,
-tone ring, hover lift) and found **GAP-020** — six `--ink-*` steps are
-referenced but never defined, so ~68 elements silently inherit their
-parent's colour (`--ink-80` alone is 52 uses); locked against growth,
-cleanup is its own round. DEC-094 restyled the plan review as Book time's sibling (presentation only —
+DEC-096 closed GAP-020: the five real ink steps are defined in all three
+themes (midpoints of their neighbours), --ink-300 rewrote to --ink-60, and
+the lock is strict. DEC-095 restyled the Attention analytics tiles as house
+material (gloss, tone ring, hover lift). DEC-094 restyled the plan review as Book time's sibling (presentation only —
 the operator cut a larger redesign spec back to visuals; the cascade,
 pinning, locked rows and capacity line were NOT built and remain open ideas
 in that spec). DEC-093 made deadline chips draggable onto the grid;
@@ -20,11 +171,12 @@ comprehension. **GAP-019 remains open** (`bg-[var(--token)]/N` invalid CSS,
 Phase 5 rulings/process. DECISIONS-LOG carries DEC-072…092 in full.
 **Branch:** `ryan-command-center` (push state: check both remotes before
 assuming).
-**Suite:** 3,460 tests green. Full typecheck clean.
+**Suite:** 3,528 tests green. Full typecheck clean.
 **Operator action still owed (DEC-082):** grant Camera to the app Plexii is
 launched from (System Settings → Privacy & Security → Camera) — until then
 Meet tiles show the honest "Camera blocked by macOS" note.
-**Gated on the operator's go:** the Fireflies-level transcript UI rebuild.
+**The transcript-UI rebuild is DONE (DEC-115)** — the operator's three
+reference screenshots were the go; it shipped as the reorganised Record.
 
 ## <<<PROMPT BEGIN>>>
 
@@ -34,13 +186,12 @@ You have no memory of prior sessions; everything lives in the repo's planning do
 
 Read in order:
 1. [ACTIVE-MISSION.md](ACTIVE-MISSION.md) — live state, newest at top
-2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…095**, append-only. DEC-072…095 carry
+2. [DECISIONS-LOG.md](DECISIONS-LOG.md) — **DEC-001…101**, append-only. DEC-072…101 carry
    the day of post-landing rounds; DEC-056…061 the platform lessons.
 3. [analysis/27-DEMO-FEEDBACK-PLAN.md](analysis/27-DEMO-FEEDBACK-PLAN.md) — the demo
    feedback consolidation and 5-phase plan (Phases 1–2 done; Phase 3 = context fidelity)
-4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages), GAP-019
-   (invalid var()+modifier utilities, ~40 sites) and GAP-020 (undefined ink
-   tokens, ~68 sites) are the live ones
+4. [GAP-REGISTER.md](GAP-REGISTER.md) — GAP-017 (Respond → Messages) is the last
+   live one (GAP-018/019/020 all closed — the paint-integrity family is done)
 
 Pre-flight:
 ```bash

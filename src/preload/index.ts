@@ -93,7 +93,7 @@ interface DocCommentDto {
   resolved: boolean
   createdAt: number
 }
-import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
+import type { Meeting, MeetingDraft, MeetingPatch, MeetingPrep, TranscriptSearchHit, TranscriptSegment, TranscriptSegmentDraft } from '@shared/meetings'
 import type { PlexiApp, PlexiAppDraft, PlexiAppPatch } from '@shared/apps'
 import type { PlexiForm, PlexiFormDraft, PlexiFormPatch } from '@shared/forms'
 import type { PlexiSignRequest, PlexiSignDraft, PlexiSignPatch, SignAction } from '@shared/sign'
@@ -1260,12 +1260,16 @@ const api = {
       mimeType?: string
       samples?: Float32Array
       sampleRate?: number
+      /** M2 (CR-11) — meetings force 'local'; no silent cloud fallback. */
+      forceProvider?: 'cloud' | 'local'
     }): Promise<
       | {
           ok: true
           transcript: string
           durationSec: number | null
           language: string | null
+          /** M2 — timestamped spans when the engine yields them. */
+          segments: Array<{ startMs: number; endMs: number; text: string; confidence: number | null }> | null
         }
       | { ok: false; error: string; reason?: 'no_key' | 'network' | 'api' | 'unknown' | 'model_load' | 'decode' }
     > => ipcRenderer.invoke('ai:transcribeAudio', input),
@@ -1297,6 +1301,14 @@ const api = {
     // the first recording isn't blocked on the download.
     getProvider: (): Promise<'cloud' | 'local'> =>
       ipcRenderer.invoke('voice:getProvider'),
+    /** M2 — warm the local model without touching the preference. */
+    preloadLocal: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('voice:preloadLocal'),
+    /** M4 — decode one live 16kHz chunk (serial queue; may report dropped). */
+    transcribeLive: (
+      pcm: ArrayBuffer
+    ): Promise<{ ok: boolean; text?: string; dropped?: boolean; error?: string }> =>
+      ipcRenderer.invoke('voice:transcribeLive', pcm),
     setProvider: (
       p: 'cloud' | 'local'
     ): Promise<{ ok: boolean; error?: string }> =>
@@ -1611,11 +1623,83 @@ const api = {
     // True once entries are embedded (an embedding key is set and indexed).
     semanticActive: (): Promise<boolean> => ipcRenderer.invoke('knowledge:semanticActive')
   },
+  /** M6 — arm one picker-free display-media grant (screen + loopback audio)
+   *  for guest capture. One-shot: it disarms the moment a request fires. */
+  guestCapture: {
+    arm: (): Promise<boolean> => ipcRenderer.invoke('guestCapture:arm')
+  },
   // PlexiMeet — meetings with transcript, summary and action items.
   meetings: {
     list: (): Promise<Meeting[]> => ipcRenderer.invoke('meetings:list'),
     get: (id: string): Promise<Meeting | null> => ipcRenderer.invoke('meetings:get', id),
     create: (draft: MeetingDraft): Promise<Meeting> => ipcRenderer.invoke('meetings:create', draft),
+    /** M2 — replace a meeting's attributed transcript segments (derived data). */
+    saveSegments: (meetingId: string, segments: TranscriptSegmentDraft[]): Promise<TranscriptSegment[]> =>
+      ipcRenderer.invoke('meetings:saveSegments', meetingId, segments),
+    segments: (meetingId: string): Promise<TranscriptSegment[]> =>
+      ipcRenderer.invoke('meetings:segments', meetingId),
+    /** M4 — Recall: search every meeting's transcript at segment level. */
+    searchSegments: (query: string, limit?: number): Promise<TranscriptSearchHit[]> =>
+      ipcRenderer.invoke('meetings:searchSegments', query, limit),
+    /** M5 — prep: previous instance, carried items, attendee items, agenda. */
+    prep: (input: {
+      seriesId?: string | null
+      excludeMeetingId?: string
+      invitees?: string[]
+      agenda?: string | null
+    }): Promise<MeetingPrep> => ipcRenderer.invoke('meetings:prep', input),
+    getSeriesPrefs: (
+      seriesId: string
+    ): Promise<{ briefs: boolean; shareBriefs: boolean; followBriefs: boolean | null }> =>
+      ipcRenderer.invoke('meetings:getSeriesPrefs', seriesId),
+    setSeriesPrefs: (
+      seriesId: string,
+      patch: { briefs?: boolean; shareBriefs?: boolean; followBriefs?: boolean }
+    ): Promise<{ briefs: boolean; shareBriefs: boolean; followBriefs: boolean | null }> =>
+      ipcRenderer.invoke('meetings:setSeriesPrefs', seriesId, patch),
+    /** M2c — audio retention (CR-13) + export. */
+    saveAudioTakes: (
+      meetingId: string,
+      takes: Array<{ speaker: string; bytes: Uint8Array; mimeType: string; offsetMs: number }>
+    ): Promise<{ ok: boolean; path: string }> =>
+      ipcRenderer.invoke('meetings:saveAudioTakes', meetingId, takes),
+    audioInfo: (meetingId: string): Promise<{ present: boolean; files: number; bytes: number; kept: boolean; path: string }> =>
+      ipcRenderer.invoke('meetings:audioInfo', meetingId),
+    /** Re-transcribe fuel — the retained takes (local bytes, never uploaded). */
+    loadAudioTakes: (
+      meetingId: string
+    ): Promise<Array<{ speaker: string; offsetMs: number; mimeType: string; bytes: Uint8Array }>> =>
+      ipcRenderer.invoke('meetings:loadAudioTakes', meetingId),
+    keepAudio: (meetingId: string, keep: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('meetings:keepAudio', meetingId, keep),
+    revealAudio: (meetingId: string): Promise<boolean> =>
+      ipcRenderer.invoke('meetings:revealAudio', meetingId),
+    getAudioRetention: (): Promise<'0' | '7' | '30' | '90' | 'keep'> =>
+      ipcRenderer.invoke('meetings:getAudioRetention'),
+    setAudioRetention: (mode: '0' | '7' | '30' | '90' | 'keep'): Promise<void> =>
+      ipcRenderer.invoke('meetings:setAudioRetention', mode),
+    export: (meetingId: string, format: 'markdown' | 'json'): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('meetings:export', meetingId, format),
+    /** M3 — commitment extraction; anchors validated renderer-side. */
+    extractCommitments: (input: {
+      title: string
+      notes: string
+      segments: Array<{ id: string; startMs: number; speakerName: string; speakerAccountId: string | null; text: string }>
+      roster: Array<{ accountId: string; name: string }>
+    }): Promise<
+      | { ok: true; commitments: Array<{ title: string; ownerAccountId?: string | null; ownerName?: string | null; dueAt?: string | null; intentClass?: string; segmentId?: string | null }> }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('ai:extractCommitments', input),
+    /** M2b — the Enhance pass; renderer validates + downgrades unprovable spans. */
+    enhanceRecord: (input: {
+      title: string
+      notes: string
+      segments: Array<{ id: string; startMs: number; speakerName: string; text: string }>
+      sections?: string[]
+    }): Promise<
+      | { ok: true; spans: Array<{ tier: 'heard' | 'inferred'; text: string; segmentId?: string; section?: string }> }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('ai:enhanceRecord', input),
     update: (id: string, patch: MeetingPatch): Promise<Meeting | null> =>
       ipcRenderer.invoke('meetings:update', id, patch),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke('meetings:delete', id)
@@ -1792,6 +1876,8 @@ const api = {
         phrase: string
         candidates: Array<{ id: string; title: string; hint: string }>
       } | null
+      /** #16 — existing tags the capture evokes; suggested, never applied. */
+      tags: string[]
     }> => ipcRenderer.invoke('workItems:classify', text),
     /** DEC-088 — the people scan alone (marked captures skip classify). */
     scanPeople: (

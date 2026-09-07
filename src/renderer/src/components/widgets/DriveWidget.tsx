@@ -134,7 +134,7 @@ export default function DriveWidget({ widget, inline = false }: Props): JSX.Elem
       data-testid="drive-body"
     >
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-raised)]/70">
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-raised)_70%,transparent)]">
         <Icon name="folder" size={14} className="text-accent shrink-0" />
         <span className="text-[11px] font-medium text-[var(--ink-90)] truncate flex-1" title={folderName}>
           {folderName}

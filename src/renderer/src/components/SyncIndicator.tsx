@@ -133,7 +133,7 @@ export default function SyncIndicator(): JSX.Element {
 
   return (
     <div
-      className="mx-2 mb-2 px-2.5 py-2 rounded-[10px] bg-[var(--surface-sunken)]/60 shadow-[0_0_0_1px_var(--edge-hairline)] flex items-center gap-2"
+      className="mx-2 mb-2 px-2.5 py-2 rounded-[10px] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] shadow-[0_0_0_1px_var(--edge-hairline)] flex items-center gap-2"
       title={containerTitle}
       data-testid="sync-indicator"
       data-sync-state={syncState}

@@ -556,7 +556,7 @@ export function CalendarView({
               className={`min-h-[64px] p-1 ${
                 inMonth
                   ? 'bg-[var(--surface-raised)]'
-                  : 'bg-[var(--surface-sunken)]/60'
+                  : 'bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]'
               }`}
             >
               <div

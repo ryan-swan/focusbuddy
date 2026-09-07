@@ -41,7 +41,10 @@ const IDENTITIES: Record<string, SourceIdentity> = {
   chart: { icon: 'bar_chart', tone: areaTone('desks'), location: 'Desks' },
   // Drive files and past Plexii conversations (A2, #17).
   file: { icon: 'draft', tone: areaTone('files'), location: 'Files' },
-  chat: { icon: 'forum', tone: areaTone('home'), location: 'Plexii chats' }
+  chat: { icon: 'forum', tone: areaTone('home'), location: 'Plexii chats' },
+  // Meeting transcripts (M4, SPEC-003 P4). They live in PlexiMeet, an Office
+  // surface, so colour answers WHERE with the office tone.
+  meeting: { icon: 'video_call', tone: areaTone('office'), location: 'PlexiMeet' }
 }
 
 export function sourceIdentity(docType: string | undefined): SourceIdentity | null {

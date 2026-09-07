@@ -227,7 +227,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 e.preventDefault()
                 props.onSelectAll?.()
               }}
-              className="sticky left-0 z-30 bg-[var(--surface-sunken)]/80 border-b border-[var(--edge-firm)] border-r border-[var(--edge-soft)] cursor-pointer hover:bg-accent/10 transition-colors"
+              className="sticky left-0 z-30 bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)] border-b border-[var(--edge-firm)] border-r border-[var(--edge-soft)] cursor-pointer hover:bg-accent/10 transition-colors"
             />
             {tab.columns.map((col, c) => {
               if (props.hiddenCols?.has(c)) return null
@@ -244,7 +244,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 className={`relative border-b border-[var(--edge-firm)] border-r p-0 transition-colors ${
                   c === fCols - 1 ? 'border-r-2 border-r-[var(--edge-firm)]' : 'border-[var(--edge-soft)]'
                 } ${
-                  colFullySelected(c) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'
+                  colFullySelected(c) ? 'bg-accent/20' : 'bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)]'
                 } ${props.reorderOver?.kind === 'col' && props.reorderOver.over === c ? 'shadow-[inset_2px_0_0_0_var(--accent)]' : ''}`}
               >
                 <div className="flex items-center">
@@ -351,7 +351,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                 style={r < fRows ? { position: 'sticky', top: rowTop(r), left: 0, zIndex: 25 } : undefined}
                 className={`relative sticky left-0 z-10 text-center text-[11px] text-[var(--ink-40)] border-r border-[var(--edge-soft)] select-none cursor-pointer hover:text-accent transition-colors ${
                   r === fRows - 1 ? 'border-b-2 border-b-[var(--edge-firm)]' : 'border-b border-[var(--edge-soft)]'
-                } ${rowFullySelected(r) ? 'bg-accent/20' : 'bg-[var(--surface-sunken)]/80'} ${
+                } ${rowFullySelected(r) ? 'bg-accent/20' : 'bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)]'} ${
                   props.reorderOver?.kind === 'row' && props.reorderOver.over === r ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : ''
                 }`}
               >
@@ -496,7 +496,7 @@ export default function SheetGrid(props: Props): JSX.Element {
                         ? 'bg-accent/[0.10]'
                         : inFillPreview
                           ? 'bg-accent/[0.06]'
-                          : 'group-hover:bg-[var(--surface-sunken)]/40'
+                          : 'group-hover:bg-[color-mix(in_oklab,var(--surface-sunken)_40%,transparent)]'
                     } ${isActive ? 'outline outline-2 -outline-offset-1 outline-accent' : ''}`}
                   >
                     {showHandle && (

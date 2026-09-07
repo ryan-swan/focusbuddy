@@ -73,13 +73,13 @@ export default function AgenticOpsView(): JSX.Element {
             {state === 'checking' ? 'Reaching your ops console…' : 'Ops console not reachable'}
           </h2>
           {state === 'checking' ? (
-            <p className="text-sm text-[var(--ink-300)]">Checking {OPS_URL}.</p>
+            <p className="text-sm text-[var(--ink-60)]">Checking {OPS_URL}.</p>
           ) : (
             <>
-              <p className="text-sm text-[var(--ink-300)] mb-1">
+              <p className="text-sm text-[var(--ink-60)] mb-1">
                 {lastError} The agentic ops console runs as a local service on this machine.
               </p>
-              <p className="text-sm text-[var(--ink-300)] mb-4">
+              <p className="text-sm text-[var(--ink-60)] mb-4">
                 Start it, then retry. Nothing is shown here unless the real console is live.
               </p>
               <button

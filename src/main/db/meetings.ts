@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { getDb } from './database'
 import { getActiveOrgId } from './activeOrg'
+import { deleteAudioFor } from '../meetingAudio'
 import type { Meeting, MeetingDraft, MeetingPatch } from '@shared/meetings'
 
 // ── fb_meetings (PlexiMeet) ──────────────────────────────────────────────────
@@ -14,8 +15,22 @@ interface MeetingRow {
   summary: string
   action_items_json: string
   duration_sec: number | null
+  record_json: string | null
+  desk_node_id: string | null
+  series_id: string | null
+  block_id: string | null
   created_at: number
   updated_at: number
+}
+
+function parseRecord(raw: string | null): Meeting['record'] {
+  if (!raw) return null
+  try {
+    const r = JSON.parse(raw) as Meeting['record']
+    return r && Array.isArray(r.spans) ? r : null
+  } catch {
+    return null
+  }
 }
 
 function parseItems(raw: string): string[] {
@@ -29,6 +44,10 @@ function parseItems(raw: string): string[] {
 
 function rowToMeeting(row: MeetingRow): Meeting {
   return {
+    record: parseRecord(row.record_json),
+    deskNodeId: row.desk_node_id ?? null,
+    seriesId: row.series_id ?? null,
+    blockId: row.block_id ?? null,
     id: row.id,
     title: row.title,
     transcript: row.transcript,
@@ -57,8 +76,8 @@ export function createMeeting(draft: MeetingDraft): Meeting {
   const id = randomUUID()
   const now = Date.now()
   db.prepare(
-    `INSERT INTO fb_meetings (id, title, transcript, summary, action_items_json, duration_sec, created_at, updated_at, org_id)
-     VALUES (@id, @title, @transcript, @summary, @items, @duration, @now, @now, @orgId)`
+    `INSERT INTO fb_meetings (id, title, transcript, summary, action_items_json, duration_sec, series_id, block_id, created_at, updated_at, org_id)
+     VALUES (@id, @title, @transcript, @summary, @items, @duration, @seriesId, @blockId, @now, @now, @orgId)`
   ).run({
     id,
     title: draft.title ?? 'Untitled meeting',
@@ -66,6 +85,8 @@ export function createMeeting(draft: MeetingDraft): Meeting {
     summary: draft.summary ?? '',
     items: JSON.stringify(draft.actionItems ?? []),
     duration: draft.durationSec ?? null,
+    seriesId: draft.seriesId ?? null,
+    blockId: draft.blockId ?? null,
     now,
     orgId: getActiveOrgId()
   })
@@ -82,17 +103,33 @@ export function updateMeeting(id: string, patch: MeetingPatch): Meeting | null {
     summary: patch.summary ?? existing.summary,
     items: JSON.stringify(patch.actionItems ?? existing.actionItems),
     duration: patch.durationSec !== undefined ? patch.durationSec : existing.durationSec,
+    record:
+      patch.record !== undefined
+        ? patch.record
+          ? JSON.stringify(patch.record)
+          : null
+        : existing.record
+          ? JSON.stringify(existing.record)
+          : null,
+    desk_node: patch.deskNodeId !== undefined ? patch.deskNodeId : existing.deskNodeId,
     updated_at: Date.now(),
     id
   }
   db.prepare(
     `UPDATE fb_meetings SET title = @title, transcript = @transcript, summary = @summary,
-       action_items_json = @items, duration_sec = @duration, updated_at = @updated_at WHERE id = @id`
+       action_items_json = @items, duration_sec = @duration, record_json = @record,
+       desk_node_id = @desk_node, updated_at = @updated_at WHERE id = @id`
   ).run(next)
   return getMeeting(id)
 }
 
 export function deleteMeeting(id: string): boolean {
+  // M2 — a meeting's segments die with it (no FK cascade in this schema;
+  // the delete is explicit so a removed meeting never leaves orphaned
+  // attributed speech lying in the store).
+  getDb().prepare('DELETE FROM fb_transcript_segments WHERE meeting_id = ?').run(id)
+  // M2c — and its audio takes go with it (CR-13's own cascade).
+  deleteAudioFor(id)
   const db = getDb()
   const r = db.prepare('DELETE FROM fb_meetings WHERE id = ?').run(id)
   return r.changes > 0

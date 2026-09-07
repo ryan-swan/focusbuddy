@@ -367,7 +367,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
             style={{ position: 'absolute', left: f.x, top: f.y, width: f.w, height: f.h }}
             className={
               mode === 'design'
-                ? `rounded border ${selected === f.id ? 'border-accent ring-1 ring-accent/40' : 'border-[var(--edge-soft)]'} bg-[var(--surface-raised)]/70`
+                ? `rounded border ${selected === f.id ? 'border-accent ring-1 ring-accent/40' : 'border-[var(--edge-soft)]'} bg-[color-mix(in_oklab,var(--surface-raised)_70%,transparent)]`
                 : ''
             }
             onMouseDown={(e) => {

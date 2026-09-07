@@ -1068,10 +1068,10 @@ export default function WidgetFrame({
                 }}
                 className={`widget-nodrag ml-1 h-5 w-5 rounded inline-flex items-center justify-center shrink-0 transition-colors ${
                   attentionItem
-                    ? 'text-accent hover:bg-[var(--surface-sunken)]/60'
+                    ? 'text-accent hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]'
                     : // DEC-089 — was ink-40 at 60%: tuned for the light
                       // stone bar, invisible on the dark one. Quiet, not gone.
-                      'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
+                      'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent'
                 }`}
                 aria-label={attentionItem ? 'In Attention — open the queue' : 'Add to Attention'}
                 title={
@@ -1107,7 +1107,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   beginRename()
                 }}
-                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] opacity-75 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] opacity-75 hover:opacity-100 hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent transition-opacity"
                 aria-label="Rename widget"
                 title="Rename"
               >
@@ -1133,7 +1133,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   linkDrag.start(widget.id)
                 }}
-                className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-accent cursor-cell"
+                className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent cursor-cell"
                 aria-label="Link to another widget"
                 title="Click, then click another widget to connect them"
               >
@@ -1312,7 +1312,7 @@ function ResizeStepButton({
         e.stopPropagation()
         onClick()
       }}
-      className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)] transition-colors"
+      className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-[var(--ink-100)] transition-colors"
       aria-label={isGrow ? 'Grow widget' : 'Shrink widget'}
       data-testid={isGrow ? `widget-grow-${widgetId}` : `widget-shrink-${widgetId}`}
       title={
@@ -1425,7 +1425,7 @@ function PinControl({
         className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
           isPinned
             ? 'text-amber-600 hover:bg-amber-100'
-            : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]'
+            : 'text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-[var(--ink-100)]'
         }`}
         aria-label={isPinned ? 'Pin options' : 'Pin to screen'}
         title={
@@ -1573,7 +1573,7 @@ function ExpandControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]"
+        className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-[var(--ink-100)]"
         aria-label="Expand options"
         title="Expand — bigger on desk or full focus mode"
       >

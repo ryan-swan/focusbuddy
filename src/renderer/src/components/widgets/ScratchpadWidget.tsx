@@ -162,7 +162,7 @@ export default function ScratchpadWidget({ widget, inline = false }: Props): JSX
   const body = (
     <div className="h-full w-full flex flex-col bg-[#fcfbf7] dark:bg-stone-900">
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80">
+      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)]">
         <button
           onClick={() => setTool('pen')}
           className={`icon-btn ${tool === 'pen' ? '!text-accent' : 'text-[var(--ink-50)]'}`}

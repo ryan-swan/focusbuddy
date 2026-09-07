@@ -54,27 +54,30 @@ test('1 — meet-start-live, meet-record, meet-message and meet-add all render i
 
 // ── Check 2: Message picker — honest empty state when no peers ────────────────
 
-test('2 — meet-message opens picker; honest "No teammates online right now." shown with zero peers', async () => {
+test('2 — meet-message opens the Message dialog; honest "No teammates online right now." with zero peers', async () => {
   launched = await launchApp()
   const { window } = launched
   await waitForReady(window)
   await openMeet(window)
 
-  // Picker not visible yet.
-  await expect(window.locator('[data-testid="meet-message-picker"]')).toHaveCount(0)
+  // DEC-119: the picker became the composer-twin dialog.
+  await expect(window.locator('[data-testid="message-dialog"]')).toHaveCount(0)
 
   await window.locator('[data-testid="meet-message"]').click()
 
-  // Picker mounts.
-  const picker = window.locator('[data-testid="meet-message-picker"]')
-  await expect(picker).toBeVisible({ timeout: 3_000 })
+  const dialog = window.locator('[data-testid="message-dialog"]')
+  await expect(dialog).toBeVisible({ timeout: 3_000 })
 
-  // With no account signed in → zero presence peers → honest empty message.
-  await expect(picker).toContainText('No teammates online right now.', { timeout: 3_000 })
+  // With no account signed in → zero presence peers → the TO field says so.
+  await expect(dialog.locator('[data-testid="message-to-input"]')).toHaveAttribute(
+    'placeholder',
+    'No teammates online right now.',
+    { timeout: 3_000 }
+  )
 
-  // Toggle again: picker dismissed.
-  await window.locator('[data-testid="meet-message"]').click()
-  await expect(window.locator('[data-testid="meet-message-picker"]')).toHaveCount(0)
+  // Esc discards.
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="message-dialog"]')).toHaveCount(0)
 })
 
 // ── Check 3: Start a meeting — no crash; honest camera/mic error surfaced ─────

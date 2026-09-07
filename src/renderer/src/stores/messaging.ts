@@ -18,6 +18,7 @@ import {
 } from '../lib/messagingSocket'
 import { usePresenceStore } from './presence'
 import { useAccountStore } from './account'
+import { maybeIngestBrief } from '../lib/briefInbox'
 import { useViewStore } from './view'
 import { useOrgStore, PERSONAL_ORG_ID } from './org'
 import { notifyExternal } from '../lib/notify'
@@ -261,6 +262,10 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       const conv = conversations.find((c) => c.id === incoming.conversationId)
       const senderMember = conv?.members.find((m) => m.accountId === incoming.message.fromAccount)
       const sender = personDisplayName(senderMember, 'New message')
+      // Q14 — a live-delivered meeting brief offers the per-series follow.
+      // Idempotent via the inbox ledger, so the history load below cannot
+      // double-act on the same message.
+      maybeIngestBrief(incoming.message, sender)
       const preview = incoming.message.body || (incoming.message.attachment ? 'Shared something' : '')
       // A message that @mentions the signed-in handle alerts even while the
       // app is focused elsewhere: being named is the one chat event that
@@ -394,6 +399,13 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set({ activeId: id, activeThreadId: null })
     const messages = await api.getMessages(token, id)
     set((s) => ({ messagesByConv: { ...s.messagesByConv, [id]: messages } }))
+    // Q14 — an attendee who was AWAY at wrap-up meets the brief here, on
+    // history load. The ledger makes this scan idempotent across opens.
+    const convMembers = get().conversations.find((c) => c.id === id)?.members ?? []
+    for (const m of messages) {
+      const from = convMembers.find((mm) => mm.accountId === m.fromAccount)
+      maybeIngestBrief(m, personDisplayName(from, 'Someone'))
+    }
     await api.markRead(token, id)
     await get().refreshConversations()
   },

@@ -834,7 +834,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
         className={`border-b border-[var(--edge-soft)] group ${
           idx % 2 === 0
             ? 'bg-[var(--surface-raised)]'
-            : 'bg-[var(--surface-sunken)]/60'
+            : 'bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]'
         } hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08] ${
           rowReorder.dragId === row.id ? 'opacity-40' : ''
         } ${
@@ -932,7 +932,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
         </div>
       )}
       {/* Title row */}
-      <div className="sticky top-0 z-10 px-3 py-2 bg-[var(--surface-raised)]/95 border-b border-[var(--edge-soft)] flex items-center gap-1.5">
+      <div className="sticky top-0 z-10 px-3 py-2 bg-[color-mix(in_oklab,var(--surface-raised)_95%,transparent)] border-b border-[var(--edge-soft)] flex items-center gap-1.5">
         <Icon name={currentViewMeta.icon} size={15} className="text-accent shrink-0" />
         <input
           value={table.title}
@@ -987,7 +987,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
           highlighted; clicking switches without losing data. Each non-
           table view uses TableSchema.viewConfig to remember which column
           drives its grouping (kanban lanes / calendar date / etc.). */}
-      <div className="sticky top-[44px] z-[9] px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 flex items-center gap-0.5 overflow-x-auto">
+      <div className="sticky top-[44px] z-[9] px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] flex items-center gap-0.5 overflow-x-auto">
         {VIEW_OPTIONS.map((v) => {
           const active = v.id === viewMode
           return (
@@ -1093,7 +1093,7 @@ export default function TableWidget({ widget, inline = false }: Props): JSX.Elem
             <col style={{ width: ADD_COL_WIDTH }} />
           </colgroup>
           <thead>
-            <tr className="border-b border-[var(--edge-firm)] bg-[var(--surface-sunken)]/70">
+            <tr className="border-b border-[var(--edge-firm)] bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)]">
               <th className="px-1 py-1.5" />
               {table.schema.columns.map((col, index) => (
                 <ColumnHeader
@@ -1482,7 +1482,7 @@ function GroupRows({
 }): JSX.Element {
   return (
     <>
-      <tr className="bg-[var(--surface-sunken)]/80 border-b border-[var(--edge-firm)]">
+      <tr className="bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)] border-b border-[var(--edge-firm)]">
         <td colSpan={colSpan} className="px-2 py-1.5">
           <button
             onClick={onToggle}

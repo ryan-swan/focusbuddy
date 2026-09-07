@@ -225,6 +225,24 @@ CREATE TABLE IF NOT EXISTS fb_meetings (
 );
 CREATE INDEX IF NOT EXISTS idx_fb_meetings_created ON fb_meetings(created_at DESC);
 
+-- M2 (SPEC-003 S3-DEC-021) — the transcript as SEGMENTS, not a string:
+-- speaker-attributed (per-track capture makes attribution exact), offset on
+-- the recording clock, with the engine's own confidence where it gives one
+-- (cloud logprobs) and an honest NULL where it does not (local). Every
+-- provenance tier, moment anchor and Recall citation resolves against these.
+CREATE TABLE IF NOT EXISTS fb_transcript_segments (
+  id TEXT PRIMARY KEY,
+  meeting_id TEXT NOT NULL,
+  speaker_account_id TEXT,
+  speaker_name TEXT NOT NULL DEFAULT '',
+  start_ms INTEGER NOT NULL,
+  end_ms INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  confidence REAL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fb_segments_meeting ON fb_transcript_segments(meeting_id, start_ms);
+
 -- ── PlexiBuild apps ──────────────────────────────────────────────────────────
 -- No-code apps: a named component stack (components_json) built and run in-app.
 CREATE TABLE IF NOT EXISTS fb_apps (
@@ -1218,6 +1236,16 @@ export function getDb(): Database.Database {
   ensureColumn(db, 'fb_apps', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_forms', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_meetings', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
+  // M2b — the Record (SPEC-003 §3.4): provenance-tiered spans, JSON.
+  ensureColumn(db, 'fb_meetings', 'record_json', 'TEXT')
+  // M2c (S3-DEC-020) — the meeting's desk node, when one was minted.
+  ensureColumn(db, 'fb_meetings', 'desk_node_id', 'TEXT')
+  // M5 (SPEC-003 P5) — series identity: a meeting born from a booked calendar
+  // block remembers its block and its series, which is what makes "carried
+  // from last time" a cheap indexed lookup instead of a title-match guess.
+  ensureColumn(db, 'fb_meetings', 'series_id', 'TEXT')
+  ensureColumn(db, 'fb_meetings', 'block_id', 'TEXT')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_fb_meetings_series ON fb_meetings(series_id, created_at)')
   ensureColumn(db, 'fb_sign_requests', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   ensureColumn(db, 'fb_smart_folders', 'org_id', "TEXT NOT NULL DEFAULT 'personal'")
   // Semantic-search vectors and the activity / focus / browsing logs are scoped

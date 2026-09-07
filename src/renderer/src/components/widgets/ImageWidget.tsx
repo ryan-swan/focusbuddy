@@ -76,7 +76,7 @@ export default function ImageWidget({ widget, inline = false }: Props): JSX.Elem
               setEditing(true)
             }}
             title="Change URL"
-            className="absolute top-1 right-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-raised)]/90 border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
+            className="absolute top-1 right-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] border border-[var(--edge-firm)] hover:bg-[var(--surface-sunken)] text-[var(--ink-70)]"
           >
             <Icon name="edit" size={11} />
             <span>edit</span>

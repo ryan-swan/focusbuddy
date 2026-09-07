@@ -22,6 +22,7 @@ import {
 import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { joinMeetingRoom } from '../../lib/startMeeting'
+import { useGuestCaptureStore } from '../../stores/guestCapture'
 import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
@@ -780,7 +781,7 @@ export default function WeekTimeGrid({
                         done
                           ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                           : isPast
-                            ? 'bg-[var(--surface-sunken)]/90 border-[var(--edge-firm)]/50 text-[var(--ink-50)]'
+                            ? 'bg-[color-mix(in_oklab,var(--surface-sunken)_90%,transparent)] border-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)] text-[var(--ink-50)]'
                             : 'bg-accent/15 border-accent/40 text-[var(--ink-90)]'
                       }`}
                       style={{
@@ -867,7 +868,13 @@ export default function WeekTimeGrid({
                               // room is the fallback, not the destination.
                               const ext = block.meeting?.joinUrl
                               if (ext) void window.api.files.openExternal(ext)
-                              else void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
+                              else
+                                void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting', {
+                                  blockId: block.id,
+                                  seriesId: block.seriesId ?? null,
+                                  agenda: block.meeting!.agenda ?? null,
+                                  invitees: block.meeting!.invitees
+                                })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                             className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"
@@ -877,6 +884,30 @@ export default function WeekTimeGrid({
                             <Icon name="videocam" size={9} />
                           </button>
                         )}
+                        {/* M6 — an EXTERNAL meeting (Zoom/Meet/Teams) can be
+                            recorded on this machine: mic + system audio,
+                            local transcription, the same wrap-up. Explicitly
+                            separate from Join — recording is its own act,
+                            never a side effect of opening a link. */}
+                        {block.meeting?.joinUrl && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void useGuestCaptureStore.getState().start({
+                                title: block.title || 'Meeting',
+                                blockId: block.id,
+                                seriesId: block.seriesId ?? null,
+                                agenda: block.meeting?.agenda ?? null
+                              })
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-rose-500/90 !text-white fb-press"
+                            title="Record this external meeting — your mic + this machine's audio, transcribed locally"
+                            data-testid="block-record-external"
+                          >
+                            <Icon name="radio_button_checked" size={9} />
+                          </button>
+                        )}
                         {block.meeting && (
                           <button
                             onClick={(e) => {
@@ -884,7 +915,7 @@ export default function WeekTimeGrid({
                               setCalMenu({ block, x: e.clientX, y: e.clientY })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] fb-press"
                             title="Add to my calendar"
                             data-testid="block-add-to-calendar"
                           >
@@ -898,7 +929,7 @@ export default function WeekTimeGrid({
                               jumpToNode(linked)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] fb-press"
                             title={linked.kind === 'folder' ? 'Open this folder' : 'Jump to this task'}
                             data-testid="block-jump"
                           >
@@ -931,7 +962,7 @@ export default function WeekTimeGrid({
                               void updateBlock(block.id, { status: done ? 'planned' : 'done' })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] fb-press"
                             title={done ? 'Mark not done' : 'Mark done'}
                             data-testid="block-complete"
                           >
@@ -953,7 +984,7 @@ export default function WeekTimeGrid({
                             }
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
+                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] hover:text-rose-500 fb-press"
                           title="Delete block"
                           data-testid="block-delete"
                         >
@@ -1016,7 +1047,7 @@ export default function WeekTimeGrid({
                               e.stopPropagation()
                               onGhostRemove(g.itemId)
                             }}
-                            className="absolute top-0.5 right-0.5 hidden group-hover/ghost:inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
+                            className="absolute top-0.5 right-0.5 hidden group-hover/ghost:inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] hover:text-rose-500 fb-press"
                             title="Drop this proposal"
                           >
                             <Icon name="close" size={9} />
