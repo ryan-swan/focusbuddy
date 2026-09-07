@@ -256,9 +256,13 @@
 > a house card (the Timeline's own material), edge to edge with the cards
 > below it, the speaker avatars ringed in the card's fill. 4/4 live; suite
 > 3,896 tests / 356 files. Addendum: "Notes" and "New meeting" already carry
-> it (one component) — verified on the running app, no code.
+> it (one component) — verified on the running app, no code. **DEC-136**:
+> the Record's section titles in Overview and Analytics (Summary, Your
+> notes, the Brief sections, the transcript toggle, Who spoke, Moments) sit
+> on a sunken band — `RECORD_SECTION_BAND` / `RecordSectionTitle`; Action
+> items untouched. 4/4 live; suite 3,897 tests / 356 files.
 
-**Last updated:** 2026-09-07 — through DEC-135 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-136 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

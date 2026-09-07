@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Icon from '../Icon'
 import { whisperEnabled, setWhisperEnabled } from '../../lib/whisperPref'
 import ModuleDashboard from '../ModuleDashboard'
@@ -718,6 +718,22 @@ export default function PlexiMeetView(): JSX.Element {
 //   inferred — lighter ink, no rule, no anchor. The machine's guess LOOKS
 //              like a guess (the same accent-vs-ink doctrine as capture).
 type RecordView = 'commitments' | 'brief' | 'analytics'
+
+// DEC-136 — a section title inside the Record wears a filled block: the
+// pane's own in-card fill, the sunken surface the segmented track and the
+// fields already sit on — the way the meeting header wears its card
+// (DEC-135). Operator: "Now do the same for the Overview and Analytics
+// tabs." Just the title field: the section's content stays on the pane
+// beneath it. The transcript toggle is the same band, as a button.
+const RECORD_SECTION_BAND = 'rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-1.5 mb-2'
+
+function RecordSectionTitle({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <div className={RECORD_SECTION_BAND} data-record-section-title>
+      <h2 className="text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)]">{children}</h2>
+    </div>
+  )
+}
 
 /** The state of a filed work item as the list exposes it. */
 function itemState(i: FbNode): string {
@@ -1544,7 +1560,7 @@ function MeetingDetail({
           {view === 'brief' && (
             <div className="px-4 py-4 space-y-4" data-testid="rendering-brief-outer">
               <section>
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Summary</div>
+                <RecordSectionTitle>Summary</RecordSectionTitle>
                 <textarea
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
@@ -1582,7 +1598,7 @@ function MeetingDetail({
                   {/* yours first — the reader's own words lead. */}
                   {meeting.record.spans.filter((s) => s.tier === 'yours').length > 0 && (
                     <div className="space-y-1" data-testid="brief-yours">
-                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Your notes</div>
+                      <RecordSectionTitle>Your notes</RecordSectionTitle>
                       {meeting.record.spans
                         .filter((s) => s.tier === 'yours')
                         .map((s, i) => (
@@ -1595,7 +1611,7 @@ function MeetingDetail({
                   {[...new Set(meeting.record.spans.filter((s) => s.tier !== 'yours').map((s) => s.section ?? 'Notes'))].map(
                     (section) => (
                       <section key={section} data-brief-section={section}>
-                        <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)] mb-2">{section}</h2>
+                        <RecordSectionTitle>{section}</RecordSectionTitle>
                         <div className="space-y-1.5">
                           {meeting.record!.spans
                             .filter((s) => s.tier !== 'yours' && (s.section ?? 'Notes') === section)
@@ -1639,7 +1655,8 @@ function MeetingDetail({
                 <button
                   onClick={() => setShowTranscript((v) => !v)}
                   aria-expanded={showTranscript || segments.length === 0}
-                  className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5 fb-press"
+                  className={`${RECORD_SECTION_BAND} w-full flex items-center gap-1.5 text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)] fb-press`}
+                  data-record-section-title
                 >
                   <Icon name="expand_more" size={14} className={`transition-transform ${showTranscript || segments.length === 0 ? 'rotate-180' : ''}`} />
                   Plain transcript text
@@ -1673,7 +1690,7 @@ function MeetingDetail({
                     <StatTile icon="notes" label="Lines" value={segments.length} tone="stone" />
                   </div>
                   <section data-testid="meet-who-spoke">
-                    <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)]">Who spoke</h2>
+                    <RecordSectionTitle>Who spoke</RecordSectionTitle>
                     <p className="text-[12px] text-[var(--ink-50)] mb-2.5">
                       Share of the transcript by speaker — a fact from the attributed lines, not a score. Click a name to read only them.
                     </p>
@@ -1705,7 +1722,7 @@ function MeetingDetail({
                   </section>
                   {markers.length > 0 && (
                     <section>
-                      <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)]">Moments</h2>
+                      <RecordSectionTitle>Moments</RecordSectionTitle>
                       <p className="text-[12px] text-[var(--ink-50)] mb-2">
                         Where the Record and your action items point into the call. Each one opens the line.
                       </p>

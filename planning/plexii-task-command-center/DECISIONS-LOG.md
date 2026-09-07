@@ -4454,3 +4454,34 @@ could show the old bare header. Screenshots `peek-notes.png` /
 here and is fixed in the verification memory: the finally-block restored
 only four view kinds and left the operator on Home when they had been on the
 Office view — restore the whole view object from now on.
+
+## DEC-136 — The Record's section titles in Overview and Analytics sit on a filled band
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Overview and Analytics
+tabs") — DEC-135's filled block behind a title field, carried into the
+Record's two renderings.
+
+**What changed.** Every section title in the Overview and Analytics
+renderings — Summary, Your notes, each Brief section (Background, Signals,
+Concerns, Where this leans, …), the Plain-transcript toggle, Who spoke,
+Moments — sits on one band: the pane's own in-card fill (the sunken
+surface the segmented track and the fields already sit on), field radius,
+spanning the rendering's content width, the title inside it at 13.5px
+semibold ink. Just the title field: the section's content stays on the pane
+beneath it. One constant (`RECORD_SECTION_BAND`) and one component
+(`RecordSectionTitle`) carry it; the transcript toggle is the same band as
+a button, chevron kept. The Summary and Your-notes eyebrows (10.5px
+uppercase grey) became titles in the band, so the Overview reads as one
+family of sections. The Action items tab was not asked for and is as it
+was (its In Attention / From the summary eyebrows stay). Every testid and
+anchor (`data-brief-section`, `meet-who-spoke`, `rendering-*`) is where it
+was, so Brief-chip jumps and Recall still land.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, the whole view object restored: Overview shows Summary, Background,
+Signals, Concerns, Where this leans and Plain transcript text on bands;
+every band's computed background equals the segmented track's sunken fill,
+spans the rendering's content box edge to edge, stands 32px, and its
+section content sits below it; Analytics shows Who spoke and Moments the
+same way; Action items has no band and keeps its eyebrows. Suite: 3,897
+tests / 356 files; typecheck clean.

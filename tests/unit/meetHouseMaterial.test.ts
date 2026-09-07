@@ -102,6 +102,31 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
     expect(view).not.toContain('lg:max-h-[calc(100vh-140px)]')
   })
 
+  it("the Record's section titles in Overview and Analytics sit on a filled block — the pane's own sunken fill — like the header on its card", () => {
+    // DEC-136 — operator: "Now do the same for the Overview and Analytics
+    // tabs." One band, one component, every section title in those two
+    // renderings; the section's content stays on the pane beneath it.
+    expect(view).toContain("const RECORD_SECTION_BAND = 'rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-1.5 mb-2'")
+    expect(view).toContain('<div className={RECORD_SECTION_BAND} data-record-section-title>')
+    expect(view).toContain('<h2 className="text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)]">{children}</h2>')
+    for (const t of [
+      '<RecordSectionTitle>Summary</RecordSectionTitle>',
+      '<RecordSectionTitle>Your notes</RecordSectionTitle>',
+      '<RecordSectionTitle>{section}</RecordSectionTitle>',
+      '<RecordSectionTitle>Who spoke</RecordSectionTitle>',
+      '<RecordSectionTitle>Moments</RecordSectionTitle>'
+    ])
+      expect(view).toContain(t)
+    // The transcript toggle is the same band, as a button.
+    expect(view).toContain('className={`${RECORD_SECTION_BAND} w-full flex items-center gap-1.5 text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)] fb-press`}')
+    // No bare heading is left in those two renderings…
+    expect(view).not.toContain('<h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)] mb-2">{section}</h2>')
+    expect(view).not.toContain('>Who spoke</h2>')
+    expect(view).not.toContain('tracking-wider text-[var(--ink-40)] mb-1.5">Summary</div>')
+    // …and the Action items tab's eyebrows are as they were (not asked for).
+    expect(view).toContain('tracking-wider text-[var(--ink-40)] mb-1.5">In Attention</div>')
+  })
+
   it('the kit grew what the page needed, without moving a pixel for Home', () => {
     const kit = readFileSync(join(ROOT, 'src/renderer/src/components/plexi/index.tsx'), 'utf-8')
     expect(kit).toContain('trailing?: ReactNode')
