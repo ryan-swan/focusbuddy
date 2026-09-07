@@ -64,11 +64,13 @@ test('NM-1 — meet-start-live opens new-meeting-dialog with mode toggle', async
   await expect(dialog.locator('[data-testid="new-meeting-mode-schedule"]')).toBeVisible()
   await expect(dialog.locator('[data-testid="new-meeting-start"]')).toBeVisible()
 
-  // Toggle to schedule mode — date/time fields appear.
+  // Toggle to schedule mode — the date / start chips appear (DEC-117: the
+  // composer's chips open native pickers; the inputs behind them are sr-only).
   await dialog.locator('[data-testid="new-meeting-mode-schedule"]').click()
   await expect(dialog.locator('[data-testid="new-meeting-when"]')).toBeVisible()
   await expect(dialog.locator('[data-testid="new-meeting-date"]')).toBeVisible()
   await expect(dialog.locator('[data-testid="new-meeting-time"]')).toBeVisible()
+  await expect(dialog.locator('[data-testid="new-meeting-date-input"]')).toHaveCount(1)
   await expect(dialog.locator('[data-testid="new-meeting-schedule"]')).toBeVisible()
 })
 
@@ -86,6 +88,8 @@ test('NM-2 — schedule mode creates a real TimeBlock meeting with roomId and in
 
   await dialog.locator('[data-testid="new-meeting-mode-schedule"]').click()
   await dialog.locator('[data-testid="new-meeting-title"]').fill('Roadmap sync')
+  // DEC-117: guests are chips on the composer's field; a typed, uncommitted
+  // address still counts at commit (finalGuests), so fill-then-schedule holds.
   await dialog.locator('[data-testid="new-meeting-invitees"]').fill('guest@example.com')
 
   await dialog.locator('[data-testid="new-meeting-schedule"]').click()
@@ -130,8 +134,10 @@ test('NM-3 — new-meeting-start (now mode) does not crash the app; no uncaught 
   const dialog = window.locator('[data-testid="new-meeting-dialog"]')
   await expect(dialog).toBeVisible({ timeout: 4_000 })
 
-  // "now" is the default mode.
-  await expect(dialog.locator('[data-testid="new-meeting-mode-now"]')).toHaveClass(/bg-rose-500/)
+  // "now" is the default mode. (DEC-117: the dialog is the Calendar
+  // composer's twin — the active tab is the slider thumb + accent text, not
+  // a rose fill; aria-selected is the truth.)
+  await expect(dialog.locator('[data-testid="new-meeting-mode-now"]')).toHaveAttribute('aria-selected', 'true')
 
   await dialog.locator('[data-testid="new-meeting-start"]').click()
 

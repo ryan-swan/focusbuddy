@@ -124,8 +124,19 @@
 > dashboard `embedded` as the empty state. Live-caught: duplicate
 > marker keys when two Brief entries cite one line. Suite: 3,695
 > tests / 339 files.
+> **DEC-117**: the New meeting dialog is the Calendar composer's twin
+> (operator: "nearly identical" to the booking page) — BookTimeDialog's
+> recipes verbatim (slider, 23px title, date/start → end chips, Repeat,
+> GUESTS chips, WHERE segmented, AGENDA, Attach, Esc/↵ footer; a twin
+> test holds the strings in both files) over Meet's behaviour: Start
+> now opens the room, rings picked online teammates, emails the rest;
+> Schedule writes a real meeting block (room id, guests, where, agenda,
+> attached desk, repeat) and emails invites. Attach is REAL here (the
+> composer's is still the DEC-019 stub); the invite email is
+> where-aware (`composeInviteBody`). 18/18 live; suite 3,737 tests /
+> 340 files.
 
-**Last updated:** 2026-09-06 — through DEC-116 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-117 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

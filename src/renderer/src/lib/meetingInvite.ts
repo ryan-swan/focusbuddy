@@ -16,6 +16,38 @@ export function meetingJoinLink(roomId: string): string {
   return `haptyx://meet?room=${encodeURIComponent(roomId)}`
 }
 
+/** The invite's text — a pure function so the suite can read every line.
+ *  Where-aware: an external link is THE join line (the Plexii room stays as
+ *  the PlexiDesk door), a place is stated first with the room as the remote
+ *  option, and a plain Plexii meeting reads exactly as it always has. */
+export function composeInviteBody(input: {
+  title: string
+  durationMin: number
+  host?: string
+  when: string
+  link: string
+  joinUrl?: string | null
+  location?: string | null
+}): string {
+  const lines = [
+    `${input.host ? `${input.host} has invited you to a meeting.` : 'You have been invited to a meeting.'}`,
+    '',
+    `What: ${input.title}`,
+    `When: ${input.when} (${input.durationMin} min)`
+  ]
+  if (input.location?.trim()) lines.push(`Where: ${input.location.trim()}`)
+  lines.push('')
+  if (input.joinUrl?.trim()) {
+    lines.push(`Join the meeting: ${input.joinUrl.trim()}`, `Or in PlexiDesk: ${input.link}`)
+  } else if (input.location?.trim()) {
+    lines.push(`Can't be there? Join remotely in PlexiDesk: ${input.link}`)
+  } else {
+    lines.push(`Join the meeting in PlexiDesk: ${input.link}`)
+  }
+  lines.push('', 'Open the PlexiDesk link on a device with PlexiDesk installed to join at the scheduled time.')
+  return lines.join('\n')
+}
+
 function fmtWhen(startMs: number): string {
   try {
     return new Date(startMs).toLocaleString(undefined, {
@@ -37,6 +69,11 @@ export async function sendMeetingInvites(input: {
   roomId: string
   invitees: string[]
   hostName?: string
+  /** DEC-063's other answers to "where": an external link takes precedence
+   *  over the built-in room; a place is stated, with the room kept as the
+   *  remote door. Absent → the Plexii room alone, as before. */
+  joinUrl?: string | null
+  location?: string | null
 }): Promise<MeetingInviteResult> {
   const to = input.invitees.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'))
   if (to.length === 0) return { sent: 0, failed: [], noAccount: false }
@@ -44,16 +81,7 @@ export async function sendMeetingInvites(input: {
   const link = meetingJoinLink(input.roomId)
   const when = fmtWhen(input.startMs)
   const host = input.hostName?.trim()
-  const body = [
-    `${host ? `${host} has invited you to a meeting.` : 'You have been invited to a meeting.'}`,
-    '',
-    `What: ${input.title}`,
-    `When: ${when} (${input.durationMin} min)`,
-    '',
-    `Join the meeting in PlexiDesk: ${link}`,
-    '',
-    'Open the link on a device with PlexiDesk installed to join at the scheduled time.'
-  ].join('\n')
+  const body = composeInviteBody({ ...input, host, when, link })
 
   const failed: string[] = []
   let sent = 0

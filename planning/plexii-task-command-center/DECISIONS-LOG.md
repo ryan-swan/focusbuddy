@@ -3516,3 +3516,67 @@ detail bar → title on the paper; the DEC-115 `data-testid` panel pins →
 `testId` on RailCards. Verified live: 42/42 CDP checks on a scratch
 meeting (created, removed, its items dismissed the house way), light +
 dark screenshots. Suite: 3,695 tests / 339 files; both typechecks clean.
+
+## DEC-117 — The New meeting dialog is the Calendar composer's twin
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("make the Start or schedule a meeting button and the window that pops up
+look more like the booking page from making a calendar invite… it could be
+nearly identical… just make sure the relevant functionality exists for
+actually scheduling and booking a meeting") · **Branch:** ryan-next ·
+**Scope rule:** BookTimeDialog's material verbatim, Meet's behaviour intact
+and completed where the twin exposed gaps.
+
+**The twin.** `NewMeetingDialog` is rebuilt on `BookTimeDialog`'s own
+strings: the header slider with the sliding thumb (Start now / Schedule —
+both meetings; there is no Focus here), the 23px title with placeholder
+resolution ("Meeting" → the guests' names → the attached desk) and the
+"Leave blank and it saves as" hint, the date / start → end chips (end
+cycles the duration, Shift+click shorter; Start now shows today · Now), the
+quiet Repeat chip, GUESTS as chips on a filled field with suggestions ranked
+by shared-meeting recency, WHERE as one segmented question (Plexii Meet /
+Paste link / In person / None — the chosen branch reveals and autofocuses),
+AGENDA (Shift+Enter newline), the Attach row, the Esc / ↵ footer, the
+keyboard map (Esc discards, Enter commits, Cmd+M flips the mode, guests and
+agenda guard Enter). `meetDialogTwin.test.ts` holds ~30 recipe strings in
+BOTH files at once, so the twin cannot drift quietly.
+
+**Meet's behaviour behind it.** Start now opens the live room, RINGS the
+online teammates you picked (green-dot chips; an "Online now" strip under
+the field, and they lead the suggestions) and EMAILS the join link to
+everyone else. Schedule writes a real meeting block — room id minted,
+guests, external link or place, agenda (which the Stage's PREP pane already
+reads), the attached desk as `taskId`, repeat — and emails the invites with
+the honest mailbox note; the dialog closes itself after the note, as
+before. A typed, uncommitted address still counts at commit. Entitlements
+(`meet`, `meet_schedule`) gate exactly as before.
+
+**Two places the twin is MORE than the composer, deliberately.** Attach is
+REAL: a picker over open desks from the store, and the block links to the
+one picked (the composer's Attach is still the DEC-019 stub). And the
+composer's known-false line ("Guests join in the browser — no account
+needed", the CR-08/09 stub copy) is NOT copied — the twin states what
+happens: the link is emailed; anyone with it joins in PlexiDesk. The invite
+email itself now knows where the meeting is (`composeInviteBody`, pure and
+unit-tested: an external link is THE join line with the Plexii room as the
+PlexiDesk door; a place is stated with the room as the remote option; a
+plain Plexii meeting reads exactly as it always has).
+
+**Verified live** over CDP, 18/18: both modes; guest chip commit / remove
+with the placeholder following the guest and the primary counting the
+invite; duration cycling; the Repeat menu; Paste link revealing its field
+focused; a real desk attached (Staged); then ONE scratch meeting scheduled
+with NO email guests (a connected mailbox would send real mail) and the
+block read back — room id, link, agenda, desk, 45 min, no repeat — and
+deleted. e2e NM-1/2/3 updated to the twin's ids and `aria-selected`.
+Suite: 3,737 tests / 340 files; both typechecks clean.
+
+**Probe lessons:** an OCCLUDED window never fires requestAnimationFrame, so
+a probe that awaits a frame hangs — bound the wait, and let the damage
+nudge do the capture (the DEC-112 lesson's other half); `[attr!=v]` is not
+CSS — `:not([attr=v])`. The Meet door lives in the Office sidebar.
+**Probe lesson, the costly one:** a probe must RESTORE the theme class it
+toggled, never strip it — the app applies `.dark` itself (`lib/theme.ts`,
+`applyTheme` → `classList.toggle('dark', …)`, following the system in
+`auto`), so a blind `classList.remove('dark')` on a system-dark evening
+left the operator's running app in light tokens until re-applied. Both
+probes now record `contains('dark')` before and `toggle('dark', had)` after.
