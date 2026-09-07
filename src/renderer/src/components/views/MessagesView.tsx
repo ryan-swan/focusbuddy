@@ -2,6 +2,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import MentionText from './chat/MentionText'
 import { useMessagingStore } from '../../stores/messaging'
 import { buildMessageUrl } from '../../lib/messageLink'
+import { liveItemForMessage } from '../../lib/messageAttention'
+import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
+import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import BellIcon from '../attention/BellIcon'
+import CompleteCircle from '../attention/CompleteCircle'
+import { useWorkItemStore } from '../../stores/workItems'
+import type { FbNode } from '@shared/types'
 import { presetForSelection } from '../../lib/attentionPresets'
 import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
@@ -86,21 +93,58 @@ function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Eleme
 
 // A short text label for a message whose body is empty but which carries an
 // attachment, used in the conversation-list preview.
-// DEC-124 — the bell on a message: capture it into Attention through the
-// house confirm stop (classify first — Respond by default — then file), the
-// same door every other bell in Plexii opens. The header's own bell (the
-// notification level) left the panel so the bell means one thing there.
-function CaptureBell({ id, onClick }: { id: string; onClick: () => void }): JSX.Element {
+// DEC-124/125 — the bell on a message, behaving exactly as it does on a desk
+// widget: empty, it opens the house capture prompt (classify first — Respond
+// by default — then file); once an open item points at the message it fills
+// solid and stays visible, with a check-off circle beside it that closes the
+// item with its queue's own verb through the one closing path (DEC-051), and
+// then empties again. A filled bell opens the queue. Read in line, that is
+// the list of messages still waiting on you.
+function MessageBell({
+  m,
+  marked,
+  onCapture
+}: {
+  m: ChatMessage
+  marked: FbNode | null
+  onCapture: () => void
+}): JSX.Element {
+  const closeWorkItem = useCloseWorkItem()
+  const goAttention = useViewStore((s) => s.goAttention)
+  const verb = marked ? (PRIMARY_ACTION[queueOf(marked)] ?? PRIMARY_ACTION.to_do) : null
   return (
-    <button
-      onClick={onClick}
-      aria-label="Add to Attention"
-      title="Add to Attention — you choose how it's filed (Respond by default)"
-      data-testid={`msg-attention-${id}`}
-      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[rgb(var(--accent))] self-center shrink-0"
+    <span
+      className={`self-center inline-flex items-center gap-0.5 shrink-0 ${
+        marked ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100'
+      }`}
+      data-testid={`msg-attention-wrap-${m.id}`}
     >
-      <Icon name="notifications" size={14} />
-    </button>
+      <button
+        onClick={marked ? goAttention : onCapture}
+        aria-pressed={!!marked}
+        aria-label={marked ? 'In Attention — open the queue' : 'Add to Attention'}
+        title={
+          marked
+            ? `In Attention: “${marked.title || 'this message'}” — click to open the queue`
+            : "Add to Attention — you choose how it's filed (Respond by default)"
+        }
+        data-testid={`msg-attention-${m.id}`}
+        className={`h-6 w-6 inline-flex items-center justify-center rounded-full hover:bg-[var(--surface-sunken)] transition-colors ${
+          marked ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-50)] hover:text-[rgb(var(--accent))]'
+        }`}
+      >
+        <BellIcon size={14} active={!!marked} />
+      </button>
+      {marked && verb && (
+        <CompleteCircle
+          size={14}
+          className="shrink-0"
+          onClick={() => void closeWorkItem(marked, verb.state)}
+          title={`${verb.label} — complete “${marked.title || 'this message'}”`}
+          dataTestId={`msg-attn-complete-${m.id}`}
+        />
+      )}
+    </span>
   )
 }
 
@@ -208,7 +252,8 @@ export function MessageRow({
   onTogglePin,
   pinned,
   translateLang,
-  onCapture
+  onCapture,
+  marked = null
 }: {
   m: ChatMessage
   mine: boolean
@@ -222,6 +267,8 @@ export function MessageRow({
   translateLang?: string
   /** DEC-124 — the bell: capture this message into Attention. */
   onCapture?: () => void
+  /** DEC-125 — the open item pointing at this message, if any: the bell fills. */
+  marked?: FbNode | null
 }): JSX.Element {
   const reactions = m.reactions ?? []
   const replyCount = m.replyCount ?? 0
@@ -256,7 +303,7 @@ export function MessageRow({
       className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'} rounded-lg transition-colors`}
     >
       {mine && !deleted && !editing && <ReactPicker onPick={onReact} />}
-      {mine && !deleted && !editing && onCapture && <CaptureBell id={m.id} onClick={onCapture} />}
+      {mine && !deleted && !editing && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}
       {/* Own-message menu (edit / delete) */}
       {mine && !deleted && (onEdit || onDelete) && !editing && (
         <div className="relative self-center">
@@ -344,38 +391,71 @@ export function MessageRow({
                   {translated && !showOriginal ? translated : <MentionBody m={m} />}
                 </div>
               )}
-              {translated && (
-                <button
-                  onClick={() => setShowOriginal((v) => !v)}
-                  className={`mt-0.5 text-[10px] ${mine ? 'text-white/70' : 'text-[var(--ink-50)]'} hover:underline`}
-                  data-testid={`msg-translate-toggle-${m.id}`}
-                >
-                  {showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original'}
-                </button>
-              )}
               <AttachmentView m={m} mine={mine} />
             </>
           )}
-          {!editing && (
-            <div className={`text-[9px] mt-0.5 flex items-center gap-1.5 ${deleted ? 'text-[var(--ink-40)]' : mine ? 'text-white/70' : 'text-stone-400'}`}>
-              <span>
-                {fmtTime(m.createdAt)}
-                {!deleted && m.editedAt ? ' · edited' : ''}
-              </span>
-              {!deleted && m.body && !translated && (
-                <button
-                  onClick={() => void onTranslate()}
-                  disabled={translating}
-                  className={`opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity inline-flex items-center gap-0.5 ${mine ? 'text-white/70' : 'text-stone-400'} hover:underline disabled:opacity-40`}
-                  title={`Translate to ${translateLang || 'English'}`}
-                  data-testid={`msg-translate-${m.id}`}
-                >
-                  <Icon name="translate" size={11} /> {translating ? '…' : 'Translate'}
-                </button>
-              )}
-            </div>
-          )}
         </div>
+        {/* DEC-125 — the meta row, OUTSIDE the bubble: the time and the doors
+            on the left, the thread on the right edge. */}
+        {!editing && (
+          <div
+            className="mt-0.5 w-full flex items-center gap-2 text-[10px] text-[var(--ink-40)]"
+            data-testid={`msg-meta-${m.id}`}
+          >
+            <span className="fb-tabular shrink-0">
+              {fmtTime(m.createdAt)}
+              {!deleted && m.editedAt ? ' · edited' : ''}
+            </span>
+            {!deleted && m.body && (
+              <button
+                onClick={() => void onTranslate()}
+                disabled={translating}
+                className={`inline-flex items-center gap-0.5 hover:text-[var(--ink-90)] transition-opacity ${
+                  translated ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
+                }`}
+                title={translated ? (showOriginal ? `Show the ${translateLang || 'translation'}` : 'Show the original') : `Translate to ${translateLang || 'English'}`}
+                data-testid={`msg-translate-${m.id}`}
+              >
+                <Icon name="translate" size={11} />{' '}
+                {translating ? '…' : translated ? (showOriginal ? `Show ${translateLang || 'translation'}` : 'Show original') : 'Translate'}
+              </button>
+            )}
+            {onTogglePin && !deleted && (
+              <button
+                onClick={onTogglePin}
+                data-testid={`msg-pin-${m.id}`}
+                title={pinned ? 'Unpin message' : 'Pin message'}
+                aria-label={pinned ? 'Unpin message' : 'Pin message'}
+                className={`inline-flex items-center hover:text-accent transition-opacity ${
+                  pinned ? 'text-accent' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
+                }`}
+              >
+                <Icon name="keep" size={12} filled={pinned} />
+              </button>
+            )}
+            {onOpenThread && (
+              <span className="ml-auto shrink-0">
+                {replyCount > 0 ? (
+                  <button
+                    onClick={onOpenThread}
+                    data-testid={`thread-open-${m.id}`}
+                    className="text-[11px] text-accent inline-flex items-center gap-1 hover:underline"
+                  >
+                    <Icon name="forum" size={12} /> {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={onOpenThread}
+                    data-testid={`thread-reply-${m.id}`}
+                    className="text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 hover:text-accent"
+                  >
+                    <Icon name="reply" size={12} /> Reply in thread
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+        )}
         {reactions.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1" data-testid={`reactions-${m.id}`}>
             {reactions.map((r) => {
@@ -411,41 +491,9 @@ export function MessageRow({
             />
           </div>
         )}
-        {onOpenThread &&
-          (replyCount > 0 ? (
-            <button
-              onClick={onOpenThread}
-              data-testid={`thread-open-${m.id}`}
-              className="mt-1 text-[11px] text-accent inline-flex items-center gap-1 hover:underline"
-            >
-              <Icon name="forum" size={12} /> {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
-            </button>
-          ) : (
-            <button
-              onClick={onOpenThread}
-              data-testid={`thread-reply-${m.id}`}
-              className="mt-1 text-[11px] text-[var(--ink-50)] inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-[var(--ink-90)]"
-            >
-              <Icon name="reply" size={12} /> Reply in thread
-            </button>
-          ))}
-        {onTogglePin && !deleted && (
-          <button
-            onClick={onTogglePin}
-            data-testid={`msg-pin-${m.id}`}
-            title={pinned ? 'Unpin message' : 'Pin message'}
-            className={`mt-1 ml-2 text-[11px] inline-flex items-center gap-1 transition-opacity hover:text-accent ${
-              pinned
-                ? 'text-accent'
-                : 'text-[var(--ink-50)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
-            }`}
-          >
-            <Icon name="keep" size={12} filled={pinned} /> {pinned ? 'Pinned' : 'Pin'}
-          </button>
-        )}
       </div>
       {!mine && <ReactPicker onPick={onReact} />}
-      {!mine && !deleted && onCapture && <CaptureBell id={m.id} onClick={onCapture} />}
+      {!mine && !deleted && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}
     </div>
   )
 }
@@ -679,6 +727,16 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
       })
     )
   }
+
+  // DEC-125 — which messages an open Attention item still points at: the bell
+  // fills for those and shows its check-off circle.
+  const workItems = useWorkItemStore((s) => s.items)
+  const workItemsLoaded = useWorkItemStore((s) => s.loaded)
+  const refreshWorkItems = useWorkItemStore((s) => s.refresh)
+  useEffect(() => {
+    if (!workItemsLoaded) void refreshWorkItems()
+  }, [workItemsLoaded, refreshWorkItems])
+  const markedFor = (id: string): FbNode | null => liveItemForMessage(workItems, id)
 
   // Who is currently typing in the open conversation (recent pings only).
   const typers = activeId
@@ -1166,6 +1224,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                   translateLang={translateLang}
                   onReact={(emoji) => void react(m.id, emoji)}
                   onCapture={() => captureMessage(m)}
+                  marked={markedFor(m.id)}
                   onOpenThread={() => void openThread(m.id)}
                   onEdit={(b) => void editMessage(m.id, b)}
                   onDelete={() => void deleteMessage(m.id)}
@@ -1202,6 +1261,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
           parent={messages.find((m) => m.id === activeThreadId) ?? null}
           myId={account.id}
           onCapture={captureMessage}
+          markedFor={markedFor}
         />
       )}
     </div>
@@ -1214,13 +1274,15 @@ function ThreadPanel({
   parentId,
   parent,
   myId,
-  onCapture
+  onCapture,
+  markedFor
 }: {
   parentId: string
   parent: ChatMessage | null
   myId: string
   /** DEC-124 — the bell on the parent and every reply. */
   onCapture?: (m: ChatMessage) => void
+  markedFor?: (id: string) => FbNode | null
 }): JSX.Element {
   const threadsByParent = useMessagingStore((s) => s.threadsByParent)
   const sendThreadReply = useMessagingStore((s) => s.sendThreadReply)
@@ -1319,6 +1381,7 @@ function ThreadPanel({
               translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
               onReact={(e) => void react(parent.id, e)}
               onCapture={onCapture ? () => onCapture(parent) : undefined}
+              marked={markedFor ? markedFor(parent.id) : null}
             />
             <div className="text-[10px] uppercase tracking-wide text-stone-400 border-b border-[var(--edge-soft)] pb-1">
               {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
@@ -1334,6 +1397,7 @@ function ThreadPanel({
             translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
             onReact={(e) => void react(m.id, e)}
             onCapture={onCapture ? () => onCapture(m) : undefined}
+            marked={markedFor ? markedFor(m.id) : null}
           />
         ))}
         <div ref={endRef} />

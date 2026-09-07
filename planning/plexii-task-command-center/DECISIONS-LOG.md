@@ -3859,3 +3859,60 @@ it like this… Respond", and cancelling through the console's own door
 leaves the work-item count unchanged. Suite: 3,803 tests / 346 files; both
 typechecks clean. (The figure was first written as 3,827 — a guess made
 before the run finished, corrected here; the log stays honest.)
+
+## DEC-125 — The message bell is the desk bell: it fills when marked, a circle checks it off; the meta row leaves the bubble
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("that bell icon functionality should work the
+same way it does as a widget, tool, or app on a desk. So when I click it,
+the bell fills with color, and the checkbox opens up next to it, so I can
+check it off. The bell then gets unhighlighted again, so I can see in line,
+in chat, what messages I need to attend to or respond to. Additionally, we
+need to clean up the buttons within the messages themselves… the timestamp
+for a message should not be in the colored message box. It should be just
+below but still on the left side. Next to it should also be the translate
+button… followed by the pin button, but just use the icon of the pin…
+and then the last thing along the right edge, just below the colored
+message box, should be the full reply thread").
+
+**What changed.**
+- **One bell.** The desk widget's bell (DEC-076/077) moved out of
+  `WidgetFrame` into a shared `attention/BellIcon.tsx`; the frame and the
+  message row both render it, so a bell means the same thing everywhere.
+  On a message: empty on hover → the house capture prompt (DEC-124,
+  unchanged — it still asks how to file). Once an open item points at the
+  message (`lib/messageAttention.ts` — `liveItemForMessage`: sourceType
+  `message`, not terminal, not detached, the moment link's messageId is
+  this message; newest wins), the bell fills solid and stays visible
+  without hover, with the shared `CompleteCircle` beside it. The circle
+  closes the item with its queue's own verb through the one closing path
+  (DEC-051 `useCloseWorkItem`, `PRIMARY_ACTION[queueOf(item)]` — Respond
+  closes as "Responded"), and the bell empties again. A filled bell opens
+  the Attention page. The list and the thread panel (parent + replies)
+  carry it; the marked state is derived from the work-item store, never
+  kept on the row.
+- **The meta row, outside the bubble.** Under the bubble, full width: the
+  time (· edited) at the left; Translate beside it (one door — Translate /
+  Show original / Show ‹language›; revealed on hover until a translation
+  exists); the pin as the icon alone (filled when pinned; the words ride
+  the aria-label); the reply thread at the right edge ("N replies" always,
+  "Reply in thread" on hover). The in-bubble time/translate block and the
+  in-bubble toggle are gone. The hover reveal on the doors is the DEC-124
+  convention carried over — a judgement call, one class each if the
+  operator wants them always visible.
+
+**Verified live** over CDP, panel restored as found, in two probes. Read-only
+(5/5): the message the operator's own open item points at (filed from my
+prompt in DEC-124, never touched) shows a filled bell visible without hover
+with the circle beside it; an unmarked message's bell is empty, hover-only,
+no circle; the meta row sits under the bubble at its left edge, no time
+inside the bubble, the pin an icon, the thread at the right edge. Then the
+check-off itself (7/7) on ONE scratch item created through the store,
+tagged `test-seed`, pointed at an unmarked message: the bell filled and the
+circle appeared; the circle's title read "Responded — complete …"; clicking
+it closed the item as `answered` in the store AND on disk, and the bell
+emptied; the operator's own item was still open after. The scratch row
+(`97f7bd0f…`, state `answered`) stays on disk as a closed test-seed —
+dismiss by tag with the others. Suite: 3,809 tests / 347 files; both
+typechecks clean. Pins rewritten with history, never deleted: DEC-076/077's
+frame-bell pins now point at the shared definition; DEC-124's `CaptureBell`
+pins → `MessageBell`; e2e P2100-6's translate toggle → the meta-row door.

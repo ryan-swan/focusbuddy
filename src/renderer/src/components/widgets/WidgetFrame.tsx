@@ -40,8 +40,8 @@ import { workItemsEnabled } from '../../lib/workItemsCapability'
 import { presetForWidget, browserMarkUrl } from '../../lib/attentionPresets'
 import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import BellIcon from '../attention/BellIcon'
 import CompleteCircle from '../attention/CompleteCircle'
-import { PLEXII_ICONS } from '../icons/plexiiIcons'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -1258,31 +1258,6 @@ export default function WidgetFrame({
         />
       )}
     </Rnd>
-  )
-}
-
-// ── The bell (DEC-076/077) ──────────────────────────────────────────────────
-//
-// The brand 'notifications' icon is a line SVG on currentColor; Icon's
-// `filled` prop deliberately does not apply to brand icons, which is why the
-// active bell only changed colour. Active state here fills the SAME brand
-// path solid — one path source (PLEXII_ICONS), two renderings.
-
-function BellIcon({ size, active }: { size: number; active: boolean }): JSX.Element {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={active ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ flexShrink: 0 }}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: PLEXII_ICONS['notifications'] }}
-    />
   )
 }
 

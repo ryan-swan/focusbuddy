@@ -21,10 +21,11 @@ describe('DEC-124 — the message bell', () => {
   })
 
   it('every message, mine or theirs, wears a bell that opens the house capture prompt', () => {
-    expect(messages).toContain('function CaptureBell({ id, onClick }: { id: string; onClick: () => void }): JSX.Element {')
-    expect(messages).toContain('data-testid={`msg-attention-${id}`}')
-    expect(messages).toContain('{mine && !deleted && !editing && onCapture && <CaptureBell id={m.id} onClick={onCapture} />}')
-    expect(messages).toContain('{!mine && !deleted && onCapture && <CaptureBell id={m.id} onClick={onCapture} />}')
+    // DEC-125 renamed the bell (CaptureBell → MessageBell) when it learned the widget's marked state
+    expect(messages).toContain('function MessageBell({')
+    expect(messages).toContain('data-testid={`msg-attention-${m.id}`}')
+    expect(messages).toContain('{mine && !deleted && !editing && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}')
+    expect(messages).toContain('{!mine && !deleted && onCapture && <MessageBell m={m} marked={marked} onCapture={onCapture} />}')
     expect(messages).toContain('onCapture={() => captureMessage(m)}')
   })
 

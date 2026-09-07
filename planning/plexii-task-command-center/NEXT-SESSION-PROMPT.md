@@ -180,8 +180,15 @@
 > capture prompt (Respond by default, the card asks), filing an item that
 > points back at the message (`plexii://message/<conv>?m=<id>`, routed
 > from the Attention page). 6/6 live; suite 3,803 tests / 346 files.
+> **DEC-125**: the message bell IS the desk bell — one shared
+> `attention/BellIcon.tsx`; a marked message's bell fills and stays
+> visible with the shared completion circle beside it (closes through
+> DEC-051's one path with the queue's verb, then empties); the meta row
+> left the bubble (time · Translate · pin icon on the left, the thread at
+> the right edge). 5/5 read-only + 7/7 check-off on one `test-seed`
+> scratch (left closed on disk); suite 3,809 tests / 347 files.
 
-**Last updated:** 2026-09-06 — through DEC-124 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-125 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
