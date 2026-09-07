@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { whisperEnabled, setWhisperEnabled } from '../../lib/whisperPref'
 import ModuleDashboard from '../ModuleDashboard'
@@ -40,6 +40,7 @@ import { useWorkItemStore } from '../../stores/workItems'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { CLASS_LABEL, isTerminalState } from '../../lib/attentionQueues'
 import { RailCard, StatTile, StatusPill } from '../plexi'
+import RecordSectionTitle, { RECORD_SECTION_BAND } from '../RecordSectionTitle'
 import {
   speakerOrder,
   speakerColor,
@@ -719,21 +720,8 @@ export default function PlexiMeetView(): JSX.Element {
 //              like a guess (the same accent-vs-ink doctrine as capture).
 type RecordView = 'commitments' | 'brief' | 'analytics'
 
-// DEC-136 — a section title inside the Record wears a filled block: the
-// pane's own in-card fill, the sunken surface the segmented track and the
-// fields already sit on — the way the meeting header wears its card
-// (DEC-135). Operator: "Now do the same for the Overview and Analytics
-// tabs." Just the title field: the section's content stays on the pane
-// beneath it. The transcript toggle is the same band, as a button.
-const RECORD_SECTION_BAND = 'rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-1.5 mb-2'
-
-function RecordSectionTitle({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <div className={RECORD_SECTION_BAND} data-record-section-title>
-      <h2 className="text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)]">{children}</h2>
-    </div>
-  )
-}
+// DEC-136/137 — every section title inside the Record (all three renderings)
+// sits on RecordSectionTitle's band: see components/RecordSectionTitle.tsx.
 
 /** The state of a filed work item as the list exposes it. */
 function itemState(i: FbNode): string {
@@ -1418,6 +1406,7 @@ function MeetingDetail({
                   items={carried}
                   lastTitle={lastMeeting?.title}
                   lastAt={lastMeeting?.createdAt}
+                  band
                 />
               )}
               {segments.length > 0 && foundCommitments === null && (
@@ -1452,7 +1441,7 @@ function MeetingDetail({
 
               {filedItems.length > 0 && (
                 <div data-testid="meet-filed-items">
-                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">In Attention</div>
+                  <RecordSectionTitle>In Attention</RecordSectionTitle>
                   <div className="divide-y divide-[var(--edge-soft)]">
                     {filedItems.map((i) => {
                       const done = isTerminalState(itemState(i))
@@ -1520,7 +1509,7 @@ function MeetingDetail({
               ) : (
                 unfiledLegacy.length > 0 && (
                   <div data-testid="meet-legacy-items">
-                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">From the summary</div>
+                    <RecordSectionTitle>From the summary</RecordSectionTitle>
                     <div className="divide-y divide-[var(--edge-soft)]">
                       {unfiledLegacy.map(({ text: item, i }) => (
                         <div key={i} className="flex items-start gap-3 py-2.5">

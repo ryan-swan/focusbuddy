@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon'
+import RecordSectionTitle from './RecordSectionTitle'
 import { CLASS_CHOICES, CLASS_LABEL } from '../lib/attentionQueues'
 import { fmtAnchor, type ValidatedCommitment } from '../lib/commitments'
 import { useWorkItemStore } from '../stores/workItems'
@@ -29,11 +30,16 @@ import { buildMeetingMomentUrl } from '../lib/meetingLink'
 export function CarriedFromLastTime({
   items,
   lastTitle,
-  lastAt
+  lastAt,
+  band = false
 }: {
   items: CarriedItem[]
   lastTitle?: string
   lastAt?: number
+  /** DEC-137 — in the Record's Action items tab the title sits on the
+   *  section band every other title there wears; the wrap-up keeps its
+   *  eyebrow. */
+  band?: boolean
 }): JSX.Element | null {
   const setItemState = useWorkItemStore((s) => s.setState)
   const [doneIds, setDoneIds] = useState<Record<string, boolean>>({})
@@ -43,10 +49,17 @@ export function CarriedFromLastTime({
     : null
   return (
     <div className="mb-3" data-testid="carried-from-last-time">
-      <div className="text-[10.5px] font-semibold tracking-wider text-[var(--ink-40)] mb-1.5">
-        CARRIED FROM LAST TIME
-        {when && <span className="ml-1.5 font-normal normal-case tracking-normal">· {lastTitle || 'previous meeting'}, {when}</span>}
-      </div>
+      {band ? (
+        <RecordSectionTitle>
+          Carried from last time
+          {when && <span className="ml-1.5 font-normal text-[var(--ink-50)]">· {lastTitle || 'previous meeting'}, {when}</span>}
+        </RecordSectionTitle>
+      ) : (
+        <div className="text-[10.5px] font-semibold tracking-wider text-[var(--ink-40)] mb-1.5">
+          CARRIED FROM LAST TIME
+          {when && <span className="ml-1.5 font-normal normal-case tracking-normal">· {lastTitle || 'previous meeting'}, {when}</span>}
+        </div>
+      )}
       {items.map((it) => (
         <div
           key={it.id}

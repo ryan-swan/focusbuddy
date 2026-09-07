@@ -102,13 +102,18 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
     expect(view).not.toContain('lg:max-h-[calc(100vh-140px)]')
   })
 
-  it("the Record's section titles in Overview and Analytics sit on a filled block — the pane's own sunken fill — like the header on its card", () => {
+  it("the Record's section titles sit on a filled block — the pane's own sunken fill — like the header on its card", () => {
     // DEC-136 — operator: "Now do the same for the Overview and Analytics
     // tabs." One band, one component, every section title in those two
     // renderings; the section's content stays on the pane beneath it.
-    expect(view).toContain("const RECORD_SECTION_BAND = 'rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-1.5 mb-2'")
-    expect(view).toContain('<div className={RECORD_SECTION_BAND} data-record-section-title>')
-    expect(view).toContain('<h2 className="text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)]">{children}</h2>')
+    // DEC-137 ("…for the Action items tab") moved the band into its own
+    // module so the tab's "Carried from last time" (MeetingCommitmentsCard)
+    // could wear it too; the view imports it.
+    const band = readFileSync(join(ROOT, 'src/renderer/src/components/RecordSectionTitle.tsx'), 'utf-8')
+    expect(band).toContain("export const RECORD_SECTION_BAND = 'rounded-[var(--radius-field)] bg-[var(--surface-sunken)] px-3 py-1.5 mb-2'")
+    expect(band).toContain('<div className={RECORD_SECTION_BAND} data-record-section-title>')
+    expect(band).toContain('<h2 className="text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)]">{children}</h2>')
+    expect(view).toContain("import RecordSectionTitle, { RECORD_SECTION_BAND } from '../RecordSectionTitle'")
     for (const t of [
       '<RecordSectionTitle>Summary</RecordSectionTitle>',
       '<RecordSectionTitle>Your notes</RecordSectionTitle>',
@@ -123,8 +128,27 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
     expect(view).not.toContain('<h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)] mb-2">{section}</h2>')
     expect(view).not.toContain('>Who spoke</h2>')
     expect(view).not.toContain('tracking-wider text-[var(--ink-40)] mb-1.5">Summary</div>')
-    // …and the Action items tab's eyebrows are as they were (not asked for).
-    expect(view).toContain('tracking-wider text-[var(--ink-40)] mb-1.5">In Attention</div>')
+  })
+
+  it("the Action items tab's section titles wear the same band — In Attention, From the summary, Carried from last time", () => {
+    // History: DEC-136 left this tab's eyebrows as they were (not asked
+    // for). DEC-137 — operator: "Now do the same for the Action items tab."
+    for (const t of ['<RecordSectionTitle>In Attention</RecordSectionTitle>', '<RecordSectionTitle>From the summary</RecordSectionTitle>'])
+      expect(view).toContain(t)
+    expect(view).not.toContain('tracking-wider text-[var(--ink-40)] mb-1.5">In Attention</div>')
+    expect(view).not.toContain('tracking-wider text-[var(--ink-40)] mb-1.5">From the summary</div>')
+    // "Carried from last time" lives in MeetingCommitmentsCard and is shared
+    // with the wrap-up: the Record asks for the band, the wrap-up keeps its
+    // eyebrow.
+    expect(view).toContain('lastAt={lastMeeting?.createdAt}\n                  band\n')
+    const card = readFileSync(join(ROOT, 'src/renderer/src/components/MeetingCommitmentsCard.tsx'), 'utf-8')
+    expect(card).toContain("import RecordSectionTitle from './RecordSectionTitle'")
+    expect(card).toContain('band?: boolean')
+    expect(card).toContain('<RecordSectionTitle>\n          Carried from last time')
+    expect(card).toContain('CARRIED FROM LAST TIME')
+    // The confirm-stop card ("Plexii found N things…") is its own tinted
+    // block already and is untouched.
+    expect(card).toContain('rounded-[var(--radius-card)] border border-accent/30 bg-accent/[0.05] p-3" data-testid="meeting-commitments"')
   })
 
   it('the kit grew what the page needed, without moving a pixel for Home', () => {

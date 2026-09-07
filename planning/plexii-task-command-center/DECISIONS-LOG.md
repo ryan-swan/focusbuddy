@@ -4485,3 +4485,27 @@ spans the rendering's content box edge to edge, stands 32px, and its
 section content sits below it; Analytics shows Who spoke and Moments the
 same way; Action items has no band and keeps its eyebrows. Suite: 3,897
 tests / 356 files; typecheck clean.
+
+## DEC-137 — The Action items tab's section titles wear the same band
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Action items tab") —
+DEC-136's band, carried into the Record's third rendering, so all three
+read as one family.
+
+**What changed.** "In Attention" and "From the summary" sit on the band
+(`RecordSectionTitle`), and so does "Carried from last time" — which lives
+in `MeetingCommitmentsCard` and is shared with the wrap-up, so it takes a
+`band` prop: the Record asks for the band, the wrap-up keeps its eyebrow.
+To share the band across the two files it moved into its own module,
+`components/RecordSectionTitle.tsx` (the constant and the component, one
+source of truth; the DEC-136 pins follow it). The confirm-stop card
+("Plexii found N things in this meeting") is its own accent-tinted block
+already and is untouched; every testid and anchor is where it was.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, the whole view object restored (the operator was on Attention and was
+returned there): the Action items rendering shows "In Attention" on a band
+filled with the segmented track's own colour, spanning the rendering's
+content box, its list below it, and no eyebrow remains; Overview and
+Analytics unchanged from DEC-136 (six and two bands). Suite: 3,898 tests /
+356 files; typecheck clean.
