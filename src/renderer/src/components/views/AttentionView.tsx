@@ -4,6 +4,8 @@ import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
+import { parseMessageUrl } from '../../lib/messageLink'
+import { useMessagingStore } from '../../stores/messaging'
 import { useCaptureConsole } from '../../stores/captureConsole'
 import { promptText } from '../plexi/PromptDialog'
 import Icon from '../Icon'
@@ -133,6 +135,7 @@ export default function AttentionView(): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const setActive = useNodeStore((s) => s.setActive)
   const goTask = useViewStore((s) => s.goTask)
+  const goMessages = useViewStore((s) => s.goMessages)
   const goMeetings = useViewStore((s) => s.goMeetings)
   const goProject = useViewStore((s) => s.goProject)
   const goRoom = useViewStore((s) => s.goRoom)
@@ -637,6 +640,15 @@ export default function AttentionView(): JSX.Element {
         ),
       250
     )
+  }
+
+  // DEC-124 — a message moment: open the conversation on the Chat page and
+  // land on the message once it is on screen.
+  function openConversationAt(conversationId: string, messageId: string | null): void {
+    void useMessagingStore.getState().openConversation(conversationId)
+    goMessages()
+    if (messageId)
+      setTimeout(() => document.getElementById(`msg-${messageId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 400)
   }
 
   function openSource(i: FbNode): void {
@@ -1175,18 +1187,22 @@ export default function AttentionView(): JSX.Element {
                     // (the Slack thread, the ticket), frozen at mark time —
                     // the widget may have browsed away; this has not.
                     const moment = parseMeetingMomentUrl(i.sourceUrl)
+                    const msg = parseMessageUrl(i.sourceUrl)
                     if (moment) openMeeting(moment.meetingId, moment.segmentId)
+                    else if (msg) openConversationAt(msg.conversationId, msg.messageId)
                     else void window.api.files.openExternal(i.sourceUrl!)
                   }}
                   data-row-action
                   title={
                     parseMeetingMomentUrl(i.sourceUrl)
                       ? 'Jump to the spoken moment in the meeting'
-                      : `Open the source page — ${i.sourceUrl}`
+                      : parseMessageUrl(i.sourceUrl)
+                        ? 'Open the conversation at this message'
+                        : `Open the source page — ${i.sourceUrl}`
                   }
                   className="icon-btn !h-6 !w-6"
                 >
-                  <Icon name={parseMeetingMomentUrl(i.sourceUrl) ? 'my_location' : 'link'} size={14} />
+                  <Icon name={parseMeetingMomentUrl(i.sourceUrl) ? 'my_location' : parseMessageUrl(i.sourceUrl) ? 'forum' : 'link'} size={14} />
                 </button>
               )}
               {hasDesk && i.sourceRef && i.sourceType !== 'note' && (

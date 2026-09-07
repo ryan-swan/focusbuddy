@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import MentionText from './chat/MentionText'
 import { useMessagingStore } from '../../stores/messaging'
+import { buildMessageUrl } from '../../lib/messageLink'
+import { presetForSelection } from '../../lib/attentionPresets'
 import { useAccountStore } from '../../stores/account'
 import { useCallStore } from '../../stores/call'
 import { useSignInPrompt } from '../../stores/signInPrompt'
@@ -84,6 +86,24 @@ function ReactPicker({ onPick }: { onPick: (emoji: string) => void }): JSX.Eleme
 
 // A short text label for a message whose body is empty but which carries an
 // attachment, used in the conversation-list preview.
+// DEC-124 — the bell on a message: capture it into Attention through the
+// house confirm stop (classify first — Respond by default — then file), the
+// same door every other bell in Plexii opens. The header's own bell (the
+// notification level) left the panel so the bell means one thing there.
+function CaptureBell({ id, onClick }: { id: string; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Add to Attention"
+      title="Add to Attention — you choose how it's filed (Respond by default)"
+      data-testid={`msg-attention-${id}`}
+      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--ink-50)] hover:bg-[var(--surface-sunken)] hover:text-[rgb(var(--accent))] self-center shrink-0"
+    >
+      <Icon name="notifications" size={14} />
+    </button>
+  )
+}
+
 function attachmentPreviewLabel(att: ChatMessage['attachment']): string {
   if (!att) return ''
   if (att.kind === 'share') return att.label
@@ -187,7 +207,8 @@ export function MessageRow({
   onDelete,
   onTogglePin,
   pinned,
-  translateLang
+  translateLang,
+  onCapture
 }: {
   m: ChatMessage
   mine: boolean
@@ -199,6 +220,8 @@ export function MessageRow({
   onTogglePin?: () => void
   pinned?: boolean
   translateLang?: string
+  /** DEC-124 — the bell: capture this message into Attention. */
+  onCapture?: () => void
 }): JSX.Element {
   const reactions = m.reactions ?? []
   const replyCount = m.replyCount ?? 0
@@ -233,6 +256,7 @@ export function MessageRow({
       className={`group flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'} rounded-lg transition-colors`}
     >
       {mine && !deleted && !editing && <ReactPicker onPick={onReact} />}
+      {mine && !deleted && !editing && onCapture && <CaptureBell id={m.id} onClick={onCapture} />}
       {/* Own-message menu (edit / delete) */}
       {mine && !deleted && (onEdit || onDelete) && !editing && (
         <div className="relative self-center">
@@ -421,6 +445,7 @@ export function MessageRow({
         )}
       </div>
       {!mine && <ReactPicker onPick={onReact} />}
+      {!mine && !deleted && onCapture && <CaptureBell id={m.id} onClick={onCapture} />}
     </div>
   )
 }
@@ -628,6 +653,32 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
     activeConv?.kind === 'dm' && dmOther
       ? personDisplayName(dmOther, dmOther.handle ?? 'Conversation')
       : activeConv?.title ?? 'Conversation'
+
+  // DEC-124 — a message's bell: the house capture prompt, prefilled with the
+  // message and pointed back at it (sourceType 'message', the conversation as
+  // sourceRef, the moment URL as sourceUrl), opening on Respond — the card
+  // still asks how to file it. Nothing files until the person says so.
+  function captureMessage(m: ChatMessage): void {
+    const member = activeConv?.members.find((mm) => mm.accountId === m.fromAccount)
+    const who =
+      m.fromAccount === account?.id ? 'You' : member ? personDisplayName(member, member.handle ?? 'teammate') : 'Someone'
+    const text = (m.body || attachmentPreviewLabel(m.attachment)).trim()
+    const p = presetForSelection('chat', text)
+    window.dispatchEvent(
+      new CustomEvent('fb:command-new-work-item', {
+        detail: {
+          captureText: p.text || `Reply to ${who}`,
+          notes: `${who} in ${headerTitle}:\n${text}`,
+          source: {
+            sourceType: 'message',
+            sourceRef: m.conversationId,
+            intentClass: 'to_respond',
+            sourceUrl: buildMessageUrl(m.conversationId, m.id)
+          }
+        }
+      })
+    )
+  }
 
   // Who is currently typing in the open conversation (recent pings only).
   const typers = activeId
@@ -1040,7 +1091,9 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     )}
                   </div>
                 )}
-                {activeId && (
+                {/* The notification-level bell stays on the Office page; in the
+                    panel the bell means Attention (DEC-124). */}
+                {activeId && !compact && (
                   <button
                     onClick={() => {
                       const cur = activeConv?.notifLevel ?? 'all'
@@ -1112,6 +1165,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                   myId={account.id}
                   translateLang={translateLang}
                   onReact={(emoji) => void react(m.id, emoji)}
+                  onCapture={() => captureMessage(m)}
                   onOpenThread={() => void openThread(m.id)}
                   onEdit={(b) => void editMessage(m.id, b)}
                   onDelete={() => void deleteMessage(m.id)}
@@ -1147,6 +1201,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
           parentId={activeThreadId}
           parent={messages.find((m) => m.id === activeThreadId) ?? null}
           myId={account.id}
+          onCapture={captureMessage}
         />
       )}
     </div>
@@ -1158,11 +1213,14 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
 function ThreadPanel({
   parentId,
   parent,
-  myId
+  myId,
+  onCapture
 }: {
   parentId: string
   parent: ChatMessage | null
   myId: string
+  /** DEC-124 — the bell on the parent and every reply. */
+  onCapture?: (m: ChatMessage) => void
 }): JSX.Element {
   const threadsByParent = useMessagingStore((s) => s.threadsByParent)
   const sendThreadReply = useMessagingStore((s) => s.sendThreadReply)
@@ -1260,6 +1318,7 @@ function ThreadPanel({
               myId={myId}
               translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
               onReact={(e) => void react(parent.id, e)}
+              onCapture={onCapture ? () => onCapture(parent) : undefined}
             />
             <div className="text-[10px] uppercase tracking-wide text-stone-400 border-b border-[var(--edge-soft)] pb-1">
               {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
@@ -1274,6 +1333,7 @@ function ThreadPanel({
             myId={myId}
             translateLang={localStorage.getItem('plexi-translate-lang') || 'English'}
             onReact={(e) => void react(m.id, e)}
+            onCapture={onCapture ? () => onCapture(m) : undefined}
           />
         ))}
         <div ref={endRef} />

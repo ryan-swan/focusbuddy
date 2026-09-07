@@ -175,8 +175,13 @@
 > (a DM meets the person now; a space opens PlexiMeet), no translate menu,
 > the doors on their own left-aligned wrapping row so nothing is cut off;
 > the Office page untouched. 5/5 live; suite 3,795 tests / 344 files.
+> **DEC-124**: the bell means Attention — PlexiiMessage's notification
+> bell left the panel; every message wears a bell that opens the house
+> capture prompt (Respond by default, the card asks), filing an item that
+> points back at the message (`plexii://message/<conv>?m=<id>`, routed
+> from the Attention page). 6/6 live; suite 3,827 tests / 346 files.
 
-**Last updated:** 2026-09-06 — through DEC-123 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-124 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

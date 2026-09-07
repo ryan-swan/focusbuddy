@@ -3825,3 +3825,36 @@ Wilton now — a video call"; no translate menu; the doors start at the
 header's left edge, all on one row, right edge 1256 px inside a pane edge
 of 1409 px, no horizontal overflow. Suite: 3,795 tests / 344 files; both
 typechecks clean.
+
+## DEC-124 — The bell means Attention: PlexiiMessage's header bell retired, a bell on every message
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("there is currently a bell icon which stands
+for notifications, which is misleading because we're using the bell icon
+for the attention AI layer now, so just remove it altogether. Then on any
+given message, there needs to be the ability to click a bell icon and have
+it route to the attention cue, most likely to the respond tag. But like
+all the attention layer stuff, it should prompt you and ask you how you
+want to classify it").
+
+**What changed.** In the panel, PlexiiMessage's notification-level bell is
+gone (it stays on the Office Chat page). Every message — mine or theirs,
+in the list and in a thread — wears a bell on hover that opens the HOUSE
+capture prompt (`fb:command-new-work-item` → the capture console → the
+Attention confirm card): the message prefilled as the capture, the sender
+and conversation as its notes, opening on **Respond** (the preset table's
+class for chat), and the card asks how to file it — category, urgency,
+when, people, desk — exactly as every other bell in Plexii. Nothing files
+from the bell itself. The item it files points back at the message:
+`sourceType 'message'`, the conversation as `sourceRef`, and a new internal
+moment link `plexii://message/<conversationId>?m=<messageId>`
+(`lib/messageLink.ts`, the meeting-moment pattern); the Attention page's
+source door opens the conversation on the Chat page and lands on the
+message, and the source reads "From a message — open it to reply in the
+conversation".
+
+**Verified live** over CDP, 6/6, panel restored as found: the header
+bell gone, a bell on all 12 messages of a DM, the bell's title says what it
+does, the prompt opens prefilled with the message's words and "Plexii read
+it like this… Respond", and cancelling through the console's own door
+leaves the work-item count unchanged. Suite: 3,827 tests / 346 files; both
+typechecks clean.
