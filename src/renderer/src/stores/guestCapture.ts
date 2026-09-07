@@ -38,6 +38,9 @@ interface GuestCaptureState {
   status: 'idle' | 'recording'
   mode: GuestCaptureMode
   title: string
+  /** The recorder's own words typed before pressing Start — carried to the
+   *  wrap-up as its notes, where they become `yours` spans (never rewritten). */
+  notes: string
   startedAt: number | null
   moments: number[]
   start: (opts: {
@@ -45,6 +48,10 @@ interface GuestCaptureState {
     blockId?: string
     seriesId?: string | null
     agenda?: string | null
+    notes?: string | null
+    /** "In the room": the honest floor chosen on purpose — the loopback
+     *  picker is never raised; Plexii can hear you, not them. */
+    micOnly?: boolean
   }) => Promise<boolean>
   markMoment: () => void
   stop: () => void
@@ -65,10 +72,11 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
   status: 'idle',
   mode: 'mic-only',
   title: '',
+  notes: '',
   startedAt: null,
   moments: [],
 
-  start: async ({ title, blockId, seriesId, agenda }) => {
+  start: async ({ title, blockId, seriesId, agenda, notes, micOnly }) => {
     if (get().status === 'recording') return false
     // The mic is the floor: no mic, no capture at all.
     try {
@@ -79,19 +87,23 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
     // System audio, best-effort: arm the one-shot picker-free grant, take the
     // loopback audio, and throw the vehicle video track away immediately —
     // nothing visual is ever recorded. An empty audio track list is the
-    // honest "this platform cannot hear them" answer, not an error.
+    // honest "this platform cannot hear them" answer, not an error. A
+    // meeting "in the room" (micOnly) never asks — there is nothing on this
+    // machine to hear, so the floor is the choice, not a fallback.
     let mode: GuestCaptureMode = 'mic-only'
-    try {
-      await window.api.guestCapture.arm()
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-      display.getVideoTracks().forEach((t) => t.stop())
-      const audioTracks = display.getAudioTracks()
-      if (audioTracks.length > 0) {
-        systemStream = new MediaStream(audioTracks)
-        mode = 'both'
+    if (!micOnly) {
+      try {
+        await window.api.guestCapture.arm()
+        const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+        display.getVideoTracks().forEach((t) => t.stop())
+        const audioTracks = display.getAudioTracks()
+        if (audioTracks.length > 0) {
+          systemStream = new MediaStream(audioTracks)
+          mode = 'both'
+        }
+      } catch {
+        systemStream = null
       }
-    } catch {
-      systemStream = null
     }
     recorder = new MeetingTrackRecorder()
     recorder.tap('me', micStream)
@@ -99,7 +111,7 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
     // Series identity rides the origin, exactly like a native calendar join.
     if (blockId || seriesId) markCalendarOrigin({ title, blockId, seriesId, agenda })
     else clearMeetingOrigin()
-    set({ status: 'recording', mode, title, startedAt: Date.now(), moments: [] })
+    set({ status: 'recording', mode, title, notes: notes?.trim() ?? '', startedAt: Date.now(), moments: [] })
     return true
   },
 
@@ -112,8 +124,8 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
   stop: () => {
     const rec = recorder
     recorder = null
-    const { title, moments } = get()
-    set({ status: 'idle', title: '', startedAt: null, moments: [] })
+    const { title, moments, notes } = get()
+    set({ status: 'idle', title: '', notes: '', startedAt: null, moments: [] })
     if (!rec) {
       teardownStreams()
       return
@@ -130,7 +142,9 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
           speakers: { me: 'You', [GUESTS_ID]: 'Them' },
           // CR-11 — meeting-grade audio: on-device only, no cloud fallback.
           forceLocalTranscription: true,
-          notes: '',
+          // The recorder's own pre-meeting words → `yours` spans, as a live
+          // meeting's notes would be. Guests never get a voice in them.
+          notes,
           moments
         })
       }

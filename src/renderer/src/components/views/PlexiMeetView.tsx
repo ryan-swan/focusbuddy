@@ -5,6 +5,7 @@ import ModuleDashboard from '../ModuleDashboard'
 import { bucketByWeek, periodDelta } from '../../lib/dashboardMetrics'
 import { useMeetingsStore } from '../../stores/meetings'
 import NewMeetingDialog from '../NewMeetingDialog'
+import RecordDialog, { type RecordNotesDraft } from '../RecordDialog'
 import { usePresenceStore } from '../../stores/presence'
 import { useAccountStore } from '../../stores/account'
 import { useQuickCreate } from '../../stores/quickCreate'
@@ -15,7 +16,7 @@ import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { CarriedItem, Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
 import { useGuestCaptureStore } from '../../stores/guestCapture'
 import { fmtOffset } from '../../lib/transcriptMerge'
-import { validateRecordSpans } from '../../lib/recordSpans'
+import { buildYoursSpans, validateRecordSpans } from '../../lib/recordSpans'
 import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
 import MeetingCommitmentsCard, { CarriedFromLastTime } from '../MeetingCommitmentsCard'
 import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
@@ -84,6 +85,11 @@ export default function PlexiMeetView(): JSX.Element {
     void window.api.meetings.getAudioRetention().then(setRetention).catch(() => {})
   }, [])
   const recRef = useRef<MediaRecorder | null>(null)
+  // DEC-118 — both record doors open the composer-twin dialog first; the
+  // draft it hands over (title, notes, desk) rides the recording to the
+  // meeting it becomes.
+  const [recordDialog, setRecordDialog] = useState<'notes' | 'external' | null>(null)
+  const recDraftRef = useRef<RecordNotesDraft | null>(null)
 
   useEffect(() => {
     void load()
@@ -138,8 +144,9 @@ export default function PlexiMeetView(): JSX.Element {
   const selected = meetings.find((m) => m.id === selectedId) ?? null
   const now = Date.now()
 
-  async function startRecording(): Promise<void> {
+  async function startRecording(draft?: RecordNotesDraft): Promise<boolean> {
     setError(null)
+    recDraftRef.current = draft ?? null
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const rec = new MediaRecorder(stream)
@@ -154,8 +161,12 @@ export default function PlexiMeetView(): JSX.Element {
       rec.start()
       recRef.current = rec
       setRecording(true)
+      return true
     } catch {
-      setError('Could not access the microphone. Check your system permissions.')
+      // The dialog that opened this door reports the microphone itself and
+      // stays open — a second banner behind it would say the same thing twice.
+      recDraftRef.current = null
+      return false
     }
   }
 
@@ -182,8 +193,10 @@ export default function PlexiMeetView(): JSX.Element {
       setBusy('Pulling out action items…')
       const acts = await window.api.voiceNote.extractActions({ transcript: t.transcript }).catch(() => null)
       const actionItems = acts?.ok ? acts.proposals.flatMap(proposalLabels).filter(Boolean) : []
+      const draft = recDraftRef.current
+      recDraftRef.current = null
       const created = await createMeeting({
-        title: `Meeting · ${fmtDate(Date.now())}`,
+        title: draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`,
         transcript: t.transcript,
         // An empty summary when the AI step failed is honest: the transcript is
         // the real captured value, and nothing fake is filled in.
@@ -191,6 +204,14 @@ export default function PlexiMeetView(): JSX.Element {
         actionItems,
         durationSec: t.durationSec
       })
+      // The dialog's NOTES are the recorder's own words — `yours` spans on the
+      // Record, never rewritten; the attached desk is the meeting's desk.
+      if (created && draft && (draft.notes.trim() || draft.deskNodeId)) {
+        await updateMeeting(created.id, {
+          ...(draft.notes.trim() ? { record: { spans: buildYoursSpans(draft.notes), generatedAt: Date.now() } } : {}),
+          ...(draft.deskNodeId ? { deskNodeId: draft.deskNodeId } : {})
+        })
+      }
       if (created) setSelectedId(created.id)
     } catch {
       setError('Something went wrong saving the recording. The audio was captured; please try again.')
@@ -339,7 +360,7 @@ export default function PlexiMeetView(): JSX.Element {
               </button>
             ) : (
               <button
-                onClick={() => void startRecording()}
+                onClick={() => setRecordDialog('notes')}
                 data-testid="meet-record"
                 disabled={!!busy}
                 className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
@@ -349,9 +370,7 @@ export default function PlexiMeetView(): JSX.Element {
               </button>
             )}
             <button
-              onClick={() =>
-                void useGuestCaptureStore.getState().start({ title: 'External meeting' })
-              }
+              onClick={() => setRecordDialog('external')}
               data-testid="meet-record-external"
               className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
               title="Record a meeting happening outside Plexii (Zoom, Meet, Teams) — your mic + this machine's audio, transcribed locally"
@@ -666,6 +685,16 @@ export default function PlexiMeetView(): JSX.Element {
       </div>
 
       {showNew && <NewMeetingDialog onClose={() => setShowNew(false)} />}
+      {recordDialog && (
+        <RecordDialog
+          initialMode={recordDialog}
+          onClose={() => setRecordDialog(null)}
+          onStartNotes={(d) => startRecording(d)}
+          onStartExternal={(d) =>
+            useGuestCaptureStore.getState().start({ title: d.title, notes: d.notes, micOnly: d.micOnly })
+          }
+        />
+      )}
     </div>
   )
 }

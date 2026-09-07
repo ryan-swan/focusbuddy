@@ -135,8 +135,16 @@
 > composer's is still the DEC-019 stub); the invite email is
 > where-aware (`composeInviteBody`). 18/18 live; suite 3,737 tests /
 > 340 files.
+> **DEC-118**: Record notes / Record external open the same twin
+> (`RecordDialog`): title, "now → until you stop", NOTES → `yours`
+> spans, a real desk for Record notes (the meeting's deskNodeId), and
+> for Record external WHERE — a call on this Mac (You / Them) or in the
+> room (mic only, the picker never raised) — with the CR-12 disclosure
+> stated before anything runs. `guestCapture.start` grew `notes` /
+> `micOnly`. 12/12 live with the mic stubbed to refuse; suite 3,759
+> tests / 341 files.
 
-**Last updated:** 2026-09-06 — through DEC-117 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-118 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

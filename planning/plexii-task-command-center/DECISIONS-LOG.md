@@ -3580,3 +3580,46 @@ toggled, never strip it — the app applies `.dark` itself (`lib/theme.ts`,
 `auto`), so a blind `classList.remove('dark')` on a system-dark evening
 left the operator's running app in light tokens until re-applied. Both
 probes now record `contains('dark')` before and `toggle('dark', had)` after.
+
+## DEC-118 — Record notes and Record external open the composer's twin too
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("Now do the same for the Record notes and Record external buttons") ·
+**Branch:** ryan-next · **Scope rule:** DEC-117's — BookTimeDialog's
+recipes verbatim; only fields that land somewhere.
+
+**The dialog.** `RecordDialog` — the same header slider (Record notes /
+Record external), the 23px title with placeholder resolution, a time row
+that states the one fact a recording has (today · Now → Until you stop),
+NOTES, the Attach row, the Esc / ↵ footer; `recordDialogTwin.test.ts` holds
+the recipe strings in both files. Neither door records anything until
+Start; the dialog closes on success and, when the microphone refuses, says
+so and stays.
+
+**What each mode honestly carries.** *Record notes*: the title of the
+meeting the recording becomes (was `Meeting · <date>`), NOTES minted as
+`yours` spans on its Record (`buildYoursSpans` — the recorder's own words,
+never rewritten), and a REAL desk (a picker over open desks; the meeting's
+`deskNodeId`). *Record external*: the title; WHERE — "A call on this Mac"
+(mic + system audio, You / Them) or "In the room" (mic only — the loopback
+picker is never raised; the honest floor chosen on purpose, not reached by
+failure); NOTES carried to the wrap-up as its notes (the same `yours` spans
+a live meeting's notes become). No Attach there: the wrap-up mints that
+meeting's desk itself (S3-DEC-020). The CR-12 disclosure is stated IN the
+dialog, before anything runs, in the floor's own words ("Plexii can hear
+you, not them"), and the bar's non-dismissibility is named.
+
+**Store growth, additive:** `guestCapture.start` gained `notes` and
+`micOnly`; the M6 floor, its wording and its pins are untouched. The
+calendar's own block-level Record external door is unchanged (it carries
+the block's series identity and agenda).
+
+**Verified live** over CDP, 12/12 with the microphone STUBBED TO REFUSE
+for the whole run — nothing was ever recorded on the operator's machine:
+both doors open the dialog (external lands in external mode); notes mode
+has NOTES + Attach and no WHERE; a real desk attaches (Staged, the
+placeholder takes its name); Start with the mic refused shows the honest
+error and leaves no recording state; external mode shows the two answers
+with their disclosure lines; Start capturing with the mic refused raises no
+disclosure bar; Esc discards. One live-caught fix: a desk attached in notes
+mode kept naming the title after switching to external — the placeholder is
+mode-aware now. Suite: 3,759 tests / 341 files; both typechecks clean.
