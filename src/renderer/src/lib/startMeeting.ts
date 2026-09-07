@@ -130,6 +130,13 @@ export function markCalendarOrigin(meta: {
   currentOrigin = { kind: 'calendar', ...meta }
 }
 
+// DEC-130 — "Record notes" with a desk picked in its dialog (DEC-118): the
+// recording's origin is THAT desk, so the wrap-up files its folder under it
+// and stands the Record on it instead of minting a new desk.
+export function markDeskOrigin(nodeId: string, title: string): void {
+  currentOrigin = { kind: 'desk', nodeId, title }
+}
+
 // A fresh room id for a scheduled meeting, matching the live-room format so the
 // same id is valid whether the room is opened now or later.
 export function newMeetingRoomId(): string {

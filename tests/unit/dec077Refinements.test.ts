@@ -8,6 +8,7 @@ const att = read('src/renderer/src/components/views/AttentionView.tsx')
 const cal = read('src/renderer/src/components/views/CalendarView.tsx')
 const grid = read('src/renderer/src/components/views/WeekTimeGrid.tsx')
 const frame = read('src/renderer/src/components/widgets/WidgetFrame.tsx')
+const bell = read('src/renderer/src/components/attention/BellIcon.tsx')
 const circle = read('src/renderer/src/components/attention/CompleteCircle.tsx')
 
 // DEC-077 — the operator's refinement round on DEC-073…076: one completion
@@ -92,7 +93,12 @@ describe('dec_077 — nesting lights the whole row', () => {
 
 describe('dec_077 — the bell fills and sits by the title', () => {
   it('dec_077_active_bell_is_solid_not_just_recoloured', () => {
-    expect(frame).toContain("fill={active ? 'currentColor' : 'none'}")
+    // DEC-125: the bell is one shared definition (attention/BellIcon.tsx),
+    // rendered by the frame and by the message row — the fill rule is pinned
+    // where it now lives; the frame is pinned to render THAT bell.
+    expect(bell).toContain("fill={active ? 'currentColor' : 'none'}")
+    expect(frame).toContain("import BellIcon from '../attention/BellIcon'")
+    expect(frame).toContain('<BellIcon size={13} active={!!attentionItem} />')
   })
 
   it('dec_077_bell_and_circle_precede_the_right_side_control_array', () => {

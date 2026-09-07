@@ -138,6 +138,8 @@ export function itemContext(i: FbNode, byId: Map<string, FbNode>): ItemContext {
 /** A short human label for a marked source ("Widget", "Desk"). */
 export function sourceLabel(type: string): string {
   switch (type) {
+    case 'message':
+      return 'From a message — open it to reply in the conversation'
     case 'widget':
       return 'From a widget'
     case 'widgets':

@@ -101,7 +101,12 @@ describe('the model ruling, wired', () => {
     // same bytes ffmpeg decoded cleanly transcribed as mush. The feed, not
     // the model.
     const rec = read('src/renderer/src/lib/transcribeRecording.ts')
-    expect(rec).toContain('const probe = new AC()')
+    // DEC-130: the first stage names its rate — opus' own 48 kHz — because a
+    // bare `new AudioContext()` follows the output device, and a Bluetooth
+    // headset in its call profile puts that at 16 kHz: the low-quality path
+    // by another door.
+    expect(rec).toContain('const DECODE_RATE = 48000')
+    expect(rec).toContain('const probe = new AC({ sampleRate: DECODE_RATE })')
     expect(rec).not.toContain('new AC({ sampleRate: 16000 })')
     expect(rec).toContain('new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000)')
   })

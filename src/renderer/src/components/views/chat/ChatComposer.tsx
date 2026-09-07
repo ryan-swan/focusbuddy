@@ -22,12 +22,17 @@ export function ChatComposer({
   conversationId,
   token,
   onSend,
-  onTyping
+  onTyping,
+  compact = false
 }: {
   conversationId: string
   token: string
   onSend: (body: string, attachment: MessageAttachment | null) => Promise<void>
   onTyping: () => void
+  /** DEC-131 — the assistant panel's shape: no meeting door (the header's
+   *  Meet is that), the voice-note mic INSIDE the message box at its right,
+   *  attach · emoji · GIF kept, and a taller box that fills the width. */
+  compact?: boolean
 }): JSX.Element {
   const [draft, setDraft] = useState('')
   // Consume an AI-queued draft for this conversation (post-chat proposal).
@@ -263,7 +268,7 @@ export function ChatComposer({
           </button>
         </div>
       )}
-      <div className="relative flex items-end gap-1.5">
+      <div className={`relative flex items-end gap-1.5 ${compact ? 'flex-wrap' : ''}`}>
         <input
           ref={fileInputRef}
           type="file"
@@ -284,15 +289,17 @@ export function ChatComposer({
         >
           <Icon name="attach_file" size={16} />
         </button>
-        <button
-          onClick={() => (recording ? stopRecording() : void startRecording())}
-          className={`icon-btn shrink-0 ${recording ? 'text-rose-500' : ''}`}
-          title={recording ? 'Stop recording' : 'Record a voice note'}
-          data-testid="composer-voice"
-          disabled={busy && !recording}
-        >
-          <Icon name={recording ? 'stop_circle' : 'mic'} size={16} />
-        </button>
+        {!compact && (
+          <button
+            onClick={() => (recording ? stopRecording() : void startRecording())}
+            className={`icon-btn shrink-0 ${recording ? 'text-rose-500' : ''}`}
+            title={recording ? 'Stop recording' : 'Record a voice note'}
+            data-testid="composer-voice"
+            disabled={busy && !recording}
+          >
+            <Icon name={recording ? 'stop_circle' : 'mic'} size={16} />
+          </button>
+        )}
         <div className="relative shrink-0">
           <button
             onClick={() => setShowEmoji((s) => !s)}
@@ -323,14 +330,16 @@ export function ChatComposer({
           </button>
           {showGif && <GifPicker onSelect={(url, desc) => void pickGif(url, desc)} onClose={() => setShowGif(false)} />}
         </div>
-        <button
-          onClick={() => void launchMeeting({ kind: 'chat', channelId: conversationId, title: 'Chat meeting' })}
-          className="icon-btn shrink-0"
-          title="Start a meeting"
-          data-testid="composer-meet"
-        >
-          <Icon name="videocam" size={16} />
-        </button>
+        {!compact && (
+          <button
+            onClick={() => void launchMeeting({ kind: 'chat', channelId: conversationId, title: 'Chat meeting' })}
+            className="icon-btn shrink-0"
+            title="Start a meeting"
+            data-testid="composer-meet"
+          >
+            <Icon name="videocam" size={16} />
+          </button>
+        )}
         {draft.trim().length > 0 && (
           <button
             onClick={() => void onClarify()}
@@ -369,6 +378,7 @@ export function ChatComposer({
             ))}
           </div>
         )}
+        <div className={`relative flex-1 min-w-0 ${compact ? 'basis-full order-first mb-1.5' : ''}`}>
         <textarea
           value={draft}
           onChange={(e) => {
@@ -403,10 +413,24 @@ export function ChatComposer({
             }
           }}
           placeholder={recording ? 'Recording… tap stop when done' : 'Write a message…'}
-          rows={1}
+          rows={compact ? 3 : 1}
           data-testid="message-composer"
-          className="flex-1 resize-none bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent"
+          className={`block w-full resize-none bg-[var(--surface-raised)] border border-[var(--edge-firm)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-accent ${
+            compact ? 'pr-10 min-h-[76px]' : ''
+          }`}
         />
+        {compact && (
+          <button
+            onClick={() => (recording ? stopRecording() : void startRecording())}
+            className={`absolute right-1.5 bottom-1.5 icon-btn !h-7 !w-7 ${recording ? 'text-rose-500' : ''}`}
+            title={recording ? 'Stop recording' : 'Record a voice note'}
+            data-testid="composer-voice"
+            disabled={busy && !recording}
+          >
+            <Icon name={recording ? 'stop_circle' : 'mic'} size={16} />
+          </button>
+        )}
+        </div>
         <button
           onClick={() => void submit()}
           disabled={!canSend}

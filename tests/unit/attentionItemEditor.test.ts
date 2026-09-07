@@ -455,13 +455,19 @@ describe('DEC-050 — the item rows read like a project tool', () => {
 describe('DEC-051 — desk + home widgets carry the same row anatomy', () => {
   const widgets = read('src/renderer/src/components/views/attentionWidgets.tsx')
   const view = read('src/renderer/src/components/views/AttentionView.tsx')
+  // DEC-128: the row moved into its own component (components/attention/
+  // WidgetItemRow) so it could grow the in-place summary; the anatomy pins
+  // follow it there. ItemLines still feeds every widget with it.
+  const row = read('src/renderer/src/components/attention/WidgetItemRow.tsx')
 
   it('widget rows are cards with the queue spine, a completion circle and status', () => {
-    expect(widgets).toContain('rounded-md border border-[var(--edge-soft)]')
-    expect(widgets).toContain('absolute left-0 top-1.5 bottom-1.5') // the spine
-    expect(widgets).toContain('close this item') // the completion circle
-    expect(widgets).toContain('<ItemStatusPill') // status, changeable in place
-    expect(widgets).toContain('statusLabel(i.workItemState, primary.label)') // dense dot
+    expect(row).toContain('rounded-md border border-[var(--edge-soft)]')
+    expect(row).toContain('absolute left-0 top-1.5 bottom-1.5') // the spine
+    expect(row).toContain('close this item') // the completion circle
+    expect(row).toContain('<ItemStatusPill') // status, changeable in place
+    expect(row).toContain('statusLabel(i.workItemState, primary.label)') // dense dot
+    expect(widgets).toContain("import { WidgetItemRow } from '../attention/WidgetItemRow'")
+    expect(widgets).toContain('<WidgetItemRow key={i.id} i={i} dense={dense} nowMs={nowMs} />')
   })
 
   it('ONE row renderer feeds every widget, so the surfaces cannot drift', () => {
@@ -473,10 +479,11 @@ describe('DEC-051 — desk + home widgets carry the same row anatomy', () => {
   })
 
   it('closing from a widget runs the SAME accounted path as the page', () => {
-    expect(widgets).toContain("import { useCloseWorkItem } from '../attention/useCloseWorkItem'")
+    // DEC-128: the hook is imported where the row lives now.
+    expect(row).toContain("import { useCloseWorkItem } from './useCloseWorkItem'")
     expect(view).toContain("import { useCloseWorkItem } from '../attention/useCloseWorkItem'")
     // Both spell the close identically: the queue's own verb, via the hook.
-    expect(widgets).toContain('void closeItem(i, primary.state)')
+    expect(row).toContain('void closeItem(i, primary.state)')
     expect(view).toContain('void closeWithOffer(i, primary.state)')
   })
 

@@ -208,7 +208,7 @@ describe('DEC-053 — the calendar QA round (operator live QA)', () => {
     // The pinned band above it holds the day headers + deadline chips — which
     // also fixes the old layout where a tall chip stack pushed its own
     // column's canvas out of line with the others.
-    expect(grid).toContain('className="flex overflow-y-auto overscroll-contain pt-2"')
+    expect(grid).toContain("className={`flex overflow-y-auto overscroll-contain pt-2 ${fill ? 'flex-1 min-h-0' : ''}`}" /* DEC-131: `fill` lets a host own the window's height */)
     expect(grid).toContain('el.scrollTop = Math.max(0, (h - START_HOUR - 1) * hourPx)')
     // Taller hours — 44px showed all seventeen rows cramped; the window owns
     // how many are visible now.

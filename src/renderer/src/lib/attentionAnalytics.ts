@@ -173,12 +173,22 @@ export function dayTimeline(
       endMs: b.startMs + b.durationMin * 60000,
       isMeeting: !!b.meeting
     }))
-  const work: TimelineEntry[] = agendaItems(items, nowMs).map((i) => ({
-    kind: 'item' as const,
-    id: i.id,
-    item: i,
-    atMs: i.dueAt ? Date.parse(i.dueAt) : null
-  }))
+  // DEC-129 — work due BEFORE today is not part of today's timed shape: it
+  // rides behind the day, as undated work does, in ranked order (oldest due
+  // first, then the Meet items). Sorting it by its past date put a backlog
+  // of overdue dates ahead of the blocks actually on today's calendar, and a
+  // four-line tile never reached them. The Overdue radar is the place for
+  // the backlog; here it follows the day.
+  const dayStart = start.getTime()
+  const work: TimelineEntry[] = agendaItems(items, nowMs).map((i) => {
+    const due = i.dueAt ? Date.parse(i.dueAt) : null
+    return {
+      kind: 'item' as const,
+      id: i.id,
+      item: i,
+      atMs: due != null && due >= dayStart ? due : null
+    }
+  })
   return [...events, ...work].sort((a, b) => {
     if (a.atMs == null && b.atMs == null) return 0
     if (a.atMs == null) return 1

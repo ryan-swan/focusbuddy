@@ -89,8 +89,12 @@ describe('dec_079 — the queue links back', () => {
 
   it('dec_079_open_meeting_navigates_then_hands_off_the_selection', () => {
     // The same post-navigation handoff pattern openHere uses for widgets.
-    expect(att).toContain('goMeetings()')
-    expect(att).toContain("'fb:open-meeting'")
+    // DEC-128: the handoff lives in lib/openMeeting (shared with the widget
+    // rows); the page delegates to it.
+    const lib = read('src/renderer/src/lib/openMeeting.ts')
+    expect(lib).toContain('goMeetings()')
+    expect(lib).toContain("'fb:open-meeting'")
+    expect(att).toContain('openMeetingMoment(meetingId, segmentId)')
     expect(meetView).toContain("window.addEventListener('fb:open-meeting'")
     expect(meetView).toContain('setSelectedId(id)')
   })

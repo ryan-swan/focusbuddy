@@ -63,7 +63,10 @@ export class MeetingTrackRecorder {
 
   constructor() {
     try {
-      this.ctx = new AudioContext()
+      // DEC-130 — the mix is rendered at opus' own 48 kHz, never at whatever
+      // rate the output device happens to be in (16 kHz on a headset in its
+      // call profile would bake a low-quality resample into the legacy blob).
+      this.ctx = new AudioContext({ sampleRate: 48000 })
       this.dest = this.ctx.createMediaStreamDestination()
       this.mixedRec = new MediaRecorder(this.dest.stream)
       this.mixedRec.ondataavailable = (e) => {

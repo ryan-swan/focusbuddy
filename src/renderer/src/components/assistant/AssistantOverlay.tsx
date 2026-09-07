@@ -6,11 +6,11 @@ import PlexiiMark from '../brand/PlexiiMark'
 import { FLOATING_MENU_INSET_RIGHT, FLOATING_MENU_STYLE } from '../chrome/floatingMenu'
 import { useAssistantChrome, type AssistantTab } from '../../stores/assistantChrome'
 import { useVoiceHold, useVoiceHoldKeys, startHold, stopHold } from '../../lib/voiceHold'
-import StandupHome from '../views/StandupHome'
-import AssistantTasksTab from './tabs/AssistantTasksTab'
-import AssistantActivityTab from './tabs/AssistantActivityTab'
-import AssistantWorkTab from './tabs/AssistantWorkTab'
+import AssistantAttentionTab from './tabs/AssistantAttentionTab'
+import AssistantMessagesTab from './tabs/AssistantMessagesTab'
 import AssistantAgentTab from './tabs/AssistantAgentTab'
+import AssistantCalendarTab from './tabs/AssistantCalendarTab'
+import AssistantHeader from './AssistantHeader'
 import { useChatStore } from '../../stores/chat'
 import { useViewStore } from '../../stores/view'
 import { useWidgetStore } from '../../stores/widgets'
@@ -61,16 +61,20 @@ const FULLSCREEN_TAKEOVER = 'fixed inset-0 z-[190] bg-[var(--surface-base)]'
 const FULLSCREEN_PAGE =
   'fixed top-10 bottom-0 right-0 z-[190] bg-[var(--surface-base)] border-l border-[var(--edge-soft)]'
 
-// The persistent assistant's tabs (spec §5.3). Today is the daily standup, Chat is
-// the conversation, the rest read real workspace state. Order matches the store's
-// ASSISTANT_TABS.
-const TAB_META: { id: AssistantTab; label: string; icon: string }[] = [
-  { id: 'today', label: 'Today', icon: 'wb_sunny' },
-  { id: 'chat', label: 'Chat', icon: 'forum' },
-  { id: 'agent', label: 'Agent', icon: 'rocket_launch' },
-  { id: 'tasks', label: 'Tasks', icon: 'checklist' },
-  { id: 'activity', label: 'Activity', icon: 'bolt' },
-  { id: 'work', label: 'Work', icon: 'smart_toy' }
+// The persistent assistant's tabs (spec §5.3, rearranged by DEC-121/122).
+// First the conversation, worn as the animated double-ii mark alone (the
+// brand's own sign for the AI — one blink on mount, a wink on hover, breathing
+// while it thinks); then Attention (every attention item — Tasks folded in),
+// Calendar (DEC-131: today's day column, the month at a glance, a day click
+// that books), Message (messaging people — the Office Chat tab in the
+// panel; "PlexiiMessage" until DEC-131), and Agents (the autonomous agent
+// with desk agents as its sub-view). Order matches the store's ASSISTANT_TABS.
+const TAB_META: { id: AssistantTab; label: string; icon?: string; mark?: boolean }[] = [
+  { id: 'chat', label: 'Plexii AI', mark: true },
+  { id: 'attention', label: 'Attention', icon: 'notifications' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar_month' },
+  { id: 'messages', label: 'Message', icon: 'chat' },
+  { id: 'agent', label: 'Agents', icon: 'rocket_launch' }
 ]
 
 // The always-mounted web panel (A2, R4): it rides this component because it
@@ -146,7 +150,6 @@ function AssistantOverlayChrome(): JSX.Element {
   const activeTab = useAssistantChrome((s) => s.activeTab)
   const setTab = useAssistantChrome((s) => s.setTab)
   const openPanel = useAssistantChrome((s) => s.openPanel)
-  const close = useAssistantChrome((s) => s.close)
   const setWidth = useAssistantChrome((s) => s.setWidth)
   const persistWidth = useAssistantChrome((s) => s.persistWidth)
   // The pill pulses while a request is genuinely in flight — the one honest
@@ -436,6 +439,10 @@ function AssistantOverlayChrome(): JSX.Element {
             : 'h-full w-full flex flex-col'
         }
       >
+        {/* The header FIRST (operator direction): the sidebar's wordmark and,
+            from the right, Minimize · Display mode · What was I doing? · New
+            chat. The tab strip sits under it on every tab. */}
+        <AssistantHeader chrome />
         <div
           role="tablist"
           aria-label="Plexii sections"
@@ -452,14 +459,23 @@ function AssistantOverlayChrome(): JSX.Element {
                 onClick={() => setTab(t.id)}
                 data-testid={`assistant-tab-${t.id}`}
                 title={t.label}
+                aria-label={t.label}
                 className={`flex-1 min-w-0 inline-flex items-center justify-center gap-1 h-7 rounded-md text-[11px] font-medium transition-colors ${
                   isActive
                     ? 'bg-accent/10 text-[rgb(var(--accent))]'
                     : 'text-[var(--ink-60)] hover:bg-[var(--surface-sunken)]'
                 }`}
               >
-                <Icon name={t.icon} size={14} className="shrink-0" />
-                <span className="truncate">{t.label}</span>
+                {t.mark ? (
+                  /* The mark IS the label: the brand's sign for the AI, animated
+                     the brand way — and breathing while a reply is in flight. */
+                  <PlexiiMark height={16} motion={'once+hover'} title={null} className="shrink-0" />
+                ) : (
+                  <>
+                    <Icon name={t.icon!} size={14} className="shrink-0" />
+                    <span className="truncate">{t.label}</span>
+                  </>
+                )}
               </button>
             )
           })}
@@ -470,17 +486,12 @@ function AssistantOverlayChrome(): JSX.Element {
         <div className={`flex-1 min-h-0 relative ${mode !== 'fullscreen' ? 'bg-[var(--surface-raised)]' : ''}`}>
           {/* Chat: always mounted, shown only on the Chat tab. */}
           <div className="h-full w-full" style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
-            <ChatPanel onCollapse={close} />
+            <ChatPanel />
           </div>
-          {activeTab === 'today' && (
-            <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-today-body">
-              <StandupHome />
-            </div>
-          )}
+          {activeTab === 'attention' && <AssistantAttentionTab />}
+          {activeTab === 'calendar' && <AssistantCalendarTab />}
           {activeTab === 'agent' && <AssistantAgentTab />}
-          {activeTab === 'tasks' && <AssistantTasksTab />}
-          {activeTab === 'activity' && <AssistantActivityTab />}
-          {activeTab === 'work' && <AssistantWorkTab />}
+          {activeTab === 'messages' && <AssistantMessagesTab />}
         </div>
       </div>
     </div>

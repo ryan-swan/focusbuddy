@@ -233,23 +233,31 @@ const grid = read('src/renderer/src/components/views/WeekTimeGrid.tsx')
 describe('step 7 — commit closes immediately; the toast holds the regret', () => {
   it('the wording tracks the button through the whole flow', () => {
     expect(src).toContain("mode === 'meeting' ? 'Schedule meeting' : 'Book it'")
-    expect(grid).toContain("const verb = meeting ? 'Scheduled' : 'Booked'")
+    // DEC-131: the verb rides with the booking, in lib/bookBlock
+    expect(readFileSync('src/renderer/src/lib/bookBlock.ts', 'utf8')).toContain("const verb = meeting ? 'Scheduled' : 'Booked'")
   })
 
+  // DEC-131: the booking itself (create, the undo toast, the stated invite
+  // hold) moved to lib/bookBlock — shared with the assistant's Calendar tab —
+  // and the grid delegates to it. The pins follow the code.
+  const book = readFileSync('src/renderer/src/lib/bookBlock.ts', 'utf8')
+
   it('closes FIRST, then creates — no spinner, no confirmation step', () => {
-    const closure = grid.slice(grid.indexOf('Step 7 — closes IMMEDIATELY'), grid.indexOf('const verb ='))
-    expect(closure.indexOf('setComposer(null)')).toBeLessThan(closure.indexOf('createBlock'))
+    const closure = grid.slice(grid.indexOf('Step 7 — closes IMMEDIATELY'), grid.indexOf('bookBlockWithToast({ taskId, title, startMs, durationMin, meeting, recurrence })'))
+    expect(closure).toContain('setComposer(null)')
+    expect(book.indexOf('await createBlock(draft)')).toBeGreaterThan(0)
   })
 
   it('the toast is the house recordWithToast, and Undo removes the block', () => {
-    expect(grid).toContain('useActionHistory.getState().recordWithToast')
-    expect(grid).toContain('await removeBlock(block.id)')
+    expect(book).toContain('useActionHistory.getState().recordWithToast')
+    expect(book).toContain('await removeBlock(block.id)')
+    expect(grid).toContain("import { bookBlockWithToast } from '../../lib/bookBlock'")
   })
 
   it('the invite hold is BUILT and stated, though nothing sends (CR-08/09)', () => {
-    expect(grid).toContain('scheduleInviteHold')
-    expect(grid).toContain('invites hold ${HOLD_INVITES_MS / 1000}s')
-    expect(grid).toContain('hold?.cancel()')
+    expect(book).toContain('scheduleInviteHold')
+    expect(book).toContain('invites hold ${HOLD_INVITES_MS / 1000}s')
+    expect(book).toContain('hold?.cancel()')
   })
 
   it('scheduleInviteHold: expiry fires once; cancel wins the race', () => {
@@ -379,8 +387,12 @@ describe('double-click opens the full dialog, seeded from the block', () => {
   })
 
   it('saving toasts with Undo restoring every prior field', () => {
-    expect(grid).toContain('label: `Saved')
-    const undo = grid.slice(grid.indexOf('label: `Saved'), grid.indexOf('redo: async () => {\n                await updateBlock(prev.id, patch)'))
+    // DEC-129: the save and its toast moved to lib/blockEdit (shared with the
+    // Today tile's block row); the grid delegates to it.
+    const lib = readFileSync('src/renderer/src/lib/blockEdit.ts', 'utf8')
+    expect(grid).toContain('await saveBlockEdit(prev, patch)')
+    expect(lib).toContain('label: `Saved')
+    const undo = lib.slice(lib.indexOf('label: `Saved'), lib.indexOf('redo: async () => {'))
     for (const f of ['taskId: prev.taskId', 'title: prev.title', 'startMs: prev.startMs', 'durationMin: prev.durationMin', 'meeting: prev.meeting ?? null'])
       expect(undo).toContain(f)
   })

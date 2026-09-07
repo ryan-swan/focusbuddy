@@ -84,12 +84,17 @@ describe('the wiring (file-level pins)', () => {
     const { readFileSync } = await import('fs')
     const view = readFileSync('src/renderer/src/components/views/AttentionView.tsx', 'utf8')
     expect(view).toContain('startWithPlexii')
-    expect(view).toContain("fb:composer-stage")
+    // DEC-128: the staging moved to lib/startWithPlexii (shared with the
+    // widget rows); the page delegates and only clears its selection after.
+    const lib = readFileSync('src/renderer/src/lib/startWithPlexii.ts', 'utf8')
+    expect(lib).toContain("fb:composer-stage")
+    expect(view).toContain('if (!startItemsWithPlexii(list, nodes)) return')
     // The chat store's send() must NOT be called by the hand-off.
+    expect(lib).not.toContain('.send(')
     const fn = view.slice(view.indexOf('function startWithPlexii'), view.indexOf('/** Open the DESK'))
     expect(fn).not.toContain('.send(')
-    // Single-item starts go to the item's desk first, for desk context.
-    expect(fn).toContain('goTask(deskId)')
+    // Single-item starts go to the item's desk first, for desk context (in the lib since DEC-128).
+    expect(lib).toContain('goTask(deskId)')
     // Both entry points exist: the per-row action and the selection bar.
     expect(view).toContain('Start it with Plexii')
     expect(view).toContain('Get started with Plexii')

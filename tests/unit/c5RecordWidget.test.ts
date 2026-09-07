@@ -79,7 +79,8 @@ describe('C5 wiring pins', () => {
   it('the Attention chip parses before it opens: moments inside, web outside', () => {
     expect(attention).toContain('const moment = parseMeetingMomentUrl(i.sourceUrl)')
     expect(attention).toContain('if (moment) openMeeting(moment.meetingId, moment.segmentId)')
-    expect(attention).toContain('else void window.api.files.openExternal(i.sourceUrl!)')
+    // DEC-127: a message moment routes to the floating assistant first; the web mark still falls through to the system browser
+    expect(attention).toContain('else if (!openMessageLink(i.sourceUrl)) void window.api.files.openExternal(i.sourceUrl!)')
     expect(attention).toContain('Jump to the spoken moment in the meeting')
   })
 })

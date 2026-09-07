@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon'
 import { useGuestCaptureStore } from '../stores/guestCapture'
+import MicLevelPill from './MicLevelPill'
 
 // M6 (CR-12) — the non-dismissible disclosure. While a guest capture runs,
 // this bar is on screen with no close affordance: the only verb is Stop.
@@ -20,6 +21,8 @@ export default function GuestCaptureBar(): JSX.Element | null {
   const moments = useGuestCaptureStore((s) => s.moments)
   const markMoment = useGuestCaptureStore((s) => s.markMoment)
   const stop = useGuestCaptureStore((s) => s.stop)
+  const micPeak = useGuestCaptureStore((s) => s.micPeak)
+  const micSilentMs = useGuestCaptureStore((s) => s.micSilentMs)
 
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
@@ -59,6 +62,8 @@ export default function GuestCaptureBar(): JSX.Element | null {
             : 'Plexii can hear you, not them — system audio unavailable, mic only.'}
         </div>
       </div>
+      {/* DEC-130 — the level, or the plain truth that nothing is arriving. */}
+      <MicLevelPill peak={micPeak} silentMs={micSilentMs} dark />
       <button
         onClick={markMoment}
         className="fb-press text-[11px] text-amber-300/90 px-1.5"

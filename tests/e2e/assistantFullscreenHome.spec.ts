@@ -257,7 +257,10 @@ test('AF-5 — fullscreen is flat and full-bleed; floating keeps the card chrome
   // than the overlay by exactly that strip. Measured rather than hardcoded, so
   // the assertion still fails if the panel ever grows its own gutter.
   const tabsBox = (await window.locator('[data-testid="assistant-tabs"]').boundingBox())!
-  expect(Math.abs(panelBox.height + tabsBox.height - overlayBox.height)).toBeLessThanOrEqual(2)
+  // DEC-120 put the assistant header above the tab strip; the panel fills
+  // everything below both.
+  const headerBox = (await window.locator('[data-testid="assistant-header"]').boundingBox())!
+  expect(Math.abs(panelBox.height + tabsBox.height + headerBox.height - overlayBox.height)).toBeLessThanOrEqual(2)
 })
 
 test('AF-6 — a capability chip click sends the real starter request it declares', async () => {

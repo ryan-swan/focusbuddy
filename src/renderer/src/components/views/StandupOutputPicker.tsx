@@ -96,7 +96,10 @@ export default function StandupOutputPicker({ input }: { input: DigestInput | nu
         disabled={!input}
         title="Save or send this standup"
         data-testid="standup-output-btn"
-        className="fb-btn-surface icon-btn h-7 px-2 gap-1.5 inline-flex items-center text-[12px] text-[var(--ink-60)] hover:text-[rgb(var(--accent))] disabled:opacity-40"
+        // DEC-133 — `icon-btn` (a fixed 24px square) had the surface hugging
+        // the icon while "Save" spilled outside it; a surface chip sized by its
+        // content, like the header's other doors.
+        className="fb-btn-surface h-7 px-2 gap-1.5 inline-flex items-center rounded-[var(--radius-field)] text-[12px] text-[var(--ink-60)] hover:text-[rgb(var(--accent))] disabled:opacity-40"
       >
         <Icon name="ios_share" size={14} />
         <span>Save</span>

@@ -169,7 +169,9 @@ test('P2100-6 — translate action and language select render on an active conve
   await window.waitForTimeout(500)
 
   await expect(window.locator('[data-testid="messages-translate-lang"]')).toBeVisible({ timeout: 4_000 })
-  await expect(window.locator('[data-testid="msg-translate-toggle-msg-1"]')).toBeVisible({ timeout: 4_000 })
+  // DEC-126: Translate lives in the message's ⋯ menu (on every message, not just your own)
+  await window.locator('[data-testid="msg-menu-msg-1"]').click()
+  await expect(window.locator('[data-testid="msg-translate-msg-1"]')).toBeVisible({ timeout: 4_000 })
 })
 
 // ── Rung 7: intent composer clarify button ─────────────────────────────────

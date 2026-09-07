@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow, dialog, shell, webContents as allWebContents, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, dialog, shell, systemPreferences, webContents as allWebContents, type WebContents } from 'electron'
 import { detectPreviewBuild } from '../appMode'
 import { writeFile } from 'node:fs/promises'
 import { join as pathJoin } from 'node:path'
@@ -2622,6 +2622,26 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('meetings:list', () => listMeetings())
   ipcMain.handle('meetings:get', (_e, id: string) => getMeeting(id))
   ipcMain.handle('meetings:create', (_e, draft: MeetingDraft) => createMeeting(draft))
+  // DEC-130 — the microphone permission, asked of the SYSTEM. On macOS an
+  // app the system has not allowed gets a working-looking stream of digital
+  // silence from getUserMedia, never an error — so the recording doors ask
+  // here first: the native prompt when undetermined, the plain status after.
+  ipcMain.handle('media:micStatus', () => {
+    if (process.platform !== 'darwin') return 'granted'
+    try {
+      return systemPreferences.getMediaAccessStatus('microphone')
+    } catch {
+      return 'unknown'
+    }
+  })
+  ipcMain.handle('media:askMic', async () => {
+    if (process.platform !== 'darwin') return true
+    try {
+      return await systemPreferences.askForMediaAccess('microphone')
+    } catch {
+      return false
+    }
+  })
   // M2 — the transcript as segments (SPEC-003): saved by the wrap-up after
   // per-track transcription, read by the Thread rendering and Recall.
   ipcMain.handle('meetings:saveSegments', (_e, meetingId: string, segments: TranscriptSegmentDraft[]) =>

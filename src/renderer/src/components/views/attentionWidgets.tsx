@@ -6,18 +6,8 @@ import WidgetFrame from '../widgets/WidgetFrame'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
 import Icon from '../Icon'
-import {
-  isTerminalState,
-  itemReason,
-  queueOf,
-  scopeItemsForDesk,
-  queueTint,
-  PRIMARY_ACTION,
-  QUEUE_COLOR,
-  QUEUE_ICON
-} from '../../lib/attentionQueues'
-import ItemStatusPill, { statusLabel, statusTone } from '../attention/ItemStatusPill'
-import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import { isTerminalState, queueOf, scopeItemsForDesk, QUEUE_ICON } from '../../lib/attentionQueues'
+import { WidgetItemRow } from '../attention/WidgetItemRow'
 import type { WidgetSize } from './homeWidgetDefs'
 
 // The Attention widget family (S6, SPEC-014): the command center's face on the
@@ -62,7 +52,8 @@ function WidgetShell({
         <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{title}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
       </button>
-      <div className="mt-2 flex-1 min-h-0 overflow-hidden">
+      {/* DEC-128 — an open row needs room: scroll, never clip. */}
+      <div className="mt-2 flex-1 min-h-0 overflow-y-auto">
         {count === 0 ? (
           <div className="text-[11px] text-[var(--ink-30)]">{emptyLine}</div>
         ) : (
@@ -74,14 +65,16 @@ function WidgetShell({
 }
 
 /**
- * DEC-050/051 — the widget row, carrying the SAME anatomy as the Attention
+ * DEC-050/051 — the widget row carries the SAME anatomy as the Attention
  * page: a card with the queue's colour as a left spine, a completion circle
  * that closes with the queue's own verb, the status, and the due date. Only
  * the density differs — `dense` (small widgets) shows a status DOT where a
  * roomy widget shows the full pill.
  *
- * Closing runs through useCloseWorkItem, the same path the page uses, so the
- * desk-done and open-subtask offers cannot quietly go missing out here.
+ * DEC-128 — the row itself is WidgetItemRow (components/attention): one
+ * click opens the page's quick summary and row actions in place, a
+ * double-click opens the full item over the page you are on. Nothing here
+ * is a trip to the Attention page any more — that is one of the row's doors.
  */
 function ItemLines({
   items,
@@ -92,80 +85,12 @@ function ItemLines({
   max: number
   dense?: boolean
 }): JSX.Element {
-  const now = Date.now()
-  const goAttention = useViewStore((s) => s.goAttention)
-  const setState = useWorkItemStore((s) => s.setState)
-  const closeItem = useCloseWorkItem()
+  const nowMs = Date.now()
   return (
     <div className="flex flex-col gap-1">
-      {items.slice(0, max).map((i) => {
-        const reason = itemReason(i, now)
-        const primary = PRIMARY_ACTION[queueOf(i)] ?? PRIMARY_ACTION.to_do
-        const closed = isTerminalState(i.workItemState)
-        const tone = statusTone(i.workItemState)
-        const overdue = i.dueAt && Date.parse(i.dueAt) < now
-        return (
-          <div
-            key={i.id}
-            className="group relative flex items-center gap-2 min-w-0 rounded-md border border-[var(--edge-soft)] bg-[var(--surface-raised)] hover:border-[var(--edge-firm)] hover:bg-accent/[0.045] transition-colors pl-2.5 pr-2 py-1.5"
-          >
-            <span
-              aria-hidden
-              className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full"
-              style={{ backgroundColor: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.55) }}
-            />
-            {!closed && (
-              <button
-                onClick={() => void closeItem(i, primary.state)}
-                title={`${primary.label} — close this item`}
-                className="shrink-0 h-[15px] w-[15px] rounded-full border-[1.5px] border-[var(--ink-30)] text-transparent flex items-center justify-center fb-press transition-colors hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
-              >
-                <Icon name="check" size={10} />
-              </button>
-            )}
-            <button
-              onClick={goAttention}
-              title={i.title}
-              className="min-w-0 flex-1 text-left fb-press"
-            >
-              <span className="block text-[12px] text-[var(--ink-90)] truncate">{i.title}</span>
-              {reason && !dense && (
-                <span className="block text-[10px] text-[var(--ink-40)] truncate">{reason}</span>
-              )}
-            </button>
-            {i.dueAt && (
-              <span
-                className={`shrink-0 text-[10px] fb-tabular ${
-                  overdue ? 'text-rose-500' : 'text-[var(--ink-40)]'
-                }`}
-              >
-                {new Date(i.dueAt).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric'
-                })}
-              </span>
-            )}
-            {closed ? (
-              <Icon name="task_alt" size={13} className="shrink-0 text-emerald-500" />
-            ) : dense ? (
-              <span
-                title={statusLabel(i.workItemState, primary.label)}
-                className="shrink-0 h-2 w-2 rounded-full"
-                style={{ backgroundColor: tone.fg }}
-              />
-            ) : (
-              <ItemStatusPill
-                state={i.workItemState}
-                closeChoice={{ state: primary.state, label: primary.label }}
-                onPick={(next) => {
-                  if (next === primary.state) void closeItem(i, next)
-                  else void setState(i.id, next)
-                }}
-              />
-            )}
-          </div>
-        )
-      })}
+      {items.slice(0, max).map((i) => (
+        <WidgetItemRow key={i.id} i={i} dense={dense} nowMs={nowMs} />
+      ))}
     </div>
   )
 }
@@ -321,7 +246,12 @@ export function AttentionWidget({
   size = 'md',
   itemsOverride,
   showStale = true,
-  storageKey = 'attention.widget.section'
+  storageKey = 'attention.widget.section',
+  limit,
+  // DEC-121 lifted the cap with `scroll`; DEC-128 makes every host scroll, so
+  // the prop is kept for its callers and no longer changes anything.
+  scroll: _scroll = false,
+  onCapture
 }: {
   size?: WidgetSize
   /** DEC-045: the desk widget hands in a pre-scoped set; the home widget
@@ -331,6 +261,13 @@ export function AttentionWidget({
    *  a desk's widget showing that desk's own staleness is circular). */
   showStale?: boolean
   storageKey?: string
+  /** DEC-121 — the assistant's Attention tab shows EVERYTHING in the
+   *  section, scrolling, where the home widget shows a sized slice. */
+  limit?: number
+  scroll?: boolean
+  /** DEC-131 — a + at the right of the section pills that opens the house
+   *  capture prompt (the assistant's Attention tab wears it). */
+  onCapture?: () => void
 }): JSX.Element {
   const allItems = useAttentionItems()
   const items = itemsOverride ?? allItems
@@ -360,7 +297,7 @@ export function AttentionWidget({
   }, [])
 
   const now = Date.now()
-  const max = size === 'lg' ? 7 : size === 'md' ? 4 : 2
+  const max = limit ?? (size === 'lg' ? 7 : size === 'md' ? 4 : 2)
   const active = (q: string): FbNode[] => activeOf(items, q)
   const allActive = useMemo(
     () =>
@@ -448,12 +385,26 @@ export function AttentionWidget({
             <Icon name={s.icon} size={13} />
           </button>
         ))}
+        {onCapture && (
+          <button
+            onClick={onCapture}
+            title="Capture a new attention item"
+            aria-label="Capture a new attention item"
+            data-testid="attention-widget-capture"
+            className="ml-auto inline-flex items-center justify-center h-6 w-6 rounded-full bg-accent/10 text-[rgb(var(--accent))] hover:bg-accent/20 fb-press"
+          >
+            <Icon name="add" size={14} />
+          </button>
+        )}
       </div>
       <button onClick={goAttention} className="mt-2 flex items-center gap-2 fb-press text-left">
         <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{current.label}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
       </button>
-      <div className="mt-1.5 flex-1 min-h-0 overflow-hidden">
+      {/* DEC-121's `scroll` lifted the cap for the assistant tab; DEC-128 makes
+          every host scroll, because an open row (the in-place summary) needs
+          room in a sized widget too — clipping it would hide the actions. */}
+      <div className="mt-1.5 flex-1 min-h-0 overflow-y-auto" data-testid="attention-widget-list">
         {section === 'stale' ? (
           stale.length === 0 ? (
             <div className="text-[11px] text-[var(--ink-30)]">Every open desk has a pulse.</div>

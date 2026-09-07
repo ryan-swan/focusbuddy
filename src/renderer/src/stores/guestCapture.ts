@@ -25,6 +25,14 @@ import { create } from 'zustand'
 import { MeetingTrackRecorder } from '../lib/trackRecorder'
 import { useWrapupStore } from './wrapup'
 import { markCalendarOrigin, clearMeetingOrigin } from '../lib/startMeeting'
+import {
+  ensureMicrophoneAccess,
+  probeMicrophone,
+  watchMicrophone,
+  MIC_FAILED_MESSAGE,
+  MIC_SILENCE_MESSAGE,
+  type StartResult
+} from '../lib/micHealth'
 
 /** The pseudo account ids of a guest capture's two tracks. 'me' is the
  *  house local-self placeholder (transcriptMerge stores it as null);
@@ -43,6 +51,10 @@ interface GuestCaptureState {
   notes: string
   startedAt: number | null
   moments: number[]
+  /** DEC-130 — the live sentinel: the mic's peak level, and how long it has
+   *  been digitally silent (the bar says so past DIGITAL_SILENCE_AFTER_MS). */
+  micPeak: number
+  micSilentMs: number
   start: (opts: {
     title: string
     blockId?: string
@@ -52,7 +64,7 @@ interface GuestCaptureState {
     /** "In the room": the honest floor chosen on purpose — the loopback
      *  picker is never raised; Plexii can hear you, not them. */
     micOnly?: boolean
-  }) => Promise<boolean>
+  }) => Promise<StartResult>
   markMoment: () => void
   stop: () => void
 }
@@ -60,6 +72,7 @@ interface GuestCaptureState {
 let recorder: MeetingTrackRecorder | null = null
 let micStream: MediaStream | null = null
 let systemStream: MediaStream | null = null
+let stopWatch: (() => void) | null = null
 
 function teardownStreams(): void {
   micStream?.getTracks().forEach((t) => t.stop())
@@ -75,14 +88,26 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
   notes: '',
   startedAt: null,
   moments: [],
+  micPeak: 0,
+  micSilentMs: 0,
 
   start: async ({ title, blockId, seriesId, agenda, notes, micOnly }) => {
-    if (get().status === 'recording') return false
+    if (get().status === 'recording') return { ok: false, reason: 'failed', message: 'A capture is already running.' }
+    // DEC-130 — ask the system first (macOS: the native prompt, or the plain
+    // truth after a refusal), then LISTEN before recording: a microphone the
+    // system has muted delivers digital silence, never an error.
+    const access = await ensureMicrophoneAccess()
+    if (!access.ok) return access
     // The mic is the floor: no mic, no capture at all.
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
-      return false
+      return { ok: false, reason: 'failed', message: MIC_FAILED_MESSAGE }
+    }
+    const probe = await probeMicrophone(micStream, 1200)
+    if (probe.digitalSilence) {
+      teardownStreams()
+      return { ok: false, reason: 'mic-silent', message: MIC_SILENCE_MESSAGE }
     }
     // System audio, best-effort: arm the one-shot picker-free grant, take the
     // loopback audio, and throw the vehicle video track away immediately —
@@ -108,11 +133,14 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
     recorder = new MeetingTrackRecorder()
     recorder.tap('me', micStream)
     if (systemStream) recorder.tap(GUESTS_ID, systemStream)
+    // The live sentinel — the bar shows the level, and says so if the
+    // microphone goes digitally silent mid-capture.
+    stopWatch = watchMicrophone(micStream, (s) => set({ micPeak: s.peak, micSilentMs: s.silentMs }))
     // Series identity rides the origin, exactly like a native calendar join.
     if (blockId || seriesId) markCalendarOrigin({ title, blockId, seriesId, agenda })
     else clearMeetingOrigin()
-    set({ status: 'recording', mode, title, notes: notes?.trim() ?? '', startedAt: Date.now(), moments: [] })
-    return true
+    set({ status: 'recording', mode, title, notes: notes?.trim() ?? '', startedAt: Date.now(), moments: [], micPeak: 0, micSilentMs: 0 })
+    return { ok: true }
   },
 
   markMoment: () => {
@@ -124,8 +152,10 @@ export const useGuestCaptureStore = create<GuestCaptureState>((set, get) => ({
   stop: () => {
     const rec = recorder
     recorder = null
+    stopWatch?.()
+    stopWatch = null
     const { title, moments, notes } = get()
-    set({ status: 'idle', title: '', notes: '', startedAt: null, moments: [] })
+    set({ status: 'idle', title: '', notes: '', startedAt: null, moments: [], micPeak: 0, micSilentMs: 0 })
     if (!rec) {
       teardownStreams()
       return

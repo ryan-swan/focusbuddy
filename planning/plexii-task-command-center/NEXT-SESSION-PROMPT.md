@@ -151,8 +151,122 @@
 > start level with the rail. 10/10 live, mic stubbed; suite 3,778
 > tests / 342 files. **Every Meet door is now the composer's twin
 > (DEC-117/118/119).**
+> **DEC-120 — the Plexii assistant panel, round 1 of an operator-led
+> series ("start there and then we'll keep going")**: `AssistantHeader`
+> is the panel's first row on every tab — the sidebar's own animated
+> wordmark, then New chat · What was I doing? · Display mode · Minimize;
+> Body double and Your conversations left the bar; the tab strip sits
+> under it; ChatPanel keeps only a slim context strip (focused desk,
+> Discovery, linked desk, Clear). `recap` lives in the chat store. 10/10
+> live, panel restored as found; suite 3,785 tests / 343 files.
+> **BRANCHES (2026-09-06, operator instruction): the Meet work is PR #6
+> (`ryan-next` → main, frozen at DEC-119, zero conflicts, ready to
+> ship; Michael lands). The assistant series lives on `ryan-assistant`
+> (from DEC-120).** **DEC-121**: tabs rearranged — Attention (the home
+> Attention widget itself, uncapped + scrolling), Chat, Agent (with a
+> Desk agents sub-view — Work folded in), Tasks, PlexiChat (the Office
+> `MessagesView`, compact: one pane at a time with a way back). Today,
+> Activity and Work are gone; saved tabs migrate. 13/13 live; suite
+> 3,793 tests / 344 files. **DEC-122**: the strip is now the animated
+> double-ii mark (the conversation, "Plexii AI") · Attention ·
+> PlexiiMessage (two i's) · Agents; Tasks retired into Attention; the
+> default is the conversation. 7/7 live; suite 3,794 tests / 344 files.
+> **DEC-123**: PlexiiMessage's thread header in the panel — one Meet door
+> (a DM meets the person now; a space opens PlexiMeet), no translate menu,
+> the doors on their own left-aligned wrapping row so nothing is cut off;
+> the Office page untouched. 5/5 live; suite 3,795 tests / 344 files.
+> **DEC-124**: the bell means Attention — PlexiiMessage's notification
+> bell left the panel; every message wears a bell that opens the house
+> capture prompt (Respond by default, the card asks), filing an item that
+> points back at the message (`plexii://message/<conv>?m=<id>`, routed
+> from the Attention page). 6/6 live; suite 3,803 tests / 346 files.
+> **DEC-125**: the message bell IS the desk bell — one shared
+> `attention/BellIcon.tsx`; a marked message's bell fills and stays
+> visible with the shared completion circle beside it (closes through
+> DEC-051's one path with the queue's verb, then empties); the meta row
+> left the bubble (time · Translate · pin icon on the left, the thread at
+> the right edge). 5/5 read-only + 7/7 check-off on one `test-seed`
+> scratch (left closed on disk); suite 3,809 tests / 347 files.
+> **DEC-126**: a message's doors — palette · bell · ⋯ — are one cluster
+> hung off the bubble on its vertical centre (both sides); the time shows
+> on hover; Translate lives in the ⋯ menu, which every message has now
+> (Edit / Delete still yours only); the palette and the menu close on a
+> click anywhere outside or Esc (`hooks/useClickAway.ts`, the house
+> pattern extracted). 16/16 live; suite 3,817 tests / 348 files.
+> **DEC-127**: the way back — an Attention item filed from a message (the
+> row's `message` chip, its source door, the editor's Source link) opens
+> the floating assistant on PlexiiMessage, on that person, landed on the
+> exact message (`lib/openMessage.ts` + `messaging.landOnMessage`,
+> consumed once by MessagesView after its pin-to-newest; replies open
+> their thread first via the link's new `p=`). 9/9 live; suite 3,828
+> tests / 349 files.
+> **DEC-128**: the Attention widget's row, everywhere the widget lives
+> (home, desk, the assistant's Attention tab) — `attention/WidgetItemRow`:
+> title + date at rest; one click opens the page's quick summary and row
+> actions IN PLACE (source door, desk, Start with Plexii, Snooze, Archive,
+> Open the item, the page); double-click opens the page's editor over the
+> current page (portalled). Shared doors extracted: `lib/startWithPlexii`,
+> `lib/openMeeting`. 13/13 live; suite 3,838 tests / 350 files.
+> **DEC-129**: the Today tile's meeting and calendar items get the same
+> three depths — `attention/CalendarBlockRow` (summary in place with the
+> calendar's own doors: Join, Record external, Start, Done, Skip, Open,
+> Delete, the page; double-click → BookTimeDialog in edit mode, saving via
+> `lib/blockEdit`); the tile's dated work and the Overdue radar use
+> `WidgetItemRow`; MiniRow retired. Judgement call: `dayTimeline` puts
+> overdue work BEHIND today's timed shape. 8/8 live with scratch blocks
+> (removed); suite 3,846 tests / 351 files.
+> **DEC-130 — the recording audit.** The operator's silent "Record notes"
+> was a DIGITALLY SILENT microphone (the dev app launched from Claude Code
+> inherits a mic-less macOS permission; the app never said so) plus an
+> on-device engine that derails a whole take on a few hard seconds. Now:
+> every door asks the system, listens 1.2 s and refuses silence with the
+> settings door (`lib/micHealth`, `MicLevelPill`, `media:micStatus` /
+> `media:askMic` — the main bridge needs an app RESTART, no `--watch`);
+> Record notes rides the on-device wrap-up (segments, retained take, the
+> picked desk as container); `transcriptSanity` refuses hallucinations;
+> the derail net (`audioSplit`) cuts at pauses and decodes the pieces;
+> decode at 48 kHz. 10/10 + 10/10 live with a synthetic mic (residue in
+> Trash + dismissed briefs — purge on the operator's word); suite 3,871
+> tests / 354 files. The operator's mic works when Plexii is launched
+> from the Dock or the launcher is allowed the microphone.
+> **DEC-131**: the panel — Message (was PlexiiMessage) with a one-row
+> header (people · Meet · Recall · pin; no members button, a space reads
+> as its people) and a panel-shaped composer (mic inside the box, no
+> camera, taller); a + on Attention that opens the capture prompt; a
+> Calendar tab after Attention (today's rail column, ‹ Today ›, the month
+> at a glance, a day click → Book-time dialog → `lib/bookBlock`, shared
+> with the grid). 12/12 live; suite 3,880 tests / 355 files. Addendum: the
+> Calendar tab's day column fills the tab (`WeekTimeGrid fill`).
+> **DEC-132**: home tiles scroll instead of clipping (the tile wrapper is
+> `overflow-y-auto`); RailCard `fill` pins the header and scrolls the body
+> (Rooms and desks' two columns each scroll; Continue; Quick actions); the
+> standup pins its title row over a scrolling body; the command-center
+> blocks scroll; `ItemStatusPill`'s menu is portalled at the pill's
+> coordinates (flips upward at the bottom). 5/5 live; suite 3,886 tests /
+> 356 files. **DEC-133**: every desk widget body scrolls (`WidgetFrame`),
+> the Attention widget verified pinned + scrolling on home and desk, the
+> standup's Save chip fixed (`icon-btn` retired from it). 4/4 live; suite
+> 3,888 tests / 356 files. **DEC-134**: the Calendar and Meet pages are
+> windows, not scrolls — headers pinned, the rail/grid/panes take the rest
+> and scroll inside themselves (the week grid on `fill`, the month sharing
+> its height across six weeks, the Meet rail hugging-or-shrinking, the
+> Record and Transcript hugging-or-capping); the four `100vh` caps and both
+> sticky rails are gone. 16/16 live at 2021×1105 and 1400×640; suite
+> 3,896 tests / 356 files. **DEC-135**: the meeting detail header sits on
+> a house card (the Timeline's own material), edge to edge with the cards
+> below it, the speaker avatars ringed in the card's fill. 4/4 live; suite
+> 3,896 tests / 356 files. Addendum: "Notes" and "New meeting" already carry
+> it (one component) — verified on the running app, no code. **DEC-136**:
+> the Record's section titles in Overview and Analytics (Summary, Your
+> notes, the Brief sections, the transcript toggle, Who spoke, Moments) sit
+> on a sunken band — `RECORD_SECTION_BAND` / `RecordSectionTitle`; Action
+> items untouched. 4/4 live; suite 3,897 tests / 356 files. **DEC-137**:
+> the Action items tab too (In Attention, From the summary, Carried from
+> last time via a `band` prop; the wrap-up keeps its eyebrow); the band now
+> lives in `components/RecordSectionTitle.tsx`. 4/4 live; suite 3,898
+> tests / 356 files.
 
-**Last updated:** 2026-09-06 — through DEC-119 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-07 — through DEC-137 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

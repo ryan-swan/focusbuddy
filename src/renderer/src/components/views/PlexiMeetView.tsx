@@ -17,17 +17,30 @@ import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { CarriedItem, Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
 import { useGuestCaptureStore } from '../../stores/guestCapture'
+import { useWrapupStore } from '../../stores/wrapup'
+import { MeetingTrackRecorder } from '../../lib/trackRecorder'
+import { markDeskOrigin, clearMeetingOrigin } from '../../lib/startMeeting'
+import {
+  ensureMicrophoneAccess,
+  probeMicrophone,
+  watchMicrophone,
+  MIC_FAILED_MESSAGE,
+  MIC_SILENCE_MESSAGE,
+  type StartResult
+} from '../../lib/micHealth'
+import MicLevelPill from '../MicLevelPill'
 import { fmtOffset } from '../../lib/transcriptMerge'
-import { buildYoursSpans, validateRecordSpans } from '../../lib/recordSpans'
+import { validateRecordSpans } from '../../lib/recordSpans'
 import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
 import MeetingCommitmentsCard, { CarriedFromLastTime } from '../MeetingCommitmentsCard'
 import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
 import { useViewStore } from '../../stores/view'
-import type { ActionProposal, FbNode } from '@shared/types'
+import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { CLASS_LABEL, isTerminalState } from '../../lib/attentionQueues'
 import { RailCard, StatTile, StatusPill } from '../plexi'
+import RecordSectionTitle, { RECORD_SECTION_BAND } from '../RecordSectionTitle'
 import {
   speakerOrder,
   speakerColor,
@@ -48,14 +61,6 @@ import {
 // hand. Action items become real tasks beside the work. Reads only real
 // meetings; an empty history is honestly empty. Live transcription needs a
 // configured key, surfaced plainly when it is missing.
-
-function proposalLabels(p: ActionProposal): string[] {
-  if (p.kind === 'create-todo-list') return p.items?.length ? p.items : [p.title]
-  if (p.kind === 'create-task') return [p.title]
-  if (p.kind === 'open-url') return [p.title || p.url]
-  if ('title' in p && p.title) return [p.title]
-  return []
-}
 
 function fmtDate(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -78,7 +83,6 @@ export default function PlexiMeetView(): JSX.Element {
   // A segment to land on once the detail's segments load (from a Recall hit
   // or an fb:open-meeting with a segmentId).
   const [pendingSegment, setPendingSegment] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
   const [whisper, setWhisper] = useState(whisperEnabled())
@@ -86,12 +90,12 @@ export default function PlexiMeetView(): JSX.Element {
   useEffect(() => {
     void window.api.meetings.getAudioRetention().then(setRetention).catch(() => {})
   }, [])
-  const recRef = useRef<MediaRecorder | null>(null)
+  const recRef = useRef<{ rec: MeetingTrackRecorder; stream: MediaStream; draft: RecordNotesDraft | null; stopWatch: () => void } | null>(null)
+  const [micState, setMicState] = useState<{ peak: number; silentMs: number }>({ peak: 0, silentMs: 0 })
   // DEC-118 — both record doors open the composer-twin dialog first; the
   // draft it hands over (title, notes, desk) rides the recording to the
   // meeting it becomes.
   const [recordDialog, setRecordDialog] = useState<'notes' | 'external' | null>(null)
-  const recDraftRef = useRef<RecordNotesDraft | null>(null)
 
   useEffect(() => {
     void load()
@@ -146,80 +150,75 @@ export default function PlexiMeetView(): JSX.Element {
   const selected = meetings.find((m) => m.id === selectedId) ?? null
   const now = Date.now()
 
-  async function startRecording(draft?: RecordNotesDraft): Promise<boolean> {
+  // DEC-130 — "Record notes" is the same recording as every other door now:
+  // the per-track recorder, transcribed ON THIS MACHINE at the wrap-up (CR-11:
+  // meeting audio never leaves it — the old path shipped it to a cloud
+  // engine), which writes SEGMENTS (the Record's Thread, Recall, commitments
+  // and analytics all read segments; a plain transcript lit none of them),
+  // retains the take (CR-13, so Re-transcribe has fuel) and refuses to file a
+  // meeting on silence. The desk picked in the dialog IS the container.
+  //
+  // And the microphone is checked before, and watched during: the operator's
+  // three-minute "you you you you you you" record (2026-09-07) was a track of
+  // digital zeros — macOS had not allowed the microphone, and nothing said so.
+  async function startRecording(draft?: RecordNotesDraft): Promise<StartResult> {
     setError(null)
-    recDraftRef.current = draft ?? null
+    const access = await ensureMicrophoneAccess()
+    if (!access.ok) return access
+    let stream: MediaStream
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const rec = new MediaRecorder(stream)
-      const chunks: Blob[] = []
-      rec.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data)
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        setRecording(false)
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
-        await transcribeAndSave(await blob.arrayBuffer(), rec.mimeType || 'audio/webm')
-      }
-      rec.start()
-      recRef.current = rec
-      setRecording(true)
-      return true
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
       // The dialog that opened this door reports the microphone itself and
       // stays open — a second banner behind it would say the same thing twice.
-      recDraftRef.current = null
-      return false
+      return { ok: false, reason: 'failed', message: MIC_FAILED_MESSAGE }
     }
+    const probe = await probeMicrophone(stream, 1200)
+    if (probe.digitalSilence) {
+      stream.getTracks().forEach((tr) => tr.stop())
+      return { ok: false, reason: 'mic-silent', message: MIC_SILENCE_MESSAGE }
+    }
+    const rec = new MeetingTrackRecorder()
+    rec.tap('me', stream)
+    const stopWatch = watchMicrophone(stream, (s) => setMicState({ peak: s.peak, silentMs: s.silentMs }))
+    recRef.current = { rec, stream, draft: draft ?? null, stopWatch }
+    setMicState({ peak: 0, silentMs: 0 })
+    setRecording(true)
+    return { ok: true }
   }
 
   function stopRecording(): void {
-    recRef.current?.stop()
-  }
-
-  async function transcribeAndSave(buffer: ArrayBuffer, mimeType: string): Promise<void> {
-    setBusy('Transcribing the recording…')
-    setError(null)
-    try {
-      // Unguarded before: a rejected transcribe left the spinner stuck forever.
-      const t = await transcribeRecording(buffer, mimeType)
-      if (!t.ok) {
-        setError(
-          t.reason === 'no_key'
-            ? 'Recording captured, but transcription needs a key. Add an OpenAI or Anthropic key in Settings, then record again.'
-            : `Transcription failed: ${t.error}`
-        )
+    const cur = recRef.current
+    recRef.current = null
+    setRecording(false)
+    if (!cur) return
+    cur.stopWatch()
+    void cur.rec.stop().then((take) => {
+      cur.stream.getTracks().forEach((tr) => tr.stop())
+      if (!take.mixed) {
+        setError('Nothing was recorded — the recorder could not start on this machine.')
         return
       }
-      setBusy('Summarising…')
-      const sum = await window.api.voiceNote.process({ transcript: t.transcript, mode: 'summary' }).catch(() => null)
-      setBusy('Pulling out action items…')
-      const acts = await window.api.voiceNote.extractActions({ transcript: t.transcript }).catch(() => null)
-      const actionItems = acts?.ok ? acts.proposals.flatMap(proposalLabels).filter(Boolean) : []
-      const draft = recDraftRef.current
-      recDraftRef.current = null
-      const created = await createMeeting({
-        title: draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`,
-        transcript: t.transcript,
-        // An empty summary when the AI step failed is honest: the transcript is
-        // the real captured value, and nothing fake is filled in.
-        summary: sum?.ok ? sum.text : '',
-        actionItems,
-        durationSec: t.durationSec
+      const draft = cur.draft
+      const title = draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`
+      if (draft?.deskNodeId) markDeskOrigin(draft.deskNodeId, title)
+      else clearMeetingOrigin()
+      void useWrapupStore.getState().begin({
+        title,
+        buffer: take.mixed.buffer,
+        mimeType: take.mixed.mimeType,
+        durationSec: take.mixed.durationSec,
+        tracks: take.tracks,
+        speakers: { me: 'You' },
+        // CR-11 — meeting-grade audio: on-device only, no cloud fallback.
+        forceLocalTranscription: true,
+        // The dialog's NOTES are the recorder's own words — `yours` spans on
+        // the Record, never rewritten.
+        notes: draft?.notes ?? '',
+        moments: [],
+        deskNodeId: draft?.deskNodeId ?? null
       })
-      // The dialog's NOTES are the recorder's own words — `yours` spans on the
-      // Record, never rewritten; the attached desk is the meeting's desk.
-      if (created && draft && (draft.notes.trim() || draft.deskNodeId)) {
-        await updateMeeting(created.id, {
-          ...(draft.notes.trim() ? { record: { spans: buildYoursSpans(draft.notes), generatedAt: Date.now() } } : {}),
-          ...(draft.deskNodeId ? { deskNodeId: draft.deskNodeId } : {})
-        })
-      }
-      if (created) setSelectedId(created.id)
-    } catch {
-      setError('Something went wrong saving the recording. The audio was captured; please try again.')
-    } finally {
-      setBusy(null)
-    }
+    })
   }
 
   async function addManual(): Promise<void> {
@@ -342,10 +341,21 @@ export default function PlexiMeetView(): JSX.Element {
     // primary as Home's accent button, and every surface below a floating
     // house card on the paper. Presentation ONLY: every testid, handler and
     // copy string is exactly where it was.
-    <div className="h-full w-full overflow-auto paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view">
-      <div className="max-w-[1440px] mx-auto px-8 pb-8 pt-8">
+    //
+    // DEC-134 — on a wide window the page is a WINDOW, not a scroll (the rule
+    // DEC-132/133 gave the home tiles and the desk widgets): the hero stays
+    // pinned, the rail is as tall as the floor and no taller, and the column
+    // beside it scrolls on its own — or, with a meeting open, hands its
+    // height to the Record so its panes scroll under their own headers. The
+    // rail and the transcript used to stick to a page scroll under caps of
+    // `calc(100vh - 460px)` and `calc(100vh - 140px)`, numbers the wrapping
+    // hero and the footer could not see, so their bottom edges ran under the
+    // footer with nothing to scroll. Below `lg` the columns stack and the
+    // page scrolls, as before.
+    <div className="h-full w-full flex flex-col overflow-y-auto lg:overflow-hidden paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view">
+      <div className="w-full max-w-[1440px] mx-auto px-8 pb-8 pt-8 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
         {/* Hero — Home's greeting header idiom: title + subtitle left, doors right. */}
-        <header className="flex items-start justify-between gap-4 flex-wrap mb-6" data-testid="meet-hero">
+        <header className="flex items-start justify-between gap-4 flex-wrap mb-6 shrink-0" data-testid="meet-hero">
           <div className="flex items-center gap-3 min-w-0">
             <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-rose-500/10 text-rose-500 shadow-[inset_0_0_0_1px_rgb(244_63_94/0.18)]">
               <Icon name="groups" size={22} filled />
@@ -358,18 +368,21 @@ export default function PlexiMeetView(): JSX.Element {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Secondary doors first, the primary last — Home's order. */}
             {recording ? (
-              <button
-                onClick={stopRecording}
-                data-testid="meet-stop"
-                className="inline-flex items-center gap-2 h-9 px-3.5 rounded-[10px] bg-red-500 text-white fb-t-body font-medium animate-pulse fb-press"
-              >
-                <Icon name="stop_circle" size={16} /> Stop recording
-              </button>
+              <>
+                {/* DEC-130 — what the microphone is doing, while it runs. */}
+                <MicLevelPill peak={micState.peak} silentMs={micState.silentMs} />
+                <button
+                  onClick={stopRecording}
+                  data-testid="meet-stop"
+                  className="inline-flex items-center gap-2 h-9 px-3.5 rounded-[10px] bg-red-500 text-white fb-t-body font-medium animate-pulse fb-press"
+                >
+                  <Icon name="stop_circle" size={16} /> Stop recording
+                </button>
+              </>
             ) : (
               <button
                 onClick={() => setRecordDialog('notes')}
                 data-testid="meet-record"
-                disabled={!!busy}
                 className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
                 title="Record audio, transcribe it and extract action items"
               >
@@ -406,7 +419,6 @@ export default function PlexiMeetView(): JSX.Element {
             <button
               onClick={() => void addManual()}
               data-testid="meet-add"
-              disabled={!!busy}
               className="inline-flex items-center justify-center h-9 w-9 fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
               title="Add a meeting from notes" aria-label="Add a meeting from notes"
             >
@@ -424,13 +436,8 @@ export default function PlexiMeetView(): JSX.Element {
           </div>
         </header>
 
-        {(busy || error || msgNote) && (
-          <div className="mb-4 space-y-2">
-            {busy && (
-              <div className="flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
-                <Icon name="progress_activity" size={14} className="animate-spin" /> {busy}
-              </div>
-            )}
+        {(error || msgNote) && (
+          <div className="mb-4 space-y-2 shrink-0">
             {error && (
               <div className="px-3 py-2 rounded-[var(--radius-row)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] leading-relaxed" data-testid="meet-error">
                 {error}
@@ -444,18 +451,24 @@ export default function PlexiMeetView(): JSX.Element {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Rail — Home's rail idiom: floating cards that stay put while the Record scrolls. */}
-          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 self-start" data-testid="meet-rail">
+        <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-stretch lg:flex-1 lg:min-h-0">
+          {/* Rail — Home's rail idiom: floating cards beside the Record. DEC-134:
+              the rail stands as tall as the floor and no taller — the Meetings
+              card hugs a short list and shrinks for a long one (the list
+              scrolling under the pinned title and search) while the Recording
+              card never gives up its height — so the last meeting and the
+              retention control are always on screen. */}
+          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4 lg:min-h-0" data-testid="meet-rail">
             <RailCard
               title="Meetings"
               icon="groups"
               tone="rose"
               testId="meet-list-card"
-              bodyClassName="px-2 pb-2"
+              className="flex flex-col min-h-0"
+              bodyClassName="px-2 pb-2 min-h-0 flex flex-col"
               trailing={loaded ? <span className="fb-tabular text-[12px] text-[var(--ink-40)]">{meetings.length}</span> : undefined}
             >
-              <div className="px-1 pb-2">
+              <div className="px-1 pb-2 shrink-0">
                 <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
                   <Icon name="search" size={14} className="text-[var(--ink-50)]" />
                   <input
@@ -467,7 +480,7 @@ export default function PlexiMeetView(): JSX.Element {
                   />
                 </div>
               </div>
-              <div className="overflow-auto max-h-[max(240px,calc(100vh-460px))]">
+              <div className="min-h-0 overflow-y-auto max-h-[60vh] lg:max-h-none" data-testid="meet-list">
           {recallHits.length > 0 && (
             <div className="mb-2" data-testid="recall-hits">
               <div className="px-3 pt-1 pb-1 text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">
@@ -537,7 +550,7 @@ export default function PlexiMeetView(): JSX.Element {
                 expresses MY side: on a call it records my mic and ASKS the
                 other person — their voice is captured when they say yes, and
                 a decline is honoured by construction (never tapped). */}
-            <RailCard bodyClassName="p-4 space-y-2" testId="meet-recording-card">
+            <RailCard className="shrink-0" bodyClassName="p-4 space-y-2" testId="meet-recording-card">
               <div className="text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">RECORDING</div>
           <label
             className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
@@ -584,8 +597,13 @@ export default function PlexiMeetView(): JSX.Element {
             </RailCard>
           </aside>
 
-          {/* Detail */}
-          <div className="flex-1 min-w-0 w-full">
+          {/* Detail — DEC-134: on a wide window the column scrolls on its own
+              under the pinned hero (the dashboard), or hands its height to the
+              Record, which pins its header and timeline and scrolls its panes. */}
+          <div
+            className={`flex-1 min-w-0 w-full ${selected ? 'lg:min-h-0 lg:flex lg:flex-col' : 'lg:min-h-0 lg:overflow-y-auto'}`}
+            data-testid="meet-main"
+          >
         {selected ? (
           <MeetingDetail
             key={selected.id}
@@ -701,6 +719,9 @@ export default function PlexiMeetView(): JSX.Element {
 //   inferred — lighter ink, no rule, no anchor. The machine's guess LOOKS
 //              like a guess (the same accent-vs-ink doctrine as capture).
 type RecordView = 'commitments' | 'brief' | 'analytics'
+
+// DEC-136/137 — every section title inside the Record (all three renderings)
+// sits on RecordSectionTitle's band: see components/RecordSectionTitle.tsx.
 
 /** The state of a filed work item as the list exposes it. */
 function itemState(i: FbNode): string {
@@ -1146,10 +1167,14 @@ function MeetingDetail({
   const actionCount = filedItems.length + (foundCommitments?.length ?? 0) + unfiledLegacy.length
 
   return (
-    <div className="flex flex-col" data-testid="meet-detail">
-      {/* ── Header: Home's idiom — the title on the paper, its facts beneath,
-          the doors as quiet surface buttons on the right ─────────────────── */}
-      <header className="flex items-start justify-between gap-4 flex-wrap mb-5" data-testid="meet-detail-header">
+    <div className="flex flex-col lg:flex-1 lg:min-h-0" data-testid="meet-detail">
+      {/* ── Header: the title, its facts beneath, the doors as quiet surface
+          buttons on the right — on a house card. DEC-116 set the title bare
+          on the paper; DEC-135 (operator: "add a filled-in colored block
+          behind it similar to the timeline block, just for that header title
+          field") gives it the Timeline card's own material, edge to edge with
+          the cards below it. ───────────────────────────────────────────── */}
+      <header className="fb-card px-4 py-3.5 flex items-start justify-between gap-4 flex-wrap mb-4 shrink-0" data-testid="meet-detail-header">
         <div className="min-w-0 flex-1">
           <input
             value={title}
@@ -1172,10 +1197,12 @@ function MeetingDetail({
               <span className="inline-flex items-center gap-2" data-testid="meet-speakers">
                 <span className="flex -space-x-1.5">
                   {speakers.map((name) => (
+                    // The ring is the card's own fill now (DEC-135), so the
+                    // overlapping avatars keep a clean separator on it.
                     <span
                       key={name}
                       title={name}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-base)]"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-raised)]"
                       style={{ backgroundColor: colorOf(name) }}
                     >
                       {speakerInitials(name)}
@@ -1254,7 +1281,7 @@ function MeetingDetail({
           icon="timeline"
           tone="rose"
           testId="meet-timeline"
-          className="mb-4"
+          className="mb-4 shrink-0"
           bodyClassName="px-4 pb-3"
           trailing={
             <span className="flex items-center gap-4 min-w-0">
@@ -1328,15 +1355,20 @@ function MeetingDetail({
       )}
 
       {/* ── Two columns: renderings left, transcript always on the right ──── */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
-        <div className="flex-1 min-w-0 w-full" ref={recordRef}>
+      {/* DEC-134 — the two panes share the window's remaining height: each
+          hugs short content and caps at the floor (max-h-full of the row), the
+          Record scrolling its renderings under the pinned title and segmented
+          control, the Transcript scrolling its thread under the pinned search
+          and speaker chips. */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:flex-1 lg:min-h-0">
+        <div className="flex-1 min-w-0 w-full lg:min-h-0 lg:max-h-full lg:flex lg:flex-col" ref={recordRef}>
           <RailCard
             title="Record"
             icon="article"
             tone="accent"
             testId="meet-record-pane"
-            className="overflow-hidden"
-            bodyClassName="px-0 pb-0"
+            className="overflow-hidden flex flex-col min-h-0"
+            bodyClassName="px-0 pb-0 min-h-0 overflow-y-auto"
             trailing={
               /* M2b — the segmented control: three renderings, one Record. */
               <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]" data-testid="record-views">
@@ -1374,6 +1406,7 @@ function MeetingDetail({
                   items={carried}
                   lastTitle={lastMeeting?.title}
                   lastAt={lastMeeting?.createdAt}
+                  band
                 />
               )}
               {segments.length > 0 && foundCommitments === null && (
@@ -1408,7 +1441,7 @@ function MeetingDetail({
 
               {filedItems.length > 0 && (
                 <div data-testid="meet-filed-items">
-                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">In Attention</div>
+                  <RecordSectionTitle>In Attention</RecordSectionTitle>
                   <div className="divide-y divide-[var(--edge-soft)]">
                     {filedItems.map((i) => {
                       const done = isTerminalState(itemState(i))
@@ -1476,7 +1509,7 @@ function MeetingDetail({
               ) : (
                 unfiledLegacy.length > 0 && (
                   <div data-testid="meet-legacy-items">
-                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">From the summary</div>
+                    <RecordSectionTitle>From the summary</RecordSectionTitle>
                     <div className="divide-y divide-[var(--edge-soft)]">
                       {unfiledLegacy.map(({ text: item, i }) => (
                         <div key={i} className="flex items-start gap-3 py-2.5">
@@ -1516,7 +1549,7 @@ function MeetingDetail({
           {view === 'brief' && (
             <div className="px-4 py-4 space-y-4" data-testid="rendering-brief-outer">
               <section>
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Summary</div>
+                <RecordSectionTitle>Summary</RecordSectionTitle>
                 <textarea
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
@@ -1554,7 +1587,7 @@ function MeetingDetail({
                   {/* yours first — the reader's own words lead. */}
                   {meeting.record.spans.filter((s) => s.tier === 'yours').length > 0 && (
                     <div className="space-y-1" data-testid="brief-yours">
-                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5">Your notes</div>
+                      <RecordSectionTitle>Your notes</RecordSectionTitle>
                       {meeting.record.spans
                         .filter((s) => s.tier === 'yours')
                         .map((s, i) => (
@@ -1567,7 +1600,7 @@ function MeetingDetail({
                   {[...new Set(meeting.record.spans.filter((s) => s.tier !== 'yours').map((s) => s.section ?? 'Notes'))].map(
                     (section) => (
                       <section key={section} data-brief-section={section}>
-                        <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)] mb-2">{section}</h2>
+                        <RecordSectionTitle>{section}</RecordSectionTitle>
                         <div className="space-y-1.5">
                           {meeting.record!.spans
                             .filter((s) => s.tier !== 'yours' && (s.section ?? 'Notes') === section)
@@ -1611,7 +1644,8 @@ function MeetingDetail({
                 <button
                   onClick={() => setShowTranscript((v) => !v)}
                   aria-expanded={showTranscript || segments.length === 0}
-                  className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-40)] mb-1.5 fb-press"
+                  className={`${RECORD_SECTION_BAND} w-full flex items-center gap-1.5 text-[13.5px] font-semibold tracking-tight text-[var(--ink-100)] fb-press`}
+                  data-record-section-title
                 >
                   <Icon name="expand_more" size={14} className={`transition-transform ${showTranscript || segments.length === 0 ? 'rotate-180' : ''}`} />
                   Plain transcript text
@@ -1645,7 +1679,7 @@ function MeetingDetail({
                     <StatTile icon="notes" label="Lines" value={segments.length} tone="stone" />
                   </div>
                   <section data-testid="meet-who-spoke">
-                    <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)]">Who spoke</h2>
+                    <RecordSectionTitle>Who spoke</RecordSectionTitle>
                     <p className="text-[12px] text-[var(--ink-50)] mb-2.5">
                       Share of the transcript by speaker — a fact from the attributed lines, not a score. Click a name to read only them.
                     </p>
@@ -1677,7 +1711,7 @@ function MeetingDetail({
                   </section>
                   {markers.length > 0 && (
                     <section>
-                      <h2 className="text-[14px] font-semibold tracking-tight text-[var(--ink-100)]">Moments</h2>
+                      <RecordSectionTitle>Moments</RecordSectionTitle>
                       <p className="text-[12px] text-[var(--ink-50)] mb-2">
                         Where the Record and your action items point into the call. Each one opens the line.
                       </p>
@@ -1711,7 +1745,7 @@ function MeetingDetail({
           icon="subtitles"
           tone="sky"
           testId="meet-transcript-pane"
-          className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 flex flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-140px)]"
+          className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 flex flex-col lg:min-h-0 lg:max-h-full"
           bodyClassName="flex-1 min-h-0 flex flex-col"
           trailing={
             segments.length > 0 ? (

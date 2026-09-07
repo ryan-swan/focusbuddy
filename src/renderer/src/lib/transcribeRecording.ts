@@ -1,3 +1,6 @@
+import { transcriptLooksEmpty } from './transcriptSanity'
+import { rmsOf, splitAtSilence } from './audioSplit'
+
 // One provider-aware way to transcribe a recorded audio blob, so every caller
 // (meeting wrap-up, record-notes, and any future recorder) behaves correctly on
 // both transcription providers.
@@ -22,11 +25,20 @@
 // let an OfflineAudioContext do the resample to 16 kHz — its render path
 // is the high-quality resampler, and connecting any channel count to a
 // mono destination downmixes correctly for free.
+//
+// DEC-130 — and the first stage must NAME its rate. A bare `new AudioContext()`
+// runs at the system output device's rate, which is 16 kHz whenever a
+// Bluetooth headset is in its call profile (operator's machine, 2026-09-07:
+// 16000 one minute, 44100 the next). At 16 kHz the "native" decode IS the
+// low-quality resample above — the same take transcribed perfectly at
+// 44.1 kHz and as "Thanks for watching." at 16 kHz. Opus is 48 kHz by
+// definition, so decode there, always; the offline stage does the rest.
+const DECODE_RATE = 48000
 async function decodeToMono16k(arrayBuffer: ArrayBuffer): Promise<Float32Array> {
   const AC: typeof AudioContext =
     (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext ||
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!
-  const probe = new AC()
+  const probe = new AC({ sampleRate: DECODE_RATE })
   let decoded: AudioBuffer
   try {
     decoded = await probe.decodeAudioData(arrayBuffer.slice(0))
@@ -47,6 +59,37 @@ async function decodeToMono16k(arrayBuffer: ArrayBuffer): Promise<Float32Array> 
 
 type TranscribeResult = Awaited<ReturnType<typeof window.api.voiceNote.transcribe>>
 
+// DEC-130 — the derail net. whisper-base decodes a take as one window, and a
+// few hard seconds (a word cut off mid-syllable at the end, a click) can
+// return the WHOLE window as a stock phrase — "Thanks for watching." for a
+// take the cloud engine read perfectly. When the first pass looks like that
+// and the audio plainly has sound, cut the take at its own pauses and decode
+// the pieces: every piece the engine can read is kept, with its timestamps
+// moved onto the take's clock; a piece that still derails is dropped rather
+// than invented. Still on-device, still no cloud (CR-11).
+const DERAIL_MIN_RMS = 0.005
+async function recoverIfDerailed(samples: Float32Array, first: TranscribeResult): Promise<TranscribeResult> {
+  if (!first.ok) return first
+  const durationSec = samples.length / 16000
+  if (!transcriptLooksEmpty(first.transcript, durationSec) || rmsOf(samples) < DERAIL_MIN_RMS) return first
+  const ranges = splitAtSilence(samples, 16000, { minChunkSec: 1.5, maxChunkSec: 8 })
+  if (ranges.length < 2 && ranges[0] && ranges[0].end - ranges[0].start >= samples.length) return first
+  const texts: string[] = []
+  const segments: NonNullable<Extract<TranscribeResult, { ok: true }>['segments']> = []
+  for (const r of ranges) {
+    const piece = samples.subarray(r.start, r.end)
+    const res = await window.api.voiceNote.transcribe({ samples: piece, sampleRate: 16000, forceProvider: 'local' })
+    if (!res.ok) continue
+    const text = res.transcript.trim()
+    if (!text || transcriptLooksEmpty(text, piece.length / 16000)) continue
+    texts.push(text)
+    const offsetMs = Math.round((r.start / 16000) * 1000)
+    for (const s of res.segments ?? []) segments.push({ ...s, startMs: s.startMs + offsetMs, endMs: s.endMs + offsetMs })
+  }
+  if (texts.length === 0) return first
+  return { ...first, transcript: texts.join(' '), segments: segments.length ? segments : null }
+}
+
 // Transcribe a recorded blob, decoding for the local provider. Returns the same
 // shape as window.api.voiceNote.transcribe so callers are unchanged otherwise.
 export async function transcribeRecording(
@@ -62,7 +105,8 @@ export async function transcribeRecording(
   if (opts.forceLocal) {
     try {
       const samples = await decodeToMono16k(buffer)
-      return await window.api.voiceNote.transcribe({ samples, sampleRate: 16000, forceProvider: 'local' })
+      const first = await window.api.voiceNote.transcribe({ samples, sampleRate: 16000, forceProvider: 'local' })
+      return await recoverIfDerailed(samples, first)
     } catch (err) {
       return {
         ok: false,

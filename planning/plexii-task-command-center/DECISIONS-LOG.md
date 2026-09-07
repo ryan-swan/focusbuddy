@@ -3666,3 +3666,846 @@ error in the dialog and raises no Stop & send; Esc. e2e: plexiMeetLive #2
 now expects the dialog and its empty-state placeholder; moduleDashboard's
 Meet case expects NO customize door. Suite: 3,778 tests / 342 files; both
 typechecks clean.
+
+## DEC-120 — The assistant's header comes first: the sidebar's wordmark, four doors, tabs below
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+(the floating Plexii panel: "the menu options for today, chat, agent, tasks,
+activity, work need to come below the plexii wordmark menu items… at the
+very top… from right to left minimize, display mode, What was I doing?…
+take body double off of this page entirely… take your conversations off of
+these menu bars and keep new chat… replace the Plexii wordmark where it
+says Plexii your space with just the plexii logo and wordmark with the
+animated bouncing eyes from the top left of the left panel menu. Start
+there and then we'll keep going.") · **Branch:** ryan-next.
+
+**What changed.** A new `AssistantHeader` is the panel's FIRST row on every
+tab: the desk sidebar's own `PlexiiLogo` (the same `PlexiiMark`, the same
+blink-once-and-wink-on-hover motion — one wordmark, one component) where
+"Plexii / your workspace" stood, and on the right, left→right, New chat ·
+What was I doing? · Display mode · Minimize — i.e. from the right exactly
+as asked. Body double left the bar (its doors in the app header and the
+command centre stay); Your conversations left the bar (the list stays the
+fullscreen rail; the narrow-mode overlay lost its only door and went with
+it). The tab strip now sits under the header. The Chat tab keeps the
+conversation's own context as a slim strip only when there is something to
+say — the focused desk thread, the Discovery badge, the linked desk, and
+Clear chat when messages exist. The hub page (`PlexiiHubView`) wears the
+same bar without the two chrome doors (it is not re-dressable).
+
+**Plumbing.** "What was I doing?" moved into the chat store (`recap`,
+`recapping`) so the overlay header and the hub share one implementation;
+`ChatPanel` lost its header, `onCollapse`, the chrome mode menu, the
+body-double hook and the history overlay — 190 lines of header for a
+30-line context strip. Existing testids survive where the doors survive
+(`assistant-new-chat`, `assistant-mode-toggle`, `assistant-mode-<mode>`,
+`assistant-minimize`, `chat-linked-desk`, `chat-mode-badge`);
+`assistant-recap` and `assistant-header` are new.
+
+**Verified live** over CDP, 10/10, the panel restored exactly as found
+(closed, floating, Chat): the header is the first row and the tab strip
+begins at its bottom edge (171→219→219 px); the header holds the SVG
+wordmark and no title; the four doors sit in order by x; no history toggle,
+no body-double button, four buttons total; the header persists across
+Today and Agent; Display mode lists Sidebar · Floating · Full screen; New
+chat lands on Chat; Minimize returns to the pill. Suite: 3,785 tests / 343
+files; both typechecks clean.
+
+## DEC-121 — The assistant's tabs rearranged: Attention, Chat, Agent (+ desk agents), Tasks, PlexiChat
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant`
+(new — the operator's AI-assistant series, branched from DEC-120; the Meet
+work shipped as PR #6 on `ryan-next`, see the branch note below) · **Plan:**
+operator request ("Replace the today button with an attention button… a
+view of all your attention items… similar to the home screen attention
+widget… replace the Activity Bar with Plexi Chat functionality… consolidate
+agent and work… a sub tab… within the agent button to see the desk agents").
+
+**Branches, first (operator instruction).** `ryan-next` rewound to DEC-119
+(`c9da6993`) so the ship excludes the assistant work, and opened as **PR #6
+ryan-next → main** on saasmouth/focusbuddy — zero conflicts against 4.2.2,
+green, marked ready to ship, visible to Michael and Caleb. Landing on main
+stays Michael's move per the standing rule (the operator can say "merge
+it"). `ryan-assistant` created from DEC-120 (`dea4fccb`) on both remotes;
+this and every following assistant round lives there.
+
+**Attention.** The tab IS the home Attention widget — the same
+`AttentionWidget` the home canvas and the desk render (section pills, rows
+with the queue spine, the closing verb, the doors) — uncapped and
+scrolling (`limit` / `scroll`, additive; the home and desk slices are
+untouched) under its own remembered section (`attention.assistant.section`)
+so the panel and the widget never fight over which slice is open. The daily
+standup (Today) keeps its home on the Home page.
+
+**PlexiChat.** The tab IS the Office Chat view — `MessagesView`, the same
+messaging store, conversations, groups, channels, search, activity,
+briefing, calls — in a `compact` dressing: no paper of its own and one pane
+at a time (the list, then the thread with a back arrow), because the panel
+has no width to give two. Every door into a conversation goes through one
+`openConv`, so the thread shows however you arrive; back never touches the
+store's active conversation (the Office page shares it).
+
+**Agent + Work.** The autonomous agent stays exactly as it was; the desk
+agents the Work tab listed are a sub-view inside Agent (a sunken segmented
+control: Autonomous agent · Desk agents). The Work and Activity tabs are
+gone; a tab saved before this round still lands somewhere sensible
+(Today → Attention, Activity → PlexiChat, Work → Agent); the default is
+Attention. AF-5's e2e geometry now counts the DEC-120 header.
+
+**Verified live** over CDP, 13/13, panel restored as found: the strip
+reads Attention · Chat · Agent · Tasks · PlexiChat and nothing else;
+Attention renders the widget's pills, label and count in the panel with
+the scrolling list; PlexiChat mounts compact, one pane at a time, the list
+with its New / Search / Channels doors (8 conversations), a conversation
+opens to its thread with a way back, back returns; Agent keeps the
+autonomous surface with the sub-tabs, Desk agents lists the desk agents,
+and back; Tasks unchanged. Suite: 3,793 tests / 344 files; both
+typechecks clean.
+**Addendum (probe residue, and a sync hazard to look at).** The Attention
+capture showed seven open "Send the revised numbers to Dana by Friday"
+items — my own DEC-115/116 probe residue, every one filed by the bell
+(through the STORE, which emits the create over the sync substrate) and
+then dismissed in each run's cleanup over RAW IPC (which emits nothing).
+`workspaceSync` applies remote rows as a plain `ON CONFLICT(id) DO UPDATE`
+upsert, so the substrate's copy — still `open` — came back and won; the
+raw-IPC-created "Book time with legal" items had no synced copy and stayed
+dismissed. Cleaned by dismissing exactly those seven through the store
+(`useWorkItemStore.setState`, which emits the attr), guarded by title,
+source and the scratch meeting no longer existing; rows re-read read-only
+at +8 s and +20 s: dismissed, stable. Probe rule from here: create and
+dismiss through the SAME path, and re-read the rows after the sync has had
+its turn. **To look at (not asserted):** main's decay path writes
+`work_item_state = 'dismissed', reason_code = 'decayed'` in raw SQL with no
+sync emit — by the same mechanism a later upsert of that row could reopen a
+decayed item. Worth a read of the upsert's guard before ruling it.
+
+## DEC-122 — The strip: the double-ii mark · Attention · PlexiiMessage · Agents
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("change the tab named chat to the animated
+double ii logo, which represents AI functionality, then change the name of
+plexichat to PlexiiMessage but make sure there are 2 i's in Plexii. And
+we're removing the tasks tab altogether since everything is now
+consolidated under Attention. Then… from left to right… Plexi AI with just
+the double ii animated logo, then Attention, then PlexiiMessage, lastly
+Agents").
+
+**What changed.** The conversation tab is the brand's own sign for the AI:
+`PlexiiMark` alone — the double-ii, one blink on mount and a wink on hover
+(the kit's `once+hover`; there is no "breathe" mode yet, so nothing
+pretends to think) — with "Plexii AI" as its accessible name and tooltip,
+no text. PlexiChat is **PlexiiMessage** (two i's, per the spelling rule).
+Tasks is gone — its list lives under Attention now — and a saved Tasks tab
+lands on Attention. Agent reads **Agents**. Order: mark · Attention ·
+PlexiiMessage · Agents; the default for a fresh install is the
+conversation, first in the strip. `AssistantTasksTab.tsx` deleted.
+
+**Verified live** over CDP, 7/7, the panel restored as found (it was open
+on PlexiiMessage): the strip's titles read Plexii AI · Attention ·
+PlexiiMessage · Agents; the first tab is an SVG with no text; PlexiiMessage
+carries two i's; no Tasks tab; each tab still opens its body. Suite: 3,794
+tests / 344 files; both typechecks clean.
+
+## DEC-123 — PlexiiMessage in the panel: one Meet door, no translate menu, the doors fit
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("merge the call and meet button into one meet
+button because they do the same thing… get rid of the translation drop
+down… shift everything left so that it all fits in the menu bar because
+right now it gets cut off") — scoped to the PlexiiMessage tab.
+
+**What changed (compact mode only — the Office Chat page is untouched).**
+The thread header in the panel is two rows: the back arrow and the name on
+the first, left-aligned; the doors on their own full-width row beneath,
+left-aligned and wrapping, at the panel's tighter size (h-7), so nothing is
+ever clipped at 420px. Call and Meet are one **Meet** door: in a DM it
+meets the person now (the 1:1 video call the Call button made); in a space
+it opens PlexiMeet, as Meet always did. The translate menu is gone from the
+panel (the per-message Translate link still uses the stored language).
+
+**Verified live** over CDP, 5/5, panel restored as found: a DM open in the
+panel; one Meet door and no Call; the door's title reads "Meet with Caleb
+Wilton now — a video call"; no translate menu; the doors start at the
+header's left edge, all on one row, right edge 1256 px inside a pane edge
+of 1409 px, no horizontal overflow. Suite: 3,795 tests / 344 files; both
+typechecks clean.
+
+## DEC-124 — The bell means Attention: PlexiiMessage's header bell retired, a bell on every message
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("there is currently a bell icon which stands
+for notifications, which is misleading because we're using the bell icon
+for the attention AI layer now, so just remove it altogether. Then on any
+given message, there needs to be the ability to click a bell icon and have
+it route to the attention cue, most likely to the respond tag. But like
+all the attention layer stuff, it should prompt you and ask you how you
+want to classify it").
+
+**What changed.** In the panel, PlexiiMessage's notification-level bell is
+gone (it stays on the Office Chat page). Every message — mine or theirs,
+in the list and in a thread — wears a bell on hover that opens the HOUSE
+capture prompt (`fb:command-new-work-item` → the capture console → the
+Attention confirm card): the message prefilled as the capture, the sender
+and conversation as its notes, opening on **Respond** (the preset table's
+class for chat), and the card asks how to file it — category, urgency,
+when, people, desk — exactly as every other bell in Plexii. Nothing files
+from the bell itself. The item it files points back at the message:
+`sourceType 'message'`, the conversation as `sourceRef`, and a new internal
+moment link `plexii://message/<conversationId>?m=<messageId>`
+(`lib/messageLink.ts`, the meeting-moment pattern); the Attention page's
+source door opens the conversation on the Chat page and lands on the
+message, and the source reads "From a message — open it to reply in the
+conversation".
+
+**Verified live** over CDP, 6/6, panel restored as found: the header
+bell gone, a bell on all 12 messages of a DM, the bell's title says what it
+does, the prompt opens prefilled with the message's words and "Plexii read
+it like this… Respond", and cancelling through the console's own door
+leaves the work-item count unchanged. Suite: 3,803 tests / 346 files; both
+typechecks clean. (The figure was first written as 3,827 — a guess made
+before the run finished, corrected here; the log stays honest.)
+
+## DEC-125 — The message bell is the desk bell: it fills when marked, a circle checks it off; the meta row leaves the bubble
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("that bell icon functionality should work the
+same way it does as a widget, tool, or app on a desk. So when I click it,
+the bell fills with color, and the checkbox opens up next to it, so I can
+check it off. The bell then gets unhighlighted again, so I can see in line,
+in chat, what messages I need to attend to or respond to. Additionally, we
+need to clean up the buttons within the messages themselves… the timestamp
+for a message should not be in the colored message box. It should be just
+below but still on the left side. Next to it should also be the translate
+button… followed by the pin button, but just use the icon of the pin…
+and then the last thing along the right edge, just below the colored
+message box, should be the full reply thread").
+
+**What changed.**
+- **One bell.** The desk widget's bell (DEC-076/077) moved out of
+  `WidgetFrame` into a shared `attention/BellIcon.tsx`; the frame and the
+  message row both render it, so a bell means the same thing everywhere.
+  On a message: empty on hover → the house capture prompt (DEC-124,
+  unchanged — it still asks how to file). Once an open item points at the
+  message (`lib/messageAttention.ts` — `liveItemForMessage`: sourceType
+  `message`, not terminal, not detached, the moment link's messageId is
+  this message; newest wins), the bell fills solid and stays visible
+  without hover, with the shared `CompleteCircle` beside it. The circle
+  closes the item with its queue's own verb through the one closing path
+  (DEC-051 `useCloseWorkItem`, `PRIMARY_ACTION[queueOf(item)]` — Respond
+  closes as "Responded"), and the bell empties again. A filled bell opens
+  the Attention page. The list and the thread panel (parent + replies)
+  carry it; the marked state is derived from the work-item store, never
+  kept on the row.
+- **The meta row, outside the bubble.** Under the bubble, full width: the
+  time (· edited) at the left; Translate beside it (one door — Translate /
+  Show original / Show ‹language›; revealed on hover until a translation
+  exists); the pin as the icon alone (filled when pinned; the words ride
+  the aria-label); the reply thread at the right edge ("N replies" always,
+  "Reply in thread" on hover). The in-bubble time/translate block and the
+  in-bubble toggle are gone. The hover reveal on the doors is the DEC-124
+  convention carried over — a judgement call, one class each if the
+  operator wants them always visible.
+
+**Verified live** over CDP, panel restored as found, in two probes. Read-only
+(5/5): the message the operator's own open item points at (filed from my
+prompt in DEC-124, never touched) shows a filled bell visible without hover
+with the circle beside it; an unmarked message's bell is empty, hover-only,
+no circle; the meta row sits under the bubble at its left edge, no time
+inside the bubble, the pin an icon, the thread at the right edge. Then the
+check-off itself (7/7) on ONE scratch item created through the store,
+tagged `test-seed`, pointed at an unmarked message: the bell filled and the
+circle appeared; the circle's title read "Responded — complete …"; clicking
+it closed the item as `answered` in the store AND on disk, and the bell
+emptied; the operator's own item was still open after. The scratch row
+(`97f7bd0f…`, state `answered`) stays on disk as a closed test-seed —
+dismiss by tag with the others. Suite: 3,809 tests / 347 files; both
+typechecks clean. Pins rewritten with history, never deleted: DEC-076/077's
+frame-bell pins now point at the shared definition; DEC-124's `CaptureBell`
+pins → `MessageBell`; e2e P2100-6's translate toggle → the meta-row door.
+
+## DEC-126 — A message's doors: centred on the bubble, the time on hover, Translate in the ⋯ menu, click-away closes
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("make the time stamp invisible unless I'm
+hovering over it; the emoji icon and the bell icon and the ellipses need to
+be centered on the message they are in reference to — right now they're
+slightly off center, so if it's a one-line message it's hard to know
+exactly what message they're associated with; get rid of the translate
+button visible on screen and instead add it to the drop down menu within
+the ellipses; when I click on the ellipse button or the emojis button, the
+only way to get rid of those menus is to click on it again — I should be
+able to click anywhere off screen to get rid of those things").
+
+**What changed** (`MessagesView.tsx`, every message — list and thread).
+- **Centred on the bubble.** The row centred its doors against the whole
+  column (bubble + the DEC-125 meta row + reactions), so on a one-line
+  message they sat a few pixels low. The doors — reaction palette, bell,
+  ⋯ — are now one cluster hung off the bubble alone: absolutely positioned
+  beside it (left of yours, right of theirs) on its vertical centre, so
+  nothing that rides under the bubble can push them off the message they
+  name. One cluster serves both sides; the theirs-side doors after the
+  bubble are gone.
+- **The time on hover.** The meta row's time (with "· edited" and, when a
+  translation is showing, "· translated") is opacity-0 until the row is
+  hovered or focused — opacity, not display, so nothing jumps. The pin
+  (when pinned) and the reply count (when there are replies) stay
+  visible, as before.
+- **Translate in the ⋯ menu.** The visible Translate button left the meta
+  row. The ⋯ menu is on EVERY message with words now — "Translate to
+  ‹language›", then "Show original" / "Show ‹language›" — with Edit and
+  Delete still only on your own; a message with no entries has no ⋯. While
+  a translation is in flight the meta row says "translating…" (the menu
+  has closed).
+- **Click-away.** A new `hooks/useClickAway.ts` — the house pattern from
+  SettingsPanel / ThemeBuilder, extracted: armed 50 ms after opening,
+  mousedown on window (so the outside target's own click still lands —
+  opening another row's door closes this one in the same gesture), and
+  Esc. Both the palette and the ⋯ menu use it. The composer's emoji and
+  GIF pickers already closed this way; unchanged.
+
+**Verified live** over CDP, 16/16, panel restored as found, no data
+touched: on a one-line message on each side the cluster sits on the
+bubble's vertical centre to the pixel (dy 0) and on the correct side; the
+time is opacity 0 at rest and 1 with `:hover` forced through CDP (an
+occluded window never sees a real pointer); no Translate on screen at rest;
+their ⋯ menu holds "Translate to English" alone, mine holds Translate ·
+Edit · Delete; an outside mousedown closes the menu and the palette, Esc
+closes both, and opening the palette on another row closes the open menu in
+the same gesture with the click landing. Known and accepted: when the
+bubble is narrower than the meta row (short messages), the row extends
+beyond the bubble on the far side on hover — the time keeps the bubble's
+near edge on theirs, the thread keeps it on yours. Suite: 3,817 tests / 348
+files; both typechecks clean. Pins rewritten with history: DEC-124's bell
+usage lines → the one cluster; DEC-125's Translate label → the menu's;
+e2e P2100-6 opens the ⋯ menu before looking for Translate.
+
+## DEC-127 — The way back: an Attention item opens the floating assistant on PlexiiMessage, on the person, at the message
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("when I add a message to the attention queue…
+it needs to link me back to that exact message with that exact person. And
+it should open up in the PlexiiMessage tab within the AI assistant menu
+that follows you from page to page… it should automatically open up in
+the floating box with the PlexiiMessage tab opened to the person that it
+came from").
+
+**What changed.**
+- **One router** — `lib/openMessage.ts`: `openMessageInPanel(conversation,
+  message, parent)` asks the messaging store to land on the message
+  (`landOn`), opens the conversation, then opens the persistent assistant
+  on its PlexiiMessage tab. `openMessageLink(url)` routes an internal
+  `plexii://message/…` link and returns false for anything else, so every
+  caller falls through to its own door for web marks. DEC-124's Chat-page
+  route (`openConversationAt`) is retired.
+- **The store carries the landing** — `messaging.landOnMessage`
+  `{messageId, parentId, at}`; MessagesView consumes it once, in an effect
+  declared AFTER its pin-to-newest effect so the landing wins the scroll:
+  in the panel it shows the thread pane first (a list pane sent back by
+  the arrow is brought forward), for a reply it opens the parent's thread
+  first and lands inside it, and a message that never appears expires
+  after 8 s instead of firing weeks later. The landing is the Recall
+  citation's own `jumpToMessage` — centred, flashed.
+- **A reply names its parent** — `buildMessageUrl` / `parseMessageUrl`
+  gained `p=` (backward compatible; the bell files `m.parentId` for a
+  thread reply).
+- **Every door on the Attention page routes**: the row's `message` chip is
+  a button now (the DEC-079 meeting chip, for messages;
+  `item-message-link`), the row's source door (forum icon; title "Open the
+  message in PlexiiMessage — the conversation, at this message"), and the
+  item editor's Source link (reads "The message, in PlexiiMessage", no
+  external-link mark; DEC-091's web deep links still open externally).
+
+**Verified live** over CDP, 9/9, DOM-read only (after a store file is
+hot-swapped a probe's own `import('/src/stores/…')` is a stale instance —
+the DOM and the real buttons are the truth), the operator's data untouched,
+panel and page restored: from a closed panel the chip and the source door
+each open the floating assistant on PlexiiMessage on Caleb with the exact
+message in view and flashed; with the panel already open on the Attention
+tab and the thread pane sent back to the list, the chip switches the tab,
+brings the thread pane back and lands; the editor's Source link reads as
+designed and lands the same way. Not exercised live: a reply inside a
+thread (no such item exists yet) — the thread-first landing is pinned by
+messageLanding.test.ts. Suite: 3,828 tests / 349 files; both typechecks
+clean. Pins rewritten with history: DEC-124's `openConversationAt` pins →
+the router; DEC-124's parsed-link shapes gained `parentId: null`; C5's door
+pin → the fall-through.
+
+## DEC-128 — The Attention widget's row: three depths in place (home, desk, the assistant's Attention tab)
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("if I click on an attention item on a widget in
+the home screen or a desk, it takes me straight to the attention page, and
+it doesn't actually show me which attention item I clicked on… I should be
+able to click an attention item, get a drop-down for a quick summary, just
+like I can on the attention page itself, double-click for a full view of
+that item on the same page that I'm existing on, or have the ability to
+take me to… the title of that item visible with maybe the due date… when I
+click it, I get a drop-down [with] the different action items… that's going
+to need to apply in the Plexii app as well as the widget on the home screen
+and widgets that I add onto a desk").
+
+**What changed.** One component — `attention/WidgetItemRow.tsx` — is the
+row for every face of the widget family (`ItemLines` renders it for the
+five faces; the desk widget and the assistant tab are the same
+`AttentionWidget`), so the three hosts cannot drift.
+- **At rest**: the title and the due date — DEC-050's anatomy kept (queue
+  spine, completion circle through DEC-051's one path, status pill or dot,
+  date). A subtle chevron on hover says it opens.
+- **One click**: the page's quick summary IN PLACE — notes, the reason, the
+  chips (priority, due, plan, desk, meeting / message / source, mentions,
+  tags), a Meet invitation's when · where · RSVP, subtask progress — and the
+  page's row actions: the source door (a meeting moment → PlexiMeet at the
+  line; a message → the floating assistant at the message, DEC-127; a web
+  mark → the browser), the desk, Start with Plexii, Snooze until tomorrow
+  (the page's 9 am rule), Archive, Open the item, and one door to the
+  Attention page. The title click no longer navigates anywhere.
+- **Double-click**: the full item — the page's own `AttentionItemEditor`,
+  with the page's desk choices — over the page you are on, portalled to
+  `<body>` so the floating panel (overflow-hidden, z-120) cannot clip it.
+- **Shared doors, not copies**: `lib/startWithPlexii.ts` (desk first, the
+  panel on chat, the prompt staged twice, never sent) and
+  `lib/openMeeting.ts` (PlexiMeet, then the hand-off once mounted) are
+  extracted from the page, which now delegates to them. Every widget list
+  scrolls instead of clipping, so an open summary has room in a sized
+  widget; DEC-121's `scroll` prop stays for its callers.
+
+**Verified live** over CDP, 13/13, DOM-read, nothing closed / snoozed /
+archived, page and panel restored: on the home canvas, in the assistant's
+Attention tab, and on the LakeDash desk's widget, a row sits closed at rest
+in a scrolling list; one click opens the summary in place with the six
+actions (message door · Start · Snooze · Archive · Open · the page) and the
+message chip, and the view does not change; a double-click opens the editor
+portalled to `<body>`, on top (element-from-point), the view unchanged; the
+editor closes through its own door; from the panel, the summary's page door
+is the one trip to Attention. Suite: 3,838 tests / 350 files; both
+typechecks clean. Pins rewritten with history, never deleted: DEC-051's row
+anatomy pins follow the row to its file; DEC-121's overflow pin → every host
+scrolls; the start-flow and DEC-079 hand-off pins → the shared libs.
+
+## DEC-129 — The Today tile's meeting and calendar items: three depths in place, like the Attention widget
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the meeting and calendar
+items") — DEC-128's row behaviour, for the calendar blocks (meetings and
+focus time) and the dated work the home Today tile lists.
+
+**What changed.**
+- **A calendar block as a widget row** — `attention/CalendarBlockRow.tsx`.
+  At rest: the camera (a meeting) or the clock (focus time), the title, the
+  start time; happening-now pulses; done / missed / skipped show. One
+  click: the summary in place — the time range and the relative when, the
+  agenda, the chips (status · where: the provider or the Plexii room ·
+  location · who's invited · the desk or item it is booked for · repeats ·
+  pinned · this meeting's Record · last time in the series) — and the
+  calendar's own doors: Join (an external link wins, the minted room is the
+  fallback), Record an external meeting, Start (a focus session on its
+  desk — the grid's rule for what can be started), Done, Skip, Open the
+  block, Delete (undo in the toast, the store's own path), and the Calendar
+  page. Double-click: the calendar's own `BookTimeDialog` in edit mode,
+  seeded from the block, portalled to `<body>`; saving runs through a new
+  `lib/blockEdit.ts` (`saveBlockEdit` — the grid's toast, undo and redo,
+  extracted; the grid delegates to it).
+- **The Today tile is made of rows.** Its calendar lines are
+  `CalendarBlockRow`, its dated work is DEC-128's `WidgetItemRow`; the
+  Overdue radar's lines are `WidgetItemRow` too. `MiniRow` (a plain line
+  that jumped to the Attention page) is retired; the tile holds the real
+  `TimeBlock` rows so a row has every field; the list scrolls.
+- **Judgement call, stated:** `dayTimeline` now places work due BEFORE
+  today behind the day's timed shape (as undated work rides), oldest first,
+  ahead of the Meet items. Sorting overdue work by its past date put the
+  operator's backlog (23 lines, August dues) ahead of the blocks actually on
+  today's calendar, and a four-line tile never reached them — the rows
+  this round adds would have been unreachable. The Overdue radar is the
+  backlog's place; on the Today tile it follows the day. Pinned in
+  attentionAnalytics.test.ts; DEC-049's own cases still hold.
+
+**Verified live** over CDP, 8/8, on the home Today tile with TWO scratch
+blocks (a Google-Meet meeting with agenda, location and an invitee; a
+focus block) created and then removed through the time-block store (none
+left on disk), nothing joined, recorded, started or marked, the page and the
+open panel restored: both rows closed at rest with title, time and a
+different glyph each, in a list that scrolls; one click on the meeting
+opens the summary in place — range, agenda, "Google Meet", the location,
+"1 invited", "Planned", Join and Record-external, no Start — and the view
+does not change; the focus row offers Start and no Join, plus Open, Delete
+and the Calendar door; a double-click opens the block dialog seeded with
+the title, portalled and on top, the view unchanged; the dialog closes
+through its own door; the summary's Calendar door is the one trip to the
+Calendar page. Suite: 3,846 tests / 351 files; both typechecks clean. Pin
+rewritten with history: the grid's save-toast pin → the shared helper.
+
+## DEC-130 — The recording audit: a silent microphone, an engine that derails, and every door made honest
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator report ("I tried testing out the record notes button on
+the PlexiMeet page, and it didn't work. It didn't capture the transcript.
+So, do a full audit of the record notes, record external, and start or
+schedule a meeting buttons… that transcripts can actually be captured").
+
+**What was found.** The 08:04 attempt is meeting `ded4a88d` ("Notes"):
+177 s recorded, transcript "you you you you you you", a 477-character AI
+summary of nothing, no segments. Root cause, measured: the microphone
+delivers DIGITAL SILENCE to this app — `getUserMedia` succeeds, the track
+reads enabled and unmuted ("Default - MacBook Pro Microphone"), and every
+sample is zero (peak 0, RMS 0, 511 bytes of opus per 1.5 s). The dev app
+was launched from inside Claude Code and inherits the launcher's macOS
+microphone permission (the same TCC identity DEC-078 found blocking the
+camera); macOS hands such an app silence, never an error. Both engines
+transcribe a synthetic voice perfectly, so transcription was never the
+fault — and nothing in the app said any of this: the cloud engine
+hallucinated on silence, the summary summarised it, a meeting was filed.
+
+**A second fault, found on the way.** Driving Record notes with a
+SYNTHETIC microphone (the `say` voice looped into a MediaStream), the
+on-device engine (whisper-base) returned "Thanks for watching." for takes
+the cloud engine read perfectly — 4 of 5 runs. Pinned by trimming: the same
+take transcribes fully at 0–9 s and derails at 0–10.5 s; one window, a few
+hard seconds at the end (a word cut mid-syllable), the whole decode lost.
+
+**What changed.**
+- **The microphone is asked, listened to, and watched** — `lib/micHealth.ts`.
+  Every recording door (Record notes, Record external, and the dialog
+  behind them) asks the system first (`media:micStatus` / `media:askMic`,
+  a main-process bridge over `systemPreferences` — effective once the dev
+  app restarts; `electron-vite dev` here runs without `--watch`), then
+  LISTENS for 1.2 s before recording: digital silence refuses to start and
+  says why, with the one door that fixes it (System Settings › Privacy &
+  Security › Microphone; `record-error[data-reason=mic-silent]` +
+  `record-mic-settings`). While recording, a level pill (`MicLevelPill`:
+  five bars, or "No sound is reaching Plexii" after 3 s of zeros with the
+  same door) sits on the PlexiMeet bar and the guest-capture bar.
+- **Record notes is the same recording as every other door.** The
+  per-track `MeetingTrackRecorder`, transcribed on this machine at the
+  wrap-up (CR-11 — the old path shipped meeting audio to the cloud engine),
+  which writes SEGMENTS (the Record's Thread, Recall, commitments and
+  analytics all read segments; a plain transcript lit none of them),
+  retains the take (CR-13, so Re-transcribe has fuel) and refuses to file
+  on silence. The desk picked in the dialog is the origin
+  (`markDeskOrigin`) and the container (`begin({ deskNodeId })` — no desk
+  minted over it). The cloud-path `transcribeAndSave` is gone.
+- **A transcript that is not a transcript is refused** —
+  `lib/transcriptSanity.ts`: "you you you you", the stock phrases, a long
+  take with almost no text. The wrap-up stops there with the honest line
+  (and the microphone hint) instead of summarising and filing.
+- **The derail net** — `lib/audioSplit.ts` + `transcribeRecording`: when
+  the on-device first pass looks like that and the audio plainly has
+  sound, the take is cut at its own pauses and the pieces decoded; every
+  piece the engine can read is kept, timestamps moved onto the take's
+  clock, nothing invented, still no cloud. The saved failing take:
+  "Thanks for watching." → 174 characters, five segments.
+- **Decode at opus' own rate** — the first decode stage names 48 kHz
+  instead of following the output device (16 kHz on a headset in its call
+  profile is the low-quality path by another door); the recorder's mix
+  likewise.
+- **Start or schedule**: audited, no change needed — Schedule writes the
+  block with a minted room; Start now opens the live room.
+
+**Verified live** over CDP, on the operator's own app, everything the tests
+made removed through the stores and bridges (meetings, blocks, desks →
+Trash, folders and transcript docs → Trash, briefs dismissed): the real
+microphone probe (2.5 s: peak 0, every sample zero); both engines on a
+synthetic voice (115 characters, identical); Record notes end to end with a
+synthetic microphone — the dialog, the 1.2 s listen, the level pill lit,
+Stop, the on-device wrap-up, a meeting with the spoken words, segments, a
+speaker, a summary, a desk and a retained take — 10/10 on the looped voice
+and 10/10 on a voice with natural pauses, after the derail net (4 of 5
+runs derailed before it); Record notes and Record external with the REAL
+microphone refused before recording with the reason and the settings door;
+Schedule booked a real meeting block; Start now opened the room and left.
+Suite: 3,871 tests / 354 files; both typechecks clean. Pins rewritten with
+history: DEC-118's door contract and mic text, the DEC-099 decode-rate pin,
+the guest-capture booleans, the page's busy banner; e2e plexiMeet #6
+follows the dialog.
+
+**Left on the operator's word.** Meeting `ded4a88d` ("Notes", the silent
+177 s) is the operator's own — untouched. The tests' residue sits in the
+Trash (seven desks, folders and transcript documents named "[TEST] DEC-130
+…") and as dismissed "Meeting brief — [TEST] DEC-130…" items — purge is a
+destructive act, so it waits. The microphone itself: launch Plexii from the
+Dock, or allow the microphone for the app that launches it.
+
+## DEC-131 — The assistant panel: Message's header and composer, a + on Attention, and a Calendar tab
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request (the PlexiiMessage screenshot round: "change the
+Plexii message to just 'message'… get rid of the meeting icon… keep gif, keep
+the emojis, move the record a voice note to inside the actual message bar
+itself on the right side, and then keep attachments… make the write a
+message box bigger… move the meet recall and pin buttons to the right of the
+actual name… the members button is redundant… if I were to have multiple
+people in this chat that should just show me both names… Within the
+attention tab, there needs to be a plus button so I can capture a new
+attention item… add a new tab… for a calendar tab. This should default to
+today's calendar, similar to the Today widget on the main Attention page…
+toggle between days and get a quick month calendar view… click a day…
+having the booking page pop up").
+
+**What changed.**
+- **Message.** The tab reads "Message". In the panel the thread header is
+  ONE row: the people, then Meet · Recall · pin at its right (DEC-123's
+  own-row placement retired). A DM reads as the person; a space reads as
+  everyone else in it, so the members button is gone from the panel (the
+  Office page keeps it, with Pulse and Schedules). The panel's composer:
+  no meeting camera (the header's Meet is that door), the voice-note mic
+  INSIDE the message box at its bottom-right, attach · emoji · GIF kept
+  under a three-line box that fills the width (`ChatComposer compact`).
+- **Attention +.** `AttentionWidget` grew `onCapture`; the assistant tab
+  wears a + at the right of the section pills that opens the house capture
+  prompt (the Attention page's Capture door — classify first, then file).
+- **Calendar tab** (`assistant/tabs/AssistantCalendarTab`, after Attention
+  in the strip): opens on today as the Attention rail's own day column
+  (`WeekTimeGrid`, one day, compact — blocks drag and resize in place);
+  ‹ Today › walks the days; a toggle shows the month at a glance (six
+  weeks, today filled, a dot on every day with something booked, read into
+  local state — never the shared range); clicking a day opens the Book-time
+  dialog on it (the composer's own, portalled above the panel: 9:00 on
+  another day, the next half hour today) and lands the tab on that day; a
+  Book button does the same for the shown day; a door opens the Calendar
+  page. Booking runs the grid's own path — `lib/bookBlock.ts`
+  (`bookBlockWithToast`: create, the undo toast, the stated invite hold),
+  extracted from the grid, which now delegates. The tab's pure parts
+  (`lib/monthGrid.ts`: the 42 cells, the default slot) are unit-tested.
+
+**Verified live** over CDP, 12/12, DOM-read, panel restored, the one
+scratch block removed through the store: the strip reads ii · Attention ·
+Calendar · Message · Agents; the + opens the capture prompt and closes
+clean; the Calendar tab opens on today with the day column, › walks to
+tomorrow and Today returns, the month shows 42 cells with today filled and
+seven booked days dotted, a click on the 9th opens the dialog on "Wed,
+Sep 9" above the panel, and Book it writes a real block at 9:00 that day
+and lands the tab on it; the Message tab shows the name with Meet · Recall
+· pin on the same row at its right and no members button, and the composer
+is a 77px box at 92% of the pane with the mic inside it at the right, no
+camera, attach · emoji · GIF present. Suite: 3,880 tests / 355 files; both
+typechecks clean. Pins rewritten with history: the tab order and labels,
+DEC-123's own-row header, the DEC-121/128 widget mounts, the grid's booking
+pins → the shared helper.
+
+**Addendum (same day) — the column fills the tab.** Operator: "Fill up the
+full window on the calendar tab so that it doesn't cut off before the
+bottom, and so you can see more on screen." The rail's compact window caps
+at twelve hours (DEC-079), which in the taller panel left the bottom
+empty. `WeekTimeGrid` grew `fill`: the hour window takes all the room left
+under the day headers and the host owns the height; the Calendar tab passes
+it. Measured live: the window ends 8 px above the tab's edge (its padding),
+499 px tall, 16.6 hours on screen, the rest a scroll away. DEC-078's
+window pin follows the class.
+
+## DEC-132 — Home tiles scroll instead of clipping; the standup and navigator pin their headers
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator report ("On the home page, individual widgets get cut off,
+and there's no ability to scroll… 'Your Stand-Up'… 'worth a look'… gets cut
+off… 'Rooms & Desks'… doesn't actually show me all of the rooms and
+desks… either it needs to stop before something gets cut off mid-row, or
+there needs to be the ability to scroll").
+
+**What changed.**
+- **Every live tile scrolls.** The home grid's tile wrapper clipped
+  (`overflow-hidden`); it scrolls now (`overflow-y-auto overflow-x-hidden`),
+  so no widget can ever be cut off without a way to reach the rest. The
+  drag ghost keeps clipping (it is a picture).
+- **RailCard `fill`.** In a sized host the header stays pinned and the
+  body takes the rest and scrolls; a body with its own `bodyClassName`
+  gets the room and manages its own regions; unsized hosts (PlexiMeet,
+  People, the Office shell) are pixel-identical. The three RailCard tiles
+  (Rooms and desks, Continue, Quick actions) pass it.
+- **Rooms and desks**: the rooms column and the desks column each scroll
+  on their own, under the pinned header — the last room and the New desk
+  button are always reachable.
+- **Your standup**: the title row stays pinned; the narrative, "Worth a
+  look" and "Completed since last time" scroll beneath it.
+- **The command-center blocks** (Today, Pulse, Overdue radar, Recent
+  activity) scroll their body.
+- **The status menu rides a portal.** `ItemStatusPill`'s menu was
+  absolutely positioned inside its row; in a scrolling list a pill near
+  the edge opened clipped. It now renders in `<body>` at the pill's own
+  coordinates, below the pill when there is room and above it when there
+  is not, and closes on a click anywhere outside or Esc.
+
+**Verified live** over CDP on the home page, 5/5, view restored: all ten
+live tiles scroll rather than clip; the standup's title row stays put while
+its body scrolls and the last "Worth a look" row is fully reachable; the
+navigator's ten rooms scroll in their column with the last room reachable,
+the desks column reaches New desk, the header pinned; a status menu opened
+from the Attention tile lands through its portal fully inside the viewport
+and on top, and Esc closes it. Suite: 3,886 tests / 356 files; both
+typechecks clean.
+
+## DEC-133 — The same rule for the Attention widget and desk widgets; the standup's Save chip
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Attention widget and
+desk widgets. Also, fix the save button design glitch on your stand-up
+section").
+
+**What changed.**
+- **Desk widgets scroll, never clip.** `WidgetFrame`'s body scrolled only
+  for the auto-growing kinds; it scrolls vertically for EVERY widget now
+  (`overflow-y-auto overflow-x-hidden`), so content stays reachable whenever
+  the frame cannot grow to fit it. A widget whose root fills the frame never
+  shows a bar (measured: none of LakeDash's four grew one).
+- **The Attention widget** already carried the rule from DEC-128 — section
+  pills and the count pinned, the list scrolling — on the home tile and on
+  a desk. Verified rather than changed: with three rows opened the home
+  tile's list scrolls under pinned pills and the last row is reachable; the
+  desk widget's list scrolls the same way.
+- **The Save chip.** `StandupOutputPicker`'s button wore `icon-btn` (a
+  fixed 24 px square) beside `fb-btn-surface`, so the surface hugged the
+  icon while "Save" spilled outside it — the glitch in the screenshot. It is
+  a surface chip sized by its content now, like the header's other doors.
+
+**Verified live** over CDP, 4/4, view restored: the Save chip is one 64×28
+surface with the icon and the word inside it; the home Attention tile
+scrolls under pinned pills once rows open; LakeDash's four widget bodies all
+scroll rather than clip with no unneeded bar; the desk Attention widget's
+list still scrolls. Suite: 3,888 tests / 356 files; both typechecks clean.
+
+## DEC-134 — The same rule for the Calendar and Meet pages: windows, not scrolls
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Calendar and Meet
+pages") — the DEC-132/133 rule ("either it needs to stop before something
+gets cut off mid-row, or there needs to be the ability to scroll"), applied
+page-wide.
+
+**What was wrong.** Neither page clipped at the operator's window size with
+today's data, but both bounded their tall regions with 100vh arithmetic:
+the hour grid at `max(280px, calc(100vh - 380px))`, the queue rail's list at
+`calc(100vh - 268px)`, the meetings list at `max(240px, calc(100vh - 460px))`,
+the sticky transcript at `calc(100vh - 140px)`. Those numbers assumed a
+header height and a footer the layout could not see — so a wrapped header,
+a longer rail or a shorter window put a region's bottom edge under the
+footer with nothing to scroll (the calendar rail was sticky, so even the
+page scroll could not reveal its last rows). The assistant's Calendar tab
+had already been ruled onto `fill` (DEC-131 addendum: "so that it doesn't
+cut off before the bottom, and so you can see more on screen").
+
+**What changed.**
+- **Calendar is a window.** The root is a flex column; the title row and
+  the toolbar are pinned; the rail/grid area takes the rest. The rail hugs
+  a short list and caps at the window (`max-h-full` of its grid area), its
+  list scrolling under the pinned title and class filter; it no longer
+  sticks, because the page no longer scrolls past it. The grid column
+  stretches to the floor: the plan bar stays put, the week/3-day/day grid
+  runs `fill` (DEC-131's mode — pinned day headers and deadline chips, the
+  hours window taking the rest), and the month pins its weekday row and
+  shares the height across the six weeks (`minmax(max-content, 1fr)` rows:
+  never shorter than a cell's content, taller when there is room, scrolling
+  when the window cannot hold them). A 240px floor on the grid and month
+  cards keeps the old `max(280px, …)` guarantee: below it the page root
+  scrolls instead of the window collapsing.
+- **Meet is a window on a wide screen.** The hero is pinned; the rail
+  stands as tall as the floor and no taller — the Meetings card hugs a
+  short list and shrinks for a long one (the list scrolling under the
+  pinned title and search) while the Recording card keeps its height —
+  and the column beside it scrolls on its own (the dashboard) or hands its
+  height to the open Record, which pins its header and Timeline and lets
+  the two panes hug short content and cap at the floor: the Record
+  scrolling its renderings under the pinned title and segmented control,
+  the Transcript scrolling its thread under the pinned search and speaker
+  chips. Nothing is sticky any more. Below `lg` the columns stack and the
+  page scrolls, as before (the meetings list capped at 60vh there).
+- Nothing else moved: every testid, handler and copy string is where it
+  was; `WeekTimeGrid`'s non-fill callers (the Attention rail column) are
+  untouched.
+
+**Verified live** over CDP on the operator's running app, 16/16 twice, view
+restored, at the real window (2021×1105) and at an emulated 1400×640:
+Calendar — the page does not scroll, the regions do; the week grid ends at
+the page floor with its window scrolling the hours (11 AM–11 PM on screen,
+one hour more than before) while the title stays put; the rail hugs its
+three rows; the month card ends at the floor with all 42 cells at 129px
+(above their 104px floor); at 640px the hours window still scrolls and ends
+at the floor, the month's six weeks scroll inside their card, and a
+page-wide sweep finds no element clipping content it cannot scroll. Meet —
+the root is `overflow: hidden` with the main column the scroller; the rail
+and the Recording card sit inside the window; with "Test" open the Record
+and Transcript panes end inside the window, the Record body and the
+transcript thread are the scrollers, and at 640px all of rail, Record and
+Transcript end inside the window with the thread scrolling; no clipping
+anywhere. Suite: 3,896 tests / 356 files; both typechecks clean.
+
+## DEC-135 — The meeting detail header sits on a house card
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request, with a screenshot of a meeting open in PlexiMeet
+("the title card where it says 'Test', Transcribed, the date, the amount of
+time, the speaker, all the way extended to the right with Desk, Export and
+the trash icon — add a filled-in colored block behind it similar to the
+timeline block, just for that header title field").
+
+**What changed.** The detail header (`meet-detail-header`) wears the
+Timeline card's own material — `fb-card`: the raised fill, hairline, soft
+shadow and card radius — edge to edge with the Timeline and the panes below
+it, one card gap apart (`mb-4`), padded like the cards (`px-4 py-3.5`).
+Everything it held stays where it was: the editable title, the status pill,
+the date, the duration, the speaker stack and count on the left; Desk,
+Export and Delete on the right. The overlapping speaker avatars ring in the
+card's fill (`--surface-raised`) instead of the paper's, so their separators
+stay clean on the new ground. DEC-116's "title bare on the paper" pin is
+rewritten with this history; nothing else moved.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, view restored: the header's computed background, box-shadow and radius
+equal the Timeline card's; its left and right edges match the Timeline's and
+the Record pane's, 16px apart; the title, the meta line, Desk, Export and
+Delete all lie inside the card; the avatar ring colour equals the card's
+fill. Suite: 3,896 tests / 356 files; typecheck clean.
+
+## DEC-135 · addendum — "Now do the same for the Notes and New meeting headers" (verification only, no code)
+**Date:** 2026-09-07 · **Status:** VERIFIED, NOTHING TO CHANGE · **Branch:** `ryan-assistant`
+The detail header is one component (`MeetingDetail` → `meet-detail-header`),
+rendered for every meeting, on the Meetings page and inside the Office
+shell's Meet surface alike (`PlexiOfficeShell` mounts the same
+`PlexiMeetView`). Opened "Notes" (transcript pasted, no desk, no speakers)
+and "New meeting" (notes only) on the operator's running dev app: both
+headers already sit on the DEC-135 card — title, status pill, date (and
+duration where there is one) on the left, Export and Delete on the right —
+with the Record and Transcript panes directly beneath (no Timeline, since
+neither has segments). Only the dev instance is running (PID 97113, CDP
+9223) and no packaged Plexii is installed, so there is no second build that
+could show the old bare header. Screenshots `peek-notes.png` /
+`peek-new-meeting.png` sent to the operator. A probe-harness fault surfaced
+here and is fixed in the verification memory: the finally-block restored
+only four view kinds and left the operator on Home when they had been on the
+Office view — restore the whole view object from now on.
+
+## DEC-136 — The Record's section titles in Overview and Analytics sit on a filled band
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Overview and Analytics
+tabs") — DEC-135's filled block behind a title field, carried into the
+Record's two renderings.
+
+**What changed.** Every section title in the Overview and Analytics
+renderings — Summary, Your notes, each Brief section (Background, Signals,
+Concerns, Where this leans, …), the Plain-transcript toggle, Who spoke,
+Moments — sits on one band: the pane's own in-card fill (the sunken
+surface the segmented track and the fields already sit on), field radius,
+spanning the rendering's content width, the title inside it at 13.5px
+semibold ink. Just the title field: the section's content stays on the pane
+beneath it. One constant (`RECORD_SECTION_BAND`) and one component
+(`RecordSectionTitle`) carry it; the transcript toggle is the same band as
+a button, chevron kept. The Summary and Your-notes eyebrows (10.5px
+uppercase grey) became titles in the band, so the Overview reads as one
+family of sections. The Action items tab was not asked for and is as it
+was (its In Attention / From the summary eyebrows stay). Every testid and
+anchor (`data-brief-section`, `meet-who-spoke`, `rendering-*`) is where it
+was, so Brief-chip jumps and Recall still land.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, the whole view object restored: Overview shows Summary, Background,
+Signals, Concerns, Where this leans and Plain transcript text on bands;
+every band's computed background equals the segmented track's sunken fill,
+spans the rendering's content box edge to edge, stands 32px, and its
+section content sits below it; Analytics shows Who spoke and Moments the
+same way; Action items has no band and keeps its eyebrows. Suite: 3,897
+tests / 356 files; typecheck clean.
+
+## DEC-137 — The Action items tab's section titles wear the same band
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Action items tab") —
+DEC-136's band, carried into the Record's third rendering, so all three
+read as one family.
+
+**What changed.** "In Attention" and "From the summary" sit on the band
+(`RecordSectionTitle`), and so does "Carried from last time" — which lives
+in `MeetingCommitmentsCard` and is shared with the wrap-up, so it takes a
+`band` prop: the Record asks for the band, the wrap-up keeps its eyebrow.
+To share the band across the two files it moved into its own module,
+`components/RecordSectionTitle.tsx` (the constant and the component, one
+source of truth; the DEC-136 pins follow it). The confirm-stop card
+("Plexii found N things in this meeting") is its own accent-tinted block
+already and is untouched; every testid and anchor is where it was.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, the whole view object restored (the operator was on Attention and was
+returned there): the Action items rendering shows "In Attention" on a band
+filled with the segmented track's own colour, spanning the rendering's
+content box, its list below it, and no eyebrow remains; Overview and
+Analytics unchanged from DEC-136 (six and two bands). Suite: 3,898 tests /
+356 files; typecheck clean.

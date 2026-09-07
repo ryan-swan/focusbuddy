@@ -6,6 +6,7 @@ import type { CarriedItem } from '@shared/meetings'
 import { sendBriefsToAttendees } from '../lib/briefOutbox'
 import { ensureMeetingFolder, saveTranscriptDoc, saveMeetingNotesDoc } from '../lib/meetingWrapup'
 import { transcribeRecording } from '../lib/transcribeRecording'
+import { transcriptLooksEmpty, NO_SPEECH_MESSAGE } from '../lib/transcriptSanity'
 import { mergeTrackSegments, formatAttributedTranscript } from '../lib/transcriptMerge'
 import { buildYoursSpans, validateRecordSpans } from '../lib/recordSpans'
 import { DEFAULT_RECORD_TEMPLATE } from '../lib/recordTemplates'
@@ -67,6 +68,9 @@ interface WrapupState {
     /** Q14 — the roster with handles, so a series meeting's brief can be
      *  DM'd to the other attendees (host shareBriefs knob permitting). */
     attendees?: Array<{ accountId: string; handle: string }>
+    /** DEC-130 — "Record notes" picked a REAL desk (DEC-118): the Record and
+     *  the transcript stand on it; no desk is minted. */
+    deskNodeId?: string | null
   }) => Promise<void>
   dismiss: () => void
 }
@@ -87,7 +91,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
   commitments: [],
   carried: [],
 
-  begin: async ({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, moments, attendees }) => {
+  begin: async ({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, moments, attendees, deskNodeId }) => {
     set({ status: 'processing', title, step: 'Transcribing the conversation…', summary: '', transcript: '', proposals: [], error: null, needsApiKey: false, folderId: null, folderName: '', transcriptDocId: null, meetingId: null, commitments: [], carried: [] })
     // M1 — the notes are the user's words and must survive REGARDLESS of how
     // transcription goes: saved first, not gated on the pipeline succeeding.
@@ -95,7 +99,7 @@ export const useWrapupStore = create<WrapupState>((set) => ({
       void saveMeetingNotesDoc(title, notes ?? '', moments ?? [], Date.now())
     }
     try {
-      await runWrapup({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, attendees }, set)
+      await runWrapup({ title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, attendees, deskNodeId }, set)
     } catch (err) {
       // Any thrown/rejected step (IPC failure, network, an AI provider error)
       // resolves to an honest error state instead of an unhandled rejection —
@@ -122,10 +126,11 @@ interface WrapupInput {
   speakers?: Record<string, string>
   forceLocalTranscription?: boolean
   notes?: string
+  deskNodeId?: string | null
 }
 
 async function runWrapup(
-  { title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, attendees }: WrapupInput,
+  { title, buffer, mimeType, durationSec, tracks, speakers, forceLocalTranscription, notes, attendees, deskNodeId }: WrapupInput,
   set: (partial: Partial<WrapupState>) => void
 ): Promise<void> {
   let transcript = ''
@@ -194,8 +199,10 @@ async function runWrapup(
     }
     transcript = t.transcript.trim()
   }
-  if (!transcript) {
-    set({ status: 'error', error: 'No speech was captured in this conversation, so there is nothing to summarise.' })
+  // DEC-130 — an engine never returns "nothing" for silence; it returns
+  // "you you you you". Refuse to summarise, file or deliver on that.
+  if (!transcript || transcriptLooksEmpty(transcript, durationSec)) {
+    set({ status: 'error', error: NO_SPEECH_MESSAGE })
     return
   }
 
@@ -408,11 +415,15 @@ async function runWrapup(
   // desk never blocks the review.
   if (meeting?.id && forceLocalTranscription) {
     try {
-      const desk = await useNodeStore.getState().create({
-        parentId: null,
-        kind: 'task',
-        title: `${title || 'Meeting'} — ${new Date().toLocaleDateString()}`
-      })
+      // DEC-130 — a desk picked at the recording's door IS the container;
+      // otherwise the meeting mints its own, as before.
+      const desk = deskNodeId
+        ? { id: deskNodeId }
+        : await useNodeStore.getState().create({
+            parentId: null,
+            kind: 'task',
+            title: `${title || 'Meeting'} — ${new Date().toLocaleDateString()}`
+          })
       if (desk) {
         // C5, closed: the Record itself stands on the desk beside the
         // transcript — reading the meetings store live, provenance tiers

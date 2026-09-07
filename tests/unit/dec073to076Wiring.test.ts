@@ -10,6 +10,7 @@ const cal = read('src/renderer/src/components/views/CalendarView.tsx')
 const grid = read('src/renderer/src/components/views/WeekTimeGrid.tsx')
 const app = read('src/renderer/src/App.tsx')
 const frame = read('src/renderer/src/components/widgets/WidgetFrame.tsx')
+const bell = read('src/renderer/src/components/attention/BellIcon.tsx')
 const triage = read('src/renderer/src/components/MissedTriagePrompt.tsx')
 
 // DEC-073…076 — the operator's build round, pinned as wiring. The pure logic
@@ -96,8 +97,12 @@ describe('dec_076 — the widget bell', () => {
     // DEC-077: the brand bell is a line SVG whose Icon `filled` prop is a
     // deliberate no-op — the active state fills the SAME path solid instead.
     expect(frame).toContain('<BellIcon size={13} active={!!attentionItem} />')
-    expect(frame).toContain("fill={active ? 'currentColor' : 'none'}")
-    expect(frame).toContain("PLEXII_ICONS['notifications']")
+    // DEC-125: the bell's SVG moved out of the frame into the shared
+    // attention/BellIcon.tsx (the message row wears the same bell now) —
+    // the frame imports it; the fill rule lives in the one definition.
+    expect(frame).toContain("import BellIcon from '../attention/BellIcon'")
+    expect(bell).toContain("fill={active ? 'currentColor' : 'none'}")
+    expect(bell).toContain("PLEXII_ICONS['notifications']")
   })
 
   it('dec_076_outlined_click_runs_the_same_flow_as_the_menu', () => {
