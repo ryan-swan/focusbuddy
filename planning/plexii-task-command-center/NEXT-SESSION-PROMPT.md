@@ -243,9 +243,12 @@
 > standup pins its title row over a scrolling body; the command-center
 > blocks scroll; `ItemStatusPill`'s menu is portalled at the pill's
 > coordinates (flips upward at the bottom). 5/5 live; suite 3,886 tests /
-> 356 files.
+> 356 files. **DEC-133**: every desk widget body scrolls (`WidgetFrame`),
+> the Attention widget verified pinned + scrolling on home and desk, the
+> standup's Save chip fixed (`icon-btn` retired from it). 4/4 live; suite
+> 3,888 tests / 356 files.
 
-**Last updated:** 2026-09-07 — through DEC-132 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-133 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

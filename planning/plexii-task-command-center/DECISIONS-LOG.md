@@ -4318,3 +4318,31 @@ the desks column reaches New desk, the header pinned; a status menu opened
 from the Attention tile lands through its portal fully inside the viewport
 and on top, and Esc closes it. Suite: 3,886 tests / 356 files; both
 typechecks clean.
+
+## DEC-133 — The same rule for the Attention widget and desk widgets; the standup's Save chip
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Attention widget and
+desk widgets. Also, fix the save button design glitch on your stand-up
+section").
+
+**What changed.**
+- **Desk widgets scroll, never clip.** `WidgetFrame`'s body scrolled only
+  for the auto-growing kinds; it scrolls vertically for EVERY widget now
+  (`overflow-y-auto overflow-x-hidden`), so content stays reachable whenever
+  the frame cannot grow to fit it. A widget whose root fills the frame never
+  shows a bar (measured: none of LakeDash's four grew one).
+- **The Attention widget** already carried the rule from DEC-128 — section
+  pills and the count pinned, the list scrolling — on the home tile and on
+  a desk. Verified rather than changed: with three rows opened the home
+  tile's list scrolls under pinned pills and the last row is reachable; the
+  desk widget's list scrolls the same way.
+- **The Save chip.** `StandupOutputPicker`'s button wore `icon-btn` (a
+  fixed 24 px square) beside `fb-btn-surface`, so the surface hugged the
+  icon while "Save" spilled outside it — the glitch in the screenshot. It is
+  a surface chip sized by its content now, like the header's other doors.
+
+**Verified live** over CDP, 4/4, view restored: the Save chip is one 64×28
+surface with the icon and the word inside it; the home Attention tile
+scrolls under pinned pills once rows open; LakeDash's four widget bodies all
+scroll rather than clip with no unneeded bar; the desk Attention widget's
+list still scrolls. Suite: 3,888 tests / 356 files; both typechecks clean.

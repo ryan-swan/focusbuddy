@@ -4,7 +4,7 @@ import { Rnd } from 'react-rnd'
 import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
 import WidgetSetupAffordance from './WidgetSetupAffordance'
-import { useAutoGrowHeight, autoGrowsHeight } from '../../lib/useAutoGrowHeight'
+import { useAutoGrowHeight } from '../../lib/useAutoGrowHeight'
 import { getNavPrefs } from '../../lib/navPrefs'
 import { useContextHealthStore } from '../../stores/contextHealth'
 import { healthFrameStyle } from '../../lib/healthFrame'
@@ -1196,13 +1196,13 @@ export default function WidgetFrame({
         </div>
         <div
           ref={bodyRef}
-          className={`relative flex-1 min-h-0 ${
-            // Auto-grow widgets size to their content, but cap out (e.g. a very
-            // long sticky) or sit in a fixed slot when pinned / inside a section.
-            // Scroll vertically rather than clipping so the content stays
-            // reachable when the frame can't grow to fit it.
-            autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-y-auto' : ''
-          }`}
+          // Auto-grow widgets size to their content, but cap out (e.g. a very
+          // long sticky) or sit in a fixed slot when pinned / inside a section.
+          // DEC-133 (operator: the home tiles' rule, for desk widgets too) —
+          // EVERY widget body scrolls vertically rather than clipping, so the
+          // content stays reachable whenever the frame cannot grow to fit it.
+          // A widget whose root fills the frame never shows a bar.
+          className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
         >
           <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>
           <WidgetSetupAffordance widget={widget} />

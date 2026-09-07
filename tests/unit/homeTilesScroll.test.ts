@@ -9,6 +9,8 @@ const kit = read('src/renderer/src/components/plexi/index.tsx')
 const standup = read('src/renderer/src/components/views/StandupHome.tsx')
 const blocks = read('src/renderer/src/components/attention/attentionBlocks.tsx')
 const pill = read('src/renderer/src/components/attention/ItemStatusPill.tsx')
+const frame = read('src/renderer/src/components/widgets/WidgetFrame.tsx')
+const picker = read('src/renderer/src/components/views/StandupOutputPicker.tsx')
 
 // DEC-132 — operator: "On the home page, individual widgets get cut off, and
 // there's no ability to scroll… either it needs to stop before something gets
@@ -56,5 +58,16 @@ describe('dec_132 — home tiles scroll, never clip', () => {
     expect(pill).toContain('data-testid="status-menu"')
     expect(pill).toContain('if (!wrap.current?.contains(t) && !menu.current?.contains(t)) setOpen(false)')
     expect(pill).not.toContain('className="absolute right-0 top-7 z-30')
+  })
+})
+
+describe('dec_133 — the same rule for desk widgets, and the Save chip', () => {
+  it('every desk widget body scrolls vertically rather than clipping', () => {
+    expect(frame).toContain('className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden"')
+    expect(frame).not.toContain("autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-y-auto' : ''")
+  })
+  it("the standup's Save chip is sized by its content — no 24px icon-btn square hugging the icon", () => {
+    expect(picker).toContain('className="fb-btn-surface h-7 px-2 gap-1.5 inline-flex items-center rounded-[var(--radius-field)] text-[12px]')
+    expect(picker).not.toContain('fb-btn-surface icon-btn')
   })
 })
