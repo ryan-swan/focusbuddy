@@ -7,8 +7,12 @@
 > that main, on both remotes): refining the app for the v1 beta launch —
 > removing the noise and the unnecessary features, production-ready.
 > Nothing removed yet: start by agreeing with Ryan what counts as noise.
-> `ryan-next` / `ryan-assistant` are landed and frozen. Rules unchanged:
-> main only via PR, never a direct push; dual-push every branch.
+> **The handoff for that mission is `planning/plexii-v1-beta/HANDOFF.md`**
+> — facts, rules, the CDP harness, the full surface inventory to classify,
+> the removal method, the readiness checklist, and a paste-able opening
+> prompt. Read it first. `ryan-next` / `ryan-assistant` are landed and
+> frozen. Rules unchanged: main only via PR, never a direct push; dual-push
+> every branch.
 
 > **SHIPPED 2026-09-01: Release 4.2.0.** Michael merged ryan-command-center
 > into main and released it (everything through DEC-095, plus his timezone
