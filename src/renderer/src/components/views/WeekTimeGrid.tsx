@@ -93,7 +93,8 @@ export default function WeekTimeGrid({
   onGhostRemove,
   filterQueue,
   onBlockDragOut,
-  onBlockDragActive
+  onBlockDragActive,
+  fill = false
 }: {
   weekStart: Date
   /** How many day columns to render from weekStart (7 = week, 3, 1 = day). */
@@ -112,6 +113,11 @@ export default function WeekTimeGrid({
   /** Fires when a block pointer-drag starts/ends, so the caller can light an
    *  unschedule zone. */
   onBlockDragActive?: (active: boolean) => void
+  /** DEC-131 (operator: "fill up the full window… so you can see more on
+   *  screen") — the hour window takes ALL the room left under the day
+   *  headers instead of the twelve-hour cap; the host owns the height (the
+   *  assistant's Calendar tab). */
+  fill?: boolean
 }): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const blocks = useTimeBlockStore((s) => s.blocks)
@@ -529,7 +535,7 @@ export default function WeekTimeGrid({
   const now = Date.now()
 
   return (
-    <div className="flex flex-col" data-testid="week-time-grid">
+    <div className={`flex flex-col ${fill ? 'h-full min-h-0' : ''}`} data-testid="week-time-grid" data-fill={fill || undefined}>
       {/* DEC-078 — the pinned band: day headers + deadline chips stay put
           while the hours scroll beneath them. Living up here (not inside each
           column) also means a tall chip stack can no longer push its own
@@ -648,8 +654,8 @@ export default function WeekTimeGrid({
           if (y < r.top + EDGE) el.scrollTop -= Math.max(6, (r.top + EDGE - y) / 2)
           else if (y > r.bottom - EDGE) el.scrollTop += Math.max(6, (y - (r.bottom - EDGE)) / 2)
         }}
-        className="flex overflow-y-auto overscroll-contain pt-2"
-        style={{ maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
+        className={`flex overflow-y-auto overscroll-contain pt-2 ${fill ? 'flex-1 min-h-0' : ''}`}
+        style={fill ? undefined : { maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
       >
       {/* Hour gutter */}
       <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`}>

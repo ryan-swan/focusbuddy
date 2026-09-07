@@ -51,7 +51,10 @@ describe('dec_131 — the Calendar tab', () => {
     expect(overlay).toContain("{activeTab === 'calendar' && <AssistantCalendarTab />}")
   })
   it("the day is the Attention rail's own column; ‹ Today › walks days; the month toggles", () => {
-    expect(tab).toContain('<WeekTimeGrid weekStart={day} days={1} compact />')
+    // the column FILLS the tab (operator: "so it doesn't cut off before the bottom")
+    expect(tab).toContain('<WeekTimeGrid weekStart={day} days={1} compact fill />')
+    expect(grid).toContain("className={`flex overflow-y-auto overscroll-contain pt-2 ${fill ? 'flex-1 min-h-0' : ''}`}")
+    expect(grid).toContain("style={fill ? undefined : { maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}")
     expect(tab).toContain('data-testid="assistant-calendar-prev"')
     expect(tab).toContain('data-testid="assistant-calendar-today"')
     expect(tab).toContain('data-testid="assistant-calendar-next"')

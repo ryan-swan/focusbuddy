@@ -4268,3 +4268,13 @@ camera, attach · emoji · GIF present. Suite: 3,880 tests / 355 files; both
 typechecks clean. Pins rewritten with history: the tab order and labels,
 DEC-123's own-row header, the DEC-121/128 widget mounts, the grid's booking
 pins → the shared helper.
+
+**Addendum (same day) — the column fills the tab.** Operator: "Fill up the
+full window on the calendar tab so that it doesn't cut off before the
+bottom, and so you can see more on screen." The rail's compact window caps
+at twelve hours (DEC-079), which in the taller panel left the bottom
+empty. `WeekTimeGrid` grew `fill`: the hour window takes all the room left
+under the day headers and the host owns the height; the Calendar tab passes
+it. Measured live: the window ends 8 px above the tab's edge (its padding),
+499 px tall, 16.6 hours on screen, the rest a scroll away. DEC-078's
+window pin follows the class.

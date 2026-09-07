@@ -140,9 +140,11 @@ export default function AssistantCalendarTab(): JSX.Element {
         </button>
       </div>
       {view === 'day' ? (
-        <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2" data-testid="assistant-calendar-day">
-          {/* DEC-052's rail column, one day, narrow — the same grid as the page. */}
-          <WeekTimeGrid weekStart={day} days={1} compact />
+        <div className="flex-1 min-h-0 px-2 py-2" data-testid="assistant-calendar-day">
+          {/* DEC-052's rail column, one day, narrow — the same grid as the page,
+              filling the tab: the hours scroll inside it, and as many as fit
+              are on screen. */}
+          <WeekTimeGrid weekStart={day} days={1} compact fill />
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2" data-testid="assistant-calendar-month">
