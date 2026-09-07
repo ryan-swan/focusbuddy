@@ -32,8 +32,8 @@ import { FLOATING_MENU_ASIDE, FLOATING_MENU_STYLE } from './chrome/floatingMenu'
 import ModelPickerChip from './assistant/ModelPickerChip'
 import { CHAT_MODES, chatModeDef } from '../lib/chatModes'
 import { ASSISTANT_CAPABILITIES } from '../lib/assistantCapabilities'
-import { useBodyDouble } from '../lib/bodyDouble'
-import { useAssistantChrome, type AssistantMode } from '../stores/assistantChrome'
+import { useAssistantChrome } from '../stores/assistantChrome'
+import AssistantHeader from './assistant/AssistantHeader'
 import {
   PUSH_TO_DESK_MESSAGE,
   TURN_INTO_DESK_MESSAGE
@@ -44,22 +44,9 @@ import { deskCaptureContext } from '../lib/captureContext'
 import { parseAttentionCommand, hasAttentionCommand } from '../lib/attentionCommand'
 import { presetForSelection } from '../lib/attentionPresets'
 
-// The three display modes, in Notion's order and with Notion's labels. The
-// header's mode button shows the current mode's icon; the dropdown lists all
-// three with a check on the active one.
-const MODE_OPTIONS: Array<{ mode: AssistantMode; label: string; icon: string }> = [
-  { mode: 'sidebar', label: 'Sidebar', icon: 'vertical_split' },
-  { mode: 'floating', label: 'Floating', icon: 'picture_in_picture_alt' },
-  { mode: 'fullscreen', label: 'Full screen', icon: 'fullscreen' }
-]
-
-// Window for the "What was I doing?" lookback — last 30 minutes covers most context switches.
-const TRAIL_LOOKBACK_MS = 30 * 60 * 1000
-
 const EMPTY_MESSAGES: ChatMessage[] = []
 
 interface Props {
-  onCollapse?: () => void
   // The Plexii hub renders this same panel as a real page in the main pane
   // (view.kind 'plexii'). Page mode forces the fullscreen layout regardless of
   // the overlay's chrome mode and drops the display-mode menu — a page is a
@@ -67,7 +54,7 @@ interface Props {
   page?: boolean
 }
 
-export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element {
+export default function ChatPanel({ page }: Props = {}): JSX.Element {
   const activeTaskId = useNodeStore((s) => s.activeTaskId)
   const nodes = useNodeStore((s) => s.nodes)
   const send = useChatStore((s) => s.send)
@@ -116,10 +103,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const newConversation = useChatStore((s) => s.newConversation)
   const openConversation = useChatStore((s) => s.openConversation)
   const deleteConversation = useChatStore((s) => s.deleteConversation)
-  // History is a permanent rail in fullscreen and an overlay elsewhere (plan
-  // D10) — the narrow modes have no room to give a rail without taking it from
-  // the conversation, which is the thing you came for.
-  const [historyOpen, setHistoryOpen] = useState(false)
   // The conversation's referenced objects (Phase 4.3) — one layer holding both
   // typed "@" mentions and clicked widgets. Shown only on the conversation they
   // belong to; the click half of the lifecycle runs in useAssistantWidgetPin,
@@ -203,7 +186,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   // EnginePickerChip idiom: the chip lives inside glass (backdrop-filter =
   // its own stacking context) where an absolute child gets buried under
   // sibling cards — the probe's first shot caught exactly that ghosting.
-  // ("conv" because modeMenu* further down already names the CHROME mode menu.)
+  // ("conv" — the CHROME display-mode menu lives in AssistantHeader now.)
   const [convModeMenuOpen, setConvModeMenuOpen] = useState(false)
   const convModeMenuRef = useRef<HTMLDivElement | null>(null)
   const convModeMenuPopRef = useRef<HTMLDivElement | null>(null)
@@ -330,7 +313,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
       if (e.key.toLowerCase() !== 'o') return
       e.preventDefault()
       newConversation()
-      setHistoryOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -424,32 +406,15 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
     if (!ed) return
     ed.chain().focus().insertContent(content).run()
   }, [])
-  const [summarizing, setSummarizing] = useState(false)
   // Which turn most recently had its text copied — drives the ✓ confirmation on
   // the copy button, then clears itself.
   const [copiedTs, setCopiedTs] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const createWidget = useWidgetStore((s) => s.create)
   const bumpLayout = useWidgetStore((s) => s.bumpLayoutVersion)
-  const pushAssistantMessage = useChatStore((s) => s.pushAssistantMessage)
-  const bodyDouble = useBodyDouble()
   // Display mode (sidebar / floating / fullscreen) — chrome state, not
-  // conversation state. Switching re-dresses this same panel over the same
-  // thread; the AssistantOverlay wrapper does the actual re-containering.
+  // conversation state; the switch itself lives in AssistantHeader now.
   const chromeMode = useAssistantChrome((s) => s.mode)
-  const setChromeMode = useAssistantChrome((s) => s.setMode)
-  const [modeMenuOpen, setModeMenuOpen] = useState(false)
-  const modeMenuRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (!modeMenuOpen) return
-    function onPointerDown(e: PointerEvent): void {
-      if (!modeMenuRef.current?.contains(e.target as Node)) setModeMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [modeMenuOpen])
-  const activeModeMeta =
-    MODE_OPTIONS.find((o) => o.mode === chromeMode) ?? MODE_OPTIONS[1]
   // Fullscreen with an empty thread renders as Notion's AI home (3a.4):
   // greeting and composer centered as a group, capability row and suggestion
   // cards under the input. Same panel, same nodes — only layout classes
@@ -457,31 +422,6 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   const isFullscreen = page || chromeMode === 'fullscreen'
   const fullscreenHome = isFullscreen && messages.length === 0
 
-  async function handleWhatWasIDoing(): Promise<void> {
-    if (summarizing) return
-    if (hasApiKey === false) {
-      pushAssistantMessage(
-        activeTaskId,
-        'Open Settings → AI · API keys and paste your Anthropic API key to use "What was I doing?".'
-      )
-      return
-    }
-    setSummarizing(true)
-    const sinceMs = Date.now() - TRAIL_LOOKBACK_MS
-    const result = await window.api.trail.summarize(activeTaskId, sinceMs)
-    setSummarizing(false)
-    if (result.ok && result.summary) {
-      const stamp = result.eventCount
-        ? `_(from ${result.eventCount} events in the last 30 min)_\n\n`
-        : ''
-      pushAssistantMessage(activeTaskId, `${stamp}${result.summary}`)
-    } else {
-      pushAssistantMessage(
-        activeTaskId,
-        result.error ?? "Couldn't summarize — try again in a moment."
-      )
-    }
-  }
   const [ctxMenu, setCtxMenu] = useState<{
     x: number
     y: number
@@ -997,56 +937,40 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         />
       )}
       <div className={isFullscreen ? 'flex-1 min-w-0 flex flex-col relative' : 'contents'}>
-      {!isFullscreen && historyOpen && (
-        <ConversationList
-          variant="overlay"
-          conversations={conversations}
-          activeId={activeConversationId}
-          onOpen={(id) => {
-            void openConversation(id)
-            setHistoryOpen(false)
-          }}
-          onNew={() => {
-            newConversation()
-            setHistoryOpen(false)
-          }}
-          onDelete={(id) => void deleteConversation(id)}
-        />
-      )}
-      <div className="px-3 py-3 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          {/* Sentence case, not shouted. The uppercase treatment made a 13px
-              label read as a system banner rather than a product surface. */}
-          <div className="flex items-center gap-1.5">
-            <Icon name={thread.icon} size={15} className="text-[var(--ink-70)]" />
-            <h2 className="fb-t-title text-[var(--ink-100)]">
-              Plexii
-            </h2>
-            {/* The mode badge (Plexii P6) — visible whenever discovery is on,
-                so the different posture is never a mystery. */}
-            {discovering && (
-              <span
-                data-testid="chat-mode-badge"
-                title="Discovery mode — Plexii is leading with questions toward a desk"
-                className="inline-flex items-center gap-1 rounded-[var(--radius-chip)] bg-accent/10 px-1.5 py-px fb-t-caption font-medium text-[rgb(var(--accent))]"
-              >
-                <Icon name="plexii:discover" size={11} />
-                Discovery
-              </span>
-            )}
-          </div>
-          <p
-            className="fb-t-caption text-[var(--ink-50)] truncate"
-            title={`Plexii is focused on ${thread.label}${thread.title ? ` — ${thread.title}` : ''}`}
-          >
-            {thread.title ? `${thread.title} · ` : ''}
-            {thread.label}
-          </p>
+      {/* DEC-120 — the header moved to the overlay chrome (AssistantHeader,
+          above the tabs); the page dresses itself with the same bar minus the
+          display-mode and minimize doors. What stays here is the
+          conversation's own context — the focused thread, Discovery, the
+          linked desk — and Clear chat, shown only when there is one. */}
+      {page && <AssistantHeader chrome={false} />}
+      {(discovering || primaryDeskId || thread.title || messages.length > 0) && (
+        <div className="px-3 pt-2.5 flex items-center gap-1.5 flex-wrap" data-testid="chat-context">
+          {thread.title && (
+            <span
+              className="inline-flex items-center gap-1 fb-t-caption text-[var(--ink-50)] truncate max-w-[220px]"
+              title={`Plexii is focused on ${thread.label} — ${thread.title}`}
+            >
+              <Icon name={thread.icon} size={12} className="text-[var(--ink-60)] shrink-0" />
+              <span className="truncate">{thread.title}</span>
+            </span>
+          )}
+          {/* The mode badge (Plexii P6) — visible whenever discovery is on,
+              so the different posture is never a mystery. */}
+          {discovering && (
+            <span
+              data-testid="chat-mode-badge"
+              title="Discovery mode — Plexii is leading with questions toward a desk"
+              className="inline-flex items-center gap-1 rounded-[var(--radius-chip)] bg-accent/10 px-1.5 py-px fb-t-caption font-medium text-[rgb(var(--accent))]"
+            >
+              <Icon name="plexii:discover" size={11} />
+              Discovery
+            </span>
+          )}
           {/* The conversation's desk, pinned where the conversation lives
               (Plexii P5). Clicking goes to it; a deleted desk says so instead
               of linking nowhere. */}
           {primaryDeskId && (
-            <div className="mt-1 flex items-center gap-1">
+            <>
               <button
                 type="button"
                 data-testid="chat-linked-desk"
@@ -1076,132 +1000,21 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
                   +{linkedDesks.length - 1}
                 </span>
               )}
-            </div>
+            </>
           )}
-        </div>
-        <div className="flex items-center gap-1">
-          {/* The mode control lives on the composer as the R19 chip; the
-              header keeps only the informational badge above. */}
-          <button
-            onClick={() => {
-              newConversation()
-              setHistoryOpen(false)
-            }}
-            className="icon-btn"
-            data-testid="assistant-new-chat"
-            title="New chat (⌘O)"
-          >
-            <Icon name="add" size={16} />
-          </button>
-          {/* Fullscreen keeps the rail open beside the conversation, so it has
-              no need of a toggle. */}
-          {!isFullscreen && (
-            <button
-              onClick={() => setHistoryOpen((v) => !v)}
-              className={`icon-btn ${historyOpen ? '!text-accent' : ''}`}
-              data-testid="assistant-history-toggle"
-              title="Your conversations"
-            >
-              <Icon name="history" size={16} />
-            </button>
-          )}
-          <button
-            onClick={bodyDouble.toggle}
-            className={`icon-btn relative ${bodyDouble.enabled ? '!text-accent' : ''}`}
-            title={
-              bodyDouble.enabled
-                ? `Body double ON — quiet check-in every ~10 min (next in ~${bodyDouble.minutesUntilNext ?? '?'} min). Click to turn off.`
-                : 'Body double OFF — turn on for a quiet AI presence sitting beside you while you work'
-            }
-          >
-            <Icon
-              name={bodyDouble.enabled ? 'group' : 'group_off'}
-              size={16}
-              filled={bodyDouble.enabled}
-            />
-            {bodyDouble.enabled && (
-              <span
-                className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-accent animate-pulse"
-                aria-label="active"
-              />
-            )}
-          </button>
-          <button
-            onClick={handleWhatWasIDoing}
-            disabled={summarizing}
-            className="icon-btn"
-            title={
-              summarizing
-                ? 'Reading the trail…'
-                : 'What was I doing? — replay the last 30 minutes as a narrative'
-            }
-          >
-            <Icon
-              name={summarizing ? 'hourglass_top' : 'replay'}
-              size={16}
-              className={summarizing ? 'animate-spin' : ''}
-            />
-          </button>
           {messages.length > 0 && (
-            <button onClick={() => clear(thread.key)} className="icon-btn" title="Clear chat">
-              <Icon name="delete_sweep" size={16} />
-            </button>
-          )}
-          {/* Display mode — Notion's ⌄ menu: Sidebar / Floating / Full screen,
-              check on the active one. Chrome only; the conversation persists
-              across switches. Absent in page mode: the hub is not re-dressable. */}
-          {!page && (
-          <div className="relative" ref={modeMenuRef}>
             <button
-              onClick={() => setModeMenuOpen((v) => !v)}
-              className="icon-btn"
-              title={`Display mode — ${activeModeMeta.label}`}
-              aria-label="Display mode"
-              aria-expanded={modeMenuOpen}
-              data-testid="assistant-mode-toggle"
+              onClick={() => clear(thread.key)}
+              className="ml-auto icon-btn"
+              title="Clear chat"
+              aria-label="Clear chat"
+              data-testid="chat-clear"
             >
-              <Icon name={activeModeMeta.icon} size={16} />
-            </button>
-            {modeMenuOpen && (
-              <div
-                data-testid="assistant-mode-menu"
-                className="absolute right-0 top-full mt-1.5 z-30 min-w-[172px] rounded-[var(--radius-row)] border border-[var(--edge-soft)] bg-[var(--surface-raised)] p-1"
-                style={{ boxShadow: 'var(--shadow-cast)' }}
-              >
-                {MODE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.mode}
-                    onClick={() => {
-                      setChromeMode(opt.mode)
-                      setModeMenuOpen(false)
-                    }}
-                    data-testid={`assistant-mode-${opt.mode}`}
-                    className="w-full flex items-center gap-2 rounded-[var(--radius-chip)] px-2 py-1.5 fb-t-label text-[var(--ink-90)] hover:bg-[var(--surface-sunken)] transition-colors"
-                  >
-                    <Icon name={opt.icon} size={15} className="text-[var(--ink-60)]" />
-                    <span className="flex-1 text-left">{opt.label}</span>
-                    {opt.mode === chromeMode && (
-                      <Icon name="check" size={14} className="text-accent" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          )}
-          {onCollapse && (
-            <button
-              onClick={onCollapse}
-              className="icon-btn"
-              title="Minimize to pill"
-              aria-label="Minimize to pill"
-              data-testid="assistant-minimize"
-            >
-              <Icon name="remove" size={16} />
+              <Icon name="delete_sweep" size={15} />
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {hasApiKey === false && !signedIn && (
         <div className="m-3 p-3 fb-card bg-accent/10 fb-t-label text-[var(--ink-90)] leading-relaxed flex gap-2">

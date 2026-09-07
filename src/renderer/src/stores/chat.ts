@@ -59,6 +59,9 @@ export function appliedKey(messageTs: number, proposalId: string): string {
   return `${messageTs}::${proposalId}`
 }
 
+// Window for the "What was I doing?" lookback — last 30 minutes covers most context switches.
+const TRAIL_LOOKBACK_MS = 30 * 60 * 1000
+
 interface ChatStore {
   messagesByTask: Record<string, ChatMessage[]>
   // Action proposals attached to an assistant message. Keyed by the message's
@@ -221,6 +224,11 @@ interface ChatStore {
   // Push a synthetic assistant message into the conversation. Used by "What was I doing?"
   // and other AI features that produce output without a user prompt.
   pushAssistantMessage: (taskId: string | null, content: string) => void
+  /** "What was I doing?" — the last 30 minutes of the trail, narrated into
+   *  the active thread. Lifted here (DEC-120) so the overlay header and the
+   *  hub page share one implementation. */
+  recapping: boolean
+  recap: (taskId: string | null) => Promise<void>
   clear: (taskId: string | null) => void
 }
 
@@ -546,6 +554,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (id) void window.api.chat.cancelStream(id).catch(() => {})
   },
   hasApiKey: null,
+  recapping: false,
+  recap: async (taskId) => {
+    if (get().recapping) return
+    if (get().hasApiKey === false) {
+      get().pushAssistantMessage(
+        taskId,
+        'Open Settings → AI · API keys and paste your Anthropic API key to use "What was I doing?".'
+      )
+      return
+    }
+    set({ recapping: true })
+    try {
+      const result = await window.api.trail.summarize(taskId, Date.now() - TRAIL_LOOKBACK_MS)
+      if (result.ok && result.summary) {
+        const stamp = result.eventCount ? `_(from ${result.eventCount} events in the last 30 min)_\n\n` : ''
+        get().pushAssistantMessage(taskId, `${stamp}${result.summary}`)
+      } else {
+        get().pushAssistantMessage(taskId, result.error ?? "Couldn't summarize — try again in a moment.")
+      }
+    } finally {
+      set({ recapping: false })
+    }
+  },
   checkApiKey: async () => {
     const has = await window.api.chat.hasApiKey()
     set({ hasApiKey: has })

@@ -3666,3 +3666,46 @@ error in the dialog and raises no Stop & send; Esc. e2e: plexiMeetLive #2
 now expects the dialog and its empty-state placeholder; moduleDashboard's
 Meet case expects NO customize door. Suite: 3,778 tests / 342 files; both
 typechecks clean.
+
+## DEC-120 — The assistant's header comes first: the sidebar's wordmark, four doors, tabs below
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+(the floating Plexii panel: "the menu options for today, chat, agent, tasks,
+activity, work need to come below the plexii wordmark menu items… at the
+very top… from right to left minimize, display mode, What was I doing?…
+take body double off of this page entirely… take your conversations off of
+these menu bars and keep new chat… replace the Plexii wordmark where it
+says Plexii your space with just the plexii logo and wordmark with the
+animated bouncing eyes from the top left of the left panel menu. Start
+there and then we'll keep going.") · **Branch:** ryan-next.
+
+**What changed.** A new `AssistantHeader` is the panel's FIRST row on every
+tab: the desk sidebar's own `PlexiiLogo` (the same `PlexiiMark`, the same
+blink-once-and-wink-on-hover motion — one wordmark, one component) where
+"Plexii / your workspace" stood, and on the right, left→right, New chat ·
+What was I doing? · Display mode · Minimize — i.e. from the right exactly
+as asked. Body double left the bar (its doors in the app header and the
+command centre stay); Your conversations left the bar (the list stays the
+fullscreen rail; the narrow-mode overlay lost its only door and went with
+it). The tab strip now sits under the header. The Chat tab keeps the
+conversation's own context as a slim strip only when there is something to
+say — the focused desk thread, the Discovery badge, the linked desk, and
+Clear chat when messages exist. The hub page (`PlexiiHubView`) wears the
+same bar without the two chrome doors (it is not re-dressable).
+
+**Plumbing.** "What was I doing?" moved into the chat store (`recap`,
+`recapping`) so the overlay header and the hub share one implementation;
+`ChatPanel` lost its header, `onCollapse`, the chrome mode menu, the
+body-double hook and the history overlay — 190 lines of header for a
+30-line context strip. Existing testids survive where the doors survive
+(`assistant-new-chat`, `assistant-mode-toggle`, `assistant-mode-<mode>`,
+`assistant-minimize`, `chat-linked-desk`, `chat-mode-badge`);
+`assistant-recap` and `assistant-header` are new.
+
+**Verified live** over CDP, 10/10, the panel restored exactly as found
+(closed, floating, Chat): the header is the first row and the tab strip
+begins at its bottom edge (171→219→219 px); the header holds the SVG
+wordmark and no title; the four doors sit in order by x; no history toggle,
+no body-double button, four buttons total; the header persists across
+Today and Agent; Display mode lists Sidebar · Floating · Full screen; New
+chat lands on Chat; Minimize returns to the pill. Suite: 3,785 tests / 343
+files; both typechecks clean.

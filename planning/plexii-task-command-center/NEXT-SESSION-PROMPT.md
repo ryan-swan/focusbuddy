@@ -151,8 +151,16 @@
 > start level with the rail. 10/10 live, mic stubbed; suite 3,778
 > tests / 342 files. **Every Meet door is now the composer's twin
 > (DEC-117/118/119).**
+> **DEC-120 — the Plexii assistant panel, round 1 of an operator-led
+> series ("start there and then we'll keep going")**: `AssistantHeader`
+> is the panel's first row on every tab — the sidebar's own animated
+> wordmark, then New chat · What was I doing? · Display mode · Minimize;
+> Body double and Your conversations left the bar; the tab strip sits
+> under it; ChatPanel keeps only a slim context strip (focused desk,
+> Discovery, linked desk, Clear). `recap` lives in the chat store. 10/10
+> live, panel restored as found; suite 3,785 tests / 343 files.
 
-**Last updated:** 2026-09-06 — through DEC-119 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-120 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

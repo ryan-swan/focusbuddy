@@ -11,6 +11,7 @@ import AssistantTasksTab from './tabs/AssistantTasksTab'
 import AssistantActivityTab from './tabs/AssistantActivityTab'
 import AssistantWorkTab from './tabs/AssistantWorkTab'
 import AssistantAgentTab from './tabs/AssistantAgentTab'
+import AssistantHeader from './AssistantHeader'
 import { useChatStore } from '../../stores/chat'
 import { useViewStore } from '../../stores/view'
 import { useWidgetStore } from '../../stores/widgets'
@@ -146,7 +147,6 @@ function AssistantOverlayChrome(): JSX.Element {
   const activeTab = useAssistantChrome((s) => s.activeTab)
   const setTab = useAssistantChrome((s) => s.setTab)
   const openPanel = useAssistantChrome((s) => s.openPanel)
-  const close = useAssistantChrome((s) => s.close)
   const setWidth = useAssistantChrome((s) => s.setWidth)
   const persistWidth = useAssistantChrome((s) => s.persistWidth)
   // The pill pulses while a request is genuinely in flight — the one honest
@@ -436,6 +436,10 @@ function AssistantOverlayChrome(): JSX.Element {
             : 'h-full w-full flex flex-col'
         }
       >
+        {/* The header FIRST (operator direction): the sidebar's wordmark and,
+            from the right, Minimize · Display mode · What was I doing? · New
+            chat. The tab strip sits under it on every tab. */}
+        <AssistantHeader chrome />
         <div
           role="tablist"
           aria-label="Plexii sections"
@@ -470,7 +474,7 @@ function AssistantOverlayChrome(): JSX.Element {
         <div className={`flex-1 min-h-0 relative ${mode !== 'fullscreen' ? 'bg-[var(--surface-raised)]' : ''}`}>
           {/* Chat: always mounted, shown only on the Chat tab. */}
           <div className="h-full w-full" style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
-            <ChatPanel onCollapse={close} />
+            <ChatPanel />
           </div>
           {activeTab === 'today' && (
             <div className="h-full overflow-y-auto px-3 py-3" data-testid="assistant-tab-today-body">
