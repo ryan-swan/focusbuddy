@@ -207,8 +207,16 @@
 > Open the item, the page); double-click opens the page's editor over the
 > current page (portalled). Shared doors extracted: `lib/startWithPlexii`,
 > `lib/openMeeting`. 13/13 live; suite 3,838 tests / 350 files.
+> **DEC-129**: the Today tile's meeting and calendar items get the same
+> three depths — `attention/CalendarBlockRow` (summary in place with the
+> calendar's own doors: Join, Record external, Start, Done, Skip, Open,
+> Delete, the page; double-click → BookTimeDialog in edit mode, saving via
+> `lib/blockEdit`); the tile's dated work and the Overdue radar use
+> `WidgetItemRow`; MiniRow retired. Judgement call: `dayTimeline` puts
+> overdue work BEHIND today's timed shape. 8/8 live with scratch blocks
+> (removed); suite 3,846 tests / 351 files.
 
-**Last updated:** 2026-09-06 — through DEC-128 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-129 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

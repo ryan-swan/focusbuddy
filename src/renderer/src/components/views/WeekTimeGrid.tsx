@@ -11,6 +11,7 @@ import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from
 import AttentionItemEditor from '../AttentionItemEditor'
 import BookTimeDialog from '../BookTimeDialog'
 import { useActionHistory } from '../../stores/actionHistory'
+import { saveBlockEdit } from '../../lib/blockEdit'
 import { loadPlannerSettings } from '../../lib/attentionPlanner'
 import {
   resolvePlaceholder,
@@ -1088,25 +1089,9 @@ export default function WeekTimeGrid({
           onSave={async (patch) => {
             const prev = editBlock
             setEditBlockState(null)
-            await updateBlock(prev.id, patch)
-            useActionHistory.getState().recordWithToast({
-              label: `Saved \u201c${patch.title ?? prev.title}\u201d \u00b7 ${fmtTimeRange(
-                patch.startMs ?? prev.startMs,
-                patch.durationMin ?? prev.durationMin
-              )}`,
-              undo: async () => {
-                await updateBlock(prev.id, {
-                  taskId: prev.taskId,
-                  title: prev.title,
-                  startMs: prev.startMs,
-                  durationMin: prev.durationMin,
-                  meeting: prev.meeting ?? null
-                })
-              },
-              redo: async () => {
-                await updateBlock(prev.id, patch)
-              }
-            })
+            // DEC-129 — the save (and its undo toast) is lib/blockEdit, shared
+            // with the Today tile's row, so an edit lands the same everywhere.
+            await saveBlockEdit(prev, patch)
           }}
         />
       )}

@@ -4072,3 +4072,54 @@ is the one trip to Attention. Suite: 3,838 tests / 350 files; both
 typechecks clean. Pins rewritten with history, never deleted: DEC-051's row
 anatomy pins follow the row to its file; DEC-121's overflow pin → every host
 scrolls; the start-flow and DEC-079 hand-off pins → the shared libs.
+
+## DEC-129 — The Today tile's meeting and calendar items: three depths in place, like the Attention widget
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the meeting and calendar
+items") — DEC-128's row behaviour, for the calendar blocks (meetings and
+focus time) and the dated work the home Today tile lists.
+
+**What changed.**
+- **A calendar block as a widget row** — `attention/CalendarBlockRow.tsx`.
+  At rest: the camera (a meeting) or the clock (focus time), the title, the
+  start time; happening-now pulses; done / missed / skipped show. One
+  click: the summary in place — the time range and the relative when, the
+  agenda, the chips (status · where: the provider or the Plexii room ·
+  location · who's invited · the desk or item it is booked for · repeats ·
+  pinned · this meeting's Record · last time in the series) — and the
+  calendar's own doors: Join (an external link wins, the minted room is the
+  fallback), Record an external meeting, Start (a focus session on its
+  desk — the grid's rule for what can be started), Done, Skip, Open the
+  block, Delete (undo in the toast, the store's own path), and the Calendar
+  page. Double-click: the calendar's own `BookTimeDialog` in edit mode,
+  seeded from the block, portalled to `<body>`; saving runs through a new
+  `lib/blockEdit.ts` (`saveBlockEdit` — the grid's toast, undo and redo,
+  extracted; the grid delegates to it).
+- **The Today tile is made of rows.** Its calendar lines are
+  `CalendarBlockRow`, its dated work is DEC-128's `WidgetItemRow`; the
+  Overdue radar's lines are `WidgetItemRow` too. `MiniRow` (a plain line
+  that jumped to the Attention page) is retired; the tile holds the real
+  `TimeBlock` rows so a row has every field; the list scrolls.
+- **Judgement call, stated:** `dayTimeline` now places work due BEFORE
+  today behind the day's timed shape (as undated work rides), oldest first,
+  ahead of the Meet items. Sorting overdue work by its past date put the
+  operator's backlog (23 lines, August dues) ahead of the blocks actually on
+  today's calendar, and a four-line tile never reached them — the rows
+  this round adds would have been unreachable. The Overdue radar is the
+  backlog's place; on the Today tile it follows the day. Pinned in
+  attentionAnalytics.test.ts; DEC-049's own cases still hold.
+
+**Verified live** over CDP, 8/8, on the home Today tile with TWO scratch
+blocks (a Google-Meet meeting with agenda, location and an invitee; a
+focus block) created and then removed through the time-block store (none
+left on disk), nothing joined, recorded, started or marked, the page and the
+open panel restored: both rows closed at rest with title, time and a
+different glyph each, in a list that scrolls; one click on the meeting
+opens the summary in place — range, agenda, "Google Meet", the location,
+"1 invited", "Planned", Join and Record-external, no Start — and the view
+does not change; the focus row offers Start and no Join, plus Open, Delete
+and the Calendar door; a double-click opens the block dialog seeded with
+the title, portalled and on top, the view unchanged; the dialog closes
+through its own door; the summary's Calendar door is the one trip to the
+Calendar page. Suite: 3,846 tests / 351 files; both typechecks clean. Pin
+rewritten with history: the grid's save-toast pin → the shared helper.

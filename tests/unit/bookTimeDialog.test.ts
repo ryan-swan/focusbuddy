@@ -379,8 +379,12 @@ describe('double-click opens the full dialog, seeded from the block', () => {
   })
 
   it('saving toasts with Undo restoring every prior field', () => {
-    expect(grid).toContain('label: `Saved')
-    const undo = grid.slice(grid.indexOf('label: `Saved'), grid.indexOf('redo: async () => {\n                await updateBlock(prev.id, patch)'))
+    // DEC-129: the save and its toast moved to lib/blockEdit (shared with the
+    // Today tile's block row); the grid delegates to it.
+    const lib = readFileSync('src/renderer/src/lib/blockEdit.ts', 'utf8')
+    expect(grid).toContain('await saveBlockEdit(prev, patch)')
+    expect(lib).toContain('label: `Saved')
+    const undo = lib.slice(lib.indexOf('label: `Saved'), lib.indexOf('redo: async () => {'))
     for (const f of ['taskId: prev.taskId', 'title: prev.title', 'startMs: prev.startMs', 'durationMin: prev.durationMin', 'meeting: prev.meeting ?? null'])
       expect(undo).toContain(f)
   })

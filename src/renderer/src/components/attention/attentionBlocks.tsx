@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FbNode } from '@shared/types'
+import type { FbNode, TimeBlock } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { useNodeStore } from '../../stores/nodes'
 import { useViewStore } from '../../stores/view'
@@ -8,7 +8,7 @@ import { useTimeBlockStore } from '../../stores/timeBlocks'
 import WeekTimeGrid from '../views/WeekTimeGrid'
 import { quietWinLines } from '../../lib/completionDetect'
 import Icon from '../Icon'
-import { QUEUE_COLOR, QUEUE_ICON, queueOf, queueTint, toneTriplet } from '../../lib/attentionQueues'
+import { queueTint, toneTriplet } from '../../lib/attentionQueues'
 import {
   pulseCounts,
   overdueRadar,
@@ -18,10 +18,11 @@ import {
   startRecommendations,
   kpiMetrics,
   dayTimeline,
-  type KpiKey,
-  type CalendarBlockLike
+  type KpiKey
 } from '../../lib/attentionAnalytics'
 import { startPromptForItem } from '../../lib/startPrompt'
+import { WidgetItemRow } from './WidgetItemRow'
+import { CalendarBlockRow } from './CalendarBlockRow'
 
 // DEC-048/049 — the command-center blocks. ONE component per widget with a
 // `variant` prop (compact | full | band) — never a fork per surface.
@@ -90,25 +91,12 @@ function BlockShell({
   )
 }
 
-function MiniRow({ i, nowMs, onOpen }: { i: FbNode; nowMs: number; onOpen: () => void }): JSX.Element {
-  const overdue = i.dueAt && Date.parse(i.dueAt) < nowMs
-  return (
-    <button onClick={onOpen} className="w-full flex items-center gap-2 py-1 text-left fb-press min-w-0">
-      <Icon
-        name={QUEUE_ICON[queueOf(i)] ?? 'check_circle'}
-        size={12}
-        style={{ color: queueTint(QUEUE_COLOR[queueOf(i)] ?? '#64748b', 0.8) }}
-        className="shrink-0"
-      />
-      <span className="text-[12px] text-[var(--ink-90)] truncate flex-1">{i.title}</span>
-      {i.dueAt && (
-        <span className={`text-[10.5px] shrink-0 ${overdue ? 'text-rose-500' : 'text-[var(--ink-40)]'}`}>
-          {new Date(i.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-        </span>
-      )}
-    </button>
-  )
-}
+// DEC-129 — MiniRow (a plain line that jumped to the Attention page) is
+// retired: every work-item row in a block is the DEC-128 WidgetItemRow, and
+// every calendar block is a CalendarBlockRow — the same three depths in place
+// (title at rest · a click opens the summary and actions · a double-click
+// opens the full item) as the Attention widget, so the home tiles cannot
+// behave differently from the widget beside them.
 
 const useGoAttention = (): (() => void) => useViewStore((s) => s.goAttention)
 
@@ -167,7 +155,6 @@ export function AttentionPulseBlock({ variant }: { variant: BlockVariant }): JSX
 
 export function OverdueRadarBlock({ variant }: { variant: BlockVariant }): JSX.Element {
   const items = useAttentionData()
-  const goAttention = useGoAttention()
   const nowMs = Date.now()
   const { overdue, dueSoon } = useMemo(() => overdueRadar(items, nowMs), [items, nowMs])
   const shown = variant === 'full' ? 8 : 3
@@ -176,18 +163,20 @@ export function OverdueRadarBlock({ variant }: { variant: BlockVariant }): JSX.E
       {overdue.length === 0 ? (
         <div className="text-[11.5px] text-[var(--ink-30)]">Nothing overdue. Empty is the goal.</div>
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           {overdue.slice(0, shown).map((i) => (
-            <MiniRow key={i.id} i={i} nowMs={nowMs} onOpen={goAttention} />
+            <WidgetItemRow key={i.id} i={i} dense nowMs={nowMs} />
           ))}
         </div>
       )}
       {variant === 'full' && dueSoon.length > 0 && (
         <div className="mt-2 pt-2 border-t border-[var(--edge-soft)]">
           <div className="fb-t-caption text-[var(--ink-40)] mb-0.5">Next 48 hours</div>
-          {dueSoon.slice(0, 5).map((i) => (
-            <MiniRow key={i.id} i={i} nowMs={nowMs} onOpen={goAttention} />
-          ))}
+          <div className="flex flex-col gap-1">
+            {dueSoon.slice(0, 5).map((i) => (
+              <WidgetItemRow key={i.id} i={i} dense nowMs={nowMs} />
+            ))}
+          </div>
         </div>
       )}
     </BlockShell>
@@ -198,7 +187,6 @@ export function OverdueRadarBlock({ variant }: { variant: BlockVariant }): JSX.E
 
 export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element {
   const items = useAttentionData()
-  const goAttention = useGoAttention()
   const goCalendar = useViewStore((s) => s.goCalendar)
   const nowMs = Date.now()
   // A change-signal only — never the range itself (see below).
@@ -212,7 +200,7 @@ export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element
   // would narrow that range to today underneath an open calendar, blanking
   // the rest of its week until it remounted. So we fetch today's blocks
   // directly into local state and leave the store alone.
-  const [blocks, setBlocks] = useState<CalendarBlockLike[]>([])
+  const [blocks, setBlocks] = useState<TimeBlock[]>([])
   const dayKey = new Date().toDateString()
   useEffect(() => {
     let alive = true
@@ -223,7 +211,7 @@ export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element
     void window.api.timeBlocks
       .list(from.getTime(), to.getTime())
       .then((rows) => {
-        if (alive) setBlocks(rows as CalendarBlockLike[])
+        if (alive) setBlocks(rows)
       })
       .catch(() => {
         /* the day simply shows its work items */
@@ -236,8 +224,6 @@ export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element
 
   const timeline = useMemo(() => dayTimeline(items, blocks, nowMs), [items, blocks, nowMs])
   const shown = variant === 'compact' ? 4 : 9
-  const hhmm = (ms: number): string =>
-    new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   return (
     <BlockShell
       title="Today"
@@ -273,28 +259,20 @@ export function AgendaBlock({ variant }: { variant: BlockVariant }): JSX.Element
       ) : timeline.length === 0 ? (
         <div className="text-[11.5px] text-[var(--ink-30)]">Nothing scheduled or due today.</div>
       ) : (
-        <div className="flex flex-col">
-          {timeline.slice(0, shown).map((e) =>
-            e.kind === 'event' ? (
-              <button
-                key={`ev:${e.id}`}
-                onClick={goCalendar}
-                className="w-full flex items-center gap-2 py-1 text-left fb-press min-w-0"
-              >
-                <Icon
-                  name={e.isMeeting ? 'videocam' : 'schedule'}
-                  size={12}
-                  className="shrink-0 text-[var(--ink-40)]"
-                />
-                <span className="text-[12px] text-[var(--ink-90)] truncate flex-1">{e.title}</span>
-                <span className="text-[10.5px] text-[var(--ink-40)] shrink-0 fb-tabular">
-                  {hhmm(e.atMs)}
-                </span>
-              </button>
-            ) : (
-              <MiniRow key={`it:${e.id}`} i={e.item} nowMs={nowMs} onOpen={goAttention} />
-            )
-          )}
+        <div className="h-full overflow-y-auto flex flex-col gap-1" data-testid="agenda-rows">
+          {/* DEC-129 — each line is a row with the three depths: a calendar
+              block (a meeting or focus time) is a CalendarBlockRow, dated work
+              is the DEC-128 WidgetItemRow. Nothing here jumps to a page on a
+              click; the pages are doors inside each row's summary. */}
+          {timeline.slice(0, shown).map((e) => {
+            if (e.kind === 'event') {
+              const block = blocks.find((b) => b.id === e.id)
+              return block ? (
+                <CalendarBlockRow key={`ev:${e.id}`} block={block} nowMs={nowMs} />
+              ) : null
+            }
+            return <WidgetItemRow key={`it:${e.id}`} i={e.item} dense nowMs={nowMs} />
+          })}
           {timeline.length > shown && (
             <div className="fb-t-caption text-[var(--ink-30)] pt-1">
               +{timeline.length - shown} more today
