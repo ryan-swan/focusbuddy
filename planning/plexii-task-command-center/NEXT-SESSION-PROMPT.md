@@ -113,8 +113,19 @@
 > item" chips). `lib/meetingRecordStats.ts` unit-tested; 42 live CDP
 > checks; the transcription engine itself was NOT re-tested this round.
 > Suite: 3,693 tests / 339 files.
+> **DEC-116**: PlexiMeet moved onto Home's own substrate and idioms
+> (operator: "look and feel more like the main home screen") —
+> `paper-texture` (not desk-paper) inside Home's page shell, a hero
+> header with the rose module chip, Home's surface-button doors and
+> ACCENT primary (the rose primary retired to the chip — a judgment
+> call, one line to revert), the rail and the three Record panels as
+> floating kit `RailCard`s with icon headers (kit grew `trailing` /
+> `bodyClassName` / `testId`, Home pixel-identical), the module
+> dashboard `embedded` as the empty state. Live-caught: duplicate
+> marker keys when two Brief entries cite one line. Suite: 3,695
+> tests / 339 files.
 
-**Last updated:** 2026-09-06 — through DEC-115 (see the header block above; analysis/29 is the ryan-next review → landing package).
+**Last updated:** 2026-09-06 — through DEC-116 (see the header block above; analysis/29 is the ryan-next review → landing package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

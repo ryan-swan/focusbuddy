@@ -3458,3 +3458,61 @@ after a dismissal — replaced by an in-flight guard, the promotion carries
 the truth; (3) the pills carried both a count and a key digit — the digit
 moved to the tooltip. **Probe lesson:** `textContent` includes Material
 ligature names ("article") — match labels, never equality.
+
+## DEC-116 — PlexiMeet on Home's substrate: paper-texture, hero header, floating kit cards
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("make the entire PlexiMeet page background design, textures, and colors
+look and feel more like the main home screen", with Home and Meet
+screenshots side by side) · **Branch:** ryan-next · **Scope rule:**
+presentation only — every testid, handler and copy string stays; the
+DEC-115 Record is unchanged in function.
+
+**What was actually different from Home.** Not the dots: Meet already sat
+on `desk-paper` (DEC-112). Home sits on `paper-texture` — the dashboard
+deliberately avoids desk-paper because its time-of-day overlay and
+custom-background override caused Home's mid-screen seam and light-in-dark
+bug — with a 28px dot grid on the themed `--surface-base`, scrolling with
+the content. The real differences were structural: Meet's rail was a
+full-height bordered panel, its detail had a sticky raised header bar, its
+primary was a glossy rose block, and its cards had no headers. Home is a
+single scrolling page (`max-w-[1440px] mx-auto px-8 pt-8 pb-8`) with a hero
+greeting, quiet surface-button doors, one accent primary, and floating
+cards with icon-tile titles.
+
+**What changed.** The view root is `paper-texture` — the SAME substrate
+as Home — inside Home's page shell. A hero header (Home's idiom: display
+title, quiet subtitle, doors right) carries the rose module chip and
+"PlexiMeet"; Record notes / Record external / Message / Add are Home's
+surface buttons (`h-9 px-3.5 fb-t-body fb-btn-surface`), and "Start or
+schedule a meeting" is Home's ACCENT primary (the Customize → Done glow) —
+a judgment call recorded here: Home's only saturated element is accent, so
+the module colour retreats to the chip. The rail became two floating kit
+`RailCard`s (Meetings — search + list, sticky beside the Record; the
+RECORDING preferences, eyebrow kept). The meeting title sits on the paper
+with its facts beneath (no sticky bar); Desk / Export / delete are surface
+buttons. The three Record panels are `RailCard`s with icon headers —
+Timeline (clock + legend in the header), Record (the sunken segmented
+track in the header, unchanged), Transcript (line count in the header,
+sticky). The empty state (no meeting selected) is the module dashboard,
+now `embedded` so the page keeps one hero.
+
+**Kit growth, additive:** `RailCard` gained `trailing` (header controls),
+`bodyClassName` (self-managed scroll regions) and `testId`; existing
+callers — Home's Rooms/Continue cards, every module dashboard — render
+pixel-identical (defaults unchanged). `ModuleDashboard` gained `embedded`.
+
+**Caught live, fixed in-round:** the operator's real "Test" meeting has
+two heard Brief entries citing the SAME transcript line — the DEC-115
+marker keys collided (`h-<segmentId>`; React duplicate-key warning ×180
+per render). Keys now carry the span index, and a line shows ONE chip per
+door (two entries under the same section open the same place). **Probe
+lesson:** after a renderer reload the app lands on the desk sidebar; the
+Meet door lives in the OFFICE sidebar — probes switch context first.
+
+**Superseded pins rewritten with history** (meetHouseMaterial): desk-paper
+root → paper-texture + Home's shell; raised rail panel → kit cards; 15px
+rail header → hero; glossy rose primary → Home's accent primary; sticky
+detail bar → title on the paper; the DEC-115 `data-testid` panel pins →
+`testId` on RailCards. Verified live: 42/42 CDP checks on a scratch
+meeting (created, removed, its items dismissed the house way), light +
+dark screenshots. Suite: 3,695 tests / 339 files; both typechecks clean.

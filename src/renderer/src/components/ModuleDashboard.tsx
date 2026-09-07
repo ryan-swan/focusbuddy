@@ -74,6 +74,10 @@ export interface ModuleDashboardProps {
   breakdown?: DashboardBreakdown
   activity?: { items: DashboardActivityItem[]; onViewAll?: () => void }
   recentItems?: { label?: string; items: ModuleItem[]; emptyHint: string; onCreate?: () => void; createLabel?: string }
+  /** Rendered inside a page that already carries its own hero header and
+   *  padding (PlexiMeet's paper page): no outer padding, no title block — the
+   *  Customize door and `actions` stay, right-aligned. */
+  embedded?: boolean
 }
 
 type SectionId = 'stats' | 'chart' | 'breakdown' | 'activity' | 'recent'
@@ -165,7 +169,7 @@ function BreakdownBody({ breakdown }: { breakdown: DashboardBreakdown }): JSX.El
 }
 
 export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Element {
-  const { moduleKey, title, greeting, subtitle, icon, accentClass, actions, stats, timeline, breakdown, activity, recentItems } = props
+  const { moduleKey, title, greeting, subtitle, icon, accentClass, actions, stats, timeline, breakdown, activity, recentItems, embedded } = props
   const [hidden, setHidden] = useState<Set<SectionId>>(() => loadHidden(moduleKey))
   const [customizing, setCustomizing] = useState(false)
 
@@ -189,13 +193,17 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
   const show = (id: SectionId): boolean => !hidden.has(id)
 
   return (
-    <div className="flex-1 min-w-0 overflow-auto" data-testid={`module-dashboard-${moduleKey}`}>
-      <div className="w-full px-8 py-6">
+    <div className={embedded ? 'min-w-0' : 'flex-1 min-w-0 overflow-auto'} data-testid={`module-dashboard-${moduleKey}`}>
+      <div className={embedded ? 'w-full' : 'w-full px-8 py-6'}>
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2.5">
-            <Icon name={icon} size={22} className={`mt-0.5 shrink-0 ${accentClass}`} filled />
-            <DashboardHeader title={title} greeting={greeting} subtitle={subtitle} />
-          </div>
+          {embedded ? (
+            <div className="flex-1" />
+          ) : (
+            <div className="flex items-start gap-2.5">
+              <Icon name={icon} size={22} className={`mt-0.5 shrink-0 ${accentClass}`} filled />
+              <DashboardHeader title={title} greeting={greeting} subtitle={subtitle} />
+            </div>
+          )}
           <div className="shrink-0 flex items-center gap-2">
             <div className="relative">
               <button

@@ -161,8 +161,12 @@ describe('DEC-115 — the numbers are facts over the segments', () => {
 describe('DEC-115 — the Record layout: renderings beside an always-visible transcript', () => {
   it('three renderings, no Thread tab — the transcript is its own column', () => {
     expect(view).toContain("type RecordView = 'commitments' | 'brief' | 'analytics'")
-    expect(view).toContain('data-testid="meet-record-pane"')
-    expect(view).toContain('data-testid="meet-transcript-pane"')
+    // History: DEC-115 pinned these as raw data-testids on plain cards; the
+    // Home-material round (DEC-116) made every panel a kit RailCard, which
+    // takes the id as `testId` and lands it on its <section>. Same ids, same
+    // elements in the live DOM.
+    expect(view).toContain('testId="meet-record-pane"')
+    expect(view).toContain('testId="meet-transcript-pane"')
     expect(view).toContain('data-testid="rendering-thread" ref={threadRef}')
     expect(view).toContain("if (e.key === '1') setView('brief')")
     expect(view).toContain("if (e.key === '2') setView('commitments')")
@@ -203,7 +207,7 @@ describe('DEC-115 — the Record layout: renderings beside an always-visible tra
   })
 
   it('the timeline is a door into the call, built from bands and marked with moments', () => {
-    expect(view).toContain('data-testid="meet-timeline"')
+    expect(view).toContain('testId="meet-timeline"')
     expect(view).toContain('data-testid="meet-timeline-bar"')
     expect(view).toContain('onClick={seekTimeline}')
     expect(view).toContain('segmentAtMs(segments, frac * totalMs)')

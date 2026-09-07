@@ -24,7 +24,7 @@ import type { ActionProposal, FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { CLASS_LABEL, isTerminalState } from '../../lib/attentionQueues'
-import { StatTile, StatusPill } from '../plexi'
+import { RailCard, StatTile, StatusPill } from '../plexi'
 import {
   speakerOrder,
   speakerColor,
@@ -307,107 +307,45 @@ export default function PlexiMeetView(): JSX.Element {
   }
 
   return (
-    // House material (the operator's "still feels vibe-coded" round): the
-    // detail side sits on the desk paper (the dotted house texture every
-    // canvas view wears), the rail is a raised panel over it, and every
-    // control below speaks the shared recipes — fb-card, fb-btn-surface,
-    // eyebrow labels, the kpi-gloss primary. Presentation ONLY: every
-    // testid, handler and copy string is exactly where it was.
-    <div className="h-full w-full flex desk-paper no-tod text-[var(--ink-100)]" data-testid="pleximeet-view">
-      {/* List */}
-      <div className="w-[330px] shrink-0 border-r border-[var(--edge-soft)] flex flex-col bg-[color-mix(in_oklab,var(--surface-raised)_88%,transparent)] backdrop-blur-[2px]">
-        <div className="px-4 py-3.5 border-b border-[var(--edge-soft)]">
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] bg-rose-500/10 text-rose-500 shadow-[inset_0_0_0_1px_rgb(244_63_94/0.18)]">
-              <Icon name="groups" size={17} filled />
+    // The page reads like Home (operator direction, 2026-09-06): the same
+    // paper-texture substrate the dashboard sits on (deliberately NOT
+    // desk-paper — that pair caused Home's mid-screen seam and its
+    // light-in-dark bug), Home's hero header with the module chip and the
+    // primary as Home's accent button, and every surface below a floating
+    // house card on the paper. Presentation ONLY: every testid, handler and
+    // copy string is exactly where it was.
+    <div className="h-full w-full overflow-auto paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view">
+      <div className="max-w-[1440px] mx-auto px-8 pb-8 pt-8">
+        {/* Hero — Home's greeting header idiom: title + subtitle left, doors right. */}
+        <header className="flex items-start justify-between gap-4 flex-wrap mb-6" data-testid="meet-hero">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-rose-500/10 text-rose-500 shadow-[inset_0_0_0_1px_rgb(244_63_94/0.18)]">
+              <Icon name="groups" size={22} filled />
             </span>
             <div className="min-w-0">
-              <h1 className="fb-display text-[15px] font-bold tracking-tight text-[var(--ink-100)] leading-tight">PlexiMeet</h1>
-              <p className="text-[11.5px] text-[var(--ink-50)] leading-tight">Meetings that turn into actions.</p>
+              <h1 className="fb-display-hero text-[24px] leading-tight text-[var(--ink-100)]">PlexiMeet</h1>
+              <p className="mt-1 text-[13px] text-[var(--ink-50)]">Meetings that turn into actions.</p>
             </div>
           </div>
-        </div>
-
-        <div className="px-3 py-2.5 space-y-2">
-          {/* Primary: a live, multi-party meeting (connect to teammates). */}
-          <button
-            onClick={openNew}
-            data-testid="meet-start-live"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-[var(--radius-field)] text-white text-[12.5px] font-semibold fb-press bg-gradient-to-b from-rose-500 to-rose-600 shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.12)] hover:from-rose-400 hover:to-rose-600"
-          >
-            <Icon name="video_call" size={17} /> Start or schedule a meeting
-          </button>
-
-          {/* DEC-098 made meeting recording consent-only; the calls consent
-              round closed the same hole for 1:1s. This preference now only
-              expresses MY side: on a call it records my mic and ASKS the
-              other person — their voice is captured when they say yes, and
-              a decline is honoured by construction (never tapped). */}
-          <div className="fb-card px-2.5 py-2 space-y-1.5">
-          <div className="text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">RECORDING</div>
-          <label
-            className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
-            title="Applies to 1:1 calls: your mic is recorded and the other person is asked before their voice is captured — declining keeps them out entirely. Meetings never auto-record."
-          >
-            <input
-              type="checkbox"
-              checked={whisper}
-              onChange={(e) => {
-                setWhisper(e.target.checked)
-                setWhisperEnabled(e.target.checked)
-              }}
-              data-testid="meet-whisper-toggle"
-              className="accent-[rgb(var(--accent))]"
-            />
-            <span>Transcribe &amp; summarise my 1:1 calls (the other person is asked)</span>
-          </label>
-
-          {/* M2c (CR-13) — audio retention. Local disk only, never uploaded. */}
-          <label className="flex items-center justify-between gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)]">
-            <span
-              className="whitespace-nowrap"
-              title="Meeting audio stays on this machine and expires after this window. 'Keep' on a meeting overrides it."
-            >
-              Keep meeting audio
-            </span>
-            <select
-              value={retention}
-              onChange={(e) => {
-                const v = e.target.value as '0' | '7' | '30' | '90' | 'keep'
-                setRetention(v)
-                void window.api.meetings.setAudioRetention(v)
-              }}
-              data-testid="meet-retention-select"
-              className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[11.5px] max-w-[150px] truncate"
-            >
-              <option value="0">never (discard at wrap-up)</option>
-              <option value="7">7 days</option>
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="keep">forever</option>
-            </select>
-          </label>
-          </div>
-
-          {/* Secondary: recording is one option, not the whole feature. */}
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Secondary doors first, the primary last — Home's order. */}
             {recording ? (
               <button
                 onClick={stopRecording}
                 data-testid="meet-stop"
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500 text-white text-[12px] font-medium animate-pulse"
+                className="inline-flex items-center gap-2 h-9 px-3.5 rounded-[10px] bg-red-500 text-white fb-t-body font-medium animate-pulse fb-press"
               >
-                <Icon name="stop_circle" size={15} /> Stop recording
+                <Icon name="stop_circle" size={16} /> Stop recording
               </button>
             ) : (
               <button
                 onClick={() => void startRecording()}
                 data-testid="meet-record"
                 disabled={!!busy}
-                className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap disabled:opacity-50"
+                className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
                 title="Record audio, transcribe it and extract action items"
               >
-                <Icon name="mic" size={15} /> Record notes
+                <Icon name="mic" size={16} /> Record notes
               </button>
             )}
             <button
@@ -415,33 +353,26 @@ export default function PlexiMeetView(): JSX.Element {
                 void useGuestCaptureStore.getState().start({ title: 'External meeting' })
               }
               data-testid="meet-record-external"
-              className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap"
+              className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
               title="Record a meeting happening outside Plexii (Zoom, Meet, Teams) — your mic + this machine's audio, transcribed locally"
             >
-              <Icon name="radio_button_checked" size={15} /> Record external
+              <Icon name="radio_button_checked" size={16} /> Record external
             </button>
-            <button
-              onClick={() => setShowMsg((v) => !v)}
-              data-testid="meet-message"
-              className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap"
-              title="Record a quick message and send it to a teammate who is away"
-            >
-              <Icon name="voicemail" size={15} /> Message
-            </button>
-            <button
-              onClick={() => void addManual()}
-              data-testid="meet-add"
-              disabled={!!busy}
-              className="fb-btn-surface fb-press inline-flex items-center justify-center gap-1.5 h-8 px-2 text-[12px] text-[var(--ink-90)] whitespace-nowrap"
-              title="Add a meeting from notes" aria-label="Add a meeting from notes"
-            >
-              <Icon name="edit_note" size={15} />
-            </button>
-          </div>
-
-          {/* Record-a-message picker: choose a teammate (away ones flagged) and leave them a voice note. */}
-          {showMsg && (
-            <div className="fb-card p-2" data-testid="meet-message-picker">
+            <div className="relative">
+              <button
+                onClick={() => setShowMsg((v) => !v)}
+                data-testid="meet-message"
+                aria-expanded={showMsg}
+                className={`inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-press ${
+                  showMsg ? 'rounded-[10px] bg-[rgb(var(--accent)/0.12)] text-[rgb(var(--accent))]' : 'fb-btn-surface text-[var(--ink-80)]'
+                }`}
+                title="Record a quick message and send it to a teammate who is away"
+              >
+                <Icon name="voicemail" size={16} /> Message
+              </button>
+              {/* Record-a-message picker: choose a teammate (away ones flagged) and leave them a voice note. */}
+              {showMsg && (
+                <div className="absolute right-0 top-11 z-20 w-[300px] fb-card p-2" data-testid="meet-message-picker">
               {msgRecording && msgTo ? (
                 <button
                   onClick={stopMessage}
@@ -475,35 +406,69 @@ export default function PlexiMeetView(): JSX.Element {
                 </>
               )}
               {msgNote && <p className="mt-1.5 px-1 text-[11px] text-emerald-600 dark:text-emerald-400" data-testid="meet-message-note">{msgNote}</p>}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+            <button
+              onClick={() => void addManual()}
+              data-testid="meet-add"
+              disabled={!!busy}
+              className="inline-flex items-center justify-center h-9 w-9 fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
+              title="Add a meeting from notes" aria-label="Add a meeting from notes"
+            >
+              <Icon name="edit_note" size={17} />
+            </button>
+            {/* Primary: a live, multi-party meeting — Home's accent primary
+                (the same glow "Customize → Done" wears), not a module colour. */}
+            <button
+              onClick={openNew}
+              data-testid="meet-start-live"
+              className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-press rounded-[10px] bg-[rgb(var(--accent))] text-white shadow-[0_1px_2px_rgb(var(--accent)/0.25),0_4px_12px_-2px_rgb(var(--accent)/0.30)] hover:bg-[rgb(var(--accent-hover))]"
+            >
+              <Icon name="video_call" size={17} /> Start or schedule a meeting
+            </button>
+          </div>
+        </header>
 
-        {busy && (
-          <div className="mx-3 mb-2 flex items-center gap-2 text-[11px] text-[var(--ink-70)]">
-            <Icon name="progress_activity" size={13} className="animate-spin" /> {busy}
+        {(busy || error) && (
+          <div className="mb-4 space-y-2">
+            {busy && (
+              <div className="flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
+                <Icon name="progress_activity" size={14} className="animate-spin" /> {busy}
+              </div>
+            )}
+            {error && (
+              <div className="px-3 py-2 rounded-[var(--radius-row)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] leading-relaxed" data-testid="meet-error">
+                {error}
+              </div>
+            )}
           </div>
         )}
-        {error && (
-          <div className="mx-3 mb-2 px-2.5 py-1.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed" data-testid="meet-error">
-            {error}
-          </div>
-        )}
 
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
-            <Icon name="search" size={14} className="text-[var(--ink-50)]" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search meetings"
-              data-testid="meet-search"
-              className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto px-2 pb-2">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Rail — Home's rail idiom: floating cards that stay put while the Record scrolls. */}
+          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 self-start" data-testid="meet-rail">
+            <RailCard
+              title="Meetings"
+              icon="groups"
+              tone="rose"
+              testId="meet-list-card"
+              bodyClassName="px-2 pb-2"
+              trailing={loaded ? <span className="fb-tabular text-[12px] text-[var(--ink-40)]">{meetings.length}</span> : undefined}
+            >
+              <div className="px-1 pb-2">
+                <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
+                  <Icon name="search" size={14} className="text-[var(--ink-50)]" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search meetings"
+                    data-testid="meet-search"
+                    className="flex-1 bg-transparent text-[12px] text-[var(--ink-100)] placeholder:text-[var(--ink-50)]"
+                  />
+                </div>
+              </div>
+              <div className="overflow-auto max-h-[max(240px,calc(100vh-460px))]">
           {recallHits.length > 0 && (
             <div className="mb-2" data-testid="recall-hits">
               <div className="px-3 pt-1 pb-1 text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">
@@ -565,11 +530,63 @@ export default function PlexiMeetView(): JSX.Element {
               </button>
             ))
           )}
-        </div>
-      </div>
+              </div>
+            </RailCard>
 
-      {/* Detail */}
-      <div className="flex-1 min-w-0">
+            {/* DEC-098 made meeting recording consent-only; the calls consent
+                round closed the same hole for 1:1s. This preference now only
+                expresses MY side: on a call it records my mic and ASKS the
+                other person — their voice is captured when they say yes, and
+                a decline is honoured by construction (never tapped). */}
+            <RailCard bodyClassName="p-4 space-y-2" testId="meet-recording-card">
+              <div className="text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">RECORDING</div>
+          <label
+            className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
+            title="Applies to 1:1 calls: your mic is recorded and the other person is asked before their voice is captured — declining keeps them out entirely. Meetings never auto-record."
+          >
+            <input
+              type="checkbox"
+              checked={whisper}
+              onChange={(e) => {
+                setWhisper(e.target.checked)
+                setWhisperEnabled(e.target.checked)
+              }}
+              data-testid="meet-whisper-toggle"
+              className="accent-[rgb(var(--accent))]"
+            />
+            <span>Transcribe &amp; summarise my 1:1 calls (the other person is asked)</span>
+          </label>
+
+          {/* M2c (CR-13) — audio retention. Local disk only, never uploaded. */}
+          <label className="flex items-center justify-between gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)]">
+            <span
+              className="whitespace-nowrap"
+              title="Meeting audio stays on this machine and expires after this window. 'Keep' on a meeting overrides it."
+            >
+              Keep meeting audio
+            </span>
+            <select
+              value={retention}
+              onChange={(e) => {
+                const v = e.target.value as '0' | '7' | '30' | '90' | 'keep'
+                setRetention(v)
+                void window.api.meetings.setAudioRetention(v)
+              }}
+              data-testid="meet-retention-select"
+              className="fb-field bg-[var(--surface-sunken)] px-1.5 py-1 text-[11.5px] max-w-[150px] truncate"
+            >
+              <option value="0">never (discard at wrap-up)</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+              <option value="keep">forever</option>
+            </select>
+          </label>
+            </RailCard>
+          </aside>
+
+          {/* Detail */}
+          <div className="flex-1 min-w-0 w-full">
         {selected ? (
           <MeetingDetail
             key={selected.id}
@@ -585,6 +602,7 @@ export default function PlexiMeetView(): JSX.Element {
         ) : (
           <ModuleDashboard
             moduleKey="meet"
+            embedded
             title="Meetings"
             subtitle="Record a meeting and it becomes a summary, a transcript and real action items"
             icon="groups"
@@ -643,6 +661,8 @@ export default function PlexiMeetView(): JSX.Element {
             }}
           />
         )}
+          </div>
+        </div>
       </div>
 
       {showNew && <NewMeetingDialog onClose={() => setShowNew(false)} />}
@@ -650,13 +670,6 @@ export default function PlexiMeetView(): JSX.Element {
   )
 }
 
-// M2b (SPEC-003 §3.4) — the three renderings of one Record, and the
-// provenance treatment that is the entire trust model:
-//   yours    — full ink, no marker. The user's words, never rewritten.
-//   heard    — normal ink with a hairline left rule; the timestamp on
-//              hover; clicking jumps to the moment in Thread.
-//   inferred — lighter ink, no rule, no anchor. The machine's guess LOOKS
-//              like a guess (the same accent-vs-ink doctrine as capture).
 // The meeting Record, reorganised (operator direction, 2026-09-06): the
 // transcript is ALWAYS on screen — tagged by speaker, searchable, and every
 // timestamp a link — beside three renderings of what the meeting produced.
@@ -1042,17 +1055,19 @@ function MeetingDetail({
       section?: string
       itemId?: string
     }> = []
-    for (const s of meeting.record?.spans ?? []) {
+    // Two heard entries may cite the SAME line (a real Record did) — the key
+    // carries the span's position so React never sees twins.
+    ;(meeting.record?.spans ?? []).forEach((s, idx) => {
       if (s.tier === 'heard' && s.segmentId && s.startMs != null)
         out.push({
-          key: `h-${s.segmentId}`,
+          key: `h-${s.segmentId}-${idx}`,
           ms: s.startMs,
           segmentId: s.segmentId,
           kind: 'heard',
           label: s.text,
           section: s.section ?? 'Notes'
         })
-    }
+    })
     for (const i of filedItems) {
       const m = parseMeetingMomentUrl(i.sourceUrl)
       if (m?.segmentId) {
@@ -1115,108 +1130,118 @@ function MeetingDetail({
   const actionCount = filedItems.length + (foundCommitments?.length ?? 0) + unfiledLegacy.length
 
   return (
-    <div className="h-full flex flex-col overflow-auto" data-testid="meet-detail">
-      {/* ── Header: title, doors, export ─────────────────────────────────── */}
-      <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-3 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)] backdrop-blur-[3px]">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => title !== meeting.title && onChange({ title })}
-          className="flex-1 min-w-0 bg-transparent fb-display text-[18px] font-bold tracking-tight text-[var(--ink-100)] outline-none"
-          data-testid="meet-title"
-        />
-        {meeting.deskNodeId && (
-          <button
-            onClick={() => goTask(meeting.deskNodeId!)}
-            className="fb-btn-surface fb-press inline-flex items-center gap-1 text-[11.5px] h-8 px-2.5 text-[var(--ink-80)]"
-            title="Open this meeting's desk — its documents live there"
-            data-testid="meet-open-desk"
-          >
-            <Icon name="desk" size={13} /> Desk
-          </button>
-        )}
-        <div className="relative">
-          <button
-            onClick={() => setExportOpen((v) => !v)}
-            aria-expanded={exportOpen}
-            className="fb-btn-surface fb-press inline-flex items-center gap-1 text-[11.5px] h-8 px-2.5 text-[var(--ink-80)]"
-            title="Export this Record — notes, brief, action items and transcript, provenance kept"
-            data-testid="meet-export"
-          >
-            <Icon name="download" size={13} /> Export
-            <Icon name="expand_more" size={13} className={`transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {exportOpen && (
-            <div className="absolute right-0 top-9 z-20 fb-card p-1 min-w-[180px]" onMouseLeave={() => setExportOpen(false)}>
-              <button
-                onClick={() => {
-                  setExportOpen(false)
-                  void window.api.meetings.export(meeting.id, 'markdown').then((r) => r.ok && setExported(r.path ?? null))
-                }}
-                className="w-full text-left px-2.5 py-1.5 rounded-md text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
-                data-testid="meet-export-md"
-              >
-                Markdown (.md) — readable, provenance kept
-              </button>
-              <button
-                onClick={() => {
-                  setExportOpen(false)
-                  void window.api.meetings.export(meeting.id, 'json').then((r) => r.ok && setExported(r.path ?? null))
-                }}
-                className="w-full text-left px-2.5 py-1.5 rounded-md text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
-                data-testid="meet-export-json"
-              >
-                JSON — the full record, segments and audio manifest
-              </button>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded-md text-[var(--ink-40)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 fb-press"
-          title="Delete meeting — its transcript segments and audio go with it" aria-label="Delete meeting"
-          data-testid="meet-delete"
-        >
-          <Icon name="delete" size={16} />
-        </button>
-      </div>
-
-      {/* ── Meta: state, when, how long, who ─────────────────────────────── */}
-      <div className="px-5 pt-3 pb-1 flex items-center gap-3 flex-wrap" data-testid="meet-meta">
-        <StatusPill tone={captureState.tone} label={captureState.label} />
-        <span className="text-[12.5px] text-[var(--ink-60)] fb-tabular">{whenLine}</span>
-        {durationLine && (
-          <>
-            <span className="text-[var(--ink-30)]">·</span>
-            <span className="text-[12.5px] text-[var(--ink-60)] fb-tabular">{durationLine}</span>
-          </>
-        )}
-        {speakers.length > 0 && (
-          <span className="ml-auto inline-flex items-center gap-2" data-testid="meet-speakers">
-            <span className="flex -space-x-1.5">
-              {speakers.map((name) => (
-                <span
-                  key={name}
-                  title={name}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-raised)]"
-                  style={{ backgroundColor: colorOf(name) }}
-                >
-                  {speakerInitials(name)}
+    <div className="flex flex-col" data-testid="meet-detail">
+      {/* ── Header: Home's idiom — the title on the paper, its facts beneath,
+          the doors as quiet surface buttons on the right ─────────────────── */}
+      <header className="flex items-start justify-between gap-4 flex-wrap mb-5" data-testid="meet-detail-header">
+        <div className="min-w-0 flex-1">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => title !== meeting.title && onChange({ title })}
+            className="w-full bg-transparent fb-display-hero text-[22px] leading-tight text-[var(--ink-100)] outline-none"
+            data-testid="meet-title"
+          />
+          {/* ── Meta: state, when, how long, who ─────────────────────────── */}
+          <div className="mt-1.5 flex items-center gap-3 flex-wrap" data-testid="meet-meta">
+            <StatusPill tone={captureState.tone} label={captureState.label} />
+            <span className="text-[12.5px] text-[var(--ink-60)] fb-tabular">{whenLine}</span>
+            {durationLine && (
+              <>
+                <span className="text-[var(--ink-30)]">·</span>
+                <span className="text-[12.5px] text-[var(--ink-60)] fb-tabular">{durationLine}</span>
+              </>
+            )}
+            {speakers.length > 0 && (
+              <span className="inline-flex items-center gap-2" data-testid="meet-speakers">
+                <span className="flex -space-x-1.5">
+                  {speakers.map((name) => (
+                    <span
+                      key={name}
+                      title={name}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-2 ring-[var(--surface-base)]"
+                      style={{ backgroundColor: colorOf(name) }}
+                    >
+                      {speakerInitials(name)}
+                    </span>
+                  ))}
                 </span>
-              ))}
-            </span>
-            <span className="text-[12px] text-[var(--ink-50)] fb-tabular">
-              {speakers.length} {speakers.length === 1 ? 'speaker' : 'speakers'}
-            </span>
-          </span>
-        )}
-      </div>
+                <span className="text-[12px] text-[var(--ink-50)] fb-tabular">
+                  {speakers.length} {speakers.length === 1 ? 'speaker' : 'speakers'}
+                </span>
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {meeting.deskNodeId && (
+            <button
+              onClick={() => goTask(meeting.deskNodeId!)}
+              className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
+              title="Open this meeting's desk — its documents live there"
+              data-testid="meet-open-desk"
+            >
+              <Icon name="desk" size={16} /> Desk
+            </button>
+          )}
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen((v) => !v)}
+              aria-expanded={exportOpen}
+              className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]"
+              title="Export this Record — notes, brief, action items and transcript, provenance kept"
+              data-testid="meet-export"
+            >
+              <Icon name="download" size={16} /> Export
+              <Icon name="expand_more" size={14} className={`transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-10 z-20 fb-card p-1 min-w-[200px]" onMouseLeave={() => setExportOpen(false)}>
+                <button
+                  onClick={() => {
+                    setExportOpen(false)
+                    void window.api.meetings.export(meeting.id, 'markdown').then((r) => r.ok && setExported(r.path ?? null))
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  data-testid="meet-export-md"
+                >
+                  Markdown (.md) — readable, provenance kept
+                </button>
+                <button
+                  onClick={() => {
+                    setExportOpen(false)
+                    void window.api.meetings.export(meeting.id, 'json').then((r) => r.ok && setExported(r.path ?? null))
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  data-testid="meet-export-json"
+                >
+                  JSON — the full record, segments and audio manifest
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onDelete}
+            className="inline-flex items-center justify-center h-9 w-9 fb-btn-surface fb-press text-[var(--ink-50)] hover:text-red-600"
+            title="Delete meeting — its transcript segments and audio go with it" aria-label="Delete meeting"
+            data-testid="meet-delete"
+          >
+            <Icon name="delete" size={16} />
+          </button>
+        </div>
+      </header>
 
       {/* ── Timeline: who was talking when; click to move through the call ── */}
       {segments.length > 0 && (
-        <div className="px-5 pt-2 pb-3">
-          <div className="fb-card px-4 pt-3 pb-2.5" data-testid="meet-timeline">
-            <div className="flex items-center justify-between gap-3 mb-2">
+        <RailCard
+          title="Timeline"
+          icon="timeline"
+          tone="rose"
+          testId="meet-timeline"
+          className="mb-4"
+          bodyClassName="px-4 pb-3"
+          trailing={
+            <span className="flex items-center gap-4 min-w-0">
               <span className="text-[12.5px] fb-tabular text-[var(--ink-70)]">
                 {activeSegment ? fmtMs(activeSegment.startMs) : '0:00'}
                 <span className="text-[var(--ink-30)]"> / </span>
@@ -1235,62 +1260,70 @@ function MeetingDetail({
                   </button>
                 ))}
               </span>
-            </div>
-            <div
-              className="relative h-9 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] cursor-pointer"
-              onClick={seekTimeline}
-              title="Click the timeline to move through the call"
-              data-testid="meet-timeline-bar"
-            >
-              {bands.map((b) => (
-                <span
-                  key={b.id}
-                  className={`absolute top-0 h-full transition-opacity ${
-                    speakerFilter && speakerFilter !== b.speaker ? 'opacity-25' : 'opacity-90'
-                  } ${activeSegmentId === b.id ? 'ring-2 ring-inset ring-[var(--ink-100)]' : ''}`}
-                  style={{ left: `${b.leftPct}%`, width: `${b.widthPct}%`, backgroundColor: colorOf(b.speaker) }}
-                  title={`[${fmtMs(b.startMs)}] ${b.speaker}`}
+            </span>
+          }
+        >
+          <div
+            className="relative h-9 rounded-[var(--radius-chip)] overflow-hidden bg-[var(--surface-sunken)] cursor-pointer"
+            onClick={seekTimeline}
+            title="Click the timeline to move through the call"
+            data-testid="meet-timeline-bar"
+          >
+            {bands.map((b) => (
+              <span
+                key={b.id}
+                className={`absolute top-0 h-full transition-opacity ${
+                  speakerFilter && speakerFilter !== b.speaker ? 'opacity-25' : 'opacity-90'
+                } ${activeSegmentId === b.id ? 'ring-2 ring-inset ring-[var(--ink-100)]' : ''}`}
+                style={{ left: `${b.leftPct}%`, width: `${b.widthPct}%`, backgroundColor: colorOf(b.speaker) }}
+                title={`[${fmtMs(b.startMs)}] ${b.speaker}`}
+              />
+            ))}
+            {activeSegment && (
+              <span
+                className="absolute top-0 h-full w-0.5 bg-[var(--ink-100)] pointer-events-none"
+                style={{ left: `${Math.min(100, (activeSegment.startMs / totalMs) * 100)}%` }}
+              />
+            )}
+          </div>
+          {markers.length > 0 && (
+            <div className="relative h-4 mt-1" data-testid="meet-timeline-markers">
+              {markers.map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => jumpToSegment(m.segmentId)}
+                  title={`[${fmtMs(m.ms)}] ${m.kind === 'heard' ? 'Heard: ' : 'Action item: '}${m.label}`}
+                  className="absolute -translate-x-1/2 top-0.5 h-2.5 w-2.5 rotate-45 fb-press"
+                  style={{
+                    left: `${Math.min(100, (m.ms / totalMs) * 100)}%`,
+                    backgroundColor: m.kind === 'heard' ? 'rgb(var(--accent))' : 'transparent',
+                    border: m.kind === 'heard' ? 'none' : '1.5px solid var(--ink-60)'
+                  }}
                 />
               ))}
-              {activeSegment && (
-                <span
-                  className="absolute top-0 h-full w-0.5 bg-[var(--ink-100)] pointer-events-none"
-                  style={{ left: `${Math.min(100, (activeSegment.startMs / totalMs) * 100)}%` }}
-                />
-              )}
             </div>
-            {markers.length > 0 && (
-              <div className="relative h-4 mt-1" data-testid="meet-timeline-markers">
-                {markers.map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => jumpToSegment(m.segmentId)}
-                    title={`[${fmtMs(m.ms)}] ${m.kind === 'heard' ? 'Heard: ' : 'Action item: '}${m.label}`}
-                    className="absolute -translate-x-1/2 top-0.5 h-2.5 w-2.5 rotate-45 fb-press"
-                    style={{
-                      left: `${Math.min(100, (m.ms / totalMs) * 100)}%`,
-                      backgroundColor: m.kind === 'heard' ? 'rgb(var(--accent))' : 'transparent',
-                      border: m.kind === 'heard' ? 'none' : '1.5px solid var(--ink-60)'
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-            <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-[var(--ink-40)] fb-tabular">
-              <span>0:00</span>
-              <span className="text-[var(--ink-40)]">Click the timeline to move through the call</span>
-              <span>{fmtMs(totalMs)}</span>
-            </div>
+          )}
+          <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-[var(--ink-40)] fb-tabular">
+            <span>0:00</span>
+            <span className="text-[var(--ink-40)]">Click the timeline to move through the call</span>
+            <span>{fmtMs(totalMs)}</span>
           </div>
-        </div>
+        </RailCard>
       )}
 
       {/* ── Two columns: renderings left, transcript always on the right ──── */}
-      <div className="flex-1 min-h-0 px-5 pb-4 flex flex-col lg:flex-row gap-4 items-start">
-        <div className="flex-1 min-w-0 w-full fb-card overflow-hidden" data-testid="meet-record-pane" ref={recordRef}>
-          {/* M2b — the segmented control: three renderings, one Record. */}
-          <div className="px-4 pt-3 pb-2 border-b border-[var(--edge-soft)]" data-testid="record-views">
-            <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]">
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <div className="flex-1 min-w-0 w-full" ref={recordRef}>
+          <RailCard
+            title="Record"
+            icon="article"
+            tone="accent"
+            testId="meet-record-pane"
+            className="overflow-hidden"
+            bodyClassName="px-0 pb-0"
+            trailing={
+              /* M2b — the segmented control: three renderings, one Record. */
+              <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]" data-testid="record-views">
               {tabs.map(([v, label, key]) => (
                 <button
                   key={v}
@@ -1311,9 +1344,9 @@ function MeetingDetail({
                   )}
                 </button>
               ))}
-            </div>
-          </div>
-
+              </div>
+            }
+          >
           {/* ── Action items ─────────────────────────────────────────────── */}
           {view === 'commitments' && (
             <div className="px-4 py-4 space-y-5" data-testid="rendering-commitments">
@@ -1653,11 +1686,28 @@ function MeetingDetail({
               )}
             </div>
           )}
+          </RailCard>
         </div>
 
         {/* ── Transcript: always visible, tagged, searchable, linked ────────── */}
-        <div className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 fb-card flex flex-col lg:sticky lg:top-[60px] lg:max-h-[calc(100vh-140px)]" data-testid="meet-transcript-pane">
-          <div className="px-3 pt-3 pb-2 border-b border-[var(--edge-soft)] space-y-2">
+        <RailCard
+          title="Transcript"
+          icon="subtitles"
+          tone="sky"
+          testId="meet-transcript-pane"
+          className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 flex flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-140px)]"
+          bodyClassName="flex-1 min-h-0 flex flex-col"
+          trailing={
+            segments.length > 0 ? (
+              <span className="fb-tabular text-[12px] text-[var(--ink-40)]">
+                {visibleSegments.length === segments.length
+                  ? `${segments.length} ${segments.length === 1 ? 'line' : 'lines'}`
+                  : `${visibleSegments.length} of ${segments.length}`}
+              </span>
+            ) : undefined
+          }
+        >
+          <div className="px-3 pb-2 border-b border-[var(--edge-soft)] space-y-2">
             <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
               <Icon name="search" size={14} className="text-[var(--ink-50)]" />
               <input
@@ -1715,6 +1765,12 @@ function MeetingDetail({
                     const name = s.speakerName?.trim() || 'Speaker'
                     const active = s.id === activeSegmentId
                     const rowAnchors = markers.filter((m) => m.segmentId === s.id)
+                    // One chip per door: two Brief entries under the same
+                    // section that cite this line open the same place.
+                    const rowChips = rowAnchors.filter(
+                      (a, i, all) =>
+                        all.findIndex((b) => b.kind === a.kind && (a.kind === 'heard' ? b.section === a.section : b.itemId === a.itemId)) === i
+                    )
                     return (
                       <div
                         key={s.id}
@@ -1745,9 +1801,9 @@ function MeetingDetail({
                             {name}
                           </span>
                           <div className="text-[13px] leading-relaxed text-[var(--ink-90)]">{highlight(s.text)}</div>
-                          {rowAnchors.length > 0 && (
+                          {rowChips.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1" data-testid={`meet-row-anchors-${s.id}`}>
-                              {rowAnchors.map((a) => (
+                              {rowChips.map((a) => (
                                 <button
                                   key={a.key}
                                   onClick={(e) => {
@@ -1787,7 +1843,7 @@ function MeetingDetail({
               <p className="px-2 py-6 text-[13px] text-[var(--ink-50)]">No transcript for this meeting.</p>
             )}
           </div>
-        </div>
+        </RailCard>
       </div>
 
       {/* ── Footer facts: series knobs, audio on disk, export receipt ──────── */}
@@ -1795,7 +1851,7 @@ function MeetingDetail({
           a series whose briefs are noise gets silenced here, and the wrap-up
           asks before minting the next one. */}
       {meeting.seriesId && seriesBriefs !== null && (
-        <div className="px-5 pb-2">
+        <div className="mt-4">
           <label className="flex items-center gap-2 text-[11.5px] text-[var(--ink-50)] cursor-pointer" data-testid="series-briefs-row">
             <input
               type="checkbox"
@@ -1837,7 +1893,7 @@ function MeetingDetail({
         </div>
       )}
       {(audio?.present || exported) && (
-        <div className="px-5 pb-3 space-y-1.5">
+        <div className="mt-3 space-y-1.5">
           {audio?.present && (
             <div className="flex items-center gap-2 text-[11.5px] text-[var(--ink-50)]" data-testid="meet-audio-row">
               <Icon name="graphic_eq" size={13} className="shrink-0" />
