@@ -84,6 +84,18 @@ describe('DEC-121 — PlexiChat IS the Office Chat view', () => {
     expect(messages.split('void open(').length - 1).toBe(1)
     expect(messages.split('openConv(').length - 1).toBeGreaterThanOrEqual(3)
   })
+  it('compact header (DEC-123): one Meet door, no translate menu, doors on their own left-aligned wrapping row', () => {
+    expect(messages).toContain("{callTarget && !compact && (")
+    expect(messages).toContain("onClick={() => (compact && callTarget ? void startCall(callTarget, 'video') : goMeetings())}")
+    expect(messages).toContain("{activeId && !compact && (\n                  <select")
+    expect(messages).toContain("compact ? 'w-full flex items-center gap-1.5 flex-wrap' : 'flex items-center gap-1.5 shrink-0'")
+    expect(messages).toContain('data-testid="messages-actions"')
+    expect(messages).toContain("const hdrBtn = compact")
+    // the Office page is unchanged: both doors, the translate menu, the wide sizes
+    expect(messages).toContain('data-testid="messages-call"')
+    expect(messages).toContain('data-testid="messages-translate-lang"')
+    expect(messages).toContain("'fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'")
+  })
 })
 
 describe('DEC-121 — Agent + Work consolidated', () => {

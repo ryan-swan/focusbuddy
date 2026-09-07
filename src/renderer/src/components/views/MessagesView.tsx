@@ -644,6 +644,15 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
           ? `${typers[0]} and ${typers[1]} are typing…`
           : 'Several people are typing…'
 
+  // Header doors: the Office page's size, or the panel's tighter one (DEC-123) —
+  // in the panel they sit on their own row, left-aligned, wrapping, so nothing
+  // is ever cut off at 420px.
+  const hdrBtn = compact
+    ? 'fb-btn-surface inline-flex items-center gap-1 h-7 px-2 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+    : 'fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+  const hdrIconBtn = compact
+    ? 'fb-btn-surface inline-flex items-center justify-center h-7 w-7 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
+    : 'fb-btn-surface inline-flex items-center justify-center h-8 w-8 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]'
   return (
     <div className={compact ? 'h-full flex flex-col' : 'h-full flex desk-paper no-tod'} data-testid="messages-view" data-compact={compact || undefined}>
       {/* Conversation list */}
@@ -858,7 +867,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
           // list, and the receiver must be able to reply immediately. Title
           // falls back until the list catches up.
           <>
-            <div className={`px-4 py-3 border-b border-[var(--edge-soft)] flex items-center justify-between gap-2 ${compact ? 'flex-wrap' : ''}`}>
+            <div className={`${compact ? 'px-3 py-2.5' : 'px-4 py-3'} border-b border-[var(--edge-soft)] flex items-center gap-2 ${compact ? 'flex-wrap' : 'justify-between'}`}>
               {compact && (
                 <button
                   onClick={() => setCompactPane('list')}
@@ -870,31 +879,35 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                   <Icon name="arrow_back" size={16} />
                 </button>
               )}
-              <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0">
+              <h2 className={`text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0 ${compact ? 'flex-1' : ''}`}>
                 <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
                 <span className="truncate">{headerTitle}</span>
               </h2>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {callTarget && (
+              <div className={compact ? 'w-full flex items-center gap-1.5 flex-wrap' : 'flex items-center gap-1.5 shrink-0'} data-testid="messages-actions">
+                {callTarget && !compact && (
                   <button
                     onClick={() => void startCall(callTarget, 'video')}
                     aria-label={`Call ${callTargetName}`}
                     title="Start a video call"
                     data-testid="messages-call"
-                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className={hdrBtn}
                   >
                     <Icon name="videocam" size={15} /> Call
                   </button>
                 )}
+                {/* Compact (DEC-123): Call and Meet are one door — a DM meets the
+                    person now (the 1:1 video call); a space opens PlexiMeet. The
+                    Office page keeps both buttons. */}
                 <button
-                  onClick={() => goMeetings()}
-                  title="Start a meeting in PlexiMeet"
+                  onClick={() => (compact && callTarget ? void startCall(callTarget, 'video') : goMeetings())}
+                  aria-label={compact && callTarget ? `Meet with ${callTargetName}` : undefined}
+                  title={compact && callTarget ? `Meet with ${callTargetName} now — a video call` : 'Start a meeting in PlexiMeet'}
                   data-testid="messages-meet"
-                  className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  className={hdrBtn}
                 >
-                  <Icon name="groups" size={15} /> Meet
+                  <Icon name={compact && callTarget ? 'videocam' : 'groups'} size={15} /> Meet
                 </button>
-                {activeId && (
+                {activeId && !compact && (
                   <select
                     value={translateLang}
                     onChange={(e) => setTranslateLang(e.target.value)}
@@ -922,7 +935,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     onClick={() => setShowRecall(true)}
                     title="Catch up or ask this channel"
                     data-testid="messages-recall"
-                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className={hdrBtn}
                   >
                     <Icon name="bolt" size={15} /> Recall
                   </button>
@@ -932,7 +945,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     onClick={() => setShowPulse(true)}
                     title="Decisions, questions and action items in this channel"
                     data-testid="messages-pulse"
-                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className={hdrBtn}
                   >
                     <Icon name="radar" size={15} /> Pulse
                   </button>
@@ -942,7 +955,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     onClick={() => setShowSchedules(true)}
                     title="Scheduled AI tasks for this channel"
                     data-testid="messages-schedules"
-                    className="fb-btn-surface inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className={hdrBtn}
                   >
                     <Icon name="schedule" size={15} /> Schedules
                   </button>
@@ -953,7 +966,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                       onClick={() => setShowMembers((v) => !v)}
                       title="Members"
                       data-testid="messages-members"
-                      className="fb-btn-surface inline-flex items-center gap-1 h-8 px-2 text-[12px] text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                      className={hdrBtn}
                     >
                       <Icon name="group" size={15} /> {activeConv.members.length}
                     </button>
@@ -1036,7 +1049,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     }}
                     title={`Notifications: ${activeConv?.notifLevel ?? 'all'} (click to cycle all → mentions → muted)`}
                     data-testid="messages-notif"
-                    className="fb-btn-surface inline-flex items-center justify-center h-8 w-8 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                    className={hdrIconBtn}
                   >
                     <Icon
                       name={
@@ -1054,7 +1067,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                   onClick={() => pinToCanvas()}
                   title="Pin this conversation to your current desk"
                   data-testid="messages-pin"
-                  className="fb-btn-surface inline-flex items-center justify-center h-8 w-8 text-[var(--ink-90)] hover:bg-[var(--surface-sunken)]"
+                  className={hdrIconBtn}
                 >
                   <Icon name="push_pin" size={15} />
                 </button>

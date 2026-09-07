@@ -3802,3 +3802,26 @@ on PlexiiMessage): the strip's titles read Plexii AI · Attention ·
 PlexiiMessage · Agents; the first tab is an SVG with no text; PlexiiMessage
 carries two i's; no Tasks tab; each tab still opens its body. Suite: 3,794
 tests / 344 files; both typechecks clean.
+
+## DEC-123 — PlexiiMessage in the panel: one Meet door, no translate menu, the doors fit
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("merge the call and meet button into one meet
+button because they do the same thing… get rid of the translation drop
+down… shift everything left so that it all fits in the menu bar because
+right now it gets cut off") — scoped to the PlexiiMessage tab.
+
+**What changed (compact mode only — the Office Chat page is untouched).**
+The thread header in the panel is two rows: the back arrow and the name on
+the first, left-aligned; the doors on their own full-width row beneath,
+left-aligned and wrapping, at the panel's tighter size (h-7), so nothing is
+ever clipped at 420px. Call and Meet are one **Meet** door: in a DM it
+meets the person now (the 1:1 video call the Call button made); in a space
+it opens PlexiMeet, as Meet always did. The translate menu is gone from the
+panel (the per-message Translate link still uses the stored language).
+
+**Verified live** over CDP, 5/5, panel restored as found: a DM open in the
+panel; one Meet door and no Call; the door's title reads "Meet with Caleb
+Wilton now — a video call"; no translate menu; the doors start at the
+header's left edge, all on one row, right edge 1256 px inside a pane edge
+of 1409 px, no horizontal overflow. Suite: 3,795 tests / 344 files; both
+typechecks clean.

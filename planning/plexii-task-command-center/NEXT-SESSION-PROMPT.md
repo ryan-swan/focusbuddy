@@ -171,8 +171,12 @@
 > double-ii mark (the conversation, "Plexii AI") · Attention ·
 > PlexiiMessage (two i's) · Agents; Tasks retired into Attention; the
 > default is the conversation. 7/7 live; suite 3,794 tests / 344 files.
+> **DEC-123**: PlexiiMessage's thread header in the panel — one Meet door
+> (a DM meets the person now; a space opens PlexiMeet), no translate menu,
+> the doors on their own left-aligned wrapping row so nothing is cut off;
+> the Office page untouched. 5/5 live; suite 3,795 tests / 344 files.
 
-**Last updated:** 2026-09-06 — through DEC-122 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-06 — through DEC-123 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
