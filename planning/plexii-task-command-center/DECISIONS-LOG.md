@@ -4123,3 +4123,92 @@ the title, portalled and on top, the view unchanged; the dialog closes
 through its own door; the summary's Calendar door is the one trip to the
 Calendar page. Suite: 3,846 tests / 351 files; both typechecks clean. Pin
 rewritten with history: the grid's save-toast pin → the shared helper.
+
+## DEC-130 — The recording audit: a silent microphone, an engine that derails, and every door made honest
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator report ("I tried testing out the record notes button on
+the PlexiMeet page, and it didn't work. It didn't capture the transcript.
+So, do a full audit of the record notes, record external, and start or
+schedule a meeting buttons… that transcripts can actually be captured").
+
+**What was found.** The 08:04 attempt is meeting `ded4a88d` ("Notes"):
+177 s recorded, transcript "you you you you you you", a 477-character AI
+summary of nothing, no segments. Root cause, measured: the microphone
+delivers DIGITAL SILENCE to this app — `getUserMedia` succeeds, the track
+reads enabled and unmuted ("Default - MacBook Pro Microphone"), and every
+sample is zero (peak 0, RMS 0, 511 bytes of opus per 1.5 s). The dev app
+was launched from inside Claude Code and inherits the launcher's macOS
+microphone permission (the same TCC identity DEC-078 found blocking the
+camera); macOS hands such an app silence, never an error. Both engines
+transcribe a synthetic voice perfectly, so transcription was never the
+fault — and nothing in the app said any of this: the cloud engine
+hallucinated on silence, the summary summarised it, a meeting was filed.
+
+**A second fault, found on the way.** Driving Record notes with a
+SYNTHETIC microphone (the `say` voice looped into a MediaStream), the
+on-device engine (whisper-base) returned "Thanks for watching." for takes
+the cloud engine read perfectly — 4 of 5 runs. Pinned by trimming: the same
+take transcribes fully at 0–9 s and derails at 0–10.5 s; one window, a few
+hard seconds at the end (a word cut mid-syllable), the whole decode lost.
+
+**What changed.**
+- **The microphone is asked, listened to, and watched** — `lib/micHealth.ts`.
+  Every recording door (Record notes, Record external, and the dialog
+  behind them) asks the system first (`media:micStatus` / `media:askMic`,
+  a main-process bridge over `systemPreferences` — effective once the dev
+  app restarts; `electron-vite dev` here runs without `--watch`), then
+  LISTENS for 1.2 s before recording: digital silence refuses to start and
+  says why, with the one door that fixes it (System Settings › Privacy &
+  Security › Microphone; `record-error[data-reason=mic-silent]` +
+  `record-mic-settings`). While recording, a level pill (`MicLevelPill`:
+  five bars, or "No sound is reaching Plexii" after 3 s of zeros with the
+  same door) sits on the PlexiMeet bar and the guest-capture bar.
+- **Record notes is the same recording as every other door.** The
+  per-track `MeetingTrackRecorder`, transcribed on this machine at the
+  wrap-up (CR-11 — the old path shipped meeting audio to the cloud engine),
+  which writes SEGMENTS (the Record's Thread, Recall, commitments and
+  analytics all read segments; a plain transcript lit none of them),
+  retains the take (CR-13, so Re-transcribe has fuel) and refuses to file
+  on silence. The desk picked in the dialog is the origin
+  (`markDeskOrigin`) and the container (`begin({ deskNodeId })` — no desk
+  minted over it). The cloud-path `transcribeAndSave` is gone.
+- **A transcript that is not a transcript is refused** —
+  `lib/transcriptSanity.ts`: "you you you you", the stock phrases, a long
+  take with almost no text. The wrap-up stops there with the honest line
+  (and the microphone hint) instead of summarising and filing.
+- **The derail net** — `lib/audioSplit.ts` + `transcribeRecording`: when
+  the on-device first pass looks like that and the audio plainly has
+  sound, the take is cut at its own pauses and the pieces decoded; every
+  piece the engine can read is kept, timestamps moved onto the take's
+  clock, nothing invented, still no cloud. The saved failing take:
+  "Thanks for watching." → 174 characters, five segments.
+- **Decode at opus' own rate** — the first decode stage names 48 kHz
+  instead of following the output device (16 kHz on a headset in its call
+  profile is the low-quality path by another door); the recorder's mix
+  likewise.
+- **Start or schedule**: audited, no change needed — Schedule writes the
+  block with a minted room; Start now opens the live room.
+
+**Verified live** over CDP, on the operator's own app, everything the tests
+made removed through the stores and bridges (meetings, blocks, desks →
+Trash, folders and transcript docs → Trash, briefs dismissed): the real
+microphone probe (2.5 s: peak 0, every sample zero); both engines on a
+synthetic voice (115 characters, identical); Record notes end to end with a
+synthetic microphone — the dialog, the 1.2 s listen, the level pill lit,
+Stop, the on-device wrap-up, a meeting with the spoken words, segments, a
+speaker, a summary, a desk and a retained take — 10/10 on the looped voice
+and 10/10 on a voice with natural pauses, after the derail net (4 of 5
+runs derailed before it); Record notes and Record external with the REAL
+microphone refused before recording with the reason and the settings door;
+Schedule booked a real meeting block; Start now opened the room and left.
+Suite: 3,871 tests / 354 files; both typechecks clean. Pins rewritten with
+history: DEC-118's door contract and mic text, the DEC-099 decode-rate pin,
+the guest-capture booleans, the page's busy banner; e2e plexiMeet #6
+follows the dialog.
+
+**Left on the operator's word.** Meeting `ded4a88d` ("Notes", the silent
+177 s) is the operator's own — untouched. The tests' residue sits in the
+Trash (seven desks, folders and transcript documents named "[TEST] DEC-130
+…") and as dismissed "Meeting brief — [TEST] DEC-130…" items — purge is a
+destructive act, so it waits. The microphone itself: launch Plexii from the
+Dock, or allow the microphone for the app that launches it.

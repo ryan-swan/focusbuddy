@@ -65,10 +65,16 @@ describe('DEC-118 — what each mode honestly carries', () => {
     expect(record).toContain("onStartNotes({ title: finalTitle, notes: notes.trim(), deskNodeId: attached?.id ?? null })")
     expect(record).toContain('data-testid="record-attach-picker"')
     expect(record).not.toContain('STUB_ATTACH')
-    expect(meet).toContain('async function startRecording(draft?: RecordNotesDraft): Promise<boolean> {')
-    expect(meet).toContain("title: draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`,")
-    expect(meet).toContain('record: { spans: buildYoursSpans(draft.notes), generatedAt: Date.now() }')
-    expect(meet).toContain('deskNodeId: draft.deskNodeId')
+    // DEC-130: the door answers with WHY it did not open (denied / silent / failed), not a bare boolean
+    expect(meet).toContain('async function startRecording(draft?: RecordNotesDraft): Promise<StartResult> {')
+    // DEC-130: the notes door rides the on-device wrap-up now — the title
+    // defaults the same way, the NOTES become `yours` spans there (buildYoursSpans
+    // in the wrap-up, never rewritten), and the picked desk is the origin AND
+    // the container the Record stands on (no desk minted over it).
+    expect(meet).toContain("const title = draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`")
+    expect(meet).toContain("notes: draft?.notes ?? '',")
+    expect(meet).toContain('deskNodeId: draft?.deskNodeId ?? null')
+    expect(meet).toContain('if (draft?.deskNodeId) markDeskOrigin(draft.deskNodeId, title)')
   })
 
   it('Record external: WHERE decides the capture — in the room never raises the picker; NOTES ride to the wrap-up', () => {
@@ -94,7 +100,9 @@ describe('DEC-118 — what each mode honestly carries', () => {
     expect(meet).toContain('data-testid="meet-record-external"')
     expect(meet).toContain("useGuestCaptureStore.getState().start({ title: d.title, notes: d.notes, micOnly: d.micOnly })")
     expect(meet).not.toContain("start({ title: 'External meeting' })")
-    expect(record).toContain("setError('Could not access the microphone. Check your system permissions.')")
+    // DEC-130: the dialog shows the door's own message — the old text survives as MIC_FAILED_MESSAGE for a refused getUserMedia
+    expect(record).toContain('setError(r.message)')
+    expect(read('renderer/src/lib/micHealth.ts')).toContain("export const MIC_FAILED_MESSAGE = 'Could not access the microphone. Check your system permissions.'")
     // the calendar's own Record external door is untouched — it carries the block's identity
     expect(read('renderer/src/components/views/WeekTimeGrid.tsx')).toContain('data-testid="block-record-external"')
   })

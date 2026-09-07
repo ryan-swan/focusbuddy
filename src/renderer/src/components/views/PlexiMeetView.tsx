@@ -17,13 +17,25 @@ import { personDisplayName } from '../../lib/personName'
 import { transcribeRecording } from '../../lib/transcribeRecording'
 import type { CarriedItem, Meeting, TranscriptSearchHit, TranscriptSegment } from '@shared/meetings'
 import { useGuestCaptureStore } from '../../stores/guestCapture'
+import { useWrapupStore } from '../../stores/wrapup'
+import { MeetingTrackRecorder } from '../../lib/trackRecorder'
+import { markDeskOrigin, clearMeetingOrigin } from '../../lib/startMeeting'
+import {
+  ensureMicrophoneAccess,
+  probeMicrophone,
+  watchMicrophone,
+  MIC_FAILED_MESSAGE,
+  MIC_SILENCE_MESSAGE,
+  type StartResult
+} from '../../lib/micHealth'
+import MicLevelPill from '../MicLevelPill'
 import { fmtOffset } from '../../lib/transcriptMerge'
-import { buildYoursSpans, validateRecordSpans } from '../../lib/recordSpans'
+import { validateRecordSpans } from '../../lib/recordSpans'
 import { validateCommitments, type ValidatedCommitment } from '../../lib/commitments'
 import MeetingCommitmentsCard, { CarriedFromLastTime } from '../MeetingCommitmentsCard'
 import { RECORD_TEMPLATES } from '../../lib/recordTemplates'
 import { useViewStore } from '../../stores/view'
-import type { ActionProposal, FbNode } from '@shared/types'
+import type { FbNode } from '@shared/types'
 import { useWorkItemStore } from '../../stores/workItems'
 import { parseMeetingMomentUrl } from '../../lib/meetingLink'
 import { CLASS_LABEL, isTerminalState } from '../../lib/attentionQueues'
@@ -49,14 +61,6 @@ import {
 // meetings; an empty history is honestly empty. Live transcription needs a
 // configured key, surfaced plainly when it is missing.
 
-function proposalLabels(p: ActionProposal): string[] {
-  if (p.kind === 'create-todo-list') return p.items?.length ? p.items : [p.title]
-  if (p.kind === 'create-task') return [p.title]
-  if (p.kind === 'open-url') return [p.title || p.url]
-  if ('title' in p && p.title) return [p.title]
-  return []
-}
-
 function fmtDate(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
@@ -78,7 +82,6 @@ export default function PlexiMeetView(): JSX.Element {
   // A segment to land on once the detail's segments load (from a Recall hit
   // or an fb:open-meeting with a segmentId).
   const [pendingSegment, setPendingSegment] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
   const [whisper, setWhisper] = useState(whisperEnabled())
@@ -86,12 +89,12 @@ export default function PlexiMeetView(): JSX.Element {
   useEffect(() => {
     void window.api.meetings.getAudioRetention().then(setRetention).catch(() => {})
   }, [])
-  const recRef = useRef<MediaRecorder | null>(null)
+  const recRef = useRef<{ rec: MeetingTrackRecorder; stream: MediaStream; draft: RecordNotesDraft | null; stopWatch: () => void } | null>(null)
+  const [micState, setMicState] = useState<{ peak: number; silentMs: number }>({ peak: 0, silentMs: 0 })
   // DEC-118 — both record doors open the composer-twin dialog first; the
   // draft it hands over (title, notes, desk) rides the recording to the
   // meeting it becomes.
   const [recordDialog, setRecordDialog] = useState<'notes' | 'external' | null>(null)
-  const recDraftRef = useRef<RecordNotesDraft | null>(null)
 
   useEffect(() => {
     void load()
@@ -146,80 +149,75 @@ export default function PlexiMeetView(): JSX.Element {
   const selected = meetings.find((m) => m.id === selectedId) ?? null
   const now = Date.now()
 
-  async function startRecording(draft?: RecordNotesDraft): Promise<boolean> {
+  // DEC-130 — "Record notes" is the same recording as every other door now:
+  // the per-track recorder, transcribed ON THIS MACHINE at the wrap-up (CR-11:
+  // meeting audio never leaves it — the old path shipped it to a cloud
+  // engine), which writes SEGMENTS (the Record's Thread, Recall, commitments
+  // and analytics all read segments; a plain transcript lit none of them),
+  // retains the take (CR-13, so Re-transcribe has fuel) and refuses to file a
+  // meeting on silence. The desk picked in the dialog IS the container.
+  //
+  // And the microphone is checked before, and watched during: the operator's
+  // three-minute "you you you you you you" record (2026-09-07) was a track of
+  // digital zeros — macOS had not allowed the microphone, and nothing said so.
+  async function startRecording(draft?: RecordNotesDraft): Promise<StartResult> {
     setError(null)
-    recDraftRef.current = draft ?? null
+    const access = await ensureMicrophoneAccess()
+    if (!access.ok) return access
+    let stream: MediaStream
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const rec = new MediaRecorder(stream)
-      const chunks: Blob[] = []
-      rec.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data)
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        setRecording(false)
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
-        await transcribeAndSave(await blob.arrayBuffer(), rec.mimeType || 'audio/webm')
-      }
-      rec.start()
-      recRef.current = rec
-      setRecording(true)
-      return true
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
       // The dialog that opened this door reports the microphone itself and
       // stays open — a second banner behind it would say the same thing twice.
-      recDraftRef.current = null
-      return false
+      return { ok: false, reason: 'failed', message: MIC_FAILED_MESSAGE }
     }
+    const probe = await probeMicrophone(stream, 1200)
+    if (probe.digitalSilence) {
+      stream.getTracks().forEach((tr) => tr.stop())
+      return { ok: false, reason: 'mic-silent', message: MIC_SILENCE_MESSAGE }
+    }
+    const rec = new MeetingTrackRecorder()
+    rec.tap('me', stream)
+    const stopWatch = watchMicrophone(stream, (s) => setMicState({ peak: s.peak, silentMs: s.silentMs }))
+    recRef.current = { rec, stream, draft: draft ?? null, stopWatch }
+    setMicState({ peak: 0, silentMs: 0 })
+    setRecording(true)
+    return { ok: true }
   }
 
   function stopRecording(): void {
-    recRef.current?.stop()
-  }
-
-  async function transcribeAndSave(buffer: ArrayBuffer, mimeType: string): Promise<void> {
-    setBusy('Transcribing the recording…')
-    setError(null)
-    try {
-      // Unguarded before: a rejected transcribe left the spinner stuck forever.
-      const t = await transcribeRecording(buffer, mimeType)
-      if (!t.ok) {
-        setError(
-          t.reason === 'no_key'
-            ? 'Recording captured, but transcription needs a key. Add an OpenAI or Anthropic key in Settings, then record again.'
-            : `Transcription failed: ${t.error}`
-        )
+    const cur = recRef.current
+    recRef.current = null
+    setRecording(false)
+    if (!cur) return
+    cur.stopWatch()
+    void cur.rec.stop().then((take) => {
+      cur.stream.getTracks().forEach((tr) => tr.stop())
+      if (!take.mixed) {
+        setError('Nothing was recorded — the recorder could not start on this machine.')
         return
       }
-      setBusy('Summarising…')
-      const sum = await window.api.voiceNote.process({ transcript: t.transcript, mode: 'summary' }).catch(() => null)
-      setBusy('Pulling out action items…')
-      const acts = await window.api.voiceNote.extractActions({ transcript: t.transcript }).catch(() => null)
-      const actionItems = acts?.ok ? acts.proposals.flatMap(proposalLabels).filter(Boolean) : []
-      const draft = recDraftRef.current
-      recDraftRef.current = null
-      const created = await createMeeting({
-        title: draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`,
-        transcript: t.transcript,
-        // An empty summary when the AI step failed is honest: the transcript is
-        // the real captured value, and nothing fake is filled in.
-        summary: sum?.ok ? sum.text : '',
-        actionItems,
-        durationSec: t.durationSec
+      const draft = cur.draft
+      const title = draft?.title.trim() || `Meeting · ${fmtDate(Date.now())}`
+      if (draft?.deskNodeId) markDeskOrigin(draft.deskNodeId, title)
+      else clearMeetingOrigin()
+      void useWrapupStore.getState().begin({
+        title,
+        buffer: take.mixed.buffer,
+        mimeType: take.mixed.mimeType,
+        durationSec: take.mixed.durationSec,
+        tracks: take.tracks,
+        speakers: { me: 'You' },
+        // CR-11 — meeting-grade audio: on-device only, no cloud fallback.
+        forceLocalTranscription: true,
+        // The dialog's NOTES are the recorder's own words — `yours` spans on
+        // the Record, never rewritten.
+        notes: draft?.notes ?? '',
+        moments: [],
+        deskNodeId: draft?.deskNodeId ?? null
       })
-      // The dialog's NOTES are the recorder's own words — `yours` spans on the
-      // Record, never rewritten; the attached desk is the meeting's desk.
-      if (created && draft && (draft.notes.trim() || draft.deskNodeId)) {
-        await updateMeeting(created.id, {
-          ...(draft.notes.trim() ? { record: { spans: buildYoursSpans(draft.notes), generatedAt: Date.now() } } : {}),
-          ...(draft.deskNodeId ? { deskNodeId: draft.deskNodeId } : {})
-        })
-      }
-      if (created) setSelectedId(created.id)
-    } catch {
-      setError('Something went wrong saving the recording. The audio was captured; please try again.')
-    } finally {
-      setBusy(null)
-    }
+    })
   }
 
   async function addManual(): Promise<void> {
@@ -358,18 +356,21 @@ export default function PlexiMeetView(): JSX.Element {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Secondary doors first, the primary last — Home's order. */}
             {recording ? (
-              <button
-                onClick={stopRecording}
-                data-testid="meet-stop"
-                className="inline-flex items-center gap-2 h-9 px-3.5 rounded-[10px] bg-red-500 text-white fb-t-body font-medium animate-pulse fb-press"
-              >
-                <Icon name="stop_circle" size={16} /> Stop recording
-              </button>
+              <>
+                {/* DEC-130 — what the microphone is doing, while it runs. */}
+                <MicLevelPill peak={micState.peak} silentMs={micState.silentMs} />
+                <button
+                  onClick={stopRecording}
+                  data-testid="meet-stop"
+                  className="inline-flex items-center gap-2 h-9 px-3.5 rounded-[10px] bg-red-500 text-white fb-t-body font-medium animate-pulse fb-press"
+                >
+                  <Icon name="stop_circle" size={16} /> Stop recording
+                </button>
+              </>
             ) : (
               <button
                 onClick={() => setRecordDialog('notes')}
                 data-testid="meet-record"
-                disabled={!!busy}
                 className="inline-flex items-center gap-2 h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
                 title="Record audio, transcribe it and extract action items"
               >
@@ -406,7 +407,6 @@ export default function PlexiMeetView(): JSX.Element {
             <button
               onClick={() => void addManual()}
               data-testid="meet-add"
-              disabled={!!busy}
               className="inline-flex items-center justify-center h-9 w-9 fb-btn-surface fb-press text-[var(--ink-80)] disabled:opacity-50"
               title="Add a meeting from notes" aria-label="Add a meeting from notes"
             >
@@ -424,13 +424,8 @@ export default function PlexiMeetView(): JSX.Element {
           </div>
         </header>
 
-        {(busy || error || msgNote) && (
+        {(error || msgNote) && (
           <div className="mb-4 space-y-2">
-            {busy && (
-              <div className="flex items-center gap-2 text-[12px] text-[var(--ink-70)]">
-                <Icon name="progress_activity" size={14} className="animate-spin" /> {busy}
-              </div>
-            )}
             {error && (
               <div className="px-3 py-2 rounded-[var(--radius-row)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] leading-relaxed" data-testid="meet-error">
                 {error}

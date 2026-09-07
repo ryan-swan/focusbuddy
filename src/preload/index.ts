@@ -1625,6 +1625,12 @@ const api = {
   },
   /** M6 — arm one picker-free display-media grant (screen + loopback audio)
    *  for guest capture. One-shot: it disarms the moment a request fires. */
+  // DEC-130 — the system's own answer about the microphone (macOS TCC).
+  media: {
+    micStatus: (): Promise<'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'> =>
+      ipcRenderer.invoke('media:micStatus'),
+    askMicrophone: (): Promise<boolean> => ipcRenderer.invoke('media:askMic')
+  },
   guestCapture: {
     arm: (): Promise<boolean> => ipcRenderer.invoke('guestCapture:arm')
   },

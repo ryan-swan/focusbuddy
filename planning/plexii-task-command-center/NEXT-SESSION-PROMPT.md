@@ -215,8 +215,22 @@
 > `WidgetItemRow`; MiniRow retired. Judgement call: `dayTimeline` puts
 > overdue work BEHIND today's timed shape. 8/8 live with scratch blocks
 > (removed); suite 3,846 tests / 351 files.
+> **DEC-130 — the recording audit.** The operator's silent "Record notes"
+> was a DIGITALLY SILENT microphone (the dev app launched from Claude Code
+> inherits a mic-less macOS permission; the app never said so) plus an
+> on-device engine that derails a whole take on a few hard seconds. Now:
+> every door asks the system, listens 1.2 s and refuses silence with the
+> settings door (`lib/micHealth`, `MicLevelPill`, `media:micStatus` /
+> `media:askMic` — the main bridge needs an app RESTART, no `--watch`);
+> Record notes rides the on-device wrap-up (segments, retained take, the
+> picked desk as container); `transcriptSanity` refuses hallucinations;
+> the derail net (`audioSplit`) cuts at pauses and decodes the pieces;
+> decode at 48 kHz. 10/10 + 10/10 live with a synthetic mic (residue in
+> Trash + dismissed briefs — purge on the operator's word); suite 3,871
+> tests / 354 files. The operator's mic works when Plexii is launched
+> from the Dock or the launcher is allowed the microphone.
 
-**Last updated:** 2026-09-07 — through DEC-129 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-130 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

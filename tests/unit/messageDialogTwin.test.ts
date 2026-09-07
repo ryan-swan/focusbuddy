@@ -77,7 +77,8 @@ describe('DEC-119 — Meet\'s message flow behind the twin', () => {
     expect(meet).toContain('sendMessage(token, conversationId, opts.text, {')
     expect(meet).toContain("onStart={(d) => recordMessageTo(d.to, { text: d.text, video: d.video })}")
     expect(meet).toContain('data-testid="meet-message-note"')
-    expect(meet).toContain('(busy || error || msgNote) && (')
+    // DEC-130: the page's own busy spinner retired with the cloud record path — the wrap-up overlay carries progress now
+    expect(meet).toContain('(error || msgNote) && (')
   })
 })
 

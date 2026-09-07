@@ -87,7 +87,8 @@ describe('guest capture — modes and handoff', () => {
   it('with loopback audio: both tracks tapped, mode both, series origin marked', async () => {
     stubMedia({ displayAudio: 1 })
     const ok = await useGuestCaptureStore.getState().start({ title: 'Zoom weekly', blockId: 'b1', seriesId: 's1' })
-    expect(ok).toBe(true)
+    // DEC-130: the door answers with why it did or did not open
+    expect(ok).toEqual({ ok: true })
     expect(useGuestCaptureStore.getState().mode).toBe('both')
     expect(taps.map(([id]) => id)).toEqual(['me', GUESTS_ID])
     expect(originCalls[0]).toMatchObject({ title: 'Zoom weekly', seriesId: 's1' })
@@ -96,7 +97,7 @@ describe('guest capture — modes and handoff', () => {
   it('no system audio: the capture CONTINUES mic-only — the floor, not a failure', async () => {
     stubMedia({ displayAudio: 'reject' })
     const ok = await useGuestCaptureStore.getState().start({ title: 'Teams call' })
-    expect(ok).toBe(true)
+    expect(ok).toEqual({ ok: true })
     expect(useGuestCaptureStore.getState().mode).toBe('mic-only')
     expect(taps.map(([id]) => id)).toEqual(['me'])
   })

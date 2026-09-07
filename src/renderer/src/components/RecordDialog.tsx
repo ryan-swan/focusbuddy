@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { openMicrophoneSettings, type StartResult } from '../lib/micHealth'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import Icon from './Icon'
@@ -52,9 +53,9 @@ export default function RecordDialog({
   initialMode: RecordMode
   onClose: () => void
   /** Resolves true once the mic is live and the recording has begun. */
-  onStartNotes: (draft: RecordNotesDraft) => Promise<boolean>
+  onStartNotes: (draft: RecordNotesDraft) => Promise<StartResult>
   /** Resolves true once the capture is running (the disclosure bar is up). */
-  onStartExternal: (draft: RecordExternalDraft) => Promise<boolean>
+  onStartExternal: (draft: RecordExternalDraft) => Promise<StartResult>
 }): JSX.Element {
   const reduceMotion = useReducedMotion()
   const [mode, setMode] = useState<RecordMode>(initialMode)
@@ -64,6 +65,7 @@ export default function RecordDialog({
   const [where, setWhere] = useState<'both' | 'mic'>('both')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorReason, setErrorReason] = useState<'mic-denied' | 'mic-silent' | 'failed' | null>(null)
 
   // Attach — a REAL desk from the store (Record notes only): the meeting
   // the recording becomes links to it.
@@ -106,12 +108,16 @@ export default function RecordDialog({
     setError(null)
     try {
       const finalTitle = title.trim() || placeholder
-      const ok =
+      const r =
         mode === 'notes'
           ? await onStartNotes({ title: finalTitle, notes: notes.trim(), deskNodeId: attached?.id ?? null })
           : await onStartExternal({ title: finalTitle, notes: notes.trim(), micOnly: where === 'mic' })
-      if (!ok) {
-        setError('Could not access the microphone. Check your system permissions.')
+      if (!r.ok) {
+        // DEC-130 — the door says exactly why it did not open: the microphone
+        // refused, or it "worked" and delivered digital silence (macOS has not
+        // allowed it). Either way the fix is one door away.
+        setError(r.message)
+        setErrorReason(r.reason)
         return
       }
       onClose()
@@ -416,8 +422,18 @@ export default function RecordDialog({
           </AnimatePresence>
 
           {error && (
-            <div className="rounded-[var(--radius-field)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] px-3 py-2" data-testid="record-error">
+            <div className="rounded-[var(--radius-field)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] px-3 py-2" data-testid="record-error" data-reason={errorReason ?? undefined}>
               {error}
+              {(errorReason === 'mic-silent' || errorReason === 'mic-denied') && (
+                <button
+                  onClick={openMicrophoneSettings}
+                  className="ml-2 underline underline-offset-2 fb-press font-medium"
+                  title="Open System Settings › Privacy & Security › Microphone"
+                  data-testid="record-mic-settings"
+                >
+                  Open microphone settings
+                </button>
+              )}
             </div>
           )}
         </div>
