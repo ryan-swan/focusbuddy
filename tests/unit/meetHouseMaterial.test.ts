@@ -23,7 +23,12 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
   // RailCard. The rose identity survives as the module chip; the sunken
   // segmented track survives unchanged.
   it('the view sits on the SAME paper as Home (paper-texture, not desk-paper)', () => {
-    expect(view).toContain('overflow-auto paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view"')
+    // History: DEC-116 made the root `h-full w-full overflow-auto` — the whole
+    // page scrolled. DEC-134 (operator: the DEC-132 rule "for the Calendar and
+    // Meet pages") made it a WINDOW on a wide screen — the hero pinned, the
+    // rail and the column beside it scrolling inside themselves — and a
+    // scroll only below `lg`, where the columns stack. Same paper.
+    expect(view).toContain('overflow-y-auto lg:overflow-hidden paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view"')
     expect(view).not.toContain('desk-paper no-tod')
     // Home's page shell, verbatim: wide board, 32px gutters.
     expect(view).toContain('max-w-[1440px] mx-auto px-8 pb-8 pt-8')
@@ -44,8 +49,15 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
     expect(view.split('h-9 px-3.5 fb-t-body font-medium fb-btn-surface fb-press text-[var(--ink-80)]').length - 1).toBeGreaterThanOrEqual(4)
   })
 
-  it('the rail is a stack of floating kit cards, sticky beside the Record', () => {
-    expect(view).toContain('lg:sticky lg:top-4 self-start" data-testid="meet-rail"')
+  it('the rail is a stack of floating kit cards standing beside the Record', () => {
+    // History: DEC-116 pinned the rail with `lg:sticky lg:top-4 self-start`
+    // and capped its list at `calc(100vh - 460px)` — a number the wrapping
+    // hero could not see, so a full rail ran under the footer. DEC-134: the
+    // rail stands as tall as the window's floor and no taller (the Meetings
+    // card shrinks and scrolls its list; the Recording card keeps its
+    // height), so nothing sticks because nothing scrolls past it.
+    expect(view).toContain('shrink-0 flex flex-col gap-4 lg:min-h-0" data-testid="meet-rail"')
+    expect(view).not.toContain('lg:sticky lg:top-4 self-start')
     expect(view).toContain('testId="meet-list-card"')
     expect(view).toContain('testId="meet-recording-card"')
     expect(view).not.toContain('bg-[color-mix(in_oklab,var(--surface-raised)_88%,transparent)]')
@@ -67,13 +79,19 @@ describe('PlexiMeet wears the house material — and reads like Home', () => {
     expect(view).not.toContain('bg-[color-mix(in_oklab,var(--surface-raised)_92%,transparent)]')
   })
 
-  it('the three panels are kit RailCards with icon headers, side by side, the transcript sticky', () => {
+  it('the three panels are kit RailCards with icon headers, side by side, the transcript capped at the window', () => {
     expect(view).not.toContain('max-w-[780px]')
     expect(view).toContain('flex flex-col lg:flex-row gap-4 items-start')
     for (const s of ['title="Timeline"', 'title="Record"', 'title="Transcript"']) expect(view).toContain(s)
     expect(view).toContain('testId="meet-record-pane"')
     expect(view).toContain('testId="meet-transcript-pane"')
-    expect(view).toContain('lg:sticky lg:top-4 lg:max-h-[calc(100vh-140px)]')
+    // History: DEC-116 stuck the transcript to the page scroll under
+    // `lg:max-h-[calc(100vh-140px)]`, which put its bottom edge under the
+    // footer. DEC-134: the Record hands the two panes its remaining height;
+    // each hugs short content and caps at the floor (`lg:max-h-full`), the
+    // thread scrolling under the pinned search and speaker chips.
+    expect(view).toContain('shrink-0 flex flex-col lg:min-h-0 lg:max-h-full"')
+    expect(view).not.toContain('lg:max-h-[calc(100vh-140px)]')
   })
 
   it('the kit grew what the page needed, without moving a pixel for Home', () => {

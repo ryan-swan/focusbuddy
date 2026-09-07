@@ -673,14 +673,25 @@ export default function CalendarView(): JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-y-auto paper-texture text-[var(--ink-100)]">
-      <div className="fb-cq max-w-[1600px] mx-auto px-5 lg:px-8 xl:px-10 py-7">
+    // DEC-134 — the page is a WINDOW, not a scroll: the header stays pinned,
+    // and the rail and the grid take the rest of the height and scroll inside
+    // themselves (the same rule DEC-132/133 gave the home tiles and the desk
+    // widgets, and DEC-131 gave the assistant's Calendar tab). The hour grid
+    // used to bound itself with `calc(100vh - 380px)` and the rail's list
+    // with `calc(100vh - 268px)` — numbers that drifted from the real header
+    // whenever it wrapped, so a full rail ran under the footer with no way to
+    // reach its last rows, and a short window pushed the grid's bottom out of
+    // sight. The root keeps `overflow-y-auto` as the safety valve for a window
+    // too short to hold the floors below; at any real size nothing scrolls
+    // but the regions.
+    <div className="h-full flex flex-col overflow-y-auto paper-texture text-[var(--ink-100)]" data-testid="calendar-view">
+      <div className="fb-cq w-full max-w-[1600px] mx-auto px-5 lg:px-8 xl:px-10 py-7 flex-1 min-h-0 flex flex-col">
         {/* DEC-054 — the header is TWO stable rows, not one that reflows: a
             title row, then a toolbar that keeps its shape whether the left
             panel is open or closed. The mode switcher never compresses (its
             buttons carry a min width) and the toolbar wraps as a whole
             instead of squeezing its members. */}
-        <div className="mb-5 flex flex-col gap-3.5">
+        <div className="mb-5 flex flex-col gap-3.5 shrink-0">
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div className="min-w-0">
               <h1 className="fb-t-title text-[var(--ink-90)]">Calendar</h1>
@@ -759,13 +770,18 @@ export default function CalendarView(): JSX.Element {
           </div>
         </div>
 
-        <div className="fb-cq-cal">
-          {/* The queue rail — the half you drag FROM. */}
+        <div className="fb-cq-cal flex-1 min-h-0">
+          {/* The queue rail — the half you drag FROM. DEC-134: it hugs a short
+              list and is capped at the window (max-h-full of its grid area),
+              its list scrolling under the pinned title and filter; it no
+              longer needs to stick, because the page no longer scrolls past
+              it. */}
           <aside
             ref={railRef}
-            className={`fb-cq-rail flex-col gap-2 sticky top-0 rounded-xl transition-shadow ${
+            className={`fb-cq-rail flex-col gap-2 max-h-full min-h-0 rounded-xl transition-shadow ${
               blockDragging ? 'ring-2 ring-accent/45 ring-offset-4 ring-offset-[var(--surface-base)]' : ''
             }`}
+            data-testid="calendar-rail"
           >
             {/* DEC-055 — the panel is a SOLID glass surface, not a list lying
                 on the dotted paper, and it filters by CLASSIFICATION (the
@@ -773,7 +789,7 @@ export default function CalendarView(): JSX.Element {
                 filter the header shows, so there is a single truth with two
                 places to reach it. */}
             <div className="rounded-[var(--radius-card)] fb-glass-panel p-3 flex flex-col gap-2.5 min-h-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Icon name="notifications" size={14} className="text-[var(--ink-40)]" />
                 <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">
                   {blockDragging ? 'Drop here to unschedule' : 'To schedule'}
@@ -790,7 +806,7 @@ export default function CalendarView(): JSX.Element {
                 onChange={(e) => pickClass(e.target.value)}
                 title="Filter this list by classification"
                 data-testid="rail-class-filter"
-                className="fb-field w-full bg-[var(--surface-sunken)] px-2.5 py-1.5 text-[12.5px] text-[var(--ink-80)]"
+                className="fb-field w-full shrink-0 bg-[var(--surface-sunken)] px-2.5 py-1.5 text-[12.5px] text-[var(--ink-80)]"
               >
                 <option value="all">All open items</option>
                 {QUEUE_ORDER.map((q) => (
@@ -799,7 +815,7 @@ export default function CalendarView(): JSX.Element {
                   </option>
                 ))}
               </select>
-              <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[calc(100vh-268px)] pr-0.5 -mr-0.5">
+              <div className="flex flex-col gap-1.5 min-h-0 overflow-y-auto pr-0.5 -mr-0.5" data-testid="calendar-rail-list">
                 {railItems.length === 0 ? (
                   <div className="text-[11.5px] text-[var(--ink-30)] py-6 text-center leading-relaxed">
                     {classFilter === 'all'
@@ -813,9 +829,13 @@ export default function CalendarView(): JSX.Element {
             </div>
           </aside>
 
-          <div className="min-w-0" onWheel={onRangeWheel}>
+          {/* DEC-134 — the grid column stretches to the window's floor (the
+              rail's grid row is the window; `self-stretch` overrides the
+              row's `align-items: start`, which the rail keeps so it can hug):
+              the plan bar stays put, the grid or the month takes the rest. */}
+          <div className="min-w-0 min-h-0 self-stretch flex flex-col" onWheel={onRangeWheel} data-testid="calendar-main">
             {mode !== 'month' && (
-              <div className="mb-3 flex flex-col gap-2" data-testid="plan-bar">
+              <div className="mb-3 flex flex-col gap-2 shrink-0" data-testid="plan-bar">
                 <div className="flex items-start gap-2 rounded-[var(--radius-card)] fb-glass-card pl-3.5 pr-2 py-2">
                   {/* DEC-092 — mt centres the ii mark on the FIRST line of the
                       growable textarea (items-start is deliberate, DEC-071;
@@ -1040,15 +1060,20 @@ export default function CalendarView(): JSX.Element {
               </div>
             )}
             {mode === 'month' ? (
-              <div className="rounded-[var(--radius-card)] fb-glass-card p-3">
-                <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+              /* DEC-134 — the month fills the window too: the weekday row is
+                 pinned, and the six weeks share whatever height is left
+                 (`minmax(max-content, 1fr)` — never shorter than a cell's own
+                 content, taller when there is room, and the grid scrolls when
+                 the window cannot hold six weeks at all). */
+              <div className="rounded-[var(--radius-card)] fb-glass-card p-3 flex-1 min-h-[240px] flex flex-col" data-testid="calendar-month">
+                <div className="grid grid-cols-7 gap-1.5 mb-1.5 shrink-0">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
                     <div key={d} className="text-center fb-t-caption font-semibold text-[var(--ink-40)]">
                       {d}
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-7 gap-1.5 flex-1 min-h-0 overflow-y-auto auto-rows-[minmax(max-content,1fr)]" data-testid="calendar-month-cells">
                   {monthDays.map((d) => {
                     const key = dayMs(d)
                     const inMonth = d.getMonth() === rangeStart.getMonth()
@@ -1128,8 +1153,15 @@ export default function CalendarView(): JSX.Element {
                 </div>
               </div>
             ) : (
-              <div className="rounded-[var(--radius-card)] fb-glass-card p-3">
+              /* DEC-134 — `fill`: the grid's pinned band (day headers and
+                 deadline chips) stays, and the hours window takes the rest
+                 of the card down to the page's floor — the assistant tab's
+                 own mode (DEC-131), on the page. The 240px floor is the old
+                 `max(280px, …)` guarantee: below it the page scrolls rather
+                 than the window collapsing. */
+              <div className="rounded-[var(--radius-card)] fb-glass-card p-3 flex-1 min-h-[240px] flex flex-col" data-testid="calendar-grid-card">
               <WeekTimeGrid
+                fill
                 weekStart={rangeStart}
                 days={MODE_DAYS[mode]}
                 filterQueue={classFilter === 'all' ? undefined : classFilter}

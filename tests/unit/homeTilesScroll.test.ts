@@ -71,3 +71,76 @@ describe('dec_133 — the same rule for desk widgets, and the Save chip', () => 
     expect(picker).not.toContain('fb-btn-surface icon-btn')
   })
 })
+
+// DEC-134 — operator: "Now do the same for the Calendar and Meet pages." Both
+// pages bounded their tall regions with 100vh arithmetic (`calc(100vh - 380px)`
+// for the hour grid, `- 268px` for the queue rail, `- 460px` for the meetings
+// list, `- 140px` for the sticky transcript) — numbers that drifted from the
+// real header whenever it wrapped, so a full rail or the transcript's bottom
+// edge ran under the footer with nothing to scroll. Each page is a WINDOW now:
+// the header pinned, the regions taking the rest of the height and scrolling
+// inside themselves, hugging when short (DEC-131's `fill` on the grid).
+
+describe('dec_134 — the same rule for the Calendar and Meet pages', () => {
+  const cal = read('src/renderer/src/components/views/CalendarView.tsx')
+  const meet = read('src/renderer/src/components/views/PlexiMeetView.tsx')
+
+  it('Calendar: the page is a window — the header pinned, the rail and the grid take the rest', () => {
+    expect(cal).toContain('<div className="h-full flex flex-col overflow-y-auto paper-texture text-[var(--ink-100)]" data-testid="calendar-view">')
+    expect(cal).toContain('<div className="fb-cq w-full max-w-[1600px] mx-auto px-5 lg:px-8 xl:px-10 py-7 flex-1 min-h-0 flex flex-col">')
+    expect(cal).toContain('<div className="mb-5 flex flex-col gap-3.5 shrink-0">')
+    expect(cal).toContain('<div className="fb-cq-cal flex-1 min-h-0">')
+  })
+  it('Calendar: the rail hugs a short list and caps at the window, its list scrolling under the pinned title and filter — no 100vh arithmetic, nothing to stick to', () => {
+    expect(cal).toContain('className={`fb-cq-rail flex-col gap-2 max-h-full min-h-0 rounded-xl transition-shadow ${')
+    expect(cal).toContain('<div className="flex items-center gap-2 shrink-0">')
+    expect(cal).toContain('className="fb-field w-full shrink-0 bg-[var(--surface-sunken)] px-2.5 py-1.5 text-[12.5px] text-[var(--ink-80)]"')
+    expect(cal).toContain('<div className="flex flex-col gap-1.5 min-h-0 overflow-y-auto pr-0.5 -mr-0.5" data-testid="calendar-rail-list">')
+    expect(cal).not.toContain('max-h-[calc(100vh-268px)]')
+    expect(cal).not.toContain('sticky top-0')
+  })
+  it('Calendar: the grid column stretches to the floor; the plan bar stays; the week grid fills (DEC-131 `fill`) above a 240px floor', () => {
+    expect(cal).toContain('<div className="min-w-0 min-h-0 self-stretch flex flex-col" onWheel={onRangeWheel} data-testid="calendar-main">')
+    expect(cal).toContain('<div className="mb-3 flex flex-col gap-2 shrink-0" data-testid="plan-bar">')
+    expect(cal).toContain('<div className="rounded-[var(--radius-card)] fb-glass-card p-3 flex-1 min-h-[240px] flex flex-col" data-testid="calendar-grid-card">')
+    expect(cal).toContain('<WeekTimeGrid\n                fill\n')
+  })
+  it('Calendar: the month fills too — the weekday row pinned, six weeks sharing the height and never shorter than their content, scrolling when the window cannot hold them', () => {
+    expect(cal).toContain('<div className="rounded-[var(--radius-card)] fb-glass-card p-3 flex-1 min-h-[240px] flex flex-col" data-testid="calendar-month">')
+    expect(cal).toContain('<div className="grid grid-cols-7 gap-1.5 mb-1.5 shrink-0">')
+    expect(cal).toContain('<div className="grid grid-cols-7 gap-1.5 flex-1 min-h-0 overflow-y-auto auto-rows-[minmax(max-content,1fr)]" data-testid="calendar-month-cells">')
+  })
+
+  it('Meet: the page is a window on a wide screen (the hero pinned); below lg the columns stack and the page scrolls', () => {
+    expect(meet).toContain('<div className="h-full w-full flex flex-col overflow-y-auto lg:overflow-hidden paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view">')
+    expect(meet).toContain('<div className="w-full max-w-[1440px] mx-auto px-8 pb-8 pt-8 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">')
+    expect(meet).toContain('<header className="flex items-start justify-between gap-4 flex-wrap mb-6 shrink-0" data-testid="meet-hero">')
+    expect(meet).toContain('<div className="mb-4 space-y-2 shrink-0">')
+    expect(meet).toContain('<div className="flex flex-col lg:flex-row gap-6 items-start lg:items-stretch lg:flex-1 lg:min-h-0">')
+  })
+  it('Meet: the rail stands as tall as the floor — the Meetings card shrinks and scrolls its list under the pinned title and search, the Recording card keeps its height; no 100vh cap, nothing sticky', () => {
+    expect(meet).toContain('<aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4 lg:min-h-0" data-testid="meet-rail">')
+    expect(meet).toContain('className="flex flex-col min-h-0"\n              bodyClassName="px-2 pb-2 min-h-0 flex flex-col"')
+    expect(meet).toContain('<div className="px-1 pb-2 shrink-0">')
+    expect(meet).toContain('<div className="min-h-0 overflow-y-auto max-h-[60vh] lg:max-h-none" data-testid="meet-list">')
+    expect(meet).toContain('<RailCard className="shrink-0" bodyClassName="p-4 space-y-2" testId="meet-recording-card">')
+    expect(meet).not.toContain('max-h-[max(240px,calc(100vh-460px))]')
+    expect(meet).not.toContain('lg:sticky')
+  })
+  it('Meet: the column beside the rail scrolls on its own for the dashboard, or hands its height to the open Record (header and timeline pinned)', () => {
+    expect(meet).toContain("className={`flex-1 min-w-0 w-full ${selected ? 'lg:min-h-0 lg:flex lg:flex-col' : 'lg:min-h-0 lg:overflow-y-auto'}`}")
+    expect(meet).toContain('data-testid="meet-main"')
+    expect(meet).toContain('<div className="flex flex-col lg:flex-1 lg:min-h-0" data-testid="meet-detail">')
+    expect(meet).toContain('<header className="flex items-start justify-between gap-4 flex-wrap mb-5 shrink-0" data-testid="meet-detail-header">')
+    expect(meet).toContain('testId="meet-timeline"\n          className="mb-4 shrink-0"')
+  })
+  it('Meet: the Record and the Transcript hug short content and cap at the floor, each scrolling under its own pinned header', () => {
+    expect(meet).toContain('<div className="flex flex-col lg:flex-row gap-4 items-start lg:flex-1 lg:min-h-0">')
+    expect(meet).toContain('<div className="flex-1 min-w-0 w-full lg:min-h-0 lg:max-h-full lg:flex lg:flex-col" ref={recordRef}>')
+    expect(meet).toContain('className="overflow-hidden flex flex-col min-h-0"\n            bodyClassName="px-0 pb-0 min-h-0 overflow-y-auto"')
+    expect(meet).toContain('className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 flex flex-col lg:min-h-0 lg:max-h-full"')
+    expect(meet).toContain('bodyClassName="flex-1 min-h-0 flex flex-col"')
+    expect(meet).toContain('<div className="flex-1 min-h-0 overflow-auto px-3 py-2" data-testid="rendering-thread" ref={threadRef}>')
+    expect(meet).not.toContain('lg:max-h-[calc(100vh-140px)]')
+  })
+})

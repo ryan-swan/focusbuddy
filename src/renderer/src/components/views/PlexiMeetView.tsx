@@ -340,10 +340,21 @@ export default function PlexiMeetView(): JSX.Element {
     // primary as Home's accent button, and every surface below a floating
     // house card on the paper. Presentation ONLY: every testid, handler and
     // copy string is exactly where it was.
-    <div className="h-full w-full overflow-auto paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view">
-      <div className="max-w-[1440px] mx-auto px-8 pb-8 pt-8">
+    //
+    // DEC-134 — on a wide window the page is a WINDOW, not a scroll (the rule
+    // DEC-132/133 gave the home tiles and the desk widgets): the hero stays
+    // pinned, the rail is as tall as the floor and no taller, and the column
+    // beside it scrolls on its own — or, with a meeting open, hands its
+    // height to the Record so its panes scroll under their own headers. The
+    // rail and the transcript used to stick to a page scroll under caps of
+    // `calc(100vh - 460px)` and `calc(100vh - 140px)`, numbers the wrapping
+    // hero and the footer could not see, so their bottom edges ran under the
+    // footer with nothing to scroll. Below `lg` the columns stack and the
+    // page scrolls, as before.
+    <div className="h-full w-full flex flex-col overflow-y-auto lg:overflow-hidden paper-texture text-[var(--ink-100)]" data-testid="pleximeet-view">
+      <div className="w-full max-w-[1440px] mx-auto px-8 pb-8 pt-8 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
         {/* Hero — Home's greeting header idiom: title + subtitle left, doors right. */}
-        <header className="flex items-start justify-between gap-4 flex-wrap mb-6" data-testid="meet-hero">
+        <header className="flex items-start justify-between gap-4 flex-wrap mb-6 shrink-0" data-testid="meet-hero">
           <div className="flex items-center gap-3 min-w-0">
             <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-rose-500/10 text-rose-500 shadow-[inset_0_0_0_1px_rgb(244_63_94/0.18)]">
               <Icon name="groups" size={22} filled />
@@ -425,7 +436,7 @@ export default function PlexiMeetView(): JSX.Element {
         </header>
 
         {(error || msgNote) && (
-          <div className="mb-4 space-y-2">
+          <div className="mb-4 space-y-2 shrink-0">
             {error && (
               <div className="px-3 py-2 rounded-[var(--radius-row)] bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[12px] leading-relaxed" data-testid="meet-error">
                 {error}
@@ -439,18 +450,24 @@ export default function PlexiMeetView(): JSX.Element {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Rail — Home's rail idiom: floating cards that stay put while the Record scrolls. */}
-          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 self-start" data-testid="meet-rail">
+        <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-stretch lg:flex-1 lg:min-h-0">
+          {/* Rail — Home's rail idiom: floating cards beside the Record. DEC-134:
+              the rail stands as tall as the floor and no taller — the Meetings
+              card hugs a short list and shrinks for a long one (the list
+              scrolling under the pinned title and search) while the Recording
+              card never gives up its height — so the last meeting and the
+              retention control are always on screen. */}
+          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4 lg:min-h-0" data-testid="meet-rail">
             <RailCard
               title="Meetings"
               icon="groups"
               tone="rose"
               testId="meet-list-card"
-              bodyClassName="px-2 pb-2"
+              className="flex flex-col min-h-0"
+              bodyClassName="px-2 pb-2 min-h-0 flex flex-col"
               trailing={loaded ? <span className="fb-tabular text-[12px] text-[var(--ink-40)]">{meetings.length}</span> : undefined}
             >
-              <div className="px-1 pb-2">
+              <div className="px-1 pb-2 shrink-0">
                 <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-[var(--radius-field)] bg-[var(--surface-sunken)] border border-transparent focus-within:border-[rgb(var(--accent))] transition-colors">
                   <Icon name="search" size={14} className="text-[var(--ink-50)]" />
                   <input
@@ -462,7 +479,7 @@ export default function PlexiMeetView(): JSX.Element {
                   />
                 </div>
               </div>
-              <div className="overflow-auto max-h-[max(240px,calc(100vh-460px))]">
+              <div className="min-h-0 overflow-y-auto max-h-[60vh] lg:max-h-none" data-testid="meet-list">
           {recallHits.length > 0 && (
             <div className="mb-2" data-testid="recall-hits">
               <div className="px-3 pt-1 pb-1 text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">
@@ -532,7 +549,7 @@ export default function PlexiMeetView(): JSX.Element {
                 expresses MY side: on a call it records my mic and ASKS the
                 other person — their voice is captured when they say yes, and
                 a decline is honoured by construction (never tapped). */}
-            <RailCard bodyClassName="p-4 space-y-2" testId="meet-recording-card">
+            <RailCard className="shrink-0" bodyClassName="p-4 space-y-2" testId="meet-recording-card">
               <div className="text-[10px] font-semibold tracking-wider text-[var(--ink-40)]">RECORDING</div>
           <label
             className="flex items-center gap-2 px-0.5 text-[11.5px] text-[var(--ink-70)] cursor-pointer"
@@ -579,8 +596,13 @@ export default function PlexiMeetView(): JSX.Element {
             </RailCard>
           </aside>
 
-          {/* Detail */}
-          <div className="flex-1 min-w-0 w-full">
+          {/* Detail — DEC-134: on a wide window the column scrolls on its own
+              under the pinned hero (the dashboard), or hands its height to the
+              Record, which pins its header and timeline and scrolls its panes. */}
+          <div
+            className={`flex-1 min-w-0 w-full ${selected ? 'lg:min-h-0 lg:flex lg:flex-col' : 'lg:min-h-0 lg:overflow-y-auto'}`}
+            data-testid="meet-main"
+          >
         {selected ? (
           <MeetingDetail
             key={selected.id}
@@ -1141,10 +1163,10 @@ function MeetingDetail({
   const actionCount = filedItems.length + (foundCommitments?.length ?? 0) + unfiledLegacy.length
 
   return (
-    <div className="flex flex-col" data-testid="meet-detail">
+    <div className="flex flex-col lg:flex-1 lg:min-h-0" data-testid="meet-detail">
       {/* ── Header: Home's idiom — the title on the paper, its facts beneath,
           the doors as quiet surface buttons on the right ─────────────────── */}
-      <header className="flex items-start justify-between gap-4 flex-wrap mb-5" data-testid="meet-detail-header">
+      <header className="flex items-start justify-between gap-4 flex-wrap mb-5 shrink-0" data-testid="meet-detail-header">
         <div className="min-w-0 flex-1">
           <input
             value={title}
@@ -1249,7 +1271,7 @@ function MeetingDetail({
           icon="timeline"
           tone="rose"
           testId="meet-timeline"
-          className="mb-4"
+          className="mb-4 shrink-0"
           bodyClassName="px-4 pb-3"
           trailing={
             <span className="flex items-center gap-4 min-w-0">
@@ -1323,15 +1345,20 @@ function MeetingDetail({
       )}
 
       {/* ── Two columns: renderings left, transcript always on the right ──── */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
-        <div className="flex-1 min-w-0 w-full" ref={recordRef}>
+      {/* DEC-134 — the two panes share the window's remaining height: each
+          hugs short content and caps at the floor (max-h-full of the row), the
+          Record scrolling its renderings under the pinned title and segmented
+          control, the Transcript scrolling its thread under the pinned search
+          and speaker chips. */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:flex-1 lg:min-h-0">
+        <div className="flex-1 min-w-0 w-full lg:min-h-0 lg:max-h-full lg:flex lg:flex-col" ref={recordRef}>
           <RailCard
             title="Record"
             icon="article"
             tone="accent"
             testId="meet-record-pane"
-            className="overflow-hidden"
-            bodyClassName="px-0 pb-0"
+            className="overflow-hidden flex flex-col min-h-0"
+            bodyClassName="px-0 pb-0 min-h-0 overflow-y-auto"
             trailing={
               /* M2b — the segmented control: three renderings, one Record. */
               <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--surface-sunken)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.06)]" data-testid="record-views">
@@ -1706,7 +1733,7 @@ function MeetingDetail({
           icon="subtitles"
           tone="sky"
           testId="meet-transcript-pane"
-          className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 flex flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-140px)]"
+          className="w-full lg:w-[44%] lg:max-w-[560px] shrink-0 flex flex-col lg:min-h-0 lg:max-h-full"
           bodyClassName="flex-1 min-h-0 flex flex-col"
           trailing={
             segments.length > 0 ? (

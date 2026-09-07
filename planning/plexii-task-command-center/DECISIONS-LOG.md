@@ -4346,3 +4346,67 @@ surface with the icon and the word inside it; the home Attention tile
 scrolls under pinned pills once rows open; LakeDash's four widget bodies all
 scroll rather than clip with no unneeded bar; the desk Attention widget's
 list still scrolls. Suite: 3,888 tests / 356 files; both typechecks clean.
+
+## DEC-134 — The same rule for the Calendar and Meet pages: windows, not scrolls
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Calendar and Meet
+pages") — the DEC-132/133 rule ("either it needs to stop before something
+gets cut off mid-row, or there needs to be the ability to scroll"), applied
+page-wide.
+
+**What was wrong.** Neither page clipped at the operator's window size with
+today's data, but both bounded their tall regions with 100vh arithmetic:
+the hour grid at `max(280px, calc(100vh - 380px))`, the queue rail's list at
+`calc(100vh - 268px)`, the meetings list at `max(240px, calc(100vh - 460px))`,
+the sticky transcript at `calc(100vh - 140px)`. Those numbers assumed a
+header height and a footer the layout could not see — so a wrapped header,
+a longer rail or a shorter window put a region's bottom edge under the
+footer with nothing to scroll (the calendar rail was sticky, so even the
+page scroll could not reveal its last rows). The assistant's Calendar tab
+had already been ruled onto `fill` (DEC-131 addendum: "so that it doesn't
+cut off before the bottom, and so you can see more on screen").
+
+**What changed.**
+- **Calendar is a window.** The root is a flex column; the title row and
+  the toolbar are pinned; the rail/grid area takes the rest. The rail hugs
+  a short list and caps at the window (`max-h-full` of its grid area), its
+  list scrolling under the pinned title and class filter; it no longer
+  sticks, because the page no longer scrolls past it. The grid column
+  stretches to the floor: the plan bar stays put, the week/3-day/day grid
+  runs `fill` (DEC-131's mode — pinned day headers and deadline chips, the
+  hours window taking the rest), and the month pins its weekday row and
+  shares the height across the six weeks (`minmax(max-content, 1fr)` rows:
+  never shorter than a cell's content, taller when there is room, scrolling
+  when the window cannot hold them). A 240px floor on the grid and month
+  cards keeps the old `max(280px, …)` guarantee: below it the page root
+  scrolls instead of the window collapsing.
+- **Meet is a window on a wide screen.** The hero is pinned; the rail
+  stands as tall as the floor and no taller — the Meetings card hugs a
+  short list and shrinks for a long one (the list scrolling under the
+  pinned title and search) while the Recording card keeps its height —
+  and the column beside it scrolls on its own (the dashboard) or hands its
+  height to the open Record, which pins its header and Timeline and lets
+  the two panes hug short content and cap at the floor: the Record
+  scrolling its renderings under the pinned title and segmented control,
+  the Transcript scrolling its thread under the pinned search and speaker
+  chips. Nothing is sticky any more. Below `lg` the columns stack and the
+  page scrolls, as before (the meetings list capped at 60vh there).
+- Nothing else moved: every testid, handler and copy string is where it
+  was; `WeekTimeGrid`'s non-fill callers (the Attention rail column) are
+  untouched.
+
+**Verified live** over CDP on the operator's running app, 16/16 twice, view
+restored, at the real window (2021×1105) and at an emulated 1400×640:
+Calendar — the page does not scroll, the regions do; the week grid ends at
+the page floor with its window scrolling the hours (11 AM–11 PM on screen,
+one hour more than before) while the title stays put; the rail hugs its
+three rows; the month card ends at the floor with all 42 cells at 129px
+(above their 104px floor); at 640px the hours window still scrolls and ends
+at the floor, the month's six weeks scroll inside their card, and a
+page-wide sweep finds no element clipping content it cannot scroll. Meet —
+the root is `overflow: hidden` with the main column the scroller; the rail
+and the Recording card sit inside the window; with "Test" open the Record
+and Transcript panes end inside the window, the Record body and the
+transcript thread are the scrollers, and at 640px all of rail, Record and
+Transcript end inside the window with the thread scrolling; no clipping
+anywhere. Suite: 3,896 tests / 356 files; both typechecks clean.
