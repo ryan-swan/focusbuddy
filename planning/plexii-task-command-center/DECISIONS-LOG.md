@@ -4212,3 +4212,59 @@ Trash (seven desks, folders and transcript documents named "[TEST] DEC-130
 …") and as dismissed "Meeting brief — [TEST] DEC-130…" items — purge is a
 destructive act, so it waits. The microphone itself: launch Plexii from the
 Dock, or allow the microphone for the app that launches it.
+
+## DEC-131 — The assistant panel: Message's header and composer, a + on Attention, and a Calendar tab
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request (the PlexiiMessage screenshot round: "change the
+Plexii message to just 'message'… get rid of the meeting icon… keep gif, keep
+the emojis, move the record a voice note to inside the actual message bar
+itself on the right side, and then keep attachments… make the write a
+message box bigger… move the meet recall and pin buttons to the right of the
+actual name… the members button is redundant… if I were to have multiple
+people in this chat that should just show me both names… Within the
+attention tab, there needs to be a plus button so I can capture a new
+attention item… add a new tab… for a calendar tab. This should default to
+today's calendar, similar to the Today widget on the main Attention page…
+toggle between days and get a quick month calendar view… click a day…
+having the booking page pop up").
+
+**What changed.**
+- **Message.** The tab reads "Message". In the panel the thread header is
+  ONE row: the people, then Meet · Recall · pin at its right (DEC-123's
+  own-row placement retired). A DM reads as the person; a space reads as
+  everyone else in it, so the members button is gone from the panel (the
+  Office page keeps it, with Pulse and Schedules). The panel's composer:
+  no meeting camera (the header's Meet is that door), the voice-note mic
+  INSIDE the message box at its bottom-right, attach · emoji · GIF kept
+  under a three-line box that fills the width (`ChatComposer compact`).
+- **Attention +.** `AttentionWidget` grew `onCapture`; the assistant tab
+  wears a + at the right of the section pills that opens the house capture
+  prompt (the Attention page's Capture door — classify first, then file).
+- **Calendar tab** (`assistant/tabs/AssistantCalendarTab`, after Attention
+  in the strip): opens on today as the Attention rail's own day column
+  (`WeekTimeGrid`, one day, compact — blocks drag and resize in place);
+  ‹ Today › walks the days; a toggle shows the month at a glance (six
+  weeks, today filled, a dot on every day with something booked, read into
+  local state — never the shared range); clicking a day opens the Book-time
+  dialog on it (the composer's own, portalled above the panel: 9:00 on
+  another day, the next half hour today) and lands the tab on that day; a
+  Book button does the same for the shown day; a door opens the Calendar
+  page. Booking runs the grid's own path — `lib/bookBlock.ts`
+  (`bookBlockWithToast`: create, the undo toast, the stated invite hold),
+  extracted from the grid, which now delegates. The tab's pure parts
+  (`lib/monthGrid.ts`: the 42 cells, the default slot) are unit-tested.
+
+**Verified live** over CDP, 12/12, DOM-read, panel restored, the one
+scratch block removed through the store: the strip reads ii · Attention ·
+Calendar · Message · Agents; the + opens the capture prompt and closes
+clean; the Calendar tab opens on today with the day column, › walks to
+tomorrow and Today returns, the month shows 42 cells with today filled and
+seven booked days dotted, a click on the 9th opens the dialog on "Wed,
+Sep 9" above the panel, and Book it writes a real block at 9:00 that day
+and lands the tab on it; the Message tab shows the name with Meet · Recall
+· pin on the same row at its right and no members button, and the composer
+is a 77px box at 92% of the pane with the mic inside it at the right, no
+camera, attach · emoji · GIF present. Suite: 3,880 tests / 355 files; both
+typechecks clean. Pins rewritten with history: the tab order and labels,
+DEC-123's own-row header, the DEC-121/128 widget mounts, the grid's booking
+pins → the shared helper.

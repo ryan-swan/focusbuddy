@@ -10,16 +10,10 @@ import { blockFit } from '../../lib/calendarGeometry'
 import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
 import AttentionItemEditor from '../AttentionItemEditor'
 import BookTimeDialog from '../BookTimeDialog'
-import { useActionHistory } from '../../stores/actionHistory'
+import { bookBlockWithToast } from '../../lib/bookBlock'
 import { saveBlockEdit } from '../../lib/blockEdit'
 import { loadPlannerSettings } from '../../lib/attentionPlanner'
-import {
-  resolvePlaceholder,
-  scheduleInviteHold,
-  fmtTimeRange,
-  HOLD_INVITES_MS,
-  type InviteHold
-} from '../../lib/bookTime'
+import { resolvePlaceholder } from '../../lib/bookTime'
 import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { joinMeetingRoom } from '../../lib/startMeeting'
@@ -1111,30 +1105,10 @@ export default function WeekTimeGrid({
             // Step 7 — closes IMMEDIATELY; no spinner, no confirmation step.
             // The create is a local write; the toast is where regret goes.
             setComposer(null)
-            const draft = { taskId, title, startMs, durationMin, meeting, recurrence }
-            const block = await createBlock(draft)
-            // The stated hold: outbound invites wait a window Undo can
-            // cancel. Nothing sends today (CR-08/CR-09 — no outbound path,
-            // no hosted links); the expiry callback is the future send site.
-            const hold: InviteHold | null =
-              meeting && meeting.invitees.length > 0
-                ? scheduleInviteHold(() => {
-                    /* future: sendMeetingInvites(...) — deliberately silent */
-                  }, HOLD_INVITES_MS)
-                : null
-            const verb = meeting ? 'Scheduled' : 'Booked'
-            useActionHistory.getState().recordWithToast({
-              label: `${verb} “${title}” · ${fmtTimeRange(startMs, durationMin)}${
-                hold ? ` · invites hold ${HOLD_INVITES_MS / 1000}s` : ''
-              }`,
-              undo: async () => {
-                hold?.cancel()
-                await removeBlock(block.id)
-              },
-              redo: async () => {
-                await createBlock(draft)
-              }
-            })
+            // DEC-131 — the booking itself (create, the undo toast, the stated
+            // invite hold) is lib/bookBlock, shared with the assistant's
+            // Calendar tab, so a day picked there books exactly like this.
+            await bookBlockWithToast({ taskId, title, startMs, durationMin, meeting, recurrence })
           }}
         />
       )}

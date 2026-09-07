@@ -229,8 +229,15 @@
 > Trash + dismissed briefs — purge on the operator's word); suite 3,871
 > tests / 354 files. The operator's mic works when Plexii is launched
 > from the Dock or the launcher is allowed the microphone.
+> **DEC-131**: the panel — Message (was PlexiiMessage) with a one-row
+> header (people · Meet · Recall · pin; no members button, a space reads
+> as its people) and a panel-shaped composer (mic inside the box, no
+> camera, taller); a + on Attention that opens the capture prompt; a
+> Calendar tab after Attention (today's rail column, ‹ Today ›, the month
+> at a glance, a day click → Book-time dialog → `lib/bookBlock`, shared
+> with the grid). 12/12 live; suite 3,880 tests / 355 files.
 
-**Last updated:** 2026-09-07 — through DEC-130 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-07 — through DEC-131 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

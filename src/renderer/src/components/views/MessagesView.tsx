@@ -766,6 +766,17 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
     activeConv?.kind === 'dm' && dmOther
       ? personDisplayName(dmOther, dmOther.handle ?? 'Conversation')
       : activeConv?.title ?? 'Conversation'
+  // DEC-131 — in the panel the header IS the people: a DM reads as the person,
+  // a space reads as everyone else in it ("if I were to have multiple people
+  // in this chat that should just show me both names"), so no members
+  // button is needed; a space with no one else falls back to its title.
+  const others = (activeConv?.members ?? []).filter((m) => m.accountId !== account?.id)
+  const panelTitle =
+    activeConv?.kind === 'dm'
+      ? headerTitle
+      : others.length > 0
+        ? others.map((m) => personDisplayName(m, m.handle ?? 'teammate')).join(', ')
+        : headerTitle
 
   // DEC-124 — a message's bell: the house capture prompt, prefilled with the
   // message and pointed back at it (sourceType 'message', the conversation as
@@ -1042,7 +1053,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
           // list, and the receiver must be able to reply immediately. Title
           // falls back until the list catches up.
           <>
-            <div className={`${compact ? 'px-3 py-2.5' : 'px-4 py-3'} border-b border-[var(--edge-soft)] flex items-center gap-2 ${compact ? 'flex-wrap' : 'justify-between'}`}>
+            <div className={`${compact ? 'px-3 py-2' : 'px-4 py-3'} border-b border-[var(--edge-soft)] flex items-center gap-2 justify-between`}>
               {compact && (
                 <button
                   onClick={() => setCompactPane('list')}
@@ -1054,11 +1065,18 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                   <Icon name="arrow_back" size={16} />
                 </button>
               )}
-              <h2 className={`text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0 ${compact ? 'flex-1' : ''}`}>
+              <h2
+                className={`text-sm font-semibold text-stone-900 dark:text-stone-100 inline-flex items-center gap-1.5 min-w-0 ${compact ? 'flex-1' : ''}`}
+                title={compact ? panelTitle : undefined}
+              >
                 <Icon name={activeConv?.kind === 'space' ? 'folder_shared' : 'person'} size={14} className="text-accent shrink-0" />
-                <span className="truncate">{headerTitle}</span>
+                <span className="truncate">{compact ? panelTitle : headerTitle}</span>
               </h2>
-              <div className={compact ? 'w-full flex items-center gap-1.5 flex-wrap' : 'flex items-center gap-1.5 shrink-0'} data-testid="messages-actions">
+              {/* DEC-123 put the panel's doors on their own row; DEC-131 moves
+                  them to the right of the name — Meet · Recall · pin, the
+                  three the panel keeps (the members button is the name now;
+                  Pulse and Schedules stay on the Office page). */}
+              <div className="flex items-center gap-1.5 shrink-0" data-testid="messages-actions">
                 {callTarget && !compact && (
                   <button
                     onClick={() => void startCall(callTarget, 'video')}
@@ -1115,7 +1133,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     <Icon name="bolt" size={15} /> Recall
                   </button>
                 )}
-                {activeId && activeConv && activeConv.kind !== 'dm' && (
+                {activeId && activeConv && activeConv.kind !== 'dm' && !compact && (
                   <button
                     onClick={() => setShowPulse(true)}
                     title="Decisions, questions and action items in this channel"
@@ -1125,7 +1143,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     <Icon name="radar" size={15} /> Pulse
                   </button>
                 )}
-                {activeId && activeConv && activeConv.kind !== 'dm' && (
+                {activeId && activeConv && activeConv.kind !== 'dm' && !compact && (
                   <button
                     onClick={() => setShowSchedules(true)}
                     title="Scheduled AI tasks for this channel"
@@ -1135,7 +1153,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                     <Icon name="schedule" size={15} /> Schedules
                   </button>
                 )}
-                {activeId && activeConv && (
+                {activeId && activeConv && !compact && (
                   <div className="relative">
                     <button
                       onClick={() => setShowMembers((v) => !v)}
@@ -1315,6 +1333,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                 token={sessionToken}
                 onSend={(body, attachment) => send(body, attachment)}
                 onTyping={notifyTyping}
+                compact={compact}
               />
             )}
           </>

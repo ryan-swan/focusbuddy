@@ -19,8 +19,10 @@ export type AssistantMode = 'sidebar' | 'floating' | 'fullscreen'
 // the Office Chat tab, in the panel), Agents (the autonomous agent, with
 // desk agents as its sub-view — Work folded in). The tab is chrome, not
 // conversation state, so it lives here beside mode/width.
-export type AssistantTab = 'chat' | 'attention' | 'messages' | 'agent'
-export const ASSISTANT_TABS: AssistantTab[] = ['chat', 'attention', 'messages', 'agent']
+// DEC-131 — Calendar joins the strip (today's day column, the month at a
+// glance, a day click that books), and PlexiiMessage reads "Message".
+export type AssistantTab = 'chat' | 'attention' | 'calendar' | 'messages' | 'agent'
+export const ASSISTANT_TABS: AssistantTab[] = ['chat', 'attention', 'calendar', 'messages', 'agent']
 /** What a saved tab from before means now: Today and Tasks → Attention,
  *  Activity → PlexiiMessage, Work → Agents (its desk-agents sub-view). */
 export const LEGACY_TAB: Record<string, AssistantTab> = { today: 'attention', tasks: 'attention', activity: 'messages', work: 'agent' }

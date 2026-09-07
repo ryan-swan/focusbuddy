@@ -21,11 +21,13 @@ const messages = read('renderer/src/components/views/MessagesView.tsx')
 
 describe('DEC-121/122 — the tab set', () => {
   it('the mark · Attention · PlexiiMessage · Agents, in that order, in the store and the strip', () => {
-    expect(ASSISTANT_TABS).toEqual(['chat', 'attention', 'messages', 'agent'])
+    // DEC-131: Calendar joins after Attention; PlexiiMessage reads "Message"
+    expect(ASSISTANT_TABS).toEqual(['chat', 'attention', 'calendar', 'messages', 'agent'])
     const order = [
       "{ id: 'chat', label: 'Plexii AI', mark: true }",
       "{ id: 'attention', label: 'Attention', icon: 'notifications' }",
-      "{ id: 'messages', label: 'PlexiiMessage', icon: 'chat' }",
+      "{ id: 'calendar', label: 'Calendar', icon: 'calendar_month' }",
+      "{ id: 'messages', label: 'Message', icon: 'chat' }",
       "{ id: 'agent', label: 'Agents', icon: 'rocket_launch' }"
     ].map((s) => overlay.indexOf(s))
     for (const i of order) expect(i).toBeGreaterThan(-1)
@@ -56,7 +58,8 @@ describe('DEC-121/122 — the tab set', () => {
 describe('DEC-121 — Attention IS the home widget', () => {
   it('the tab renders the same AttentionWidget, uncapped and scrolling, under its own remembered section', () => {
     expect(attentionTab).toContain("import { AttentionWidget } from '../../views/attentionWidgets'")
-    expect(attentionTab).toContain('<AttentionWidget size="lg" storageKey="attention.assistant.section" limit={Number.POSITIVE_INFINITY} scroll />')
+    // DEC-131: the mount grew a capture door (onCapture) and went multi-line
+    expect(attentionTab).toContain('<AttentionWidget\n        size="lg"\n        storageKey="attention.assistant.section"\n        limit={Number.POSITIVE_INFINITY}\n        scroll\n        onCapture={() => openConsole()}\n      />')
     expect(overlay).toContain("{activeTab === 'attention' && <AssistantAttentionTab />}")
   })
   it('the widget grew limit / scroll additively — the home and desk slices are untouched', () => {
@@ -91,7 +94,8 @@ describe('DEC-121 — PlexiChat IS the Office Chat view', () => {
     expect(messages).toContain("{callTarget && !compact && (")
     expect(messages).toContain("onClick={() => (compact && callTarget ? void startCall(callTarget, 'video') : goMeetings())}")
     expect(messages).toContain("{activeId && !compact && (\n                  <select")
-    expect(messages).toContain("compact ? 'w-full flex items-center gap-1.5 flex-wrap' : 'flex items-center gap-1.5 shrink-0'")
+    // DEC-131: the panel's doors moved to the right of the name — one row, no wrap
+    expect(messages).toContain('<div className="flex items-center gap-1.5 shrink-0" data-testid="messages-actions">')
     expect(messages).toContain('data-testid="messages-actions"')
     expect(messages).toContain("const hdrBtn = compact")
     // the Office page is unchanged: both doors, the translate menu, the wide sizes

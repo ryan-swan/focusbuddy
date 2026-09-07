@@ -9,6 +9,7 @@ import { useVoiceHold, useVoiceHoldKeys, startHold, stopHold } from '../../lib/v
 import AssistantAttentionTab from './tabs/AssistantAttentionTab'
 import AssistantMessagesTab from './tabs/AssistantMessagesTab'
 import AssistantAgentTab from './tabs/AssistantAgentTab'
+import AssistantCalendarTab from './tabs/AssistantCalendarTab'
 import AssistantHeader from './AssistantHeader'
 import { useChatStore } from '../../stores/chat'
 import { useViewStore } from '../../stores/view'
@@ -64,13 +65,15 @@ const FULLSCREEN_PAGE =
 // First the conversation, worn as the animated double-ii mark alone (the
 // brand's own sign for the AI — one blink on mount, a wink on hover, breathing
 // while it thinks); then Attention (every attention item — Tasks folded in),
-// PlexiiMessage (messaging people — the Office Chat tab in the panel), and
-// Agents (the autonomous agent with desk agents as its sub-view). Order
-// matches the store's ASSISTANT_TABS.
+// Calendar (DEC-131: today's day column, the month at a glance, a day click
+// that books), Message (messaging people — the Office Chat tab in the
+// panel; "PlexiiMessage" until DEC-131), and Agents (the autonomous agent
+// with desk agents as its sub-view). Order matches the store's ASSISTANT_TABS.
 const TAB_META: { id: AssistantTab; label: string; icon?: string; mark?: boolean }[] = [
   { id: 'chat', label: 'Plexii AI', mark: true },
   { id: 'attention', label: 'Attention', icon: 'notifications' },
-  { id: 'messages', label: 'PlexiiMessage', icon: 'chat' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar_month' },
+  { id: 'messages', label: 'Message', icon: 'chat' },
   { id: 'agent', label: 'Agents', icon: 'rocket_launch' }
 ]
 
@@ -486,6 +489,7 @@ function AssistantOverlayChrome(): JSX.Element {
             <ChatPanel />
           </div>
           {activeTab === 'attention' && <AssistantAttentionTab />}
+          {activeTab === 'calendar' && <AssistantCalendarTab />}
           {activeTab === 'agent' && <AssistantAgentTab />}
           {activeTab === 'messages' && <AssistantMessagesTab />}
         </div>

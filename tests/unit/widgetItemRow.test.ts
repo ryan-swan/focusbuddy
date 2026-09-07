@@ -86,7 +86,8 @@ describe('dec_128 — every host gets it, and none clips it', () => {
   })
 
   it('the assistant tab and the desk widget are the same component', () => {
-    expect(tab).toContain('<AttentionWidget size="lg" storageKey="attention.assistant.section" limit={Number.POSITIVE_INFINITY} scroll />')
+    // DEC-131: the mount grew a capture door (onCapture) and went multi-line
+    expect(tab).toContain('<AttentionWidget\n        size="lg"\n        storageKey="attention.assistant.section"\n        limit={Number.POSITIVE_INFINITY}\n        scroll\n        onCapture={() => openConsole()}\n      />')
     expect(widgets).toContain('<AttentionWidget\n            size="lg"\n            itemsOverride={effective}')
   })
 })

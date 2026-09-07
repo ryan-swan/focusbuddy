@@ -250,7 +250,8 @@ export function AttentionWidget({
   limit,
   // DEC-121 lifted the cap with `scroll`; DEC-128 makes every host scroll, so
   // the prop is kept for its callers and no longer changes anything.
-  scroll: _scroll = false
+  scroll: _scroll = false,
+  onCapture
 }: {
   size?: WidgetSize
   /** DEC-045: the desk widget hands in a pre-scoped set; the home widget
@@ -264,6 +265,9 @@ export function AttentionWidget({
    *  section, scrolling, where the home widget shows a sized slice. */
   limit?: number
   scroll?: boolean
+  /** DEC-131 — a + at the right of the section pills that opens the house
+   *  capture prompt (the assistant's Attention tab wears it). */
+  onCapture?: () => void
 }): JSX.Element {
   const allItems = useAttentionItems()
   const items = itemsOverride ?? allItems
@@ -381,6 +385,17 @@ export function AttentionWidget({
             <Icon name={s.icon} size={13} />
           </button>
         ))}
+        {onCapture && (
+          <button
+            onClick={onCapture}
+            title="Capture a new attention item"
+            aria-label="Capture a new attention item"
+            data-testid="attention-widget-capture"
+            className="ml-auto inline-flex items-center justify-center h-6 w-6 rounded-full bg-accent/10 text-[rgb(var(--accent))] hover:bg-accent/20 fb-press"
+          >
+            <Icon name="add" size={14} />
+          </button>
+        )}
       </div>
       <button onClick={goAttention} className="mt-2 flex items-center gap-2 fb-press text-left">
         <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{current.label}</span>
