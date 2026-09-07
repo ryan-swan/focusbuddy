@@ -4436,3 +4436,21 @@ equal the Timeline card's; its left and right edges match the Timeline's and
 the Record pane's, 16px apart; the title, the meta line, Desk, Export and
 Delete all lie inside the card; the avatar ring colour equals the card's
 fill. Suite: 3,896 tests / 356 files; typecheck clean.
+
+## DEC-135 · addendum — "Now do the same for the Notes and New meeting headers" (verification only, no code)
+**Date:** 2026-09-07 · **Status:** VERIFIED, NOTHING TO CHANGE · **Branch:** `ryan-assistant`
+The detail header is one component (`MeetingDetail` → `meet-detail-header`),
+rendered for every meeting, on the Meetings page and inside the Office
+shell's Meet surface alike (`PlexiOfficeShell` mounts the same
+`PlexiMeetView`). Opened "Notes" (transcript pasted, no desk, no speakers)
+and "New meeting" (notes only) on the operator's running dev app: both
+headers already sit on the DEC-135 card — title, status pill, date (and
+duration where there is one) on the left, Export and Delete on the right —
+with the Record and Transcript panes directly beneath (no Timeline, since
+neither has segments). Only the dev instance is running (PID 97113, CDP
+9223) and no packaged Plexii is installed, so there is no second build that
+could show the old bare header. Screenshots `peek-notes.png` /
+`peek-new-meeting.png` sent to the operator. A probe-harness fault surfaced
+here and is fixed in the verification memory: the finally-block restored
+only four view kinds and left the operator on Home when they had been on the
+Office view — restore the whole view object from now on.

@@ -255,7 +255,8 @@
 > 3,896 tests / 356 files. **DEC-135**: the meeting detail header sits on
 > a house card (the Timeline's own material), edge to edge with the cards
 > below it, the speaker avatars ringed in the card's fill. 4/4 live; suite
-> 3,896 tests / 356 files.
+> 3,896 tests / 356 files. Addendum: "Notes" and "New meeting" already carry
+> it (one component) — verified on the running app, no code.
 
 **Last updated:** 2026-09-07 — through DEC-135 on `ryan-assistant` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
