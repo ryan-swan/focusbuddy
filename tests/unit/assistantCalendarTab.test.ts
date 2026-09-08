@@ -28,7 +28,18 @@ describe('dec_131 — the month at a glance (pure)', () => {
     expect(cells[0].getDate()).toBe(30) // Aug 30
     expect(cells[2].getDate()).toBe(1)
     expect(cells[41].getDate()).toBe(10) // Oct 10
-    for (let i = 1; i < cells.length; i++) expect(cells[i].getTime() - cells[i - 1].getTime()).toBe(24 * 60 * 60 * 1000)
+    // Consecutive CALENDAR days at local midnight, not a fixed 24h delta. A day
+    // is not always 86400000ms: this grid spans 30 Aug to 10 Oct 2026, and a
+    // daylight-saving transition inside that range makes one day 23 hours, so
+    // the fixed-delta assertion failed anywhere observing DST in that window
+    // (Australia/Adelaide) while passing under UTC. monthCells already steps by
+    // calendar date and was correct; only the assertion assumed otherwise.
+    for (let i = 1; i < cells.length; i++) {
+      const prev = cells[i - 1]
+      const nextDay = new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() + 1)
+      expect(cells[i].getTime()).toBe(nextDay.getTime())
+      expect(cells[i].getHours()).toBe(0)
+    }
   })
   it('a picked day opens on 9:00; today opens on the next round half hour', () => {
     const tomorrow = new Date(2026, 8, 8)
