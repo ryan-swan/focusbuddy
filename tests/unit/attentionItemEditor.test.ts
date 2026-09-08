@@ -222,7 +222,9 @@ describe('DEC-045 — the Attention widget on any desk', () => {
     const cat = read('src/renderer/src/lib/widgetCatalog.ts')
     expect(cat).toContain("kind: 'attention'")
     expect(cat).toContain('{"scope":"desk"}') // desk is the DEFAULT
-    expect(read('src/renderer/src/components/Canvas.tsx')).toContain('<DeskAttentionWidget widget={w} />')
+    expect(read('src/renderer/src/components/widgets/renderWidget.tsx')).toContain(
+      '<DeskAttentionWidget widget={w} />'
+    )
   })
 
   it('it is a REAL widget: framed, draggable, layered like every other kind', () => {

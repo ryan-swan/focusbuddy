@@ -11,6 +11,14 @@ export type HomeWidgetId =
   | 'quick'
   | 'activity'
   | 'pinned-desk'
+  // A real, editable object lifted off a desk onto a dashboard, and a real
+  // office document rendered in its own editor. Both are live: what you type
+  // here is written to the same row the desk reads.
+  | 'desk-widget'
+  | 'office-document'
+  // People's former home screen, kept whole as a widget so turning that page
+  // into a personalisable grid loses none of what was on it.
+  | 'people-home'
   | 'room-portal'
   | 'quick-links'
   | 'shortcuts'
@@ -67,6 +75,12 @@ export type ShortcutTarget =
 
 export interface HomeWidgetConfig {
   deskId?: string
+  // desk-widget: the object lifted onto the dashboard, and the desk it lives on
+  // (kept so the card can offer "open on its desk" and survive a store miss).
+  widgetId?: string
+  // office-document: the fb_documents row this card edits.
+  documentId?: string
+  documentTitle?: string
   roomId?: string
   routes?: string[]
   // Shortcuts: the box name and its tiles.
@@ -94,6 +108,12 @@ export interface HomeWidgetInstance {
 // its content genuinely supports, plus the size it arrives at.
 export type WidgetSize = 'icon' | 'sm' | 'md' | 'lg' | 'stack'
 
+// Which dashboard a widget is offered on. Home, Office, People and Brain each
+// render the same engine with their own saved layout, so the catalogue is
+// scoped rather than duplicated. A def with no `surfaces` is offered everywhere.
+export type DashboardSurface = 'home' | 'office' | 'people' | 'brain'
+export const DASHBOARD_SURFACES: DashboardSurface[] = ['home', 'office', 'people', 'brain']
+
 export interface HomeWidgetDef {
   id: HomeWidgetId
   name: string
@@ -105,7 +125,9 @@ export interface HomeWidgetDef {
   // others are singletons: the gallery shows them as Added once placed.
   multi?: boolean
   // Which picker must run before this widget can be placed.
-  config?: 'desk' | 'room' | 'conversation'
+  config?: 'desk' | 'room' | 'conversation' | 'desk-widget' | 'document'
+  // Dashboards this widget appears on. Absent = every dashboard.
+  surfaces?: DashboardSurface[]
   // Retired widgets stay in the id union and this registry so stored layouts
   // keep loading (and migrating) sanely, but the gallery never offers them.
   retired?: boolean
@@ -125,6 +147,9 @@ export const HOME_WIDGET_DEFS: HomeWidgetDef[] = [
   // Navigation
   { id: 'navigator', name: 'Rooms and desks', blurb: 'Browse rooms on the left, their desks open to the right', icon: 'meeting_room', tint: 'bg-sky-500/10 text-sky-500', category: 'Navigation', defaultCol: 'main', sizes: ['lg'], defaultSize: 'lg' },
   { id: 'pinned-desk', name: 'Pinned desk', blurb: 'One desk you care about, one click away', icon: 'push_pin', tint: 'bg-violet-500/10 text-violet-500', category: 'Navigation', multi: true, config: 'desk', defaultCol: 'rail', sizes: ['sm', 'md'], defaultSize: 'sm' },
+  { id: 'people-home', name: 'Team status', blurb: 'Who is around, standups and team activity', icon: 'groups', tint: 'bg-indigo-500/10 text-indigo-500', category: 'Live', surfaces: ['people'], defaultCol: 'main', sizes: ['lg'], defaultSize: 'lg' },
+  { id: 'desk-widget', name: 'Desk object', blurb: 'One object from a desk, live and editable right here', icon: 'widgets', tint: 'bg-emerald-500/10 text-emerald-500', category: 'Navigation', multi: true, config: 'desk-widget', defaultCol: 'main', sizes: ['sm', 'md', 'lg'], defaultSize: 'md' },
+  { id: 'office-document', name: 'Office document', blurb: 'A doc, sheet or deck in its own editor, live and editable', icon: 'description', tint: 'bg-sky-500/10 text-sky-500', category: 'Navigation', multi: true, config: 'document', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'lg' },
   { id: 'room-portal', name: 'Room portal', blurb: 'A single room and the desks inside it', icon: 'door_open', tint: 'bg-teal-500/10 text-teal-500', category: 'Navigation', multi: true, config: 'room', defaultCol: 'main', sizes: ['md', 'lg'], defaultSize: 'lg' },
   // Absorbed by Shortcuts (2026-08-21): stored quick-links instances migrate
   // to a Shortcuts box with section targets at load.

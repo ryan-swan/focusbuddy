@@ -1,6 +1,7 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
+import { useWidgetSurface } from '../../lib/widgetSurface'
 import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
 import WidgetSetupAffordance from './WidgetSetupAffordance'
@@ -78,6 +79,9 @@ export default function WidgetFrame({
   // position explicitly), then fall back to the PinLayoutContext provided
   // by Canvas's pinned-layer. The context approach avoids prop-drilling
   // through every kind-specific widget component.
+  // A dashboard renders the same object with the same component; it just has to
+  // fill its card instead of sitting at its desk coordinates.
+  const embedded = useWidgetSurface() === 'embedded'
   const contextZonePosition = useZonePosition(widget.id)
   const zonePosition = zonePositionProp ?? contextZonePosition
   const update = useWidgetStore((s) => s.update)
@@ -665,10 +669,14 @@ export default function WidgetFrame({
               height: widget.height
             }
       }
-      position={controlledPos}
-      size={controlledSize}
+      position={embedded ? { x: 0, y: 0 } : controlledPos}
+      size={embedded ? { width: '100%', height: '100%' } : controlledSize}
       scale={effectiveScale}
-      style={{ zIndex: widget.zIndex, position: 'absolute', pointerEvents: 'auto' }}
+      style={
+        embedded
+          ? { position: 'relative', width: '100%', height: '100%', pointerEvents: 'auto' }
+          : { zIndex: widget.zIndex, position: 'absolute', pointerEvents: 'auto' }
+      }
       minWidth={180}
       minHeight={120}
       dragHandleClassName={draggableHandleClass}
@@ -676,9 +684,11 @@ export default function WidgetFrame({
       // must NOT start a drag — otherwise react-draggable swallows the
       // double-click that opens the editor. `cancel` excludes it from dragging.
       cancel=".widget-nodrag"
-      disableDragging={dragDisabled}
+      disableDragging={embedded || dragDisabled}
       enableResizing={
-        useControlled
+        // Resizing on a dashboard would write a size back to the desk the
+        // object still lives on.
+        embedded || useControlled
           ? false
           : {
               top: true,

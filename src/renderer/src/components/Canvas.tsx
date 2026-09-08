@@ -6,34 +6,9 @@ import { useWidgetStore } from '../stores/widgets'
 import { useMessagingStore } from '../stores/messaging'
 import { useConnectedAppsStore } from '../stores/connectedApps'
 import { CONNECTED_APP_DRAG_MIME } from './Sidebar'
-import WidgetErrorBoundary from './WidgetErrorBoundary'
-import StickyWidget from './widgets/StickyWidget'
-import ImageGenWidget from './widgets/ImageGenWidget'
-import WebViewWidget from './widgets/WebViewWidget'
-import NoteWidget from './widgets/NoteWidget'
-import MarkdownWidget from './widgets/MarkdownWidget'
-import TaskLinkWidget from './widgets/TaskLinkWidget'
-import LocalAppLauncherWidget from './widgets/LocalAppLauncherWidget'
-import FileWidget from './widgets/FileWidget'
-import DriveWidget from './widgets/DriveWidget'
-import FieldWidget from './widgets/FieldWidget'
-import PageWidget from './widgets/PageWidget'
-import LivingDocWidget from './widgets/LivingDocWidget'
-import ChatThreadWidget from './widgets/ChatThreadWidget'
 import DeskPresenceBar from './DeskPresenceBar'
-import TableWidget from './widgets/TableWidget'
-import ChartWidget from './widgets/ChartWidget'
-import OfficeDocWidget from './widgets/OfficeDocWidget'
 import OfficeDocAddDialog from './widgets/OfficeDocAddDialog'
-import CalculatorWidget from './widgets/CalculatorWidget'
-import ColorWidget from './widgets/ColorWidget'
-import ImageWidget from './widgets/ImageWidget'
-import VideoWidget from './widgets/VideoWidget'
-import TimerWidget from './widgets/TimerWidget'
-import SectionWidget from './widgets/SectionWidget'
-import StreamDeckWidget from './widgets/StreamDeckWidget'
 import WidgetFocusMode from './WidgetFocusMode'
-import { DeskAttentionWidget } from './views/attentionWidgets'
 import ExtensionPrompt from './ExtensionPrompt'
 import AISetupDialog from './AISetupDialog'
 import SaveTemplateDialog from './SaveTemplateDialog'
@@ -55,18 +30,6 @@ import DeskGallery from './DeskGallery'
 import ColumnsView from './ColumnsView'
 import DeskDataViews, { type DataLayout } from './views/DeskDataViews'
 import { useDeskViewStore } from '../stores/deskView'
-import VoiceRecorderWidget from './widgets/VoiceRecorderWidget'
-import MeetingRecordWidget from './widgets/MeetingRecordWidget'
-import MindMapWidget from './widgets/MindMapWidget'
-import DiagramWidget from './widgets/DiagramWidget'
-import ScratchpadWidget from './widgets/ScratchpadWidget'
-import ShapeWidget from './widgets/ShapeWidget'
-import CardWidget from './widgets/CardWidget'
-import CustomBlockWidget from './widgets/CustomBlockWidget'
-import AgentWidget from './widgets/AgentWidget'
-import WebhookWidget from './widgets/WebhookWidget'
-import InboundHookWidget from './widgets/InboundHookWidget'
-import PortalWidget from './widgets/PortalWidget'
 import ZoomControls from './ZoomControls'
 import CanvasEdgeIndicators from './CanvasEdgeIndicators'
 import { useEdgePan } from '../lib/useEdgePan'
@@ -172,117 +135,8 @@ const EMPTY_OVERLAY_OBJECTS: never[] = []
 const WEB_KINDS: WidgetKind[] = ['webview', 'pdf', 'gdoc', 'gsheet', 'gslide', 'email']
 const isWebKind = (k: WidgetKind): boolean => WEB_KINDS.includes(k)
 
-// Wrap every widget in its own error boundary so one widget throwing during
-// render degrades to a small in-place "hit a problem" card instead of unmounting
-// the whole canvas. Section children route through renderWidget too (see the
-// 'section' case), so they are isolated the same way.
-function renderWidget(w: Widget): JSX.Element | null {
-  const inner = renderWidgetInner(w)
-  if (inner === null) return null
-  return (
-    <WidgetErrorBoundary widgetId={w.id} label={w.title || w.kind}>
-      {inner}
-    </WidgetErrorBoundary>
-  )
-}
+import { renderWidget } from './widgets/renderWidget'
 
-function renderWidgetInner(w: Widget): JSX.Element | null {
-  switch (w.kind) {
-    case 'sticky':
-      return <StickyWidget widget={w} />
-    case 'image-gen':
-      return <ImageGenWidget widget={w} />
-    case 'note':
-      return <NoteWidget widget={w} />
-    case 'markdown':
-      return <MarkdownWidget widget={w} />
-    case 'task-link':
-      return <TaskLinkWidget widget={w} />
-    case 'local-app-launcher':
-      return <LocalAppLauncherWidget widget={w} />
-    case 'file':
-      return <FileWidget widget={w} />
-    case 'drive':
-      return <DriveWidget widget={w} />
-    case 'field':
-      return <FieldWidget widget={w} />
-    case 'page':
-      return <PageWidget widget={w} />
-    case 'table':
-      return <TableWidget widget={w} />
-    case 'chart':
-      return <ChartWidget widget={w} />
-    case 'doc':
-    case 'sheet':
-    case 'slides':
-    case 'map':
-    case 'design':
-      return <OfficeDocWidget widget={w} />
-    case 'calculator':
-      return <CalculatorWidget widget={w} />
-    case 'color':
-      return <ColorWidget widget={w} />
-    case 'image':
-      return <ImageWidget widget={w} />
-    case 'video':
-      return <VideoWidget widget={w} />
-    case 'timer':
-      return <TimerWidget widget={w} />
-    case 'streamdeck':
-      return <StreamDeckWidget widget={w} />
-    case 'minimap':
-      // Deprecated: the minimap is now the always-present corner FAB
-      // (CanvasMinimapFAB). A stored legacy minimap widget must NEVER render —
-      // it would float mid-canvas at its world position (drifting with pan/zoom)
-      // and duplicate the FAB, which is exactly the "minimap in the middle,
-      // showing twice" bug. The migration effect below also deletes them from
-      // storage; this guarantees they are invisible even before that runs.
-      return null
-    case 'attention':
-      // DEC-045: the desk-scoped command-center face (CR-09 D-B).
-      return <DeskAttentionWidget widget={w} />
-    case 'voice-recorder':
-      return <VoiceRecorderWidget widget={w} />
-    case 'meeting-record':
-      // C5 — the Record on the meeting's own desk, provenance intact.
-      return <MeetingRecordWidget widget={w} />
-    case 'mindmap':
-      return <MindMapWidget widget={w} />
-    case 'diagram':
-      return <DiagramWidget widget={w} />
-    case 'scratchpad':
-      return <ScratchpadWidget widget={w} />
-    case 'shape':
-      return <ShapeWidget widget={w} />
-    case 'card':
-      return <CardWidget widget={w} />
-    case 'custom-block':
-      return <CustomBlockWidget widget={w} />
-    case 'agent':
-      return <AgentWidget widget={w} />
-    case 'webhook':
-      return <WebhookWidget widget={w} />
-    case 'inbound-hook':
-      return <InboundHookWidget widget={w} />
-    case 'portal':
-      return <PortalWidget widget={w} />
-    case 'living-doc':
-      return <LivingDocWidget widget={w} />
-    case 'section':
-      return <SectionWidget widget={w} renderChild={renderWidget} />
-    case 'webview':
-    case 'pdf':
-    case 'gdoc':
-    case 'gsheet':
-    case 'gslide':
-    case 'email':
-      return <WebViewWidget widget={w} />
-    case 'chat-thread':
-      return <ChatThreadWidget widget={w} />
-    default:
-      return null
-  }
-}
 
 const STATUS_META: Record<
   'open' | 'in_progress' | 'done' | 'parked',

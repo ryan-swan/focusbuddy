@@ -68,7 +68,7 @@ export function PlexiDeskShell({ initialApp }: { initialApp?: string } = {}): JS
 export function PlexiPeopleShell({ initialApp }: { initialApp?: string } = {}): JSX.Element {
   const enabled = useViewKindEnabled()
   const apps: GatedApp[] = [
-    { key: 'home', label: 'People Home', blurb: 'Team status and who is around', icon: 'groups', tint: 'bg-indigo-500', tone: 'text-indigo-500', render: () => <PeopleHomeView /> },
+    { key: 'home', label: 'People Home', blurb: 'Team status and who is around', icon: 'groups', tint: 'bg-indigo-500', tone: 'text-indigo-500', render: () => <HomeDashboard surface="people" /> },
     { key: 'directory', label: 'Directory', blurb: 'Everyone in your workspace', icon: 'badge', tint: 'bg-sky-500', tone: 'text-sky-500', render: () => <PeopleHomeView /> },
     { key: 'workspaces', label: 'Organisation', blurb: 'Members, roles, offices and profiles', icon: 'apartment', tint: 'bg-teal-500', tone: 'text-teal-500', render: () => <OrgAdminView />, gateKind: 'organization' },
     { key: 'map', label: 'Organisation Map', blurb: 'Everyone by office and reporting line', icon: 'account_tree', tint: 'bg-violet-500', tone: 'text-violet-500', render: () => <PeopleMapView />, gateKind: 'people-map' }
@@ -97,7 +97,8 @@ export function PlexiBrainShell({ initialApp }: { initialApp?: string } = {}): J
         subtitle: 'Your knowledge, search, automation and insights, with AI woven through.',
         icon: 'neurology',
         apps: [
-          { key: 'ask', label: 'Ask Brain', blurb: 'Your knowledge base, ask anything', icon: 'neurology', tint: 'bg-indigo-500', tone: 'text-indigo-500', render: () => <KnowledgeView /> },
+          { key: 'home', label: 'Brain Home', blurb: 'Your dashboard for what the workspace knows', icon: 'plexii:home', tint: 'bg-indigo-500', tone: 'text-indigo-500', render: () => <HomeDashboard surface="brain" /> },
+      { key: 'ask', label: 'Ask Brain', blurb: 'Your knowledge base, ask anything', icon: 'neurology', tint: 'bg-indigo-500', tone: 'text-indigo-500', render: () => <KnowledgeView /> },
           { key: 'search', label: 'Search', blurb: 'Find anything across your workspace', icon: 'search', tint: 'bg-sky-500', tone: 'text-sky-500', render: () => <PlexiSearchView /> },
           { key: 'map', label: 'Brain Map', blurb: 'Your knowledge as a linked graph', icon: 'bubble_chart', tint: 'bg-fuchsia-500', tone: 'text-fuchsia-500', render: () => <BrainMapView /> },
           { key: 'decisions', label: 'Decisions', blurb: 'What was decided, and what a change puts at risk', icon: 'gavel', tint: 'bg-red-500', tone: 'text-red-500', render: () => <DecisionsView /> },

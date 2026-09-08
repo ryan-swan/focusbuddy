@@ -41,7 +41,9 @@ const read = (p: string): string => readFileSync(join(ROOT, p), 'utf-8')
 
 describe('C5 wiring pins', () => {
   const types = read('src/shared/types.ts')
-  const canvas = read('src/renderer/src/components/Canvas.tsx')
+  // The live widget dispatcher moved out of Canvas so a dashboard can render
+  // a real, editable widget through the same switch.
+  const canvas = read('src/renderer/src/components/widgets/renderWidget.tsx')
   const widget = read('src/renderer/src/components/widgets/MeetingRecordWidget.tsx')
   const wrapup = read('src/renderer/src/stores/wrapup.ts')
   const card = read('src/renderer/src/components/MeetingCommitmentsCard.tsx')

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import HomeDashboard from '../views/HomeDashboard'
 import { useDocumentsStore } from '../../stores/documents'
 import { useViewStore } from '../../stores/view'
 import { useAccountStore } from '../../stores/account'
@@ -82,6 +83,9 @@ interface CommsApp {
   render: () => JSX.Element
 }
 const COMMS_APPS: CommsApp[] = [
+  // Office gains a dashboard of its own: the same personalisable grid Home
+  // uses, so a document you live in can sit here instead of being re-opened.
+  { key: 'home', label: 'Office Home', blurb: 'Your dashboard for documents and comms', icon: 'plexii:home', tint: 'bg-indigo-500', tone: 'text-indigo-500', render: () => <HomeDashboard surface="office" /> },
   { key: 'mail', label: 'Mail', blurb: 'Your email inbox', icon: 'mail', tint: 'bg-rose-500', tone: 'text-rose-500', render: () => <MailView /> },
   { key: 'inbox', label: 'Inbox', blurb: 'Notifications and share invites', icon: 'inbox', tint: 'bg-amber-500', tone: 'text-amber-500', render: () => <InboxView /> },
   { key: 'chat', label: 'Chat', blurb: 'Channels and direct messages', icon: 'forum', tint: 'bg-sky-500', tone: 'text-sky-500', render: () => <MessagesView /> },

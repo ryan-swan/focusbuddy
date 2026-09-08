@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  DeskWidgetCard,
+  OfficeDocumentCard,
+  DeskWidgetPicker,
+  DocumentPicker
+} from './dashboardEmbeds'
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
@@ -54,6 +60,8 @@ import {
   DiscoverWidget,
   conversationName
 } from './homeWidgets'
+import type { DashboardSurface } from './homeWidgetDefs'
+import PeopleHomeView from './PeopleHomeView'
 import {
   AttentionWidget,
   AttentionQueueWidget,
@@ -149,6 +157,43 @@ interface HomeLayout {
   rail: HomeWidgetInstance[]
 }
 
+// Each dashboard opens with a layout that suits it. Home keeps the layout it
+// has always had; the three new surfaces open on widgets that mean something
+// there, with People leading on the view that used to BE its home screen so
+// nothing is lost by turning that page into a grid.
+const STOCK_BY_SURFACE: Record<Exclude<DashboardSurface, 'home'>, HomeLayout> = {
+  office: {
+    main: [
+      { key: 'office-document', widget: 'office-document' },
+      { key: 'continue', widget: 'continue' }
+    ],
+    rail: [
+      { key: 'quick', widget: 'quick' },
+      { key: 'activity', widget: 'activity' }
+    ]
+  },
+  people: {
+    main: [
+      { key: 'people-home', widget: 'people-home' },
+      { key: 'standup', widget: 'standup' }
+    ],
+    rail: [
+      { key: 'agenda', widget: 'agenda' },
+      { key: 'activity', widget: 'activity' }
+    ]
+  },
+  brain: {
+    main: [
+      { key: 'navigator', widget: 'navigator' },
+      { key: 'continue', widget: 'continue' }
+    ],
+    rail: [
+      { key: 'pulse', widget: 'pulse' },
+      { key: 'activity', widget: 'activity' }
+    ]
+  }
+}
+
 const STOCK_LAYOUT: HomeLayout = {
   main: [
     { key: 'standup', widget: 'standup' },
@@ -227,7 +272,11 @@ const GRID = {
 // v2 reader) migrate on first load — main-column widgets arrive large, rail
 // widgets small — and the v2 key is never deleted, so rolling back to a
 // pre-grid build finds the user's old layout intact.
-const FLAT_KEY = 'home.layout.v3'
+// Home keeps the original key so an existing layout survives untouched; the
+// other dashboards get their own, so each personalises independently.
+function flatKey(surface: DashboardSurface): string {
+  return surface === 'home' ? 'home.layout.v3' : `home.layout.v3.${surface}`
+}
 const SIZE_VALUES: readonly string[] = ['icon', 'sm', 'md', 'lg', 'stack']
 
 // The packing runs in half-cell subunits (see homeGridLayout.ts): same gap,
@@ -237,9 +286,16 @@ const SUBROW_H = (GRID.cellH - GRID.gap) / 2
 
 const STOCK_FLAT: SizedInstance[] = sizedFromColumns(STOCK_LAYOUT.main, STOCK_LAYOUT.rail)
 
-function loadFlat(): SizedInstance[] {
+function stockFlatFor(surface: DashboardSurface): SizedInstance[] {
+  if (surface === 'home') return STOCK_FLAT
+  const l = STOCK_BY_SURFACE[surface]
+  return sizedFromColumns(l.main, l.rail)
+}
+
+function loadFlat(surface: DashboardSurface): SizedInstance[] {
+  const stock = stockFlatFor(surface)
   try {
-    const raw = localStorage.getItem(FLAT_KEY)
+    const raw = localStorage.getItem(flatKey(surface))
     if (raw) {
       const parsed = JSON.parse(raw) as { widgets?: unknown }
       const seen = new Set<string>()
@@ -258,27 +314,31 @@ function loadFlat(): SizedInstance[] {
           .map(migrateQuickLinks)
           .map((it) => ({ ...it, size: clampSize(widgetDef(it.widget), it.size) }))
     }
+    // The v1/v2 migration only ever applied to Home; the other dashboards are
+    // new and have nothing to migrate from.
+    if (surface !== 'home') return stock
     const legacy = loadLayout()
     // Absorb quick-links before sizing so the columns carry Shortcuts defs.
     const migrated = sizedFromColumns(legacy.main.map(migrateQuickLinks), legacy.rail.map(migrateQuickLinks))
-    return migrated.length > 0 ? migrated : STOCK_FLAT
+    return migrated.length > 0 ? migrated : stock
   } catch {
-    return STOCK_FLAT
+    return stock
   }
 }
 
-function saveFlat(flat: SizedInstance[]): void {
+function saveFlat(surface: DashboardSurface, flat: SizedInstance[]): void {
   try {
-    localStorage.setItem(FLAT_KEY, JSON.stringify({ widgets: flat }))
+    localStorage.setItem(flatKey(surface), JSON.stringify({ widgets: flat }))
   } catch {
     /* ignore quota */
   }
 }
 
-function flatIsStock(flat: SizedInstance[]): boolean {
+function flatIsStock(surface: DashboardSurface, flat: SizedInstance[]): boolean {
+  const stock = stockFlatFor(surface)
   return (
-    flat.length === STOCK_FLAT.length &&
-    flat.every((it, i) => it.widget === STOCK_FLAT[i].widget && it.size === STOCK_FLAT[i].size)
+    flat.length === stock.length &&
+    flat.every((it, i) => it.widget === stock[i].widget && it.size === stock[i].size)
   )
 }
 
@@ -302,7 +362,9 @@ function roomTint(id: string): string {
 
 const TOP_LEVEL = '__top__'
 
-export default function HomeDashboard(): JSX.Element {
+export default function HomeDashboard({
+  surface = 'home'
+}: { surface?: DashboardSurface } = {}): JSX.Element {
   const v = useViewStore()
   const account = useAccountStore((s) => s.account)
 
@@ -326,7 +388,7 @@ export default function HomeDashboard(): JSX.Element {
   const [now, setNow] = useState(() => Date.now())
 
   // The sized widget list, rendered as one packed grid. Order IS the layout.
-  const [flat, setFlat] = useState<SizedInstance[]>(() => loadFlat())
+  const [flat, setFlat] = useState<SizedInstance[]>(() => loadFlat(surface))
   // A pointer drag in flight. React state carries only identity and the
   // settling flag; per-frame position rides motion values so pointer moves
   // never re-render.
@@ -351,7 +413,7 @@ export default function HomeDashboard(): JSX.Element {
   // with the result — place at a position, swap an instance, or edit in place.
   const [picker, setPicker] = useState<{
     widget: HomeWidgetId
-    kind: 'desk' | 'room' | 'conversation'
+    kind: 'desk' | 'room' | 'conversation' | 'desk-widget' | 'document'
     initial?: HomeWidgetConfig
     apply: (config: HomeWidgetConfig) => void
   } | null>(null)
@@ -523,7 +585,7 @@ export default function HomeDashboard(): JSX.Element {
   const commitFlat = (next: SizedInstance[]): void => {
     flatRef.current = next
     setFlat(next)
-    saveFlat(next)
+    saveFlat(surface, next)
   }
 
   const findInstance = (key: string): SizedInstance | null =>
@@ -592,7 +654,7 @@ export default function HomeDashboard(): JSX.Element {
   const isPlaced = (id: HomeWidgetId): boolean => flat.some((it) => it.widget === id)
 
   const resetLayout = (): void => {
-    commitFlat(STOCK_FLAT)
+    commitFlat(stockFlatFor(surface))
     setSwapKey(null)
   }
 
@@ -624,6 +686,49 @@ export default function HomeDashboard(): JSX.Element {
         // Add desk pins another desk: it places a fresh pinned-desk widget,
         // running the desk picker first.
         return <PinnedDeskWidget deskId={inst.config?.deskId} onAddAnother={() => placeWidget('pinned-desk')} />
+      case 'people-home':
+        // The whole former People home page, now one widget on its own grid.
+        return <PeopleHomeView />
+      case 'desk-widget':
+        // The real object, live and editable. Re-picking replaces this card's
+        // target rather than placing another.
+        return (
+          <DeskWidgetCard
+            deskId={inst.config?.deskId}
+            widgetId={inst.config?.widgetId}
+            onPick={() =>
+              setPicker({
+                widget: 'desk-widget',
+                kind: 'desk-widget',
+                apply: (cfg) =>
+                  commitFlat(
+                    flatRef.current.map((it) =>
+                      it.key === inst.key ? { ...it, config: { ...it.config, ...cfg } } : it
+                    )
+                  )
+              })
+            }
+          />
+        )
+      case 'office-document':
+        return (
+          <OfficeDocumentCard
+            documentId={inst.config?.documentId}
+            documentTitle={inst.config?.documentTitle}
+            onPick={() =>
+              setPicker({
+                widget: 'office-document',
+                kind: 'document',
+                apply: (cfg) =>
+                  commitFlat(
+                    flatRef.current.map((it) =>
+                      it.key === inst.key ? { ...it, config: { ...it.config, ...cfg } } : it
+                    )
+                  )
+              })
+            }
+          />
+        )
       case 'room-portal':
         return <RoomPortalWidget roomId={inst.config?.roomId} size={size} />
       case 'shortcuts':
@@ -1194,7 +1299,7 @@ export default function HomeDashboard(): JSX.Element {
             </p>
           </motion.div>
           <div className="flex items-center gap-2">
-            {customize && !flatIsStock(flat) && (
+            {customize && !flatIsStock(surface, flat) && (
               <button
                 onClick={resetLayout}
                 data-testid="home-layout-reset"
@@ -1306,6 +1411,7 @@ export default function HomeDashboard(): JSX.Element {
       <AnimatePresence>
         {gallery && (
           <WidgetPickerOverlay
+            surface={surface}
             isPlaced={isPlaced}
             swapTarget={swapKey ? findInstance(swapKey) : null}
             cellW={gridMetrics()?.cellW ?? 132}
@@ -1334,7 +1440,28 @@ export default function HomeDashboard(): JSX.Element {
         )}
       </AnimatePresence>
 
-      {picker && (
+      {/* The two embed pickers run their own flows (desk then object, or a
+          document list), so they are separate components rather than two more
+          branches in an already-crowded conditional. */}
+      {picker?.kind === 'desk-widget' && (
+        <DeskWidgetPicker
+          onCancel={() => setPicker(null)}
+          onConfirm={(cfg) => {
+            picker.apply(cfg)
+            setPicker(null)
+          }}
+        />
+      )}
+      {picker?.kind === 'document' && (
+        <DocumentPicker
+          onCancel={() => setPicker(null)}
+          onConfirm={(cfg) => {
+            picker.apply(cfg)
+            setPicker(null)
+          }}
+        />
+      )}
+      {picker && picker.kind !== 'desk-widget' && picker.kind !== 'document' && (
         <WidgetConfigPicker
           widget={picker.widget}
           kind={picker.kind}
@@ -1378,7 +1505,8 @@ function WidgetPickerOverlay({
   onAdd,
   onSwap,
   onClearSwap,
-  onClose
+  onClose,
+  surface
 }: {
   isPlaced: (id: HomeWidgetId) => boolean
   swapTarget: SizedInstance | null
@@ -1391,6 +1519,7 @@ function WidgetPickerOverlay({
   onSwap: (id: HomeWidgetId) => void
   onClearSwap: () => void
   onClose: () => void
+  surface: DashboardSurface
 }): JSX.Element {
   const CATEGORIES = ['All', 'Navigation', 'Live', 'Smart', 'Actions', 'Communication'] as const
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('All')
@@ -1402,6 +1531,9 @@ function WidgetPickerOverlay({
   const q = search.trim().toLowerCase()
   const visible = HOME_WIDGET_DEFS.filter((d) => {
     if (d.retired) return false
+    // A def with no `surfaces` belongs everywhere; one that names them is
+    // offered only on those dashboards.
+    if (d.surfaces && !d.surfaces.includes(surface)) return false
     if (category !== 'All' && d.category !== category) return false
     if (q && !`${d.name} ${d.blurb}`.toLowerCase().includes(q)) return false
     return true
@@ -1686,7 +1818,7 @@ function WidgetConfigPicker({
   onConfirm
 }: {
   widget: HomeWidgetId
-  kind: 'desk' | 'room' | 'conversation'
+  kind: 'desk' | 'room' | 'conversation' | 'desk-widget' | 'document'
   initial?: HomeWidgetConfig
   onCancel: () => void
   onConfirm: (config: HomeWidgetConfig) => void
