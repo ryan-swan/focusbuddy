@@ -2102,7 +2102,16 @@ const api = {
     setPaused: (deskId: string, paused: boolean): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke('liveDesk:setPaused', deskId, paused),
     stop: (deskId: string): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke('liveDesk:stop', deskId)
+      ipcRenderer.invoke('liveDesk:stop', deskId),
+    note: (deskId: string, skip: string | null): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('liveDesk:note', deskId, skip),
+    // Main announces the published desks; the renderer only listens. Pulling
+    // this with an invoke was a single point of silent failure.
+    onDesks: (cb: (rows: LiveDeskRecord[]) => void): (() => void) => {
+      const handler = (_e: unknown, rows: LiveDeskRecord[]): void => cb(rows)
+      ipcRenderer.on('liveDesk:desks', handler)
+      return () => ipcRenderer.removeListener('liveDesk:desks', handler)
+    }
   },
   documents: {
     list: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:list'),

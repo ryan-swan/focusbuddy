@@ -178,18 +178,38 @@ export function useLiveDeskPublisher(deskId: string | null): {
   // last sent. When nothing has changed the fingerprint matches and it costs
   // one comparison.
   useEffect(() => {
-    if (!deskId || !status.token || status.paused) return
+    if (!deskId) return
+    if (!status.token || status.paused) {
+      void window.api.liveDesk.note(deskId, status.paused ? 'paused' : 'no share token loaded')
+      return
+    }
     const tick = (): void => {
+      // Every branch reports what it decided. Silence was the actual bug: a
+      // desk could sit unpublished for an hour and the only evidence was an
+      // old timestamp.
       const projection = build()
-      if (!projection) return
+      if (!projection) {
+        void window.api.liveDesk.note(deskId, storeHasDesk ? 'no projection built' : 'desk contents unknown')
+        return
+      }
       const fingerprint = projectionFingerprint(projection)
-      if (fingerprint === lastSentRef.current) return
+      if (fingerprint === lastSentRef.current) {
+        void window.api.liveDesk.note(deskId, null)
+        return
+      }
       lastSentRef.current = fingerprint
-      void window.api.liveDesk.publish(deskId, projection).then(() => void refresh())
+      void window.api.liveDesk
+        .publish(deskId, projection)
+        .then(() => void refresh())
+        .catch((e: unknown) => {
+          // An IPC rejection here used to vanish: `void` with no catch is an
+          // unhandled rejection and nothing reaches the share panel.
+          void window.api.liveDesk.note(deskId, `publish threw: ${String(e).slice(0, 80)}`)
+        })
     }
     const timer = setInterval(tick, RECONCILE_MS)
     return () => clearInterval(timer)
-  }, [deskId, status.token, status.paused, build, refresh])
+  }, [deskId, status.token, status.paused, storeHasDesk, build, refresh])
 
   // Fetch the bodies the projection needs, then rebuild. Publishing waits for
   // this rather than shipping placeholders where real content exists: a public

@@ -9,6 +9,7 @@ import {
   recordPublishError,
   setLiveDeskPaused,
   removeLiveDesk,
+  recordCheck,
   type LiveDeskRecord
 } from './db/liveDesks'
 
@@ -194,6 +195,11 @@ export async function stopLiveDesk(deskId: string): Promise<{ ok: boolean; error
   }
   removeLiveDesk(deskId)
   return { ok: true }
+}
+
+/** The renderer reports what it decided, so a silent no-op leaves a trace. */
+export function noteCheck(deskId: string, skip: string | null): void {
+  recordCheck(deskId, skip)
 }
 
 export function liveDeskFor(deskId: string): LiveDeskRecord | null {

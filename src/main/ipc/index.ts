@@ -6,6 +6,7 @@ import {
   uploadLiveAsset,
   setLivePaused,
   stopLiveDesk,
+  noteCheck,
   liveDeskFor,
   allLiveDesks
 } from '../livePublisher'
@@ -1141,7 +1142,20 @@ export function registerIpcHandlers(): void {
   // sanitized projection (src/renderer/src/lib/publicDeskProjection.ts); these
   // handlers get it to Signal and report what is actually live.
   ipcMain.handle('liveDesk:get', (_e, deskId: string) => liveDeskFor(deskId))
-  ipcMain.handle('liveDesk:list', () => allLiveDesks())
+  // Returned as plain objects built here rather than whatever the row mapper
+  // produced: an IPC result has to survive structured cloning, and a value that
+  // does not makes invoke() hang rather than reject, which is invisible.
+  ipcMain.handle('liveDesk:list', () =>
+    allLiveDesks().map((d) => ({
+      deskId: String(d.deskId),
+      token: String(d.token),
+      revision: Number(d.revision),
+      lastPublishedAt: d.lastPublishedAt === null ? null : Number(d.lastPublishedAt),
+      lastError: d.lastError === null ? null : String(d.lastError),
+      paused: Boolean(d.paused),
+      createdAt: Number(d.createdAt)
+    }))
+  )
   ipcMain.handle('liveDesk:start', (_e, deskId: string, fromHandle?: string) =>
     createLiveDesk(deskId, fromHandle)
   )
@@ -1160,6 +1174,50 @@ export function registerIpcHandlers(): void {
     setLivePaused(deskId, paused)
   )
   ipcMain.handle('liveDesk:stop', (_e, deskId: string) => stopLiveDesk(deskId))
+  // The renderer reports each publishing decision, including the decision not
+  // to publish, so "nothing happened" is distinguishable from "nothing ran".
+  // Main announces which desks are published, rather than the renderer asking.
+  //
+  // The renderer used to pull this with an invoke, and that invoke stopped
+  // settling -- neither resolving nor rejecting -- which disabled publishing
+  // completely and silently, because every branch that would have reported the
+  // problem was downstream of the call that hung. Announcing removes the
+  // request from the critical path: the renderer only has to listen, and a
+  // missed broadcast is corrected by the next one.
+  const announceLiveDesks = (): void => {
+    try {
+      const rows = allLiveDesks().map((d) => ({
+        deskId: String(d.deskId),
+        token: String(d.token),
+        revision: Number(d.revision),
+        lastPublishedAt: d.lastPublishedAt === null ? null : Number(d.lastPublishedAt),
+        lastError: d.lastError === null ? null : String(d.lastError),
+        paused: Boolean(d.paused),
+        createdAt: Number(d.createdAt)
+      }))
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send('liveDesk:desks', rows)
+      }
+    } catch {
+      /* a desk index that cannot be read is not a reason to stop announcing */
+    }
+  }
+  setInterval(announceLiveDesks, 15_000)
+  setTimeout(announceLiveDesks, 4_000)
+
+  // Record at startup that the app is up and how many desks are published.
+  // Publishing is otherwise invisible until something goes wrong, and "the app
+  // never looked" and "the app looked and decided not to" are different faults.
+  try {
+    for (const d of allLiveDesks()) noteCheck(d.deskId, `main: app started, ${allLiveDesks().length} live`)
+  } catch {
+    /* a desk index that cannot be read is not a reason to fail startup */
+  }
+
+  ipcMain.handle('liveDesk:note', (_e, deskId: string, skip: string | null) => {
+    noteCheck(deskId, skip)
+    return { ok: true }
+  })
 
 
   // Share-link CRUD

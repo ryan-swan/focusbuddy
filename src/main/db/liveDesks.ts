@@ -28,7 +28,16 @@ interface Raw {
   created_at: number
 }
 
+// Run once per process. This used to re-run CREATE TABLE, a PRAGMA and two
+// conditional ALTERs on every single call -- including from a 15s timer and
+// every IPC -- which is both wasteful and, on a table another connection is
+// touching, a good way to stall the main process. Schema setup happens when the
+// module is first used and never again.
+let ensured = false
+
 function ensure(): void {
+  if (ensured) return
+  ensured = true
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS fb_live_desks (
       desk_id TEXT PRIMARY KEY,
@@ -40,6 +49,19 @@ function ensure(): void {
       created_at INTEGER NOT NULL
     );
   `)
+  // Why a desk is not publishing is as important as why a publish failed, and
+  // for a long time it was invisible: a desk could sit unpublished for an hour
+  // with last_error empty, because nothing had been attempted and nothing
+  // attempted leaves no trace.
+  const cols = new Set(
+    (getDb().prepare('PRAGMA table_info(fb_live_desks)').all() as { name: string }[]).map((c) => c.name)
+  )
+  if (!cols.has('last_check_at')) {
+    getDb().exec('ALTER TABLE fb_live_desks ADD COLUMN last_check_at INTEGER')
+  }
+  if (!cols.has('last_skip')) {
+    getDb().exec('ALTER TABLE fb_live_desks ADD COLUMN last_skip TEXT')
+  }
 }
 
 function hydrate(r: Raw): LiveDeskRecord {
@@ -87,6 +109,27 @@ export function upsertLiveDesk(deskId: string, token: string): LiveDeskRecord {
     )
     .run(deskId, token, Date.now())
   return getLiveDesk(deskId)!
+}
+
+/**
+ * Record that the publisher looked at this desk, and what it decided. `skip` is
+ * null when it went on to publish. This is the difference between "publishing
+ * is broken" and "publishing never ran", which took three rounds to tell apart
+ * without it.
+ */
+export function recordCheck(deskId: string, skip: string | null): void {
+  ensure()
+  // '*' records against every published desk. The renderer needs to report
+  // things it learns BEFORE it knows any desk id -- that it started at all,
+  // and whether listing the desks even succeeded -- and without that the trace
+  // was empty in exactly the case worth diagnosing.
+  if (deskId === '*') {
+    getDb().prepare('UPDATE fb_live_desks SET last_check_at = ?, last_skip = ?').run(Date.now(), skip)
+    return
+  }
+  getDb()
+    .prepare('UPDATE fb_live_desks SET last_check_at = ?, last_skip = ? WHERE desk_id = ?')
+    .run(Date.now(), skip, deskId)
 }
 
 export function recordPublish(deskId: string, revision: number): void {

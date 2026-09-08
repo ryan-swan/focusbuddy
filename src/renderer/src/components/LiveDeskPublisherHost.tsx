@@ -3,16 +3,23 @@ import { useLiveDeskPublisher } from '../lib/useLiveDeskPublisher'
 
 // Keeps every published desk current, for as long as the app is running.
 //
-// The publishing hook used to live only inside the share dialog's Live web view
-// panel, which meant a "live" desk was live exactly while its share panel was
-// on screen and frozen the rest of the time. Worse, the panel's last act on the
-// way out could be a publish built from a desk that was no longer loaded.
+// Publishing used to live inside the share dialog's Live web view panel, which
+// meant a "live" desk was live exactly while its share panel was on screen. It
+// belongs to the app, so it is mounted once at the root.
 //
-// Publishing belongs to the app, not to a dialog, so it is mounted once at the
-// root and runs for every desk that has a public link.
+// Which desks are published is ANNOUNCED by the main process rather than asked
+// for. The previous version pulled the list with an invoke, and that invoke
+// stopped settling -- neither resolving nor rejecting -- which disabled
+// publishing completely and silently, because every branch that would have
+// reported the problem sat downstream of the call that hung. Listening removes
+// the request from the critical path, and a missed announcement is corrected by
+// the next one.
 
 function DeskPublisher({ deskId }: { deskId: string }): null {
   useLiveDeskPublisher(deskId)
+  useEffect(() => {
+    void window.api.liveDesk.note(deskId, 'publisher mounted')
+  }, [deskId])
   return null
 }
 
@@ -20,28 +27,14 @@ export default function LiveDeskPublisherHost(): JSX.Element | null {
   const [deskIds, setDeskIds] = useState<string[]>([])
 
   useEffect(() => {
-    let cancelled = false
-    const load = (): void => {
-      void window.api.liveDesk
-        .list()
-        .then((rows) => {
-          if (cancelled) return
-          const next = rows.map((r) => r.deskId).sort()
-          // Replace only on a real change, so publishers are not torn down and
-          // remounted every poll.
-          setDeskIds((prev) => (prev.join(',') === next.join(',') ? prev : next))
-        })
-        .catch(() => {
-          /* the list is a convenience; a failed read just means no change */
-        })
-    }
-    load()
-    // Picks up a desk that was just published or stopped, without a restart.
-    const timer = setInterval(load, 15_000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
+    void window.api.liveDesk.note('*', 'renderer: host listening')
+    return window.api.liveDesk.onDesks((rows) => {
+      const next = rows.map((r) => r.deskId).sort()
+      void window.api.liveDesk.note('*', `renderer: announced ${rows.length}`)
+      // Replaced only on a real change, so publishers are not torn down and
+      // remounted on every announcement.
+      setDeskIds((prev) => (prev.join(',') === next.join(',') ? prev : next))
+    })
   }, [])
 
   if (deskIds.length === 0) return null

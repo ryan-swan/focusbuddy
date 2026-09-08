@@ -68,12 +68,15 @@ describe('publishing runs for as long as the app does', () => {
 
   it('publishes for every desk that has a public link', () => {
     expect(host).toContain('window.api.liveDesk')
-    expect(host).toContain('.list()')
     expect(host).toContain('deskIds.map((id) => (')
   })
 
-  it('picks up a newly published desk without a restart', () => {
-    expect(host).toContain('setInterval(load, 15_000)')
+  it('listens for the desk list rather than asking for it', () => {
+    // Pulling it with an invoke was a single point of silent failure: the call
+    // stopped settling, and every branch that could have reported that sat
+    // downstream of it.
+    expect(host).toContain('window.api.liveDesk.onDesks(')
+    expect(host).not.toContain('.list()')
   })
 
   it('does not remount its publishers on every poll', () => {
@@ -97,7 +100,7 @@ describe('a published desk converges on its own', () => {
 
   it('costs one comparison when nothing has changed', () => {
     const tick = src.slice(src.indexOf('const tick = ()'))
-    expect(tick.slice(0, 400)).toContain('if (fingerprint === lastSentRef.current) return')
+    expect(tick.slice(0, 900)).toContain('if (fingerprint === lastSentRef.current)')
   })
 
   it('publishes directly, so a failure is recorded rather than queued away', () => {
