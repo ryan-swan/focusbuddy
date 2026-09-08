@@ -24,14 +24,45 @@ interface PagCfg {
   onPages: ((count: number) => void) | null
 }
 
-const cfg: PagCfg = { enabled: false, pageContentPx: 0, gapPx: 0, mTop: 0, mBottom: 0, onPages: null }
+const DEFAULT_CFG: PagCfg = {
+  enabled: false,
+  pageContentPx: 0,
+  gapPx: 0,
+  mTop: 0,
+  mBottom: 0,
+  onPages: null
+}
 
-// The active plugin's re-measure hook, so a config change from React re-runs it.
-let repaginate: (() => void) | null = null
+// Configuration is PER EDITOR, not per module.
+//
+// It used to be a single module-level `cfg` plus a single `repaginate`, shared by
+// every editor alive in the window. That is fine with one editor and wrong with
+// two: a document open on a desk alongside another doc surface paginated against
+// the OTHER editor's page geometry, or against `enabled: false` left behind when
+// a sibling unmounted. The sheets are drawn from the page count this config
+// reports, so the count stopped growing while the content kept flowing — text
+// ran past the last sheet onto the canvas. It looked correct in the expanded
+// view only because a single editor made the shared state accidentally right.
+const configs = new WeakMap<object, PagCfg>()
+const repaginators = new WeakMap<object, () => void>()
 
-export function setPaginationConfig(next: Partial<PagCfg>): void {
-  Object.assign(cfg, next)
-  repaginate?.()
+function cfgFor(editor: object): PagCfg {
+  let c = configs.get(editor)
+  if (!c) {
+    c = { ...DEFAULT_CFG }
+    configs.set(editor, c)
+  }
+  return c
+}
+
+/** Test seam: read back one editor's effective configuration. */
+export function _paginationConfigFor(editor: object): Readonly<PagCfg> {
+  return cfgFor(editor)
+}
+
+export function setPaginationConfig(editor: object, next: Partial<PagCfg>): void {
+  Object.assign(cfgFor(editor), next)
+  repaginators.get(editor)?.()
 }
 
 export const paginationKey = new PluginKey<DecorationSet>('pagePagination')
@@ -195,7 +226,10 @@ function lineBoxesOf(dom: HTMLElement): LineBox[] {
 // flow makes the result stable: re-measuring with the spacers in place reproduces
 // the same natural positions and therefore the same breaks, so the
 // measure -> dispatch -> update loop settles.
-function computeDecorations(view: EditorView): { set: DecorationSet; pages: number; sig: string } {
+function computeDecorations(
+  view: EditorView,
+  cfg: PagCfg
+): { set: DecorationSet; pages: number; sig: string } {
   if (!cfg.enabled || cfg.pageContentPx <= 0) return { set: DecorationSet.empty, pages: 1, sig: 'off' }
   const { pageContentPx, gapPx, mTop, mBottom } = cfg
   const decos: Decoration[] = []
@@ -251,6 +285,15 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
         : null
       let rowPos = offset + 1
       let firstOnPage = true
+      // Which row of the TABLE we are on, as distinct from the first row on the
+      // current page. They are not the same thing, and conflating them left a
+      // hole: firstOnPage starts true for every table, so the table's own first
+      // row could never trigger a break. A table starting near the page bottom
+      // therefore drew its header row past the band and into the gap instead of
+      // moving down — measured at 13px past the band on page 6 of a generated
+      // report. The first row breaks BEFORE THE TABLE, moving it whole, which is
+      // what the generic path already does for a block's first line.
+      let rowIndex = 0
       // A repeated header eats the top of every continuation page, so those pages
       // hold less. Without this the rows are measured against a full-height band
       // they no longer have, and the shortfall compounds: each page starts one
@@ -263,7 +306,13 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
           const above = spacerAbove(r.top)
           const nTop = r.top - contentTop - above
           const nBottom = r.bottom - contentTop - above
-          if (nBottom > pageTop + pageContentPx - bandLoss + 0.5 && nTop > pageTop + 0.5 && !firstOnPage) {
+          const crosses = nBottom > pageTop + pageContentPx - bandLoss + 0.5 && nTop > pageTop + 0.5
+          if (crosses && rowIndex === 0) {
+            // Move the whole table to the next page: the spacer goes before the
+            // table node, so it is an ordinary block spacer rather than a row.
+            addBreak(offset, nTop, `${offset}`)
+            firstOnPage = true
+          } else if (crosses && !firstOnPage) {
             // The spacer's job is unchanged by the repeat: it must still carry
             // the break all the way TO the next page's content top. The repeated
             // header then occupies the first band of that page and the data rows
@@ -302,6 +351,7 @@ function computeDecorations(view: EditorView): { set: DecorationSet; pages: numb
           }
         }
         rowPos += row.nodeSize
+        rowIndex++
       })
       return
     }
@@ -337,6 +387,8 @@ export const PagePagination = Extension.create({
   addProseMirrorPlugins() {
     let lastSig = ''
     let raf = 0
+    // This editor's own config and re-measure hook, keyed by the editor itself.
+    const editor = this.editor as unknown as object
     return [
       new Plugin<DecorationSet>({
         key: paginationKey,
@@ -360,7 +412,8 @@ export const PagePagination = Extension.create({
             raf = requestAnimationFrame(() => {
               raf = 0
               try {
-                const { set, pages, sig } = computeDecorations(view)
+                const cfg = cfgFor(editor)
+                const { set, pages, sig } = computeDecorations(view, cfg)
                 cfg.onPages?.(pages)
                 // Only dispatch when the break layout actually changed, so the
                 // measure->dispatch->update cycle settles instead of looping.
@@ -372,14 +425,14 @@ export const PagePagination = Extension.create({
               }
             })
           }
-          repaginate = measure
+          repaginators.set(editor, measure)
           const ro = new ResizeObserver(() => measure())
           ro.observe(view.dom as HTMLElement)
           measure()
           return {
             update: () => measure(),
             destroy: () => {
-              if (repaginate === measure) repaginate = null
+              if (repaginators.get(editor) === measure) repaginators.delete(editor)
               ro.disconnect()
               if (raf) cancelAnimationFrame(raf)
             }

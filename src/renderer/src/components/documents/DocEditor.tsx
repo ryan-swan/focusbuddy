@@ -1152,7 +1152,7 @@ function PageSheet({
   // mounted, and switch pagination off again when we leave page view. Depending
   // on the effective margins means dragging a ruler marker re-paginates live.
   useEffect(() => {
-    setPaginationConfig({
+    setPaginationConfig(editor, {
       enabled: true,
       pageContentPx: usable,
       gapPx: PAGE_GAP,
@@ -1160,8 +1160,8 @@ function PageSheet({
       mBottom: geom.mBottom,
       onPages: setPageCount
     })
-    return () => setPaginationConfig({ enabled: false, onPages: null })
-  }, [usable, geom.mTop, geom.mBottom])
+    return () => setPaginationConfig(editor, { enabled: false, onPages: null })
+  }, [editor, usable, geom.mTop, geom.mBottom])
 
   const stride = geom.h + PAGE_GAP
   const totalH = pageCount * geom.h + (pageCount - 1) * PAGE_GAP
