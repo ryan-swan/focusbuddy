@@ -1,6 +1,6 @@
 # Plexii v1 beta — session handoff
 
-> **UPDATE 2026-09-07 (DEC-139, DEC-140).** The first hour of §9 is done.
+> **UPDATE 2026-09-07, revised 2026-09-08 (DEC-138…141).** The first hour of §9 is done.
 > Pre-flight reported: `main` still `8579cbaf`, nobody else has pushed;
 > suite green (3,898 / 356). The §5 inventory has been REBUILT from the code
 > — 168 surfaces in ten families, each with reach, health, tests, data,
@@ -12,12 +12,14 @@
 > corrections to §5 (45 widget kinds not 44; 27 suite products not 32) and
 > the 21 verified findings are in DEC-140.
 >
-> One defect was fixed on sight rather than filed (DEC-139): `widgets:delete`
-> threw `ReferenceError: origin is not defined` in main on EVERY widget
-> delete since v4.2.0 — the row was trashed, then the handler died, so no
-> CRDT tombstone, no store prune, no undo toast, no `WidgetDeleted` event.
-> One token plus a pin over all 500 `ipcMain.handle` callbacks. **It is on
-> `ryan-v1-beta` and deserves its own small PR to main ahead of the cull.**
+> One defect was found on sight and fixed here (DEC-139): `widgets:delete`
+> threw `ReferenceError: origin is not defined` in main on EVERY widget delete
+> since v4.2.0 — the row was trashed, then the handler died, so no CRDT
+> tombstone, no store prune, no undo toast, no `WidgetDeleted` event.
+> **Michael landed the same fix independently on main the next day
+> (`c86111fa`), so ours was dropped on Ryan's word and this branch was rebased
+> onto the new main.** DEC-139 is marked SUPERSEDED and kept for the
+> crash-row evidence.
 >
 > Nothing has been removed. The next round starts with the rulings.
 
@@ -47,15 +49,15 @@ or behind a flag. Michael can cut the beta build from `main`.
 | | |
 |---|---|
 | Repo | `~/focusbuddy-plexi` (product name Plexii — two i's; fused legacy compounds like PlexiMeet stay single-i) |
-| Active branch | `ryan-v1-beta`, head `5557dc0e` (DEC-138 docs) on `origin` and `fork` |
-| `main` | `8579cbaf` — carries DEC-098…137 (PR #6 `ryan-next`, PR #7 `ryan-assistant`); Michael's last release 4.2.2 (2026-09-01) |
+| Active branch | `ryan-v1-beta`, rebased 2026-09-08 onto `origin/main` (Michael's 26 commits: live desk publishing, the assistant/retrieval pass, the widget-delete fix) |
+| `main` | moved to `3af4ce37` on 2026-09-08 — Michael pushed 26 commits directly (no PR). **CI is red on main**: `npm ci` fails because package.json and package-lock.json disagree (he added `@electron/fuses` and two scripts). Still version 4.2.2; no new release cut |
 | Frozen branches | `ryan-next`, `ryan-assistant` (landed); Caleb's `Caleb-4.3-ui` (in main), `Caleb-4.1-brain` (13 old commits) — paused |
 | Closed | PR #5 `fix/platform-stability` — superseded (its DEC-056…061 reached main via ryan-command-center) |
 | Remotes | `origin` = github.com/saasmouth/focusbuddy (push as **ryanswan313**); `fork` = github.com/ryan-swan/focusbuddy (push as **ryan-swan**) |
 | Push ritual | `git push fork <branch>` → `gh auth switch -u ryanswan313` → `git push origin <branch>` → `gh auth switch -u ryan-swan` |
 | Landing rule | `main` only via a PR, only on Ryan's explicit go; never a direct push. Before any landing: check GitHub (main's last commit, other branches, PR reviews, the event stream) and REPORT who changed what — Ryan confirms, then it moves. Michael cuts releases; landing is not a release |
 | Suite at handoff | `npm run typecheck` clean (node + web); `npx vitest run` → 3,898 tests / 356 files; 414 Playwright specs in `tests/e2e` (heavy — run targeted specs, `npm run test:e2e` builds first) |
-| Planning | `planning/plexii-task-command-center/DECISIONS-LOG.md` (append-only; **next entry is DEC-139**), `…/NEXT-SESSION-PROMPT.md` (resume prompt, top note points here), this file |
+| Planning | `planning/plexii-task-command-center/DECISIONS-LOG.md` (append-only; **next entry is DEC-142**), `…/NEXT-SESSION-PROMPT.md` (resume prompt, top note points here), this file |
 | Review packages | `analysis/28` (the Meet plan, SPEC-003), `analysis/29` (PR #6 review package) |
 | Commit trailer | `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`; `.claude/` is never committed |
 | Live app | Electron dev instance with `--remote-debugging-port=9223` (last session: PID 97113, log `/tmp/plexii-dev33.log`); `npm run dev` runs electron-vite WITHOUT `--watch` — main/preload edits need a manual restart (renderer hot-swaps) |

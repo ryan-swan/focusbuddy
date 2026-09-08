@@ -4600,52 +4600,47 @@ Nothing of that has started; the next session begins by taking stock of
 what counts as noise with the operator before removing anything.
 
 
-## DEC-139 — Deleting a widget threw in the main process on every call (the `origin` that was never declared)
-**Date:** 2026-09-07 · **Status:** EXECUTED (code + pin; live run pending an app restart) · **Branch:** `ryan-v1-beta` ·
-**Plan:** found by the v1-beta audit's main-process map (read-only pass over
-`src/main/ipc/index.ts` and the operator's crash log), fixed on sight because
-it is a one-token defect in a shipped build.
+## DEC-139 — The widget-delete `origin` bug: found here, fixed by Michael on main, our commit dropped
+**Date:** 2026-09-07, superseded 2026-09-08 · **Status:** SUPERSEDED — the fix on main is `c86111fa` (Michael Dean) · **Branch:** was `ryan-v1-beta` ·
+**Plan:** found by the v1-beta audit's main-process map and fixed on sight, because it was a one-token defect in a shipped build.
 
-**What was wrong.** `widgets:delete` (`src/main/ipc/index.ts:1082`) carried
-DEC-059's real-delete guard — `if (origin !== 'sync' && isRealDelete(before))`
-— without declaring the `origin` parameter that `nodes:delete` (line 930)
-declares and that the preload already passes
-(`src/preload/index.ts:217`). It typechecked only because the node project's
-default lib includes DOM's global `origin`; in the main process at runtime
-the name does not exist. Sequence on every widget delete since DEC-059 part 2
-(`7c363379`): the row IS trashed (`deleteWidget` runs first), then the
-handler throws `ReferenceError: origin is not defined`, the renderer's
-`await window.api.widgets.delete(id)` rejects, and everything after it in
-`stores/widgets.ts remove` never runs — no CRDT delete tombstone (other
-devices never converge), no store prune (the widget stays on screen until a
-reload), no undo toast, no snapshot — and no `WidgetDeleted` event is
-written. The operator's crash log holds 53 rows of exactly this between
-2026-09-01 16:50 and 2026-09-07 00:42 (read-only:
-`select count(*) from crash_events where message like '%origin is not
-defined%'`). The commit is inside Release 4.2.0, so the shipped build has
-it.
+**The defect (both of us diagnosed it identically).** `widgets:delete`
+(`src/main/ipc/index.ts`) carried DEC-059's real-delete guard — `if (origin
+!== 'sync' && isRealDelete(before))` — without declaring the `origin`
+parameter that `nodes:delete` declares and the preload already passes. It
+typechecked only because the node project's default lib includes DOM's global
+`origin`; in the main process the name does not exist. On every widget delete
+the row was soft-deleted FIRST, then the handler threw `ReferenceError: origin
+is not defined`, so the renderer's `await window.api.widgets.delete(id)`
+rejected and nothing after it in `stores/widgets.ts remove` ran: no CRDT
+tombstone, no store prune, no undo toast, no `WidgetDeleted` event. The widget
+stayed on the canvas while the data was already gone. 53 crash rows in the
+operator's database between 2026-09-01 and 09-07; shipped inside v4.2.0.
 
-**What changed.** The parameter is declared
-(`(_e, id: string, origin?: WriteOrigin)`), matching its five siblings
-(`nodes:create/update/delete`, `widgets:create/update`). One token.
+**What happened.** We committed the one-token fix plus a source-walking pin
+here as `ecc15ff9` on 2026-09-07 and pushed it to both remotes. About fifteen
+hours later, on 2026-09-08, Michael landed the same fix directly on `main` as
+`c86111fa`, independently and with the same diagnosis, adding two behavioural
+regression specs (that the IPC RESOLVES, and that the widget leaves the canvas
+through the real Remove → Delete path), a regenerated `ipcContracts.generated.ts`,
+and a manual sweep of `src/main/ipc` confirming no other handler has the shape.
+He also recorded that the contract test could not have caught it, because the
+contract was derived FROM the broken signature.
 
-**The pin.** `tests/unit/ipcHandlerOriginDeclared.test.ts` walks all 500
-`ipcMain.handle` callbacks in the file and refuses any whose body references
-`origin` without naming it as a parameter (or declaring it locally). Proven
-to fail on the pre-fix source (the same walker over `git show
-HEAD:src/main/ipc/index.ts` reports exactly `["widgets:delete"]`) and to
-pass after. Both typechecks clean.
+**The ruling (operator, 2026-09-08: "drop my delete fix and rebase onto
+main").** `ecc15ff9` was dropped and `ryan-v1-beta` rebased onto
+`origin/main`. Michael's fix is the one of record; there is no duplicate and
+no conflict. This entry stays because the append-only log keeps the reason a
+thing has its shape, and because the crash-row evidence above is the only
+record of how long the bug was live in the operator's own install.
 
-**Not yet done.** A live run needs the dev app restarted (main-process edit;
-`electron-vite dev` runs without `--watch`) — the operator's instance
-(PID 97113) was left running. When it restarts: delete a scratch widget,
-expect the undo toast, no new crash row, and a `WidgetDeleted` event.
-Follow-ups for the readiness pass, not this entry: the node project's lib
-should drop DOM so a bare browser global can never typecheck in main again;
-the same crash log shows 140 `mail:list: reply was never sent` rows from the
-boot-time IMAP fetch (`App.tsx:243`), which the Mail ruling will settle.
-**This deserves its own small PR to main ahead of the cull — Michael's
-call on a 4.2.3.**
+**One thing did not carry over.** Our commit also held
+`tests/unit/ipcHandlerOriginDeclared.test.ts`, a pin that walks all ~500
+`ipcMain.handle` callbacks and refuses any that reads `origin` without
+declaring it — the automated form of the sweep Michael did by hand. It was
+dropped with the commit rather than kept behind the operator's back; it
+survives on `backup/pre-rebase-2026-09-08` and can be added as its own commit
+on his word.
 
 ## DEC-140 — The v1 beta inventory: 168 surfaces audited, put in front of the operator to rule
 **Date:** 2026-09-07 · **Status:** AWAITING OPERATOR RULINGS · **Branch:** `ryan-v1-beta` ·
