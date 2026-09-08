@@ -123,7 +123,32 @@ describe('the capture itself', () => {
   })
 
   it('strips everything executable or session-bearing before serialising', () => {
-    expect(src).toContain('script,style,link,iframe,webview,object,embed,canvas,video,audio,input,textarea,select,button')
+    expect(src).toContain("const STRIP_SELECTOR = 'script,style,link,iframe,webview,object,embed,canvas,video,audio'")
+  })
+
+  it('defuses controls rather than deleting them', () => {
+    // A calculator's keypad and a Stream Deck's grid ARE the widget. Deleting
+    // them published a calculator with no keys.
+    expect(src).toContain('function defuseControls')
+    expect(src).toContain("const CONTROL_SELECTOR = 'button,input,textarea,select,a,form,label'")
+    // The replacement is inert: a div, carrying only style.
+    expect(src).toContain("createElement('div')")
+    expect(src).toContain("if (a.name === 'style') plain.setAttribute('style', a.value)")
+  })
+
+  it('states zero borders rather than implying them', () => {
+    // The app's reset is `border-style: solid; border-width: 0`. Skipping the
+    // zero width left a solid border at the browser default and outlined every
+    // element in the capture.
+    expect(src).toContain("const isBorder = prop.startsWith('border-')")
+    expect(src).toContain('if (!isBorder) {')
+  })
+
+  it('captures box spacing per side, not as a shorthand', () => {
+    // `margin` computes to '0px' on an element whose margin-right is 8px, so
+    // capturing the shorthand dropped the spacing and labels ran together.
+    expect(src).toContain("'margin-top', 'margin-right', 'margin-bottom', 'margin-left'")
+    expect(src).toContain("'column-gap', 'row-gap'")
   })
 
   it('drops internal identifiers', () => {
@@ -136,7 +161,23 @@ describe('the capture itself', () => {
     expect(src).not.toContain('for (let i = 0; i < cs.length; i++)')
   })
 
-  it('still passes the result through the sanitiser', () => {
-    expect(src).toContain('sanitizeHtml(html)')
+  it('sanitises with a structural allowlist, not the document one', () => {
+    // The editor's sanitiser allows only document tags, so it unwrapped every
+    // div and a calculator's keypad arrived as the string "789456123".
+    expect(src).toContain('export function sanitizeCapturedHtml')
+    expect(src).toContain("'div', 'span', 'p', 'section'")
+    // Only style survives, and only on the tags we keep.
+    expect(src).toContain("a.name === 'style'")
+  })
+
+  it('drops the frame chrome and icon-font glyphs', () => {
+    expect(src).toContain("querySelectorAll('.widget-handle')")
+    expect(src).toContain('material (symbols|icons)')
+  })
+
+  it('refuses images that are not self-contained', () => {
+    // A local reference is dead in a browser; a remote one phones home from
+    // the reader's machine.
+    expect(src).toContain("/^data:image\\//i.test(src)")
   })
 })
