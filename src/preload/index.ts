@@ -109,6 +109,16 @@ interface PageSetupInput {
   footer?: { text?: string; showPageNumber?: boolean }
 }
 
+export interface LiveDeskRecord {
+  deskId: string
+  token: string
+  revision: number
+  lastPublishedAt: number | null
+  lastError: string | null
+  paused: boolean
+  createdAt: number
+}
+
 const api = {
   // The host OS, so the renderer can tailor flows that differ by platform
   // (e.g. macOS updates are download-to-replace rather than in-place install).
@@ -2073,6 +2083,24 @@ const api = {
   search: {
     // Global "find anything" across the local workspace.
     query: (q: string): Promise<SearchHit[]> => ipcRenderer.invoke('search:query', q)
+  },
+  // Public live desks — publish a sanitized projection of a desk to the web.
+  liveDesk: {
+    get: (deskId: string): Promise<LiveDeskRecord | null> =>
+      ipcRenderer.invoke('liveDesk:get', deskId),
+    list: (): Promise<LiveDeskRecord[]> => ipcRenderer.invoke('liveDesk:list'),
+    start: (deskId: string, fromHandle?: string): Promise<{ ok: boolean; token?: string; error?: string }> =>
+      ipcRenderer.invoke('liveDesk:start', deskId, fromHandle),
+    publish: (deskId: string, projection: unknown): Promise<{ ok: boolean; revision?: number; error?: string }> =>
+      ipcRenderer.invoke('liveDesk:publish', deskId, projection),
+    queuePublish: (deskId: string, projection: unknown): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('liveDesk:queuePublish', deskId, projection),
+    uploadAsset: (deskId: string, assetId: string, mime: string, bytes: Uint8Array): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('liveDesk:uploadAsset', deskId, assetId, mime, bytes),
+    setPaused: (deskId: string, paused: boolean): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('liveDesk:setPaused', deskId, paused),
+    stop: (deskId: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('liveDesk:stop', deskId)
   },
   documents: {
     list: (): Promise<DocumentMeta[]> => ipcRenderer.invoke('documents:list'),

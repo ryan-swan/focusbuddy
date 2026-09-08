@@ -1,3 +1,13 @@
+import {
+  createLiveDesk,
+  publishProjection,
+  queuePublish,
+  uploadLiveAsset,
+  setLivePaused,
+  stopLiveDesk,
+  liveDeskFor,
+  allLiveDesks
+} from '../livePublisher'
 import { app, ipcMain, BrowserWindow, dialog, systemPreferences, webContents as allWebContents, type WebContents } from 'electron'
 import { openExternalSafe } from '../safeOpenExternal'
 import { detectPreviewBuild } from '../appMode'
@@ -1122,6 +1132,31 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('widgetLinks:listByTask', (_e, taskId: string) => listLinksByTask(taskId))
+
+  // Public live desks — the web view of a desk. The renderer builds the
+  // sanitized projection (src/renderer/src/lib/publicDeskProjection.ts); these
+  // handlers get it to Signal and report what is actually live.
+  ipcMain.handle('liveDesk:get', (_e, deskId: string) => liveDeskFor(deskId))
+  ipcMain.handle('liveDesk:list', () => allLiveDesks())
+  ipcMain.handle('liveDesk:start', (_e, deskId: string, fromHandle?: string) =>
+    createLiveDesk(deskId, fromHandle)
+  )
+  ipcMain.handle('liveDesk:publish', (_e, deskId: string, projection: unknown) =>
+    publishProjection(deskId, projection)
+  )
+  // Fire-and-forget: coalesces rapid edits into one revision.
+  ipcMain.handle('liveDesk:queuePublish', (_e, deskId: string, projection: unknown) => {
+    queuePublish(deskId, projection)
+    return { ok: true }
+  })
+  ipcMain.handle('liveDesk:uploadAsset', (_e, deskId: string, assetId: string, mime: string, bytes: Uint8Array) =>
+    uploadLiveAsset(deskId, assetId, mime, bytes)
+  )
+  ipcMain.handle('liveDesk:setPaused', (_e, deskId: string, paused: boolean) =>
+    setLivePaused(deskId, paused)
+  )
+  ipcMain.handle('liveDesk:stop', (_e, deskId: string) => stopLiveDesk(deskId))
+
 
   // Share-link CRUD
   ipcMain.handle('shares:listAll', () => listAllShareLinks())

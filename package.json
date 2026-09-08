@@ -31,6 +31,7 @@
     "release:mac": "bash scripts/release-mac.sh",
     "release:verify": "bash scripts/verify-release-assets.sh",
     "release:verify:office": "bash scripts/verify-office-release.sh",
+    "sync:contract": "node scripts/sync-contract.mjs",
     "test:unit": "vitest run",
     "test:e2e": "npm run build && playwright test",
     "test": "npm run test:unit && npm run test:e2e",

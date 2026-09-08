@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import LiveWebViewPanel from './LiveWebViewPanel'
 import { showCopyFallback } from './plexi/PromptDialog'
 import Modal from './plexi/Modal'
 import { createPortal } from 'react-dom'
@@ -297,6 +298,11 @@ export default function ShareDialog({
           {(kind === 'folder' || kind === 'task') && (
             <LiveDeskSharing rootId={entityId} roomRootId={roomInfo?.id} roomTitle={roomInfo?.title} />
           )}
+
+          {/* Public live web view — a sanitized, read-only projection anyone with
+              the link can open in a browser. Distinct from LiveDeskSharing above,
+              which grants named accounts real access to the desk itself. */}
+          {kind === 'task' && <LiveWebViewPanel deskId={entityId} />}
 
           {/* An office file promotes to a live co-edited document and invites the
               chosen people, via the same shared picker. */}
