@@ -108,6 +108,15 @@ describe('public desk projection — disclosure surface', () => {
     }
   })
 
+  it('never claims a document is an image', () => {
+    // A design and a shape are document/vector content, not files. Both were
+    // mapped to the image family, so every one of them published as "image not
+    // published" -- a missing picture rather than an honest statement.
+    expect(isPubliclyRenderable('design')).toBe(false)
+    expect(projectWidget(widget('design', 'doc-id'), NULL_RESOLVERS).render.type).toBe('placeholder')
+    expect(PUBLIC_RENDER_POLICY['shape']).toBe('color')
+  })
+
   it('falls back to a placeholder when a referenced document is gone', () => {
     // A deleted table must not publish as an empty grid pretending to be data.
     const out = projectWidget(widget('table'), NULL_RESOLVERS)

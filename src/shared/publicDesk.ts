@@ -258,7 +258,6 @@ export const PUBLIC_RENDER_POLICY: Readonly<Record<string, PublicRenderType>> = 
 
   image: 'image',
   'image-gen': 'image',
-  design: 'image',
   // A shape carries a fill and a geometry, not a file. Projecting it as an
   // image meant every shape published as "image not published"; its colour is
   // the honest part we can carry, so it goes out as one.
@@ -296,6 +295,10 @@ export const PUBLIC_RENDER_POLICY: Readonly<Record<string, PublicRenderType>> = 
   //   email, chat-thread             (private correspondence)
   //   meeting-record                 (provenance-tiered private record)
   //   minimap, attention             (viewer-local chrome, not content)
+  //   design                         (a freely-placed canvas with no public
+  //                                   renderer yet -- it is a document id, not
+  //                                   a file, so projecting it as an image
+  //                                   published every design as a missing one)
 })
 
 /** Human-readable reason shown for each unsupported kind. */
@@ -310,6 +313,7 @@ export const PUBLIC_PLACEHOLDER_REASON: Readonly<Record<string, string>> = Objec
   'chat-thread': 'Chat thread — not available publicly',
   'meeting-record': 'Meeting record — not available publicly',
   minimap: 'Minimap — not available publicly',
+  design: 'Design — not available publicly',
   attention: 'Attention — not available publicly'
 })
 
