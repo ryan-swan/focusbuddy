@@ -4703,3 +4703,51 @@ except the activity tracker, the updater and the API server.
 **Nothing has been removed.** The next round starts with the operator's
 rulings, outside in, one DEC per batch, each verified live and landed
 small.
+
+## DEC-141 — Why streaming services will not play in the browser widget: no Widevine
+**Date:** 2026-09-07 · **Status:** DIAGNOSED, FIX PROVEN, AWAITING OPERATOR + MICHAEL · **Branch:** `ryan-v1-beta` ·
+**Plan:** operator report ("I can't stream streaming services within Plexii
+through a browser — Netflix, Amazon Prime Video, live sports. Figure out why.
+If there is an obvious fix, fix it. If not, let me know what the issue is").
+
+**The cause, measured.** Not Plexii's code. Plain Electron ships **no Widevine
+content decryption module**, and Netflix, Prime Video, Disney+, Max, Hulu and
+essentially every paid live-sports service require Widevine on desktop
+Chromium. Probed on a `file://` page (a secure context — a `data:` URL is not
+one and hides the EME API entirely, which gives a false "API missing" reading;
+the first run here did exactly that and was re-done):
+
+| | `electron@37.10.3` (shipped) | `castlabs/electron-releases#v37.10.3+wvcus` |
+|---|---|---|
+| `com.widevine.alpha` | **NotSupportedError** | **SUPPORTED**, `createMediaKeys` ok |
+| robustness | — | SW_SECURE_CRYPTO ok · SW_SECURE_DECODE ok · **HW_SECURE_ALL no** |
+| `decodingInfo` + Widevine | `supported:false` | `supported:true, smooth:true` |
+| `org.w3.clearkey` | supported (nothing commercial uses it) | supported |
+| CDM | absent from the bundle | 4.10.3050.0, fetched by `components.whenReady()` |
+
+**Everything else in the path was checked and is fine.** All codecs pass
+(H.264, AAC, VP9, HEVC, AV1 — MSE true, `canPlayType` "probably"); the
+permission denylist (`src/main/index.ts:147`) does not deny
+`protectedMediaIdentifier`; the webview presents a clean desktop-Chrome UA
+(`src/main/userAgent.ts`); the widget is a real `<webview>` with a persistent
+partition. **Clear video already works** — YouTube, Vimeo, Twitch-style HLS.
+The failure is exactly and only the DRM gate.
+
+**Why the fix was NOT applied.** It replaces the runtime in every user's
+binary and is not ours alone to decide: production playback needs **VMP
+signing** through castLabs' EVS, which requires an account and acceptance of
+castLabs + Google Widevine terms (not something an agent creates or accepts);
+it reorders **Michael's notarised release lane** (code sign → VMP sign →
+notarise); and the GitHub tarball install **loses macOS framework symlinks**
+on this machine (dyld "Library not loaded: @rpath/Electron Framework" —
+repaired here by recreating `Versions/Current` and the top-level links in
+every `*.framework`), so a naive `npm install` would break local dev. Even
+signed, desktop Widevine is L3, so Netflix caps at 720p.
+
+**Where it connects.** The operator's Attention queue already carries "Add
+in-browser video streaming for multiple concurrent streams in Plexii". The
+*concurrent streams* half is a separate, performance question — each webview
+is a full renderer.
+
+**Nothing in the repo was changed by this round.** The probes ran in the
+session scratchpad against an isolated castLabs install.
