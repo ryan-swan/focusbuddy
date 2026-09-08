@@ -1,4 +1,4 @@
-import { widgetCountsByTask } from '../db/widgets'
+import { widgetCountsByTask, syncTableWidgetTitles } from '../db/widgets'
 import {
   createLiveDesk,
   publishProjection,
@@ -2745,9 +2745,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('tables:list', () => listTables())
   ipcMain.handle('tables:get', (_e, id: string) => getTable(id))
   ipcMain.handle('tables:create', (_e, draft: FbTableDraft) => createTable(draft))
-  ipcMain.handle('tables:update', (_e, id: string, patch: FbTablePatch) =>
-    updateTable(id, patch)
-  )
+  ipcMain.handle('tables:update', (_e, id: string, patch: FbTablePatch) => {
+    // A rename has to reach the desk too. The table's name lives on the table
+    // record, but every desk-level surface reads the widget, so renaming a
+    // table left "Untitled table" showing in summaries and Gallery.
+    const before = typeof patch.title === 'string' ? getTable(id) : null
+    const updated = updateTable(id, patch)
+    if (updated && before && typeof patch.title === 'string' && patch.title !== before.title) {
+      syncTableWidgetTitles(id, before.title, patch.title)
+    }
+    return updated
+  })
   ipcMain.handle('tables:delete', (_e, id: string) => deleteTable(id))
   ipcMain.handle('tables:listRows', (_e, tableId: string) => listRows(tableId))
   ipcMain.handle('tables:createRow', (_e, draft: FbRowDraft) => createRow(draft))

@@ -91,6 +91,35 @@ export function listWidgetsByTask(taskId: string): Widget[] {
 }
 
 /**
+ * Keep a table widget's desk-level name in step with the table's own name.
+ *
+ * A table widget stores the table id in `content`; the human name lives on the
+ * table record. Surfaces that only have the widget -- desk summaries, Gallery,
+ * List, the minimap -- called widgetDisplayName with no fallback and so showed
+ * "Table" or "Untitled table" long after the user had renamed it.
+ *
+ * Only widgets that were never given a name of their own, or that still carry
+ * the table's previous name, are updated. A widget the user deliberately titled
+ * something else keeps that title: this syncs a default, it does not overwrite
+ * an intention.
+ */
+export function syncTableWidgetTitles(
+  tableId: string,
+  previousTitle: string,
+  nextTitle: string
+): number {
+  const db = getDb()
+  const res = db
+    .prepare(
+      `UPDATE widgets SET title = ?
+        WHERE kind = 'table' AND content = ? AND trashed_at IS NULL
+          AND (title IS NULL OR title = '' OR title = ?)`
+    )
+    .run(nextTitle, tableId, previousTitle)
+  return res.changes
+}
+
+/**
  * How many live objects each of these desks holds. One grouped query rather
  * than a listWidgetsByTask per desk, because this exists to disambiguate
  * search results: two desks with the same name are told apart by what is on
