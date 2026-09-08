@@ -25,7 +25,19 @@ const CAPTURE_TAGS = new Set([
   'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'hr',
   'strong', 'b', 'em', 'i', 'u', 's', 'small', 'code', 'pre', 'blockquote',
-  'sub', 'sup', 'mark', 'img', 'figure', 'figcaption'
+  'sub', 'sup', 'mark', 'img', 'figure', 'figcaption',
+  // Vector content. `foreignObject` is excluded on purpose -- it can carry
+  // arbitrary HTML back in through the side door.
+  'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+  'text', 'tspan', 'defs', 'use', 'symbol', 'title', 'linearGradient', 'radialGradient', 'stop'
+])
+
+/** Attributes an SVG element needs to draw, none of which can execute. */
+const SVG_ATTRS = new Set([
+  'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'stroke-dasharray', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
+  'cx', 'cy', 'r', 'rx', 'ry', 'points', 'transform', 'opacity', 'fill-rule',
+  'clip-rule', 'offset', 'stop-color', 'gradientUnits', 'text-anchor', 'font-size'
 ])
 
 /**
@@ -45,9 +57,18 @@ export function sanitizeCapturedHtml(root: HTMLElement): string {
     const tag = el.tagName.toLowerCase()
     for (const a of Array.from(el.attributes)) {
       const keep =
+        SVG_ATTRS.has(a.name) ||
+        // `class` is what makes the app's own stylesheet apply in the viewer's
+        // shadow root; `style` carries the runtime values CSS cannot know.
+        a.name === 'class' ||
         a.name === 'style' ||
         (tag === 'img' && (a.name === 'src' || a.name === 'alt'))
       if (!keep) el.removeAttribute(a.name)
+    }
+    if (tag === 'use') {
+      const href = el.getAttribute('href') ?? el.getAttribute('xlink:href') ?? ''
+      if (!href.startsWith('#')) el.remove()
+      return
     }
     if (tag === 'img') {
       const src = el.getAttribute('src') ?? ''
@@ -65,25 +86,6 @@ export function sanitizeCapturedHtml(root: HTMLElement): string {
   return root.innerHTML
 }
 
-/** Enough to preserve layout and appearance without shipping a stylesheet. */
-const CAPTURED_PROPERTIES = [
-  'display', 'position', 'top', 'left', 'right', 'bottom', 'z-index',
-  'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-  // Individual sides, not shorthands: `margin` computes to '0px' on an element
-  // whose margin-right is 8px, so capturing the shorthand dropped the spacing
-  // and rows of labels ran into each other.
-  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-  'box-sizing', 'overflow',
-  'flex-direction', 'flex-wrap', 'flex-grow', 'flex-shrink', 'flex-basis',
-  'align-items', 'align-self', 'justify-content', 'column-gap', 'row-gap',
-  'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
-  'color', 'background-color', 'background-image', 'opacity',
-  'border-width', 'border-style', 'border-color', 'border-radius', 'box-shadow',
-  'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
-  'text-align', 'text-decoration-line', 'text-transform', 'letter-spacing',
-  'white-space', 'text-overflow', 'vertical-align', 'transform'
-]
 
 /**
  * Elements that must never appear in published markup: executable, or a window
@@ -103,7 +105,8 @@ function defuseControls(root: HTMLElement): void {
   for (const el of Array.from(root.querySelectorAll<HTMLElement>(CONTROL_SELECTOR))) {
     const plain = document.createElement('div')
     for (const a of Array.from(el.attributes)) {
-      if (a.name === 'style') plain.setAttribute('style', a.value)
+      // A defused control keeps how it looked, which now means its classes.
+      if (a.name === 'class' || a.name === 'style') plain.setAttribute(a.name, a.value)
     }
     // An input shows its value; everything else keeps its children.
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
@@ -120,34 +123,6 @@ function defuseControls(root: HTMLElement): void {
 const MAX_CAPTURE_BYTES = 512 * 1024
 /** Rendering is asynchronous; give effects a moment to put content on screen. */
 const SETTLE_MS = 450
-
-function inlineStyles(root: HTMLElement): void {
-  const all = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
-  for (const el of all) {
-    const cs = getComputedStyle(el)
-    const parts: string[] = []
-    for (const prop of CAPTURED_PROPERTIES) {
-      const v = cs.getPropertyValue(prop)
-      if (!v) continue
-      // Border properties are never skipped. The app's reset sets
-      // `border-style: solid; border-width: 0`, so dropping a 0px width leaves
-      // a solid border at the browser's default ~3px and outlines every element
-      // in the capture. A zero here has to be stated, not implied.
-      const isBorder = prop.startsWith('border-')
-      if (!isBorder) {
-        if (v === 'none' || v === 'normal' || v === 'auto' || v === '0px') continue
-      }
-      parts.push(`${prop}:${v}`)
-    }
-    el.setAttribute('style', parts.join(';'))
-    // Internal identifiers are not content and have no business being public.
-    for (const a of Array.from(el.attributes)) {
-      if (a.name.startsWith('data-') || a.name.startsWith('on') || a.name === 'class' || a.name === 'id') {
-        el.removeAttribute(a.name)
-      }
-    }
-  }
-}
 
 /**
  * Render one widget off-screen and return its sanitised markup, or null when it
@@ -172,14 +147,6 @@ export async function captureWidgetHtml(widget: Widget): Promise<string | null> 
     // The frame's own header is chrome, not content: it published the widget's
     // title followed by "edit push_pin remove open_in_full close".
     for (const el of Array.from(host.querySelectorAll('.widget-handle'))) el.remove()
-    // Icon fonts do not travel. Material Symbols render their ligature as the
-    // literal word without the font, so a deck button read "play_pause".
-    for (const el of Array.from(host.querySelectorAll<HTMLElement>('*'))) {
-      if (/material (symbols|icons)/i.test(getComputedStyle(el).fontFamily)) el.remove()
-    }
-    // Styles are inlined BEFORE controls are replaced, so a defused button
-    // carries the appearance it actually had.
-    inlineStyles(host)
     defuseControls(host)
 
     // Nothing visible is not worth a card; the placeholder says more.

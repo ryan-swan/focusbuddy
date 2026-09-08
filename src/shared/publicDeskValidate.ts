@@ -45,7 +45,7 @@ const RENDER_FIELDS: Record<string, string[]> = {
   'task-link': ['type', 'title', 'status', 'publicToken'],
   file: ['type', 'name', 'mime', 'assetId'],
   placeholder: ['type', 'reason'],
-  capture: ['type', 'html', 'kind']
+  capture: ['type', 'assetId', 'kind']
 }
 
 const WIDGET_FIELDS = [
@@ -189,16 +189,10 @@ export function validatePublicDeskProjection(input: unknown): ValidationResult {
           )
         }
       }
-      // Captured markup must not carry executable content. The producer
-      // sanitises; the server refuses to store anything that got through.
-      if (type === 'capture') {
-        const html = typeof r.html === 'string' ? r.html : ''
-        if (/<script|\son\w+\s*=|javascript:/i.test(html)) {
-          errors.push(`${at}.render.html: captured markup carries script or handlers`)
-        }
-        if (html.length > 512 * 1024) {
-          errors.push(`${at}.render.html: capture exceeds 512KB`)
-        }
+      // The markup itself is checked when the asset is uploaded, which is the
+      // only place the server sees it; here we only require the reference.
+      if (type === 'capture' && (typeof r.assetId !== 'string' || r.assetId === '')) {
+        errors.push(`${at}.render.assetId: expected a non-empty asset id`)
       }
       if (type === 'link' && !isSafePublicUrl(r.url)) {
         errors.push(`${at}.render.url: unsafe or malformed public URL`)

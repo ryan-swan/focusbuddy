@@ -26,7 +26,7 @@ function widget(kind: string, id = `w_${kind}`): Widget {
   } as unknown as Widget
 }
 
-const withCapture = (html: string): ProjectionResolvers => ({ ...NULL_RESOLVERS, capture: () => html })
+const withCapture = (assetId: string): ProjectionResolvers => ({ ...NULL_RESOLVERS, capture: () => assetId })
 
 describe('what may be captured', () => {
   it('only covers kinds that have no structural projector', () => {
@@ -71,43 +71,28 @@ describe('the server enforces the same rule', () => {
 
   it('accepts a capture from an allowlisted kind', () => {
     const r = validatePublicDeskProjection(
-      projection('calculator', { type: 'capture', html: '<div>1+1</div>', kind: 'calculator' })
+      projection('calculator', { type: 'capture', assetId: 'cap_1', kind: 'calculator' })
     )
     expect(r.errors).toEqual([])
+  })
+
+  it('requires the capture to reference an asset', () => {
+    const r = validatePublicDeskProjection(
+      projection('calculator', { type: 'capture', assetId: '', kind: 'calculator' })
+    )
+    expect(r.ok).toBe(false)
   })
 
   it('refuses a capture from a kind that is not allowlisted', () => {
     // The desktop is not the only thing standing between an agent's prompt and
     // the public page.
     const r = validatePublicDeskProjection(
-      projection('agent', { type: 'capture', html: '<div>system prompt</div>', kind: 'agent' })
+      projection('agent', { type: 'capture', assetId: 'cap_x', kind: 'agent' })
     )
     expect(r.ok).toBe(false)
     expect(r.errors.join(' ')).toMatch(/has no public projector/)
   })
 
-  it('refuses captured markup carrying a script', () => {
-    const r = validatePublicDeskProjection(
-      projection('calculator', { type: 'capture', html: '<div><script>alert(1)</script></div>', kind: 'calculator' })
-    )
-    expect(r.ok).toBe(false)
-    expect(r.errors.join(' ')).toMatch(/script or handlers/)
-  })
-
-  it('refuses captured markup carrying an event handler', () => {
-    const r = validatePublicDeskProjection(
-      projection('calculator', { type: 'capture', html: '<div onclick="steal()">x</div>', kind: 'calculator' })
-    )
-    expect(r.ok).toBe(false)
-  })
-
-  it('refuses an oversized capture', () => {
-    const r = validatePublicDeskProjection(
-      projection('calculator', { type: 'capture', html: 'x'.repeat(600 * 1024), kind: 'calculator' })
-    )
-    expect(r.ok).toBe(false)
-    expect(r.errors.join(' ')).toMatch(/exceeds 512KB/)
-  })
 })
 
 describe('the capture itself', () => {
@@ -133,32 +118,24 @@ describe('the capture itself', () => {
     expect(src).toContain("const CONTROL_SELECTOR = 'button,input,textarea,select,a,form,label'")
     // The replacement is inert: a div, carrying only style.
     expect(src).toContain("createElement('div')")
-    expect(src).toContain("if (a.name === 'style') plain.setAttribute('style', a.value)")
+    expect(src).toContain("if (a.name === 'class' || a.name === 'style')")
   })
 
-  it('states zero borders rather than implying them', () => {
-    // The app's reset is `border-style: solid; border-width: 0`. Skipping the
-    // zero width left a solid border at the browser default and outlined every
-    // element in the capture.
-    expect(src).toContain("const isBorder = prop.startsWith('border-')")
-    expect(src).toContain('if (!isBorder) {')
+  it('keeps the classes the app stylesheet needs, and nothing else', () => {
+    // Appearance now comes from the app's own CSS in a shadow root, not from
+    // ~9KB of inlined properties per element.
+    expect(src).toContain("a.name === 'class'")
+    expect(src).toContain("a.name === 'style'")
   })
 
-  it('captures box spacing per side, not as a shorthand', () => {
-    // `margin` computes to '0px' on an element whose margin-right is 8px, so
-    // capturing the shorthand dropped the spacing and labels ran together.
-    expect(src).toContain("'margin-top', 'margin-right', 'margin-bottom', 'margin-left'")
-    expect(src).toContain("'column-gap', 'row-gap'")
+  it('keeps vector content but not its escape hatch', () => {
+    expect(src).toContain("'svg', 'g', 'path'")
+    // foreignObject would let arbitrary HTML back in through the side door.
+    expect(src).not.toContain("'foreignObject'")
   })
 
-  it('drops internal identifiers', () => {
-    expect(src).toContain("a.name.startsWith('data-')")
-  })
-
-  it('inlines a curated style set rather than everything computed', () => {
-    // Inlining every computed property costs about 9KB per element.
-    expect(src).toContain('CAPTURED_PROPERTIES')
-    expect(src).not.toContain('for (let i = 0; i < cs.length; i++)')
+  it('only allows same-document svg references', () => {
+    expect(src).toContain("if (!href.startsWith('#')) el.remove()")
   })
 
   it('sanitises with a structural allowlist, not the document one', () => {
@@ -170,9 +147,17 @@ describe('the capture itself', () => {
     expect(src).toContain("a.name === 'style'")
   })
 
-  it('drops the frame chrome and icon-font glyphs', () => {
+  it('drops the frame chrome, which is not content', () => {
+    // It published the widget title followed by "edit push_pin remove
+    // open_in_full close" -- the frame's own buttons.
     expect(src).toContain("querySelectorAll('.widget-handle')")
-    expect(src).toContain('material (symbols|icons)')
+  })
+
+  it('keeps icon-font elements, now that the font ships with the viewer', () => {
+    // They used to be deleted because a Material Symbols ligature renders as
+    // the literal word without its font; the viewer now carries the app's
+    // stylesheet, so the glyphs resolve.
+    expect(src).not.toContain('material (symbols|icons)')
   })
 
   it('refuses images that are not self-contained', () => {

@@ -167,6 +167,13 @@ function diagramGraph(content: string): {
   }
 }
 
+/** Content hash, so an unchanged capture keeps the same asset id. */
+function hashOf(text: string): string {
+  let h = 0
+  for (let i = 0; i < text.length; i++) h = (Math.imul(h, 31) + text.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
 const ASSET_KINDS = new Set(['image', 'image-gen', 'video', 'voice-recorder', 'pdf', 'file', 'shape', 'design'])
 const DIAGRAM_KINDS = new Set(['map', 'mindmap', 'diagram'])
 
@@ -236,7 +243,16 @@ export async function warmCache(
         // desk with nothing to capture should not pay for it.
         const { captureWidgetHtml } = await import('./widgetCapture')
         const html = await captureWidgetHtml(w)
-        if (html) note(`c:${w.id}`, html)
+        if (html) {
+          // Uploaded rather than inlined. Inline, captures were 74% of one
+          // desk's payload and were resent on every revision; as an asset the
+          // markup is fetched once and cached, and the id is content-derived so
+          // an unchanged capture keeps the same one.
+          const assetId = `cap${hashOf(w.id + html)}`
+          const bytes = new TextEncoder().encode(html)
+          const up = await window.api.liveDesk.uploadAsset(deskId, assetId, 'text/plain', bytes)
+          if (up.ok) note(`c:${w.id}`, assetId)
+        }
       } else if (ASSET_KINDS.has(w.kind) && !cache.has(`a:${id}`)) {
         const got = await assetBytes(id)
         if (got && PUBLISHABLE_MIME.has(got.mime) && got.bytes.byteLength <= MAX_ASSET_BYTES) {

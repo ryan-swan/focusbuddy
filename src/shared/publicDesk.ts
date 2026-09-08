@@ -186,8 +186,15 @@ export interface PublicRenderFile {
  */
 export interface PublicRenderCapture {
   type: 'capture'
-  /** Sanitised markup with styles inlined; carries no scripts and no handlers. */
-  html: string
+  /**
+   * The markup, stored as a token-scoped asset rather than inline.
+   *
+   * Inline it dominated the payload -- on one desk 74% of 168KB -- and was
+   * resent on every revision even when nothing about the widget had changed.
+   * As an asset it is fetched once, cached, and dies with the share like every
+   * other published byte.
+   */
+  assetId: string
   /** The originating kind, so the viewer can still label the frame. */
   kind: string
 }

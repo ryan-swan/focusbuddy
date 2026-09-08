@@ -40,7 +40,7 @@ export interface ProjectionResolvers {
   document(id: string): { html: string; pageCount: number } | null
   slides(id: string): { slides: { id: string; html: string }[] } | null
   diagram(id: string): { nodes: { id: string; label: string; x: number; y: number }[]; edges: { id: string; from: string; to: string; label: string | null }[] } | null
-  /** Sanitised markup for a kind with no projector, when one was captured. */
+  /** Asset id of the captured markup for a kind with no projector. */
   capture(widgetId: string): string | null
   /** Returns an asset reference if the owner published the bytes, else null. */
   asset(id: string): { assetId: string; mime: string; bytes: number; width: number | null; height: number | null } | null
@@ -135,7 +135,7 @@ export function projectWidget(w: Widget, r: ProjectionResolvers = NULL_RESOLVERS
     // is not on the allowlist can never reach the capture branch, whatever the
     // resolver returns.
     const captured = mayCapture(w.kind) ? r.capture(w.id) : null
-    render = captured ? { type: 'capture', html: captured, kind: w.kind } : placeholder(w.kind)
+    render = captured ? { type: 'capture', assetId: captured, kind: w.kind } : placeholder(w.kind)
   } else {
     switch (family) {
       case 'text':
