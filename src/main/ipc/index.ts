@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow, dialog, shell, systemPreferences, webContents as allWebContents, type WebContents } from 'electron'
+import { app, ipcMain, BrowserWindow, dialog, systemPreferences, webContents as allWebContents, type WebContents } from 'electron'
 import { openExternalSafe } from '../safeOpenExternal'
 import { detectPreviewBuild } from '../appMode'
 import { writeFile } from 'node:fs/promises'
