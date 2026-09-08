@@ -1,3 +1,4 @@
+import { widgetCountsByTask } from '../db/widgets'
 import {
   createLiveDesk,
   publishProjection,
@@ -1132,6 +1133,9 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('widgetLinks:listByTask', (_e, taskId: string) => listLinksByTask(taskId))
+
+  // Object counts for a set of desks, so search can tell same-named desks apart.
+  ipcMain.handle('widgets:countsByTask', (_e, taskIds: string[]) => widgetCountsByTask(taskIds))
 
   // Public live desks — the web view of a desk. The renderer builds the
   // sanitized projection (src/renderer/src/lib/publicDeskProjection.ts); these

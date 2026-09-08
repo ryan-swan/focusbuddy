@@ -90,6 +90,29 @@ export function listWidgetsByTask(taskId: string): Widget[] {
   return rows.map(rowToWidget)
 }
 
+/**
+ * How many live objects each of these desks holds. One grouped query rather
+ * than a listWidgetsByTask per desk, because this exists to disambiguate
+ * search results: two desks with the same name are told apart by what is on
+ * them, and that has to be cheap enough to compute while someone is typing.
+ */
+export function widgetCountsByTask(taskIds: string[]): Record<string, number> {
+  if (taskIds.length === 0) return {}
+  const db = getDb()
+  const placeholders = taskIds.map(() => '?').join(',')
+  const rows = db
+    .prepare(
+      `SELECT task_id AS taskId, COUNT(*) AS n FROM widgets
+        WHERE task_id IN (${placeholders}) AND trashed_at IS NULL
+        GROUP BY task_id`
+    )
+    .all(...taskIds) as { taskId: string; n: number }[]
+  const out: Record<string, number> = {}
+  for (const id of taskIds) out[id] = 0
+  for (const r of rows) out[r.taskId] = r.n
+  return out
+}
+
 // Every live widget of a given kind across the whole workspace, newest-touched
 // first. Used by the PlexiBrain Agents view to list desk agents wherever they
 // live, since agents are widgets that otherwise only load per desk.

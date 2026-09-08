@@ -455,6 +455,11 @@ function AssistantOverlayChrome(): JSX.Element {
               <button
                 key={t.id}
                 role="tab"
+                  id={`assistant-tab-${t.id}`}
+                  // The tab strip had no panel to point at, so assistive
+                  // technology saw the tabs and never their contents.
+                  aria-controls="assistant-tabpanel"
+                  tabIndex={isActive ? 0 : -1}
                 aria-selected={isActive}
                 onClick={() => setTab(t.id)}
                 data-testid={`assistant-tab-${t.id}`}
@@ -483,7 +488,12 @@ function AssistantOverlayChrome(): JSX.Element {
         {/* Opaque surface so the non-Chat tabs (Today/Agent/Tasks/Activity/Work)
             are never see-through — the Chat tab supplies its own card. Fullscreen
             uses the wrapper's own base surface. */}
-        <div className={`flex-1 min-h-0 relative ${mode !== 'fullscreen' ? 'bg-[var(--surface-raised)]' : ''}`}>
+        <div
+          role="tabpanel"
+          id="assistant-tabpanel"
+          aria-labelledby={`assistant-tab-${activeTab}`}
+          className={`flex-1 min-h-0 relative ${mode !== 'fullscreen' ? 'bg-[var(--surface-raised)]' : ''}`}
+        >
           {/* Chat: always mounted, shown only on the Chat tab. */}
           <div className="h-full w-full" style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
             <ChatPanel />

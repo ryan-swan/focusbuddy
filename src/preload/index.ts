@@ -217,6 +217,8 @@ const api = {
       ipcRenderer.invoke('widgets:listByTask', taskId),
     listByKind: (kind: Widget['kind']): Promise<Widget[]> =>
       ipcRenderer.invoke('widgets:listByKind', kind),
+    countsByTask: (taskIds: string[]): Promise<Record<string, number>> =>
+      ipcRenderer.invoke('widgets:countsByTask', taskIds),
     create: (draft: WidgetDraft, origin?: WriteOrigin): Promise<Widget> =>
       ipcRenderer.invoke('widgets:create', draft, origin),
     createOptional: (draft: WidgetDraft): Promise<Widget | null> =>

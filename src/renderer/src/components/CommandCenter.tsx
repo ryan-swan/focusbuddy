@@ -91,6 +91,37 @@ export default function CommandCenter({
   const caps = useCapabilityStore((s) => s.capabilities)
 
   const nodes = useNodeStore((s) => s.nodes)
+
+  // Object counts, fetched only for desks whose name is ambiguous. Two desks
+  // called the same thing need telling apart; every other desk does not, so
+  // this stays silent in the common case instead of counting the workspace.
+  const [deskObjectCounts, setDeskObjectCounts] = useState<Record<string, number>>({})
+  useEffect(() => {
+    const byTitle = new Map<string, string[]>()
+    for (const n of nodes) {
+      if (n.archived || n.kind !== 'task') continue
+      const t = (n.title || '').trim().toLowerCase()
+      if (!t) continue
+      byTitle.set(t, [...(byTitle.get(t) ?? []), n.id])
+    }
+    const ambiguous = [...byTitle.values()].filter((ids) => ids.length > 1).flat()
+    if (ambiguous.length === 0) {
+      setDeskObjectCounts({})
+      return
+    }
+    let cancelled = false
+    void window.api.widgets
+      .countsByTask(ambiguous)
+      .then((c) => {
+        if (!cancelled) setDeskObjectCounts(c)
+      })
+      .catch(() => {
+        /* counts are a nicety; the room and status still disambiguate */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [nodes])
   const setActive = useNodeStore((s) => s.setActive)
   const goHome = useViewStore((s) => s.goHome)
   const goAllTasks = useViewStore((s) => s.goAllTasks)
@@ -696,6 +727,66 @@ export default function CommandCenter({
       }
     }
 
+    // Desks and rooms straight from the in-memory store, matched by name.
+    //
+    // Deep search owns node results when there is a query, but it reads an
+    // index written after the fact -- so a desk created seconds ago was not
+    // findable by its own exact title, which is exactly when someone looks for
+    // it. The store updates synchronously on create and rename, so matching it
+    // here makes a new or renamed desk findable immediately, with no separate
+    // index to keep transactional. Deep hits still outrank these, and the two
+    // are deduplicated.
+    if (q !== '') {
+      const seen = new Set(deepHits.map((h) => `${h.type}-${h.id}`))
+      // Same-named desks are the reported ambiguity: two "Plexii Marketing"
+      // desks, one holding five objects and one ten, told apart by nothing.
+      const byTitle = new Map<string, number>()
+      for (const n of nodes) {
+        if (n.archived || n.kind === 'work_item') continue
+        const t = (n.title || '').trim().toLowerCase()
+        if (t) byTitle.set(t, (byTitle.get(t) ?? 0) + 1)
+      }
+      for (const n of nodes) {
+        if (n.archived || n.kind === 'work_item') continue
+        const isFolder = n.kind === 'folder'
+        if (seen.has(`${isFolder ? 'folder' : 'task'}-${n.id}`)) continue
+        const score = Math.max(
+          matchScore(n.title || '', q),
+          matchScore(n.description || '', q) * 0.6
+        )
+        if (score <= 0) continue
+        const duplicate = (byTitle.get((n.title || '').trim().toLowerCase()) ?? 0) > 1
+        const room = n.parentId ? nodes.find((pn) => pn.id === n.parentId)?.title : null
+        // Spend the disambiguating detail only where it is needed, so the
+        // common case stays a clean one-line hint.
+        const parts = [isFolder ? 'Open folder' : 'Open desk']
+        if (duplicate) {
+          if (room) parts.push(room)
+          if (!isFolder && n.status) parts.push(String(n.status).replace('_', ' '))
+          const count = deskObjectCounts[n.id]
+          if (typeof count === 'number') parts.push(`${count} object${count === 1 ? '' : 's'}`)
+        }
+        items.push({
+          id: `node-${n.id}`,
+          label: n.title || (isFolder ? '(untitled folder)' : '(untitled desk)'),
+          hint: parts.join(' · '),
+          icon: isFolder ? 'folder' : 'task_alt',
+          kind: 'jump',
+          // Below a strong deep hit, above the static nav rows.
+          score: 120 + score / 2,
+          run: () => {
+            if (isFolder) goProject(n.id)
+            else {
+              setActive(n.id)
+              goTask(n.id)
+            }
+            closePalette()
+          }
+        })
+      }
+    }
+
+
     // Deep content search — anything the main process found in note/page/doc
     // bodies, table cells, file names, and node descriptions. Ranked above the
     // static commands when there's a real query, since this is what the user is
@@ -793,6 +884,7 @@ export default function CommandCenter({
   }, [
     query,
     nodes,
+    deskObjectCounts,
     workItemsOn,
     canSmartStack,
     activeTaskId,

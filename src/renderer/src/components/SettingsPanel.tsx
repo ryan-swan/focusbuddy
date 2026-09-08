@@ -201,6 +201,23 @@ export default function SettingsPanel({
             <button
               key={t.id}
               role="tab"
+              id={`settings-tab-${t.id}`}
+              // Without aria-controls and a matching tabpanel the tabs were
+              // announced while their contents stayed orphaned -- the reported
+              // "tabs are exposed, their visible controls are not".
+              aria-controls="settings-tabpanel"
+              // Roving tabindex: one tab stop for the whole strip, arrows move
+              // between tabs. That is the ARIA tabs keyboard contract.
+              tabIndex={active ? 0 : -1}
+              onKeyDown={(e) => {
+                const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+                if (dir === 0) return
+                e.preventDefault()
+                const i = TABS.findIndex((x) => x.id === tab)
+                const next = TABS[(i + dir + TABS.length) % TABS.length]
+                setTab(next.id)
+                document.getElementById(`settings-tab-${next.id}`)?.focus()
+              }}
               aria-selected={active}
               data-testid={`settings-tab-${t.id}`}
               onClick={() => setTab(t.id)}
@@ -218,7 +235,15 @@ export default function SettingsPanel({
       </div>
 
       {/* Scrollable content pane — only the active tab's sections render. */}
-      <div className="flex-1 overflow-y-auto" data-testid={`settings-pane-${tab}`}>
+      <div
+        role="tabpanel"
+        id="settings-tabpanel"
+        aria-labelledby={`settings-tab-${tab}`}
+        // Focusable so a keyboard user can reach and scroll the pane at all.
+        tabIndex={0}
+        className="flex-1 overflow-y-auto"
+        data-testid={`settings-pane-${tab}`}
+      >
         {tab === 'appearance' && (
           <>
             <div className="px-3 py-3 space-y-3">

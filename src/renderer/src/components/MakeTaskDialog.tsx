@@ -180,10 +180,16 @@ export default function MakeTaskDialog({
         </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
+            {/* A <label> with no htmlFor names nothing: the control was reaching
+                assistive technology unnamed, with only a placeholder. */}
+            <label
+              htmlFor="make-desk-title"
+              className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1"
+            >
               Task title
             </label>
             <input
+              id="make-desk-title"
               autoFocus
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
@@ -194,8 +200,11 @@ export default function MakeTaskDialog({
               placeholder="What is the desk for?"
             />
           </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1">
+          <div role="group" aria-labelledby="make-desk-folder-label">
+            <label
+              id="make-desk-folder-label"
+              className="block text-[10px] uppercase tracking-wider text-[var(--ink-50)] mb-1"
+            >
               Folder
             </label>
             {folderSel === NEW_FOLDER_VALUE ? (
@@ -207,6 +216,7 @@ export default function MakeTaskDialog({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void handleSubmit()
                   }}
+                  aria-label="New folder name"
                   placeholder="New folder name — e.g. Q3 outreach"
                   className="fb-field w-full text-sm px-2.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-100)]"
                 />
@@ -223,6 +233,7 @@ export default function MakeTaskDialog({
                 <input
                   value={folderQuery}
                   onChange={(e) => setFolderQuery(e.target.value)}
+                  aria-label="Search folders"
                   placeholder="Search folders…"
                   className="fb-field w-full text-sm px-2.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-100)]"
                 />
