@@ -169,6 +169,7 @@ export function useLiveDeskPublisher(deskId: string | null): {
     if (!deskId || !status.token || status.paused) return
     let cancelled = false
     void warmCache(
+      deskId,
       widgets.filter((w) => w.taskId === deskId),
       cache.current
     ).then((learned) => {
@@ -226,6 +227,7 @@ export function useLiveDeskPublisher(deskId: string | null): {
     publishNow: async () => {
       if (!deskId) return
       const projection = build()
+      // No trustworthy source yet: publishing here is what blanked the desk.
       if (!projection) return
       // An explicit publish is a deliberate act: it goes through even when the
       // content is unchanged.

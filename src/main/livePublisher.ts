@@ -81,9 +81,17 @@ export async function publishProjection(
 ): Promise<PublishResult> {
   const record = getLiveDesk(deskId)
   if (!record) return { ok: false, error: 'This desk is not published.' }
+  // Paused is a state the owner chose, not a failure, so it is not recorded as
+  // one. Everything else is: a publish that quietly does nothing leaves the
+  // owner believing a stale public page is current, which is the exact failure
+  // this whole feature is supposed to make impossible.
   if (record.paused) return { ok: false, error: 'Publishing is paused for this desk.' }
   const headers = authHeaders()
-  if (!headers) return { ok: false, error: 'Sign in to publish a desk to the web.' }
+  if (!headers) {
+    const msg = 'Sign in to publish a desk to the web.'
+    recordPublishError(deskId, msg)
+    return { ok: false, error: msg }
+  }
 
   try {
     const res = await fetch(`${SIGNAL_BASE}/shares/desks/${record.token}/projection`, {
