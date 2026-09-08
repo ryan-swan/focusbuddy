@@ -52,6 +52,36 @@ describe('what gets published does not depend on what is on screen', () => {
   })
 })
 
+describe('publishing runs for as long as the app does', () => {
+  const host = readFileSync(
+    join(__dirname, '..', '..', 'src', 'renderer', 'src', 'components', 'LiveDeskPublisherHost.tsx'),
+    'utf8'
+  )
+  const app = readFileSync(join(__dirname, '..', '..', 'src', 'renderer', 'src', 'App.tsx'), 'utf8')
+
+  it('is mounted at the app root, not inside a dialog', () => {
+    // It used to live in the share dialog's panel, so a "live" desk was live
+    // only while that panel was open and frozen the rest of the time.
+    expect(app).toContain('<LiveDeskPublisherHost />')
+    expect(host).toContain('useLiveDeskPublisher(deskId)')
+  })
+
+  it('publishes for every desk that has a public link', () => {
+    expect(host).toContain('window.api.liveDesk')
+    expect(host).toContain('.list()')
+    expect(host).toContain('deskIds.map((id) => (')
+  })
+
+  it('picks up a newly published desk without a restart', () => {
+    expect(host).toContain('setInterval(load, 15_000)')
+  })
+
+  it('does not remount its publishers on every poll', () => {
+    // Tearing them down each poll would restart the fetch-and-publish cycle.
+    expect(host).toContain("prev.join(',') === next.join(',') ? prev : next")
+  })
+})
+
 describe('the projection itself still reflects its input honestly', () => {
   const base = { deskId: 'd1', title: 'Desk', revision: 0, now: 1 }
 

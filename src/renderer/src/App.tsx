@@ -9,6 +9,7 @@ import { PlexiDeskShell, PlexiPeopleShell, PlexiBrainShell } from './components/
 import AssistantOverlay from './components/assistant/AssistantOverlay'
 import PinTray from './components/pins/PinTray'
 import { useAssistantChrome } from './stores/assistantChrome'
+import LiveDeskPublisherHost from './components/LiveDeskPublisherHost'
 import TelemetryReporter from './components/TelemetryReporter'
 import ReleaseModal from './components/ReleaseModal'
 import Tooltip from './components/Tooltip'
@@ -485,6 +486,11 @@ export default function App(): JSX.Element {
     <div className="fb-app-shell flex flex-col">
       {/* Reports aggregate usage telemetry while signed in (admin Analytics). */}
       <TelemetryReporter />
+      {/* Keeps every desk with a public link up to date. Mounted at the root
+          because publishing belongs to the app: it used to run only while the
+          share dialog was open, so a "live" desk was frozen the moment you
+          closed it. */}
+      <LiveDeskPublisherHost />
       {/* First-run "What's new in vX.Y.Z" after an update. */}
       {releaseEntry && (
         <ReleaseModal entry={releaseEntry} onClose={() => setReleaseEntry(null)} />
