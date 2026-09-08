@@ -283,7 +283,7 @@ export const IPC_ARG_CONTRACTS: Record<string, readonly ArgSpec[]> = {
   'widgets:bringToFront': [{ kind: 'string', optional: false, nullable: false }],
   'widgets:create': [{ kind: 'object', optional: false, nullable: false }, { kind: 'string', optional: true, nullable: false }],
   'widgets:createOptional': [{ kind: 'object', optional: false, nullable: false }],
-  'widgets:delete': [{ kind: 'string', optional: false, nullable: false }],
+  'widgets:delete': [{ kind: 'string', optional: false, nullable: false }, { kind: 'string', optional: true, nullable: false }],
   'widgets:get': [{ kind: 'string', optional: false, nullable: false }],
   'widgets:listByTask': [{ kind: 'string', optional: false, nullable: false }],
   'widgets:restore': [{ kind: 'string', optional: false, nullable: false }],

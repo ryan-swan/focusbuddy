@@ -1060,7 +1060,13 @@ export function registerIpcHandlers(): void {
     }
     return widget
   })
-  ipcMain.handle('widgets:delete', (_e, id: string) => {
+  // `origin` distinguishes a user's delete from one applied by sync, exactly as
+  // widgets:create/update and nodes:delete do. It was missing from the signature
+  // while the body still read it, so EVERY delete threw "origin is not defined"
+  // after the row had already been soft-deleted: the database lost the widget,
+  // the renderer's await rejected, and the store therefore never pruned it — so
+  // the widget stayed on screen and deleting appeared to do nothing.
+  ipcMain.handle('widgets:delete', (_e, id: string, origin?: WriteOrigin) => {
     const before = getWidget(id)
     const removed = deleteWidget(id)
     if (origin !== 'sync' && isRealDelete(before)) {
