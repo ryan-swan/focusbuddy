@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Widget, WidgetLink } from '@shared/types'
 import { useWidgetStore } from '../stores/widgets'
 import { useLinksStore } from '../stores/links'
 import { useNodeStore } from '../stores/nodes'
@@ -71,8 +72,51 @@ export function useLiveDeskPublisher(deskId: string | null): {
   publishNow: () => Promise<void>
 } {
   const [status, setStatus] = useState<LiveDeskStatus>(EMPTY)
-  const widgets = useWidgetStore((s) => s.widgets)
-  const links = useLinksStore((s) => s.links)
+  const storeWidgets = useWidgetStore((s) => s.widgets)
+  const storeLinks = useLinksStore((s) => s.links)
+
+  // What gets published must not depend on what is on screen.
+  //
+  // Both stores hold the desk the user currently has OPEN. Building the
+  // projection straight from them meant that walking away from a published
+  // desk published an empty one over it: the filter found nothing, and a desk
+  // with 49 objects went out as zero. The store is only the right source while
+  // it actually holds this desk -- and then it is the best one, because it
+  // carries edits as they are typed.
+  const storeHasDesk = storeWidgets.some((w) => w.taskId === deskId)
+  const [offscreen, setOffscreen] = useState<{ widgets: Widget[]; links: WidgetLink[] } | null>(null)
+
+  useEffect(() => {
+    if (!deskId || !storeHasDesk) {
+      // Reading the desk directly is what makes publishing independent of
+      // navigation. Nothing in the UI can change a closed desk, so one read is
+      // enough until it is opened again.
+      let cancelled = false
+      void Promise.all([
+        window.api.widgets.listByTask(deskId ?? ''),
+        window.api.widgetLinks.listByTask(deskId ?? '')
+      ])
+        .then(([w, l]) => {
+          if (!cancelled) setOffscreen({ widgets: w, links: l })
+        })
+        .catch(() => {
+          // Leave it null: with no trustworthy source we publish nothing at
+          // all, rather than publishing an empty desk.
+          if (!cancelled) setOffscreen(null)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+    setOffscreen(null)
+    return
+  }, [deskId, storeHasDesk])
+
+  const widgets = storeHasDesk ? storeWidgets : (offscreen?.widgets ?? [])
+  const links = storeHasDesk ? storeLinks : (offscreen?.links ?? [])
+  // True when we genuinely know what is on the desk. Publishing without this
+  // is how the desk got blanked.
+  const haveSource = storeHasDesk || offscreen !== null
   const cache = useRef(new Map<string, unknown>())
   // The last projection actually queued, so an identical rebuild is a no-op.
   const lastSentRef = useRef<string>('')
@@ -101,7 +145,7 @@ export function useLiveDeskPublisher(deskId: string | null): {
   }, [refresh])
 
   const build = useCallback(() => {
-    if (!deskId) return null
+    if (!deskId || !haveSource) return null
     const node = useNodeStore.getState().nodes.find((n) => n.id === deskId)
     return buildProjection({
       deskId,

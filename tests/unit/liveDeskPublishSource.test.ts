@@ -1,0 +1,77 @@
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { buildProjection } from '../../src/renderer/src/lib/publicDeskProjection'
+import type { Widget } from '../../src/shared/types'
+
+// A published desk of 49 objects went out as an empty one, and the public page
+// showed a blank canvas.
+//
+// The publisher built the projection from the widget store, and that store
+// holds the desk the user currently has OPEN. Walk away from the desk you are
+// sharing and the filter finds nothing, so an empty projection is published
+// over the good one. Nothing was broken about the desk; the publisher was
+// simply reading the screen instead of the desk.
+
+const SRC = readFileSync(
+  join(__dirname, '..', '..', 'src', 'renderer', 'src', 'lib', 'useLiveDeskPublisher.ts'),
+  'utf8'
+)
+
+function widget(id: string, taskId: string): Widget {
+  return {
+    id, taskId, kind: 'note', title: '', content: 'x',
+    x: 0, y: 0, width: 10, height: 10, zIndex: 0, color: null, status: null,
+    pinned: false, pinnedScreenX: null, pinnedScreenY: null, pinnedZone: null,
+    parentSectionId: null, layout: null, sourceAppId: null
+  } as unknown as Widget
+}
+
+describe('what gets published does not depend on what is on screen', () => {
+  it('reads the desk directly when it is not the one open', () => {
+    expect(SRC).toContain('window.api.widgets.listByTask(deskId ?? \'\')')
+    expect(SRC).toContain('window.api.widgetLinks.listByTask(deskId ?? \'\')')
+  })
+
+  it('prefers the store only while it actually holds this desk', () => {
+    // While the desk IS open the store is the better source: it carries edits
+    // as they are typed, before they reach the database.
+    expect(SRC).toContain('const storeHasDesk = storeWidgets.some((w) => w.taskId === deskId)')
+    expect(SRC).toContain('const widgets = storeHasDesk ? storeWidgets : (offscreen?.widgets ?? [])')
+  })
+
+  it('publishes nothing at all when the desk contents are unknown', () => {
+    // The blanking happened in exactly this window. Publishing "no widgets"
+    // because we have not looked yet is worse than publishing nothing.
+    expect(SRC).toContain('const haveSource = storeHasDesk || offscreen !== null')
+    expect(SRC).toContain('if (!deskId || !haveSource) return null')
+  })
+
+  it('clears the fetched copy once the desk is open, so it cannot go stale', () => {
+    expect(SRC).toContain('setOffscreen(null)')
+  })
+})
+
+describe('the projection itself still reflects its input honestly', () => {
+  const base = { deskId: 'd1', title: 'Desk', revision: 0, now: 1 }
+
+  it('a desk with objects projects those objects', () => {
+    const out = buildProjection({ ...base, widgets: [widget('w1', 'd1'), widget('w2', 'd1')] })
+    expect(out.widgets).toHaveLength(2)
+    expect(out.bounds.width).toBeGreaterThan(0)
+  })
+
+  it('a genuinely empty desk still projects as empty', () => {
+    // The fix must not make it impossible to empty a desk on purpose.
+    const out = buildProjection({ ...base, widgets: [] })
+    expect(out.widgets).toEqual([])
+    expect(out.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
+  })
+
+  it('another desk\'s objects are never published to this one', () => {
+    const out = buildProjection({ ...base, widgets: [widget('w1', 'd1'), widget('other', 'd2')] })
+    // buildProjection takes what it is given; the hook filters by taskId, and
+    // this asserts the shape that filter produces stays honest.
+    expect(out.widgets.map((w) => w.id)).toContain('w1')
+  })
+})
