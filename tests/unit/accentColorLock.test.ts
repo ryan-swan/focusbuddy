@@ -44,26 +44,21 @@ describe('the accent color always paints', () => {
   })
 })
 
-// ── DEC-095 — undefined ink tokens (GAP-020) ───────────────────────────────
-// A `var(--ink-80)` the sheet never defines is INVALID: the declaration is
-// dropped and the element silently inherits its parent's colour, so text
-// meant to be secondary renders at full ink. Measured live — --ink-80,
-// --ink-45, --ink-55, --ink-35, --ink-25 and --ink-300 all resolve to nothing.
-//
-// Defining them app-wide changes text colour in ~68 places at once, so the
-// cleanup is its own round (GAP-020). This lock does the one thing that is
-// safe today: the offender set may SHRINK, never grow.
-describe('DEC-095 — no NEW undefined ink tokens (GAP-020 baseline)', () => {
-  it('every ink step referenced is defined, or is a known GAP-020 offender', () => {
+// ── DEC-096 — undefined ink tokens (GAP-020, CLOSED) ───────────────────────
+// A `var(--ink-N)` the sheet never defines is INVALID: the declaration is
+// dropped and the element silently inherits its parent's colour. DEC-095
+// found six such steps (~68 sites) and froze them; DEC-096 DEFINED the five
+// real ones in all three themes (midpoints of their neighbours) and rewrote
+// the --ink-300 typo to --ink-60. The lock is strict now: every ink step
+// referenced anywhere must exist in tokens.css.
+describe('DEC-096 — every ink token referenced is defined (GAP-020 closed)', () => {
+  it('no component references an ink step the sheet does not define', () => {
     const { readFileSync, readdirSync, statSync } = require('node:fs') as typeof import('node:fs')
     const { join } = require('node:path') as typeof import('node:path')
-    // Frozen at the moment GAP-020 was found. Shrinking this list is the fix;
-    // adding to it is the regression this lock exists to catch.
-    const KNOWN_OFFENDERS = new Set(['80', '45', '55', '35', '25', '300'])
     const root = join(__dirname, '../..', 'src/renderer/src')
     const tokens = readFileSync(join(root, 'styles/tokens.css'), 'utf-8')
     const defined = new Set([...tokens.matchAll(/--ink-(\d+):/g)].map((m) => m[1]))
-    const found = new Set<string>()
+    const offenders: string[] = []
     const walk = (dir: string): void => {
       for (const name of readdirSync(dir)) {
         const p = join(dir, name)
@@ -71,12 +66,52 @@ describe('DEC-095 — no NEW undefined ink tokens (GAP-020 baseline)', () => {
         else if (/\.(tsx|ts)$/.test(name)) {
           const body = readFileSync(p, 'utf-8')
           for (const m of body.matchAll(/--ink-(\d+)/g))
-            if (!defined.has(m[1])) found.add(m[1])
+            if (!defined.has(m[1])) offenders.push(`${name}: --ink-${m[1]}`)
         }
       }
     }
     walk(root)
-    const novel = [...found].filter((step) => !KNOWN_OFFENDERS.has(step))
-    expect(novel).toEqual([])
+    expect([...new Set(offenders)]).toEqual([])
+  })
+  it('each theme block defines the full scale — a new theme cannot ship a partial one', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs')
+    const { join } = require('node:path') as typeof import('node:path')
+    const tokens = readFileSync(join(__dirname, '../..', 'src/renderer/src/styles/tokens.css'), 'utf-8')
+    const STEPS = ['100', '90', '80', '70', '60', '55', '50', '45', '40', '35', '30', '25', '10']
+    for (const step of STEPS) {
+      const n = [...tokens.matchAll(new RegExp(`--ink-${step}:`, 'g'))].length
+      expect(`--ink-${step} x${n}`).toBe(`--ink-${step} x3`)
+    }
+  })
+})
+
+// ── DEC-097 — var()+opacity-modifier utilities (GAP-019, CLOSED) ────────────
+// `bg-[var(--surface-sunken)]/60` emits `rgb(var(--surface-sunken) / 0.6)`,
+// and since the token is a COMPLETE color the declaration is invalid — the
+// element paints NOTHING, both themes, silently (117 sites, measured by
+// paint-probe under DEC-089/095). The working form is a color-mix arbitrary
+// value: `bg-[color-mix(in_oklab,var(--x)_60%,transparent)]` — same token,
+// same opacity, valid CSS. This lock keeps the broken form out of the app
+// source for every property prefix (bg/border/divide/via/…). The codemod
+// test fixture in tests/ is sample input, deliberately out of scope.
+describe('DEC-097 — no var()+modifier utilities anywhere (GAP-019 closed)', () => {
+  it('app source never alpha-modifies a var() token with the slash form', () => {
+    const { readFileSync, readdirSync, statSync } = require('node:fs') as typeof import('node:fs')
+    const { join } = require('node:path') as typeof import('node:path')
+    const root = join(__dirname, '../..', 'src/renderer/src')
+    const offenders: string[] = []
+    const walk = (dir: string): void => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name)
+        if (statSync(p).isDirectory()) walk(p)
+        else if (/\.(tsx|ts)$/.test(name)) {
+          const body = readFileSync(p, 'utf-8')
+          for (const m of body.matchAll(/\[var\((--[a-z-]+)\)\]\/(\d+)/g))
+            offenders.push(`${name}: [var(${m[1]})]/${m[2]}`)
+        }
+      }
+    }
+    walk(root)
+    expect(offenders).toEqual([])
   })
 })

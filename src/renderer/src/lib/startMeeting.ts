@@ -33,7 +33,18 @@ export type MeetingOrigin =
   | { kind: 'design'; id: string; title: string }
   | { kind: 'chat'; channelId: string; title: string }
   | { kind: 'desk'; nodeId: string; title: string }
-  | { kind: 'calendar'; title: string }
+  | {
+      kind: 'calendar'
+      title: string
+      // M5 — series identity + staging facts ride the origin from the booked
+      // block: the wrap-up stamps them onto the meeting record, and the Stage
+      // assembles prep from them. All optional — an external-calendar join or
+      // a bare deep link has none, and prep quietly shows nothing.
+      blockId?: string
+      seriesId?: string | null
+      agenda?: string | null
+      invitees?: string[]
+    }
   | { kind: 'standalone'; title: string }
 
 let currentOrigin: MeetingOrigin | null = null
@@ -94,11 +105,36 @@ export async function startArtifactMeeting(origin: MeetingOrigin): Promise<strin
 // Join a specific, already-known room — the host and every invitee of a
 // scheduled calendar meeting open the SAME room id, so this is what the "Join"
 // button on a calendar meeting and the haptyx://meet?room= deep link both call.
-export async function joinMeetingRoom(roomId: string, title?: string): Promise<void> {
+export async function joinMeetingRoom(
+  roomId: string,
+  title?: string,
+  meta?: { blockId?: string; seriesId?: string | null; agenda?: string | null; invitees?: string[] }
+): Promise<void> {
   if (meetBlocked()) return
-  currentOrigin = { kind: 'calendar', title: title || 'Meeting' }
+  currentOrigin = { kind: 'calendar', title: title || 'Meeting', ...meta }
   useViewStore.getState().goMeetings()
   await useMeetingRoomStore.getState().join(roomId, title || 'Meeting')
+}
+
+// M6 — guest capture records an EXTERNAL meeting (Zoom/Meet/Teams); there is
+// no room to join, but the wrap-up still stamps series identity from the
+// origin, so an external series meeting gets prep and "carried from last
+// time" exactly like a native one.
+export function markCalendarOrigin(meta: {
+  title: string
+  blockId?: string
+  seriesId?: string | null
+  agenda?: string | null
+  invitees?: string[]
+}): void {
+  currentOrigin = { kind: 'calendar', ...meta }
+}
+
+// DEC-130 — "Record notes" with a desk picked in its dialog (DEC-118): the
+// recording's origin is THAT desk, so the wrap-up files its folder under it
+// and stands the Record on it instead of minting a new desk.
+export function markDeskOrigin(nodeId: string, title: string): void {
+  currentOrigin = { kind: 'desk', nodeId, title }
 }
 
 // A fresh room id for a scheduled meeting, matching the live-room format so the

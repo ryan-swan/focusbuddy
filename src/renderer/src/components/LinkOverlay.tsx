@@ -661,8 +661,8 @@ export default function LinkOverlay({ ghost, pendingPick, onPendingPickDone }: P
               hasError
                 ? 'bg-red-500 border-red-400 text-white'
                 : reactiveOff
-                  ? 'bg-[var(--surface-raised)]/90 border-[var(--edge-firm)] text-[var(--ink-40)]'
-                  : 'bg-[var(--surface-raised)]/90 border-accent/50 text-accent'
+                  ? 'bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] border-[var(--edge-firm)] text-[var(--ink-40)]'
+                  : 'bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] border-accent/50 text-accent'
             } ${isRunning ? 'fb-breathing' : ''}`}
           >
             <Icon name={hasError ? 'error' : meta.icon} size={11} />

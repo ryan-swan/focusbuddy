@@ -227,7 +227,7 @@ export default function SheetAiFill({
             {activeHeaders.map((h, i) => (
               <span
                 key={i}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)]/70 text-[var(--ink-70)]"
+                className="text-[11px] px-2 py-0.5 rounded-full bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] text-[var(--ink-70)]"
               >
                 {h}
               </span>

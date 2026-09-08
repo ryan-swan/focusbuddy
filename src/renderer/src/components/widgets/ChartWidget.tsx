@@ -318,7 +318,7 @@ function ChartConfigPanel({
     'text-[11px] bg-[var(--surface-sunken)] rounded px-1.5 py-1 text-[var(--ink-100)] focus:border-accent'
 
   return (
-    <div className="shrink-0 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60 px-2.5 py-2 space-y-2">
+    <div className="shrink-0 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] px-2.5 py-2 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-[10px] uppercase tracking-wider text-[var(--ink-40)]">Table</label>
         <select

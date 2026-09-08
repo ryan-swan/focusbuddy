@@ -204,7 +204,8 @@ test('Meet/zero — module-dashboard-meet renders; chart honest empty; create bu
 
   const dash = window.locator('[data-testid="module-dashboard-meet"]')
   await expect(dash).toBeVisible({ timeout: 5_000 })
-  await expect(window.locator('[data-testid="module-dashboard-customize-meet"]')).toBeVisible()
+  // DEC-119: under Meet's own hero the dashboard is embedded — no Customize door.
+  await expect(window.locator('[data-testid="module-dashboard-customize-meet"]')).toHaveCount(0)
 
   // Honest empty chart state
   await expect(dash.locator('text=No activity yet')).toBeVisible({ timeout: 5_000 })

@@ -15,6 +15,7 @@ import { canonicalIntentClass } from '@shared/workItems'
 import { PROTOCOL_VOCAB_NOTE } from './vocabulary'
 import { listPeopleDirectory } from '../peopleDirectory'
 import { extractPeople, type PersonClarify, type PersonSuggestion } from './peopleExtract'
+import { suggestTags } from './tagSuggest'
 import {
   classifyByRules,
   scanDeadline,
@@ -47,6 +48,10 @@ export interface CaptureClassification {
   /** DEC-088 — ONE ambiguous single-name reference ("Which Caleb?") for the
    *  People drawer. The deadline question still outranks it at auto-open. */
   personClarify: PersonClarify | null
+  /** #16 (analysis/27 P4) — existing tags the capture's words evoke.
+   *  Deterministic and vocabulary-grounded (tagSuggest.ts): suggested, never
+   *  applied — accent-marked at the confirm stop like every inference. */
+  tags: string[]
 }
 
 async function classifyWithModel(text: string): Promise<{ intentClass: IntentClass; confidence: number } | null> {
@@ -100,6 +105,9 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
   // DEC-088 — people can appear in ANY segment of a compound; scan the whole
   // capture. Deterministic, so the rules fast path stays model-free.
   const peopleScan = extractPeople(text, listPeopleDirectory())
+  // #16 — tags, like people, scan the WHOLE capture, deterministically:
+  // the fast path stays model-free either way.
+  const tagSuggestions = suggestTags(text)
   const ruled = classifyByRules(primaryText)
   if (ruled) {
     return {
@@ -113,7 +121,8 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
       via: 'rules',
       secondaries,
       people: peopleScan.people,
-      personClarify: peopleScan.clarify
+      personClarify: peopleScan.clarify,
+      tags: tagSuggestions
     }
   }
   const modeled = await classifyWithModel(primaryText)
@@ -129,7 +138,8 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
       via: 'model',
       secondaries,
       people: peopleScan.people,
-      personClarify: peopleScan.clarify
+      personClarify: peopleScan.clarify,
+      tags: tagSuggestions
     }
   }
   // The floor: never block, never lose — file it lightly.
@@ -142,6 +152,7 @@ export async function classifyCapture(text: string, now = new Date()): Promise<C
     via: 'fallback',
     secondaries,
     people: peopleScan.people,
-    personClarify: peopleScan.clarify
+    personClarify: peopleScan.clarify,
+    tags: tagSuggestions
   }
 }

@@ -16,8 +16,43 @@ export interface Meeting {
   // Plain-text action items distilled from the meeting.
   actionItems: string[]
   durationSec: number | null
+  /** M2b — the Record: one object, three renderings (SPEC-003 §3.4). Null
+   *  until an Enhance pass has run for this meeting. */
+  record: MeetingRecord | null
+  /** M2c (S3-DEC-020) — the desk node minted for this meeting, when one
+   *  was. The container everything else hangs off. */
+  deskNodeId: string | null
+  // M5 — series identity, stamped when the meeting started from a booked
+  // calendar block. Null for ad-hoc meetings; seriesId groups instances.
+  seriesId: string | null
+  blockId: string | null
   createdAt: number
   updatedAt: number
+}
+
+// M2b (SPEC-003 §2.3, S3-DEC-021) — the Record's provenance model. Three
+// tiers, and the middle one is the rule that makes the model honest:
+//   yours    — the user typed it. Verbatim, never rewritten, ever.
+//   heard    — carries a resolvable transcript anchor (segmentId). A heard
+//              span whose anchor does not resolve is DOWNGRADED to inferred
+//              automatically — the tier can never be asserted, only proven.
+//   inferred — the model's synthesis. Contestable, and rendered as such.
+export type RecordTier = 'yours' | 'heard' | 'inferred'
+
+export interface RecordSpan {
+  tier: RecordTier
+  text: string
+  /** heard only — the segment this claim is drawn from. */
+  segmentId: string | null
+  /** heard only — the anchor's clock position, for the hover timestamp. */
+  startMs: number | null
+  /** Brief section heading this span renders under (template-driven). */
+  section: string | null
+}
+
+export interface MeetingRecord {
+  spans: RecordSpan[]
+  generatedAt: number
 }
 
 export interface MeetingDraft {
@@ -26,6 +61,9 @@ export interface MeetingDraft {
   summary?: string
   actionItems?: string[]
   durationSec?: number | null
+  // M5 — stamped when the meeting started from a booked calendar block.
+  seriesId?: string | null
+  blockId?: string | null
 }
 
 export interface MeetingPatch {
@@ -34,4 +72,71 @@ export interface MeetingPatch {
   summary?: string
   actionItems?: string[]
   durationSec?: number | null
+  record?: MeetingRecord | null
+  deskNodeId?: string | null
+  seriesId?: string | null
+  blockId?: string | null
+}
+
+// M2 (SPEC-003 S3-DEC-021) — one attributed, timestamped span of speech.
+// speakerAccountId is null only when attribution was genuinely unavailable
+// (legacy mixed-blob transcriptions); per-track capture makes it exact for
+// native meetings. confidence is the ENGINE's own belief (cloud logprobs),
+// or null where the engine exposes none (local) — never fabricated.
+// M5 — meeting prep: what the staging assembles before (and the wrap-up
+// reads after) a series meeting. Everything here is a database fact — the
+// agenda from the booking, the previous instance, its still-open items, and
+// the attendees' open items. No model call builds prep.
+export interface CarriedItem {
+  id: string
+  title: string
+  state: string
+  intentClass: string | null
+  dueAt: number | null
+}
+
+export interface AttendeeItems {
+  invitee: string
+  items: CarriedItem[]
+}
+
+export interface MeetingPrep {
+  agenda: string | null
+  lastMeeting: { id: string; title: string; createdAt: number } | null
+  carried: CarriedItem[]
+  attendees: AttendeeItems[]
+}
+
+// M4 — one Recall hit: a segment with its meeting identity, so the answer
+// is a speaker + a timestamp + a door (never a bare string).
+export interface TranscriptSearchHit {
+  segmentId: string
+  meetingId: string
+  meetingTitle: string
+  speakerAccountId: string | null
+  speakerName: string
+  startMs: number
+  endMs: number
+  text: string
+  rank: number
+}
+
+export interface TranscriptSegment {
+  id: string
+  meetingId: string
+  speakerAccountId: string | null
+  speakerName: string
+  startMs: number
+  endMs: number
+  text: string
+  confidence: number | null
+}
+
+export interface TranscriptSegmentDraft {
+  speakerAccountId: string | null
+  speakerName: string
+  startMs: number
+  endMs: number
+  text: string
+  confidence: number | null
 }

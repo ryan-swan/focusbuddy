@@ -91,7 +91,9 @@ describe('DEC-089(B) — widget chrome survives dark mode', () => {
   })
   it('the idle bell is quiet, not gone', () => {
     expect(frame).toContain(
-      "'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'"
+      // DEC-097 (GAP-019): the /60 modifier on a var() token painted NOTHING;
+      // the hover wash is now a color-mix arbitrary value. Bell contract same.
+      "'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent'"
     )
   })
 

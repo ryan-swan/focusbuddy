@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
 import { useMeetingRoomStore, type DockSide } from '../stores/meetingRoom'
+import { consentSummary } from '../lib/meetingConsent'
+import { getMeetingOrigin } from '../lib/startMeeting'
+import type { MeetingPrep } from '@shared/meetings'
+import { useAccountStore } from '../stores/account'
 import { useVideoBlocked, CAMERA_BLOCKED_HINT } from '../lib/useVideoBlocked'
 import { usePresenceStore } from '../stores/presence'
 import { personDisplayName, personInitials } from '../lib/personName'
@@ -78,8 +82,12 @@ function ControlButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`inline-flex ${size} items-center justify-center rounded-full transition-colors ${
-        danger ? 'bg-rose-500 text-white hover:bg-rose-600' : active ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white/10 text-white hover:bg-white/20'
+      className={`inline-flex ${size} items-center justify-center rounded-full fb-press transition-colors shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] ${
+        danger
+          ? 'bg-gradient-to-b from-rose-500 to-rose-600 text-white hover:from-rose-400'
+          : active
+            ? 'bg-white/20 text-white hover:bg-white/30'
+            : 'bg-white/10 text-white hover:bg-white/20'
       }`}
     >
       <Icon name={icon} size={small ? 17 : 20} />
@@ -101,6 +109,16 @@ export default function MeetingOverlay(): JSX.Element | null {
   const layout = useMeetingRoomStore((s) => s.layout)
   const dockSide = useMeetingRoomStore((s) => s.dockSide)
   const transcribing = useMeetingRoomStore((s) => s.transcribing)
+  const recordingBy = useMeetingRoomStore((s) => s.recordingBy)
+  const liveLines = useMeetingRoomStore((s) => s.liveLines)
+  const setLiveOpen = useMeetingRoomStore((s) => s.setLiveOpen)
+  const consent = useMeetingRoomStore((s) => s.consent)
+  const consentAsk = useMeetingRoomStore((s) => s.consentAsk)
+  const notes = useMeetingRoomStore((s) => s.notes)
+  const moments = useMeetingRoomStore((s) => s.moments)
+  const setNotes = useMeetingRoomStore((s) => s.setNotes)
+  const markMoment = useMeetingRoomStore((s) => s.markMoment)
+  const answerConsent = useMeetingRoomStore((s) => s.answerConsent)
   const leave = useMeetingRoomStore((s) => s.leave)
   const invite = useMeetingRoomStore((s) => s.invite)
   const toggleMute = useMeetingRoomStore((s) => s.toggleMute)
@@ -114,11 +132,87 @@ export default function MeetingOverlay(): JSX.Element | null {
 
   const presencePeers = usePresenceStore((s) => s.peers)
   const [showInvite, setShowInvite] = useState(false)
+  // M1 — the Stage is notes-first: the pane opens with the room (stage
+  // layout) and its content is the highest-signal input the system gets.
+  const [showNotes, setShowNotes] = useState(true)
+  const [showTranscriptNote, setShowTranscriptNote] = useState(false)
+  const myId = useAccountStore((s) => s.account?.id ?? '')
   // DEC-078 — a live-but-muted local video track means the OS is refusing
   // frames (TCC denial): show the honest state, never a black rectangle.
   const cameraBlocked = useVideoBlocked(localStream)
 
   const remote = useMemo(() => Object.values(participants), [participants])
+
+  // M1 (§3.8) — the state, named in words, continuously. Never an icon alone.
+  const consentLine = useMemo(() => {
+    const nameOf = (id: string): string => {
+      if (id === myId) return 'you'
+      const p = participants[id]
+      return p ? personDisplayName(p, p.handle) : 'someone'
+    }
+    return consentSummary(transcribing, consent, nameOf)
+  }, [transcribing, consent, participants, myId])
+
+  // M1 — the Stage grammar: ⌘⇧M marks the moment without breaking typing;
+  // ⌘⇧T answers honestly about the transcript. Active for the whole meeting.
+  useEffect(() => {
+    if (status !== 'in') return
+    function onKey(e: KeyboardEvent): void {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return
+      if (e.key.toLowerCase() === 'm') {
+        e.preventDefault()
+        markMoment()
+      } else if (e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        setShowTranscriptNote((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [status, markMoment])
+
+  // M4 — the live tap follows the pane: decode runs only while the initiator
+  // has the transcript pane open. Closing it (or the recording ending)
+  // detaches every processor — the cost is view-driven, never ambient.
+  useEffect(() => {
+    const wantLive = showTranscriptNote && transcribing && recordingBy === myId
+    setLiveOpen(wantLive)
+    return () => setLiveOpen(false)
+  }, [showTranscriptNote, transcribing, recordingBy, myId, setLiveOpen])
+
+  const liveScrollRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = liveScrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [liveLines])
+
+  // M5 (P5) — staging: when the room came from a booked calendar block, the
+  // Stage assembles prep from database facts — the agenda, the previous
+  // instance's still-open items, and each attendee's open items. Fetched
+  // once per room; an ad-hoc meeting has no origin block and shows nothing.
+  const [prep, setPrep] = useState<MeetingPrep | null>(null)
+  const [prepOpen, setPrepOpen] = useState(true)
+  useEffect(() => {
+    if (status !== 'in') {
+      setPrep(null)
+      return
+    }
+    const origin = getMeetingOrigin()
+    if (origin?.kind !== 'calendar') return
+    if (!origin.seriesId && !origin.agenda && !origin.invitees?.length) return
+    if (typeof window.api.meetings.prep !== 'function') return
+    let alive = true
+    void window.api.meetings
+      .prep({ seriesId: origin.seriesId ?? null, invitees: origin.invitees ?? [], agenda: origin.agenda ?? null })
+      .then((data) => {
+        if (!alive) return
+        if (data.agenda || data.carried.length || data.attendees.length) setPrep(data)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [status])
 
   // Active screen shares to present: my own (when sharing) plus any peer who is
   // presenting. These render whole (object-contain), separate from camera tiles.
@@ -276,6 +370,158 @@ export default function MeetingOverlay(): JSX.Element | null {
     </>
   )
 
+  // M1 (§3.8) — someone wants to record: ask, in the room, before a sample
+  // of your audio is captured. Three honest answers; no fourth.
+  const consentModal = consentAsk && (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50" data-testid="consent-modal">
+      <div className="w-[380px] rounded-2xl bg-stone-900 text-white border border-white/10 shadow-2xl p-5">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-rose-500/20">
+            <Icon name="radio_button_checked" size={18} className="text-rose-400" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold">{consentAsk.byName} wants to record</p>
+            <p className="text-[12px] text-white/60">Nothing of yours is captured until you answer.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-1.5">
+          <button
+            onClick={() => answerConsent('accepted')}
+            data-testid="consent-accept"
+            className="h-10 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-[13px] font-semibold"
+          >
+            Record me
+          </button>
+          <button
+            onClick={() => answerConsent('no-transcript')}
+            data-testid="consent-no-transcript"
+            className="h-10 rounded-lg bg-white/10 hover:bg-white/20 text-[13px]"
+            title="Your audio is recorded for replay, but excluded from the written transcript"
+          >
+            Record me, but leave me out of the transcript
+          </button>
+          <button
+            onClick={() => answerConsent('declined')}
+            data-testid="consent-decline"
+            className="h-10 rounded-lg bg-white/10 hover:bg-white/20 text-[13px] text-white/80"
+            title="Your audio is never captured — the record will say so"
+          >
+            Don’t record me
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // M1 — the Stage pane: a notepad, not a transcript viewer. Blank by
+  // default; your words are saved verbatim and never rewritten.
+  const fmtMoment = (ms: number): string => {
+    const s = Math.floor(ms / 1000)
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  }
+  const notesPane = (
+    <div className="w-[300px] shrink-0 flex flex-col rounded-xl bg-stone-900/90 border border-white/10 overflow-hidden" data-testid="meeting-notes-pane">
+      <div className="px-3 py-2 border-b border-white/10 flex items-center gap-2">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-chip)] bg-white/10 text-white/80">
+          <Icon name="edit_note" size={14} />
+        </span>
+        <span className="text-[12px] font-semibold text-white/90 flex-1 tracking-tight">Notes — yours, verbatim</span>
+        {moments.length > 0 && (
+          <span className="text-[10.5px] text-amber-300/90" data-testid="moment-count">⚑ {moments.length}</span>
+        )}
+      </div>
+      {prep && (
+        <div className="border-b border-white/10" data-testid="meeting-prep">
+          <button
+            onClick={() => setPrepOpen((v) => !v)}
+            className="w-full px-3 py-1.5 flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wider text-white/50 hover:text-white/80"
+            data-testid="meeting-prep-toggle"
+          >
+            <Icon name={prepOpen ? 'expand_more' : 'chevron_right'} size={13} />
+            PREP
+          </button>
+          {prepOpen && (
+            <div className="px-3 pb-2 max-h-[180px] overflow-y-auto space-y-2">
+              {prep.agenda && (
+                <div className="text-[11.5px] text-white/70 leading-snug" data-testid="prep-agenda">
+                  <span className="text-white/40">To settle:</span> {prep.agenda}
+                </div>
+              )}
+              {prep.carried.length > 0 && (
+                <div data-testid="prep-carried">
+                  <div className="text-[10px] text-white/40 mb-0.5">
+                    Carried from {prep.lastMeeting?.title || 'last time'} — still open
+                  </div>
+                  {prep.carried.slice(0, 6).map((it) => (
+                    <div key={it.id} className="text-[11.5px] text-white/70 leading-snug truncate">
+                      · {it.title}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {prep.attendees.map((a) => (
+                <div key={a.invitee} data-testid="prep-attendee">
+                  <div className="text-[10px] text-white/40 mb-0.5">Open with {a.invitee}</div>
+                  {a.items.slice(0, 3).map((it) => (
+                    <div key={it.id} className="text-[11.5px] text-white/70 leading-snug truncate">
+                      · {it.title}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder={'Type anything. Or nothing.'}
+        data-testid="meeting-notes"
+        className="flex-1 min-h-0 w-full resize-none bg-transparent px-3 py-2.5 text-[13px] leading-relaxed text-white outline-none placeholder:text-white/30"
+      />
+      {moments.length > 0 && (
+        <div className="px-3 py-1.5 border-t border-white/10 flex flex-wrap gap-1">
+          {moments.map((m, i) => (
+            <span key={i} className="text-[10.5px] text-amber-300/90 bg-amber-500/10 rounded px-1.5 py-0.5">⚑ {fmtMoment(m)}</span>
+          ))}
+        </div>
+      )}
+      {showTranscriptNote && !transcribing && (
+        <div className="px-3 py-2 border-t border-white/10 text-[11px] text-white/50" data-testid="transcript-note">
+          Nothing is being recorded or transcribed. Start a recording (everyone will be asked) and ⌘⇧T shows the words live.
+        </div>
+      )}
+      {showTranscriptNote && transcribing && recordingBy !== myId && (
+        <div className="px-3 py-2 border-t border-white/10 text-[11px] text-white/50" data-testid="transcript-note-remote">
+          Only the recording machine hears the room — your transcript arrives with the Record after the call. Your ⚑ moments will anchor into it.
+        </div>
+      )}
+      {showTranscriptNote && transcribing && recordingBy === myId && (
+        <div className="border-t border-white/10" data-testid="live-transcript">
+          <div className="px-3 pt-2 text-[10px] font-semibold tracking-wider text-white/40">
+            LIVE · rough and local — the Record is written at wrap-up
+          </div>
+          <div ref={liveScrollRef} className="px-3 py-2 max-h-[140px] overflow-y-auto">
+            {liveLines.length === 0 ? (
+              <div className="text-[11px] text-white/40">Listening — lines appear as people speak.</div>
+            ) : (
+              liveLines.slice(-12).map((l, i) => (
+                <div key={i} className="text-[11.5px] text-white/80 leading-snug mb-1">
+                  <span className="text-white/40 fb-tabular">[{fmtMoment(l.atMs)}]</span>{' '}
+                  <span className="font-medium text-white/60">{l.name}:</span> {l.text}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      <div className="px-3 py-1.5 border-t border-white/10 text-[10.5px] text-white/40">
+        ⌘⇧M mark moment · ⌘⇧T transcript
+      </div>
+    </div>
+  )
+
   const controls = (small: boolean): JSX.Element => (
     <div className={`relative flex items-center justify-center gap-2 ${small ? '' : 'gap-3'}`}>
       <ControlButton small={small} icon={muted ? 'mic_off' : 'mic'} label={muted ? 'Unmute' : 'Mute'} active={!muted} onClick={toggleMute} />
@@ -289,10 +535,26 @@ export default function MeetingOverlay(): JSX.Element | null {
       />
       <ControlButton
         small={small}
-        icon="record_voice_over"
-        label={transcribing ? 'Stop transcribing' : 'Transcribe & summarise'}
+        icon={transcribing ? 'stop_circle' : 'radio_button_checked'}
+        label={
+          !transcribing
+            ? 'Start recording — everyone will be asked'
+            : recordingBy === myId
+              ? 'Stop recording'
+              : 'Recording — only the person who started it can stop it'
+        }
         active={transcribing}
-        onClick={() => setTranscribing(!transcribing)}
+        onClick={() => {
+          if (transcribing && recordingBy !== myId) return
+          setTranscribing(!transcribing)
+        }}
+      />
+      <ControlButton
+        small={small}
+        icon="edit_note"
+        label={showNotes ? 'Hide notes' : 'Notes'}
+        active={showNotes}
+        onClick={() => setShowNotes((v) => !v)}
       />
       <div className="relative">
         <ControlButton small={small} icon="person_add" label="Invite people" active={showInvite} onClick={() => setShowInvite((v) => !v)} />
@@ -354,8 +616,14 @@ export default function MeetingOverlay(): JSX.Element | null {
           {screenTiles(true)}
           {tiles('mini')}
         </div>
+        {transcribing && (
+          <div className="px-3 py-1 text-[10.5px] text-rose-300/90 bg-rose-500/10 text-center shrink-0" data-testid="consent-line-mini">
+            {consentLine}
+          </div>
+        )}
         {error && <div className="px-3 py-1 text-[11px] text-rose-300 bg-rose-500/10 text-center shrink-0">{error}</div>}
         <div className="px-2 py-2 border-t border-white/10 shrink-0">{controls(true)}</div>
+        {consentModal}
       </div>
     )
   }
@@ -371,38 +639,45 @@ export default function MeetingOverlay(): JSX.Element | null {
           {tileCount} {tileCount === 1 ? 'person' : 'people'}
         </span>
         {status === 'joining' && <span className="text-[12px] text-white/50">Joining…</span>}
-        {transcribing && (
-          <span className="text-[11px] text-rose-300 inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" /> transcribing
-          </span>
-        )}
+        {/* M1 (§3.8) — the state named in words, for everyone, continuously. */}
+        <span
+          className={`text-[11px] inline-flex items-center gap-1.5 ${transcribing ? 'text-rose-300' : 'text-white/40'}`}
+          data-testid="consent-line"
+        >
+          {transcribing && <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />}
+          {consentLine}
+        </span>
       </div>
 
-      {screens.length > 0 ? (
-        // Presentation layout: the shared screen(s) take the stage; people become
-        // a filmstrip underneath so the content is the focus.
-        <div className="flex-1 min-h-0 px-5 pb-2 flex flex-col gap-3 overflow-hidden">
-          <div
-            className="flex-1 min-h-0 grid gap-3"
-            style={{ gridTemplateColumns: `repeat(${Math.min(screens.length, 2)}, minmax(0, 1fr))` }}
-          >
-            {screenTiles(false)}
+      <div className="flex-1 min-h-0 px-5 pb-2 flex gap-3 overflow-hidden">
+        {screens.length > 0 ? (
+          // Presentation layout: the shared screen(s) take the stage; people
+          // become a filmstrip underneath so the content is the focus.
+          <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+            <div
+              className="flex-1 min-h-0 grid gap-3"
+              style={{ gridTemplateColumns: `repeat(${Math.min(screens.length, 2)}, minmax(0, 1fr))` }}
+            >
+              {screenTiles(false)}
+            </div>
+            <div className="shrink-0 h-28 flex gap-3 overflow-x-auto pb-1">
+              {tiles('strip')}
+            </div>
           </div>
-          <div className="shrink-0 h-28 flex gap-3 overflow-x-auto pb-1">
-            {tiles('strip')}
+        ) : (
+          <div className="flex-1 min-h-0 overflow-auto">
+            <div className="grid gap-3 h-full" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+              {tiles('grid')}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 px-5 pb-2 overflow-auto">
-          <div className="grid gap-3 h-full" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-            {tiles('grid')}
-          </div>
-        </div>
-      )}
+        )}
+        {showNotes && notesPane}
+      </div>
 
       {error && <div className="px-5 py-2 text-[12px] text-rose-300 bg-rose-500/10 text-center">{error}</div>}
 
       <div className="py-4">{controls(false)}</div>
+      {consentModal}
     </div>
   )
 }

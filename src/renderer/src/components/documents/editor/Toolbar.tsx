@@ -100,7 +100,7 @@ export default function Toolbar({
   return (
     <div
       data-testid="doc-toolbar"
-      className="sticky top-0 z-20 -mx-2 px-2 py-1.5 mb-4 flex items-center gap-0.5 flex-wrap bg-paper/95 backdrop-blur border-b border-[var(--edge-soft)]/70"
+      className="sticky top-0 z-20 -mx-2 px-2 py-1.5 mb-4 flex items-center gap-0.5 flex-wrap bg-paper/95 backdrop-blur border-b border-[color-mix(in_oklab,var(--edge-soft)_70%,transparent)]"
     >
       <button className={btn(false)} title="Undo" onClick={() => editor.chain().focus().undo().run()}>
         <Icon name="undo" size={15} />

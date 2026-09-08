@@ -110,7 +110,7 @@ export default function SheetFormulaAssist({
       <div className="mt-1.5 flex flex-wrap items-center gap-1" data-testid="sheet-formula-chips">
         <button
           onClick={() => insertChip(activeRef)}
-          className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)]/70 hover:bg-accent hover:text-white"
+          className="text-[11px] px-2 py-0.5 rounded-full bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] hover:bg-accent hover:text-white"
         >
           {activeRef}
         </button>
@@ -118,7 +118,7 @@ export default function SheetFormulaAssist({
           <button
             key={i}
             onClick={() => insertChip(`${colLetter(i)} (${h || colLetter(i)})`)}
-            className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-sunken)]/70 hover:bg-accent hover:text-white"
+            className="text-[11px] px-2 py-0.5 rounded-full bg-[color-mix(in_oklab,var(--surface-sunken)_70%,transparent)] hover:bg-accent hover:text-white"
             title={`Reference column ${colLetter(i)}`}
           >
             {colLetter(i)}

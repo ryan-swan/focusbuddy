@@ -121,7 +121,7 @@ export default function MinimapWidget({ widget, inline = false }: Props): JSX.El
         }}
         data-testid="minimap-collapsed"
         title="Show minimap"
-        className="absolute w-9 h-9 rounded-full bg-[var(--surface-raised)]/95 shadow-lg ring-1 ring-black/10 dark:ring-white/10 flex items-center justify-center text-[var(--ink-50)] hover:text-accent pointer-events-auto"
+        className="absolute w-9 h-9 rounded-full bg-[color-mix(in_oklab,var(--surface-raised)_95%,transparent)] shadow-lg ring-1 ring-black/10 dark:ring-white/10 flex items-center justify-center text-[var(--ink-50)] hover:text-accent pointer-events-auto"
         style={{ position: 'absolute', ...pos }}
       >
         <Icon name="map" size={18} />

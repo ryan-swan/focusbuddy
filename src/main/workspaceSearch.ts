@@ -24,6 +24,7 @@ import {
   chunkSearchChats
 } from './chunkIndex'
 import { collectExtraSources } from './workspaceExtras'
+import { meetingRecallSources } from './segmentRecall'
 
 export type { WorkspaceSource } from './workspaceRank'
 export { extractDocText } from './workspaceRank'
@@ -92,6 +93,11 @@ export async function retrieveSources(
   // answered right now — the recall mechanism #18 asked for.
   const chatSources = chunkSearchChats(query, limit, opts?.excludeChatId)
 
+  // Meetings (M4, SPEC-003 P4): the transcript corpus, segment-searched so
+  // every grounded line arrives WITH its speaker and timestamp — the model
+  // cites who said it and when, not a paraphrase of a bare string.
+  const meetingSources = meetingRecallSources(query, limit)
+
   // Interleave the pools round-robin so documents, tasks/tables/notes, widgets
   // and knowledge all get a fair shot at the limited source slots. Curated
   // knowledge still leads each round. Each pool passes the relevance gate
@@ -99,7 +105,7 @@ export async function retrieveSources(
   // analysed (Caleb's drive: an SDR question dragged in every doc containing
   // "research"). An emptied pool is an honest result — the trace says
   // "nothing relevant" and web results lead.
-  const pools = [kSources, docSources, extraSources, widgetSources, fileSources, chatSources].map(
+  const pools = [kSources, docSources, extraSources, widgetSources, fileSources, chatSources, meetingSources].map(
     (p) => relevanceGate(query, p)
   )
   const merged: WorkspaceSource[] = []

@@ -129,7 +129,7 @@ export default function ProductHome({ productKey }: { productKey: string }): JSX
               {product.planned.map((cap, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 rounded-lg border border-[var(--edge-soft)]/60 bg-[var(--surface-sunken)]/60 px-3 py-2"
+                  className="flex items-center gap-2 rounded-lg border border-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] px-3 py-2"
                 >
                   <Icon name="schedule" size={14} className="shrink-0 text-[var(--ink-50)]" />
                   <span className="text-[12.5px] text-[var(--ink-90)]">{cap}</span>

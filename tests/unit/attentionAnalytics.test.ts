@@ -251,4 +251,18 @@ describe('DEC-049 — dayTimeline (today\'s calendar + dated work)', () => {
     const t = dayTimeline([], [block({ meeting: { roomId: 'r1' } })], NOON)
     expect(t[0].kind === 'event' && t[0].isMeeting).toBe(true)
   })
+
+  it('DEC-129 — overdue work rides BEHIND the day\'s timed shape, oldest first, before the undated Meet items', () => {
+    // A backlog of past dues used to sort ahead of today's blocks by their
+    // past dates, so a four-line tile never reached the calendar.
+    const older = wi({ id: 'od-older', dueAt: new Date(NOON - 12 * DAY).toISOString() })
+    const yesterday = wi({ id: 'od-yesterday', dueAt: new Date(NOON - DAY).toISOString() })
+    const todayItem = wi({ id: 'due-today', dueAt: new Date(NOON + 60 * 60 * 1000).toISOString() })
+    const meetItem = wi({ id: 'meet', intentClass: 'to_meet' })
+    const standup = block({ id: 'b-standup', title: 'Standup', startMs: NOON - 3 * 60 * 60 * 1000 })
+    const t = dayTimeline([meetItem, yesterday, todayItem, older], [standup], NOON)
+    expect(t.map((e) => e.id)).toEqual(['b-standup', 'due-today', 'od-older', 'od-yesterday', 'meet'])
+    // and the overdue entries carry no time — they are not "at" a moment today
+    expect(t.filter((e) => e.id.startsWith('od-')).every((e) => e.atMs === null)).toBe(true)
+  })
 })

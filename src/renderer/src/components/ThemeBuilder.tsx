@@ -110,7 +110,7 @@ export default function ThemeBuilder({
     <div className="fb-scrim fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div
         ref={ref}
-        className="w-full max-w-md max-h-[86vh] overflow-y-auto rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[var(--surface-sunken)]/95"
+        className="w-full max-w-md max-h-[86vh] overflow-y-auto rounded-xl fb-glass-pillow border border-[color:var(--glass-pillow-border)] bg-[color-mix(in_oklab,var(--surface-sunken)_95%,transparent)]"
         data-testid="theme-builder"
       >
         <div className="sticky top-0 z-10 px-4 py-3 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)] flex items-center justify-between">

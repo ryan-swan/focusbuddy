@@ -144,7 +144,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
             onClick={() => setPickIcon((v) => !v)}
             onMouseDown={(e) => e.stopPropagation()}
             className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded text-[15px] leading-none ${
-              data.icon ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:bg-[var(--surface-sunken)]/60'
+              data.icon ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[var(--ink-40)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]'
             } transition-opacity`}
             title="Card icon"
             aria-label="Card icon"
@@ -173,7 +173,7 @@ export default function CardWidget({ widget, inline = false }: Props): JSX.Eleme
                   set({ icon: data.icon === ic ? '' : ic })
                   setPickIcon(false)
                 }}
-                className="h-6 w-6 inline-flex items-center justify-center rounded text-[15px] hover:bg-[var(--surface-sunken)]/60"
+                className="h-6 w-6 inline-flex items-center justify-center rounded text-[15px] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]"
               >
                 {ic}
               </button>

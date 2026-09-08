@@ -88,7 +88,7 @@ export default function ExternalMdEditorView({ path }: Props): JSX.Element {
             <Icon name="description" size={28} className="text-accent" />
           </div>
           <h2 className="text-xl font-semibold text-[var(--ink-100)] mb-2">Cannot open this document</h2>
-          <p className="text-sm text-[var(--ink-300)] mb-4">{error}</p>
+          <p className="text-sm text-[var(--ink-60)] mb-4">{error}</p>
           <button
             type="button"
             onClick={() => void load()}
@@ -108,13 +108,13 @@ export default function ExternalMdEditorView({ path }: Props): JSX.Element {
         <Icon name="description" size={18} className="text-accent" />
         <div className="min-w-0">
           <div className="text-sm font-semibold text-[var(--ink-100)] truncate">{fileName}</div>
-          <div className="text-[11px] text-[var(--ink-300)] truncate">{path}</div>
+          <div className="text-[11px] text-[var(--ink-60)] truncate">{path}</div>
         </div>
         <div className="ml-auto text-xs">
-          {state === 'loading' && <span className="text-[var(--ink-300)]">Loading…</span>}
+          {state === 'loading' && <span className="text-[var(--ink-60)]">Loading…</span>}
           {state === 'clean' && <span className="text-emerald-400">Saved to file</span>}
-          {state === 'dirty' && <span className="text-[var(--ink-300)]">Editing…</span>}
-          {state === 'saving' && <span className="text-[var(--ink-300)]">Saving…</span>}
+          {state === 'dirty' && <span className="text-[var(--ink-60)]">Editing…</span>}
+          {state === 'saving' && <span className="text-[var(--ink-60)]">Saving…</span>}
           {state === 'error' && (
             <span className="text-rose-400" title={error ?? ''}>
               Save failed: {error}

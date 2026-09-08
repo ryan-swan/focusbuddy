@@ -74,6 +74,10 @@ export interface ModuleDashboardProps {
   breakdown?: DashboardBreakdown
   activity?: { items: DashboardActivityItem[]; onViewAll?: () => void }
   recentItems?: { label?: string; items: ModuleItem[]; emptyHint: string; onCreate?: () => void; createLabel?: string }
+  /** Rendered inside a page that already carries its own hero header and
+   *  padding (PlexiMeet's paper page): no outer padding, no title block, no
+   *  Customize door — the tiles start level with whatever sits beside them. */
+  embedded?: boolean
 }
 
 type SectionId = 'stats' | 'chart' | 'breakdown' | 'activity' | 'recent'
@@ -165,7 +169,7 @@ function BreakdownBody({ breakdown }: { breakdown: DashboardBreakdown }): JSX.El
 }
 
 export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Element {
-  const { moduleKey, title, greeting, subtitle, icon, accentClass, actions, stats, timeline, breakdown, activity, recentItems } = props
+  const { moduleKey, title, greeting, subtitle, icon, accentClass, actions, stats, timeline, breakdown, activity, recentItems, embedded } = props
   const [hidden, setHidden] = useState<Set<SectionId>>(() => loadHidden(moduleKey))
   const [customizing, setCustomizing] = useState(false)
 
@@ -189,8 +193,11 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
   const show = (id: SectionId): boolean => !hidden.has(id)
 
   return (
-    <div className="flex-1 min-w-0 overflow-auto" data-testid={`module-dashboard-${moduleKey}`}>
-      <div className="w-full px-8 py-6">
+    <div className={embedded ? 'min-w-0' : 'flex-1 min-w-0 overflow-auto'} data-testid={`module-dashboard-${moduleKey}`}>
+      <div className={embedded ? 'w-full' : 'w-full px-8 py-6'}>
+        {/* Embedded (PlexiMeet's paper page): the host page carries the hero and
+            there is no Customize — the tiles start level with the rail. */}
+        {!embedded && (
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2.5">
             <Icon name={icon} size={22} className={`mt-0.5 shrink-0 ${accentClass}`} filled />
@@ -223,9 +230,10 @@ export default function ModuleDashboard(props: ModuleDashboardProps): JSX.Elemen
             {actions}
           </div>
         </div>
+        )}
 
         {show('stats') && stats.length > 0 && (
-          <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={`${embedded ? '' : 'mt-5 '}grid grid-cols-2 sm:grid-cols-4 gap-3`}>
             {stats.map((s) => (
               <div key={s.label} className="relative">
                 <StatTile icon={s.icon} label={s.label} value={s.value} tone={s.tone} delta={s.delta} hint={s.hint} />

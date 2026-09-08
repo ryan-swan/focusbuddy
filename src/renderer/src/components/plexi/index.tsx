@@ -127,38 +127,66 @@ export function StatTile({
   )
 }
 
-/** A titled panel for the main column or the right rail, with an optional action. */
+/** A titled panel for the main column or the right rail, with an optional action.
+ *  `trailing` puts arbitrary controls (a segmented track, a clock, a legend) at
+ *  the header's right edge where `action` would go; `bodyClassName` replaces
+ *  the default body padding for panels that manage their own scroll region;
+ *  `testId` lands on the section so a panel can be addressed in tests. All
+ *  three are optional and leave existing callers pixel-identical. */
 export function RailCard({
   title,
   icon,
   tone = 'accent',
   action,
+  trailing,
   children,
-  className = ''
+  className = '',
+  bodyClassName,
+  testId,
+  fill = false
 }: {
   title?: string
   icon?: string
   tone?: Tone
   action?: { label: string; onClick: () => void }
+  trailing?: ReactNode
   children: ReactNode
   className?: string
+  bodyClassName?: string
+  testId?: string
+  /** DEC-132 — in a SIZED host (a home tile): the header stays pinned and the
+   *  body takes the rest and scrolls, so nothing is cut off mid-row. A body
+   *  with its own `bodyClassName` manages its own scroll regions and only
+   *  gets the room (`flex-1 min-h-0`). Unsized hosts are pixel-identical. */
+  fill?: boolean
 }): JSX.Element {
   return (
-    <section className={`${PLEXI_CARD} ${className}`}>
+    <section className={`${PLEXI_CARD} ${fill ? 'h-full flex flex-col min-h-0' : ''} ${className}`} data-testid={testId}>
       {title && (
-        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 shrink-0">
           <h3 className="fb-t-title text-[var(--ink-90)] flex items-center gap-2">
             {icon && <Icon name={icon} size={16} className={TONE_TEXT[tone]} />}
             {title}
           </h3>
-          {action && (
-            <button onClick={action.onClick} className="fb-t-label text-accent hover:underline underline-offset-2">
-              {action.label}
-            </button>
+          {(action || trailing) && (
+            <div className="flex items-center gap-2 min-w-0">
+              {trailing}
+              {action && (
+                <button onClick={action.onClick} className="fb-t-label text-accent hover:underline underline-offset-2">
+                  {action.label}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
-      <div className={title ? 'px-4 pb-4' : 'p-4'}>{children}</div>
+      <div
+        className={`${fill ? 'flex-1 min-h-0 ' : ''}${bodyClassName ?? (title ? 'px-4 pb-4' : 'p-4')}${
+          fill && !bodyClassName ? ' overflow-y-auto' : ''
+        }`}
+      >
+        {children}
+      </div>
     </section>
   )
 }

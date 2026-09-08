@@ -623,7 +623,7 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
       </div>
       {/* Stencil category picker — groups the shape library so the palette stays
           scannable as it grows. */}
-      <div className="shrink-0 flex items-center gap-1 px-2 pt-1 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/60">
+      <div className="shrink-0 flex items-center gap-1 px-2 pt-1 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]">
         {STENCIL_CATEGORIES.map((cat) => (
           <button
             key={cat}
@@ -640,7 +640,7 @@ function MapInner({ body, title, onChange, foldExternal = false }: Props): JSX.E
         ))}
       </div>
       {/* Toolbar — the shapes of the active stencil category. */}
-      <div className="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/80 flex-wrap">
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_80%,transparent)] flex-wrap">
         {SHAPE_TOOLS.filter((t) => t.category === stencilCat).map((t) => (
           <button
             key={t.shape}

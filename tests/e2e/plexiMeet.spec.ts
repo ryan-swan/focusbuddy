@@ -262,11 +262,14 @@ test('6 — meet-record renders; clicking without mic shows honest error in meet
   const recordBtn = window.locator('[data-testid="meet-record"]')
   await expect(recordBtn).toBeVisible()
 
-  // Click Record. In headless Electron there is no real microphone device,
-  // so getUserMedia will reject, and the component catches it and sets an error.
-  // We wait up to 4s for meet-error to appear.
+  // DEC-118/130: Record opens the dialog first; Start asks the system, LISTENS
+  // for 1.2 s, and either refuses honestly (record-error, with the reason) or
+  // begins. In headless Electron there is no real microphone device, so
+  // getUserMedia rejects (or hands over silence) and the dialog says so.
   await recordBtn.click()
-  const errorEl = window.locator('[data-testid="meet-error"]')
+  await expect(window.locator('[data-testid="record-dialog"]')).toBeVisible({ timeout: 4_000 })
+  await window.locator('[data-testid="record-start"]').click()
+  const errorEl = window.locator('[data-testid="record-error"]')
 
   // Two expected outcomes in headless:
   //   (a) meet-error appears (getUserMedia denied) — PASS

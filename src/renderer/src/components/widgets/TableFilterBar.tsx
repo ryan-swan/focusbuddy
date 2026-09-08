@@ -132,7 +132,7 @@ export default function TableFilterBar({
   }
 
   return (
-    <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[var(--surface-sunken)]/40 flex items-center gap-1.5 text-[11px]">
+    <div className="px-2.5 py-1.5 border-b border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_40%,transparent)] flex items-center gap-1.5 text-[11px]">
       {/* ── Filter ── */}
       <div ref={filterRef} className="relative">
         <button

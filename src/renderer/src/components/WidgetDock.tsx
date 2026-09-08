@@ -32,7 +32,7 @@ export default function WidgetDock(): JSX.Element | null {
   if (dockable.length === 0) return null
 
   return (
-    <div className="border-t border-[var(--edge-soft)] bg-[var(--surface-sunken)]/95 backdrop-blur">
+    <div className="border-t border-[var(--edge-soft)] bg-[color-mix(in_oklab,var(--surface-sunken)_95%,transparent)] backdrop-blur">
       <div className="px-3 py-2 flex items-center gap-2 overflow-x-auto">
         <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-50)] font-medium pr-1 shrink-0">
           On desk

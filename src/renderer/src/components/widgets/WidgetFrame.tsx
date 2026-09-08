@@ -4,7 +4,7 @@ import { Rnd } from 'react-rnd'
 import { type CtxMenuItem } from '../CanvasContextMenu'
 import UnifiedWidgetMenu from '../contextMenu/UnifiedWidgetMenu'
 import WidgetSetupAffordance from './WidgetSetupAffordance'
-import { useAutoGrowHeight, autoGrowsHeight } from '../../lib/useAutoGrowHeight'
+import { useAutoGrowHeight } from '../../lib/useAutoGrowHeight'
 import { getNavPrefs } from '../../lib/navPrefs'
 import { useContextHealthStore } from '../../stores/contextHealth'
 import { healthFrameStyle } from '../../lib/healthFrame'
@@ -40,8 +40,8 @@ import { workItemsEnabled } from '../../lib/workItemsCapability'
 import { presetForWidget, browserMarkUrl } from '../../lib/attentionPresets'
 import { PRIMARY_ACTION, queueOf } from '../../lib/attentionQueues'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
+import BellIcon from '../attention/BellIcon'
 import CompleteCircle from '../attention/CompleteCircle'
-import { PLEXII_ICONS } from '../icons/plexiiIcons'
 import Icon from '../Icon'
 import AgeHalo from '../AgeHalo'
 import { SectionLayoutContext } from './sectionLayoutContext'
@@ -1068,10 +1068,10 @@ export default function WidgetFrame({
                 }}
                 className={`widget-nodrag ml-1 h-5 w-5 rounded inline-flex items-center justify-center shrink-0 transition-colors ${
                   attentionItem
-                    ? 'text-accent hover:bg-[var(--surface-sunken)]/60'
+                    ? 'text-accent hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)]'
                     : // DEC-089 — was ink-40 at 60%: tuned for the light
                       // stone bar, invisible on the dark one. Quiet, not gone.
-                      'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent'
+                      'text-[var(--ink-50)] opacity-80 hover:opacity-100 hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent'
                 }`}
                 aria-label={attentionItem ? 'In Attention — open the queue' : 'Add to Attention'}
                 title={
@@ -1107,7 +1107,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   beginRename()
                 }}
-                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] opacity-75 hover:opacity-100 hover:bg-[var(--surface-sunken)]/60 hover:text-accent transition-opacity"
+                className="widget-nodrag h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] opacity-75 hover:opacity-100 hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent transition-opacity"
                 aria-label="Rename widget"
                 title="Rename"
               >
@@ -1133,7 +1133,7 @@ export default function WidgetFrame({
                   e.stopPropagation()
                   linkDrag.start(widget.id)
                 }}
-                className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-accent cursor-cell"
+                className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-accent cursor-cell"
                 aria-label="Link to another widget"
                 title="Click, then click another widget to connect them"
               >
@@ -1196,13 +1196,13 @@ export default function WidgetFrame({
         </div>
         <div
           ref={bodyRef}
-          className={`relative flex-1 min-h-0 ${
-            // Auto-grow widgets size to their content, but cap out (e.g. a very
-            // long sticky) or sit in a fixed slot when pinned / inside a section.
-            // Scroll vertically rather than clipping so the content stays
-            // reachable when the frame can't grow to fit it.
-            autoGrowsHeight(widget.kind) && !isChildOfSection && !isPinned ? 'overflow-y-auto' : ''
-          }`}
+          // Auto-grow widgets size to their content, but cap out (e.g. a very
+          // long sticky) or sit in a fixed slot when pinned / inside a section.
+          // DEC-133 (operator: the home tiles' rule, for desk widgets too) —
+          // EVERY widget body scrolls vertically rather than clipping, so the
+          // content stays reachable whenever the frame cannot grow to fit it.
+          // A widget whose root fills the frame never shows a bar.
+          className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
         >
           <FrameCallbacksProvider value={frameCallbacks}>{children}</FrameCallbacksProvider>
           <WidgetSetupAffordance widget={widget} />
@@ -1261,31 +1261,6 @@ export default function WidgetFrame({
   )
 }
 
-// ── The bell (DEC-076/077) ──────────────────────────────────────────────────
-//
-// The brand 'notifications' icon is a line SVG on currentColor; Icon's
-// `filled` prop deliberately does not apply to brand icons, which is why the
-// active bell only changed colour. Active state here fills the SAME brand
-// path solid — one path source (PLEXII_ICONS), two renderings.
-
-function BellIcon({ size, active }: { size: number; active: boolean }): JSX.Element {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={active ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ flexShrink: 0 }}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: PLEXII_ICONS['notifications'] }}
-    />
-  )
-}
-
 // ── Resize step button — small +/− in the header for quick scaling ──────────
 //
 // One-click ratchet: every press grows or shrinks the widget by 50%, capped
@@ -1312,7 +1287,7 @@ function ResizeStepButton({
         e.stopPropagation()
         onClick()
       }}
-      className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)] transition-colors"
+      className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-[var(--ink-100)] transition-colors"
       aria-label={isGrow ? 'Grow widget' : 'Shrink widget'}
       data-testid={isGrow ? `widget-grow-${widgetId}` : `widget-shrink-${widgetId}`}
       title={
@@ -1425,7 +1400,7 @@ function PinControl({
         className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
           isPinned
             ? 'text-amber-600 hover:bg-amber-100'
-            : 'text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]'
+            : 'text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-[var(--ink-100)]'
         }`}
         aria-label={isPinned ? 'Pin options' : 'Pin to screen'}
         title={
@@ -1573,7 +1548,7 @@ function ExpandControl({
           e.stopPropagation()
           setOpen(!open)
         }}
-        className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[var(--surface-sunken)]/60 hover:text-[var(--ink-100)]"
+        className="h-6 w-6 rounded inline-flex items-center justify-center text-[var(--ink-50)] hover:bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] hover:text-[var(--ink-100)]"
         aria-label="Expand options"
         title="Expand — bigger on desk or full focus mode"
       >

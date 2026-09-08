@@ -2520,6 +2520,1995 @@ freezes the offender set — it may shrink, a new one fails the build.
 
 11 new pins; 3,460 green; both typechecks clean.
 
+## DEC-096 — GAP-020 swept: the ink scale is whole
+**Date:** 2026-08-31 · **Status:** EXECUTED · **Closes:** GAP-020
+
+Define, don't rewrite: the ~60 sites referencing `--ink-80/55/45/35/25`
+all WANTED an in-between step — the authors were writing against a scale
+they assumed existed. So the five steps now exist, in all three themes
+(:root, .dark, .atelier), each the midpoint of its neighbours on that
+theme's own scale. The visible change is the intended one: text that had
+been silently inheriting its parent's colour (usually full ink-100) now
+renders at the weight its author chose — including DEC-094's own prompt
+echo, which had been quietly using undefined `--ink-55`. ink-35/ink-25
+inherit ink-30's documented caveat (decorative-leaning, not body text).
+
+The `--ink-300` sites (8, across ExternalMdEditorView and AgenticOpsView)
+were Tailwind gray-300 muscle memory meaning "muted secondary" — rewritten
+to `--ink-60`, the house token for exactly that.
+
+The lock (accentColorLock.test.ts) is strict again: any undefined ink step
+anywhere fails the build, and a second clause requires every theme block to
+carry the full 13-step scale — a NEW theme cannot ship a partial one.
+
+Verified live across all three themes by computed-style probe: every step
+resolves; `var(--ink-80)` paints 79% in dark (its own step) where it used
+to paint 96% (inherited ink-100). 3,461 green; both typechecks clean.
+
+## DEC-097 — GAP-019 swept: every wash finally paints
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Closes:** GAP-019 ·
+**Branch:** ryan-next (first round on the new branch)
+
+The register said each site needed a judgment call. It didn't — the right
+fix made the judgment unnecessary: `[var(--x)]/N` rewrote mechanically to
+`[color-mix(in_oklab,var(--x)_N%,transparent)]`, which is the SAME token at
+the SAME opacity the author wrote, as valid CSS. No site's intended look
+was re-decided; the intended look simply started rendering. 117
+occurrences, 57 files, every property prefix (bg/border/divide/via, plus
+hover: and group-hover: variants), one regex.
+
+The census had said ~40 sites — the real count was 117. Translucent panel
+washes, hover states, frosted `backdrop-blur` cards whose tint never
+painted behind the blur, a scrim gradient's mid-stop: all silently
+transparent in both themes, some likely since they were written.
+
+Verified live after HMR: 34 color-mix rules generated; 17 elements on the
+current screen, all painting; and the definitive pair — a probe div wearing
+the OLD class computes `rgba(0, 0, 0, 0)` while the NEW class computes
+`oklab(0.145 … / 0.6)`. The oklab mix space keeps the token's perceived
+hue and lightness on the way to transparent.
+
+Locked repo-wide beside its siblings in accentColorLock.test.ts (GAP-018
+accent forms, GAP-020 ink steps, now GAP-019 var()+modifier): any
+slash-modified var() token anywhere in renderer source fails the build.
+The edges-codemod FIXTURE keeps one deliberately (it is sample input to an
+AST scanner, not app source) — the lock scopes to src. One DEC-089 pin
+rewritten to the superseding hover-wash form with history.
+
+3,462 green; both typechecks clean. All three paint-integrity gaps are now
+closed: the accent family (GAP-018/DEC-086), the wash family
+(GAP-019/DEC-097), the ink scale (GAP-020/DEC-096).
+
+## DEC-098 — M1: the Stage, honest consent, per-track capture
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003)
+· **Branch:** ryan-next
+
+The first Meet phase, and the one that fixes a live liability. Three builds:
+
+**Consent (S3-DEC-024).** Recording had TWO silent-start paths: any
+participant's toggle captured every stream with nobody told, and a saved
+preference started capture at join. Both are gone. Starting a recording now
+prompts every participant over the existing meetingSignal relay (zero
+server changes): accept / accept-without-transcript / decline. Until
+someone answers they are 'pending' and not a sample of theirs is captured;
+a decline is honoured BY CONSTRUCTION (their stream is never tapped — the
+recorder's tap() is the single choke point, gated on `mayCapture`). The
+header names the state in words, continuously, in both layouts —
+"Recording · 1 of 3 consented — Dana has not responded" — never an icon
+alone. Late joiners are prompted before capture; the initiator alone stops
+it; the initiator leaving stops it for everyone, said out loud. The
+whisper preference no longer touches meetings (it still governs 1:1
+PlexiCam calls — the SAME consent hole exists there and is a named
+follow-up; the consent lib was built reusable for it).
+
+**Per-track capture (C1, operator-ruled foundation).** "I do not want AI
+guessing at speaker 1 versus 4." It never will again for native meetings:
+MeetingTrackRecorder records one attributed, audio-only take per consented
+participant on one shared clock, alongside the mixed blob that still feeds
+the legacy wrap-up. Attribution is exact by construction — each take IS a
+known accountId. M2 transcribes the tracks; the mixed blob then becomes a
+convenience artifact.
+
+**The Stage (SPEC-003 §3.3).** A notepad, not a transcript viewer, grafted
+into MeetingOverlay's stage layout (C9 — no fourth surface): blank by
+default, your words verbatim and never rewritten, ⌘⇧M marks a moment
+(clock offsets — no recording and no model required; they resolve into
+transcript anchors in M2), ⌘⇧T answers honestly ("the transcript arrives
+after the call"). Notes + moments survive every path: with a recording
+they ride the wrap-up (saved FIRST, never gated on transcription
+succeeding); without one they are still saved as the meeting's record —
+notes-first, recording-optional.
+
+Verified live via the store's e2e handle (a real two-party handshake needs
+the operator's two-machine QA session — flagged): the Stage renders with
+the notes pane open; typed notes land verbatim in the store; a REAL ⌘⇧M
+keystroke marked a moment and ⌘⇧T toggled the honest line; the worded
+header rendered "Recording · 1 of 2 consented — Sam Oak has not
+responded" from a mixed consent map; the decline button wrote 'declined'
+under the operator's real accountId. Driving quirk for the record:
+synthetic clicks don't transfer element focus while the Electron window is
+unfocused — Page.bringToFront + asserted programmatic focus is the
+pattern (the DEC-084 rule's substance, an asserted focused target, held
+throughout). A missed-triage dialog (z-330) over the meeting overlay
+(z-200) intercepted the first probe — real data, not a defect chased now.
+
+24 new tests (the consent decision table in full, wire-envelope kinds,
+recorder degradation, choke-point and no-auto-start pins); 3,486 green;
+both typechecks clean.
+
+## DEC-099 — M2a: transcript truth
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M2, first half) · **Branch:** ryan-next
+
+The transcript stops being a string. Everything provenance promises later
+(S3-DEC-021's heard-requires-anchor, moments, Recall citations) resolves
+against what this round built:
+
+**Both engines yield timestamps.** Cloud has requested `verbose_json` since
+day one and the parser THREW THE SEGMENTS AWAY — they are now parsed, with
+`exp(avg_logprob)` as the engine's own 0–1 confidence. Local flips
+`return_timestamps: true` and parses the chunks; transformers.js exposes no
+logprobs, so local confidence is an HONEST NULL — a fabricated confidence
+is exactly the confidently-wrong sin the field teardown documents, and we
+never invent one.
+
+**The attributed pipeline (C1 pays off).** The wrap-up transcribes each
+per-track take separately and merges on the shared clock
+(`lib/transcriptMerge.ts`, pure and matrix-tested): interleaving is
+arithmetic, not inference — attribution came from capture and stays exact.
+A track whose engine gave text only degrades to one attributed span
+(attribution survives even when in-track timing is lost). The summariser
+now reads `[m:ss] Name: words` — real attribution replaces the old
+"AI guesses Speaker 1–4 from prose" mode on this path. Speaker names are
+resolved from the roster at leave time, before teardown erases it.
+
+**Meeting audio never leaves the machine (CR-11, ruled).** The track path
+pins the on-device engine (`forceLocal`) with NO cloud fallback — failing
+honestly beats a silent second disclosure; the error says exactly that.
+The meeting handoff marks even its legacy mixed-blob fallback
+`forceLocalTranscription`. The local model warms when recording STARTS
+(a bare `voice:preloadLocal` channel that never touches the provider
+preference), so the ~80MB whisper-tiny download happens during the meeting,
+not appended to its end. Calls (PlexiCam) keep the provider preference
+until their own consent round — same boundary as DEC-098.
+
+**The segments have a home.** `fb_transcript_segments` (speaker accountId
+nullable for genuinely unattributed speech, start/end ms, text, confidence
+REAL NULL), written atomically per meeting after the record exists, read
+back sorted. Live round-trip on the real build: three drafts saved out of
+order → read back clock-ordered with null confidence and null speaker
+intact; atomic replace 3 → 1. The round-trip CAUGHT a real defect —
+deleting a meeting orphaned its segments — fixed (explicit cascade in
+deleteMeeting), pinned, and the stray row cleaned.
+
+Ops note for the record: the first restart's app couldn't bind :9223 (an
+orphaned Electron held it) and the probe talked to the OLD build — the
+"preload functions undefined" symptom. Port-holder kill via lsof before
+relaunch is now part of the restart ritual.
+
+16 new tests; 3,502 green; both typechecks clean. M2b (the Record object,
+three renderings, provenance CSS, meeting-node container, export,
+retention) is next.
+
+## DEC-100 — M2b: the Record — one object, three renderings
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M2, second half) · **Branch:** ryan-next
+
+**The Record object (§3.4).** `record_json` on fb_meetings: provenance-
+tiered spans (`yours / heard / inferred`), each heard span carrying a
+segmentId anchor. Built by the Enhance pass at wrap-up — best-effort and
+NON-BLOCKING: a failed enhance leaves summary and deliverables intact and
+the Record simply absent.
+
+**The rule that makes the middle tier honest (S3-DEC-021), enforced in a
+pure layer.** `lib/recordSpans.ts`: a heard span whose anchor does not
+resolve to a real segment is DOWNGRADED to inferred, anchor nulled — the
+tier can never be asserted, only proven. A model-forged `yours` is a
+forgery, downgraded too: only `buildYoursSpans` mints yours, from the
+user's notes, verbatim, byte-for-byte. The anchor's timestamp is always
+taken from the SEGMENT, never trusted from the model. The Enhance prompt
+states the contract in the model's own terms ("a heard claim without its
+segmentId will be discarded as unproven") — and the FIRST live call
+honoured it: four spans back, both heard ones carrying real segmentIds.
+
+**Three renderings, Commitments default (S3-DEC-022).** A segmented
+control (1/2/3, §3.10) in the meeting detail: Commitments (the existing
+action items — owners and Attention routing arrive with M3's extractor),
+Brief (yours leads at full ink; heard renders with a hairline left rule,
+the timestamp on hover, and a click that jumps to the moment in Thread;
+inferred in lighter ink — the same accent-vs-ink doctrine as capture, its
+third tier), and Thread (the real segments: clock position, speaker, text,
+with sub-50% engine confidence dimmed and every row carrying an honest
+tooltip — "Engine confidence 31%" / "unknown (on-device)").
+
+Verified live on the real build: record round-trip (3 spans); a REAL
+Enhance call over scratch segments (contract held); Commitments default;
+yours measured at ink-100, inferred at ink-50, heard's rule and hover
+timestamp rendered; the heard click landed in Thread on the anchored
+segment; the low-confidence row dimmed; scratch meeting deleted with its
+segments (DEC-099's cascade doing its job).
+
+Still open in M2 (M2c): the meeting-node container (C5), templates,
+export, audio retention (CR-13). 12 new tests; 3,514 green; both
+typechecks clean.
+
+## DEC-101 — M2c: container, templates, export, retention — M2 complete
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M2, final third) · **Branch:** ryan-next
+
+**Retention (CR-13), exactly as ruled.** Meeting audio lives at
+userData/meeting-audio/<meetingId>/ — per-speaker takes plus a take.json of
+offsets — and NEVER leaves the machine. Modes 0/7/30/90/keep, default 30,
+set from the Meet view. Zero means zero: the wrap-up skips the save call
+entirely, so the takes die with renderer memory at the end of the Enhance
+pass, not at a nightly sweep. The per-meeting "Keep" override is a flag
+file; the boot sweep honours both it and keep-mode. A declined participant
+has no take to save (DEC-098 never captured one). Deleting a meeting
+deletes its audio — the same cascade rule as its segments.
+
+**Export (Part V §6, the non-negotiable).** Markdown and JSON from the
+meeting detail, through the OS save dialog. Provenance SURVIVES the file:
+your notes lead, commitments are checkboxes, heard spans export as
+timestamped quotes, inferred spans are marked "(inferred)", and the
+transcript is the attributed segment list. JSON carries the full object —
+meeting, record, segments, audio manifest. Audio itself is already open
+files on disk; a Reveal button shows them in Finder rather than
+re-encoding anything.
+
+**Templates (§3.5).** The four ruled: Decisions & Actions (default),
+Client Call, 1:1, Interview — a section-list registry, not a second
+template mechanism. The wrap-up briefs under the default; the Brief view
+offers one-click rebuilds under any of the four, and every rebuild
+preserves the yours spans byte-for-byte — the user's words survive every
+template. Commitments is never templated: its shape is the product.
+
+**The container (S3-DEC-020), first honest increment.** A recorded MEETING
+mints a desk node at wrap-up, holding the transcript document as a widget,
+with desk_node_id on the meeting row and a "Desk" door in the detail
+header. Calls stay lightweight; a failed desk never blocks the review. The
+Record itself still renders in the Meet view — the Record WIDGET on the
+desk is the remaining sliver of C5, deferred to ride with M3's sourceUrl
+anchors rather than shipped as an empty shell now.
+
+**And the preference finally tells the truth.** The old toggle said
+"Transcribe & summarise my meetings" while DEC-098 had made meeting
+recording consent-only — it now says what it governs (1:1 calls) and that
+meetings never auto-record.
+
+Verified live on the real build: the full audio lifecycle (two takes
+saved with offsets, keep-flag flip, default 30, audio gone with the
+meeting's delete); export surface present (the OS dialog needs a human
+hand — honest limit of solo verification). 14 new tests; 3,528 green;
+both typechecks clean. **M2 is complete** — M3 (routing into Attention)
+is next.
+
+## DEC-102 — M3: commitments route into Attention — the loop closes
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+M3, C6 C7) · **Branch:** ryan-next
+
+**The extractor is anchored or it is honest.** `ai:extractCommitments`
+(main/ai/extractCommitments.ts) reads the attributed segments and returns
+commitments with a `segmentId` that must be verbatim-or-null — the prompt
+says why in the model's face: an unanchored item "will be marked
+unverified, which is honest; a wrong anchor is not." Owners come ONLY from
+the meeting roster, deadlines only if someone said one, and zero
+commitments is a valid answer. `validateCommitments` (lib/commitments.ts)
+then enforces it in pure code: an unresolvable anchor downgrades to
+inferred, `mine` = ownerless-or-self, and intent classes are canonicalised
+with `to_do` as the floor.
+
+**The confirm stop is the batch variant of the card we already trust.**
+MeetingCommitmentsCard sits atop the wrap-up review (and behind "Find
+commitments" on any past meeting): checkbox list, class chips that cycle
+on click, due dates, and the header that states the contract — "nothing
+files until you say so." Your own commitments start CHECKED; other-owned
+start UNCHECKED with an amber "owner is X, not you" note, and filing one
+attaches the owner as a person MENTION — never a send (C7, the SPEC-027
+boundary). Anchored rows quote their line — `[m:ss] Speaker: "…"` behind
+the heard rule; unanchored rows say so in words. Filed items land as one
+undo batch: parentId = the meeting's desk node, sourceType 'meeting' +
+sourceRef = the meeting id (DEC-079's chip route opens the meeting from
+Attention), wiOrigin 'ai', confidence 0.95 anchored / 0.6 inferred.
+
+**C6 split, as planned.** When commitments exist, create-task proposals
+are filtered OFF the wrap-up's ProposalCards — commitments own tasks now;
+artifact deliverables (docs, lists, links) stay on the cards. And the
+host gets the **To Know brief** — a machine-authored to_know item titled
+for the meeting, wiOrigin 'ai' (DEC-014-exempt by spec ruling); Q14's
+per-series opt-in for other attendees stays deferred to M5.
+
+**Live, on the real build:** a REAL extractCommitments call over scratch
+segments honoured every clause first try — Dana's "I will send Doug the
+revised contract by Friday" came back owner-attributed and anchored, the
+group's March decision came back ownerless and anchored, and the
+small-talk line was left alone. The Meet-view door rendered the card
+("Plexii found 2 things in this meeting"), Dana's row defaulted
+unchecked, "File 1 item" filed exactly the checked one — sourceType
+'meeting', to_decide, wiOrigin 'ai', confidence 0.95 — and the scratch
+item was dismissed (R008) and the meeting deleted clean, segments gone
+with it. One honest sliver deferred: the filed item points at its MEETING
+(sourceRef → the DEC-079 door); the per-item MOMENT anchor (jump straight
+to the quoted segment from Attention) rides with the C5 Record-widget
+round, where sourceUrl anchors get built once for both.
+
+13 new tests (m3Routing); 3,541 green across 326 files; both typechecks
+clean. **M3 is complete** — M4 (Recall, G2/G3 spikes first) is next on
+the operator's go.
+
+## DEC-103 — M4: Recall + the live transcript — the corpus pays out
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+P4 + C8's deferred half; G2/G3 spikes ruled first) · **Branch:** ryan-next
+
+**The G2 spike reversed the plan's caution — with numbers.** analysis/28
+budgeted for live decode being too expensive and Recall shipping alone.
+Measured on this machine over REAL speech (a `say`-generated 19.3s clip,
+16kHz mono, whisper-tiny through the repo's own @xenova/transformers):
+batch RTF 0.09, and live-style 5s chunks at ~0.6s each — a ~15% duty cycle
+of one core. Not ugly; live shipped. **G3 (MCP) ruled to its own round**,
+as the plan allowed: no MCP server surface exists in the app, and one
+means a transport + auth design (a GUI app can't speak stdio), not a
+route on anything existing.
+
+**Recall — the citation IS the answer.** fb_segments_fts (FTS5, the same
+trigger-synced pattern as fb_chunks_fts, with a backfill for pre-M4 rows
+at IPC-register time) mirrors the segment table WITHOUT flattening it:
+where the chunk index cuts paragraphs, this keeps segment identity, so
+every hit is a speaker + a timestamp + a door. Org-scoped through the
+meetings join; an orphaned segment is not a citable answer; searches
+degrade to [] rather than throwing through an ask (the chunkIndexActive
+precedent). Three consumers:
+- **The Meet view's search box** now answers from the corpus: "FROM THE
+  TRANSCRIPTS" hits under the query, each an attributed line, and
+  clicking one opens that meeting's Thread scrolled to the exact segment
+  (fb:open-meeting learned an optional segmentId for the same trip).
+  Pure FTS — no model call between the question and the quote.
+- **The assistant grounds on what was said**: a meetings pool rides
+  retrieveSources round-robin, its grounding text the attributed lines
+  themselves, so the model cites who said it and when.
+- **A meeting citation routes**: sourceTarget 'meeting' → PlexiMeet via
+  the DEC-079 door, with its own trace identity (video_call, office tone).
+
+**The live transcript — ⌘⇧T finally shows the words.** A ScriptProcessor
+PCM tap rides the recorder's OWN taps — consent is inherited, not
+re-decided: processors exist only on taps, and taps exist only for
+participants the M1 choke point allowed. Cost is view-driven: the tap
+attaches when the initiator opens the pane and detaches when it closes or
+the recording ends — nothing decodes while nobody watches. Chunks decode
+serially in main (whisper-tiny, 16kHz, linear resample); a backlog SHEDS
+the oldest chunk rather than lagging — the pane is a courtesy, the
+wrap-up's per-track pass writes the Record. Every branch of the pane is
+honest: idle says nothing is being recorded; a non-initiator is told only
+the recording machine hears the room; live is labelled "rough and local".
+
+Verified live on the real build: searchSegments ranked Dana's
+countersignature line first with full attribution and left the small talk
+alone; the typed query rendered both Recall hits and clicking one landed
+the Thread scrolled to the exact segment, visible in-viewport; a silence
+chunk through voice:transcribeLive came back ok-and-empty (the honest
+decode); deleting the meeting swept its FTS rows through the trigger
+cascade. Not driven live: a full grounded ask citing a meeting (the pool
+is pinned + unit-proven over real FTS5) and the in-call speak→pane loop
+(needs a real mic in a real room — rides the operator's two-machine QA).
+
+26 new tests (m4Recall real-FTS5 + m4Live); 3,567 green across 328 files;
+both typechecks clean. One M1 pin rewritten to the pane's new truth (the
+static "arrives after the call" note became three honest branches). **M4
+is complete** — M5 (Prep + series) next on the operator's go; MCP is a
+named follow-up round.
+
+## DEC-104 — M5: Prep + series — the meeting remembers
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+P5, Q12/Q14) · **Branch:** ryan-next
+
+**Series identity is a column, not a guess.** fb_meetings gained series_id
+and block_id, stamped at wrap-up from the calendar origin (the Join button
+on a booked block now sends blockId, seriesId, agenda and invitees along).
+From there, everything M5 promises is an INDEXED LOOKUP: the previous
+instance is the latest sibling row, and "carried from last time" is the
+still-ACTIVE work_items that instance filed — M3's own output, read back.
+External-calendar series matching stayed deferred by plan: title-matching
+would fake a memory the store does not have.
+
+**The staging (P5).** meetings:prep assembles pure database facts — agenda
+from the booking, the previous instance, its still-open items, and each
+attendee's open items (invitee email matched humbly against mention names;
+a miss is a quiet miss). No model call builds prep. It renders in the
+Stage's notes pane as a collapsible PREP section the moment a room joined
+from a booked block opens: what to settle, what last time left open, what
+is open with each person in the room.
+
+**"Carried from last time" leads both ends (the crown jewel).** Atop the
+wrap-up review — before even the confirm stop, because the room's first
+question is "did we move?" — and atop the Record's Commitments view, with
+the previous meeting named and dated. The one verb is Done: a carried item
+resolved in the room is closed right there (house terminal state
+'completed', one hover button).
+
+**Q14, wired honestly.** meeting-series-prefs.json (the retention-pref
+precedent) holds one knob per series: whether the wrap-up mints the host's
+To Know brief. Default ON; the toggle lives on the series meeting itself
+("Brief me after each meeting in this series"); the wrap-up asks before
+minting. Briefs FOR OTHER ATTENDEES remain a named follow-up — they need
+an out-of-room delivery channel (the meetingSignal relay dies with the
+room, and the wrap-up finishes after everyone has left).
+
+**Live verification caught a real bug.** The Done button first shipped
+calling setState(id, 'done') — but the house terminal state is
+'completed', and setWorkItemState REJECTS an unknown state by resolving
+FALSE without throwing: the strikethrough stood over an item still open, a
+false completion the catch-only handler could never see. Fixed ('completed',
+and a false return now un-strikes the row) and pinned. The rest held
+first try: series stamped through create; prep returned the previous
+instance, the carried item, the Dana-by-email-local-part attendee match
+(ghost invitee quietly missed) and the agenda; prefs defaulted on, turned
+off, persisted off, and the detail's toggle rendered that persisted state;
+CARRIED FROM LAST TIME rendered named and dated atop the Record. Scratch
+data cleaned. Not driven live: the Stage PREP pane inside a real joined
+room (origin-driven; pinned + the assembly proven by the same IPC the pane
+calls) — it rides the operator's two-machine QA.
+
+15 new tests (m5PrepSeries: real-SQLite prep queries, prefs, pins);
+3,582 green across 329 files; both typechecks clean. **M5 is complete** —
+M6 (Guest Capture) starts with the G1 ScreenCaptureKit spike, on the
+operator's go.
+
+## DEC-105 — M6: Guest Capture — SPEC-003 lands complete
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/28 (SPEC-003
+P6, CR-12 · G1) · **Branch:** ryan-next
+
+**G1 answered YES, with numbers.** The spike everything was gated on:
+an armed display-media grant (primary screen + `audio: 'loopback'`,
+ScreenCaptureKit under Electron 37) returned a track literally labelled
+"System audio" — RMS 0.000 in silence, 0.369 while the Mac spoke through
+its own output. Real loopback, proven through the PRODUCTION handler, no
+virtual driver, no picker. The arming is one-shot over IPC: screen SHARE
+keeps the native system picker; exactly one armed request bypasses it and
+the handler re-registers the picker path the moment it fires.
+
+**Reduced mode, exactly per CR-12.** Guest Capture records an EXTERNAL
+meeting (Zoom/Meet/Teams) with no roster handshake — guests are not
+Plexii users; the person responsible is the one who presses record, and
+the disclosure bar on their screen is NON-DISMISSIBLE: two verbs (⚑
+moment, Stop), an elapsed clock, and a mode line that names exactly what
+is heard. Attribution is by construction, never by guess: mic = "You",
+system audio = "Them" — and guests NEVER enter the extractor roster
+(wrap-up filter), so nothing is owner-attributed to or sent toward
+someone who never consented into the system. A guest's spoken commitment
+still surfaces — ownerless, behind its "[m:ss] Them: …" anchor.
+**Mic-only is the honest floor**, named in the bar as ruled: "Plexii can
+hear you, not them." The vehicle video track is stopped the instant the
+stream arrives — nothing visual is ever recorded.
+
+**Everything rides the existing foundations.** MeetingTrackRecorder
+(shared clock, per-track takes), CR-11 local-only transcription, the same
+wrap-up (Record, commitments confirm stop, To Know brief, retention), and
+series identity stamped from the calendar origin — an external weekly
+booked with a joinUrl gets prep and "carried from last time" exactly like
+a native meeting. Doors: a Record button on external-joinUrl calendar
+blocks (explicitly separate from Join — recording is its own act, never a
+side effect of opening a link) and "Record external" in the Meet view.
+
+**The live round caught an M2-era latent bug worth the whole exercise:**
+the ai:transcribeAudio IPC handler DROPPED forceProvider — the renderer
+forced 'local' (CR-11), the bridge never passed it, and the cloud
+PREFERENCE answered instead. On this machine (preference: cloud) every
+real per-track meeting wrap-up would have errored — failing CLOSED only
+because meeting callers send samples without bytes, so nothing could ever
+have leaked to the cloud; it just failed. Fixed at the seam and pinned.
+The re-run then proved the whole pipeline: door → bar (mode 'both') →
+real speech through loopback → ⚑ → Stop → on-device wrap-up → a meeting
+record with attributed segments — "You" from the mic (which heard the
+room acoustically) and "Them" from loopback (which heard it electrically),
+the same sentence transcribed twice by two different physical paths.
+Scratch data cleaned (item dismissed per R008, meeting deleted).
+
+12 new tests (m6GuestCapture: mode behaviours + contract pins incl. the
+CR-11 seam); 3,593 green across 330 files; both typechecks clean.
+
+**SPEC-003 is COMPLETE: M1–M6 all landed** (DEC-098…105). Still owed,
+named: two-machine consent QA (live pane, Stage PREP, real-room guest
+coexistence); PlexiCam 1:1 calls consent round; C5 Record widget +
+per-item moment anchors; Recall-over-MCP round; briefs for other
+attendees (out-of-room delivery).
+
+## DEC-106 — PlexiCam calls consent — the M1 hole closed in its 1:1 form
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** named follow-up from
+DEC-098/DEC-101 (the meetings audit found the same defect in calls) ·
+**Branch:** ryan-next
+
+**The hole.** One side's whisper preference silently recorded BOTH voices
+the moment a call connected — `ConversationRecorder` mixed local + remote
+and the peer was never told, never asked. Identical in kind to the
+meetings hole M1 closed; it survived because DEC-101 could only rename
+the preference honestly, not rebuild the flow.
+
+**The close, mirroring M1 exactly.** The preference now expresses MY
+intent only: at connect it starts a per-track recorder (the M1/C1
+foundation, reused), taps MY mic, and sends a consent-request over the
+existing callSignal relay — an opaque-JSON kind, zero server changes,
+old clients ignore it. The peer's stream is tapped when their
+consent-response arrives, never before (capture-on-answer); a decline is
+honoured by construction — never tapped, the call continues, the record
+holds only my side. Late media (renegotiation) applies the standing
+answer, not a new grab. The peer's own standing preference answers FOR
+them — someone who ticked "transcribe my 1:1 calls" has already said
+yes, so both-on calls record on both machines, each side consented;
+everyone else gets a modal that names the machine and the stakes
+("recorded and transcribed on their machine… decline and your voice is
+never captured; the call continues either way" — the verbs are "Yes,
+transcribe" and "Not my voice").
+
+**Named in words, continuously (§3.8 reduced).** The requester's window:
+"Recording · asking NAME…" → "you and NAME consented" / "only you — NAME
+declined (not recorded)", with a requester-only Stop (the take-so-far
+still wraps up at call end, via a held take). The consenting side's
+window: "NAME is transcribing this call — their machine, not yours."
+
+**Calls ride the meeting pipeline now.** The wrap-up gets per-track
+takes with speakers { You, peer's name } and forceLocalTranscription —
+a consented recording must not grow a silent third-party disclosure, so
+call audio joins meeting audio in never leaving the machine. That buys
+calls the whole M2–M4 stack for free: attributed segments, the Record,
+the commitments confirm stop, Recall. ConversationRecorder — the silent
+mixer — is deleted from the tree. The preference copy tells the new
+truth: "Transcribe & summarise my 1:1 calls (the other person is asked)."
+
+Verified: 9-pin suite over the closed hole (blind-capture gone,
+capture-on-answer, decline-never-tapped, standing-pref auto-answer,
+worded states, held take, meeting-grade handoff, dead recorder gone);
+clean boot on the real build with the new preference copy rendered. The
+live two-party round-trip inherently needs two machines — it joins the
+operator's two-machine QA (with meetings consent, the live pane, Stage
+PREP and guest capture).
+
+9 new tests; 3,602 green across 331 files; both typechecks clean. The
+PlexiCam follow-up is CLOSED; remaining named rounds: C5 Record widget +
+moment anchors, Recall-over-MCP, briefs for other attendees, two-machine
+QA (operator-owed).
+
+## DEC-107 — C5 closed: the Record widget + per-item moment anchors
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** named follow-up
+(S3-DEC-020's last sliver, deferred at DEC-101; the moment anchor named at
+DEC-102) · **Branch:** ryan-next
+
+**The Record stands on its desk.** New widget kind 'meeting-record'
+(content = meeting id): the wrap-up mints it FIRST, beside the transcript
+doc, and it READS the meetings store live — never a copy — so the desk
+shows the same truth PlexiMeet shows, provenance tiers intact: yours at
+ink-100 leading, heard behind its timestamped quote rule, inferred
+visibly quieter. Every heard line is a DOOR — click it and PlexiMeet
+opens with the Thread scrolled to that exact segment. Honest states for
+the not-yet ("written at wrap-up") and the gone ("the Record went with
+it"). The kind is deliberately absent from the hand-add catalogue, so
+the empty shell S3-DEC-020 warned about can never be placed by hand; an
+unknown kind on an older client falls into Canvas's default case.
+
+**The moment anchor, closed where DEC-102 left it.** A new internal URL —
+plexii://meeting/<id>?seg=<segmentId> (lib/meetingLink, build + parse
+unit-pinned) — rides the DEC-091 source_url column. MeetingCommitmentsCard
+stamps it on every ANCHORED commitment it files; unanchored items keep the
+meeting-level door only, the honest asymmetry. The Attention chip now
+PARSES before it opens: an internal moment routes inside Plexii
+(openMeeting + segmentId → M4's fb:open-meeting listener → Thread scrolled
+to the line, icon my_location, title "Jump to the spoken moment"); any
+other URL is DEC-091's web mark, still opened externally, untouched.
+
+Verified live on the real build, both doors: the Attention chip landed
+the Thread on Dana's exact line ("[0:30] Dana: the contract must be
+countersigned by Friday", visible in-viewport); the desk widget rendered
+its DECISIONS section with all three tiers and its heard line landed the
+same segment the same way. Scratch data cleaned (item dismissed per
+R008, meeting deleted with segments, desk trashed).
+
+9 new tests (c5RecordWidget: URL round-trips + wiring pins); 3,611 green
+across 332 files; both typechecks clean. **C5 is fully closed.**
+Remaining named rounds: Recall-over-MCP; briefs for other attendees;
+two-machine QA (operator-owed); analysis/27 Phase 4/5.
+
+## DEC-108 — Recall over MCP — G3 closed
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** named follow-up
+(G3, deferred at DEC-103: "a transport + auth design, not a route on
+anything existing") · **Branch:** ryan-next
+
+**G3's cost collapsed on contact with the codebase.** The deferral read
+"no MCP server surface exists" — true — but PlexiAPI already existed:
+127.0.0.1-only, scoped bearer tokens, Origin rejection, a DNS-rebind host
+guard, enabled only by the user. Transport and auth were SOLVED problems;
+only the protocol layer was new. So Recall-over-MCP is POST /mcp on that
+server, behind every guard PlexiAPI already enforces — asking for the
+READ scope explicitly, since MCP speaks POST for reads and the server's
+method-based write gate would have demanded the wrong thing.
+
+**The protocol layer is hand-rolled and dependency-free** (mcpRecall.ts):
+JSON-RPC 2.0 — initialize with honest version negotiation (a known offer
+is echoed; an unknown one gets our default, not a lie), ping, tools/list,
+tools/call, notifications answered 202 with no body, batches tolerated
+for older clients. Stateless by design; plain JSON replies, which the
+Streamable HTTP spec permits. The full SDK would have been a dependency
+for three read-only tools.
+
+**Three tools, every answer attributed:** recall_search (segment FTS —
+"[0:15] Dana: … — in 'Weekly sync' (meetingId: …)"; an empty result says
+"an honest zero, not a failure"), recall_meeting (title, date, summary,
+action items, the attributed transcript — truncation announced, never
+silent), recall_recent_meetings. **The refusals, stated where enforced:**
+READ-ONLY forever — no tool on this surface writes, files, or sends; no
+audio — bytes never leave the machine (CR-11/CR-13), MCP gets text;
+loopback only, token required — both inherited from PlexiAPI, both real.
+The PlexiAPI view documents the endpoint and teaches the client config
+(`claude mcp add --transport http plexii-recall …`).
+
+**Verified live over real HTTP against the running app:** 401 without a
+token; 403 with a forged Origin header; initialize echoed 2025-06-18 and
+named the server at the real app version; the initialized notification
+got its 202; tools/list returned the three; recall_search answered with
+Dana's attributed line and its meeting identity; recall_meeting rendered
+the full record. Scratch meeting deleted, probe token revoked, server
+disabled back to its prior state — the port answers nothing again.
+
+13 new tests (mcpRecall: the JSON-RPC contract on fakes + wiring pins);
+3,624 green across 333 files; both typechecks clean. **G3 is closed.**
+Remaining named rounds: briefs for other attendees (out-of-room
+delivery); two-machine QA (operator-owed); analysis/27 Phase 4/5.
+
+## DEC-109 — Briefs for other attendees — Q14 completed
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** the last named
+follow-up (deferred at DEC-102, machinery half-built at DEC-104: "needs an
+out-of-room delivery channel") · **Branch:** ryan-next
+
+**The channel was in the house all along.** The blocker read "the
+meetingSignal relay dies with the room, and the wrap-up finishes after
+everyone left" — true, but PlexiChat DMs are server-persisted and
+delivered live or on next open: the same channel "record a message for a
+teammate who is away" already trusts. The brief rides it as a READABLE
+message — prose first, one plexii://brief marker as the last line
+(meetingLink build/parse, unit-pinned) — so an attendee on an old client
+gets a useful DM; the machine layer degrades to prose, never to noise.
+
+**Two-sided sovereignty, both defaults honest.** The HOST opts in to SEND
+per series — a new shareBriefs knob, default OFF because sending is its
+own act (the SPEC-027 doctrine), toggled on the series meeting itself
+("Send the brief to the other attendees too"). The RECIPIENT opts in to
+FILE per series — followBriefs, default null meaning never-asked: the
+first arriving brief raises a notice that IS the opt-in ("Dana shared the
+meeting brief for 'Weekly sync'" → "File it + follow this series"), and
+NOTHING files until they say so — the confirm-stop doctrine reduced to
+one toast. Following files quietly with the door OUT on the same notice;
+declining leaves the chat message readable and does nothing else. The
+filed item is sourceType 'note' — the meeting row lives on the host's
+machine, and a chip pointing at a meeting this client does not have would
+be a dead door dressed as a live one.
+
+**The plumbing.** The roster (with handles) survives room teardown into
+the wrap-up; the outbox speaks messagingClient DIRECTLY (the store's
+startDm would hijack the user's open conversation mid-wrap-up) and skips
+self; ingestion feeds from BOTH points a message can arrive — the live
+socket and every history load — made exactly-once by a capped
+processed-id ledger. SeriesPrefs widened to {briefs, shareBriefs,
+followBriefs}; DEC-104's pin rewritten to the wider truth with history.
+
+**Verified live:** the widened prefs round-tripped through the real IPC
+(default {briefs on, share off, follow unasked}; both directions
+persisted); both toggles rendered on a series meeting with share
+correctly unchecked; clean boot with the new ingest hooks. The full
+sender→server→recipient loop inherently needs two signed-in accounts —
+it joins the operator's two-machine QA, with the wire format and the
+whole recipient decision table proven by unit (13 tests incl. the
+never-asked/following/declined table, idempotence, self- and
+deleted-message guards).
+
+13 new tests; 3,637 green across 334 files; both typechecks clean.
+**Q14 is complete — and with it, every named build round from SPEC-003 is
+closed** (DEC-098…109). Remaining: the operator's two-machine QA sweep;
+analysis/27 Phase 4/5 on the operator's go.
+
+## DEC-110 — #16 AI-suggested tags — analysis/27 Phase 4 opens
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/27 Phase 4
+(item #16; the phase was gated on operator go — "keep going" was the go) ·
+**Branch:** ryan-next
+
+**The ruled shape, built exactly.** Tags stay deliberately never-mandatory;
+the fix is SUGGESTED tags at the confirm stop, accent-marked as inferred
+like every other inference. And the DEC-088 people pattern is the template,
+applied whole: suggestions are DETERMINISTIC and grounded in what already
+exists — a tag is suggested only when the capture's own words (whole-word,
+punctuation-folded) match a tag ALREADY IN USE on live work items, ranked
+by the user's own usage counts. No model call — the rules fast path stays
+model-free. No invented taxonomy — the module can never mint a vocabulary,
+only echo the user's back (the DEC-029 taxonomy law holds). Empty whenever
+the workspace's tag population is: honesty over recall.
+
+**Discoverable the house way.** Tags live in the DESK drawer, so waiting
+suggestions LIGHT the desk pill (accent + "No desk · 3 tags?") — the
+DEC-088 pill doctrine: accent means an inference is waiting and the
+operator hasn't touched the dimension. Inside the drawer, suggestions are
+accent-bordered chips under the tag input; a CLICK accepts one into the
+chosen set, an accepted chip stops being a suggestion, and nothing ever
+applies on its own.
+
+**Two live-caught fixes worth the round:** (1) hyphenated tags never
+matched — the text side folds punctuation to spaces and the tag side
+didn't; tokenization aligned and pinned ('test-seed' now matches both
+"test-seed" and "test seed" in prose). (2) the first placement was
+invisible — suggestions sat in a closed drawer with no signal; the lit
+pill closed the gap. Verified live against the operator's REAL vocabulary:
+"Call the LakeDash client about the rush order" suggested exactly
+#client, #lakedash, #rush (usage-ranked); the pill lit with the count;
+clicking #lakedash accepted it and the suggestion row shrank to two —
+the filter reading the chosen set is itself the proof the state took.
+Escape closed the card; nothing filed.
+
+**Phase 4 ledger:** #16 DONE (this entry). **#13 "transcript UI rebuild"
+is SATISFIED by SPEC-003** — the Fireflies-level rebuild it queued is
+DEC-099…103's attributed Thread, provenance Record, moment anchors and
+Recall; marked in analysis/27, no separate build owed. **#17 home
+widgets / live doc embed stays gated**: "new product build" is a shaping
+question (which home? embedding what, for whom?) the operator owns
+before any code does.
+
+10 new tests (p4TagSuggest: real-SQLite vocabulary + scoring + the
+tokenization drift + pins); 3,647 green across 335 files; both
+typechecks clean.
+
+## DEC-111 — main merged back (4.2.2) + the review → landing package
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** analysis/27 Phase 5
+(Caleb checkout note · Michael review → landing) · **Branch:** ryan-next
+
+**Michael kept shipping while we built.** origin/main moved to 4.2.2
+(4.2.1: mail-list selection scrolling + PlexiOffice notarised; 4.2.2:
+page-respecting tables, code blocks and images). The standing promise —
+ryan-next stays zero-conflict mergeable — was re-earned: main merged back
+(`9e26b73c`), ZERO conflicts (his work is doc-pagination/mail; ours is
+meetings — disjoint by construction), and the merged tree runs **3,655
+tests green across 336 files** (his tableHeaderRepeat suite beside ours),
+0 type errors. Pushed to both remotes.
+
+**analysis/29 is the landing package** — written for its two readers:
+Michael's review guide (the commits in order with the five places review
+attention pays most: the consent invariants, the forceProvider seam fix
+that touches every wrap-up, the /mcp surface behind PlexiAPI's guards,
+the all-additive schema deltas, the shared-surface touches outside
+PlexiMeet) and Caleb's checkout (the two-line instruction + the flags
+note resolved: the Settings work-items capability toggle). Plus the
+two-machine QA sheet in one place, and the deliberately-deferred list so
+nothing reads as forgotten.
+
+Phase 5 ledger: checkout note DONE · review package DONE (Michael's
+actual review + merge is his act) · taxonomy ruling still waits on real
+queue-usage data (the [TEST] seeds would poison a snapshot taken today) ·
+synced-docs QA rides the two-machine session.
+
+## DEC-112 — PlexiMeet wears the house material
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** operator request
+("this page still feels very vibe-coded") · **Branch:** ryan-next ·
+**Scope rule:** DEC-094's — presentation ONLY; every testid, handler and
+copy string exactly where it was, proven by the untouched m1–m6 suites.
+
+**The recipes, applied whole.** The view now sits on the desk paper (the
+dotted house texture every canvas wears, with its dark/futuristic
+variants for free); the rail is a raised color-mix panel with the
+display-type header and a rose identity chip; the primary is glossy rose
+(gradient + inset highlight + fb-press — the kpi-tile gloss language on a
+button); the recording preferences gather into ONE eyebrowed fb-card
+("RECORDING") instead of loose labels; the four actions sit on a 2×2
+grid of uniform h-8 fb-btn-surface buttons; search is a sunken field with
+an accent focus ring; rows carry fb-press and an inset-highlight selected
+state; the detail header is a sticky raised bar over the paper; the three
+Record renderings are a sunken segmented TRACK with a glossy accent
+active pill; and every rendering reads as an editorial max-w column.
+
+**Two live-caught layout wraps** fixed in the round: the retention label
+colliding with its select (nowrap + bounded select) and four actions
+squeezed into one flex row (the grid).
+
+**A verification lesson worth keeping:** three dark-mode screenshots in a
+row showed light patches over correctly-dark computed styles — stale
+compositor tiles in the OCCLUDED window (throttled rendering reuses
+cached textures for layerized elements; the backdrop-blur rail and
+resizable textareas each own layers). The definitive capture is
+`captureBeyondViewport` + a display-none/restore damage nudge — dark mode
+was then fully correct on the first honest frame. Recorded so the next
+CDP visual round doesn't chase ghosts. Light and dark screenshots
+delivered to the operator.
+
+7 material pins (meetHouseMaterial — paper, chip, gloss, eyebrow, track,
+sticky bar, column); 3,662 green across 337 files; both typechecks clean.
+
+## DEC-113 — the transcription bug: `task:'transcribe'` was poisoning whisper
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** operator bug report
+(a real test meeting came back as one sentence looped a dozen times; "Find
+commitments" then honestly found nothing) · **Branch:** ryan-next ·
+**Commit:** cca8693a
+
+**Root-caused by measurement on the operator's OWN saved take** (36.5s of
+clear speech, decoded off disk). The decode passed `task: 'transcribe'`;
+on transformers.js 2.17.2's whisper models that option forces a decoder
+path that collapses real speech into "So So So…" loops. Omitting it — the
+library default — transcribes the same audio near-perfectly. The
+commitments extractor was never broken: it correctly found nothing in the
+loop mush (an honest zero over garbage).
+
+**The full fix, each part proven on that take:**
+- Drop `task: 'transcribe'`. The one load-bearing line.
+- whisper-base for wrap-up truth (tiny genuinely loops on this audio);
+  tiny stays only for the live ⌘⇧T pane, a labelled courtesy the wrap-up
+  rewrites afterward.
+- Belt and braces: explicit 30s windows + 5s stride + a 3-gram repeat ban,
+  and a pure collapse-repeat net (whisperCore.collapseRepeatRuns) that
+  folds any surviving loop to one honest segment.
+- Decode quality: the renderer decodes at native rate then resamples via
+  OfflineAudioContext, instead of a forced-16kHz AudioContext whose
+  in-decode resampler muddied the first seconds.
+- Recovery: a "Re-transcribe" button on any meeting with retained audio
+  re-runs the saved takes through the current engine (segments, transcript
+  and summary rewritten, the commitments door reopened). Audio never
+  leaves the machine — the same local decode path as the wrap-up.
+
+**Honest note on the detour:** a long bisection wrongly blamed the Electron
+main process / onnxruntime threadpool and briefly moved transcription to a
+child process — every "clean" comparison run had simply happened to omit
+`task`. That machinery was fully reverted; the engine stays simple and
+in-process. Pure logic lives in whisperCore.
+
+Verified live on the operator's broken meeting: a clean 6-segment
+transcript, a coherent summary, and both stated deliverables ("follow up
+with Caleb on timestamp/clip", "make the video meeting feel in-desk") now
+surface as commitments. 10 new tests (whisperQuality); one M2a pin
+migrated to whisperCore; 3,672 green.
+
+## DEC-114 — Stage + wrap-up wear the house material
+**Date:** 2026-09-01 · **Status:** EXECUTED · **Plan:** operator request
+(the DEC-112 companion — "bring the Stage and wrap-up into the house
+material too") · **Branch:** ryan-next · **Scope rule:** DEC-094's —
+presentation only.
+
+**Wrap-up** (the review overlay after every recording) now carries the
+same finish as the restyled PlexiMeet: a rose identity chip, the display
+title, eyebrow section headers (SUMMARY / DELIVERABLES), and a glossy
+accent-primary "Done" (Close stays quiet). Already an fb-card on the house
+scrim; this made it read as the same product as the rest. **Stage** (the
+live video surface — legitimately dark, like every video app) got the
+premium treatment where it belongs: control buttons gain the house press,
+an inset gloss highlight and a danger gradient; the notes-pane header gets
+the chip-and-eyebrow treatment. The dark video stage stays dark by design.
+
+3 material pins added (wrap-up chip + display, glossy Done, premium Stage
+controls); 3,675 green across 338 files; both typechecks clean. Light and
+dark wrap-up screenshots delivered.
+
+## DEC-115 — The meeting Record reorganised: transcript beside the renderings, links both ways
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+(three reference screenshots of a mock transcript page — "this is not the
+trump card; this is just a design direction") · **Branch:** ryan-next ·
+**Scope rule:** UI/UX first, plus the linking the operator named as
+important ("linking to certain sections and instructions from a
+transcript"); core function unchanged; the transcription engine itself
+NOT re-tested this round (the operator's caveat stands — DEC-113 is
+verified on one real meeting).
+
+**What the operator asked to keep from the reference:** everything
+organised, bulleted and categorised; transcripts tagged by person,
+searchable and linked; action items with a checkbox and a bell into
+Attention; analytics filterable by person; transcripts broken out cleanly;
+the existing "Find commitments" button; all of it in the Plexii house
+material, not the reference's styling.
+
+**The frame.** Two columns. LEFT: the Record's renderings in the sunken
+segmented track — Overview (1), Action items (2 — still the DEFAULT per
+S3-DEC-022, now carrying a count), Analytics (3). RIGHT: the transcript,
+ALWAYS on screen — the Thread tab is gone because the transcript stopped
+being a destination. Lines are tagged by speaker (colour by order of first
+appearance, accent leads), searchable (`/` lands in the box; hits are
+`<mark>`ed; an honest empty line when nothing matches), filterable by
+speaker chip, every timestamp a link, the active line highlighted; DEC-100's
+confidence dimming and its hover truth survive verbatim. Above both: a meta
+strip (state pill, when, duration — seconds under a minute, "0 min" for a
+24-second call was a lie — speaker initials) and a speaker TIMELINE of
+proportional bands with markers (heard spans filled, action items hollow);
+clicking it moves through the call. No fake play button: there is no audio
+player and the Record does not pretend to be one.
+
+**Overview** = the Brief organised by section: SUMMARY field, "Brief as"
+templates, YOUR NOTES, then sections with heard rows (hairline rule +
+timestamp → jump) and inferred rows (lighter, labelled) — the M2b
+provenance treatment untouched; plain transcript text folds away once
+segments exist. **Action items**: Find commitments kept (its confirm stop
+unchanged); IN ATTENTION lists the work items that POINT at this meeting
+(DEC-079's sourceRef) — each with a circle checkbox that sets the house
+terminal state `completed` (and back to `open`), the class chip, due date,
+a "m:ss in transcript" moment link (DEC-107's anchor, parsed) and the bell
+mark; FROM THE SUMMARY lists the legacy lines with a hollow circle, a bell
+that files a human-origin, already-approved item pointing back at the
+meeting (no silent assignment), and Desk. A filed line is PROMOTED, not
+duplicated — it leaves the summary list for the checkbox list, and comes
+back if dismissed from Attention. **Analytics**: Duration / Speaker changes
+/ Questions asked / Lines tiles, "Who spoke" as per-speaker share bars
+(click = filter the transcript), Moments chips. SPEC-003's refusal holds
+and is now a banned-word pin: neutral facts, never a ranking, a score or a
+mood. **Links both ways**: a transcript line that anchors a Brief entry or
+an action item wears a chip ("In Brief · Decisions", "Action item") that
+opens the rendering and scrolls to the entry — the reverse of the jump.
+
+**Code:** `lib/meetingRecordStats.ts` (pure figures, unit-tested — speaker
+order/colour/initials, spoken time, hand-offs, questions, bands, seek,
+filter, clock/duration); `PlexiMeetView.tsx` MeetingDetail rewritten
+(1,272 → 1,860 lines; every functional pin from M1–M6, the calls round, C5
+and the briefs round survives verbatim). Superseded pins rewritten with
+history: m2b's tab tuples (Thread → Analytics, Overview leads) and
+DEC-114's 780px editorial column (→ the two-column frame). New suite
+`tests/unit/meetRecordLayout.test.ts`.
+
+**Verified live** over CDP on a scratch meeting (six attributed segments,
+yours/heard/inferred spans, a legacy line): 42 checks — search, speaker
+filter, timeline seek, heard-row jump that clears a hiding filter without
+switching tab, keys 1/2/3 and `/`, bell → one work item (meeting source,
+human origin, approved), checkbox → `completed` → `open`, promotion and
+return on dismissal, anchored-item moment link + hollow marker + reverse
+chips, Export menu. Scratch meeting removed; the items my bell filed were
+DISMISSED through the house path (work items are never deleted —
+`WorkItemDeleteRefusedError` — so the probe cleans up the way a person
+would). Light + dark screenshots via the DEC-112 honest capture. Suite:
+3,693 tests / 339 files; both typechecks clean.
+
+**Caught live, fixed in-round:** (1) the renderer store never sees a
+raw-IPC write, so a dismissal made elsewhere (the queue in another session,
+a snooze expiry) would not show on reopen — the Record now re-reads work
+items on every open; (2) a sticky "already sent" bell state would go stale
+after a dismissal — replaced by an in-flight guard, the promotion carries
+the truth; (3) the pills carried both a count and a key digit — the digit
+moved to the tooltip. **Probe lesson:** `textContent` includes Material
+ligature names ("article") — match labels, never equality.
+
+## DEC-116 — PlexiMeet on Home's substrate: paper-texture, hero header, floating kit cards
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("make the entire PlexiMeet page background design, textures, and colors
+look and feel more like the main home screen", with Home and Meet
+screenshots side by side) · **Branch:** ryan-next · **Scope rule:**
+presentation only — every testid, handler and copy string stays; the
+DEC-115 Record is unchanged in function.
+
+**What was actually different from Home.** Not the dots: Meet already sat
+on `desk-paper` (DEC-112). Home sits on `paper-texture` — the dashboard
+deliberately avoids desk-paper because its time-of-day overlay and
+custom-background override caused Home's mid-screen seam and light-in-dark
+bug — with a 28px dot grid on the themed `--surface-base`, scrolling with
+the content. The real differences were structural: Meet's rail was a
+full-height bordered panel, its detail had a sticky raised header bar, its
+primary was a glossy rose block, and its cards had no headers. Home is a
+single scrolling page (`max-w-[1440px] mx-auto px-8 pt-8 pb-8`) with a hero
+greeting, quiet surface-button doors, one accent primary, and floating
+cards with icon-tile titles.
+
+**What changed.** The view root is `paper-texture` — the SAME substrate
+as Home — inside Home's page shell. A hero header (Home's idiom: display
+title, quiet subtitle, doors right) carries the rose module chip and
+"PlexiMeet"; Record notes / Record external / Message / Add are Home's
+surface buttons (`h-9 px-3.5 fb-t-body fb-btn-surface`), and "Start or
+schedule a meeting" is Home's ACCENT primary (the Customize → Done glow) —
+a judgment call recorded here: Home's only saturated element is accent, so
+the module colour retreats to the chip. The rail became two floating kit
+`RailCard`s (Meetings — search + list, sticky beside the Record; the
+RECORDING preferences, eyebrow kept). The meeting title sits on the paper
+with its facts beneath (no sticky bar); Desk / Export / delete are surface
+buttons. The three Record panels are `RailCard`s with icon headers —
+Timeline (clock + legend in the header), Record (the sunken segmented
+track in the header, unchanged), Transcript (line count in the header,
+sticky). The empty state (no meeting selected) is the module dashboard,
+now `embedded` so the page keeps one hero.
+
+**Kit growth, additive:** `RailCard` gained `trailing` (header controls),
+`bodyClassName` (self-managed scroll regions) and `testId`; existing
+callers — Home's Rooms/Continue cards, every module dashboard — render
+pixel-identical (defaults unchanged). `ModuleDashboard` gained `embedded`.
+
+**Caught live, fixed in-round:** the operator's real "Test" meeting has
+two heard Brief entries citing the SAME transcript line — the DEC-115
+marker keys collided (`h-<segmentId>`; React duplicate-key warning ×180
+per render). Keys now carry the span index, and a line shows ONE chip per
+door (two entries under the same section open the same place). **Probe
+lesson:** after a renderer reload the app lands on the desk sidebar; the
+Meet door lives in the OFFICE sidebar — probes switch context first.
+
+**Superseded pins rewritten with history** (meetHouseMaterial): desk-paper
+root → paper-texture + Home's shell; raised rail panel → kit cards; 15px
+rail header → hero; glossy rose primary → Home's accent primary; sticky
+detail bar → title on the paper; the DEC-115 `data-testid` panel pins →
+`testId` on RailCards. Verified live: 42/42 CDP checks on a scratch
+meeting (created, removed, its items dismissed the house way), light +
+dark screenshots. Suite: 3,695 tests / 339 files; both typechecks clean.
+
+## DEC-117 — The New meeting dialog is the Calendar composer's twin
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("make the Start or schedule a meeting button and the window that pops up
+look more like the booking page from making a calendar invite… it could be
+nearly identical… just make sure the relevant functionality exists for
+actually scheduling and booking a meeting") · **Branch:** ryan-next ·
+**Scope rule:** BookTimeDialog's material verbatim, Meet's behaviour intact
+and completed where the twin exposed gaps.
+
+**The twin.** `NewMeetingDialog` is rebuilt on `BookTimeDialog`'s own
+strings: the header slider with the sliding thumb (Start now / Schedule —
+both meetings; there is no Focus here), the 23px title with placeholder
+resolution ("Meeting" → the guests' names → the attached desk) and the
+"Leave blank and it saves as" hint, the date / start → end chips (end
+cycles the duration, Shift+click shorter; Start now shows today · Now), the
+quiet Repeat chip, GUESTS as chips on a filled field with suggestions ranked
+by shared-meeting recency, WHERE as one segmented question (Plexii Meet /
+Paste link / In person / None — the chosen branch reveals and autofocuses),
+AGENDA (Shift+Enter newline), the Attach row, the Esc / ↵ footer, the
+keyboard map (Esc discards, Enter commits, Cmd+M flips the mode, guests and
+agenda guard Enter). `meetDialogTwin.test.ts` holds ~30 recipe strings in
+BOTH files at once, so the twin cannot drift quietly.
+
+**Meet's behaviour behind it.** Start now opens the live room, RINGS the
+online teammates you picked (green-dot chips; an "Online now" strip under
+the field, and they lead the suggestions) and EMAILS the join link to
+everyone else. Schedule writes a real meeting block — room id minted,
+guests, external link or place, agenda (which the Stage's PREP pane already
+reads), the attached desk as `taskId`, repeat — and emails the invites with
+the honest mailbox note; the dialog closes itself after the note, as
+before. A typed, uncommitted address still counts at commit. Entitlements
+(`meet`, `meet_schedule`) gate exactly as before.
+
+**Two places the twin is MORE than the composer, deliberately.** Attach is
+REAL: a picker over open desks from the store, and the block links to the
+one picked (the composer's Attach is still the DEC-019 stub). And the
+composer's known-false line ("Guests join in the browser — no account
+needed", the CR-08/09 stub copy) is NOT copied — the twin states what
+happens: the link is emailed; anyone with it joins in PlexiDesk. The invite
+email itself now knows where the meeting is (`composeInviteBody`, pure and
+unit-tested: an external link is THE join line with the Plexii room as the
+PlexiDesk door; a place is stated with the room as the remote option; a
+plain Plexii meeting reads exactly as it always has).
+
+**Verified live** over CDP, 18/18: both modes; guest chip commit / remove
+with the placeholder following the guest and the primary counting the
+invite; duration cycling; the Repeat menu; Paste link revealing its field
+focused; a real desk attached (Staged); then ONE scratch meeting scheduled
+with NO email guests (a connected mailbox would send real mail) and the
+block read back — room id, link, agenda, desk, 45 min, no repeat — and
+deleted. e2e NM-1/2/3 updated to the twin's ids and `aria-selected`.
+Suite: 3,737 tests / 340 files; both typechecks clean.
+
+**Probe lessons:** an OCCLUDED window never fires requestAnimationFrame, so
+a probe that awaits a frame hangs — bound the wait, and let the damage
+nudge do the capture (the DEC-112 lesson's other half); `[attr!=v]` is not
+CSS — `:not([attr=v])`. The Meet door lives in the Office sidebar.
+**Probe lesson, the costly one:** a probe must RESTORE the theme class it
+toggled, never strip it — the app applies `.dark` itself (`lib/theme.ts`,
+`applyTheme` → `classList.toggle('dark', …)`, following the system in
+`auto`), so a blind `classList.remove('dark')` on a system-dark evening
+left the operator's running app in light tokens until re-applied. Both
+probes now record `contains('dark')` before and `toggle('dark', had)` after.
+
+## DEC-118 — Record notes and Record external open the composer's twin too
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("Now do the same for the Record notes and Record external buttons") ·
+**Branch:** ryan-next · **Scope rule:** DEC-117's — BookTimeDialog's
+recipes verbatim; only fields that land somewhere.
+
+**The dialog.** `RecordDialog` — the same header slider (Record notes /
+Record external), the 23px title with placeholder resolution, a time row
+that states the one fact a recording has (today · Now → Until you stop),
+NOTES, the Attach row, the Esc / ↵ footer; `recordDialogTwin.test.ts` holds
+the recipe strings in both files. Neither door records anything until
+Start; the dialog closes on success and, when the microphone refuses, says
+so and stays.
+
+**What each mode honestly carries.** *Record notes*: the title of the
+meeting the recording becomes (was `Meeting · <date>`), NOTES minted as
+`yours` spans on its Record (`buildYoursSpans` — the recorder's own words,
+never rewritten), and a REAL desk (a picker over open desks; the meeting's
+`deskNodeId`). *Record external*: the title; WHERE — "A call on this Mac"
+(mic + system audio, You / Them) or "In the room" (mic only — the loopback
+picker is never raised; the honest floor chosen on purpose, not reached by
+failure); NOTES carried to the wrap-up as its notes (the same `yours` spans
+a live meeting's notes become). No Attach there: the wrap-up mints that
+meeting's desk itself (S3-DEC-020). The CR-12 disclosure is stated IN the
+dialog, before anything runs, in the floor's own words ("Plexii can hear
+you, not them"), and the bar's non-dismissibility is named.
+
+**Store growth, additive:** `guestCapture.start` gained `notes` and
+`micOnly`; the M6 floor, its wording and its pins are untouched. The
+calendar's own block-level Record external door is unchanged (it carries
+the block's series identity and agenda).
+
+**Verified live** over CDP, 12/12 with the microphone STUBBED TO REFUSE
+for the whole run — nothing was ever recorded on the operator's machine:
+both doors open the dialog (external lands in external mode); notes mode
+has NOTES + Attach and no WHERE; a real desk attaches (Staged, the
+placeholder takes its name); Start with the mic refused shows the honest
+error and leaves no recording state; external mode shows the two answers
+with their disclosure lines; Start capturing with the mic refused raises no
+disclosure bar; Esc discards. One live-caught fix: a desk attached in notes
+mode kept naming the title after switching to external — the placeholder is
+mode-aware now. Suite: 3,759 tests / 341 files; both typechecks clean.
+
+## DEC-119 — The Message door opens the composer's twin; Meet's dashboard loses Customize and sits level with the rail
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+("Now do the same for the Message button. Also, get rid of the customize
+button on the PlexiiMeet page and shift things upwards so the top row is in
+line with the top of the left column") · **Branch:** ryan-next · **Scope
+rule:** DEC-117's — BookTimeDialog's recipes verbatim; only fields that
+land somewhere.
+
+**The dialog.** `MessageDialog` — the header slider is the one real choice
+(Video message / Voice message: it sets the capture), the 23px field is the
+message TEXT (sent with the recording — blank sends the recording alone),
+the time row says now → until you stop, TO is one teammate as a chip on
+the filled field (from live presence, with the online-now strip; a DM
+needs an account, so no addresses), the "how" line states the capture and
+the delivery ("recorded on this Mac, then sent as a direct message in
+PlexiChat — they see it when they are back"), the Esc / ↵ footer.
+`messageDialogTwin.test.ts` holds the recipe strings in both files.
+
+**Meet's flow behind it.** The popover picker is gone. The Message door
+opens the dialog; once the camera / mic are live it closes and the door
+becomes "Stop & send to <name>" (red, pulsing) until you stop; the sent
+note lands beside busy / error. The kind decides `getUserMedia`'s video
+flag (video asked for but denied still sends a voice message, honestly;
+no mic at all is reported IN the dialog, which stays); the text rides the
+DM as its body. Start with no recipient says "Pick a teammate".
+
+**The dashboard.** `ModuleDashboard` in `embedded` mode renders no header
+row at all — no title, no Customize, no actions — and the tile grid drops
+its top margin, so the first row of tiles begins at the rail's own top
+edge (measured live: 149 px both). The Customize door still exists on
+every non-embedded module landing.
+
+**Verified live** over CDP, 10/10 with camera / mic stubbed to refuse —
+nothing recorded, nothing sent: no Customize, tiles level with the
+Meetings card; the dialog opens in video, focus in the text; the
+online-now strip (Michael) or the honest empty line; Start with no
+recipient refuses; picking a teammate chips them and names the primary;
+Voice flips the how-line to mic only; Start with the mic refused shows the
+error in the dialog and raises no Stop & send; Esc. e2e: plexiMeetLive #2
+now expects the dialog and its empty-state placeholder; moduleDashboard's
+Meet case expects NO customize door. Suite: 3,778 tests / 342 files; both
+typechecks clean.
+
+## DEC-120 — The assistant's header comes first: the sidebar's wordmark, four doors, tabs below
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Plan:** operator request
+(the floating Plexii panel: "the menu options for today, chat, agent, tasks,
+activity, work need to come below the plexii wordmark menu items… at the
+very top… from right to left minimize, display mode, What was I doing?…
+take body double off of this page entirely… take your conversations off of
+these menu bars and keep new chat… replace the Plexii wordmark where it
+says Plexii your space with just the plexii logo and wordmark with the
+animated bouncing eyes from the top left of the left panel menu. Start
+there and then we'll keep going.") · **Branch:** ryan-next.
+
+**What changed.** A new `AssistantHeader` is the panel's FIRST row on every
+tab: the desk sidebar's own `PlexiiLogo` (the same `PlexiiMark`, the same
+blink-once-and-wink-on-hover motion — one wordmark, one component) where
+"Plexii / your workspace" stood, and on the right, left→right, New chat ·
+What was I doing? · Display mode · Minimize — i.e. from the right exactly
+as asked. Body double left the bar (its doors in the app header and the
+command centre stay); Your conversations left the bar (the list stays the
+fullscreen rail; the narrow-mode overlay lost its only door and went with
+it). The tab strip now sits under the header. The Chat tab keeps the
+conversation's own context as a slim strip only when there is something to
+say — the focused desk thread, the Discovery badge, the linked desk, and
+Clear chat when messages exist. The hub page (`PlexiiHubView`) wears the
+same bar without the two chrome doors (it is not re-dressable).
+
+**Plumbing.** "What was I doing?" moved into the chat store (`recap`,
+`recapping`) so the overlay header and the hub share one implementation;
+`ChatPanel` lost its header, `onCollapse`, the chrome mode menu, the
+body-double hook and the history overlay — 190 lines of header for a
+30-line context strip. Existing testids survive where the doors survive
+(`assistant-new-chat`, `assistant-mode-toggle`, `assistant-mode-<mode>`,
+`assistant-minimize`, `chat-linked-desk`, `chat-mode-badge`);
+`assistant-recap` and `assistant-header` are new.
+
+**Verified live** over CDP, 10/10, the panel restored exactly as found
+(closed, floating, Chat): the header is the first row and the tab strip
+begins at its bottom edge (171→219→219 px); the header holds the SVG
+wordmark and no title; the four doors sit in order by x; no history toggle,
+no body-double button, four buttons total; the header persists across
+Today and Agent; Display mode lists Sidebar · Floating · Full screen; New
+chat lands on Chat; Minimize returns to the pill. Suite: 3,785 tests / 343
+files; both typechecks clean.
+
+## DEC-121 — The assistant's tabs rearranged: Attention, Chat, Agent (+ desk agents), Tasks, PlexiChat
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant`
+(new — the operator's AI-assistant series, branched from DEC-120; the Meet
+work shipped as PR #6 on `ryan-next`, see the branch note below) · **Plan:**
+operator request ("Replace the today button with an attention button… a
+view of all your attention items… similar to the home screen attention
+widget… replace the Activity Bar with Plexi Chat functionality… consolidate
+agent and work… a sub tab… within the agent button to see the desk agents").
+
+**Branches, first (operator instruction).** `ryan-next` rewound to DEC-119
+(`c9da6993`) so the ship excludes the assistant work, and opened as **PR #6
+ryan-next → main** on saasmouth/focusbuddy — zero conflicts against 4.2.2,
+green, marked ready to ship, visible to Michael and Caleb. Landing on main
+stays Michael's move per the standing rule (the operator can say "merge
+it"). `ryan-assistant` created from DEC-120 (`dea4fccb`) on both remotes;
+this and every following assistant round lives there.
+
+**Attention.** The tab IS the home Attention widget — the same
+`AttentionWidget` the home canvas and the desk render (section pills, rows
+with the queue spine, the closing verb, the doors) — uncapped and
+scrolling (`limit` / `scroll`, additive; the home and desk slices are
+untouched) under its own remembered section (`attention.assistant.section`)
+so the panel and the widget never fight over which slice is open. The daily
+standup (Today) keeps its home on the Home page.
+
+**PlexiChat.** The tab IS the Office Chat view — `MessagesView`, the same
+messaging store, conversations, groups, channels, search, activity,
+briefing, calls — in a `compact` dressing: no paper of its own and one pane
+at a time (the list, then the thread with a back arrow), because the panel
+has no width to give two. Every door into a conversation goes through one
+`openConv`, so the thread shows however you arrive; back never touches the
+store's active conversation (the Office page shares it).
+
+**Agent + Work.** The autonomous agent stays exactly as it was; the desk
+agents the Work tab listed are a sub-view inside Agent (a sunken segmented
+control: Autonomous agent · Desk agents). The Work and Activity tabs are
+gone; a tab saved before this round still lands somewhere sensible
+(Today → Attention, Activity → PlexiChat, Work → Agent); the default is
+Attention. AF-5's e2e geometry now counts the DEC-120 header.
+
+**Verified live** over CDP, 13/13, panel restored as found: the strip
+reads Attention · Chat · Agent · Tasks · PlexiChat and nothing else;
+Attention renders the widget's pills, label and count in the panel with
+the scrolling list; PlexiChat mounts compact, one pane at a time, the list
+with its New / Search / Channels doors (8 conversations), a conversation
+opens to its thread with a way back, back returns; Agent keeps the
+autonomous surface with the sub-tabs, Desk agents lists the desk agents,
+and back; Tasks unchanged. Suite: 3,793 tests / 344 files; both
+typechecks clean.
+**Addendum (probe residue, and a sync hazard to look at).** The Attention
+capture showed seven open "Send the revised numbers to Dana by Friday"
+items — my own DEC-115/116 probe residue, every one filed by the bell
+(through the STORE, which emits the create over the sync substrate) and
+then dismissed in each run's cleanup over RAW IPC (which emits nothing).
+`workspaceSync` applies remote rows as a plain `ON CONFLICT(id) DO UPDATE`
+upsert, so the substrate's copy — still `open` — came back and won; the
+raw-IPC-created "Book time with legal" items had no synced copy and stayed
+dismissed. Cleaned by dismissing exactly those seven through the store
+(`useWorkItemStore.setState`, which emits the attr), guarded by title,
+source and the scratch meeting no longer existing; rows re-read read-only
+at +8 s and +20 s: dismissed, stable. Probe rule from here: create and
+dismiss through the SAME path, and re-read the rows after the sync has had
+its turn. **To look at (not asserted):** main's decay path writes
+`work_item_state = 'dismissed', reason_code = 'decayed'` in raw SQL with no
+sync emit — by the same mechanism a later upsert of that row could reopen a
+decayed item. Worth a read of the upsert's guard before ruling it.
+
+## DEC-122 — The strip: the double-ii mark · Attention · PlexiiMessage · Agents
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("change the tab named chat to the animated
+double ii logo, which represents AI functionality, then change the name of
+plexichat to PlexiiMessage but make sure there are 2 i's in Plexii. And
+we're removing the tasks tab altogether since everything is now
+consolidated under Attention. Then… from left to right… Plexi AI with just
+the double ii animated logo, then Attention, then PlexiiMessage, lastly
+Agents").
+
+**What changed.** The conversation tab is the brand's own sign for the AI:
+`PlexiiMark` alone — the double-ii, one blink on mount and a wink on hover
+(the kit's `once+hover`; there is no "breathe" mode yet, so nothing
+pretends to think) — with "Plexii AI" as its accessible name and tooltip,
+no text. PlexiChat is **PlexiiMessage** (two i's, per the spelling rule).
+Tasks is gone — its list lives under Attention now — and a saved Tasks tab
+lands on Attention. Agent reads **Agents**. Order: mark · Attention ·
+PlexiiMessage · Agents; the default for a fresh install is the
+conversation, first in the strip. `AssistantTasksTab.tsx` deleted.
+
+**Verified live** over CDP, 7/7, the panel restored as found (it was open
+on PlexiiMessage): the strip's titles read Plexii AI · Attention ·
+PlexiiMessage · Agents; the first tab is an SVG with no text; PlexiiMessage
+carries two i's; no Tasks tab; each tab still opens its body. Suite: 3,794
+tests / 344 files; both typechecks clean.
+
+## DEC-123 — PlexiiMessage in the panel: one Meet door, no translate menu, the doors fit
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("merge the call and meet button into one meet
+button because they do the same thing… get rid of the translation drop
+down… shift everything left so that it all fits in the menu bar because
+right now it gets cut off") — scoped to the PlexiiMessage tab.
+
+**What changed (compact mode only — the Office Chat page is untouched).**
+The thread header in the panel is two rows: the back arrow and the name on
+the first, left-aligned; the doors on their own full-width row beneath,
+left-aligned and wrapping, at the panel's tighter size (h-7), so nothing is
+ever clipped at 420px. Call and Meet are one **Meet** door: in a DM it
+meets the person now (the 1:1 video call the Call button made); in a space
+it opens PlexiMeet, as Meet always did. The translate menu is gone from the
+panel (the per-message Translate link still uses the stored language).
+
+**Verified live** over CDP, 5/5, panel restored as found: a DM open in the
+panel; one Meet door and no Call; the door's title reads "Meet with Caleb
+Wilton now — a video call"; no translate menu; the doors start at the
+header's left edge, all on one row, right edge 1256 px inside a pane edge
+of 1409 px, no horizontal overflow. Suite: 3,795 tests / 344 files; both
+typechecks clean.
+
+## DEC-124 — The bell means Attention: PlexiiMessage's header bell retired, a bell on every message
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("there is currently a bell icon which stands
+for notifications, which is misleading because we're using the bell icon
+for the attention AI layer now, so just remove it altogether. Then on any
+given message, there needs to be the ability to click a bell icon and have
+it route to the attention cue, most likely to the respond tag. But like
+all the attention layer stuff, it should prompt you and ask you how you
+want to classify it").
+
+**What changed.** In the panel, PlexiiMessage's notification-level bell is
+gone (it stays on the Office Chat page). Every message — mine or theirs,
+in the list and in a thread — wears a bell on hover that opens the HOUSE
+capture prompt (`fb:command-new-work-item` → the capture console → the
+Attention confirm card): the message prefilled as the capture, the sender
+and conversation as its notes, opening on **Respond** (the preset table's
+class for chat), and the card asks how to file it — category, urgency,
+when, people, desk — exactly as every other bell in Plexii. Nothing files
+from the bell itself. The item it files points back at the message:
+`sourceType 'message'`, the conversation as `sourceRef`, and a new internal
+moment link `plexii://message/<conversationId>?m=<messageId>`
+(`lib/messageLink.ts`, the meeting-moment pattern); the Attention page's
+source door opens the conversation on the Chat page and lands on the
+message, and the source reads "From a message — open it to reply in the
+conversation".
+
+**Verified live** over CDP, 6/6, panel restored as found: the header
+bell gone, a bell on all 12 messages of a DM, the bell's title says what it
+does, the prompt opens prefilled with the message's words and "Plexii read
+it like this… Respond", and cancelling through the console's own door
+leaves the work-item count unchanged. Suite: 3,803 tests / 346 files; both
+typechecks clean. (The figure was first written as 3,827 — a guess made
+before the run finished, corrected here; the log stays honest.)
+
+## DEC-125 — The message bell is the desk bell: it fills when marked, a circle checks it off; the meta row leaves the bubble
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("that bell icon functionality should work the
+same way it does as a widget, tool, or app on a desk. So when I click it,
+the bell fills with color, and the checkbox opens up next to it, so I can
+check it off. The bell then gets unhighlighted again, so I can see in line,
+in chat, what messages I need to attend to or respond to. Additionally, we
+need to clean up the buttons within the messages themselves… the timestamp
+for a message should not be in the colored message box. It should be just
+below but still on the left side. Next to it should also be the translate
+button… followed by the pin button, but just use the icon of the pin…
+and then the last thing along the right edge, just below the colored
+message box, should be the full reply thread").
+
+**What changed.**
+- **One bell.** The desk widget's bell (DEC-076/077) moved out of
+  `WidgetFrame` into a shared `attention/BellIcon.tsx`; the frame and the
+  message row both render it, so a bell means the same thing everywhere.
+  On a message: empty on hover → the house capture prompt (DEC-124,
+  unchanged — it still asks how to file). Once an open item points at the
+  message (`lib/messageAttention.ts` — `liveItemForMessage`: sourceType
+  `message`, not terminal, not detached, the moment link's messageId is
+  this message; newest wins), the bell fills solid and stays visible
+  without hover, with the shared `CompleteCircle` beside it. The circle
+  closes the item with its queue's own verb through the one closing path
+  (DEC-051 `useCloseWorkItem`, `PRIMARY_ACTION[queueOf(item)]` — Respond
+  closes as "Responded"), and the bell empties again. A filled bell opens
+  the Attention page. The list and the thread panel (parent + replies)
+  carry it; the marked state is derived from the work-item store, never
+  kept on the row.
+- **The meta row, outside the bubble.** Under the bubble, full width: the
+  time (· edited) at the left; Translate beside it (one door — Translate /
+  Show original / Show ‹language›; revealed on hover until a translation
+  exists); the pin as the icon alone (filled when pinned; the words ride
+  the aria-label); the reply thread at the right edge ("N replies" always,
+  "Reply in thread" on hover). The in-bubble time/translate block and the
+  in-bubble toggle are gone. The hover reveal on the doors is the DEC-124
+  convention carried over — a judgement call, one class each if the
+  operator wants them always visible.
+
+**Verified live** over CDP, panel restored as found, in two probes. Read-only
+(5/5): the message the operator's own open item points at (filed from my
+prompt in DEC-124, never touched) shows a filled bell visible without hover
+with the circle beside it; an unmarked message's bell is empty, hover-only,
+no circle; the meta row sits under the bubble at its left edge, no time
+inside the bubble, the pin an icon, the thread at the right edge. Then the
+check-off itself (7/7) on ONE scratch item created through the store,
+tagged `test-seed`, pointed at an unmarked message: the bell filled and the
+circle appeared; the circle's title read "Responded — complete …"; clicking
+it closed the item as `answered` in the store AND on disk, and the bell
+emptied; the operator's own item was still open after. The scratch row
+(`97f7bd0f…`, state `answered`) stays on disk as a closed test-seed —
+dismiss by tag with the others. Suite: 3,809 tests / 347 files; both
+typechecks clean. Pins rewritten with history, never deleted: DEC-076/077's
+frame-bell pins now point at the shared definition; DEC-124's `CaptureBell`
+pins → `MessageBell`; e2e P2100-6's translate toggle → the meta-row door.
+
+## DEC-126 — A message's doors: centred on the bubble, the time on hover, Translate in the ⋯ menu, click-away closes
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("make the time stamp invisible unless I'm
+hovering over it; the emoji icon and the bell icon and the ellipses need to
+be centered on the message they are in reference to — right now they're
+slightly off center, so if it's a one-line message it's hard to know
+exactly what message they're associated with; get rid of the translate
+button visible on screen and instead add it to the drop down menu within
+the ellipses; when I click on the ellipse button or the emojis button, the
+only way to get rid of those menus is to click on it again — I should be
+able to click anywhere off screen to get rid of those things").
+
+**What changed** (`MessagesView.tsx`, every message — list and thread).
+- **Centred on the bubble.** The row centred its doors against the whole
+  column (bubble + the DEC-125 meta row + reactions), so on a one-line
+  message they sat a few pixels low. The doors — reaction palette, bell,
+  ⋯ — are now one cluster hung off the bubble alone: absolutely positioned
+  beside it (left of yours, right of theirs) on its vertical centre, so
+  nothing that rides under the bubble can push them off the message they
+  name. One cluster serves both sides; the theirs-side doors after the
+  bubble are gone.
+- **The time on hover.** The meta row's time (with "· edited" and, when a
+  translation is showing, "· translated") is opacity-0 until the row is
+  hovered or focused — opacity, not display, so nothing jumps. The pin
+  (when pinned) and the reply count (when there are replies) stay
+  visible, as before.
+- **Translate in the ⋯ menu.** The visible Translate button left the meta
+  row. The ⋯ menu is on EVERY message with words now — "Translate to
+  ‹language›", then "Show original" / "Show ‹language›" — with Edit and
+  Delete still only on your own; a message with no entries has no ⋯. While
+  a translation is in flight the meta row says "translating…" (the menu
+  has closed).
+- **Click-away.** A new `hooks/useClickAway.ts` — the house pattern from
+  SettingsPanel / ThemeBuilder, extracted: armed 50 ms after opening,
+  mousedown on window (so the outside target's own click still lands —
+  opening another row's door closes this one in the same gesture), and
+  Esc. Both the palette and the ⋯ menu use it. The composer's emoji and
+  GIF pickers already closed this way; unchanged.
+
+**Verified live** over CDP, 16/16, panel restored as found, no data
+touched: on a one-line message on each side the cluster sits on the
+bubble's vertical centre to the pixel (dy 0) and on the correct side; the
+time is opacity 0 at rest and 1 with `:hover` forced through CDP (an
+occluded window never sees a real pointer); no Translate on screen at rest;
+their ⋯ menu holds "Translate to English" alone, mine holds Translate ·
+Edit · Delete; an outside mousedown closes the menu and the palette, Esc
+closes both, and opening the palette on another row closes the open menu in
+the same gesture with the click landing. Known and accepted: when the
+bubble is narrower than the meta row (short messages), the row extends
+beyond the bubble on the far side on hover — the time keeps the bubble's
+near edge on theirs, the thread keeps it on yours. Suite: 3,817 tests / 348
+files; both typechecks clean. Pins rewritten with history: DEC-124's bell
+usage lines → the one cluster; DEC-125's Translate label → the menu's;
+e2e P2100-6 opens the ⋯ menu before looking for Translate.
+
+## DEC-127 — The way back: an Attention item opens the floating assistant on PlexiiMessage, on the person, at the message
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("when I add a message to the attention queue…
+it needs to link me back to that exact message with that exact person. And
+it should open up in the PlexiiMessage tab within the AI assistant menu
+that follows you from page to page… it should automatically open up in
+the floating box with the PlexiiMessage tab opened to the person that it
+came from").
+
+**What changed.**
+- **One router** — `lib/openMessage.ts`: `openMessageInPanel(conversation,
+  message, parent)` asks the messaging store to land on the message
+  (`landOn`), opens the conversation, then opens the persistent assistant
+  on its PlexiiMessage tab. `openMessageLink(url)` routes an internal
+  `plexii://message/…` link and returns false for anything else, so every
+  caller falls through to its own door for web marks. DEC-124's Chat-page
+  route (`openConversationAt`) is retired.
+- **The store carries the landing** — `messaging.landOnMessage`
+  `{messageId, parentId, at}`; MessagesView consumes it once, in an effect
+  declared AFTER its pin-to-newest effect so the landing wins the scroll:
+  in the panel it shows the thread pane first (a list pane sent back by
+  the arrow is brought forward), for a reply it opens the parent's thread
+  first and lands inside it, and a message that never appears expires
+  after 8 s instead of firing weeks later. The landing is the Recall
+  citation's own `jumpToMessage` — centred, flashed.
+- **A reply names its parent** — `buildMessageUrl` / `parseMessageUrl`
+  gained `p=` (backward compatible; the bell files `m.parentId` for a
+  thread reply).
+- **Every door on the Attention page routes**: the row's `message` chip is
+  a button now (the DEC-079 meeting chip, for messages;
+  `item-message-link`), the row's source door (forum icon; title "Open the
+  message in PlexiiMessage — the conversation, at this message"), and the
+  item editor's Source link (reads "The message, in PlexiiMessage", no
+  external-link mark; DEC-091's web deep links still open externally).
+
+**Verified live** over CDP, 9/9, DOM-read only (after a store file is
+hot-swapped a probe's own `import('/src/stores/…')` is a stale instance —
+the DOM and the real buttons are the truth), the operator's data untouched,
+panel and page restored: from a closed panel the chip and the source door
+each open the floating assistant on PlexiiMessage on Caleb with the exact
+message in view and flashed; with the panel already open on the Attention
+tab and the thread pane sent back to the list, the chip switches the tab,
+brings the thread pane back and lands; the editor's Source link reads as
+designed and lands the same way. Not exercised live: a reply inside a
+thread (no such item exists yet) — the thread-first landing is pinned by
+messageLanding.test.ts. Suite: 3,828 tests / 349 files; both typechecks
+clean. Pins rewritten with history: DEC-124's `openConversationAt` pins →
+the router; DEC-124's parsed-link shapes gained `parentId: null`; C5's door
+pin → the fall-through.
+
+## DEC-128 — The Attention widget's row: three depths in place (home, desk, the assistant's Attention tab)
+**Date:** 2026-09-06 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("if I click on an attention item on a widget in
+the home screen or a desk, it takes me straight to the attention page, and
+it doesn't actually show me which attention item I clicked on… I should be
+able to click an attention item, get a drop-down for a quick summary, just
+like I can on the attention page itself, double-click for a full view of
+that item on the same page that I'm existing on, or have the ability to
+take me to… the title of that item visible with maybe the due date… when I
+click it, I get a drop-down [with] the different action items… that's going
+to need to apply in the Plexii app as well as the widget on the home screen
+and widgets that I add onto a desk").
+
+**What changed.** One component — `attention/WidgetItemRow.tsx` — is the
+row for every face of the widget family (`ItemLines` renders it for the
+five faces; the desk widget and the assistant tab are the same
+`AttentionWidget`), so the three hosts cannot drift.
+- **At rest**: the title and the due date — DEC-050's anatomy kept (queue
+  spine, completion circle through DEC-051's one path, status pill or dot,
+  date). A subtle chevron on hover says it opens.
+- **One click**: the page's quick summary IN PLACE — notes, the reason, the
+  chips (priority, due, plan, desk, meeting / message / source, mentions,
+  tags), a Meet invitation's when · where · RSVP, subtask progress — and the
+  page's row actions: the source door (a meeting moment → PlexiMeet at the
+  line; a message → the floating assistant at the message, DEC-127; a web
+  mark → the browser), the desk, Start with Plexii, Snooze until tomorrow
+  (the page's 9 am rule), Archive, Open the item, and one door to the
+  Attention page. The title click no longer navigates anywhere.
+- **Double-click**: the full item — the page's own `AttentionItemEditor`,
+  with the page's desk choices — over the page you are on, portalled to
+  `<body>` so the floating panel (overflow-hidden, z-120) cannot clip it.
+- **Shared doors, not copies**: `lib/startWithPlexii.ts` (desk first, the
+  panel on chat, the prompt staged twice, never sent) and
+  `lib/openMeeting.ts` (PlexiMeet, then the hand-off once mounted) are
+  extracted from the page, which now delegates to them. Every widget list
+  scrolls instead of clipping, so an open summary has room in a sized
+  widget; DEC-121's `scroll` prop stays for its callers.
+
+**Verified live** over CDP, 13/13, DOM-read, nothing closed / snoozed /
+archived, page and panel restored: on the home canvas, in the assistant's
+Attention tab, and on the LakeDash desk's widget, a row sits closed at rest
+in a scrolling list; one click opens the summary in place with the six
+actions (message door · Start · Snooze · Archive · Open · the page) and the
+message chip, and the view does not change; a double-click opens the editor
+portalled to `<body>`, on top (element-from-point), the view unchanged; the
+editor closes through its own door; from the panel, the summary's page door
+is the one trip to Attention. Suite: 3,838 tests / 350 files; both
+typechecks clean. Pins rewritten with history, never deleted: DEC-051's row
+anatomy pins follow the row to its file; DEC-121's overflow pin → every host
+scrolls; the start-flow and DEC-079 hand-off pins → the shared libs.
+
+## DEC-129 — The Today tile's meeting and calendar items: three depths in place, like the Attention widget
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the meeting and calendar
+items") — DEC-128's row behaviour, for the calendar blocks (meetings and
+focus time) and the dated work the home Today tile lists.
+
+**What changed.**
+- **A calendar block as a widget row** — `attention/CalendarBlockRow.tsx`.
+  At rest: the camera (a meeting) or the clock (focus time), the title, the
+  start time; happening-now pulses; done / missed / skipped show. One
+  click: the summary in place — the time range and the relative when, the
+  agenda, the chips (status · where: the provider or the Plexii room ·
+  location · who's invited · the desk or item it is booked for · repeats ·
+  pinned · this meeting's Record · last time in the series) — and the
+  calendar's own doors: Join (an external link wins, the minted room is the
+  fallback), Record an external meeting, Start (a focus session on its
+  desk — the grid's rule for what can be started), Done, Skip, Open the
+  block, Delete (undo in the toast, the store's own path), and the Calendar
+  page. Double-click: the calendar's own `BookTimeDialog` in edit mode,
+  seeded from the block, portalled to `<body>`; saving runs through a new
+  `lib/blockEdit.ts` (`saveBlockEdit` — the grid's toast, undo and redo,
+  extracted; the grid delegates to it).
+- **The Today tile is made of rows.** Its calendar lines are
+  `CalendarBlockRow`, its dated work is DEC-128's `WidgetItemRow`; the
+  Overdue radar's lines are `WidgetItemRow` too. `MiniRow` (a plain line
+  that jumped to the Attention page) is retired; the tile holds the real
+  `TimeBlock` rows so a row has every field; the list scrolls.
+- **Judgement call, stated:** `dayTimeline` now places work due BEFORE
+  today behind the day's timed shape (as undated work rides), oldest first,
+  ahead of the Meet items. Sorting overdue work by its past date put the
+  operator's backlog (23 lines, August dues) ahead of the blocks actually on
+  today's calendar, and a four-line tile never reached them — the rows
+  this round adds would have been unreachable. The Overdue radar is the
+  backlog's place; on the Today tile it follows the day. Pinned in
+  attentionAnalytics.test.ts; DEC-049's own cases still hold.
+
+**Verified live** over CDP, 8/8, on the home Today tile with TWO scratch
+blocks (a Google-Meet meeting with agenda, location and an invitee; a
+focus block) created and then removed through the time-block store (none
+left on disk), nothing joined, recorded, started or marked, the page and the
+open panel restored: both rows closed at rest with title, time and a
+different glyph each, in a list that scrolls; one click on the meeting
+opens the summary in place — range, agenda, "Google Meet", the location,
+"1 invited", "Planned", Join and Record-external, no Start — and the view
+does not change; the focus row offers Start and no Join, plus Open, Delete
+and the Calendar door; a double-click opens the block dialog seeded with
+the title, portalled and on top, the view unchanged; the dialog closes
+through its own door; the summary's Calendar door is the one trip to the
+Calendar page. Suite: 3,846 tests / 351 files; both typechecks clean. Pin
+rewritten with history: the grid's save-toast pin → the shared helper.
+
+## DEC-130 — The recording audit: a silent microphone, an engine that derails, and every door made honest
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator report ("I tried testing out the record notes button on
+the PlexiMeet page, and it didn't work. It didn't capture the transcript.
+So, do a full audit of the record notes, record external, and start or
+schedule a meeting buttons… that transcripts can actually be captured").
+
+**What was found.** The 08:04 attempt is meeting `ded4a88d` ("Notes"):
+177 s recorded, transcript "you you you you you you", a 477-character AI
+summary of nothing, no segments. Root cause, measured: the microphone
+delivers DIGITAL SILENCE to this app — `getUserMedia` succeeds, the track
+reads enabled and unmuted ("Default - MacBook Pro Microphone"), and every
+sample is zero (peak 0, RMS 0, 511 bytes of opus per 1.5 s). The dev app
+was launched from inside Claude Code and inherits the launcher's macOS
+microphone permission (the same TCC identity DEC-078 found blocking the
+camera); macOS hands such an app silence, never an error. Both engines
+transcribe a synthetic voice perfectly, so transcription was never the
+fault — and nothing in the app said any of this: the cloud engine
+hallucinated on silence, the summary summarised it, a meeting was filed.
+
+**A second fault, found on the way.** Driving Record notes with a
+SYNTHETIC microphone (the `say` voice looped into a MediaStream), the
+on-device engine (whisper-base) returned "Thanks for watching." for takes
+the cloud engine read perfectly — 4 of 5 runs. Pinned by trimming: the same
+take transcribes fully at 0–9 s and derails at 0–10.5 s; one window, a few
+hard seconds at the end (a word cut mid-syllable), the whole decode lost.
+
+**What changed.**
+- **The microphone is asked, listened to, and watched** — `lib/micHealth.ts`.
+  Every recording door (Record notes, Record external, and the dialog
+  behind them) asks the system first (`media:micStatus` / `media:askMic`,
+  a main-process bridge over `systemPreferences` — effective once the dev
+  app restarts; `electron-vite dev` here runs without `--watch`), then
+  LISTENS for 1.2 s before recording: digital silence refuses to start and
+  says why, with the one door that fixes it (System Settings › Privacy &
+  Security › Microphone; `record-error[data-reason=mic-silent]` +
+  `record-mic-settings`). While recording, a level pill (`MicLevelPill`:
+  five bars, or "No sound is reaching Plexii" after 3 s of zeros with the
+  same door) sits on the PlexiMeet bar and the guest-capture bar.
+- **Record notes is the same recording as every other door.** The
+  per-track `MeetingTrackRecorder`, transcribed on this machine at the
+  wrap-up (CR-11 — the old path shipped meeting audio to the cloud engine),
+  which writes SEGMENTS (the Record's Thread, Recall, commitments and
+  analytics all read segments; a plain transcript lit none of them),
+  retains the take (CR-13, so Re-transcribe has fuel) and refuses to file
+  on silence. The desk picked in the dialog is the origin
+  (`markDeskOrigin`) and the container (`begin({ deskNodeId })` — no desk
+  minted over it). The cloud-path `transcribeAndSave` is gone.
+- **A transcript that is not a transcript is refused** —
+  `lib/transcriptSanity.ts`: "you you you you", the stock phrases, a long
+  take with almost no text. The wrap-up stops there with the honest line
+  (and the microphone hint) instead of summarising and filing.
+- **The derail net** — `lib/audioSplit.ts` + `transcribeRecording`: when
+  the on-device first pass looks like that and the audio plainly has
+  sound, the take is cut at its own pauses and the pieces decoded; every
+  piece the engine can read is kept, timestamps moved onto the take's
+  clock, nothing invented, still no cloud. The saved failing take:
+  "Thanks for watching." → 174 characters, five segments.
+- **Decode at opus' own rate** — the first decode stage names 48 kHz
+  instead of following the output device (16 kHz on a headset in its call
+  profile is the low-quality path by another door); the recorder's mix
+  likewise.
+- **Start or schedule**: audited, no change needed — Schedule writes the
+  block with a minted room; Start now opens the live room.
+
+**Verified live** over CDP, on the operator's own app, everything the tests
+made removed through the stores and bridges (meetings, blocks, desks →
+Trash, folders and transcript docs → Trash, briefs dismissed): the real
+microphone probe (2.5 s: peak 0, every sample zero); both engines on a
+synthetic voice (115 characters, identical); Record notes end to end with a
+synthetic microphone — the dialog, the 1.2 s listen, the level pill lit,
+Stop, the on-device wrap-up, a meeting with the spoken words, segments, a
+speaker, a summary, a desk and a retained take — 10/10 on the looped voice
+and 10/10 on a voice with natural pauses, after the derail net (4 of 5
+runs derailed before it); Record notes and Record external with the REAL
+microphone refused before recording with the reason and the settings door;
+Schedule booked a real meeting block; Start now opened the room and left.
+Suite: 3,871 tests / 354 files; both typechecks clean. Pins rewritten with
+history: DEC-118's door contract and mic text, the DEC-099 decode-rate pin,
+the guest-capture booleans, the page's busy banner; e2e plexiMeet #6
+follows the dialog.
+
+**Left on the operator's word.** Meeting `ded4a88d` ("Notes", the silent
+177 s) is the operator's own — untouched. The tests' residue sits in the
+Trash (seven desks, folders and transcript documents named "[TEST] DEC-130
+…") and as dismissed "Meeting brief — [TEST] DEC-130…" items — purge is a
+destructive act, so it waits. The microphone itself: launch Plexii from the
+Dock, or allow the microphone for the app that launches it.
+
+## DEC-131 — The assistant panel: Message's header and composer, a + on Attention, and a Calendar tab
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request (the PlexiiMessage screenshot round: "change the
+Plexii message to just 'message'… get rid of the meeting icon… keep gif, keep
+the emojis, move the record a voice note to inside the actual message bar
+itself on the right side, and then keep attachments… make the write a
+message box bigger… move the meet recall and pin buttons to the right of the
+actual name… the members button is redundant… if I were to have multiple
+people in this chat that should just show me both names… Within the
+attention tab, there needs to be a plus button so I can capture a new
+attention item… add a new tab… for a calendar tab. This should default to
+today's calendar, similar to the Today widget on the main Attention page…
+toggle between days and get a quick month calendar view… click a day…
+having the booking page pop up").
+
+**What changed.**
+- **Message.** The tab reads "Message". In the panel the thread header is
+  ONE row: the people, then Meet · Recall · pin at its right (DEC-123's
+  own-row placement retired). A DM reads as the person; a space reads as
+  everyone else in it, so the members button is gone from the panel (the
+  Office page keeps it, with Pulse and Schedules). The panel's composer:
+  no meeting camera (the header's Meet is that door), the voice-note mic
+  INSIDE the message box at its bottom-right, attach · emoji · GIF kept
+  under a three-line box that fills the width (`ChatComposer compact`).
+- **Attention +.** `AttentionWidget` grew `onCapture`; the assistant tab
+  wears a + at the right of the section pills that opens the house capture
+  prompt (the Attention page's Capture door — classify first, then file).
+- **Calendar tab** (`assistant/tabs/AssistantCalendarTab`, after Attention
+  in the strip): opens on today as the Attention rail's own day column
+  (`WeekTimeGrid`, one day, compact — blocks drag and resize in place);
+  ‹ Today › walks the days; a toggle shows the month at a glance (six
+  weeks, today filled, a dot on every day with something booked, read into
+  local state — never the shared range); clicking a day opens the Book-time
+  dialog on it (the composer's own, portalled above the panel: 9:00 on
+  another day, the next half hour today) and lands the tab on that day; a
+  Book button does the same for the shown day; a door opens the Calendar
+  page. Booking runs the grid's own path — `lib/bookBlock.ts`
+  (`bookBlockWithToast`: create, the undo toast, the stated invite hold),
+  extracted from the grid, which now delegates. The tab's pure parts
+  (`lib/monthGrid.ts`: the 42 cells, the default slot) are unit-tested.
+
+**Verified live** over CDP, 12/12, DOM-read, panel restored, the one
+scratch block removed through the store: the strip reads ii · Attention ·
+Calendar · Message · Agents; the + opens the capture prompt and closes
+clean; the Calendar tab opens on today with the day column, › walks to
+tomorrow and Today returns, the month shows 42 cells with today filled and
+seven booked days dotted, a click on the 9th opens the dialog on "Wed,
+Sep 9" above the panel, and Book it writes a real block at 9:00 that day
+and lands the tab on it; the Message tab shows the name with Meet · Recall
+· pin on the same row at its right and no members button, and the composer
+is a 77px box at 92% of the pane with the mic inside it at the right, no
+camera, attach · emoji · GIF present. Suite: 3,880 tests / 355 files; both
+typechecks clean. Pins rewritten with history: the tab order and labels,
+DEC-123's own-row header, the DEC-121/128 widget mounts, the grid's booking
+pins → the shared helper.
+
+**Addendum (same day) — the column fills the tab.** Operator: "Fill up the
+full window on the calendar tab so that it doesn't cut off before the
+bottom, and so you can see more on screen." The rail's compact window caps
+at twelve hours (DEC-079), which in the taller panel left the bottom
+empty. `WeekTimeGrid` grew `fill`: the hour window takes all the room left
+under the day headers and the host owns the height; the Calendar tab passes
+it. Measured live: the window ends 8 px above the tab's edge (its padding),
+499 px tall, 16.6 hours on screen, the rest a scroll away. DEC-078's
+window pin follows the class.
+
+## DEC-132 — Home tiles scroll instead of clipping; the standup and navigator pin their headers
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator report ("On the home page, individual widgets get cut off,
+and there's no ability to scroll… 'Your Stand-Up'… 'worth a look'… gets cut
+off… 'Rooms & Desks'… doesn't actually show me all of the rooms and
+desks… either it needs to stop before something gets cut off mid-row, or
+there needs to be the ability to scroll").
+
+**What changed.**
+- **Every live tile scrolls.** The home grid's tile wrapper clipped
+  (`overflow-hidden`); it scrolls now (`overflow-y-auto overflow-x-hidden`),
+  so no widget can ever be cut off without a way to reach the rest. The
+  drag ghost keeps clipping (it is a picture).
+- **RailCard `fill`.** In a sized host the header stays pinned and the
+  body takes the rest and scrolls; a body with its own `bodyClassName`
+  gets the room and manages its own regions; unsized hosts (PlexiMeet,
+  People, the Office shell) are pixel-identical. The three RailCard tiles
+  (Rooms and desks, Continue, Quick actions) pass it.
+- **Rooms and desks**: the rooms column and the desks column each scroll
+  on their own, under the pinned header — the last room and the New desk
+  button are always reachable.
+- **Your standup**: the title row stays pinned; the narrative, "Worth a
+  look" and "Completed since last time" scroll beneath it.
+- **The command-center blocks** (Today, Pulse, Overdue radar, Recent
+  activity) scroll their body.
+- **The status menu rides a portal.** `ItemStatusPill`'s menu was
+  absolutely positioned inside its row; in a scrolling list a pill near
+  the edge opened clipped. It now renders in `<body>` at the pill's own
+  coordinates, below the pill when there is room and above it when there
+  is not, and closes on a click anywhere outside or Esc.
+
+**Verified live** over CDP on the home page, 5/5, view restored: all ten
+live tiles scroll rather than clip; the standup's title row stays put while
+its body scrolls and the last "Worth a look" row is fully reachable; the
+navigator's ten rooms scroll in their column with the last room reachable,
+the desks column reaches New desk, the header pinned; a status menu opened
+from the Attention tile lands through its portal fully inside the viewport
+and on top, and Esc closes it. Suite: 3,886 tests / 356 files; both
+typechecks clean.
+
+## DEC-133 — The same rule for the Attention widget and desk widgets; the standup's Save chip
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Attention widget and
+desk widgets. Also, fix the save button design glitch on your stand-up
+section").
+
+**What changed.**
+- **Desk widgets scroll, never clip.** `WidgetFrame`'s body scrolled only
+  for the auto-growing kinds; it scrolls vertically for EVERY widget now
+  (`overflow-y-auto overflow-x-hidden`), so content stays reachable whenever
+  the frame cannot grow to fit it. A widget whose root fills the frame never
+  shows a bar (measured: none of LakeDash's four grew one).
+- **The Attention widget** already carried the rule from DEC-128 — section
+  pills and the count pinned, the list scrolling — on the home tile and on
+  a desk. Verified rather than changed: with three rows opened the home
+  tile's list scrolls under pinned pills and the last row is reachable; the
+  desk widget's list scrolls the same way.
+- **The Save chip.** `StandupOutputPicker`'s button wore `icon-btn` (a
+  fixed 24 px square) beside `fb-btn-surface`, so the surface hugged the
+  icon while "Save" spilled outside it — the glitch in the screenshot. It is
+  a surface chip sized by its content now, like the header's other doors.
+
+**Verified live** over CDP, 4/4, view restored: the Save chip is one 64×28
+surface with the icon and the word inside it; the home Attention tile
+scrolls under pinned pills once rows open; LakeDash's four widget bodies all
+scroll rather than clip with no unneeded bar; the desk Attention widget's
+list still scrolls. Suite: 3,888 tests / 356 files; both typechecks clean.
+
+## DEC-134 — The same rule for the Calendar and Meet pages: windows, not scrolls
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Calendar and Meet
+pages") — the DEC-132/133 rule ("either it needs to stop before something
+gets cut off mid-row, or there needs to be the ability to scroll"), applied
+page-wide.
+
+**What was wrong.** Neither page clipped at the operator's window size with
+today's data, but both bounded their tall regions with 100vh arithmetic:
+the hour grid at `max(280px, calc(100vh - 380px))`, the queue rail's list at
+`calc(100vh - 268px)`, the meetings list at `max(240px, calc(100vh - 460px))`,
+the sticky transcript at `calc(100vh - 140px)`. Those numbers assumed a
+header height and a footer the layout could not see — so a wrapped header,
+a longer rail or a shorter window put a region's bottom edge under the
+footer with nothing to scroll (the calendar rail was sticky, so even the
+page scroll could not reveal its last rows). The assistant's Calendar tab
+had already been ruled onto `fill` (DEC-131 addendum: "so that it doesn't
+cut off before the bottom, and so you can see more on screen").
+
+**What changed.**
+- **Calendar is a window.** The root is a flex column; the title row and
+  the toolbar are pinned; the rail/grid area takes the rest. The rail hugs
+  a short list and caps at the window (`max-h-full` of its grid area), its
+  list scrolling under the pinned title and class filter; it no longer
+  sticks, because the page no longer scrolls past it. The grid column
+  stretches to the floor: the plan bar stays put, the week/3-day/day grid
+  runs `fill` (DEC-131's mode — pinned day headers and deadline chips, the
+  hours window taking the rest), and the month pins its weekday row and
+  shares the height across the six weeks (`minmax(max-content, 1fr)` rows:
+  never shorter than a cell's content, taller when there is room, scrolling
+  when the window cannot hold them). A 240px floor on the grid and month
+  cards keeps the old `max(280px, …)` guarantee: below it the page root
+  scrolls instead of the window collapsing.
+- **Meet is a window on a wide screen.** The hero is pinned; the rail
+  stands as tall as the floor and no taller — the Meetings card hugs a
+  short list and shrinks for a long one (the list scrolling under the
+  pinned title and search) while the Recording card keeps its height —
+  and the column beside it scrolls on its own (the dashboard) or hands its
+  height to the open Record, which pins its header and Timeline and lets
+  the two panes hug short content and cap at the floor: the Record
+  scrolling its renderings under the pinned title and segmented control,
+  the Transcript scrolling its thread under the pinned search and speaker
+  chips. Nothing is sticky any more. Below `lg` the columns stack and the
+  page scrolls, as before (the meetings list capped at 60vh there).
+- Nothing else moved: every testid, handler and copy string is where it
+  was; `WeekTimeGrid`'s non-fill callers (the Attention rail column) are
+  untouched.
+
+**Verified live** over CDP on the operator's running app, 16/16 twice, view
+restored, at the real window (2021×1105) and at an emulated 1400×640:
+Calendar — the page does not scroll, the regions do; the week grid ends at
+the page floor with its window scrolling the hours (11 AM–11 PM on screen,
+one hour more than before) while the title stays put; the rail hugs its
+three rows; the month card ends at the floor with all 42 cells at 129px
+(above their 104px floor); at 640px the hours window still scrolls and ends
+at the floor, the month's six weeks scroll inside their card, and a
+page-wide sweep finds no element clipping content it cannot scroll. Meet —
+the root is `overflow: hidden` with the main column the scroller; the rail
+and the Recording card sit inside the window; with "Test" open the Record
+and Transcript panes end inside the window, the Record body and the
+transcript thread are the scrollers, and at 640px all of rail, Record and
+Transcript end inside the window with the thread scrolling; no clipping
+anywhere. Suite: 3,896 tests / 356 files; both typechecks clean.
+
+## DEC-135 — The meeting detail header sits on a house card
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request, with a screenshot of a meeting open in PlexiMeet
+("the title card where it says 'Test', Transcribed, the date, the amount of
+time, the speaker, all the way extended to the right with Desk, Export and
+the trash icon — add a filled-in colored block behind it similar to the
+timeline block, just for that header title field").
+
+**What changed.** The detail header (`meet-detail-header`) wears the
+Timeline card's own material — `fb-card`: the raised fill, hairline, soft
+shadow and card radius — edge to edge with the Timeline and the panes below
+it, one card gap apart (`mb-4`), padded like the cards (`px-4 py-3.5`).
+Everything it held stays where it was: the editable title, the status pill,
+the date, the duration, the speaker stack and count on the left; Desk,
+Export and Delete on the right. The overlapping speaker avatars ring in the
+card's fill (`--surface-raised`) instead of the paper's, so their separators
+stay clean on the new ground. DEC-116's "title bare on the paper" pin is
+rewritten with this history; nothing else moved.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, view restored: the header's computed background, box-shadow and radius
+equal the Timeline card's; its left and right edges match the Timeline's and
+the Record pane's, 16px apart; the title, the meta line, Desk, Export and
+Delete all lie inside the card; the avatar ring colour equals the card's
+fill. Suite: 3,896 tests / 356 files; typecheck clean.
+
+## DEC-135 · addendum — "Now do the same for the Notes and New meeting headers" (verification only, no code)
+**Date:** 2026-09-07 · **Status:** VERIFIED, NOTHING TO CHANGE · **Branch:** `ryan-assistant`
+The detail header is one component (`MeetingDetail` → `meet-detail-header`),
+rendered for every meeting, on the Meetings page and inside the Office
+shell's Meet surface alike (`PlexiOfficeShell` mounts the same
+`PlexiMeetView`). Opened "Notes" (transcript pasted, no desk, no speakers)
+and "New meeting" (notes only) on the operator's running dev app: both
+headers already sit on the DEC-135 card — title, status pill, date (and
+duration where there is one) on the left, Export and Delete on the right —
+with the Record and Transcript panes directly beneath (no Timeline, since
+neither has segments). Only the dev instance is running (PID 97113, CDP
+9223) and no packaged Plexii is installed, so there is no second build that
+could show the old bare header. Screenshots `peek-notes.png` /
+`peek-new-meeting.png` sent to the operator. A probe-harness fault surfaced
+here and is fixed in the verification memory: the finally-block restored
+only four view kinds and left the operator on Home when they had been on the
+Office view — restore the whole view object from now on.
+
+## DEC-136 — The Record's section titles in Overview and Analytics sit on a filled band
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Overview and Analytics
+tabs") — DEC-135's filled block behind a title field, carried into the
+Record's two renderings.
+
+**What changed.** Every section title in the Overview and Analytics
+renderings — Summary, Your notes, each Brief section (Background, Signals,
+Concerns, Where this leans, …), the Plain-transcript toggle, Who spoke,
+Moments — sits on one band: the pane's own in-card fill (the sunken
+surface the segmented track and the fields already sit on), field radius,
+spanning the rendering's content width, the title inside it at 13.5px
+semibold ink. Just the title field: the section's content stays on the pane
+beneath it. One constant (`RECORD_SECTION_BAND`) and one component
+(`RecordSectionTitle`) carry it; the transcript toggle is the same band as
+a button, chevron kept. The Summary and Your-notes eyebrows (10.5px
+uppercase grey) became titles in the band, so the Overview reads as one
+family of sections. The Action items tab was not asked for and is as it
+was (its In Attention / From the summary eyebrows stay). Every testid and
+anchor (`data-brief-section`, `meet-who-spoke`, `rendering-*`) is where it
+was, so Brief-chip jumps and Recall still land.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, the whole view object restored: Overview shows Summary, Background,
+Signals, Concerns, Where this leans and Plain transcript text on bands;
+every band's computed background equals the segmented track's sunken fill,
+spans the rendering's content box edge to edge, stands 32px, and its
+section content sits below it; Analytics shows Who spoke and Moments the
+same way; Action items has no band and keeps its eyebrows. Suite: 3,897
+tests / 356 files; typecheck clean.
+
+## DEC-137 — The Action items tab's section titles wear the same band
+**Date:** 2026-09-07 · **Status:** EXECUTED · **Branch:** `ryan-assistant` ·
+**Plan:** operator request ("Now do the same for the Action items tab") —
+DEC-136's band, carried into the Record's third rendering, so all three
+read as one family.
+
+**What changed.** "In Attention" and "From the summary" sit on the band
+(`RecordSectionTitle`), and so does "Carried from last time" — which lives
+in `MeetingCommitmentsCard` and is shared with the wrap-up, so it takes a
+`band` prop: the Record asks for the band, the wrap-up keeps its eyebrow.
+To share the band across the two files it moved into its own module,
+`components/RecordSectionTitle.tsx` (the constant and the component, one
+source of truth; the DEC-136 pins follow it). The confirm-stop card
+("Plexii found N things in this meeting") is its own accent-tinted block
+already and is untouched; every testid and anchor is where it was.
+
+**Verified live** over CDP on the operator's running app with "Test" open,
+4/4, the whole view object restored (the operator was on Attention and was
+returned there): the Action items rendering shows "In Attention" on a band
+filled with the segmented track's own colour, spanning the rendering's
+content box, its list below it, and no eyebrow remains; Overview and
+Analytics unchanged from DEC-136 (six and two bands). Suite: 3,898 tests /
+356 files; typecheck clean.
 
 ## DEC-096 — The liveness gate, real-data verification, and process weight by reversibility
 **Date:** 2026-09-03 · **Status:** EXECUTED · **Trigger:** market-readiness review +

@@ -241,8 +241,14 @@ same pattern. Verify-command:
 `grep -rn "rgba(var(--accent)" src/renderer/src --include="*.tsx"`.
 
 ## GAP-019 — `bg-[var(--token)]/N` opacity modifiers are INVALID CSS and paint nothing
-**Found:** 2026-08-30 (DEC-089's dark-mode chrome round) · **Status:** OPEN — two
-header sites fixed under DEC-089; the repo-wide sweep is its own round.
+**Found:** 2026-08-30 (DEC-089's dark-mode chrome round) · **Status:** CLOSED
+(DEC-097) — all 117 occurrences across 57 files rewrote mechanically to the
+color-mix arbitrary form (`[color-mix(in_oklab,var(--x)_N%,transparent)]`):
+same token, same opacity, valid CSS, zero per-site judgment calls. Verified
+live: the old form still computes `rgba(0,0,0,0)`, the new form computes the
+token at the author's alpha; 17 on-screen elements all painting. Locked
+repo-wide in accentColorLock.test.ts (any slash-modified var() token fails
+the build).
 
 GAP-018's sibling, one layer up. Tailwind 3.4 cannot alpha-modify an OPAQUE
 custom property: `bg-[var(--edge-firm)]/60` emits `rgb(var(--edge-firm) / 0.6)`,
@@ -274,8 +280,11 @@ value. Then a repo-wide lock (accentColorLock's pattern) closes the class.
 DEC-089's lock already forbids the pattern in `headerAccent` specifically.
 
 ## GAP-020 — Six `--ink-*` steps are referenced but never defined
-**Found:** 2026-08-31 (DEC-095's analytics restyle) · **Status:** OPEN —
-locked against growth, cleanup is its own round.
+**Found:** 2026-08-31 (DEC-095's analytics restyle) · **Status:** CLOSED
+(DEC-096) — the five real steps are DEFINED in all three themes as midpoints
+of their neighbours; the `--ink-300` typo (8 sites, gray-300 muscle memory)
+rewrote to `--ink-60`; the lock is strict (any undefined step fails the
+build, and every theme block must carry the full 13-step scale).
 
 `var(--ink-80)` and friends are not in tokens.css. An undefined custom
 property makes the whole declaration invalid, so the element **silently

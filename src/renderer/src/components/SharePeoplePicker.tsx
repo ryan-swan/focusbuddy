@@ -122,7 +122,7 @@ export default function SharePeoplePicker({
         className="fb-field w-full text-[12px] px-2 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-90)]"
       />
 
-      <div className="max-h-40 overflow-auto rounded bg-[var(--surface-sunken)] divide-y divide-[var(--edge-soft)]/60">
+      <div className="max-h-40 overflow-auto rounded bg-[var(--surface-sunken)] divide-y divide-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)]">
         {matches.map((p: DirectoryPerson) => (
           <button
             key={p.accountId}

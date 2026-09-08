@@ -121,7 +121,7 @@ export default function StageManagerStrip({ roomId, activeId }: Props): JSX.Elem
         <span className="tracking-wide uppercase">{roomId ? 'Room' : 'Home'}</span>
       </button>
 
-      <div className="w-full h-px bg-[var(--edge-soft)]/60 shrink-0" />
+      <div className="w-full h-px bg-[color-mix(in_oklab,var(--edge-soft)_60%,transparent)] shrink-0" />
 
       {/* Scrollable desk cards — wheel events stop here so canvas doesn't scroll.
           Fades to 0.4 opacity while widget data is loading to smooth the flash. */}

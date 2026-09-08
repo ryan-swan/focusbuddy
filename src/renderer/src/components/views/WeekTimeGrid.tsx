@@ -10,18 +10,14 @@ import { blockFit } from '../../lib/calendarGeometry'
 import { PRIMARY_ACTION, QUEUE_COLOR, queueOf, queueTint, isTerminalState } from '../../lib/attentionQueues'
 import AttentionItemEditor from '../AttentionItemEditor'
 import BookTimeDialog from '../BookTimeDialog'
-import { useActionHistory } from '../../stores/actionHistory'
+import { bookBlockWithToast } from '../../lib/bookBlock'
+import { saveBlockEdit } from '../../lib/blockEdit'
 import { loadPlannerSettings } from '../../lib/attentionPlanner'
-import {
-  resolvePlaceholder,
-  scheduleInviteHold,
-  fmtTimeRange,
-  HOLD_INVITES_MS,
-  type InviteHold
-} from '../../lib/bookTime'
+import { resolvePlaceholder } from '../../lib/bookTime'
 import CompleteCircle from '../attention/CompleteCircle'
 import { useCloseWorkItem } from '../attention/useCloseWorkItem'
 import { joinMeetingRoom } from '../../lib/startMeeting'
+import { useGuestCaptureStore } from '../../stores/guestCapture'
 import { googleCalendarUrl } from '@shared/ics'
 import Icon from '../Icon'
 
@@ -97,7 +93,8 @@ export default function WeekTimeGrid({
   onGhostRemove,
   filterQueue,
   onBlockDragOut,
-  onBlockDragActive
+  onBlockDragActive,
+  fill = false
 }: {
   weekStart: Date
   /** How many day columns to render from weekStart (7 = week, 3, 1 = day). */
@@ -116,6 +113,11 @@ export default function WeekTimeGrid({
   /** Fires when a block pointer-drag starts/ends, so the caller can light an
    *  unschedule zone. */
   onBlockDragActive?: (active: boolean) => void
+  /** DEC-131 (operator: "fill up the full window… so you can see more on
+   *  screen") — the hour window takes ALL the room left under the day
+   *  headers instead of the twelve-hour cap; the host owns the height (the
+   *  assistant's Calendar tab). */
+  fill?: boolean
 }): JSX.Element {
   const nodes = useNodeStore((s) => s.nodes)
   const blocks = useTimeBlockStore((s) => s.blocks)
@@ -533,7 +535,7 @@ export default function WeekTimeGrid({
   const now = Date.now()
 
   return (
-    <div className="flex flex-col" data-testid="week-time-grid">
+    <div className={`flex flex-col ${fill ? 'h-full min-h-0' : ''}`} data-testid="week-time-grid" data-fill={fill || undefined}>
       {/* DEC-078 — the pinned band: day headers + deadline chips stay put
           while the hours scroll beneath them. Living up here (not inside each
           column) also means a tall chip stack can no longer push its own
@@ -652,8 +654,8 @@ export default function WeekTimeGrid({
           if (y < r.top + EDGE) el.scrollTop -= Math.max(6, (r.top + EDGE - y) / 2)
           else if (y > r.bottom - EDGE) el.scrollTop += Math.max(6, (y - (r.bottom - EDGE)) / 2)
         }}
-        className="flex overflow-y-auto overscroll-contain pt-2"
-        style={{ maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
+        className={`flex overflow-y-auto overscroll-contain pt-2 ${fill ? 'flex-1 min-h-0' : ''}`}
+        style={fill ? undefined : { maxHeight: compact ? 12 * hourPx : 'max(280px, calc(100vh - 380px))' }}
       >
       {/* Hour gutter */}
       <div className={`${compact ? 'w-8' : 'w-14'} shrink-0 select-none`}>
@@ -780,7 +782,7 @@ export default function WeekTimeGrid({
                         done
                           ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                           : isPast
-                            ? 'bg-[var(--surface-sunken)]/90 border-[var(--edge-firm)]/50 text-[var(--ink-50)]'
+                            ? 'bg-[color-mix(in_oklab,var(--surface-sunken)_90%,transparent)] border-[color-mix(in_oklab,var(--edge-firm)_50%,transparent)] text-[var(--ink-50)]'
                             : 'bg-accent/15 border-accent/40 text-[var(--ink-90)]'
                       }`}
                       style={{
@@ -867,7 +869,13 @@ export default function WeekTimeGrid({
                               // room is the fallback, not the destination.
                               const ext = block.meeting?.joinUrl
                               if (ext) void window.api.files.openExternal(ext)
-                              else void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting')
+                              else
+                                void joinMeetingRoom(block.meeting!.roomId, block.title || 'Meeting', {
+                                  blockId: block.id,
+                                  seriesId: block.seriesId ?? null,
+                                  agenda: block.meeting!.agenda ?? null,
+                                  invitees: block.meeting!.invitees
+                                })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                             className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-accent !text-white fb-press"
@@ -877,6 +885,30 @@ export default function WeekTimeGrid({
                             <Icon name="videocam" size={9} />
                           </button>
                         )}
+                        {/* M6 — an EXTERNAL meeting (Zoom/Meet/Teams) can be
+                            recorded on this machine: mic + system audio,
+                            local transcription, the same wrap-up. Explicitly
+                            separate from Join — recording is its own act,
+                            never a side effect of opening a link. */}
+                        {block.meeting?.joinUrl && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void useGuestCaptureStore.getState().start({
+                                title: block.title || 'Meeting',
+                                blockId: block.id,
+                                seriesId: block.seriesId ?? null,
+                                agenda: block.meeting?.agenda ?? null
+                              })
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-rose-500/90 !text-white fb-press"
+                            title="Record this external meeting — your mic + this machine's audio, transcribed locally"
+                            data-testid="block-record-external"
+                          >
+                            <Icon name="radio_button_checked" size={9} />
+                          </button>
+                        )}
                         {block.meeting && (
                           <button
                             onClick={(e) => {
@@ -884,7 +916,7 @@ export default function WeekTimeGrid({
                               setCalMenu({ block, x: e.clientX, y: e.clientY })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] fb-press"
                             title="Add to my calendar"
                             data-testid="block-add-to-calendar"
                           >
@@ -898,7 +930,7 @@ export default function WeekTimeGrid({
                               jumpToNode(linked)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] fb-press"
                             title={linked.kind === 'folder' ? 'Open this folder' : 'Jump to this task'}
                             data-testid="block-jump"
                           >
@@ -931,7 +963,7 @@ export default function WeekTimeGrid({
                               void updateBlock(block.id, { status: done ? 'planned' : 'done' })
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] fb-press"
+                            className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] fb-press"
                             title={done ? 'Mark not done' : 'Mark done'}
                             data-testid="block-complete"
                           >
@@ -953,7 +985,7 @@ export default function WeekTimeGrid({
                             }
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
+                          className="h-4 w-4 inline-flex items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] hover:text-rose-500 fb-press"
                           title="Delete block"
                           data-testid="block-delete"
                         >
@@ -1016,7 +1048,7 @@ export default function WeekTimeGrid({
                               e.stopPropagation()
                               onGhostRemove(g.itemId)
                             }}
-                            className="absolute top-0.5 right-0.5 hidden group-hover/ghost:inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--surface-raised)]/90 text-[var(--ink-70)] hover:text-rose-500 fb-press"
+                            className="absolute top-0.5 right-0.5 hidden group-hover/ghost:inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-chip)] bg-[color-mix(in_oklab,var(--surface-raised)_90%,transparent)] text-[var(--ink-70)] hover:text-rose-500 fb-press"
                             title="Drop this proposal"
                           >
                             <Icon name="close" size={9} />
@@ -1057,25 +1089,9 @@ export default function WeekTimeGrid({
           onSave={async (patch) => {
             const prev = editBlock
             setEditBlockState(null)
-            await updateBlock(prev.id, patch)
-            useActionHistory.getState().recordWithToast({
-              label: `Saved \u201c${patch.title ?? prev.title}\u201d \u00b7 ${fmtTimeRange(
-                patch.startMs ?? prev.startMs,
-                patch.durationMin ?? prev.durationMin
-              )}`,
-              undo: async () => {
-                await updateBlock(prev.id, {
-                  taskId: prev.taskId,
-                  title: prev.title,
-                  startMs: prev.startMs,
-                  durationMin: prev.durationMin,
-                  meeting: prev.meeting ?? null
-                })
-              },
-              redo: async () => {
-                await updateBlock(prev.id, patch)
-              }
-            })
+            // DEC-129 — the save (and its undo toast) is lib/blockEdit, shared
+            // with the Today tile's row, so an edit lands the same everywhere.
+            await saveBlockEdit(prev, patch)
           }}
         />
       )}
@@ -1095,30 +1111,10 @@ export default function WeekTimeGrid({
             // Step 7 — closes IMMEDIATELY; no spinner, no confirmation step.
             // The create is a local write; the toast is where regret goes.
             setComposer(null)
-            const draft = { taskId, title, startMs, durationMin, meeting, recurrence }
-            const block = await createBlock(draft)
-            // The stated hold: outbound invites wait a window Undo can
-            // cancel. Nothing sends today (CR-08/CR-09 — no outbound path,
-            // no hosted links); the expiry callback is the future send site.
-            const hold: InviteHold | null =
-              meeting && meeting.invitees.length > 0
-                ? scheduleInviteHold(() => {
-                    /* future: sendMeetingInvites(...) — deliberately silent */
-                  }, HOLD_INVITES_MS)
-                : null
-            const verb = meeting ? 'Scheduled' : 'Booked'
-            useActionHistory.getState().recordWithToast({
-              label: `${verb} “${title}” · ${fmtTimeRange(startMs, durationMin)}${
-                hold ? ` · invites hold ${HOLD_INVITES_MS / 1000}s` : ''
-              }`,
-              undo: async () => {
-                hold?.cancel()
-                await removeBlock(block.id)
-              },
-              redo: async () => {
-                await createBlock(draft)
-              }
-            })
+            // DEC-131 — the booking itself (create, the undo toast, the stated
+            // invite hold) is lib/bookBlock, shared with the assistant's
+            // Calendar tab, so a day picked there books exactly like this.
+            await bookBlockWithToast({ taskId, title, startMs, durationMin, meeting, recurrence })
           }}
         />
       )}

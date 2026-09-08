@@ -265,7 +265,7 @@ export default function RetrievalTrace({
             // provenance slot naming where it lives, the way a web result
             // names its domain. Scrolls past six rows rather than growing.
             <ul
-              className={`ml-[18px] mt-0.5 rounded-[var(--radius-row)] bg-[var(--surface-sunken)]/60 px-1.5 py-1 max-h-44 flex flex-col gap-px ${
+              className={`ml-[18px] mt-0.5 rounded-[var(--radius-row)] bg-[color-mix(in_oklab,var(--surface-sunken)_60%,transparent)] px-1.5 py-1 max-h-44 flex flex-col gap-px ${
                 line.leaves.length > SCROLL_PAST_ROWS ? 'overflow-y-auto' : 'overflow-hidden'
               }`}
             >

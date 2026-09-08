@@ -18,6 +18,7 @@ import {
 } from '../lib/messagingSocket'
 import { usePresenceStore } from './presence'
 import { useAccountStore } from './account'
+import { maybeIngestBrief } from '../lib/briefInbox'
 import { useViewStore } from './view'
 import { useOrgStore, PERSONAL_ORG_ID } from './org'
 import { notifyExternal } from '../lib/notify'
@@ -159,6 +160,11 @@ interface MessagingStore {
   // ChatComposer when its conversation becomes active. Draft only — the human
   // presses send.
   pendingDraft: { conversationId: string; text: string } | null
+  // DEC-127 — a message to land on once its conversation (and, for a reply,
+  // its thread) is on screen: set by the route back from an Attention item,
+  // consumed once by the view that lands. `at` lets a landing that never
+  // finds its message expire instead of firing weeks later.
+  landOnMessage: { messageId: string; parentId: string | null; at: number } | null
 
   connect: (token: string) => Promise<void>
   disconnect: () => void
@@ -179,6 +185,7 @@ interface MessagingStore {
   consumeProposal: (conversationId: string, messageId: string, proposalId: string) => void
   openThread: (parentId: string) => Promise<void>
   closeThread: () => void
+  landOn: (messageId: string | null, parentId?: string | null) => void
   sendThreadReply: (parentId: string, body: string) => Promise<void>
   notifyTyping: () => void
   browseChannels: (orgId: string) => Promise<api.OrgChannel[]>
@@ -246,6 +253,7 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   pinsByConv: {},
   activity: [],
   activeThreadId: null,
+  landOnMessage: null,
 
   connect: async (token) => {
     set({ token, connected: true })
@@ -261,6 +269,10 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
       const conv = conversations.find((c) => c.id === incoming.conversationId)
       const senderMember = conv?.members.find((m) => m.accountId === incoming.message.fromAccount)
       const sender = personDisplayName(senderMember, 'New message')
+      // Q14 — a live-delivered meeting brief offers the per-series follow.
+      // Idempotent via the inbox ledger, so the history load below cannot
+      // double-act on the same message.
+      maybeIngestBrief(incoming.message, sender)
       const preview = incoming.message.body || (incoming.message.attachment ? 'Shared something' : '')
       // A message that @mentions the signed-in handle alerts even while the
       // app is focused elsewhere: being named is the one chat event that
@@ -394,6 +406,13 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
     set({ activeId: id, activeThreadId: null })
     const messages = await api.getMessages(token, id)
     set((s) => ({ messagesByConv: { ...s.messagesByConv, [id]: messages } }))
+    // Q14 — an attendee who was AWAY at wrap-up meets the brief here, on
+    // history load. The ledger makes this scan idempotent across opens.
+    const convMembers = get().conversations.find((c) => c.id === id)?.members ?? []
+    for (const m of messages) {
+      const from = convMembers.find((mm) => mm.accountId === m.fromAccount)
+      maybeIngestBrief(m, personDisplayName(from, 'Someone'))
+    }
     await api.markRead(token, id)
     await get().refreshConversations()
   },
@@ -503,6 +522,8 @@ export const useMessagingStore = create<MessagingStore>((set, get) => ({
   },
 
   closeThread: () => set({ activeThreadId: null }),
+  landOn: (messageId, parentId = null) =>
+    set({ landOnMessage: messageId ? { messageId, parentId: parentId ?? null, at: Date.now() } : null }),
 
   sendThreadReply: async (parentId, body) => {
     const { token, activeId } = get()

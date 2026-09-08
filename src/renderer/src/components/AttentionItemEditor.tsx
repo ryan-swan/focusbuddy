@@ -9,6 +9,8 @@ import { useWorkItemStore } from '../stores/workItems'
 import { CLASS_CHOICES, queueOf } from '../lib/attentionQueues'
 import { URGENCY_LEVELS, parseTags, serializeTags, urgencyOf } from '../lib/itemTags'
 import { parseMentions, serializeMentions, type ItemMention } from '../lib/itemMentions'
+import { parseMessageUrl } from '../lib/messageLink'
+import { openMessageLink } from '../lib/openMessage'
 import TagMentionInput from './TagMentionInput'
 import Icon from './Icon'
 
@@ -512,16 +514,21 @@ export default function AttentionItemEditor({
           <div className="block mt-3">
             <span className="fb-t-caption text-[var(--ink-40)]">Source</span>
             <button
-              onClick={() => void window.api.files.openExternal(item.sourceUrl!)}
+              onClick={() => {
+                // DEC-127 — an internal message link opens the floating
+                // assistant on the message; anything else is the web page.
+                if (!openMessageLink(item.sourceUrl)) void window.api.files.openExternal(item.sourceUrl!)
+              }}
               data-testid="item-source-link"
               title={item.sourceUrl}
               className="mt-1 flex items-center gap-1.5 text-[13px] text-[rgb(var(--accent))] hover:underline fb-press max-w-full"
             >
-              <Icon name="link" size={13} className="shrink-0" />
+              <Icon name={parseMessageUrl(item.sourceUrl) ? 'forum' : 'link'} size={13} className="shrink-0" />
               {/* DEC-091 — the exact page this was marked from (frozen at
                   mark time; the widget may have browsed away since). */}
               <span className="truncate">
                 {(() => {
+                  if (parseMessageUrl(item.sourceUrl)) return 'The message, in PlexiiMessage'
                   try {
                     return new URL(item.sourceUrl!).hostname + new URL(item.sourceUrl!).pathname
                   } catch {
@@ -529,7 +536,9 @@ export default function AttentionItemEditor({
                   }
                 })()}
               </span>
-              <Icon name="open_in_new" size={12} className="shrink-0 text-[var(--ink-40)]" />
+              {!parseMessageUrl(item.sourceUrl) && (
+                <Icon name="open_in_new" size={12} className="shrink-0 text-[var(--ink-40)]" />
+              )}
             </button>
           </div>
         )}

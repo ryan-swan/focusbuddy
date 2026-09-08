@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { sendSocketMessage, setCallSocketHandler, type CallSocketEvent } from '../lib/messagingSocket'
 import { notifyExternal } from '../lib/notify'
-import { ConversationRecorder } from '../lib/conversationRecorder'
+import { MeetingTrackRecorder } from '../lib/trackRecorder'
 import { whisperEnabled } from '../lib/whisperPref'
+import { mayCapture, type ConsentChoice, type ConsentEntry } from '../lib/meetingConsent'
+import { useAccountStore } from './account'
 import { useWrapupStore } from './wrapup'
 import { personDisplayName } from '../lib/personName'
 import { entitlementFor } from '../lib/entitlementReason'
@@ -39,6 +41,19 @@ interface CallStore {
   muted: boolean
   cameraOff: boolean
   error: string | null
+  // ── Calls consent (the M1 rule, 1:1-reduced). The old behaviour was the
+  // SAME hole M1 closed for meetings: one side's whisper preference silently
+  // recorded both voices, and the peer was never told. Now the preference
+  // only expresses MY intent — it asks; it never captures the other side.
+  /** True while this call is being recorded (by either side's machine). */
+  transcribing: boolean
+  /** Who is recording: 'me' (this machine holds the recorder) or 'peer'
+   *  (their machine does — my client records nothing). */
+  recordingBy: 'me' | 'peer' | null
+  /** The peer's answer to MY request, when recordingBy === 'me'. */
+  peerConsent: ConsentEntry | null
+  /** A consent prompt awaiting MY answer, when the peer asked. */
+  consentAsk: { byName: string } | null
   // True once init() has wired the socket handler, so we never double-register.
   ready: boolean
 
@@ -49,6 +64,10 @@ interface CallStore {
   hangup: () => void
   toggleMute: () => void
   toggleCamera: () => void
+  /** My answer to the peer's transcription request. */
+  answerCallConsent: (choice: ConsentChoice) => void
+  /** Requester-only: stop capturing now; the take still wraps up at call end. */
+  stopTranscribing: () => void
 }
 
 // Non-serializable call internals live outside the store. Which side creates the
@@ -57,8 +76,12 @@ interface CallStore {
 let pc: RTCPeerConnection | null = null
 // ICE candidates that arrive before the remote description is set are buffered.
 let pendingCandidates: RTCIceCandidateInit[] = []
-// Records the mixed call audio once connected, for an end-of-call summary.
-let recorder: ConversationRecorder | null = null
+// The per-track call recorder (the M1/C1 foundation, reused): my mic and the
+// peer's stream are separate attributed takes on one clock — the peer's is
+// tapped ONLY once they consent. Exists only on the requesting side.
+let recorder: MeetingTrackRecorder | null = null
+// A take stopped mid-call (stopTranscribing) waits here for the wrap-up.
+let heldTake: Awaited<ReturnType<MeetingTrackRecorder['stop']>> | null = null
 
 function genCallId(): string {
   return `call-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
@@ -73,22 +96,36 @@ export const useCallStore = create<CallStore>((set, get) => {
   function cleanup(nextStatus: CallStatus): void {
     // Wrap up the call: stop the recording and, when the call actually ended
     // (not a decline), hand the audio to the summary + deliverables flow.
-    if (recorder) {
+    if (recorder || heldTake) {
       const rec = recorder
       recorder = null
+      const held = heldTake
+      heldTake = null
       if (nextStatus === 'ended') {
         const title = `Call with ${personDisplayName(get().peer, 'someone')}`
-        void rec.stop().then((res) => {
-          if (res && res.durationSec >= 2) {
-            // begin() resolves errors internally; .catch is belt-and-braces so a
-            // rejection can never surface as an unhandled error after the call.
+        const peerName = personDisplayName(get().peer, 'Them')
+        void (held ? Promise.resolve(held) : rec!.stop()).then((take) => {
+          if (take.mixed && take.mixed.durationSec >= 2) {
+            // The call rides the meeting pipeline now: attributed per-track
+            // takes, on-device transcription (a consented recording must not
+            // grow a silent third-party disclosure), the Record, the confirm
+            // stop. begin() resolves errors internally; .catch is belt-and-
+            // braces so nothing surfaces as unhandled after the call.
             void useWrapupStore
               .getState()
-              .begin({ title, buffer: res.buffer, mimeType: res.mimeType, durationSec: res.durationSec })
+              .begin({
+                title,
+                buffer: take.mixed.buffer,
+                mimeType: take.mixed.mimeType,
+                durationSec: take.mixed.durationSec,
+                tracks: take.tracks,
+                speakers: { me: 'You', [get().peer?.accountId ?? 'peer']: peerName },
+                forceLocalTranscription: true
+              })
               .catch(() => {})
           }
         })
-      } else {
+      } else if (rec) {
         void rec.stop()
       }
     }
@@ -110,7 +147,11 @@ export const useCallStore = create<CallStore>((set, get) => {
       localStream: null,
       remoteStream: null,
       muted: false,
-      cameraOff: false
+      cameraOff: false,
+      transcribing: false,
+      recordingBy: null,
+      peerConsent: null,
+      consentAsk: null
     })
     // After a brief ended state, reset to idle so the overlay can dismiss.
     if (nextStatus === 'ended') {
@@ -135,22 +176,31 @@ export const useCallStore = create<CallStore>((set, get) => {
     const remote = new MediaStream()
     conn.ontrack = (e) => {
       for (const track of e.streams[0]?.getTracks() ?? [e.track]) remote.addTrack(track)
-      // Tap the peer's audio into the recording (no-op until tracks arrive).
-      recorder?.addStream(remote)
+      // The peer's audio is deliberately NOT tapped here — capture waits
+      // for their consent-response (see the callSignal consent branch). The
+      // one exception: consent already arrived and the media came later
+      // (renegotiation) — then the standing yes is applied to the new stream.
+      if (get().recordingBy === 'me' && mayCapture(get().peerConsent ?? undefined) && recorder) {
+        recorder.tap(peer.accountId, remote)
+      }
       set({ remoteStream: remote })
     }
     conn.onconnectionstatechange = () => {
       const st = conn.connectionState
       if (st === 'connected') {
         set({ status: 'connected' })
-        // Start recording the call audio (both sides) for the end-of-call summary
-        // ONLY when Whisper is opted into. Recording is off by default, never
-        // forced; the user turns it on (and can make it their default) in the
-        // meeting UI / settings.
+        // My whisper preference expresses MY intent only. It starts a
+        // recorder that captures MY mic, and it ASKS the peer — their stream
+        // is tapped when (and only when) their consent arrives. The old code
+        // captured both voices here, silently; that was the M1 hole in 1:1
+        // form, and it is closed the same way: capture-on-answer, decline
+        // honoured by construction (never tapped).
         if (whisperEnabled() && !recorder) {
-          recorder = new ConversationRecorder()
-          recorder.addStream(local)
-          recorder.addStream(remote)
+          recorder = new MeetingTrackRecorder()
+          recorder.tap('me', local)
+          const myName = personDisplayName(useAccountStore.getState().account ?? {}, 'Your contact')
+          set({ transcribing: true, recordingBy: 'me', peerConsent: 'pending' })
+          signal(peer.accountId, callId, { kind: 'consent-request', byName: myName })
         }
       }
       else if (st === 'failed') {
@@ -249,6 +299,31 @@ export const useCallStore = create<CallStore>((set, get) => {
         } else {
           pendingCandidates.push(data.candidate)
         }
+      } else if (data.kind === 'consent-request') {
+        // The peer wants their machine to transcribe this call. My own
+        // whisper preference is a standing yes ("transcribe & summarise my
+        // 1:1 calls") — it answers for me; otherwise the modal asks. Both-on
+        // calls simply record on both machines, each side consented.
+        const byName = (data as { byName?: string }).byName || personDisplayName(state.peer, 'Your contact')
+        if (whisperEnabled()) {
+          signal(state.peer.accountId, state.callId, { kind: 'consent-response', choice: 'accepted' })
+          if (get().recordingBy !== 'me') set({ transcribing: true, recordingBy: 'peer' })
+        } else {
+          set({ consentAsk: { byName } })
+        }
+      } else if (data.kind === 'consent-response') {
+        // Their answer to MY request. Capture starts HERE, never before —
+        // and a decline means their stream is simply never tapped: the call
+        // continues, the record holds only my side.
+        const choice = (data as { choice?: ConsentChoice }).choice
+        if (get().recordingBy !== 'me' || !choice) return
+        set({ peerConsent: choice })
+        if (mayCapture(choice) && recorder && get().remoteStream) {
+          recorder.tap(state.peer.accountId, get().remoteStream)
+        }
+      } else if (data.kind === 'recording-stopped') {
+        // The requester stopped capturing (or their side reset).
+        if (get().recordingBy === 'peer') set({ transcribing: false, recordingBy: null })
       }
     }
   }
@@ -263,6 +338,10 @@ export const useCallStore = create<CallStore>((set, get) => {
     muted: false,
     cameraOff: false,
     error: null,
+    transcribing: false,
+    recordingBy: null,
+    peerConsent: null,
+    consentAsk: null,
     ready: false,
 
     init: () => {
@@ -320,6 +399,27 @@ export const useCallStore = create<CallStore>((set, get) => {
       const { peer, callId } = get()
       if (peer && callId) sendSocketMessage({ type: 'callEnd', payload: { callId, to: peer.accountId } })
       cleanup('ended')
+    },
+
+    answerCallConsent: (choice) => {
+      const { peer, callId, consentAsk } = get()
+      if (!consentAsk || !peer || !callId) return
+      set({ consentAsk: null })
+      signal(peer.accountId, callId, { kind: 'consent-response', choice })
+      if (mayCapture(choice)) set({ transcribing: true, recordingBy: 'peer' })
+    },
+
+    stopTranscribing: () => {
+      const { peer, callId, recordingBy } = get()
+      if (recordingBy !== 'me' || !recorder) return
+      const rec = recorder
+      recorder = null
+      // The take-so-far survives to the wrap-up at call end; capture stops NOW.
+      void rec.stop().then((take) => {
+        heldTake = take
+      })
+      if (peer && callId) signal(peer.accountId, callId, { kind: 'recording-stopped' })
+      set({ transcribing: false, recordingBy: null, peerConsent: null })
     },
 
     toggleMute: () => {
