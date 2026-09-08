@@ -15,6 +15,7 @@ import {
   PUBLIC_DESK_SCHEMA,
   PUBLIC_DESK_VERSION,
   isPubliclyRenderable,
+  mayCapture,
   type PublicDeskProjectionV1
 } from './publicDesk'
 
@@ -43,7 +44,8 @@ const RENDER_FIELDS: Record<string, string[]> = {
   field: ['type', 'label', 'value', 'field'],
   'task-link': ['type', 'title', 'status', 'publicToken'],
   file: ['type', 'name', 'mime', 'assetId'],
-  placeholder: ['type', 'reason']
+  placeholder: ['type', 'reason'],
+  capture: ['type', 'html', 'kind']
 }
 
 const WIDGET_FIELDS = [
@@ -174,10 +176,29 @@ export function validatePublicDeskProjection(input: unknown): ValidationResult {
       // The disclosure allowlist: a kind with no projector may only ever appear
       // as a placeholder. This is the check that makes the policy enforceable
       // rather than advisory.
-      if (typeof w.kind === 'string' && !isPubliclyRenderable(w.kind) && type !== 'placeholder') {
-        errors.push(
-          `${at}: kind "${w.kind}" has no public projector and must be published as a placeholder, got "${type}"`
-        )
+      if (typeof w.kind === 'string' && !isPubliclyRenderable(w.kind)) {
+        // A kind with no projector may be a placeholder, or -- only if it is on
+        // the capture allowlist -- its own sanitised markup. Anything else is a
+        // kind trying to publish content nobody signed off on.
+        const allowed = type === 'placeholder' || (type === 'capture' && mayCapture(w.kind))
+        if (!allowed) {
+          errors.push(
+            `${at}: kind "${w.kind}" has no public projector; expected a placeholder${
+              mayCapture(w.kind) ? ' or a capture' : ''
+            }, got "${type}"`
+          )
+        }
+      }
+      // Captured markup must not carry executable content. The producer
+      // sanitises; the server refuses to store anything that got through.
+      if (type === 'capture') {
+        const html = typeof r.html === 'string' ? r.html : ''
+        if (/<script|\son\w+\s*=|javascript:/i.test(html)) {
+          errors.push(`${at}.render.html: captured markup carries script or handlers`)
+        }
+        if (html.length > 512 * 1024) {
+          errors.push(`${at}.render.html: capture exceeds 512KB`)
+        }
       }
       if (type === 'link' && !isSafePublicUrl(r.url)) {
         errors.push(`${at}.render.url: unsafe or malformed public URL`)

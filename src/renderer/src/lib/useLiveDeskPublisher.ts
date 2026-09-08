@@ -39,6 +39,7 @@ function useResolvers(cache: React.MutableRefObject<Map<string, unknown>>): Proj
   // app.
   return useMemo(
     () => ({
+        capture: (widgetId) => (cache.current.get(`c:${widgetId}`) as string | null) ?? null,
       table: (id) => (cache.current.get(`t:${id}`) as ReturnType<ProjectionResolvers['table']>) ?? null,
       document: (id) => (cache.current.get(`d:${id}`) as ReturnType<ProjectionResolvers['document']>) ?? null,
       slides: (id) => (cache.current.get(`s:${id}`) as ReturnType<ProjectionResolvers['slides']>) ?? null,

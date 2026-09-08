@@ -1,4 +1,5 @@
 import type { SheetBodyV1, SlidesBody, Widget } from '@shared/types'
+import { mayCapture } from '@shared/publicDesk'
 
 // Fetching the bodies a public desk projection needs.
 //
@@ -184,7 +185,9 @@ export async function warmCache(
 
   for (const w of widgets) {
     const id = w.content
-    if (!id) continue
+    // A capture is keyed by the widget, not its content: a calculator or a
+    // launcher has no content id and would otherwise be skipped entirely.
+    if (!id && !mayCapture(w.kind)) continue
     try {
       if (w.kind === 'table' && !cache.has(`t:${id}`)) {
         const [tbl, rows] = await Promise.all([
@@ -226,6 +229,14 @@ export async function warmCache(
             truncated: false
           })
         }
+      } else if (mayCapture(w.kind) && !cache.has(`c:${w.id}`)) {
+        // Rendered off-screen rather than read off the canvas, so a desk that
+        // is not open still publishes what it looks like.
+        // Loaded on demand: the capture pulls in the whole widget tree, and a
+        // desk with nothing to capture should not pay for it.
+        const { captureWidgetHtml } = await import('./widgetCapture')
+        const html = await captureWidgetHtml(w)
+        if (html) note(`c:${w.id}`, html)
       } else if (ASSET_KINDS.has(w.kind) && !cache.has(`a:${id}`)) {
         const got = await assetBytes(id)
         if (got && PUBLISHABLE_MIME.has(got.mime) && got.bytes.byteLength <= MAX_ASSET_BYTES) {

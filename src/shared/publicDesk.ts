@@ -174,9 +174,28 @@ export interface PublicRenderFile {
 }
 
 /**
+ * A picture of a widget the projection has no structural renderer for: its own
+ * rendered markup, sanitised and style-inlined at publish time.
+ *
+ * This is deliberately narrow. Capturing markup is a denylist -- you ship
+ * everything and strip what should not be there -- which is the opposite of how
+ * the rest of this contract works, so it is permitted only for the kinds named
+ * in PUBLIC_CAPTURE_ALLOWED, never as a general fallback. A widget that renders
+ * an agent's instructions, a webhook's URL or somebody's mail is not eligible,
+ * whatever it looks like on screen.
+ */
+export interface PublicRenderCapture {
+  type: 'capture'
+  /** Sanitised markup with styles inlined; carries no scripts and no handlers. */
+  html: string
+  /** The originating kind, so the viewer can still label the frame. */
+  kind: string
+}
+
+/**
  * Everything the projection cannot safely represent: agents, webhooks, inbound
- * hooks, launchers, stream decks, connected mail, chat threads. The public sees
- * that something is there and what it is called -- never its configuration.
+ * hooks, connected mail, chat threads. The public sees that something is there
+ * and what it is called -- never its configuration.
  */
 export interface PublicRenderPlaceholder {
   type: 'placeholder'
@@ -202,6 +221,7 @@ export type PublicRender =
   | PublicRenderTaskLink
   | PublicRenderFile
   | PublicRenderPlaceholder
+  | PublicRenderCapture
 
 export type PublicRenderType = PublicRender['type']
 
@@ -316,6 +336,30 @@ export const PUBLIC_PLACEHOLDER_REASON: Readonly<Record<string, string>> = Objec
   design: 'Design — not available publicly',
   attention: 'Attention — not available publicly'
 })
+
+/**
+ * Kinds whose rendered markup may be published when no structural projector
+ * exists. Everything here shows the owner's own content or a control surface;
+ * nothing here renders a secret, a credential, an instruction to an agent, or
+ * anybody's correspondence.
+ *
+ * Deliberately NOT here, and why:
+ *   agent, webhook, inbound-hook   render instructions, URLs and secrets
+ *   email, chat-thread             private correspondence
+ *   meeting-record                 provenance-tiered private record
+ *   minimap                        viewer-local chrome, meaningless publicly
+ */
+export const PUBLIC_CAPTURE_ALLOWED: ReadonlySet<string> = new Set([
+  'calculator',
+  'streamdeck',
+  'local-app-launcher',
+  'design',
+  'attention'
+])
+
+export function mayCapture(kind: string): boolean {
+  return !isPubliclyRenderable(kind) && PUBLIC_CAPTURE_ALLOWED.has(kind)
+}
 
 export function placeholderReasonFor(kind: string): string {
   return PUBLIC_PLACEHOLDER_REASON[kind] ?? 'Not available publicly'
