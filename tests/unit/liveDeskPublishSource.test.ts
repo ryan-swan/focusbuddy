@@ -82,6 +82,29 @@ describe('publishing runs for as long as the app does', () => {
   })
 })
 
+describe('a published desk converges on its own', () => {
+  const src = readFileSync(
+    join(__dirname, '..', '..', 'src', 'renderer', 'src', 'lib', 'useLiveDeskPublisher.ts'),
+    'utf8'
+  )
+
+  it('reconciles on a timer, not only when an effect happens to fire', () => {
+    // Publishing hung entirely on a React effect firing at the right moment,
+    // and twice it quietly did not: a desk sat unpublished for an hour with no
+    // error, because "nothing was attempted" leaves no trace.
+    expect(src).toContain('setInterval(tick, RECONCILE_MS)')
+  })
+
+  it('costs one comparison when nothing has changed', () => {
+    const tick = src.slice(src.indexOf('const tick = ()'))
+    expect(tick.slice(0, 400)).toContain('if (fingerprint === lastSentRef.current) return')
+  })
+
+  it('publishes directly, so a failure is recorded rather than queued away', () => {
+    expect(src).toContain('window.api.liveDesk.publish(deskId, projection)')
+  })
+})
+
 describe('the projection itself still reflects its input honestly', () => {
   const base = { deskId: 'd1', title: 'Desk', revision: 0, now: 1 }
 

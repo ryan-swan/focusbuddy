@@ -22,6 +22,11 @@ export interface LiveDeskStatus {
   busy: boolean
 }
 
+/** Changes settle for this long before the desk is republished. */
+const PUBLISH_SETTLE_MS = 800
+/** How often a live desk checks whether what it published is still current. */
+const RECONCILE_MS = 20_000
+
 const EMPTY: LiveDeskStatus = {
   token: null,
   revision: 0,
@@ -163,6 +168,29 @@ export function useLiveDeskPublisher(deskId: string | null): {
     })
   }, [deskId, widgets, links, resolvers, warmTick])
 
+  // A published desk reconciles itself.
+  //
+  // Publishing hung entirely on a React effect firing at the right moment, and
+  // twice that quietly did not happen: a desk sat unpublished for an hour with
+  // no error, because "nothing was attempted" leaves no trace. A desk that is
+  // live should converge on its own regardless of render timing, so this
+  // rebuilds on a timer and publishes when the result differs from what was
+  // last sent. When nothing has changed the fingerprint matches and it costs
+  // one comparison.
+  useEffect(() => {
+    if (!deskId || !status.token || status.paused) return
+    const tick = (): void => {
+      const projection = build()
+      if (!projection) return
+      const fingerprint = projectionFingerprint(projection)
+      if (fingerprint === lastSentRef.current) return
+      lastSentRef.current = fingerprint
+      void window.api.liveDesk.publish(deskId, projection).then(() => void refresh())
+    }
+    const timer = setInterval(tick, RECONCILE_MS)
+    return () => clearInterval(timer)
+  }, [deskId, status.token, status.paused, build, refresh])
+
   // Fetch the bodies the projection needs, then rebuild. Publishing waits for
   // this rather than shipping placeholders where real content exists: a public
   // desk that silently omits its tables is worse than one that takes a moment.
@@ -192,10 +220,16 @@ export function useLiveDeskPublisher(deskId: string | null): {
     const fingerprint = projectionFingerprint(projection)
     if (fingerprint === lastSentRef.current) return
     lastSentRef.current = fingerprint
-    void window.api.liveDesk.queuePublish(deskId, projection)
-    // The main process publishes asynchronously; re-read shortly after so the
-    // panel shows the real revision and any error rather than an optimistic one.
-    const t = setTimeout(() => void refresh(), 2000)
+    // Publish directly, on a short delay, rather than through the main-process
+    // queue. The queue was an extra hop that did not reliably deliver -- a desk
+    // could sit unpublished for an hour with nothing written down -- and it
+    // bought nothing here: the fingerprint above already collapses a drag's
+    // per-frame churn into one publish, which is what the debounce was for.
+    // Publishing here is also awaited, so a failure is recorded and surfaced in
+    // the share panel instead of vanishing into a timer.
+    const t = setTimeout(() => {
+      void window.api.liveDesk.publish(deskId, projection).then(() => void refresh())
+    }, PUBLISH_SETTLE_MS)
     return () => clearTimeout(t)
   }, [deskId, status.token, status.paused, build, refresh])
 

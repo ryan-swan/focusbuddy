@@ -81,6 +81,8 @@ export async function publishProjection(
 ): Promise<PublishResult> {
   const record = getLiveDesk(deskId)
   if (!record) return { ok: false, error: 'This desk is not published.' }
+  // Every other exit from here records why, so "nothing happened and nothing
+  // was written down" can only mean the call never arrived.
   // Paused is a state the owner chose, not a failure, so it is not recorded as
   // one. Everything else is: a publish that quietly does nothing leaves the
   // owner believing a stale public page is current, which is the exact failure

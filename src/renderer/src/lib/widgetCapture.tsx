@@ -147,6 +147,13 @@ export async function captureWidgetHtml(widget: Widget): Promise<string | null> 
     // The frame's own header is chrome, not content: it published the widget's
     // title followed by "edit push_pin remove open_in_full close".
     for (const el of Array.from(host.querySelectorAll('.widget-handle'))) el.remove()
+    // Icon glyphs go too. The viewer carries the app's stylesheet but not its
+    // 3.9MB Material Symbols font, and a ligature without its font renders as
+    // the literal word -- a deck button reading "play_pause", a toolbar reading
+    // "rectangle Rect". The text label beside each icon says the same thing.
+    for (const el of Array.from(host.querySelectorAll<HTMLElement>('*'))) {
+      if (/material (symbols|icons)/i.test(getComputedStyle(el).fontFamily)) el.remove()
+    }
     defuseControls(host)
 
     // Nothing visible is not worth a card; the placeholder says more.

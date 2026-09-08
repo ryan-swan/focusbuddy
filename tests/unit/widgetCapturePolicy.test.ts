@@ -153,11 +153,11 @@ describe('the capture itself', () => {
     expect(src).toContain("querySelectorAll('.widget-handle')")
   })
 
-  it('keeps icon-font elements, now that the font ships with the viewer', () => {
-    // They used to be deleted because a Material Symbols ligature renders as
-    // the literal word without its font; the viewer now carries the app's
-    // stylesheet, so the glyphs resolve.
-    expect(src).not.toContain('material (symbols|icons)')
+  it('drops icon glyphs, whose font is too large to ship', () => {
+    // The viewer carries the app's stylesheet but not its 3.9MB Material
+    // Symbols font, and a ligature without its font renders as the literal
+    // word: a deck button reading "play_pause". The text label says the same.
+    expect(src).toContain('material (symbols|icons)')
   })
 
   it('refuses images that are not self-contained', () => {
