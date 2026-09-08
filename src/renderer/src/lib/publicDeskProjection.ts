@@ -225,7 +225,16 @@ export function projectWidget(w: Widget, r: ProjectionResolvers = NULL_RESOLVERS
         // Only an actual colour value may be published. Falling back to raw
         // `content` here would forward whatever string the widget happened to
         // hold -- the fixture for this kind caught exactly that.
-        render = { type: 'color', value: safeColour(w.color) ?? safeColour(w.content) ?? '#000000' }
+        {
+          // A shape stores { shape, fill, stroke, ... }; a colour widget stores
+          // the value itself. Both end up as one publishable colour.
+          const shape = json<{ fill?: string }>(w.content)
+          render = {
+            type: 'color',
+            value:
+              safeColour(shape?.fill) ?? safeColour(w.color) ?? safeColour(w.content) ?? '#000000'
+          }
+        }
         break
 
       case 'field': {

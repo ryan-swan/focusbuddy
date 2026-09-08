@@ -27,7 +27,10 @@ export async function docHtmlFrom(
     ])
     // Sanitised on the way out: this HTML is about to be public, and it is the
     // same sanitiser the editor trusts on the way in.
-    const html = sanitizeHtml(docToHtml(body as never))
+    // Stored as { doc: <ProseMirror JSON> }; docToHtml wants the document
+    // itself, and handed the wrapper it produced nothing.
+    const inner = (body as { doc?: unknown } | null)?.doc ?? body
+    const html = sanitizeHtml(docToHtml(inner as never))
     return html ? { html, pageCount: 1 } : null
   } catch {
     return null
@@ -45,6 +48,11 @@ const PUBLISHABLE_MIME = new Set([
 /** Matches the server's per-asset ceiling; oversized files stay placeholders. */
 const MAX_ASSET_BYTES = 25 * 1024 * 1024
 
+/** "audio/webm;codecs=opus" is an audio/webm. Parameters are not the type. */
+function bareMime(raw: string): string {
+  return (raw || '').split(';')[0].trim().toLowerCase()
+}
+
 /** A stable id for an asset, so republishing does not re-upload the same bytes. */
 function assetIdFor(source: string): string {
   let h = 0
@@ -60,11 +68,20 @@ function assetIdFor(source: string): string {
  */
 async function assetBytes(content: string): Promise<{ mime: string; bytes: Uint8Array } | null> {
   if (!content) return null
+  // A recorder or player stores { fileId: ... } rather than a bare reference.
+  const wrapped = (() => {
+    try {
+      const o = JSON.parse(content) as { fileId?: string; id?: string }
+      return typeof o?.fileId === 'string' ? o.fileId : typeof o?.id === 'string' ? o.id : null
+    } catch {
+      return null
+    }
+  })()
   const local = content.match(/^fb-file:\/\/([\w-]+)/)
-  const fileId = local ? local[1] : /^[0-9a-fA-F-]{8,}$/.test(content) ? content : null
+  const fileId = wrapped ?? (local ? local[1] : /^[0-9a-fA-F-]{8,}$/.test(content) ? content : null)
   if (fileId) {
     const r = await window.api.files.read(fileId)
-    return r ? { mime: r.mimeType, bytes: new Uint8Array(r.buffer) } : null
+    return r ? { mime: bareMime(r.mimeType), bytes: new Uint8Array(r.buffer) } : null
   }
   if (content.startsWith('data:')) {
     const m = content.match(/^data:([^;,]+)[^,]*,(.*)$/)
@@ -72,7 +89,7 @@ async function assetBytes(content: string): Promise<{ mime: string; bytes: Uint8
     const bin = atob(m[2])
     const bytes = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    return { mime: m[1], bytes }
+    return { mime: bareMime(m[1]), bytes }
   }
   if (/^https?:\/\//.test(content)) {
     // A remote image still has to be copied: the public page cannot be made to
@@ -80,7 +97,7 @@ async function assetBytes(content: string): Promise<{ mime: string; bytes: Uint8
     const res = await fetch(content)
     if (!res.ok) return null
     const buf = new Uint8Array(await res.arrayBuffer())
-    return { mime: res.headers.get('content-type')?.split(';')[0] ?? '', bytes: buf }
+    return { mime: bareMime(res.headers.get('content-type') ?? ''), bytes: buf }
   }
   return null
 }
@@ -195,7 +212,13 @@ export async function warmCache(
         if (doc && !doc.archived) note(`d:${id}`, await docHtmlFrom(doc.body))
       } else if (w.kind === 'sheet' && !cache.has(`t:${id}`)) {
         const doc = await window.api.documents.get(id)
-        const body = doc?.body as SheetBodyV1 | undefined
+        // Two shapes in the wild: the flat v1 body, and a v2 workbook whose
+        // sheets live in an array. Only the first sheet is published, because a
+        // dashboard card has one grid to show.
+        const raw = doc?.body as
+          | (SheetBodyV1 & { version?: number; sheets?: SheetBodyV1[] })
+          | undefined
+        const body = Array.isArray(raw?.sheets) ? raw.sheets[0] : raw
         if (doc && !doc.archived && Array.isArray(body?.columns)) {
           note(`t:${id}`, {
             columns: body.columns.map((name, i) => ({ id: `c${i}`, name, kind: 'text' })),

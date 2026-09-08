@@ -258,8 +258,11 @@ export const PUBLIC_RENDER_POLICY: Readonly<Record<string, PublicRenderType>> = 
 
   image: 'image',
   'image-gen': 'image',
-  shape: 'image',
   design: 'image',
+  // A shape carries a fill and a geometry, not a file. Projecting it as an
+  // image meant every shape published as "image not published"; its colour is
+  // the honest part we can carry, so it goes out as one.
+  shape: 'color',
 
   video: 'media',
   'voice-recorder': 'media',

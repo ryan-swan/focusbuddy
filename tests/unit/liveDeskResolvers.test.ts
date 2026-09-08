@@ -195,3 +195,53 @@ describe('warmCache — graphs', () => {
     expect(cache.get('g:not json') ?? null).toBeNull()
   })
 })
+
+
+// Each of these was a real widget on a real shared desk that published as an
+// empty frame, and each had a different cause.
+
+describe('warmCache — shapes the data actually takes', () => {
+  it('reads a fileId out of a recorder\'s JSON content', async () => {
+    // A voice recorder stores { fileId, captureMode, ... }, not a bare id.
+    api.files.read.mockResolvedValue({ mimeType: 'audio/webm', buffer: new Uint8Array([1]).buffer })
+    api.liveDesk.uploadAsset.mockResolvedValue({ ok: true })
+    const content = JSON.stringify({ fileId: 'abc-123-def-456', captureMode: 'mic' })
+    const cache = new Map<string, unknown>()
+    await warmCache(DESK, [widget('voice-recorder', content)], cache)
+    expect(api.files.read).toHaveBeenCalledWith('abc-123-def-456')
+    expect(cache.has(`a:${content}`)).toBe(true)
+  })
+
+  it('treats audio/webm;codecs=opus as audio/webm', async () => {
+    // Parameters are not part of the type; the allowlist rejected the whole
+    // string and every recording published as unavailable.
+    api.files.read.mockResolvedValue({
+      mimeType: 'audio/webm;codecs=opus',
+      buffer: new Uint8Array([1]).buffer
+    })
+    api.liveDesk.uploadAsset.mockResolvedValue({ ok: true })
+    const cache = new Map<string, unknown>()
+    await warmCache(DESK, [widget('voice-recorder', JSON.stringify({ fileId: 'aaaa-bbbb' }))], cache)
+    const entry = [...cache.values()][0] as { mime: string }
+    expect(entry.mime).toBe('audio/webm')
+  })
+
+  it('publishes the first sheet of a v2 workbook', async () => {
+    api.documents.get.mockResolvedValue({
+      archived: false,
+      body: { version: 2, sheets: [{ columns: ['A', 'B'], rows: [['1', '2']] }] }
+    })
+    const cache = new Map<string, unknown>()
+    await warmCache(DESK, [widget('sheet', 'sheet_v2')], cache)
+    const t = cache.get('t:sheet_v2') as { columns: { name: string }[]; rows: unknown[] }
+    expect(t.columns.map((c) => c.name)).toEqual(['A', 'B'])
+    expect(t.rows).toHaveLength(1)
+  })
+
+  it('still reads a flat v1 sheet body', async () => {
+    api.documents.get.mockResolvedValue({ archived: false, body: { columns: ['X'], rows: [['9']] } })
+    const cache = new Map<string, unknown>()
+    await warmCache(DESK, [widget('sheet', 'sheet_v1')], cache)
+    expect((cache.get('t:sheet_v1') as { columns: unknown[] }).columns).toHaveLength(1)
+  })
+})
