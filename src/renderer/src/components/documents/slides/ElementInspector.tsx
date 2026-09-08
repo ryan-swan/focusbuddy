@@ -117,7 +117,7 @@ export default function ElementInspector(props: Props): JSX.Element {
             max={100}
             data-testid="element-opacity"
             title="Opacity"
-            className="flex-1"
+            className="flex-1 min-w-0"
             value={Math.round((el.opacity ?? 1) * 100)}
             onChange={(e) => props.onUpdateElement(el.id, { opacity: Number(e.target.value) / 100 })}
           />

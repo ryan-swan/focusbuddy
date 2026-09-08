@@ -669,7 +669,7 @@ export default function StreamDeckWidget({ widget, inline = false }: Props): JSX
             SpeedDeck
           </span>
         )}
-        <span className="text-[11px] text-stone-200 font-medium px-1.5 truncate flex-1">
+        <span className="text-[11px] text-stone-200 font-medium px-1.5 truncate flex-1 min-w-0">
           {pageStack.length > 1 ? currentPage.name : ''}
         </span>
         {clipboard && editing && (

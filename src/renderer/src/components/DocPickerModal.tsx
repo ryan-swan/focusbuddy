@@ -89,7 +89,7 @@ export default function DocPickerModal({
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-sunken)]"
       >
         <Icon name={TYPE_ICON[d.docType]} size={15} className="text-[rgb(var(--accent))] shrink-0" />
-        <span className="text-[12.5px] text-[var(--ink-80)] truncate flex-1">{d.title || 'Untitled'}</span>
+        <span className="text-[12.5px] text-[var(--ink-80)] truncate flex-1 min-w-0">{d.title || 'Untitled'}</span>
         <span className="text-[10px] text-[var(--ink-40)] shrink-0">{TYPE_LABEL[d.docType].slice(0, -1)}</span>
       </button>
     )

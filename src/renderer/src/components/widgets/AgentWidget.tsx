@@ -485,7 +485,7 @@ export default function AgentWidget({ widget }: Props): JSX.Element {
           >
             <div className="flex items-center gap-1.5">
               <Icon name="psychology" size={13} className="text-accent shrink-0" />
-              <span className="flex-1 font-medium truncate">{specialist.name}</span>
+              <span className="flex-1 min-w-0 font-medium truncate">{specialist.name}</span>
               <button onClick={() => setSpecialist(null)} className="text-[var(--ink-40)] hover:text-[var(--ink-70)]" aria-label="Dismiss">
                 <Icon name="close" size={12} />
               </button>

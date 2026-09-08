@@ -258,7 +258,7 @@ export default function CustomBlockWidget({ widget, inline = false }: Props): JS
                   >
                     <button
                       onClick={() => applyTemplate(t.id)}
-                      className="flex-1 text-left truncate text-[var(--ink-90)]"
+                      className="flex-1 min-w-0 text-left truncate text-[var(--ink-90)]"
                       title={`Insert "${t.name}"`}
                     >
                       {t.name}

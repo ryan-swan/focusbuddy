@@ -390,7 +390,7 @@ export default function OrgAdminView(): JSX.Element {
                           <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size={15} />
                         </button>
                       )}
-                      <span className="text-[13px] text-[var(--ink-90)] flex-1 truncate">
+                      <span className="text-[13px] text-[var(--ink-90)] flex-1 min-w-0 truncate">
                         {personDisplayName(m, m.handle)}
                         {m.accountId === myId && <span className="text-[11px] text-[var(--ink-40)]"> (you)</span>}
                         {prof?.title && <span className="text-[11px] text-[var(--ink-40)]"> · {prof.title}</span>}
@@ -445,7 +445,7 @@ export default function OrgAdminView(): JSX.Element {
                 {detail.invites.map((iv) => (
                   <div key={iv.id} className="flex items-center gap-2 py-0.5 text-[12px]">
                     <Icon name="mail" size={13} className="text-[var(--ink-40)]" />
-                    <span className="flex-1 truncate text-[var(--ink-70)]">{iv.email}</span>
+                    <span className="flex-1 min-w-0 truncate text-[var(--ink-70)]">{iv.email}</span>
                     <span className="text-[11px] text-[var(--ink-40)]">{iv.role}</span>
                     {canAdmin && (
                       <button onClick={() => void doRevoke(iv.id)} className="icon-btn" title="Revoke">

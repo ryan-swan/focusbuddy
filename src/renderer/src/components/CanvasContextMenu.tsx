@@ -304,7 +304,7 @@ function MenuPanel({
               ) : (
                 <span className="w-3.5" />
               )}
-              <span className="flex-1 truncate">{item.label}</span>
+              <span className="flex-1 min-w-0 truncate">{item.label}</span>
               {item.shortcut && (
                 <span className="text-[11px] text-[var(--ink-50)] font-mono">{item.shortcut}</span>
               )}

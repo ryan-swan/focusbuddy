@@ -125,7 +125,7 @@ export default function ChatThreadWidget({ widget }: { widget: Widget }): JSX.El
     <div className="h-full w-full flex flex-col bg-[var(--surface-base)] text-[var(--ink-90)]">
       <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center gap-1.5 shrink-0">
         <Icon name="forum" size={14} className="text-accent shrink-0" />
-        <span className="text-[12px] font-semibold truncate flex-1">{config.channelName}</span>
+        <span className="text-[12px] font-semibold truncate flex-1 min-w-0">{config.channelName}</span>
         <button
           onClick={() => {
             goMessages()

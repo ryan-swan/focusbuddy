@@ -347,7 +347,7 @@ export default function PlexiSignView(): JSX.Element {
                 data-testid={`sign-row-${r.id}`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-stone-900 dark:text-stone-50 truncate flex-1">{r.title}</span>
+                  <span className="text-[13px] font-medium text-stone-900 dark:text-stone-50 truncate flex-1 min-w-0">{r.title}</span>
                   <StatusPill tone={STATUS_TONE[r.status]} label={STATUS_LABEL[r.status]} />
                 </div>
                 <div className="mt-1.5 flex items-center gap-2 text-[11px] text-stone-400">

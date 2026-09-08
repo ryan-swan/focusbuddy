@@ -432,7 +432,7 @@ export default function ShareDialog({
                 Link ready{justCopiedId === fresh.id ? ' — copied!' : ''}
               </div>
               <div className="flex items-center gap-1.5">
-                <code className="fb-card flex-1 text-[11px] font-mono px-2 py-1 truncate">
+                <code className="fb-card flex-1 min-w-0 text-[11px] font-mono px-2 py-1 truncate">
                   {viewerUrlFor(fresh.token)}
                 </code>
                 <button
@@ -517,7 +517,7 @@ export default function ShareDialog({
                         size={11}
                         className="text-[var(--ink-40)] shrink-0"
                       />
-                      <code className="flex-1 text-[10px] font-mono text-[var(--ink-70)] truncate">
+                      <code className="flex-1 min-w-0 text-[10px] font-mono text-[var(--ink-70)] truncate">
                         {url}
                       </code>
                       {link.revoked && (

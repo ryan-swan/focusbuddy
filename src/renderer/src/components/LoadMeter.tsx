@@ -221,7 +221,7 @@ function LoadMeterPopover({
                   size={13}
                   className="text-[var(--ink-40)] group-hover:text-accent shrink-0"
                 />
-                <span className="truncate flex-1">
+                <span className="truncate flex-1 min-w-0">
                   {w.title || <em className="text-[var(--ink-40)]">{w.kind}</em>}
                 </span>
                 <span className="text-[10px] text-[var(--ink-40)] font-mono shrink-0">

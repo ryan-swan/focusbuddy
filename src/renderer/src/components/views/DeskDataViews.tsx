@@ -53,7 +53,13 @@ export default function DeskDataViews({
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   function open(w: Widget): void {
-    setActive(w.id)
+    // setActive is the node store's ACTIVE DESK setter. It was being handed a
+    // widget id, so no node matched and the app fell back to "All desks" --
+    // clicking a card in Gallery, List, Table or Compact navigated away instead
+    // of opening the object. It also wrote a task_switched trail entry naming a
+    // widget id with a null title. The desk that owns the widget is what should
+    // be active; that is a no-op when we are already on it.
+    setActive(w.taskId)
     setFocused(w.id)
   }
 

@@ -165,11 +165,16 @@ export default function SharePeoplePicker({
 
       {footer}
 
-      <div className="flex items-center gap-1.5">
+      {/* Action row. `flex-1` alone left the button with min-width:auto, so its
+          label set a floor the row could not honour: at the tested window width
+          the button overflowed the modal and appeared as a purple sliver past
+          the right edge. It now wraps to its own line before it is ever clipped,
+          and its label truncates rather than forcing the row wider. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <select
           value={perm}
           onChange={(e) => onPermChange(e.target.value as 'view' | 'edit')}
-          className="fb-field text-[12px] px-1.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-90)] shrink-0"
+          className="fb-field text-[12px] px-1.5 py-1.5 bg-[var(--surface-raised)] text-[var(--ink-90)] shrink-0 max-w-[10rem]"
           title="What the people you add can do"
         >
           <option value="edit">Can edit</option>
@@ -179,10 +184,12 @@ export default function SharePeoplePicker({
           onClick={() => void share()}
           disabled={busy || picks.length === 0}
           data-testid="share-picker-submit"
-          className="flex-1 text-[12px] px-2.5 py-1.5 rounded bg-accent text-white hover:brightness-110 disabled:opacity-50 inline-flex items-center justify-center gap-1"
+          className="flex-1 min-w-[8rem] text-[12px] px-2.5 py-1.5 rounded bg-accent text-white hover:brightness-110 disabled:opacity-50 inline-flex items-center justify-center gap-1"
         >
-          <Icon name={busy ? 'autorenew' : 'group_add'} size={13} className={busy ? 'animate-spin' : ''} />
-          {picks.length > 1 ? `Share with ${picks.length} people` : picks.length === 1 ? 'Share with 1 person' : 'Share'}
+          <Icon name={busy ? 'autorenew' : 'group_add'} size={13} className={`shrink-0 ${busy ? 'animate-spin' : ''}`} />
+          <span className="truncate">
+            {picks.length > 1 ? `Share with ${picks.length} people` : picks.length === 1 ? 'Share with 1 person' : 'Share'}
+          </span>
         </button>
       </div>
 

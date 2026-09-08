@@ -354,7 +354,7 @@ export function KanbanView({
                   className="inline-block h-2 w-2 rounded-full shrink-0"
                   style={{ backgroundColor: accent }}
                 />
-                <span className="text-[11px] font-medium text-[var(--ink-70)] truncate flex-1">
+                <span className="text-[11px] font-medium text-[var(--ink-70)] truncate flex-1 min-w-0">
                   {label}
                 </span>
                 <span className="text-[10px] text-[var(--ink-40)] font-mono">

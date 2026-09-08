@@ -197,7 +197,7 @@ export default function PlexiApiView(): JSX.Element {
               {tokens.map((t) => (
                 <div key={t.id} data-testid={`api-token-${t.id}`} className={`${PLEXI_CARD} flex items-center gap-2 px-3 py-2`}>
                   <Icon name="key" size={14} className="text-[var(--ink-70)]" />
-                  <span className="text-[12.5px] font-medium truncate flex-1">{t.name}</span>
+                  <span className="text-[12.5px] font-medium truncate flex-1 min-w-0">{t.name}</span>
                   <StatusPill tone={t.scopes.includes('write') ? 'amber' : 'stone'} label={t.scopes.includes('write') ? 'read/write' : 'read'} dot={false} />
                   <span className="text-[11px] text-[var(--ink-50)] fb-tabular">used {fmtWhen(t.lastUsedAt)}</span>
                   <button onClick={() => void revoke(t.id)} aria-label="Revoke token" className="p-1 rounded text-[var(--ink-50)] hover:text-rose-500" title="Revoke">
@@ -218,7 +218,7 @@ export default function PlexiApiView(): JSX.Element {
                 <span className={`fb-tabular font-semibold w-12 ${e.method === 'GET' ? 'text-sky-600 dark:text-sky-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{e.method}</span>
                 <code className="text-[var(--ink-90)] w-56 truncate">{e.path}</code>
                 <StatusPill tone={e.scope === 'write' ? 'amber' : 'stone'} label={e.scope} dot={false} />
-                <span className="text-[var(--ink-70)] truncate flex-1">{e.summary}</span>
+                <span className="text-[var(--ink-70)] truncate flex-1 min-w-0">{e.summary}</span>
               </div>
             ))}
           </div>

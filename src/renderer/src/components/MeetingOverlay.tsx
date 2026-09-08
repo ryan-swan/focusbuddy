@@ -595,7 +595,7 @@ export default function MeetingOverlay(): JSX.Element | null {
       >
         <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 shrink-0">
           <Icon name="groups" size={16} className="text-rose-400" filled />
-          <span className="text-[13px] font-semibold truncate flex-1">{title || 'Meeting'}</span>
+          <span className="text-[13px] font-semibold truncate flex-1 min-w-0">{title || 'Meeting'}</span>
           <span className="text-[11px] text-white/50" data-testid="meeting-count">{tileCount}</span>
           {/* Dock-side picker */}
           <div className="flex items-center gap-0.5">

@@ -831,7 +831,7 @@ function FocusModeInner(): JSX.Element | null {
               data-focus-no-exit
             >
               <Icon name={headerIcon} size={18} className="text-[var(--ink-70)]" />
-              <h3 className="text-sm font-semibold text-[var(--ink-100)] flex-1 truncate">
+              <h3 className="text-sm font-semibold text-[var(--ink-100)] flex-1 min-w-0 truncate">
                 {headerTitle}
               </h3>
               {canNavigate && !chromeTab && (

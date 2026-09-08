@@ -1458,7 +1458,7 @@ export default function ChatPanel({ page }: Props = {}): JSX.Element {
                 <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded bg-accent/[0.14] text-[rgb(var(--accent))] fb-t-caption font-medium">
                   @attention
                 </span>
-                <span className="fb-t-caption text-[var(--ink-50)] truncate flex-1">
+                <span className="fb-t-caption text-[var(--ink-50)] truncate flex-1 min-w-0">
                   “{inlineCapture.text.slice(0, 60)}
                   {inlineCapture.text.length > 60 ? '…' : ''}”
                 </span>

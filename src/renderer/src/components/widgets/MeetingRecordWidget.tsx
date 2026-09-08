@@ -67,7 +67,7 @@ export default function MeetingRecordWidget({ widget }: { widget: Widget }): JSX
     <div className="h-full w-full flex flex-col bg-[var(--surface-raised)] text-[var(--ink-100)]" data-testid="meeting-record-widget">
       <div className="px-3 py-2 border-b border-[var(--edge-soft)] flex items-center gap-2 shrink-0">
         <Icon name="history_edu" size={15} className="text-[rgb(var(--accent))]" />
-        <span className="text-[12.5px] font-semibold truncate flex-1">
+        <span className="text-[12.5px] font-semibold truncate flex-1 min-w-0">
           {meeting ? meeting.title : 'Meeting Record'}
         </span>
         {meeting && (

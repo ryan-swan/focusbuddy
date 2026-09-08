@@ -120,7 +120,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                       }`}
                     >
                       <Icon name="group" size={14} className="text-[var(--ink-40)] shrink-0" />
-                      <span className="truncate flex-1">{t.name}</span>
+                      <span className="truncate flex-1 min-w-0">{t.name}</span>
                       <span className="text-[10px] text-[var(--ink-40)]">{t.memberCount}</span>
                     </button>
                   ))
@@ -162,7 +162,7 @@ export default function OfficeTeamsDialog({ onClose }: { onClose: () => void }):
                     {members.map((m) => (
                       <div key={m.accountId} className="flex items-center gap-2 text-[12px] px-1 py-1">
                         <Icon name="person" size={13} className="text-[var(--ink-40)]" />
-                        <span className="truncate flex-1">{personDisplayName(m, m.handle || m.accountId)}</span>
+                        <span className="truncate flex-1 min-w-0">{personDisplayName(m, m.handle || m.accountId)}</span>
                         {m.role === 'owner' && <span className="text-[10px] text-[var(--ink-40)]">owner</span>}
                       </div>
                     ))}

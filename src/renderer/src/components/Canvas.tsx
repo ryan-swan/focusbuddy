@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { effectiveShortcutToKind } from '../lib/keymap'
+import { quickAddAllowed, deepActiveElement } from '../lib/quickAddFocus'
 import { useNodeStore } from '../stores/nodes'
 import { useWidgetStore } from '../stores/widgets'
 import { useMessagingStore } from '../stores/messaging'
@@ -1334,13 +1335,23 @@ export default function Canvas(): JSX.Element {
     function onKey(e: KeyboardEvent): void {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
       if (e.key.length !== 1) return
-      const el = document.activeElement as HTMLElement | null
-      const typing =
-        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-      if (typing) return
       const kind = effectiveShortcutToKind()[e.key.toUpperCase()]
       if (!kind) return
-      if (!useNodeStore.getState().activeTaskId) return
+      // Confirmed-focus gate. The old check asked only whether activeElement was
+      // an input/textarea/contenteditable, which is blind to the window between
+      // clicking into a sticky and its editor actually taking focus -- typing in
+      // that window created objects instead of text.
+      const ws = useWidgetStore.getState()
+      if (
+        !quickAddAllowed({
+          activeTaskId: useNodeStore.getState().activeTaskId,
+          activeWidgetId: ws.activeWidgetId,
+          focusedWidgetId: ws.focusedWidgetId,
+          focusedElement: deepActiveElement()
+        })
+      ) {
+        return
+      }
       e.preventDefault()
       quickAddRef.current(kind)
     }

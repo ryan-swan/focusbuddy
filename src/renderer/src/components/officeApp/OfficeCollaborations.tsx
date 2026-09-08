@@ -61,7 +61,7 @@ export default function OfficeCollaborations({
             }`}
           >
             <Icon name={docIcon(d.docType)} size={14} className="shrink-0 text-[var(--ink-40)]" />
-            <span className="truncate flex-1">{d.title || 'Untitled'}</span>
+            <span className="truncate flex-1 min-w-0">{d.title || 'Untitled'}</span>
           </button>
         ))}
       </div>

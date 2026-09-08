@@ -1760,7 +1760,7 @@ function TranscribeOverlay({ onClose }: { onClose: () => void }): JSX.Element {
                         className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
                       >
                         <Icon name="desk" size={15} className="text-[var(--ink-50)] shrink-0" />
-                        <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                        <span className="flex-1 min-w-0 truncate fb-t-body text-[var(--ink-100)]">
                           {n.title || 'Untitled desk'}
                         </span>
                       </button>
@@ -1964,7 +1964,7 @@ export function OverdueRadarWidget({ size = 'sm' }: { size?: WidgetSize } = {}):
                 className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-[var(--surface-sunken)] transition-colors"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
-                <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">{n.title || 'Untitled task'}</span>
+                <span className="flex-1 min-w-0 truncate fb-t-body text-[var(--ink-100)]">{n.title || 'Untitled task'}</span>
                 <span className="shrink-0 text-[10.5px] text-rose-500 fb-tabular">
                   due {new Date(n.dueDate ?? 0).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
@@ -2001,7 +2001,7 @@ export function OneThingNowWidget(): JSX.Element {
       {!pick ? (
         <EmptyState text="No open desks. Enjoy it." />
       ) : (
-        <div className="flex-1 flex items-center gap-3" data-testid="home-one-thing">
+        <div className="flex-1 min-w-0 flex items-center gap-3" data-testid="home-one-thing">
           <div className="min-w-0 flex-1">
             <div className="fb-t-title text-[var(--ink-100)] truncate">{pick.title || 'Untitled task'}</div>
             <div className="mt-0.5 fb-t-caption truncate">
@@ -2046,7 +2046,7 @@ export function WhereWasIWidget({ activity }: { activity: ActivityEvent[] | null
       {!last ? (
         <EmptyState text="No trail yet. Work a little and this widget will remember for you." />
       ) : (
-        <div className="flex-1 flex items-center gap-3" data-testid="home-where-was-i">
+        <div className="flex-1 min-w-0 flex items-center gap-3" data-testid="home-where-was-i">
           <div className="min-w-0 flex-1">
             <div className="fb-t-body font-medium text-[var(--ink-100)] truncate">
               {last.node.title || 'Untitled desk'}

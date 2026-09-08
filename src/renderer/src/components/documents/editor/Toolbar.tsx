@@ -402,7 +402,7 @@ function StylesPanel({
       >
         <button
           onClick={() => onApplyLevel(h.level)}
-          className="flex-1 text-left truncate"
+          className="flex-1 min-w-0 text-left truncate"
           title={`Apply ${h.label}`}
           style={{ fontSize: Math.min(h.preview, 18), fontWeight: s.bold ?? true ? 700 : 600, fontStyle: s.italic ? 'italic' : undefined, color: s.color }}
         >

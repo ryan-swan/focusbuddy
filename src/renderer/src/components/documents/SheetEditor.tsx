@@ -1435,7 +1435,7 @@ export default function SheetEditor({ body: rawBody, title, onChange }: Props): 
                 <div key={nm.name} className="flex items-center gap-2 text-[12px]" data-testid={`sheet-name-row-${nm.name}`}>
                   <span className="font-mono font-medium text-[var(--ink-70)]">{nm.name}</span>
                   <span className="text-[var(--ink-40)]">→</span>
-                  <span className="font-mono text-[var(--ink-50)] truncate flex-1">{nm.ref}</span>
+                  <span className="font-mono text-[var(--ink-50)] truncate flex-1 min-w-0">{nm.ref}</span>
                   <button
                     onClick={() => removeNamedRange(nm.name)}
                     data-testid={`sheet-name-del-${nm.name}`}

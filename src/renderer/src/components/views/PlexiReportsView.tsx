@@ -130,7 +130,7 @@ export default function PlexiReportsView(): JSX.Element {
                 }`}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-semibold truncate flex-1">{r.title || 'Untitled report'}</span>
+                  <span className="text-[13px] font-semibold truncate flex-1 min-w-0">{r.title || 'Untitled report'}</span>
                   <StatusPill tone={r.schedule === 'manual' ? 'stone' : 'accent'} label={r.schedule} dot={false} />
                 </div>
                 <p className="mt-0.5 text-[11px] text-[var(--ink-50)] fb-tabular">Last run {fmtWhen(r.lastRunAt)}</p>

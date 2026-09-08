@@ -195,7 +195,7 @@ export default function PortalWidget({ widget, inline = false }: Props): JSX.Ele
           <Icon name="picture_in_picture" size={13} className="text-accent shrink-0" />
           <button
             onClick={openTarget}
-            className="text-[12px] font-medium text-[var(--ink-90)] truncate hover:text-accent flex-1 text-left"
+            className="text-[12px] font-medium text-[var(--ink-90)] truncate hover:text-accent flex-1 min-w-0 text-left"
             data-testid="portal-title"
             title="Open this desk"
           >

@@ -49,7 +49,7 @@ function WidgetShell({
         className="flex items-center gap-2 fb-press text-left"
       >
         <Icon name={icon} size={15} className="text-[var(--ink-40)]" />
-        <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{title}</span>
+        <span className="fb-t-label text-[var(--ink-70)] flex-1 min-w-0 truncate">{title}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
       </button>
       {/* DEC-128 — an open row needs room: scroll, never clip. */}
@@ -398,7 +398,7 @@ export function AttentionWidget({
         )}
       </div>
       <button onClick={goAttention} className="mt-2 flex items-center gap-2 fb-press text-left">
-        <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{current.label}</span>
+        <span className="fb-t-label text-[var(--ink-70)] flex-1 min-w-0 truncate">{current.label}</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
       </button>
       {/* DEC-121's `scroll` lifted the cap for the assistant tab; DEC-128 makes
@@ -460,7 +460,7 @@ export function StaleDesksWidget({ size = 'sm' }: { size?: WidgetSize }): JSX.El
     <div className="w-full h-full flex flex-col p-3">
       <div className="flex items-center gap-2">
         <Icon name="bedtime" size={15} className="text-[var(--ink-40)]" />
-        <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">Stale desks</span>
+        <span className="fb-t-label text-[var(--ink-70)] flex-1 min-w-0 truncate">Stale desks</span>
         <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{stale.length}</span>
       </div>
       <div className="mt-2 flex-1 min-h-0 overflow-hidden flex flex-col gap-1.5">

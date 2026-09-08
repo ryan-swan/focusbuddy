@@ -639,7 +639,7 @@ export default function PlexiOfficeShell({ initialApp }: { initialApp?: string }
                           {todayEvents.map((b) => (
                             <li key={b.id} className="flex items-center gap-2.5" data-testid={`office-home-day-item-${b.id}`}>
                               <span className="shrink-0 text-[11px] text-[var(--ink-50)] fb-tabular w-12">{clockTime(b.startMs)}</span>
-                              <span className="flex-1 truncate text-[12px] text-[var(--ink-90)]">{b.title || 'Time block'}</span>
+                              <span className="flex-1 min-w-0 truncate text-[12px] text-[var(--ink-90)]">{b.title || 'Time block'}</span>
                             </li>
                           ))}
                         </ul>
@@ -806,7 +806,7 @@ function UnreadRow({ icon, label, count, onClick }: { icon: string; label: strin
       className="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg text-[12.5px] text-[var(--ink-80)] hover:bg-[var(--surface-sunken)]"
     >
       <Icon name={icon} size={15} className="text-[var(--ink-50)]" />
-      <span className="flex-1 truncate text-left">{label}</span>
+      <span className="flex-1 min-w-0 truncate text-left">{label}</span>
       {count > 0 && (
         <span className="shrink-0 min-w-[18px] text-center text-[10.5px] font-semibold rounded-full px-1.5 py-0.5 bg-[rgb(var(--accent)/0.15)] text-[rgb(var(--accent))] fb-tabular">
           {count}

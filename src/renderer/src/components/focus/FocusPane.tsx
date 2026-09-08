@@ -82,7 +82,7 @@ export default function FocusPane({
             filled={isActive}
             className={isActive ? 'text-[rgb(var(--accent))]' : 'text-[var(--ink-60)]'}
           />
-          <span className="text-xs font-medium text-[var(--ink-80)] flex-1 truncate">{title}</span>
+          <span className="text-xs font-medium text-[var(--ink-80)] flex-1 min-w-0 truncate">{title}</span>
           <button
             onClick={(e) => {
               e.stopPropagation()

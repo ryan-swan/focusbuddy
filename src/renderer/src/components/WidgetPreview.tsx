@@ -54,7 +54,22 @@ function Fallback({ widget, icon, label }: { widget: Widget; icon?: string; labe
   )
 }
 
+/**
+ * A widget preview is always a decorative miniature -- a picture of an object
+ * inside a thumbnail, minimap or dock, never the object itself. Rendered into
+ * the accessibility tree it leaked each widget's real content (note bodies,
+ * document text, URLs, prompts) for every desk in a collection, including the
+ * ones scrolled off screen. The surfaces that use it carry their own names.
+ */
 export default function WidgetPreview({ widget }: { widget: Widget }): JSX.Element {
+  return (
+    <div aria-hidden="true" className="h-full w-full">
+      {renderPreview(widget)}
+    </div>
+  )
+}
+
+function renderPreview(widget: Widget): JSX.Element {
   const c = widget.content ?? ''
   switch (widget.kind) {
     case 'sticky':

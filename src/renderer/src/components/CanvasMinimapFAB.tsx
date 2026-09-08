@@ -206,6 +206,8 @@ export default function CanvasMinimapFAB(): JSX.Element {
               </div>
             ) : (
               <svg
+                aria-label="Canvas overview"
+                role="img"
                 width={PANEL_W}
                 height={PANEL_H}
                 viewBox={`0 0 ${PANEL_W} ${PANEL_H}`}

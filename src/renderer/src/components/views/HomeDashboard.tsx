@@ -1544,7 +1544,7 @@ function WidgetPickerOverlay({
           <>
             <div className="px-5 pt-4 pb-3 border-b border-[var(--edge-soft)] shrink-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[15px] font-semibold text-[var(--ink-100)] flex-1 truncate">
+                <span className="text-[15px] font-semibold text-[var(--ink-100)] flex-1 min-w-0 truncate">
                   {swapTarget ? `Replace ${widgetDef(swapTarget.widget).name}` : 'Widgets'}
                 </span>
                 <button
@@ -1780,7 +1780,7 @@ function WidgetConfigPicker({
                         className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
                       >
                         <Icon name="account_circle" size={15} className="text-[var(--ink-50)] shrink-0" />
-                        <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                        <span className="flex-1 min-w-0 truncate fb-t-body text-[var(--ink-100)]">
                           {personDisplayName(p, p.handle)}
                         </span>
                         <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
@@ -1803,7 +1803,7 @@ function WidgetConfigPicker({
                         className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--surface-sunken)] transition-colors"
                       >
                         <Icon name="plexii:chat" size={15} className="text-[var(--ink-50)] shrink-0" />
-                        <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                        <span className="flex-1 min-w-0 truncate fb-t-body text-[var(--ink-100)]">
                           {conversationName(c, selfId)}
                         </span>
                         {c.unreadCount > 0 && (
@@ -1836,7 +1836,7 @@ function WidgetConfigPicker({
                   size={15}
                   className="text-[var(--ink-50)] shrink-0"
                 />
-                <span className="flex-1 truncate fb-t-body text-[var(--ink-100)]">
+                <span className="flex-1 min-w-0 truncate fb-t-body text-[var(--ink-100)]">
                   {n.title || (kind === 'desk' ? 'Untitled desk' : 'Untitled room')}
                 </span>
               </button>

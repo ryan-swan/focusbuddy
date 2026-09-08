@@ -697,7 +697,7 @@ function CompactChildView({
         >
           <Icon name={entry?.icon ?? 'apps'} size={16} className="" style={{ color }} />
         </span>
-        <span className="text-sm text-[var(--ink-100)] truncate flex-1">{title}</span>
+        <span className="text-sm text-[var(--ink-100)] truncate flex-1 min-w-0">{title}</span>
         <button
           onClick={(e) => {
             e.stopPropagation()

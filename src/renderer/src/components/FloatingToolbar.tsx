@@ -283,7 +283,7 @@ export default function FloatingToolbar({
                     className="shrink-0"
                     style={a.color ? { color: a.color } : { color: 'var(--ink-50)' }}
                   />
-                  <span className="text-[12px] truncate flex-1 text-left">{a.label}</span>
+                  <span className="text-[12px] truncate flex-1 min-w-0 text-left">{a.label}</span>
                   {a.shortcut && (
                     <span className="text-[10px] text-[var(--ink-40)] font-mono shrink-0">{a.shortcut}</span>
                   )}

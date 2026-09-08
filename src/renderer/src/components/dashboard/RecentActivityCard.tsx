@@ -112,7 +112,7 @@ export default function RecentActivityCard({ taskIds }: Props): JSX.Element {
                 size={13}
                 className="text-[var(--ink-40)] shrink-0"
               />
-              <span className="flex-1 truncate">{summarize(e)}</span>
+              <span className="flex-1 min-w-0 truncate">{summarize(e)}</span>
               <span className="text-[10px] text-[var(--ink-40)] font-mono shrink-0">
                 {relTime(e.ts)}
               </span>

@@ -96,7 +96,7 @@ function MenuDropdown({
             <span className="w-4 shrink-0 text-[var(--ink-50)]">
               {it.active ? <Icon name="check" size={15} /> : it.icon ? <Icon name={it.icon} size={15} /> : null}
             </span>
-            <span className="flex-1 truncate">{it.label}</span>
+            <span className="flex-1 min-w-0 truncate">{it.label}</span>
             {it.shortcut && <span className="text-[11px] text-[var(--ink-40)] fb-tabular">{it.shortcut}</span>}
           </button>
         )
@@ -121,7 +121,7 @@ function SubmenuRow({
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left text-[var(--ink-70)] hover:bg-[var(--surface-sunken)]">
         <span className="w-4 shrink-0 text-[var(--ink-50)]">{icon ? <Icon name={icon} size={15} /> : null}</span>
-        <span className="flex-1 truncate">{label}</span>
+        <span className="flex-1 min-w-0 truncate">{label}</span>
         <Icon name="chevron_right" size={15} className="text-[var(--ink-40)] shrink-0" />
       </button>
       {open && (
@@ -140,7 +140,7 @@ function SubmenuRow({
                 }`}
               >
                 <span className="w-4 shrink-0 text-[var(--ink-50)]">{it.active ? <Icon name="check" size={15} /> : null}</span>
-                <span className="flex-1 truncate">{it.label}</span>
+                <span className="flex-1 min-w-0 truncate">{it.label}</span>
                 {it.shortcut && <span className="text-[11px] text-[var(--ink-40)] fb-tabular">{it.shortcut}</span>}
               </button>
             )

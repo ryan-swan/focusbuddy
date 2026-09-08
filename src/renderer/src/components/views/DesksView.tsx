@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import LazyVisible from '../LazyVisible'
 import type { FbNode } from '@shared/types'
 import { useNodeStore } from '../../stores/nodes'
 import { useWorkItemStore } from '../../stores/workItems'
@@ -172,7 +173,11 @@ export default function DesksView({ roomId }: { roomId?: string }): JSX.Element 
       ) : null,
     searchText: (d) => `${d.title} ${d.description}`,
     thumb: (d) => (
-      <div className="h-full w-full flex items-center justify-center">{deskThumb(d, 320, 144)}</div>
+      <div className="h-full w-full flex items-center justify-center">
+        {/* Each miniature renders every widget on its desk. Building them for
+            cards nobody has scrolled to is what made this index slow. */}
+        <LazyVisible>{deskThumb(d, 320, 144)}</LazyVisible>
+      </div>
     ),
     // A 32px well is too small for a live miniature (its caption turns to noise);
     // icons are monochrome at rest per the icon doctrine.

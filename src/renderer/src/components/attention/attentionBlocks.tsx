@@ -80,7 +80,7 @@ function BlockShell({
         >
           <Icon name={icon} size={14} />
         </span>
-        <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">{title}</span>
+        <span className="fb-t-label text-[var(--ink-70)] flex-1 min-w-0 truncate">{title}</span>
         {count !== undefined && (
           <span className="fb-t-label text-[var(--ink-40)] fb-tabular">{count}</span>
         )}
@@ -309,7 +309,7 @@ export function RecentActivityBlock({ variant }: { variant: BlockVariant }): JSX
                 size={12}
                 className={e.kind === 'closed' ? 'text-emerald-500' : 'text-[var(--ink-40)]'}
               />
-              <span className="text-[12px] text-[var(--ink-80)] truncate flex-1">{e.item.title}</span>
+              <span className="text-[12px] text-[var(--ink-80)] truncate flex-1 min-w-0">{e.item.title}</span>
               <span className="fb-t-caption text-[var(--ink-30)] shrink-0">
                 {e.kind === 'closed' ? e.item.workItemState : 'new'}
               </span>

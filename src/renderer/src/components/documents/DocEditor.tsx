@@ -1353,7 +1353,7 @@ function PageSheet({
                       fontSize: 11
                     }}
                   >
-                    <span className="flex-1 text-center truncate">{page.header?.text ?? ''}</span>
+                    <span className="flex-1 min-w-0 text-center truncate">{page.header?.text ?? ''}</span>
                     {page.header?.showPageNumber && <span className="fb-tabular pl-2">Page {i + 1}</span>}
                   </div>
                 )}
@@ -1369,7 +1369,7 @@ function PageSheet({
                       fontSize: 11
                     }}
                   >
-                    <span className="flex-1 text-center truncate">{page.footer?.text ?? ''}</span>
+                    <span className="flex-1 min-w-0 text-center truncate">{page.footer?.text ?? ''}</span>
                     {page.footer?.showPageNumber && <span className="fb-tabular pl-2">Page {i + 1}</span>}
                   </div>
                 )}

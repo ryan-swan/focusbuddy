@@ -193,7 +193,7 @@ export default function CallOverlay(): JSX.Element | null {
         {consentLine && (
           <div className="absolute bottom-2 left-3 right-3 flex items-center gap-1.5" data-testid="call-consent-line">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse shrink-0" />
-            <span className="text-[10.5px] text-rose-200/90 truncate flex-1">{consentLine}</span>
+            <span className="text-[10.5px] text-rose-200/90 truncate flex-1 min-w-0">{consentLine}</span>
             {recordingBy === 'me' && (
               <button
                 onClick={stopTranscribing}

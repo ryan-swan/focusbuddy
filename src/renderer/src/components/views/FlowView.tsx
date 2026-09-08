@@ -324,7 +324,7 @@ export default function FlowView(): JSX.Element {
             <Icon name="arrow_back" size={16} />
           </button>
           <Icon name={conv?.kind === 'dm' ? 'person' : 'tag'} size={15} className="text-accent shrink-0" />
-          <h2 className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1">{conv?.title ?? 'Conversation'}</h2>
+          <h2 className="text-sm font-semibold text-[var(--ink-100)] truncate flex-1 min-w-0">{conv?.title ?? 'Conversation'}</h2>
           <button onClick={() => setRecallConv(focusId)} className="icon-btn" title="Recall — catch up or ask">
             <Icon name="bolt" size={15} />
           </button>
@@ -376,7 +376,7 @@ export default function FlowView(): JSX.Element {
                 <div className="max-h-44 overflow-auto space-y-0.5 mb-1.5">
                   {conv.members.map((mem) => (
                     <div key={mem.accountId} className="flex items-center gap-2 px-1 py-1 text-[12px]">
-                      <span className="flex-1 truncate text-[var(--ink-90)]">
+                      <span className="flex-1 min-w-0 truncate text-[var(--ink-90)]">
                         {personDisplayName(mem, mem.handle ?? 'Member')}
                         {mem.accountId === account?.id && ' (you)'}
                       </span>

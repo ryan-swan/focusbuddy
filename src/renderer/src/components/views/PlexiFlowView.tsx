@@ -144,7 +144,7 @@ export default function PlexiFlowView(): JSX.Element {
                 }`}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-semibold truncate flex-1">{f.title || 'Untitled flow'}</span>
+                  <span className="text-[13px] font-semibold truncate flex-1 min-w-0">{f.title || 'Untitled flow'}</span>
                   {!f.enabled && <StatusPill tone="stone" label="Off" dot={false} />}
                   {f.lastStatus === 'ok' && <StatusPill tone="emerald" label="OK" dot={false} />}
                   {f.lastStatus === 'error' && <StatusPill tone="rose" label="Error" dot={false} />}

@@ -51,7 +51,7 @@ function Row({
         className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[var(--surface-raised)] transition-colors text-left group"
       >
         <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-[var(--edge-firm)]" />
-        <span className="flex-1 text-[12.5px] text-[var(--ink-100)] truncate group-hover:text-accent transition-colors">
+        <span className="flex-1 min-w-0 text-[12.5px] text-[var(--ink-100)] truncate group-hover:text-accent transition-colors">
           {title}
         </span>
         {metaNode}

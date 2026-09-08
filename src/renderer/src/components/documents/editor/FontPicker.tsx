@@ -52,7 +52,7 @@ export default function FontPicker({ value, onChange, compact }: Props): JSX.Ele
         title="Font"
         className={`fb-tile h-7 inline-flex items-center gap-1 px-1.5 text-[11px] text-[var(--ink-70)] ${compact ? 'w-20' : 'w-28'}`}
       >
-        <span className="truncate flex-1 text-left" style={{ fontFamily: value || undefined }}>{current}</span>
+        <span className="truncate flex-1 min-w-0 text-left" style={{ fontFamily: value || undefined }}>{current}</span>
         <Icon name="expand_more" size={12} />
       </button>
       {open && (

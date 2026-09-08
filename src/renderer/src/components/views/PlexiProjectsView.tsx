@@ -567,7 +567,7 @@ function ProjectGantt({ projectId, onBack }: { projectId: string; onBack: () => 
                     style={{ height: ROW_H }}
                   >
                     {t.isMilestone && <Icon name="flag" size={12} className="text-violet-500 shrink-0" filled />}
-                    <span className="text-[13px] text-[var(--ink-100)] truncate flex-1">{t.title || 'Untitled'}</span>
+                    <span className="text-[13px] text-[var(--ink-100)] truncate flex-1 min-w-0">{t.title || 'Untitled'}</span>
                     {(t.status === 'done' || t.completedAt) && (
                       <Icon name="check_circle" size={13} className="text-emerald-500 shrink-0" filled />
                     )}
@@ -812,7 +812,7 @@ function TaskBar({
         />
       )}
       {w > 44 && (
-        <span className="relative text-[10px] truncate text-[var(--ink-90)] flex-1">{task.title}</span>
+        <span className="relative text-[10px] truncate text-[var(--ink-90)] flex-1 min-w-0">{task.title}</span>
       )}
       {task.deadlineMiss && (
         <span className="shrink-0 ml-auto inline-flex" data-testid={`gantt-deadline-miss-${task.id}`} title="Misses its deadline">
@@ -1260,7 +1260,7 @@ function TaskEditor({
               return (
                 <div key={d} className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] bg-[var(--surface-sunken)] rounded px-2 py-1">
                   <Icon name="arrow_forward" size={12} className="text-[var(--ink-50)]" />
-                  <span className="truncate flex-1">{titleOf(d)}</span>
+                  <span className="truncate flex-1 min-w-0">{titleOf(d)}</span>
                   <select
                     value={dep?.type ?? 'FS'}
                     data-testid={`dep-type-${d}`}
@@ -1338,7 +1338,7 @@ function TaskEditor({
             {successors.map((s) => (
               <div key={s.id} className="flex items-center gap-1.5 text-[12px] text-[var(--ink-90)] bg-[var(--surface-sunken)] rounded px-2 py-1">
                 <Icon name="arrow_back" size={12} className="text-[var(--ink-50)]" />
-                <span className="truncate flex-1">{s.title || 'Untitled'}</span>
+                <span className="truncate flex-1 min-w-0">{s.title || 'Untitled'}</span>
                 <button onClick={() => void removeSucc(s.id)} className="text-[var(--ink-50)] hover:text-rose-500">
                   <Icon name="close" size={12} />
                 </button>

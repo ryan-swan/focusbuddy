@@ -1183,7 +1183,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                         <div className="max-h-48 overflow-auto space-y-0.5">
                           {activeConv.members.map((mem) => (
                             <div key={mem.accountId} className="flex items-center gap-2 px-1 py-1 text-[12px]">
-                              <span className="flex-1 truncate text-[var(--ink-90)]">
+                              <span className="flex-1 min-w-0 truncate text-[var(--ink-90)]">
                                 {personDisplayName(mem, mem.handle ?? 'Member')}
                                 {mem.accountId === account.id && ' (you)'}
                               </span>
@@ -1283,7 +1283,7 @@ export default function MessagesView({ compact = false }: { compact?: boolean } 
                       className="flex items-start gap-2 text-[11.5px] text-[var(--ink-80)]"
                       data-testid={`pinned-item-${p.id}`}
                     >
-                      <span className="flex-1 truncate">{p.body || '(attachment)'}</span>
+                      <span className="flex-1 min-w-0 truncate">{p.body || '(attachment)'}</span>
                       {activeId && (
                         <button
                           onClick={() => void unpinMsg(activeId, p.id)}
@@ -2194,7 +2194,7 @@ function BotRolesConfig({ token, orgId }: { token: string; orgId: string }): JSX
           {roles.map((r) => (
             <div key={r.id} className="flex items-center gap-2 text-[12px]" data-testid="bot-role-row">
               <span className="text-accent">@{r.handle}</span>
-              <span className="text-[var(--ink-70)] truncate flex-1">{r.name}</span>
+              <span className="text-[var(--ink-70)] truncate flex-1 min-w-0">{r.name}</span>
               <button
                 onClick={async () => {
                   await deleteBotRole(token, orgId, r.id)

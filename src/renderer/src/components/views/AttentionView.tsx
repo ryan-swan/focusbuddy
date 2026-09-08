@@ -1815,7 +1815,7 @@ export default function AttentionView(): JSX.Element {
                     {closed.map((i) => (
                       <div key={i.id} className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-raised)]">
                         <Icon name="task_alt" size={14} className="text-[var(--ink-30)] shrink-0" />
-                        <span className="fb-t-body text-[var(--ink-50)] truncate flex-1">{i.title}</span>
+                        <span className="fb-t-body text-[var(--ink-50)] truncate flex-1 min-w-0">{i.title}</span>
                         <span className="text-[11px] text-[var(--ink-30)]">{i.workItemState}</span>
                       </div>
                     ))}
@@ -1845,7 +1845,7 @@ export default function AttentionView(): JSX.Element {
                         className="group flex items-center gap-3 px-4 py-2 bg-[var(--surface-raised)]"
                       >
                         <Icon name="archive" size={14} className="text-[var(--ink-30)] shrink-0" />
-                        <span className="fb-t-body text-[var(--ink-50)] truncate flex-1">{i.title}</span>
+                        <span className="fb-t-body text-[var(--ink-50)] truncate flex-1 min-w-0">{i.title}</span>
                         <button
                           onClick={() => void setState(i.id, 'open')}
                           title="Back to the queues"

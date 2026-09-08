@@ -930,7 +930,7 @@ function TrashRow({
       data-testid={`office-trash-row-${entry.name}`}
     >
       <Icon name={icon} size={14} className="shrink-0 text-[var(--ink-40)]" />
-      <span className="truncate flex-1 text-[var(--ink-50)] line-through decoration-[var(--ink-30)]">
+      <span className="truncate flex-1 min-w-0 text-[var(--ink-50)] line-through decoration-[var(--ink-30)]">
         {entry.name || 'Untitled'}
       </span>
       <button

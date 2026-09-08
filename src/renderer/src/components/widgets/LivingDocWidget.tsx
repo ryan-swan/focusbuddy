@@ -169,7 +169,7 @@ export default function LivingDocWidget({ widget, inline = false }: Props): JSX.
             setBrief(widget.livingQuery ?? '')
             setEditingBrief(true)
           }}
-          className="flex-1 text-left text-[11px] text-[var(--ink-70)] truncate hover:text-accent"
+          className="flex-1 min-w-0 text-left text-[11px] text-[var(--ink-70)] truncate hover:text-accent"
           title="Edit what this doc tracks"
           data-testid="livingdoc-brief"
         >

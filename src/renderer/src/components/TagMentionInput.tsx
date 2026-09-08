@@ -192,7 +192,7 @@ export default function TagMentionInput({
               }`}
             >
               <Icon name={MENTION_ICON[c.kind]} size={13} className="text-[var(--ink-50)] shrink-0" />
-              <span className="text-[12px] text-[var(--ink-90)] truncate flex-1">{c.title}</span>
+              <span className="text-[12px] text-[var(--ink-90)] truncate flex-1 min-w-0">{c.title}</span>
               <span className="text-[10px] text-[var(--ink-40)] shrink-0">{c.hint}</span>
             </button>
           ))}

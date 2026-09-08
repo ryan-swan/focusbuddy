@@ -791,7 +791,7 @@ export default function CalendarView(): JSX.Element {
             <div className="rounded-[var(--radius-card)] fb-glass-panel p-3 flex flex-col gap-2.5 min-h-0">
               <div className="flex items-center gap-2 shrink-0">
                 <Icon name="notifications" size={14} className="text-[var(--ink-40)]" />
-                <span className="fb-t-label text-[var(--ink-70)] flex-1 truncate">
+                <span className="fb-t-label text-[var(--ink-70)] flex-1 min-w-0 truncate">
                   {blockDragging ? 'Drop here to unschedule' : 'To schedule'}
                 </span>
                 <button

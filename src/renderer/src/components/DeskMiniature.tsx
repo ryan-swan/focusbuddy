@@ -59,14 +59,31 @@ export default function DeskMiniature({ widgets, width, height, padding = 6 }: P
 
   if (!bbox || visible.length === 0) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-[10px] text-[var(--ink-40)]">
+      <div
+        aria-hidden="true"
+        className="h-full w-full flex items-center justify-center text-[10px] text-[var(--ink-40)]"
+      >
         Empty desk
       </div>
     )
   }
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block">
+    // Decorative by definition: a spatial thumbnail of a desk the reader has not
+    // opened. Rendering it exposed every widget's real content -- note bodies,
+    // document text, URLs, prompts and internal ids -- to assistive technology
+    // and automation, for every desk in the collection including the ones
+    // scrolled off screen. The card's own title, object count and status carry
+    // the meaning; the picture of it carries none.
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="block"
+      aria-hidden="true"
+      focusable="false"
+      role="presentation"
+    >
       {visible.map((w) => {
         let ww = w.width
         let hh = w.height
