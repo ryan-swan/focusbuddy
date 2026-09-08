@@ -119,6 +119,24 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
   // History is a permanent rail in fullscreen and an overlay elsewhere (plan
   // D10) — the narrow modes have no room to give a rail without taking it from
   // the conversation, which is the thing you came for.
+  // The docked composer is absolutely positioned OVER the transcript, so the
+  // transcript must reserve room for it. That reservation was a fixed pb-44
+  // (176px), which is only right while the composer happens to be that tall:
+  // tag several references and the chips wrap onto more rows, the composer grows
+  // past the reservation, and it covers the newest messages — the chat appears
+  // to vanish underneath the tags. Measure it instead of assuming.
+  const composerRef = useRef<HTMLFormElement | null>(null)
+  const [composerH, setComposerH] = useState(176)
+  useEffect(() => {
+    const el = composerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      // A little breathing room so the last line never sits flush against it.
+      setComposerH(Math.ceil(el.getBoundingClientRect().height) + 12)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const [historyOpen, setHistoryOpen] = useState(false)
   // The conversation's referenced objects (Phase 4.3) — one layer holding both
   // typed "@" mentions and clicked widgets. Shown only on the conversation they
@@ -1212,10 +1230,11 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
         data-testid="chat-scroll"
         onContextMenu={handleMessagesContextMenu}
         onScroll={syncStick}
+        style={fullscreenHome ? undefined : { paddingBottom: composerH }}
         className={
           fullscreenHome
             ? 'shrink-0 mt-auto w-full max-w-[640px] mx-auto px-6 pb-5'
-            : 'flex-1 overflow-auto px-3 pt-5 pb-44'
+            : 'flex-1 overflow-auto px-3 pt-5'
         }
       >
         {/* In fullscreen the flat page needs a readable column; elsewhere the
@@ -1500,6 +1519,7 @@ export default function ChatPanel({ onCollapse, page }: Props = {}): JSX.Element
           colour, and the transcript scrolls underneath (the scroll area
           carries matching bottom padding). */}
       <form
+        ref={composerRef}
         onSubmit={handleSend}
         className={
           fullscreenHome
