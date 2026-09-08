@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWidgetStore } from '../stores/widgets'
 import { useLinksStore } from '../stores/links'
 import { useNodeStore } from '../stores/nodes'
@@ -31,14 +31,36 @@ const EMPTY: LiveDeskStatus = {
 }
 
 function useResolvers(cache: React.MutableRefObject<Map<string, unknown>>): ProjectionResolvers {
-  return {
-    table: (id) => (cache.current.get(`t:${id}`) as ReturnType<ProjectionResolvers['table']>) ?? null,
-    document: (id) => (cache.current.get(`d:${id}`) as ReturnType<ProjectionResolvers['document']>) ?? null,
-    slides: (id) => (cache.current.get(`s:${id}`) as ReturnType<ProjectionResolvers['slides']>) ?? null,
-    diagram: (id) => (cache.current.get(`g:${id}`) as ReturnType<ProjectionResolvers['diagram']>) ?? null,
-    asset: (id) => (cache.current.get(`a:${id}`) as ReturnType<ProjectionResolvers['asset']>) ?? null,
-    file: (id) => (cache.current.get(`f:${id}`) as ReturnType<ProjectionResolvers['file']>) ?? null
-  }
+  // Memoised: these close over a ref, so one object serves for the component's
+  // whole life. Returning a fresh literal made `build` a new function every
+  // render, which re-ran the publish effect, which set state, which
+  // re-rendered -- a republish loop that ran flat out while nobody touched the
+  // app.
+  return useMemo(
+    () => ({
+      table: (id) => (cache.current.get(`t:${id}`) as ReturnType<ProjectionResolvers['table']>) ?? null,
+      document: (id) => (cache.current.get(`d:${id}`) as ReturnType<ProjectionResolvers['document']>) ?? null,
+      slides: (id) => (cache.current.get(`s:${id}`) as ReturnType<ProjectionResolvers['slides']>) ?? null,
+      diagram: (id) => (cache.current.get(`g:${id}`) as ReturnType<ProjectionResolvers['diagram']>) ?? null,
+      asset: (id) => (cache.current.get(`a:${id}`) as ReturnType<ProjectionResolvers['asset']>) ?? null,
+      file: (id) => (cache.current.get(`f:${id}`) as ReturnType<ProjectionResolvers['file']>) ?? null
+    }),
+    [cache]
+  )
+}
+
+
+/**
+ * What the public would actually see, as a comparable string. `publishedAt` is
+ * stamped fresh on every build and `revision` is the server's to assign, so
+ * both are excluded: including them would make every rebuild look like a
+ * change and publish a new revision for nothing.
+ */
+export function projectionFingerprint(projection: unknown): string {
+  const p = projection as Record<string, unknown> | null
+  if (!p) return ''
+  const { publishedAt: _p, revision: _r, ...content } = p
+  return JSON.stringify(content)
 }
 
 export function useLiveDeskPublisher(deskId: string | null): {
@@ -52,6 +74,8 @@ export function useLiveDeskPublisher(deskId: string | null): {
   const widgets = useWidgetStore((s) => s.widgets)
   const links = useLinksStore((s) => s.links)
   const cache = useRef(new Map<string, unknown>())
+  // The last projection actually queued, so an identical rebuild is a no-op.
+  const lastSentRef = useRef<string>('')
   const [warmTick, setWarmTick] = useState(0)
   const resolvers = useResolvers(cache)
 
@@ -117,6 +141,11 @@ export function useLiveDeskPublisher(deskId: string | null): {
     if (!deskId || !status.token || status.paused) return
     const projection = build()
     if (!projection) return
+    // Republish only when the desk actually differs. Without this the hook
+    // republished on every render, and the server counted a revision each time.
+    const fingerprint = projectionFingerprint(projection)
+    if (fingerprint === lastSentRef.current) return
+    lastSentRef.current = fingerprint
     void window.api.liveDesk.queuePublish(deskId, projection)
     // The main process publishes asynchronously; re-read shortly after so the
     // panel shows the real revision and any error rather than an optimistic one.
@@ -154,6 +183,9 @@ export function useLiveDeskPublisher(deskId: string | null): {
       if (!deskId) return
       const projection = build()
       if (!projection) return
+      // An explicit publish is a deliberate act: it goes through even when the
+      // content is unchanged.
+      lastSentRef.current = projectionFingerprint(projection)
       setStatus((s) => ({ ...s, busy: true }))
       await window.api.liveDesk.publish(deskId, projection)
       await refresh()
