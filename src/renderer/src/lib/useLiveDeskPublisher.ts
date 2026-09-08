@@ -3,6 +3,7 @@ import { useWidgetStore } from '../stores/widgets'
 import { useLinksStore } from '../stores/links'
 import { useNodeStore } from '../stores/nodes'
 import { buildProjection, type ProjectionResolvers } from './publicDeskProjection'
+import { warmCache } from './liveDeskResolvers'
 
 // Keeps a published desk current.
 //
@@ -29,16 +30,8 @@ const EMPTY: LiveDeskStatus = {
   busy: false
 }
 
-/**
- * Resolvers backed by the renderer's IPC surface. Table and document bodies are
- * fetched lazily and cached per revision; a desk with no tables never pays for
- * the lookup.
- */
-function useResolvers(): ProjectionResolvers {
-  const cache = useRef(new Map<string, unknown>())
+function useResolvers(cache: React.MutableRefObject<Map<string, unknown>>): ProjectionResolvers {
   return {
-    // Synchronous by contract, so anything not already cached resolves to null
-    // and the widget publishes as a placeholder until the cache warms.
     table: (id) => (cache.current.get(`t:${id}`) as ReturnType<ProjectionResolvers['table']>) ?? null,
     document: (id) => (cache.current.get(`d:${id}`) as ReturnType<ProjectionResolvers['document']>) ?? null,
     slides: (id) => (cache.current.get(`s:${id}`) as ReturnType<ProjectionResolvers['slides']>) ?? null,
@@ -58,7 +51,9 @@ export function useLiveDeskPublisher(deskId: string | null): {
   const [status, setStatus] = useState<LiveDeskStatus>(EMPTY)
   const widgets = useWidgetStore((s) => s.widgets)
   const links = useLinksStore((s) => s.links)
-  const resolvers = useResolvers()
+  const cache = useRef(new Map<string, unknown>())
+  const [warmTick, setWarmTick] = useState(0)
+  const resolvers = useResolvers(cache)
 
   const refresh = useCallback(async () => {
     if (!deskId) return setStatus(EMPTY)
@@ -97,7 +92,24 @@ export function useLiveDeskPublisher(deskId: string | null): {
       })),
       resolvers
     })
-  }, [deskId, widgets, links, resolvers])
+  }, [deskId, widgets, links, resolvers, warmTick])
+
+  // Fetch the bodies the projection needs, then rebuild. Publishing waits for
+  // this rather than shipping placeholders where real content exists: a public
+  // desk that silently omits its tables is worse than one that takes a moment.
+  useEffect(() => {
+    if (!deskId || !status.token || status.paused) return
+    let cancelled = false
+    void warmCache(
+      widgets.filter((w) => w.taskId === deskId),
+      cache.current
+    ).then((learned) => {
+      if (learned && !cancelled) setWarmTick((t) => t + 1)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [deskId, status.token, status.paused, widgets])
 
   // Republish whenever the desk changes, but only once it is actually published
   // and not paused -- otherwise every edit on every desk would queue work.
