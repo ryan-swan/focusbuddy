@@ -4809,3 +4809,59 @@ there — that was the third option and it writes to shared state, so it waits
 on the operator's word. The tombstone emit path is covered by pins and its
 contract proven live, but not exercised end to end: doing so means
 permanently deleting a real desk.
+
+## DEC-143 — The dead desk's leftovers tombstoned on the workspace
+**Date:** 2026-09-08 · **Status:** EXECUTED · **Branch:** `ryan-v1-beta` ·
+**Plan:** operator ("clean up the five orphans") — the third option offered
+in DEC-142, the one that writes to shared state, on his explicit word.
+
+**The count was wrong, and reading the raw payloads fixed it.** DEC-142 said
+five orphan widgets. The dead desk "SMOKE Trash Test"
+(`4832f885-610c-4663-915a-0d84251293a2`) actually left SIX objects of three
+kinds on the workspace, and the earlier walk had mistaken two of them for
+widgets because a table snapshot also carries a `taskId`:
+- **3 widgets** — `eb31e590…` (table), `d8dbcf94…` (table), `d8c24989…`
+  (note). These are the FOREIGN KEY failures.
+- **2 tables** — `e65d07d0…`, `3d6c9df0…`, both "Untitled table", zero data
+  rows.
+- **1 work_item** — `7a62b873…`, "SMOKE remind me to test the detach shelf".
+  **Left alone.** It is alive locally under a different parent, state
+  `completed`: detached and revived exactly as R008 requires. Its workspace
+  snapshot still names the dead desk, but work_item creates route through
+  `workItems.applySyncEvent`, never the FK path, so it was never part of the
+  noise. Tombstoning it would have destroyed one of the operator's own
+  items.
+
+**What was done.** The three widgets were tombstoned through DEC-142's own
+`tombstonePurged` (which also exercises that path end to end for the first
+time). The two tables were soft-deleted through the app's own door
+(`tables.delete` sets `trashed_at`; it is not a hard delete) and tombstoned
+with `crdtEmitTableDelete`. Five outbound `field:"delete"` frames were
+captured on the signal socket, one per object — proof of send, not
+inference. Nothing else was touched.
+
+**Verified live** by restarting the app and measuring:
+
+| | FK failures at boot | over the following idle minutes | log |
+|---|---|---|---|
+| before DEC-142 | 5,172 | 888/min | 47,095 lines |
+| DEC-142, orphans still present | 888 | 0 | 8,165 lines |
+| after this cleanup | **3** | **0** | **199 lines, 16 KB** |
+
+The residual three are one attempt per widget on the first sync pass, before
+the delete tombstone lands in the same pass; the tombstone stops every
+attempt after that. The app renders Home normally (41 nodes, 12 tiles) and
+the log carries no other handler error.
+
+**Two findings left on the table, neither acted on.**
+1. **Nine more orphan table rows** sit in `fb_tables` from other permanently
+   deleted desks (46 rows, 11 orphaned, 2 of them now ours and trashed).
+   `purgeDeskPermanently` cascades widgets through the FK but nothing
+   cascades tables, so every permanent delete has been leaving them behind —
+   the same class of gap DEC-142 closed for the sync layer, still open in
+   the purge itself.
+2. **`crdtEmitTableDelete` had never been called by anything.** It is
+   defined in `crdtBridge` and, before this round, referenced nowhere in the
+   renderer: deleting a table has always been local-only, exactly the bug
+   DEC-142 fixed for desks. A future round should wire it into the real
+   table-delete path rather than leaving it to a cleanup script.

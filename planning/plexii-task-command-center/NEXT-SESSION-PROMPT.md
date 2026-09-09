@@ -280,7 +280,7 @@
 > lives in `components/RecordSectionTitle.tsx`. 4/4 live; suite 3,898
 > tests / 356 files.
 
-**Last updated:** 2026-09-08 — through DEC-142 on `ryan-v1-beta` (the orphan-widget retry loop; the five orphans already on the workspace still await the operator's word)
+**Last updated:** 2026-09-08 — through DEC-143 on `ryan-v1-beta`. The orphan-widget loop is closed (888/min → 0; boot 5,172 → 3). Still open from that round: 9 orphan `fb_tables` rows from other purged desks, and `crdtEmitTableDelete` still not wired into the real table-delete path.
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,
