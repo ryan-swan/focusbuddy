@@ -280,7 +280,7 @@
 > lives in `components/RecordSectionTitle.tsx`. 4/4 live; suite 3,898
 > tests / 356 files.
 
-**Last updated:** 2026-09-07 — through DEC-138; main carries DEC-098…137; new work on `ryan-v1-beta` (the Meet work is PR #6 from `ryan-next`; analysis/29 is its review package).
+**Last updated:** 2026-09-08 — through DEC-142 on `ryan-v1-beta` (the orphan-widget retry loop; the five orphans already on the workspace still await the operator's word)
 calendar: padded slots + an adjustable meeting buffer, affinity-scored
 placement with visible "Grouped beside" reasons, discretionary clustering
 with due-date barriers, and the RESCHEDULE route — "reschedule my day,

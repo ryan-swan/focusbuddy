@@ -4746,3 +4746,66 @@ is a full renderer.
 
 **Nothing in the repo was changed by this round.** The probes ran in the
 session scratchpad against an isolated castLabs install.
+
+## DEC-142 — The orphan-widget retry loop: the client stops retrying the impossible, and a permanent delete tells the workspace
+**Date:** 2026-09-08 · **Status:** EXECUTED · **Branch:** `ryan-v1-beta` ·
+**Plan:** operator, on opening the dev environment and being shown the boot
+log ("dig into it", then "do 1 and 2" of the three offered fixes).
+
+**What was wrong.** The dev app logged a `widgets:create` FOREIGN KEY
+failure 888 times a MINUTE while sitting idle — 33,823 of the log's 34,622
+lines; the previous session's log was 205,877 lines and 12 MB of the same
+thing. Traced live: one desk, "SMOKE Trash Test", created and permanently
+deleted on 2026-08-26. The purge only ever ran against this device's
+database, so the workspace still holds five widget snapshots naming that
+node. Every twenty-second poll re-offers them; each fails the FK because
+`widgets.task_id REFERENCES nodes(id)` and the node is gone; the retry
+buffer burns its budget on each and forgets them; the next poll re-arms the
+same five. Evidence: the sync frames were captured off the socket (63 parent
+task ids, exactly one absent from `nodes`), and the dead node's history was
+read from the event store ("Permanently deleted … (memory purged)").
+
+**What changed.**
+- **The client parks what cannot work** (`lib/crdtSync.ts`). A create that
+  exhausts its retry budget is parked against the id it is waiting for, and
+  the poll stops re-arming it; it is released the moment THAT id is created,
+  so a genuinely late parent still lands its dependents. A widget parks on
+  its `taskId` — the id its foreign key names. A create whose dependency is
+  unknown keeps the old behaviour exactly.
+- **A permanent delete tombstones what it erased.** `deleteNodePermanent`
+  already computed the purged node and widget ids and threw them away; it
+  returns them now, the preload contract carries them, and both permanent-
+  delete doors (`deleteDeskFlow`'s per-item flow and the Trash view's bulk
+  arm) call the new `tombstonePurged` — widget deletes first, then their
+  nodes. This stops the NEXT deleted desk from leaving orphans behind.
+
+**A wrong turn worth keeping.** The first version released parked creates
+whenever any node create succeeded. `nodes.create` is create-if-missing, so
+every already-present node reports success on every poll: the release fired
+constantly, nothing stayed parked, and the measured rate DOUBLED to 1,776 a
+minute. Parking against the specific id is the whole fix, and the test says
+why so it cannot be "simplified" back.
+
+**A pre-existing fragility this surfaced.** `dec071PlanReview.test.ts`
+awaited `import('…/planSelect')` inside five 5-second tests. Adding any one
+more test file to the pool tipped the first over its timeout — it failed in
+the full suite and passed alone. Proven mine by parking the changes and
+re-running green, then proven NOT the source change by restoring it and
+running green without the new test file. The import is hoisted to
+`beforeAll`; the cases are untouched.
+
+**Verified live** on the operator's running app, restarted so main and
+preload reload: 888 failures while the budget is spent once at boot, then
+**0 over two idle minutes** (before the fix, the same window cost 5,172 and
+47,095 log lines). The new IPC contract was checked non-destructively —
+`deletePermanent` on a non-existent id returns `nodeIds: []` / `widgetIds:
+[]` with the trash count and node count unchanged. The app renders Home
+normally, no uncaught renderer errors. Suite: 4,203 passed / 2 skipped
+across 382 files; both typechecks clean.
+
+**Not done, and why.** The five orphans ALREADY on the workspace are still
+offered on every boot, so the one-off 888 stays until they are tombstoned
+there — that was the third option and it writes to shared state, so it waits
+on the operator's word. The tombstone emit path is covered by pins and its
+contract proven live, but not exercised end to end: doing so means
+permanently deleting a real desk.
